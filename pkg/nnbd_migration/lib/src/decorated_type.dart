@@ -170,6 +170,15 @@ class DecoratedType {
     }
   }
 
+  List<TypeParameterElement> get typeFormals {
+    var type = this.type;
+    if (type is FunctionType) {
+      return type.typeFormals;
+    } else {
+       return null;
+    }
+  }
+
   /// Apply the given [substitution] to this type.
   ///
   /// [undecoratedResult] is the result of the substitution, as determined by
@@ -233,21 +242,7 @@ class DecoratedType {
     var type = this.type;
     if (type is FunctionType && undecoratedResult is FunctionType) {
       assert(type.typeFormals.isEmpty); // TODO(paulberry)
-      var newPositionalParameters = <DecoratedType>[];
-      for (int i = 0; i < positionalParameters.length; i++) {
-        var numRequiredParameters =
-            undecoratedResult.normalParameterTypes.length;
-        var undecoratedParameterType = i < numRequiredParameters
-            ? undecoratedResult.normalParameterTypes[i]
-            : undecoratedResult
-                .optionalParameterTypes[i - numRequiredParameters];
-        newPositionalParameters.add(positionalParameters[i]
-            ._substitute(substitution, undecoratedParameterType));
-      }
-      return DecoratedType(undecoratedResult, node,
-          returnType: returnType._substitute(
-              substitution, undecoratedResult.returnType),
-          positionalParameters: newPositionalParameters);
+      return _substituteFunctionAfterFormals(undecoratedResult, substitution);
     } else if (type is InterfaceType && undecoratedResult is InterfaceType) {
       List<DecoratedType> newTypeArguments = [];
       for (int i = 0; i < typeArguments.length; i++) {
@@ -268,6 +263,37 @@ class DecoratedType {
       return this;
     }
     throw '$type.substitute($substitution)'; // TODO(paulberry)
+  }
+
+  DecoratedType _substituteFunctionAfterFormals(FunctionType undecoratedResult, Map<TypeParameterElement, DecoratedType> substitution) {
+    var newPositionalParameters = <DecoratedType>[];
+    for (int i = 0; i < positionalParameters.length; i++) {
+      var numRequiredParameters =
+          undecoratedResult.normalParameterTypes.length;
+      var undecoratedParameterType = i < numRequiredParameters
+          ? undecoratedResult.normalParameterTypes[i]
+          : undecoratedResult
+              .optionalParameterTypes[i - numRequiredParameters];
+      newPositionalParameters.add(positionalParameters[i]
+          ._substitute(substitution, undecoratedParameterType));
+    }
+    return DecoratedType(undecoratedResult, node,
+        returnType: returnType._substitute(
+            substitution, undecoratedResult.returnType),
+        positionalParameters: newPositionalParameters);
+  }
+
+  DecoratedType instantiate(List<DecoratedType> argumentTypes) {
+    var type = this.type as FunctionType;
+    var typeFormals = type.typeFormals;
+    List<DartType> undecoratedArgumentTypes = [];
+    Map<TypeParameterElement, DecoratedType> substitution = {};
+    for (int i = 0; i < argumentTypes.length; i++) {
+      var argumentType = argumentTypes[i];
+      undecoratedArgumentTypes.add(argumentType.type);
+      substitution[typeFormals[i]] = argumentType;
+    }
+    return _substituteFunctionAfterFormals(type.instantiate(undecoratedArgumentTypes), substitution);
   }
 }
 

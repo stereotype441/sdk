@@ -462,7 +462,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
       // TODO(brianwilkerson)
       _unimplemented(node, 'Instance creation expression with type arguments');
     }
-    _handleInvocationArguments(node.argumentList, calleeType);
+    _handleInvocationArguments(
+        node.argumentList, node.constructorName.type.typeArguments, calleeType);
     return calleeType.returnType;
   }
 
@@ -578,7 +579,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
     }
     var calleeType = getOrComputeElementType(callee, targetType: targetType);
     // TODO(paulberry): substitute if necessary
-    _handleInvocationArguments(node.argumentList, calleeType);
+    _handleInvocationArguments(
+        node.argumentList, node.typeArguments, calleeType);
     var expressionType = calleeType.returnType;
     if (isConditional) {
       expressionType = expressionType.withNode(
@@ -950,8 +952,18 @@ $stackTrace''');
 
   /// Creates the necessary constraint(s) for an [argumentList] when invoking an
   /// executable element whose type is [calleeType].
-  void _handleInvocationArguments(
-      ArgumentList argumentList, DecoratedType calleeType) {
+  void _handleInvocationArguments(ArgumentList argumentList,
+      TypeArgumentList typeArguments, DecoratedType calleeType) {
+    var typeFormals = calleeType.typeFormals;
+    if (typeFormals.isNotEmpty) {
+      if (typeArguments != null) {
+        calleeType = calleeType.instantiate(typeArguments.arguments
+            .map((t) => _variables.decoratedTypeAnnotation(_source, t))
+            .toList());
+      } else {
+        _unimplemented(argumentList, 'Inferred type parameters in invocation');
+      }
+    }
     var arguments = argumentList.arguments;
     int i = 0;
     var suppliedNamedParameters = Set<String>();
