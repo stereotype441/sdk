@@ -41,10 +41,6 @@ class DecoratedType {
       this.namedParameters = const {},
       this.typeArguments = const []}) {
     assert(node != null);
-    var type = this.type;
-    if (type is FunctionType && type.typeFormals.isNotEmpty) {
-      throw UnimplementedError('TODO(paulberry)');
-    }
   }
 
   /// Creates a [DecoratedType] corresponding to the given [element], which is

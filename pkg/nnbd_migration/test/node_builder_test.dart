@@ -345,13 +345,6 @@ class C {
         same(decoratedType));
   }
 
-  solo_test_generic_function_simple() async {
-    await analyze('''
-void f<T>() {}
-''');
-    fail('TODO(paulberry)');
-  }
-
   test_genericFunctionType_namedParameterType() async {
     await analyze('''
 void f(void Function({int y}) x) {}
