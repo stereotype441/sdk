@@ -208,11 +208,14 @@ class DecoratedType {
       }
       return '$name$args$trailing';
     } else if (type is FunctionType) {
-      assert(type.typeFormals.isEmpty); // TODO(paulberry)
+      String formals = '';
+      if (type.typeFormals.isNotEmpty) {
+        formals = '<${type.typeFormals.join(', ')}>';
+      }
       assert(type.namedParameterTypes.isEmpty &&
           namedParameters.isEmpty); // TODO(paulberry)
       var args = positionalParameters.map((p) => p.toString()).join(', ');
-      return '$returnType Function($args)$trailing';
+      return '$returnType Function$formals($args)$trailing';
     } else if (type is DynamicTypeImpl) {
       return 'dynamic';
     } else {
