@@ -1336,12 +1336,12 @@ bool f(C c) => c.m();
         hard: false);
   }
 
-  solo_test_methodInvocation_return_type_generic_function() async {
+  test_methodInvocation_return_type_generic_function() async {
     await analyze('''
 T f<T>(T t) => t;
-int g() => f<int>(1)/*check*/;
+int g() => (f<int>(1));
 ''');
-    var check_i = checkExpression('f<int>(1)/*check*/');
+    var check_i = checkExpression('(f<int>(1))');
     var nullable_f_t = decoratedTypeAnnotation('int>').node;
     var nullable_f_t_or_nullable_t =
         check_i.edges.single.primarySource as NullabilityNodeForSubstitution;
@@ -1350,7 +1350,7 @@ int g() => f<int>(1)/*check*/;
     expect(nullable_f_t_or_nullable_t.outerNode, same(nullable_t));
     var nullable_return = decoratedTypeAnnotation('int g').node;
     assertNullCheck(check_i,
-        assertEdge(nullable_f_t_or_nullable_t, nullable_return, hard: true));
+        assertEdge(nullable_f_t_or_nullable_t, nullable_return, hard: false));
   }
 
   test_methodInvocation_return_type_null_aware() async {
