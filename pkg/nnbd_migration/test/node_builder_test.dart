@@ -133,24 +133,21 @@ class C<T> {
   C(T t);
 }
 mixin M {}
-class D = C<List<int>> with M;
+class D<U> = C<U> with M;
 ''');
     var dConstructor = findElement.class_('D').unnamedConstructor;
-    var cConstructor = findElement.class_('C').unnamedConstructor;
     var dConstructorType = variables.decoratedElementType(dConstructor);
-    expect(dConstructorType.type.toString(), 'D Function(List<int>)');
+    expect(dConstructorType.type.toString(), 'D<U> Function(U)');
     expect(dConstructorType.node, same(never));
     expect(dConstructorType.typeArguments, isEmpty);
-    expect(dConstructorType.returnType.type.toString(), 'D');
+    expect(dConstructorType.returnType.type.toString(), 'D<U>');
     expect(dConstructorType.returnType.node, same(never));
+    expect(dConstructorType.returnType.typeArguments, hasLength(1));
+    fail("What's the correct assertion for the type argument?");
     var dParams = dConstructorType.positionalParameters;
     expect(dParams, hasLength(1));
-    expect(dParams[0].type.toString(), 'List<int>');
+    expect(dParams[0].type.toString(), 'U');
     expect(dParams[0].node, TypeMatcher<NullabilityNodeMutable>());
-    expect(dParams[0].typeArguments, hasLength(1));
-    expect(dParams[0].typeArguments[0].type.toString(), 'int');
-    expect(dParams[0].typeArguments[0].node,
-        TypeMatcher<NullabilityNodeMutable>());
   }
 
   test_class_with_default_constructor() async {
