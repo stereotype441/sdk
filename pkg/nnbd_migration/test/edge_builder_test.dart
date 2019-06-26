@@ -1336,6 +1336,23 @@ bool f(C c) => c.m();
         hard: false);
   }
 
+  solo_test_methodInvocation_return_type_generic_function() async {
+    await analyze('''
+T f<T>(T t) => t;
+int g() => f<int>(1)/*check*/;
+''');
+    var check_i = checkExpression('f<int>(1)/*check*/');
+    var nullable_f_t = decoratedTypeAnnotation('int>').node;
+    var nullable_f_t_or_nullable_t =
+        check_i.edges.single.primarySource as NullabilityNodeForSubstitution;
+    var nullable_t = decoratedTypeAnnotation('T f').node;
+    expect(nullable_f_t_or_nullable_t.innerNode, same(nullable_f_t));
+    expect(nullable_f_t_or_nullable_t.outerNode, same(nullable_t));
+    var nullable_return = decoratedTypeAnnotation('int g').node;
+    assertNullCheck(check_i,
+        assertEdge(nullable_f_t_or_nullable_t, nullable_return, hard: true));
+  }
+
   test_methodInvocation_return_type_null_aware() async {
     await analyze('''
 class C {

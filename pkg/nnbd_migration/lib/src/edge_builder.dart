@@ -579,9 +579,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
     }
     var calleeType = getOrComputeElementType(callee, targetType: targetType);
     // TODO(paulberry): substitute if necessary
-    _handleInvocationArguments(
+    var expressionType = _handleInvocationArguments(
         node.argumentList, node.typeArguments, calleeType);
-    var expressionType = calleeType.returnType;
     if (isConditional) {
       expressionType = expressionType.withNode(
           NullabilityNode.forLUB(targetType.node, expressionType.node));
@@ -952,7 +951,7 @@ $stackTrace''');
 
   /// Creates the necessary constraint(s) for an [argumentList] when invoking an
   /// executable element whose type is [calleeType].
-  void _handleInvocationArguments(ArgumentList argumentList,
+  DecoratedType _handleInvocationArguments(ArgumentList argumentList,
       TypeArgumentList typeArguments, DecoratedType calleeType) {
     var typeFormals = calleeType.typeFormals;
     if (typeFormals.isNotEmpty) {
@@ -991,6 +990,7 @@ $stackTrace''');
       entry.value.node.recordNamedParameterNotSupplied(_guards, _graph,
           NamedParameterNotSuppliedOrigin(_source, argumentList.offset));
     }
+    return calleeType.returnType;
   }
 
   DecoratedType _handlePropertyAccess(
