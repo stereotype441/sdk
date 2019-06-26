@@ -170,6 +170,8 @@ class DecoratedType {
     }
   }
 
+  /// If this type is a function type, returns its generic formal parameters.
+  /// Otherwise returns `null`.
   List<TypeParameterElement> get typeFormals {
     var type = this.type;
     if (type is FunctionType) {
@@ -179,6 +181,8 @@ class DecoratedType {
     }
   }
 
+  /// Converts one function type into another by substituting the given
+  /// [argumentTypes] for the function's generic parameters.
   DecoratedType instantiate(List<DecoratedType> argumentTypes) {
     var type = this.type as FunctionType;
     var typeFormals = type.typeFormals;
@@ -279,6 +283,10 @@ class DecoratedType {
     throw '$type.substitute($substitution)'; // TODO(paulberry)
   }
 
+  /// Performs the logic that is common to substitution and function type
+  /// instantiation.  Namely, a decorated type is formed whose undecorated type
+  /// is [undecoratedResult], and whose return type, positional parameters, and
+  /// named parameters are formed by performing the given [substitution].
   DecoratedType _substituteFunctionAfterFormals(FunctionType undecoratedResult,
       Map<TypeParameterElement, DecoratedType> substitution) {
     var newPositionalParameters = <DecoratedType>[];

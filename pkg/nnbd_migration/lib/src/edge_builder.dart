@@ -951,6 +951,9 @@ $stackTrace''');
 
   /// Creates the necessary constraint(s) for an [argumentList] when invoking an
   /// executable element whose type is [calleeType].
+  ///
+  /// Returns the decorated return type of the invocation, after any necessary
+  /// substitutions.
   DecoratedType _handleInvocationArguments(ArgumentList argumentList,
       TypeArgumentList typeArguments, DecoratedType calleeType) {
     var typeFormals = calleeType.typeFormals;
