@@ -685,7 +685,7 @@ $stackTrace''');
       RedirectingConstructorInvocation node) {
     var callee = node.constructorName.staticElement;
     var calleeType = _variables.decoratedElementType(callee);
-    _handleInvocationArguments(node.argumentList, calleeType);
+    _handleInvocationArguments(node.argumentList, null, calleeType);
     return null;
   }
 
