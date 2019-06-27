@@ -1310,6 +1310,32 @@ main() {
     await _checkSingleFileChanges(content, expected);
   }
 
+  test_redirecting_constructor_factory() async {
+    var content = '''
+class C {
+  factory C(int i, int j) = D;
+}
+class D extends C {
+  D(int i, int j);
+}
+main() {
+  C(null, 1);
+}
+''';
+    var expected = '''
+class C {
+  factory C(int? i, int j) = D;
+}
+class D extends C {
+  D(int? i, int j);
+}
+main() {
+  C(null, 1);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_redirecting_constructor_ordinary() async {
     var content = '''
 class C {
