@@ -716,6 +716,16 @@ double f() {
     assertNoUpstreamNullability(decoratedTypeAnnotation('double').node);
   }
 
+  test_constructorDeclaration_returnType_simple() async {
+    await analyze('''
+class C {
+  C();
+}
+''');
+    variables.decoratedElementType(findElement.unnamedConstructor('C'));
+    TODO;
+  }
+
   test_functionDeclaration_expression_body() async {
     await analyze('''
 int/*1*/ f(int/*2*/ i) => i/*3*/;
