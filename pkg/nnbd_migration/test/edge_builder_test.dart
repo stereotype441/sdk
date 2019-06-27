@@ -1728,6 +1728,21 @@ void test(C c) {
         assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true));
   }
 
+  test_redirecting_constructor_ordinary() async {
+    await analyze('''
+class C {
+  C(int/*1*/ i, int/*2*/ j) : this.named(j, i);
+  C.named(int/*3*/ j, int/*4*/ i);
+}
+''');
+    assertEdge(decoratedTypeAnnotation('int/*1*/').node,
+        decoratedTypeAnnotation('int/*4*/').node,
+        hard: true);
+    assertEdge(decoratedTypeAnnotation('int/*2*/').node,
+        decoratedTypeAnnotation('int/*3*/').node,
+        hard: true);
+  }
+
   test_return_function_type_simple() async {
     await analyze('''
 int/*1*/ Function() f(int/*2*/ Function() x) => x;

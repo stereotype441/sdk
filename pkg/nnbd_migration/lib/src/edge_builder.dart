@@ -676,6 +676,15 @@ $stackTrace''');
   }
 
   @override
+  DecoratedType visitRedirectingConstructorInvocation(
+      RedirectingConstructorInvocation node) {
+    var callee = node.constructorName.staticElement;
+    var calleeType = _variables.decoratedElementType(callee);
+    _handleInvocationArguments(node.argumentList, calleeType);
+    return null;
+  }
+
+  @override
   DecoratedType visitReturnStatement(ReturnStatement node) {
     if (node.expression == null) {
       _checkAssignment(null,
