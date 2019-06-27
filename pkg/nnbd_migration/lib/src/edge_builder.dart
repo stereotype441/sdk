@@ -7,6 +7,7 @@ import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
+import 'package:analyzer/src/dart/element/handle.dart';
 import 'package:analyzer/src/dart/element/inheritance_manager2.dart';
 import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/generated/resolver.dart';
@@ -287,6 +288,9 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
     var classElement = node.declaredElement;
     var supertype = classElement.supertype;
     var superElement = supertype.element;
+    if (superElement is ClassElementHandle) {
+      superElement = (superElement as ClassElementHandle).actualElement;
+    }
     for (var constructorElement in classElement.constructors) {
       assert(constructorElement.isSynthetic);
       var superConstructorElement =
@@ -472,7 +476,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
       // TODO(brianwilkerson)
       _unimplemented(node, 'Instance creation expression with type arguments');
     }
-    _handleInvocationArguments(node.argumentList, calleeType);
+    _handleInvocationArguments(
+        node.argumentList, node.constructorName.type.typeArguments, calleeType);
     return calleeType.returnType;
   }
 
@@ -563,8 +568,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
     }
     var calleeType = getOrComputeElementType(callee, targetType: targetType);
     // TODO(paulberry): substitute if necessary
-    _handleInvocationArguments(node.argumentList, calleeType);
-    var expressionType = calleeType.returnType;
+    var expressionType = _handleInvocationArguments(
+        node.argumentList, node.typeArguments, calleeType);
     if (isConditional) {
       expressionType = expressionType.withNode(
           NullabilityNode.forLUB(targetType.node, expressionType.node));
@@ -987,8 +992,21 @@ $stackTrace''');
 
   /// Creates the necessary constraint(s) for an [argumentList] when invoking an
   /// executable element whose type is [calleeType].
-  void _handleInvocationArguments(
-      ArgumentList argumentList, DecoratedType calleeType) {
+  ///
+  /// Returns the decorated return type of the invocation, after any necessary
+  /// substitutions.
+  DecoratedType _handleInvocationArguments(ArgumentList argumentList,
+      TypeArgumentList typeArguments, DecoratedType calleeType) {
+    var typeFormals = calleeType.typeFormals;
+    if (typeFormals.isNotEmpty) {
+      if (typeArguments != null) {
+        calleeType = calleeType.instantiate(typeArguments.arguments
+            .map((t) => _variables.decoratedTypeAnnotation(_source, t))
+            .toList());
+      } else {
+        _unimplemented(argumentList, 'Inferred type parameters in invocation');
+      }
+    }
     var arguments = argumentList.arguments;
     int i = 0;
     var suppliedNamedParameters = Set<String>();
@@ -1016,6 +1034,7 @@ $stackTrace''');
       entry.value.node.recordNamedParameterNotSupplied(_guards, _graph,
           NamedParameterNotSuppliedOrigin(_source, argumentList.offset));
     }
+    return calleeType.returnType;
   }
 
   DecoratedType _handlePropertyAccess(

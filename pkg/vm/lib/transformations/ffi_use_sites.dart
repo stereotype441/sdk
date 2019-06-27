@@ -8,6 +8,7 @@ import 'package:front_end/src/api_unstable/vm.dart'
     show
         templateFfiTypeInvalid,
         templateFfiTypeMismatch,
+        templateFfiDartTypeMismatch,
         templateFfiTypeUnsized,
         templateFfiNotStatic;
 
@@ -120,6 +121,20 @@ class _FfiUseSiteTransformer extends FfiTransformer {
         _ensureIsStatic(func);
         _ensureNativeTypeValid(nativeType, node);
         _ensureNativeTypeToDartType(nativeType, dartType, node);
+
+        // Check `exceptionalReturn`'s type.
+        final FunctionType funcType = dartType;
+        final Expression exceptionalReturn = node.arguments.positional[1];
+        final DartType returnType = exceptionalReturn.getStaticType(env);
+
+        if (!env.isSubtypeOf(returnType, funcType.returnType)) {
+          diagnosticReporter.report(
+              templateFfiDartTypeMismatch.withArguments(
+                  returnType, funcType.returnType),
+              exceptionalReturn.fileOffset,
+              1,
+              exceptionalReturn.location.file);
+        }
       }
     } catch (_FfiStaticTypeError) {}
 
@@ -192,17 +207,20 @@ class _FfiUseSiteTransformer extends FfiTransformer {
   }
 
   void _ensureNativeTypeToDartType(
-      DartType nativeType, DartType dartType, Expression node) {
-    DartType shouldBeDartType = convertNativeTypeToDartType(nativeType);
-    if (dartType != shouldBeDartType) {
-      diagnosticReporter.report(
-          templateFfiTypeMismatch.withArguments(
-              dartType, shouldBeDartType, nativeType),
-          node.fileOffset,
-          1,
-          node.location.file);
-      throw _FfiStaticTypeError();
-    }
+      DartType containerTypeArg, DartType elementType, Expression node) {
+    final DartType shouldBeElementType =
+        convertNativeTypeToDartType(containerTypeArg);
+    if (elementType == shouldBeElementType) return;
+    // Both subtypes and implicit downcasts are allowed statically.
+    if (env.isSubtypeOf(shouldBeElementType, elementType)) return;
+    if (env.isSubtypeOf(elementType, shouldBeElementType)) return;
+    diagnosticReporter.report(
+        templateFfiTypeMismatch.withArguments(
+            elementType, shouldBeElementType, containerTypeArg),
+        node.fileOffset,
+        1,
+        node.location.file);
+    throw _FfiStaticTypeError();
   }
 
   void _ensureNativeTypeValid(DartType nativeType, Expression node) {

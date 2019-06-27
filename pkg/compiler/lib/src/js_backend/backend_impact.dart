@@ -423,9 +423,12 @@ class BackendImpacts {
   BackendImpact _typeLiteral;
 
   BackendImpact get typeLiteral {
-    return _typeLiteral ??= new BackendImpact(
-        instantiatedClasses: [_commonElements.typeLiteralClass],
-        staticUses: [_commonElements.createRuntimeType]);
+    return _typeLiteral ??= new BackendImpact(instantiatedClasses: [
+      _commonElements.typeLiteralClass
+    ], staticUses: [
+      _commonElements.createRuntimeType,
+      if (_newRti) _commonElements.typeLiteralMaker,
+    ]);
   }
 
   BackendImpact _stackTraceInCatch;
@@ -769,6 +772,7 @@ class BackendImpacts {
     return [
       BackendImpact(staticUses: [
         _commonElements.findType,
+        _commonElements.instanceType,
         _commonElements.rtiEvalMethod,
         _commonElements.rtiBindMethod,
       ])

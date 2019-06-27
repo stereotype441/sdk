@@ -8,6 +8,7 @@
 #include "platform/globals.h"
 #include "vm/bootstrap_natives.h"
 #include "vm/class_finalizer.h"
+#include "vm/class_id.h"
 #include "vm/compiler/assembler/assembler.h"
 #include "vm/compiler/ffi.h"
 #include "vm/compiler/jit/compiler.h"
@@ -25,14 +26,6 @@ namespace dart {
 // Some checks are also performed in kernel transformation, these are asserts.
 // Some checks are only performed at runtime to allow for generic code, these
 // throw ArgumentExceptions.
-
-static void ThrowTypeArgumentError(const AbstractType& type_arg,
-                                   const char* expected) {
-  const String& error = String::Handle(String::NewFormatted(
-      "Type argument (%s) should be a %s",
-      String::Handle(type_arg.UserVisibleName()).ToCString(), expected));
-  Exceptions::ThrowArgumentError(error);
-}
 
 static bool IsPointerType(const AbstractType& type) {
   // Do a fast check for predefined types.
@@ -54,38 +47,15 @@ static bool IsPointerType(const AbstractType& type) {
   return type.IsSubtypeOf(pointer_type, Heap::kNew);
 }
 
-static bool IsConcreteNativeType(const AbstractType& type) {
-  // Do a fast check for predefined types.
-  classid_t type_cid = type.type_class_id();
-  if (RawObject::IsFfiNativeTypeTypeClassId(type_cid)) {
-    return false;
-  }
-  if (RawObject::IsFfiTypeClassId(type_cid)) {
-    return true;
-  }
-
-  // Do a slow check for subtyping.
-  const Class& native_type_class = Class::Handle(
-      Isolate::Current()->object_store()->ffi_native_type_class());
-  AbstractType& native_type_type =
-      AbstractType::Handle(native_type_class.DeclarationType());
-  return type.IsSubtypeOf(native_type_type, Heap::kNew);
-}
-
-static void CheckIsConcreteNativeType(const AbstractType& type) {
-  if (!IsConcreteNativeType(type)) {
-    ThrowTypeArgumentError(type, "concrete sub type of NativeType");
-  }
-}
-
 static bool IsNativeFunction(const AbstractType& type_arg) {
   classid_t type_cid = type_arg.type_class_id();
   return RawObject::IsFfiTypeNativeFunctionClassId(type_cid);
 }
 
 static void CheckSized(const AbstractType& type_arg) {
-  classid_t type_cid = type_arg.type_class_id();
-  if (RawObject::IsFfiTypeVoidClassId(type_cid) ||
+  const classid_t type_cid = type_arg.type_class_id();
+  if (RawObject::IsFfiNativeTypeTypeClassId(type_cid) ||
+      RawObject::IsFfiTypeVoidClassId(type_cid) ||
       RawObject::IsFfiTypeNativeFunctionClassId(type_cid)) {
     const String& error = String::Handle(String::NewFormatted(
         "%s does not have a predefined size (@unsized). "
@@ -97,6 +67,8 @@ static void CheckSized(const AbstractType& type_arg) {
     Exceptions::ThrowArgumentError(error);
   }
 }
+
+enum class FfiVariance { kInvariant = 0, kCovariant = 1, kContravariant = 2 };
 
 // Checks that a dart type correspond to a [NativeType].
 // Because this is checked already in a kernel transformation, it does not throw
@@ -118,7 +90,8 @@ static void CheckSized(const AbstractType& type_arg) {
 // [NativeFunction]<T1 Function(T2, T3) -> S1 Function(S2, S3)
 //    where DartRepresentationOf(Tn) -> Sn
 static bool DartAndCTypeCorrespond(const AbstractType& native_type,
-                                   const AbstractType& dart_type) {
+                                   const AbstractType& dart_type,
+                                   FfiVariance variance) {
   classid_t native_type_cid = native_type.type_class_id();
   if (RawObject::IsFfiTypeIntClassId(native_type_cid)) {
     return dart_type.IsSubtypeOf(AbstractType::Handle(Type::IntType()),
@@ -129,7 +102,13 @@ static bool DartAndCTypeCorrespond(const AbstractType& native_type,
                                  Heap::kNew);
   }
   if (RawObject::IsFfiPointerClassId(native_type_cid)) {
-    return native_type.Equals(dart_type) || dart_type.IsNullType();
+    return (variance == FfiVariance::kInvariant &&
+            dart_type.Equals(native_type)) ||
+           (variance == FfiVariance::kCovariant &&
+            dart_type.IsSubtypeOf(native_type, Heap::kNew)) ||
+           (variance == FfiVariance::kContravariant &&
+            native_type.IsSubtypeOf(dart_type, Heap::kNew)) ||
+           dart_type.IsNullType();
   }
   if (RawObject::IsFfiTypeNativeFunctionClassId(native_type_cid)) {
     if (!dart_type.IsFunctionType()) {
@@ -161,13 +140,14 @@ static bool DartAndCTypeCorrespond(const AbstractType& native_type,
     }
     if (!DartAndCTypeCorrespond(
             AbstractType::Handle(nativefunction_function.result_type()),
-            AbstractType::Handle(dart_function.result_type()))) {
+            AbstractType::Handle(dart_function.result_type()), variance)) {
       return false;
     }
     for (intptr_t i = 0; i < dart_function.NumParameters(); i++) {
       if (!DartAndCTypeCorrespond(
               AbstractType::Handle(nativefunction_function.ParameterTypeAt(i)),
-              AbstractType::Handle(dart_function.ParameterTypeAt(i)))) {
+              AbstractType::Handle(dart_function.ParameterTypeAt(i)),
+              variance)) {
         return false;
       }
     }
@@ -175,19 +155,20 @@ static bool DartAndCTypeCorrespond(const AbstractType& native_type,
   return true;
 }
 
-// The following functions are runtime checks on arguments.
-
-// Note that expected_from and expected_to are inclusive.
-static void CheckRange(const Integer& argument_value,
-                       intptr_t expected_from,
-                       intptr_t expected_to,
-                       const char* argument_name) {
-  int64_t value = argument_value.AsInt64Value();
-  if (value < expected_from || expected_to < value) {
-    Exceptions::ThrowRangeError(argument_name, argument_value, expected_from,
-                                expected_to);
+static void CheckDartAndCTypeCorrespond(const AbstractType& native_type,
+                                        const AbstractType& dart_type,
+                                        FfiVariance variance) {
+  if (!DartAndCTypeCorrespond(native_type, dart_type, variance)) {
+    const String& error = String::Handle(String::NewFormatted(
+        "Expected type '%s' to be different, it should be "
+        "DartRepresentationOf('%s').",
+        String::Handle(dart_type.UserVisibleName()).ToCString(),
+        String::Handle(native_type.UserVisibleName()).ToCString()));
+    Exceptions::ThrowArgumentError(error);
   }
 }
+
+// The following functions are runtime checks on arguments.
 
 static const Pointer& AsPointer(const Instance& instance) {
   if (!instance.IsPointer()) {
@@ -224,17 +205,15 @@ DEFINE_NATIVE_ENTRY(Ffi_allocate, 1, 1) {
   // Pointer. https://github.com/dart-lang/sdk/issues/35782
   GET_NATIVE_TYPE_ARGUMENT(type_arg, arguments->NativeTypeArgAt(0));
 
-  CheckIsConcreteNativeType(type_arg);
   CheckSized(type_arg);
 
   GET_NON_NULL_NATIVE_ARGUMENT(Integer, argCount, arguments->NativeArgAt(0));
   int64_t count = argCount.AsInt64Value();
   classid_t type_cid = type_arg.type_class_id();
-  int64_t max_count = INTPTR_MAX / compiler::ffi::ElementSizeInBytes(type_cid);
-  CheckRange(argCount, 1, max_count, "count");
 
-  size_t size = compiler::ffi::ElementSizeInBytes(type_cid) * count;
-  uint64_t memory = reinterpret_cast<uint64_t>(malloc(size));
+  size_t size = compiler::ffi::ElementSizeInBytes(type_cid) *
+                count;  // Truncates overflow.
+  size_t memory = reinterpret_cast<size_t>(malloc(size));
   if (memory == 0) {
     const String& error = String::Handle(String::NewFormatted(
         "allocating (%" Pd ") bytes of memory failed", size));
@@ -251,7 +230,6 @@ DEFINE_NATIVE_ENTRY(Ffi_fromAddress, 1, 1) {
   TypeArguments& type_args = TypeArguments::Handle(type_arg.arguments());
   AbstractType& native_type = AbstractType::Handle(
       type_args.TypeAtNullSafe(Pointer::kNativeTypeArgPos));
-  CheckIsConcreteNativeType(native_type);
   GET_NON_NULL_NATIVE_ARGUMENT(Integer, arg_ptr, arguments->NativeArgAt(0));
 
   // TODO(dacoharkes): should this return NULL if address is 0?
@@ -298,7 +276,6 @@ DEFINE_NATIVE_ENTRY(Ffi_cast, 1, 1) {
   TypeArguments& type_args = TypeArguments::Handle(type_arg.arguments());
   AbstractType& native_type = AbstractType::Handle(
       type_args.TypeAtNullSafe(Pointer::kNativeTypeArgPos));
-  CheckIsConcreteNativeType(native_type);
 
   const Integer& address = Integer::Handle(zone, pointer.GetCMemoryAddress());
   RawPointer* result =
@@ -379,7 +356,8 @@ DEFINE_NATIVE_ENTRY(Ffi_load, 1, 1) {
   AbstractType& pointer_type_arg =
       AbstractType::Handle(pointer.type_argument());
   CheckSized(pointer_type_arg);
-  ASSERT(DartAndCTypeCorrespond(pointer_type_arg, type_arg));
+  CheckDartAndCTypeCorrespond(pointer_type_arg, type_arg,
+                              FfiVariance::kContravariant);
 
   uint8_t* address = reinterpret_cast<uint8_t*>(
       Integer::Handle(pointer.GetCMemoryAddress()).AsInt64Value());
@@ -460,7 +438,8 @@ DEFINE_NATIVE_ENTRY(Ffi_store, 0, 2) {
   AbstractType& pointer_type_arg =
       AbstractType::Handle(pointer.type_argument());
   CheckSized(pointer_type_arg);
-  ASSERT(DartAndCTypeCorrespond(pointer_type_arg, arg_type));
+  CheckDartAndCTypeCorrespond(pointer_type_arg, arg_type,
+                              FfiVariance::kCovariant);
 
   classid_t type_cid = pointer_type_arg.type_class_id();
   StoreValue(zone, pointer, type_cid, new_value);
@@ -469,7 +448,6 @@ DEFINE_NATIVE_ENTRY(Ffi_store, 0, 2) {
 
 DEFINE_NATIVE_ENTRY(Ffi_sizeOf, 1, 0) {
   GET_NATIVE_TYPE_ARGUMENT(type_arg, arguments->NativeTypeArgAt(0));
-  CheckIsConcreteNativeType(type_arg);
   CheckSized(type_arg);
 
   classid_t type_cid = type_arg.type_class_id();
@@ -523,7 +501,8 @@ DEFINE_NATIVE_ENTRY(Ffi_asFunction, 1, 1) {
       AbstractType::Handle(pointer.type_argument());
   ASSERT(IsNativeFunction(pointer_type_arg));
   GET_NATIVE_TYPE_ARGUMENT(type_arg, arguments->NativeTypeArgAt(0));
-  ASSERT(DartAndCTypeCorrespond(pointer_type_arg, type_arg));
+  CheckDartAndCTypeCorrespond(pointer_type_arg, type_arg,
+                              FfiVariance::kInvariant);
 
   Function& dart_signature = Function::Handle(Type::Cast(type_arg).signature());
   TypeArguments& nativefunction_type_args =
@@ -549,11 +528,11 @@ DEFINE_NATIVE_ENTRY(Ffi_asFunction, 1, 1) {
 }
 
 // Generates assembly to trampoline from native code into Dart.
+#if !defined(DART_PRECOMPILED_RUNTIME) && !defined(DART_PRECOMPILER)
 static uword CompileNativeCallback(const Function& c_signature,
-                                   const Function& dart_target) {
-#if defined(DART_PRECOMPILED_RUNTIME) || defined(DART_PRECOMPILER)
-  UNREACHABLE();
-#elif defined(TARGET_ARCH_DBC)
+                                   const Function& dart_target,
+                                   const Instance& exceptional_return) {
+#if defined(TARGET_ARCH_DBC)
   // https://github.com/dart-lang/sdk/issues/35774
   // FFI is supported, but callbacks are not.
   Exceptions::ThrowUnsupportedError(
@@ -586,6 +565,33 @@ static uword CompileNativeCallback(const Function& c_signature,
   function.SetFfiCallbackId(callback_id);
   function.SetFfiCallbackTarget(dart_target);
 
+  // We require that the exceptional return value for functions returning 'Void'
+  // must be 'null', since native code should not look at the result.
+  if (compiler::ffi::NativeTypeIsVoid(
+          AbstractType::Handle(c_signature.result_type())) &&
+      !exceptional_return.IsNull()) {
+    Exceptions::ThrowUnsupportedError(
+        "Only 'null' may be used as the exceptional return value for a "
+        "callback returning void.");
+  }
+
+  // We need to load the exceptional return value as a constant in the generated
+  // function. This means we need to ensure that it's in old space and has no
+  // (transitively) mutable fields. This is done by checking (asserting) that
+  // it's a built-in FFI class, whose fields are all immutable, or a
+  // user-defined Pointer class, which has no fields.
+  //
+  // TODO(36730): We'll need to extend this when we support passing/returning
+  // structs by value.
+  ASSERT(exceptional_return.IsNull() || exceptional_return.IsNumber() ||
+         exceptional_return.IsPointer());
+  if (!exceptional_return.IsSmi() && exceptional_return.IsNew()) {
+    function.SetFfiCallbackExceptionalReturn(
+        Instance::Handle(exceptional_return.CopyShallowToOldSpace(thread)));
+  } else {
+    function.SetFfiCallbackExceptionalReturn(exceptional_return);
+  }
+
   // We compile the callback immediately because we need to return a pointer to
   // the entry-point. Native calls do not use patching like Dart calls, so we
   // cannot compile it lazily.
@@ -600,23 +606,36 @@ static uword CompileNativeCallback(const Function& c_signature,
   thread->SetFfiCallbackCode(callback_id, code);
 
   return code.EntryPoint();
-#endif
+#endif  // defined(TARGET_ARCH_DBC)
 }
+#endif  // !defined(DART_PRECOMPILED_RUNTIME) && !defined(DART_PRECOMPILER)
 
-DEFINE_NATIVE_ENTRY(Ffi_fromFunction, 1, 1) {
+DEFINE_NATIVE_ENTRY(Ffi_fromFunction, 1, 2) {
+#if defined(DART_PRECOMPILED_RUNTIME) || defined(DART_PRECOMPILER)
+  UNREACHABLE();
+#else
   GET_NATIVE_TYPE_ARGUMENT(type_arg, arguments->NativeTypeArgAt(0));
   GET_NON_NULL_NATIVE_ARGUMENT(Closure, closure, arguments->NativeArgAt(0));
+  GET_NON_NULL_NATIVE_ARGUMENT(Instance, exceptional_return,
+                               arguments->NativeArgAt(1));
+
+  if (!type_arg.IsInstantiated() || !type_arg.IsFunctionType()) {
+    // TODO(35902): Remove this when dynamic invocations of fromFunction are
+    // prohibited.
+    Exceptions::ThrowUnsupportedError(
+        "Type argument to fromFunction must an instantiated function type.");
+  }
 
   const Function& native_signature =
-      Function::Handle(((Type&)type_arg).signature());
+      Function::Handle(Type::Cast(type_arg).signature());
   Function& func = Function::Handle(closure.function());
   TypeArguments& type_args = TypeArguments::Handle(zone);
   type_args = TypeArguments::New(1);
   type_args.SetTypeAt(Pointer::kNativeTypeArgPos, type_arg);
   type_args = type_args.Canonicalize();
 
-  Class& native_function_class = Class::Handle(
-      Isolate::Current()->class_table()->At(kFfiNativeFunctionCid));
+  Class& native_function_class =
+      Class::Handle(isolate->class_table()->At(kFfiNativeFunctionCid));
   native_function_class.EnsureIsFinalized(Thread::Current());
 
   Type& native_function_type = Type::Handle(
@@ -635,12 +654,30 @@ DEFINE_NATIVE_ENTRY(Ffi_fromFunction, 1, 1) {
   func = func.parent_function();
   ASSERT(func.is_static());
 
-  const uword address = CompileNativeCallback(native_signature, func);
+  const AbstractType& return_type =
+      AbstractType::Handle(native_signature.result_type());
+  if (compiler::ffi::NativeTypeIsVoid(return_type)) {
+    if (!exceptional_return.IsNull()) {
+      const String& error = String::Handle(
+          String::NewFormatted("Exceptional return argument to 'fromFunction' "
+                               "must be null for functions returning void."));
+      Exceptions::ThrowArgumentError(error);
+    }
+  } else if (!compiler::ffi::NativeTypeIsPointer(return_type) &&
+             exceptional_return.IsNull()) {
+    const String& error = String::Handle(String::NewFormatted(
+        "Exceptional return argument to 'fromFunction' must not be null."));
+    Exceptions::ThrowArgumentError(error);
+  }
+
+  const uword address =
+      CompileNativeCallback(native_signature, func, exceptional_return);
 
   const Pointer& result = Pointer::Handle(Pointer::New(
       native_function_type, Integer::Handle(zone, Integer::New(address))));
 
   return result.raw();
+#endif
 }
 
 #if defined(TARGET_ARCH_DBC)

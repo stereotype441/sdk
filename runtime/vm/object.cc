@@ -2276,6 +2276,7 @@ bool Class::IsInFullSnapshot() const {
 }
 
 RawAbstractType* Class::RareType() const {
+  ASSERT(is_declaration_loaded());
   const Type& type = Type::Handle(Type::New(
       *this, Object::null_type_arguments(), TokenPosition::kNoSource));
   return ClassFinalizer::FinalizeType(*this, type);
@@ -3545,6 +3546,21 @@ RawObject* Class::EvaluateCompiledExpression(
       arguments, type_arguments);
 }
 
+void Class::EnsureDeclarationLoaded() const {
+  if (!is_declaration_loaded()) {
+#if defined(DART_PRECOMPILED_RUNTIME)
+    UNREACHABLE();
+#else
+    // Loading of class declaration can be postponed until needed
+    // if class comes from bytecode.
+    ASSERT(is_declared_in_bytecode());
+    kernel::BytecodeReader::LoadClassDeclaration(*this);
+    ASSERT(is_declaration_loaded());
+    ASSERT(is_type_finalized());
+#endif
+  }
+}
+
 // Ensure that top level parsing of the class has been done.
 RawError* Class::EnsureIsFinalized(Thread* thread) const {
   // Finalized classes have already been parsed.
@@ -4137,6 +4153,7 @@ void Class::set_declaration_type(const Type& value) const {
 }
 
 RawType* Class::DeclarationType() const {
+  ASSERT(is_declaration_loaded());
   if (declaration_type() != Type::null()) {
     return declaration_type();
   }
@@ -6027,6 +6044,20 @@ void Function::SetFfiCallbackTarget(const Function& target) const {
   FfiTrampolineData::Cast(obj).set_callback_target(target);
 }
 
+RawInstance* Function::FfiCallbackExceptionalReturn() const {
+  ASSERT(IsFfiTrampoline());
+  const Object& obj = Object::Handle(raw_ptr()->data_);
+  ASSERT(!obj.IsNull());
+  return FfiTrampolineData::Cast(obj).callback_exceptional_return();
+}
+
+void Function::SetFfiCallbackExceptionalReturn(const Instance& value) const {
+  ASSERT(IsFfiTrampoline());
+  const Object& obj = Object::Handle(raw_ptr()->data_);
+  ASSERT(!obj.IsNull());
+  FfiTrampolineData::Cast(obj).set_callback_exceptional_return(value);
+}
+
 RawType* Function::SignatureType() const {
   Type& type = Type::Handle(ExistingSignatureType());
   if (type.IsNull()) {
@@ -7749,7 +7780,8 @@ RawExternalTypedData* Function::KernelData() const {
 
 intptr_t Function::KernelDataProgramOffset() const {
   ASSERT(!is_declared_in_bytecode());
-  if (IsNoSuchMethodDispatcher() || IsInvokeFieldDispatcher()) {
+  if (IsNoSuchMethodDispatcher() || IsInvokeFieldDispatcher() ||
+      IsFfiTrampoline()) {
     return 0;
   }
   Object& data = Object::Handle(raw_ptr()->data_);
@@ -8241,6 +8273,11 @@ void FfiTrampolineData::set_callback_target(const Function& value) const {
 
 void FfiTrampolineData::set_callback_id(int32_t callback_id) const {
   StoreNonPointer(&raw_ptr()->callback_id_, callback_id);
+}
+
+void FfiTrampolineData::set_callback_exceptional_return(
+    const Instance& value) const {
+  StorePointer(&raw_ptr()->callback_exceptional_return_, value.raw());
 }
 
 RawFfiTrampolineData* FfiTrampolineData::New() {
@@ -16436,6 +16473,10 @@ bool Instance::CheckAndCanonicalizeFields(Thread* thread,
   return true;
 }
 
+RawInstance* Instance::CopyShallowToOldSpace(Thread* thread) const {
+  return Instance::RawCast(Object::Clone(*this, Heap::kOld));
+}
+
 RawInstance* Instance::CheckAndCanonicalize(Thread* thread,
                                             const char** error_str) const {
   ASSERT(error_str != NULL);
@@ -17693,14 +17734,7 @@ bool Type::IsEquivalent(const Instance& other, TrailPtr trail) const {
         for (intptr_t i = 0; i < from_index; i++) {
           type_arg = type_args.TypeAt(i);
           other_type_arg = other_type_args.TypeAt(i);
-          // Type arguments may not match if they are TypeRefs without
-          // underlying type (which will be set later).
-          ASSERT(
-              type_arg.IsEquivalent(other_type_arg, trail) ||
-              (type_arg.IsTypeRef() &&
-               TypeRef::Cast(type_arg).type() == AbstractType::null()) ||
-              (other_type_arg.IsTypeRef() &&
-               TypeRef::Cast(other_type_arg).type() == AbstractType::null()));
+          ASSERT(type_arg.IsEquivalent(other_type_arg, trail));
         }
       }
 #endif
@@ -18159,10 +18193,9 @@ RawAbstractType* TypeRef::Canonicalize(TrailPtr trail) const {
   // TODO(regis): Try to reduce the number of nodes required to represent the
   // referenced recursive type.
   AbstractType& ref_type = AbstractType::Handle(type());
-  if (!ref_type.IsNull()) {
-    ref_type = ref_type.Canonicalize(trail);
-    set_type(ref_type);
-  }
+  ASSERT(!ref_type.IsNull());
+  ref_type = ref_type.Canonicalize(trail);
+  set_type(ref_type);
   return raw();
 }
 
@@ -18188,11 +18221,15 @@ void TypeRef::EnumerateURIs(URIs* uris) const {
 }
 
 intptr_t TypeRef::Hash() const {
-  // Do not calculate the hash of the referenced type to avoid divergence.
-  // TypeRef can participate in type canonicalization even before referenced
-  // type is set, so its hash should not rely on referenced type.
-  const intptr_t kTypeRefHash = 37;
-  return kTypeRefHash;
+  // Do not use hash of the referenced type because
+  //  - we could be in process of calculating it (as TypeRef is used to
+  //    represent recursive references to types).
+  //  - referenced type might be incomplete (e.g. not all its
+  //    type arguments are set).
+  const AbstractType& ref_type = AbstractType::Handle(type());
+  ASSERT(!ref_type.IsNull());
+  const uint32_t result = Class::Handle(ref_type.type_class()).id();
+  return FinalizeHash(result, kHashBits);
 }
 
 RawTypeRef* TypeRef::New() {

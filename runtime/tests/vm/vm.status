@@ -24,6 +24,7 @@ dart/use_bare_instructions_flag_test: Pass, Slow # Spawns several subprocesses
 dart/transferable_throws_oom_test: SkipByDesign # This test tries to allocate too much memory on purpose. Still dartbug.com/37188
 
 [ $builder_tag == optimization_counter_threshold ]
+cc/*: Skip # Many tests want see unoptimized code running
 dart/appjit*: SkipByDesign # Test needs to a particular opt-counter value
 dart/kernel_determinism_test: SkipSlow
 
@@ -35,7 +36,7 @@ dart/snapshot_version_test: RuntimeError
 dart/entrypoints/aot/*: SkipByDesign
 
 [ $compiler == dartkb ]
-cc/*: Skip # Bytecode modes are not properly hooked up in run_vm_tests.
+cc/*: Skip # Too many timeouts and crashes for infrastructure to handle.
 
 [ $compiler == dartkp ]
 dart/v8_snapshot_profile_writer_test: Pass, Slow # Can be slow due to re-invoking the precompiler.
@@ -176,7 +177,6 @@ cc/ScriptSnapshotsUpdateSubclasses: Fail, Crash, OK # Script snapshots not suppo
 
 [ ($arch == simarm || $arch == simarm64 || $arch == simdbc || $arch == simdbc64) && ($compiler == dartk || $compiler == dartkb) ]
 dart/appjit*: SkipSlow # DFE too slow
-dart/issue_31959_31960_test: SkipSlow
 
 # Enabling of dartk for sim{arm,arm64,dbc64} revelaed these test failures, which
 # are to be triaged.  Isolate tests are skipped on purpose due to the usage of

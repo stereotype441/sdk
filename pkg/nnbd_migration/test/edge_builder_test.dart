@@ -543,7 +543,7 @@ mixin M {}
 class D = C with M;
 D f(MyList<int>/*2*/ x) => D(x);
 ''');
-    var syntheticConstructor = findElement.class_('D').unnamedConstructor;
+    var syntheticConstructor = findElement.unnamedConstructor('D');
     var constructorType = variables.decoratedElementType(syntheticConstructor);
     var constructorParameterType = constructorType.positionalParameters[0];
     assertEdge(decoratedTypeAnnotation('MyList<int>/*2*/').node,
@@ -558,6 +558,21 @@ D f(MyList<int>/*2*/ x) => D(x);
         decoratedTypeAnnotation('int>/*1*/').node);
   }
 
+  test_class_alias_synthetic_constructor_with_parameters_generic() async {
+    await analyze('''
+class C<T> {
+  C(T t);
+}
+mixin M {}
+class D<U> = C<U> with M;
+''');
+    var syntheticConstructor = findElement.unnamedConstructor('D');
+    var constructorType = variables.decoratedElementType(syntheticConstructor);
+    var constructorParameterType = constructorType.positionalParameters[0];
+    assertUnion(
+        constructorParameterType.node, decoratedTypeAnnotation('T t').node);
+  }
+
   test_class_alias_synthetic_constructor_with_parameters_named() async {
     await analyze('''
 class C {
@@ -567,7 +582,7 @@ mixin M {}
 class D = C with M;
 D f(int/*2*/ i) => D(i: i);
 ''');
-    var syntheticConstructor = findElement.class_('D').unnamedConstructor;
+    var syntheticConstructor = findElement.unnamedConstructor('D');
     var constructorType = variables.decoratedElementType(syntheticConstructor);
     var constructorParameterType = constructorType.namedParameters['i'];
     assertEdge(
@@ -586,7 +601,7 @@ mixin M {}
 class D = C with M;
 D f(int/*2*/ i) => D(i);
 ''');
-    var syntheticConstructor = findElement.class_('D').unnamedConstructor;
+    var syntheticConstructor = findElement.unnamedConstructor('D');
     var constructorType = variables.decoratedElementType(syntheticConstructor);
     var constructorParameterType = constructorType.positionalParameters[0];
     assertEdge(
@@ -605,7 +620,7 @@ mixin M {}
 class D = C with M;
 D f(int/*2*/ i) => D(i);
 ''');
-    var syntheticConstructor = findElement.class_('D').unnamedConstructor;
+    var syntheticConstructor = findElement.unnamedConstructor('D');
     var constructorType = variables.decoratedElementType(syntheticConstructor);
     var constructorParameterType = constructorType.positionalParameters[0];
     assertEdge(
@@ -705,6 +720,74 @@ class C {
 ''');
     // No assertions; just need to make sure that the test doesn't cause an
     // exception to be thrown.
+  }
+
+  test_constructorDeclaration_returnType_generic() async {
+    await analyze('''
+class C<T, U> {
+  C();
+}
+''');
+    var constructor = findElement.unnamedConstructor('C');
+    var constructorDecoratedType = variables.decoratedElementType(constructor);
+    expect(constructorDecoratedType.type.toString(), 'C<T, U> Function()');
+    expect(constructorDecoratedType.node, same(never));
+    expect(constructorDecoratedType.typeFormals, isEmpty);
+    expect(constructorDecoratedType.returnType.node, same(never));
+    expect(constructorDecoratedType.returnType.type.toString(), 'C<T, U>');
+    var typeArguments = constructorDecoratedType.returnType.typeArguments;
+    expect(typeArguments, hasLength(2));
+    expect(typeArguments[0].type.toString(), 'T');
+    expect(typeArguments[0].node, same(never));
+    expect(typeArguments[1].type.toString(), 'U');
+    expect(typeArguments[1].node, same(never));
+  }
+
+  test_constructorDeclaration_returnType_generic_implicit() async {
+    await analyze('''
+class C<T, U> {}
+''');
+    var constructor = findElement.unnamedConstructor('C');
+    var constructorDecoratedType = variables.decoratedElementType(constructor);
+    expect(constructorDecoratedType.type.toString(), 'C<T, U> Function()');
+    expect(constructorDecoratedType.node, same(never));
+    expect(constructorDecoratedType.typeFormals, isEmpty);
+    expect(constructorDecoratedType.returnType.node, same(never));
+    expect(constructorDecoratedType.returnType.type.toString(), 'C<T, U>');
+    var typeArguments = constructorDecoratedType.returnType.typeArguments;
+    expect(typeArguments, hasLength(2));
+    expect(typeArguments[0].type.toString(), 'T');
+    expect(typeArguments[0].node, same(never));
+    expect(typeArguments[1].type.toString(), 'U');
+    expect(typeArguments[1].node, same(never));
+  }
+
+  test_constructorDeclaration_returnType_simple() async {
+    await analyze('''
+class C {
+  C();
+}
+''');
+    var constructorDecoratedType =
+        variables.decoratedElementType(findElement.unnamedConstructor('C'));
+    expect(constructorDecoratedType.type.toString(), 'C Function()');
+    expect(constructorDecoratedType.node, same(never));
+    expect(constructorDecoratedType.typeFormals, isEmpty);
+    expect(constructorDecoratedType.returnType.node, same(never));
+    expect(constructorDecoratedType.returnType.typeArguments, isEmpty);
+  }
+
+  test_constructorDeclaration_returnType_simple_implicit() async {
+    await analyze('''
+class C {}
+''');
+    var constructorDecoratedType =
+        variables.decoratedElementType(findElement.unnamedConstructor('C'));
+    expect(constructorDecoratedType.type.toString(), 'C Function()');
+    expect(constructorDecoratedType.node, same(never));
+    expect(constructorDecoratedType.typeFormals, isEmpty);
+    expect(constructorDecoratedType.returnType.node, same(never));
+    expect(constructorDecoratedType.returnType.typeArguments, isEmpty);
   }
 
   test_doubleLiteral() async {
@@ -1264,6 +1347,25 @@ void f(List<int> x, int i) {
         assertEdge(nullable_i, nullable_list_t_or_nullable_t, hard: true));
   }
 
+  test_methodInvocation_parameter_contravariant_function() async {
+    await analyze('''
+void f<T>(T t) {}
+void g(int i) {
+  f<int>(i/*check*/);
+}
+''');
+    var nullable_i = decoratedTypeAnnotation('int i').node;
+    var nullable_f_t = decoratedTypeAnnotation('int>').node;
+    var nullable_t = decoratedTypeAnnotation('T t').node;
+    var check_i = checkExpression('i/*check*/');
+    var nullable_f_t_or_nullable_t =
+        check_i.edges.single.destinationNode as NullabilityNodeForSubstitution;
+    expect(nullable_f_t_or_nullable_t.innerNode, same(nullable_f_t));
+    expect(nullable_f_t_or_nullable_t.outerNode, same(nullable_t));
+    assertNullCheck(check_i,
+        assertEdge(nullable_i, nullable_f_t_or_nullable_t, hard: true));
+  }
+
   test_methodInvocation_parameter_generic() async {
     await analyze('''
 class C<T> {}
@@ -1325,6 +1427,23 @@ bool f(C c) => c.m();
     assertEdge(decoratedTypeAnnotation('bool m').node,
         decoratedTypeAnnotation('bool f').node,
         hard: false);
+  }
+
+  test_methodInvocation_return_type_generic_function() async {
+    await analyze('''
+T f<T>(T t) => t;
+int g() => (f<int>(1));
+''');
+    var check_i = checkExpression('(f<int>(1))');
+    var nullable_f_t = decoratedTypeAnnotation('int>').node;
+    var nullable_f_t_or_nullable_t =
+        check_i.edges.single.primarySource as NullabilityNodeForSubstitution;
+    var nullable_t = decoratedTypeAnnotation('T f').node;
+    expect(nullable_f_t_or_nullable_t.innerNode, same(nullable_f_t));
+    expect(nullable_f_t_or_nullable_t.outerNode, same(nullable_t));
+    var nullable_return = decoratedTypeAnnotation('int g').node;
+    assertNullCheck(check_i,
+        assertEdge(nullable_f_t_or_nullable_t, nullable_return, hard: false));
   }
 
   test_methodInvocation_return_type_null_aware() async {

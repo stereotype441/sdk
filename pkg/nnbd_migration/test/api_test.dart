@@ -262,6 +262,52 @@ main() {
     await _checkSingleFileChanges(content, expected);
   }
 
+  test_constructorDeclaration_factory_non_null_return() async {
+    var content = '''
+class C {
+  C._();
+  factory C() {
+    C c = f();
+    return c;
+  }
+}
+C f() => null;
+''';
+    var expected = '''
+class C {
+  C._();
+  factory C() {
+    C c = f()!;
+    return c;
+  }
+}
+C? f() => null;
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_constructorDeclaration_factory_simple() async {
+    var content = '''
+class C {
+  C._();
+  factory C(int i) => C._();
+}
+main() {
+  C(null);
+}
+''';
+    var expected = '''
+class C {
+  C._();
+  factory C(int? i) => C._();
+}
+main() {
+  C(null);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_constructorDeclaration_named() async {
     var content = '''
 class C {
@@ -441,6 +487,29 @@ void g(C<int?> c, int? i) {
 }
 void test(C<int> c) {
   g(c, null);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_data_flow_generic_contravariant_inward_function() async {
+    var content = '''
+T f<T>(T t) => t;
+int g(int x) => f<int>(x);
+void h() {
+  g(null);
+}
+''';
+
+    // As with the generic class case (see
+    // [test_data_flow_generic_contravariant_inward_function]), we favor adding
+    // nullability at the call site, so that other uses of `f` don't necessarily
+    // see a nullable return value.
+    var expected = '''
+T f<T>(T t) => t;
+int? g(int? x) => f<int?>(x);
+void h() {
+  g(null);
 }
 ''';
     await _checkSingleFileChanges(content, expected);
