@@ -707,13 +707,27 @@ class C {
     // exception to be thrown.
   }
 
-  test_doubleLiteral() async {
+  test_constructorDeclaration_returnType_generic() async {
     await analyze('''
-double f() {
-  return 1.0;
+class C<T, U> {
+  C();
 }
 ''');
-    assertNoUpstreamNullability(decoratedTypeAnnotation('double').node);
+    var constructor = findElement.unnamedConstructor('C');
+    var constructorDecoratedType = variables.decoratedElementType(constructor);
+    expect(
+        constructorDecoratedType.type.toString(), 'C<T, U> Function<T, U>()');
+    expect(constructorDecoratedType.node, same(never));
+    expect(constructorDecoratedType.typeFormals,
+        equals(constructor.typeParameters));
+    expect(constructorDecoratedType.returnType.node, same(never));
+    expect(constructorDecoratedType.returnType.type.toString(), 'C<T, U>');
+    var typeArguments = constructorDecoratedType.returnType.typeArguments;
+    expect(typeArguments, hasLength(2));
+    expect(typeArguments[0].type.toString(), 'T');
+    expect(typeArguments[0].node, same(never));
+    expect(typeArguments[1].type.toString(), 'U');
+    expect(typeArguments[1].node, same(never));
   }
 
   test_constructorDeclaration_returnType_simple() async {
@@ -722,8 +736,22 @@ class C {
   C();
 }
 ''');
-    variables.decoratedElementType(findElement.unnamedConstructor('C'));
-    TODO;
+    var constructorDecoratedType =
+        variables.decoratedElementType(findElement.unnamedConstructor('C'));
+    expect(constructorDecoratedType.type.toString(), 'C Function()');
+    expect(constructorDecoratedType.node, same(never));
+    expect(constructorDecoratedType.typeFormals, isEmpty);
+    expect(constructorDecoratedType.returnType.node, same(never));
+    expect(constructorDecoratedType.returnType.typeArguments, isEmpty);
+  }
+
+  test_doubleLiteral() async {
+    await analyze('''
+double f() {
+  return 1.0;
+}
+''');
+    assertNoUpstreamNullability(decoratedTypeAnnotation('double').node);
   }
 
   test_functionDeclaration_expression_body() async {
