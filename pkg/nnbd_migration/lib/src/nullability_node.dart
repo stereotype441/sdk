@@ -277,6 +277,14 @@ class NullabilityGraphForTesting extends NullabilityGraph {
   Iterable<NullabilityEdge> getUpstreamEdges(NullabilityNode node) {
     return node._upstreamEdges;
   }
+
+  /// Iterates through all edges that have this node as one of their sources.
+  ///
+  /// There is no guarantee of uniqueness of the iterated edges.
+  @visibleForTesting
+  Iterable<NullabilityEdge> getDownstreamEdges(NullabilityNode node) {
+    return node._downstreamEdges;
+  }
 }
 
 /// Representation of a single node in the nullability inference graph.

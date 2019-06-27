@@ -127,7 +127,7 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType> {
   @override
   DecoratedType visitConstructorDeclaration(ConstructorDeclaration node) {
     _handleExecutableDeclaration(
-        node.declaredElement, null, node.parameters, node.body, node);
+        node.declaredElement, null, node.parameters, node.body, node.redirectedConstructor, node);
     return null;
   }
 
@@ -167,7 +167,7 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType> {
   @override
   DecoratedType visitFunctionDeclaration(FunctionDeclaration node) {
     _handleExecutableDeclaration(node.declaredElement, node.returnType,
-        node.functionExpression.parameters, node.functionExpression.body, node);
+        node.functionExpression.parameters, node.functionExpression.body, null, node);
     return null;
   }
 
@@ -187,7 +187,7 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType> {
   @override
   DecoratedType visitMethodDeclaration(MethodDeclaration node) {
     _handleExecutableDeclaration(node.declaredElement, node.returnType,
-        node.parameters, node.body, node);
+        node.parameters, node.body, null, node);
     return null;
   }
 
@@ -366,6 +366,7 @@ $stackTrace''');
       TypeAnnotation returnType,
       FormalParameterList parameters,
       FunctionBody body,
+      ConstructorName redirectedConstructor,
       AstNode enclosingNode) {
     DecoratedType decoratedReturnType;
     if (returnType == null && declaredElement is ConstructorElement) {
@@ -384,6 +385,7 @@ $stackTrace''');
     try {
       parameters?.accept(this);
       body?.accept(this);
+      redirectedConstructor?.accept(this);
       functionType = DecoratedType(declaredElement.type, _graph.never,
           returnType: decoratedReturnType,
           positionalParameters: _positionalParameters,

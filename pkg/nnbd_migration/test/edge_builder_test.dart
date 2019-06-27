@@ -1847,6 +1847,44 @@ void test(C c) {
         assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true));
   }
 
+  test_redirecting_constructor_factory() async {
+    await analyze('''
+class C {
+  factory C(int/*1*/ i, {int/*2*/ j}) = D;
+}
+class D implements C {
+  D(int/*3*/ i, {int/*4*/ j});
+}
+''');
+    assertEdge(decoratedTypeAnnotation('int/*1*/').node,
+        decoratedTypeAnnotation('int/*3*/').node,
+        hard: true);
+    assertEdge(decoratedTypeAnnotation('int/*2*/').node,
+        decoratedTypeAnnotation('int/*4*/').node,
+        hard: true);
+  }
+
+  test_redirecting_constructor_factory_to_generic() async {
+    await analyze('''
+class C {
+  factory C(int/*1*/ i) = D<int/*2*/>;
+}
+class D<T> implements C {
+  D(T/*3*/ i);
+}
+''');
+    var nullable_i1 = decoratedTypeAnnotation('int/*1*/').node;
+    var nullable_i2 = decoratedTypeAnnotation('int/*2*/').node;
+    var nullable_t3 = decoratedTypeAnnotation('T/*3*/').node;
+    var nullable_i2_or_nullable_t3 = graph
+        .getDownstreamEdges(nullable_i1)
+        .single
+        .destinationNode as NullabilityNodeForSubstitution;
+    expect(nullable_i2_or_nullable_t3.innerNode, same(nullable_i2));
+    expect(nullable_i2_or_nullable_t3.outerNode, same(nullable_t3));
+    assertEdge(nullable_i1, nullable_i2_or_nullable_t3, hard: true);
+  }
+
   test_redirecting_constructor_ordinary() async {
     await analyze('''
 class C {
