@@ -5,6 +5,8 @@
 #include "include/dart_api.h"
 #include "include/dart_native_api.h"
 
+#include <memory>
+
 #include "lib/stacktrace.h"
 #include "platform/assert.h"
 #include "vm/class_finalizer.h"
@@ -5104,6 +5106,7 @@ DART_EXPORT Dart_Handle Dart_GetClass(Dart_Handle library,
     return Api::NewError("Class '%s' not found in library '%s'.",
                          cls_name.ToCString(), lib_name.ToCString());
   }
+  cls.EnsureDeclarationLoaded();
   CHECK_ERROR_HANDLE(cls.VerifyEntryPoint());
   return Api::NewHandle(T, cls.RareType());
 }
@@ -5133,6 +5136,7 @@ DART_EXPORT Dart_Handle Dart_GetType(Dart_Handle library,
     return Api::NewError("Type '%s' not found in library '%s'.",
                          name_str.ToCString(), lib_name.ToCString());
   }
+  cls.EnsureDeclarationLoaded();
   CHECK_ERROR_HANDLE(cls.VerifyEntryPoint());
   if (cls.NumTypeArguments() == 0) {
     if (number_of_type_arguments != 0) {
