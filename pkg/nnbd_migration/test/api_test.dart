@@ -1310,7 +1310,7 @@ main() {
     await _checkSingleFileChanges(content, expected);
   }
 
-  test_redirecting_constructor_factory() async {
+  solo_test_redirecting_constructor_factory() async {
     var content = '''
 class C {
   factory C(int i, int j) = D;
