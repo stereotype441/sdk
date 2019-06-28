@@ -694,7 +694,7 @@ main() {
     expect(decoratedType.node, TypeMatcher<NullabilityNodeMutable>());
   }
 
-  solo_test_variableDeclaration_visit_initializer() async {
+  test_variableDeclaration_visit_initializer() async {
     await analyze('''
 class C<T> {}
 void f(C<dynamic> c) {
