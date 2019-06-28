@@ -1395,7 +1395,7 @@ main() {
 class C {
   factory C(int? i, int j) = D;
 }
-class D extends C {
+class D implements C {
   D(int? i, int j);
 }
 main() {
