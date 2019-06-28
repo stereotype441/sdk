@@ -697,8 +697,8 @@ main() {
   solo_test_variableDeclaration_visit_initializer() async {
     await analyze('''
 class C<T> {}
-main() {
-  var x = c<int>;
+void f(C<dynamic> c) {
+  var x = c as C<int>;
 }
 ''');
     var decoratedType = decoratedTypeAnnotation('int');
