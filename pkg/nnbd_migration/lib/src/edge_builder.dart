@@ -472,7 +472,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
   DecoratedType visitInstanceCreationExpression(
       InstanceCreationExpression node) {
     var callee = node.staticElement;
-    var createdClass = callee.enclosingElement;
+    var typeParameters = callee.enclosingElement.typeParameters;
     List<DecoratedType> decoratedTypeArguments;
     var typeArguments = node.constructorName.type.typeArguments;
     if (typeArguments != null) {
@@ -485,8 +485,12 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
     var createdType = DecoratedType(node.staticType, _graph.never,
         typeArguments: decoratedTypeArguments);
     var calleeType = getOrComputeElementType(callee, targetType: createdType);
-    _handleInvocationArguments(node, node.argumentList.arguments, typeArguments,
-        calleeType, createdClass.typeParameters);
+    _handleInvocationArguments(
+        node,
+	node.argumentList.arguments,
+	typeArguments,
+	calleeType,
+	typeParameters);
     return createdType;
   }
 
