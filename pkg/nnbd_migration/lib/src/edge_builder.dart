@@ -472,20 +472,16 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
   DecoratedType visitInstanceCreationExpression(
       InstanceCreationExpression node) {
     var callee = node.staticElement;
-    var createdClass = callee.enclosingElement;
     var calleeType = getOrComputeElementType(callee);
-    if (callee.enclosingElement.typeParameters.isNotEmpty) {
+    var typeParameters = callee.enclosingElement.typeParameters;
+    if (typeParameters.isNotEmpty) {
       // If the class has type parameters then we might need to substitute the
       // appropriate type arguments.
       // TODO(brianwilkerson)
       _unimplemented(node, 'Instance creation expression with type arguments');
     }
-    _handleInvocationArguments(
-        node,
-        node.argumentList.arguments,
-        node.constructorName.type.typeArguments,
-        calleeType,
-        createdClass.typeParameters);
+    _handleInvocationArguments(node, node.argumentList.arguments,
+        node.constructorName.type.typeArguments, calleeType, typeParameters);
     return calleeType.returnType;
   }
 
