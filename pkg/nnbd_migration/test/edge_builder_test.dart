@@ -1157,6 +1157,25 @@ C<int> f() => C<int>();
         hard: false);
   }
 
+  test_instanceCreation_generic_parameter() async {
+    await analyze('''
+class C<T> {
+  C(T t);
+}
+f(int i) => C<int>(i/*check*/);
+''');
+    var nullable_i = decoratedTypeAnnotation('int i').node;
+    var nullable_c_t = decoratedTypeAnnotation('C<int>').typeArguments[0].node;
+    var nullable_t = decoratedTypeAnnotation('T t').node;
+    var check_i = checkExpression('i/*check*/');
+    var nullable_c_t_or_nullable_t =
+        check_i.edges.single.destinationNode as NullabilityNodeForSubstitution;
+    expect(nullable_c_t_or_nullable_t.innerNode, same(nullable_c_t));
+    expect(nullable_c_t_or_nullable_t.outerNode, same(nullable_t));
+    assertNullCheck(check_i,
+        assertEdge(nullable_i, nullable_c_t_or_nullable_t, hard: true));
+  }
+
   test_instanceCreation_parameter_named_optional() async {
     await analyze('''
 class C {
