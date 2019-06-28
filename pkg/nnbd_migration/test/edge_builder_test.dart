@@ -1864,6 +1864,27 @@ class D implements C {
         hard: true);
   }
 
+  test_redirecting_constructor_factory_from_generic_to_generic() async {
+    await analyze('''
+class C<T> {
+  factory C(T/*1*/ t) = D<T/*2*/>;
+}
+class D<U> implements C<U> {
+  D(U/*3*/ u);
+}
+''');
+    var nullable_t1 = decoratedTypeAnnotation('T/*1*/').node;
+    var nullable_t2 = decoratedTypeAnnotation('T/*2*/').node;
+    var nullable_u3 = decoratedTypeAnnotation('U/*3*/').node;
+    var nullable_t2_or_nullable_u3 = graph
+        .getDownstreamEdges(nullable_t1)
+        .single
+        .destinationNode as NullabilityNodeForSubstitution;
+    expect(nullable_t2_or_nullable_u3.innerNode, same(nullable_t2));
+    expect(nullable_t2_or_nullable_u3.outerNode, same(nullable_u3));
+    assertEdge(nullable_t1, nullable_t2_or_nullable_u3, hard: true);
+  }
+
   test_redirecting_constructor_factory_to_generic() async {
     await analyze('''
 class C {
