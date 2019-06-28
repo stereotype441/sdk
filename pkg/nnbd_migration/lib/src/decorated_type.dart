@@ -69,7 +69,8 @@ class DecoratedType {
         assert(namedParameters.length == namedParameterCount);
         assert(typeArguments.isEmpty);
       } else {
-        assert(type.isVoid, 'Unexpected type ${type.runtimeType}');
+        assert(type.isVoid || type.isDynamic,
+            'Unexpected type ${type.runtimeType}');
         assert(returnType == null);
         assert(positionalParameters.isEmpty);
         assert(namedParameters.isEmpty);
