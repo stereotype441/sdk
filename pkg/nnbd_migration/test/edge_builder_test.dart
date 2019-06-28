@@ -1147,6 +1147,16 @@ C f(C c) => c..[0];
     assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true);
   }
 
+  test_instanceCreation_generic() async {
+    await analyze('''
+class C<T> {}
+C<int> f() => C<int>();
+''');
+    assertEdge(decoratedTypeAnnotation('int>(').node,
+        decoratedTypeAnnotation('int> f').node,
+        hard: false);
+  }
+
   test_instanceCreation_parameter_named_optional() async {
     await analyze('''
 class C {
