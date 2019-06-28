@@ -952,10 +952,8 @@ $stackTrace''');
     }
     var redirectedClass = callee.enclosingElement;
     var calleeType = _variables.decoratedElementType(callee);
-    // Create synthetic argument list based on parameters.
-    List<Expression> arguments = parameters.parameters.map((p) => p.identifier).toList();
     _handleInvocationArguments(redirectedConstructor,
-        arguments, redirectedConstructor.type.typeArguments, calleeType, redirectedClass.typeParameters);
+        parameters.parameters, redirectedConstructor.type.typeArguments, calleeType, redirectedClass.typeParameters);
   }
 
   void _handleExecutableDeclaration(
