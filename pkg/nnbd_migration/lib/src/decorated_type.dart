@@ -40,7 +40,43 @@ class DecoratedType {
       this.positionalParameters = const [],
       this.namedParameters = const {},
       this.typeArguments = const []}) {
-    assert(node != null);
+    assert(() {
+      assert(node != null);
+      var type = this.type;
+      if (type is InterfaceType) {
+        assert(returnType == null);
+        assert(positionalParameters.isEmpty);
+        assert(namedParameters.isEmpty);
+        assert(typeArguments.length == type.typeArguments.length);
+        for (int i = 0; i < typeArguments.length; i++) {
+          assert(typeArguments[i].type == type.typeArguments[i]);
+        }
+      } else if (type is FunctionType) {
+        assert(returnType.type == type.returnType);
+        int positionalParameterCount = 0;
+        int namedParameterCount = 0;
+        for (var parameter in type.parameters) {
+          if (parameter.isNamed) {
+            assert(namedParameters[parameter.name].type == parameter.type);
+            namedParameterCount++;
+          } else {
+            assert(positionalParameters[positionalParameterCount].type ==
+                parameter.type);
+            positionalParameterCount++;
+          }
+        }
+        assert(positionalParameters.length == positionalParameterCount);
+        assert(namedParameters.length == namedParameterCount);
+        assert(typeArguments.isEmpty);
+      } else {
+        assert(type.isVoid, 'Unexpected type ${type.runtimeType}');
+        assert(returnType == null);
+        assert(positionalParameters.isEmpty);
+        assert(namedParameters.isEmpty);
+        assert(typeArguments.isEmpty);
+      }
+      return true;
+    }());
   }
 
   /// Creates a [DecoratedType] corresponding to the given [element], which is
