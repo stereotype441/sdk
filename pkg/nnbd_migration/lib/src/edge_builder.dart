@@ -331,8 +331,14 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
 
   @override
   DecoratedType visitConstructorDeclaration(ConstructorDeclaration node) {
-    _handleExecutableDeclaration(node.declaredElement, node.metadata, null,
-        node.parameters, node.initializers, node.body, node.redirectedConstructor);
+    _handleExecutableDeclaration(
+        node.declaredElement,
+        node.metadata,
+        null,
+        node.parameters,
+        node.initializers,
+        node.body,
+        node.redirectedConstructor);
     return null;
   }
 
@@ -474,8 +480,12 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
       // TODO(brianwilkerson)
       _unimplemented(node, 'Instance creation expression with type arguments');
     }
-    _handleInvocationArguments(node,
-        node.argumentList.arguments, node.constructorName.type.typeArguments, calleeType, createdClass.typeParameters);
+    _handleInvocationArguments(
+        node,
+        node.argumentList.arguments,
+        node.constructorName.type.typeArguments,
+        calleeType,
+        createdClass.typeParameters);
     return calleeType.returnType;
   }
 
@@ -683,7 +693,8 @@ $stackTrace''');
       RedirectingConstructorInvocation node) {
     var callee = node.constructorName.staticElement;
     var calleeType = _variables.decoratedElementType(callee);
-    _handleInvocationArguments(node, node.argumentList.arguments, null, calleeType, null);
+    _handleInvocationArguments(
+        node, node.argumentList.arguments, null, calleeType, null);
     return null;
   }
 
@@ -945,15 +956,20 @@ $stackTrace''');
     return sourceType;
   }
 
-  void _handleConstructorRedirection(FormalParameterList parameters, ConstructorName redirectedConstructor) {
+  void _handleConstructorRedirection(
+      FormalParameterList parameters, ConstructorName redirectedConstructor) {
     var callee = redirectedConstructor.staticElement;
     if (callee is ConstructorMember) {
       callee = (callee as ConstructorMember).baseElement;
     }
     var redirectedClass = callee.enclosingElement;
     var calleeType = _variables.decoratedElementType(callee);
-    _handleInvocationArguments(redirectedConstructor,
-        parameters.parameters, redirectedConstructor.type.typeArguments, calleeType, redirectedClass.typeParameters);
+    _handleInvocationArguments(
+        redirectedConstructor,
+        parameters.parameters,
+        redirectedConstructor.type.typeArguments,
+        calleeType,
+        redirectedClass.typeParameters);
   }
 
   void _handleExecutableDeclaration(
@@ -962,7 +978,8 @@ $stackTrace''');
       TypeAnnotation returnType,
       FormalParameterList parameters,
       NodeList<ConstructorInitializer> initializers,
-      FunctionBody body, ConstructorName redirectedConstructor) {
+      FunctionBody body,
+      ConstructorName redirectedConstructor) {
     assert(_currentFunctionType == null);
     metadata.accept(this);
     returnType?.accept(this);
@@ -1007,8 +1024,12 @@ $stackTrace''');
   ///
   /// Returns the decorated return type of the invocation, after any necessary
   /// substitutions.
-  DecoratedType _handleInvocationArguments(AstNode node, Iterable<AstNode> arguments,
-      TypeArgumentList typeArguments, DecoratedType calleeType, List<TypeParameterElement> constructorTypeParameters) {
+  DecoratedType _handleInvocationArguments(
+      AstNode node,
+      Iterable<AstNode> arguments,
+      TypeArgumentList typeArguments,
+      DecoratedType calleeType,
+      List<TypeParameterElement> constructorTypeParameters) {
     var typeFormals = constructorTypeParameters ?? calleeType.typeFormals;
     if (typeFormals.isNotEmpty) {
       if (typeArguments != null) {
@@ -1016,7 +1037,9 @@ $stackTrace''');
             .map((t) => _variables.decoratedTypeAnnotation(_source, t))
             .toList();
         if (constructorTypeParameters != null) {
-          calleeType = calleeType.substitute(Map<TypeParameterElement, DecoratedType>.fromIterables(constructorTypeParameters, argumentTypes));
+          calleeType = calleeType.substitute(
+              Map<TypeParameterElement, DecoratedType>.fromIterables(
+                  constructorTypeParameters, argumentTypes));
         } else {
           calleeType = calleeType.instantiate(argumentTypes);
         }

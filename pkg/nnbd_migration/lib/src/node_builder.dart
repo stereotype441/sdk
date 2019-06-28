@@ -126,8 +126,8 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType> {
 
   @override
   DecoratedType visitConstructorDeclaration(ConstructorDeclaration node) {
-    _handleExecutableDeclaration(
-        node.declaredElement, null, node.parameters, node.body, node.redirectedConstructor, node);
+    _handleExecutableDeclaration(node.declaredElement, null, node.parameters,
+        node.body, node.redirectedConstructor, node);
     return null;
   }
 
@@ -166,8 +166,13 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType> {
 
   @override
   DecoratedType visitFunctionDeclaration(FunctionDeclaration node) {
-    _handleExecutableDeclaration(node.declaredElement, node.returnType,
-        node.functionExpression.parameters, node.functionExpression.body, null, node);
+    _handleExecutableDeclaration(
+        node.declaredElement,
+        node.returnType,
+        node.functionExpression.parameters,
+        node.functionExpression.body,
+        null,
+        node);
     return null;
   }
 
