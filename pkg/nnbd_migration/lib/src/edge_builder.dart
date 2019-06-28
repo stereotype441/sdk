@@ -10,6 +10,7 @@ import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/handle.dart';
 import 'package:analyzer/src/dart/element/inheritance_manager2.dart';
 import 'package:analyzer/src/dart/element/member.dart';
+import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:meta/meta.dart';
@@ -132,7 +133,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
       } else {
         assert(baseElement.isSetter);
         decoratedBaseType = DecoratedType(baseElement.type, _graph.never,
-            positionalParameters: [decoratedElementType]);
+            positionalParameters: [decoratedElementType],
+            returnType: DecoratedType(VoidTypeImpl.instance, _graph.always));
       }
     } else {
       decoratedBaseType = _variables.decoratedElementType(baseElement);
@@ -485,12 +487,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
     var createdType = DecoratedType(node.staticType, _graph.never,
         typeArguments: decoratedTypeArguments);
     var calleeType = getOrComputeElementType(callee, targetType: createdType);
-    _handleInvocationArguments(
-        node,
-	node.argumentList.arguments,
-	typeArguments,
-	calleeType,
-	typeParameters);
+    _handleInvocationArguments(node, node.argumentList.arguments, typeArguments,
+        calleeType, typeParameters);
     return createdType;
   }
 
