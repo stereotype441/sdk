@@ -1659,6 +1659,22 @@ Object? g() => f();
     await _checkSingleFileChanges(content, expected);
   }
 
+  test_generic_function_type_syntax_inferred_dynamic_return() async {
+    var content = '''
+abstract class C {
+  Function() f();
+}
+Object g(C c) => c.f()();
+''';
+    var expected = '''
+abstract class C {
+  Function() f();
+}
+Object? g(C c) => c.f()();
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_topLevelVariable_type_inferred() async {
     var content = '''
 int f() => null;
