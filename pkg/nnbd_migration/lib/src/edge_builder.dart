@@ -1048,14 +1048,16 @@ $stackTrace''');
               }
               positionalParameterCount++;
             }
-            if (_isUntypedParameter(normalParameter)) {
-              _unionDecoratedTypes(
-                  overriddenParameterType, currentParameterType, origin);
-            } else {
-              _checkAssignment(origin,
-                  source: overriddenParameterType,
-                  destination: currentParameterType,
-                  hard: true);
+            if (overriddenParameterType != null) {
+              if (_isUntypedParameter(normalParameter)) {
+                _unionDecoratedTypes(
+                    overriddenParameterType, currentParameterType, origin);
+              } else {
+                _checkAssignment(origin,
+                    source: overriddenParameterType,
+                    destination: currentParameterType,
+                    hard: true);
+              }
             }
           }
         }
