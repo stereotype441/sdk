@@ -1058,10 +1058,6 @@ $stackTrace''');
                   hard: true);
             }
           }
-          _checkAssignment(null,
-              source: _currentFunctionType,
-              destination: overriddenFunctionType,
-              hard: true);
         }
       }
     } finally {
