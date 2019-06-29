@@ -226,8 +226,10 @@ $stackTrace''');
 
   @override
   DecoratedType visitSimpleFormalParameter(SimpleFormalParameter node) {
-    var type = decorateType(node.type, node, node.declaredElement.type);
     var declaredElement = node.declaredElement;
+    var type = node.type != null
+        ? node.type.accept(this)
+        : DecoratedType.forImplicitType(declaredElement.type, _graph);
     _variables.recordDecoratedElementType(declaredElement, type);
     if (declaredElement.isNamed) {
       _namedParameters[declaredElement.name] = type;
@@ -378,14 +380,17 @@ $stackTrace''');
       AstNode enclosingNode) {
     var functionType = declaredElement.type;
     DecoratedType decoratedReturnType;
-    if (returnType == null && declaredElement is ConstructorElement) {
+    if (returnType != null) {
+      decoratedReturnType = returnType.accept(this);
+    } else if (declaredElement is ConstructorElement) {
       // Constructors have no explicit return type annotation, so use the
       // implicit return type.
       decoratedReturnType = _createDecoratedTypeForClass(
           declaredElement.enclosingElement, parameters.parent);
     } else {
+      // Inferred return type.
       decoratedReturnType =
-          decorateType(returnType, enclosingNode, functionType.returnType);
+          DecoratedType.forImplicitType(functionType.returnType, _graph);
     }
     var previousPositionalParameters = _positionalParameters;
     var previousNamedParameters = _namedParameters;
