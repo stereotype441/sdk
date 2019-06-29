@@ -1591,6 +1591,16 @@ int? f() => null;
     await _checkSingleFileChanges(content, expected);
   }
 
+  test_topLevelFunction_parameterType_implicit_dynamic() async {
+    var content = '''
+Object f(x) => x;
+''';
+    var expected = '''
+Object? f(x) => x;
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_topLevelFunction_returnType_implicit_dynamic() async {
     var content = '''
 f() {}
