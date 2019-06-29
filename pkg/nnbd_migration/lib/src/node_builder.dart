@@ -58,17 +58,20 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType> {
             DecoratedType(_typeProvider.objectType, _graph.never);
 
   /// Creates and stores a [DecoratedType] object corresponding to the given
-  /// [type] AST, and returns it.
-  DecoratedType decorateType(TypeAnnotation type, AstNode enclosingNode) {
-    return type == null
-        // TODO(danrubel): Return something other than this
-        // to indicate that we should insert a type for the declaration
-        // that is missing a type reference.
-        ? new DecoratedType(
-            DynamicTypeImpl.instance,
-            NullabilityNode.forInferredDynamicType(
-                _graph, _source, enclosingNode.offset))
-        : type.accept(this);
+  /// [typeAnnotation] AST, and returns it.
+  DecoratedType decorateType(
+      TypeAnnotation typeAnnotation, AstNode enclosingNode,
+      [DartType type]) {
+    if (typeAnnotation != null) {
+      return typeAnnotation.accept(this);
+    } else if (type != null) {
+      return new DecoratedType.forImplicitType(type, _graph);
+    } else {
+      return new DecoratedType(
+          DynamicTypeImpl.instance,
+          NullabilityNode.forInferredDynamicType(
+              _graph, _source, enclosingNode.offset));
+    }
   }
 
   @override
@@ -376,6 +379,7 @@ $stackTrace''');
       FunctionBody body,
       ConstructorName redirectedConstructor,
       AstNode enclosingNode) {
+    var functionType = declaredElement.type;
     DecoratedType decoratedReturnType;
     if (returnType == null && declaredElement is ConstructorElement) {
       // Constructors have no explicit return type annotation, so use the
@@ -383,18 +387,19 @@ $stackTrace''');
       decoratedReturnType = _createDecoratedTypeForClass(
           declaredElement.enclosingElement, parameters.parent);
     } else {
-      decoratedReturnType = decorateType(returnType, enclosingNode);
+      decoratedReturnType =
+          decorateType(returnType, enclosingNode, functionType.returnType);
     }
     var previousPositionalParameters = _positionalParameters;
     var previousNamedParameters = _namedParameters;
     _positionalParameters = [];
     _namedParameters = {};
-    DecoratedType functionType;
+    DecoratedType decoratedFunctionType;
     try {
       parameters?.accept(this);
       body?.accept(this);
       redirectedConstructor?.accept(this);
-      functionType = DecoratedType(declaredElement.type, _graph.never,
+      decoratedFunctionType = DecoratedType(functionType, _graph.never,
           returnType: decoratedReturnType,
           positionalParameters: _positionalParameters,
           namedParameters: _namedParameters);
@@ -402,7 +407,8 @@ $stackTrace''');
       _positionalParameters = previousPositionalParameters;
       _namedParameters = previousNamedParameters;
     }
-    _variables.recordDecoratedElementType(declaredElement, functionType);
+    _variables.recordDecoratedElementType(
+        declaredElement, decoratedFunctionType);
   }
 
   void _handleSupertypeClauses(

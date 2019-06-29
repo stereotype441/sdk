@@ -878,6 +878,56 @@ int f(int x) {
     await _checkSingleFileChanges(content, expected);
   }
 
+  test_inferred_method_return_type_non_nullable() async {
+    var content = '''
+class B {
+  int f() => 1;
+}
+class C extends B {
+  f() => 1;
+}
+int g(C c) => c.f();
+''';
+    // B.f's return type is `int`.  Since C.f's return type is inferred from
+    // B.f's, it has a return type of `int` too.  Therefore g's return type
+    // must be `int`.
+    var expected = '''
+class B {
+  int f() => 1;
+}
+class C extends B {
+  f() => 1;
+}
+int g(C c) => c.f();
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_inferred_method_return_type_nullable() async {
+    var content = '''
+class B {
+  int f() => null;
+}
+class C extends B {
+  f() => 1;
+}
+int g(C c) => c.f();
+''';
+    // B.f's return type is `int?`.  Since C.f's return type is inferred from
+    // B.f's, it has a return type of `int?` too.  Therefore g's return type
+    // must be `int?`.
+    var expected = '''
+class B {
+  int? f() => null;
+}
+class C extends B {
+  f() => 1;
+}
+int? g(C c) => c.f();
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_instance_creation_generic() async {
     var content = '''
 class C<T> {
