@@ -2450,4 +2450,16 @@ void f(int i) {
         decoratedTypeAnnotation('int j').node,
         hard: true);
   }
+
+  test_visitFunctionExpressionInvocation_returnType() async {
+    await analyze('''
+abstract class C {
+  int Function() f();
+}
+int g(C c) => c.f()();
+''');
+    assertEdge(decoratedTypeAnnotation('int Function').node,
+        decoratedTypeAnnotation('int g').node,
+        hard: false);
+  }
 }
