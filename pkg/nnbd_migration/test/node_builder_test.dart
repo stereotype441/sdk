@@ -569,11 +569,11 @@ main() {
   test_localVariable_type_inferred() async {
     await analyze('''
 main() {
-  var i = 1;
+  var x = 1;
 }
 ''');
     var decoratedType =
-        variables.decoratedElementType(findNode.simple('i').staticElement);
+        variables.decoratedElementType(findNode.simple('x').staticElement);
     expect(decoratedType.node, TypeMatcher<NullabilityNodeMutable>());
   }
 
