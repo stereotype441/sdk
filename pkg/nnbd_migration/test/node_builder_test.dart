@@ -594,7 +594,7 @@ class B {
   void f(dynamic x) {}
 }
 class C extends B {
-  void f/*C*/(x) {
+  void f/*C*/(x) {}
 }
 ''');
     var decoratedType = decoratedMethodType('f/*C*/').positionalParameters[0];
@@ -607,7 +607,7 @@ class B {
   void f({dynamic x = 0}) {}
 }
 class C extends B {
-  void f/*C*/({x = 0}) {
+  void f/*C*/({x = 0}) {}
 }
 ''');
     var decoratedType = decoratedMethodType('f/*C*/').positionalParameters[0];
