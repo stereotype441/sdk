@@ -254,7 +254,7 @@ $stackTrace''');
       return decoratedType;
     }
     var typeArguments = const <DecoratedType>[];
-    DecoratedType returnType;
+    DecoratedType decoratedReturnType;
     var positionalParameters = const <DecoratedType>[];
     var namedParameters = const <String, DecoratedType>{};
     if (type is InterfaceType && type.typeParameters.isNotEmpty) {
@@ -272,7 +272,10 @@ $stackTrace''');
       }
     }
     if (node is GenericFunctionType) {
-      returnType = decorateType(node.returnType, node);
+      var returnType = node.returnType;
+      decoratedReturnType = returnType == null
+          ? DecoratedType.forImplicitType(DynamicTypeImpl.instance, _graph)
+          : returnType.accept(this);
       if (node.typeParameters != null) {
         // TODO(paulberry)
         _unimplemented(node, 'Generic function type with type parameters');
@@ -305,7 +308,7 @@ $stackTrace''');
     }
     var decoratedType = DecoratedTypeAnnotation(type, nullabilityNode, node.end,
         typeArguments: typeArguments,
-        returnType: returnType,
+        returnType: decoratedReturnType,
         positionalParameters: positionalParameters,
         namedParameters: namedParameters);
     _variables.recordDecoratedTypeAnnotation(_source, node, decoratedType);
