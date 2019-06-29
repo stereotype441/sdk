@@ -1310,6 +1310,18 @@ List<String> f() {
     assertEdge(always, decoratedTypeAnnotation('String>[').node, hard: false);
   }
 
+  test_localVariable_type_inferred() async {
+    await analyze('''
+int f() => 1;
+main() {
+  var x = f();
+}
+''');
+    var xType =
+        variables.decoratedElementType(findNode.simple('x').staticElement);
+    assertUnion(xType.node, decoratedTypeAnnotation('int').node);
+  }
+
   test_method_parameterType_inferred() async {
     await analyze('''
 class B {
