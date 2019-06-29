@@ -1519,6 +1519,18 @@ int? f() => null;
     await _checkSingleFileChanges(content, expected);
   }
 
+  test_topLevelFunction_returnType_implicit_dynamic() async {
+    var content = '''
+f() {}
+Object g() => f();
+''';
+    var expected = '''
+f() {}
+Object? g() => f();
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_two_files() async {
     var root = '/home/test/lib';
     var path1 = convertPath('$root/file1.dart');
