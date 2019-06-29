@@ -1027,12 +1027,13 @@ $stackTrace''');
               if (parameter is NormalFormalParameter) {
                 normalParameter = parameter;
               } else {
-                parameter = (parameter as DefaultFormalParameter).parameter;
+                normalParameter =
+                    (parameter as DefaultFormalParameter).parameter;
               }
               DecoratedType currentParameterType;
               DecoratedType overriddenParameterType;
               if (parameter.isNamed) {
-                var name = parameter.identifier.name;
+                var name = normalParameter.identifier.name;
                 currentParameterType =
                     _currentFunctionType.namedParameters[name];
                 overriddenParameterType =
