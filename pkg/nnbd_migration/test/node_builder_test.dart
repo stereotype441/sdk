@@ -666,7 +666,6 @@ f() {}
 ''');
     var decoratedType = decoratedFunctionType('f').returnType;
     expect(decoratedType.type.isDynamic, isTrue);
-    assertUnion(always, decoratedType.node);
   }
 
   test_topLevelFunction_returnType_simple() async {
