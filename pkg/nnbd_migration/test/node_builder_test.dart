@@ -610,7 +610,7 @@ class C extends B {
   void f/*C*/({x = 0}) {}
 }
 ''');
-    var decoratedType = decoratedMethodType('f/*C*/').positionalParameters[0];
+    var decoratedType = decoratedMethodType('f/*C*/').namedParameters['x'];
     expect(decoratedType.node, same(always));
   }
 
@@ -623,7 +623,7 @@ class C extends B {
   void f/*C*/({x = 0}) {}
 }
 ''');
-    var decoratedType = decoratedMethodType('f/*C*/').positionalParameters[0];
+    var decoratedType = decoratedMethodType('f/*C*/').namedParameters['x'];
     expect(decoratedType.node, TypeMatcher<NullabilityNodeMutable>());
   }
 
