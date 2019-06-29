@@ -57,20 +57,6 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType> {
       : _nonNullableObjectType =
             DecoratedType(_typeProvider.objectType, _graph.never);
 
-  /// Creates and stores a [DecoratedType] object corresponding to the given
-  /// [type] AST, and returns it.
-  DecoratedType decorateType(TypeAnnotation type, AstNode enclosingNode) {
-    return type == null
-        // TODO(danrubel): Return something other than this
-        // to indicate that we should insert a type for the declaration
-        // that is missing a type reference.
-        ? new DecoratedType(
-            DynamicTypeImpl.instance,
-            NullabilityNode.forInferredDynamicType(
-                _graph, _source, enclosingNode.offset))
-        : type.accept(this);
-  }
-
   @override
   DecoratedType visitClassDeclaration(ClassDeclaration node) {
     node.metadata.accept(this);
