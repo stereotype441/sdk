@@ -58,20 +58,17 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType> {
             DecoratedType(_typeProvider.objectType, _graph.never);
 
   /// Creates and stores a [DecoratedType] object corresponding to the given
-  /// [typeAnnotation] AST, and returns it.
-  DecoratedType decorateType(
-      TypeAnnotation typeAnnotation, AstNode enclosingNode,
-      [DartType type]) {
-    if (typeAnnotation != null) {
-      return typeAnnotation.accept(this);
-    } else if (type != null) {
-      return new DecoratedType.forImplicitType(type, _graph);
-    } else {
-      return new DecoratedType(
-          DynamicTypeImpl.instance,
-          NullabilityNode.forInferredDynamicType(
-              _graph, _source, enclosingNode.offset));
-    }
+  /// [type] AST, and returns it.
+  DecoratedType decorateType(TypeAnnotation type, AstNode enclosingNode) {
+    return type == null
+        // TODO(danrubel): Return something other than this
+        // to indicate that we should insert a type for the declaration
+        // that is missing a type reference.
+        ? new DecoratedType(
+            DynamicTypeImpl.instance,
+            NullabilityNode.forInferredDynamicType(
+                _graph, _source, enclosingNode.offset))
+        : type.accept(this);
   }
 
   @override
