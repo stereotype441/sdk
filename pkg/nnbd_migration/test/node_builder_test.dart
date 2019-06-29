@@ -672,7 +672,6 @@ void f(x) {}
     expect(decoratedFunctionType('f').positionalParameters[0],
         same(decoratedType));
     expect(decoratedType.type.isDynamic, isTrue);
-    assertUnion(always, decoratedType.node);
   }
 
   test_topLevelFunction_parameterType_named_no_default() async {
