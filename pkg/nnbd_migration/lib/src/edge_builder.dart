@@ -1020,43 +1020,46 @@ $stackTrace''');
                 destination: overriddenFunctionType.returnType,
                 hard: true);
           }
-          int positionalParameterCount = 0;
-          for (var parameter in parameters.parameters) {
-            NormalFormalParameter normalParameter;
-            if (parameter is NormalFormalParameter) {
-              normalParameter = parameter;
-            } else {
-              parameter = (parameter as DefaultFormalParameter).parameter;
-            }
-            DecoratedType currentParameterType;
-            DecoratedType overriddenParameterType;
-            if (parameter.isNamed) {
-              var name = parameter.identifier.name;
-              currentParameterType = _currentFunctionType.namedParameters[name];
-              overriddenParameterType =
-                  overriddenFunctionType.namedParameters[name];
-            } else {
-              if (positionalParameterCount <
-                  _currentFunctionType.positionalParameters.length) {
-                currentParameterType = _currentFunctionType
-                    .positionalParameters[positionalParameterCount];
-              }
-              if (positionalParameterCount <
-                  overriddenFunctionType.positionalParameters.length) {
-                overriddenParameterType = overriddenFunctionType
-                    .positionalParameters[positionalParameterCount];
-              }
-              positionalParameterCount++;
-            }
-            if (overriddenParameterType != null) {
-              if (_isUntypedParameter(normalParameter)) {
-                _unionDecoratedTypes(
-                    overriddenParameterType, currentParameterType, origin);
+          if (parameters != null) {
+            int positionalParameterCount = 0;
+            for (var parameter in parameters.parameters) {
+              NormalFormalParameter normalParameter;
+              if (parameter is NormalFormalParameter) {
+                normalParameter = parameter;
               } else {
-                _checkAssignment(origin,
-                    source: overriddenParameterType,
-                    destination: currentParameterType,
-                    hard: true);
+                parameter = (parameter as DefaultFormalParameter).parameter;
+              }
+              DecoratedType currentParameterType;
+              DecoratedType overriddenParameterType;
+              if (parameter.isNamed) {
+                var name = parameter.identifier.name;
+                currentParameterType =
+                    _currentFunctionType.namedParameters[name];
+                overriddenParameterType =
+                    overriddenFunctionType.namedParameters[name];
+              } else {
+                if (positionalParameterCount <
+                    _currentFunctionType.positionalParameters.length) {
+                  currentParameterType = _currentFunctionType
+                      .positionalParameters[positionalParameterCount];
+                }
+                if (positionalParameterCount <
+                    overriddenFunctionType.positionalParameters.length) {
+                  overriddenParameterType = overriddenFunctionType
+                      .positionalParameters[positionalParameterCount];
+                }
+                positionalParameterCount++;
+              }
+              if (overriddenParameterType != null) {
+                if (_isUntypedParameter(normalParameter)) {
+                  _unionDecoratedTypes(
+                      overriddenParameterType, currentParameterType, origin);
+                } else {
+                  _checkAssignment(origin,
+                      source: overriddenParameterType,
+                      destination: currentParameterType,
+                      hard: true);
+                }
               }
             }
           }
