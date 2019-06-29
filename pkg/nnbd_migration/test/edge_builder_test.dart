@@ -1310,6 +1310,20 @@ List<String> f() {
     assertEdge(always, decoratedTypeAnnotation('String>[').node, hard: false);
   }
 
+  test_method_returnType_inferred() async {
+    await analyze('''
+class B {
+  int f/*B*/() => 1;
+}
+class C extends B {
+  f/*C*/() => 1;
+}
+''');
+    var bReturnType = decoratedMethodType('f/*B*/').returnType;
+    var cReturnType = decoratedMethodType('f/*C*/').returnType;
+    assertUnion(bReturnType.node, cReturnType.node);
+  }
+
   test_methodDeclaration_resets_unconditional_control_flow() async {
     await analyze('''
 class C {

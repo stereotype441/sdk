@@ -28,11 +28,6 @@ class NodeBuilderTest extends MigrationVisitorTestBase {
       variables.decoratedElementType(
           findNode.functionDeclaration(search).declaredElement);
 
-  /// Gets the [DecoratedType] associated with the method declaration whose
-  /// name matches [search].
-  DecoratedType decoratedMethodType(String search) => variables
-      .decoratedElementType(findNode.methodDeclaration(search).declaredElement);
-
   DecoratedType decoratedTypeParameterBound(String search) => variables
       .decoratedElementType(findNode.typeParameter(search).declaredElement);
 
