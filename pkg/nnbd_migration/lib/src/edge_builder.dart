@@ -133,7 +133,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
       } else {
         assert(baseElement.isSetter);
         decoratedBaseType = DecoratedType(baseElement.type, _graph.never,
-            positionalParameters: [decoratedElementType]);
+            positionalParameters: [decoratedElementType],
+            returnType: _functionTypeReturn(baseElement.type));
       }
     } else {
       decoratedBaseType =
@@ -323,8 +324,13 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
     assert(_isSimple(thenType)); // TODO(paulberry)
     var elseType = node.elseExpression.accept(this);
     assert(_isSimple(elseType)); // TODO(paulberry)
+
+    DartType staticType = node.staticType;
     var overallType = DecoratedType(
-        node.staticType, NullabilityNode.forLUB(thenType.node, elseType.node));
+        staticType, NullabilityNode.forLUB(thenType.node, elseType.node),
+        returnType: staticType is FunctionType
+            ? _functionTypeReturn(staticType)
+            : null);
     _variables.recordDecoratedExpressionType(node, overallType);
     return overallType;
   }
@@ -913,6 +919,24 @@ $stackTrace''');
     assert(name != 'hashCode');
     assert(name != 'noSuchMethod');
     assert(name != 'runtimeType');
+  }
+
+  DecoratedType _functionTypeReturn(FunctionType functionType) {
+    DartType returnType = functionType.returnType;
+    if (returnType == null) {
+      Element functionTypeElement = functionType.element;
+      if (functionTypeElement is FunctionElement) {
+        returnType = functionTypeElement.returnType;
+      } else if (functionTypeElement is FunctionTypedElement) {
+        returnType = functionTypeElement.returnType;
+      } else {
+        throw UnimplementedError('$functionType');
+      }
+    }
+    if (returnType.isDynamic || returnType.isVoid) {
+      return DecoratedType(returnType, _variables.always);
+    }
+    return _variables.decoratedElementType(returnType.element, create: true);
   }
 
   /// Creates the necessary constraint(s) for an assignment of the given

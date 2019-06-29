@@ -29,6 +29,9 @@ class Variables implements VariableRecorder, VariableRepository {
   Variables(this._graph);
 
   @override
+  NullabilityNode get always => _graph.always;
+
+  @override
   Map<ClassElement, DecoratedType> decoratedDirectSupertypes(
       ClassElement class_) {
     assert(class_ is! ClassElementHandle);

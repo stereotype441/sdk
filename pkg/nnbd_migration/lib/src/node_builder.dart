@@ -481,6 +481,8 @@ abstract class VariableRecorder {
 /// results of the first ([NodeBuilder], which finds all the
 /// variables that need to be constrained).
 abstract class VariableRepository {
+  NullabilityNode get always;
+
   /// Given a [class_], gets the decorated type information for the superclasses
   /// it directly implements/extends/etc.
   Map<ClassElement, DecoratedType> decoratedDirectSupertypes(
