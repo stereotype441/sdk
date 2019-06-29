@@ -579,7 +579,7 @@ main() {
 
   test_localVariable_type_inferred_dynamic() async {
     await analyze('''
-dynamic f() {};
+dynamic f() {}
 main() {
   var x = f();
 }
