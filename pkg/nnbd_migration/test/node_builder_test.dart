@@ -560,6 +560,29 @@ void f(List<int> x) {}
     expect(decoratedIntType.node, isNot(never));
   }
 
+  test_method_returnType_implicit_dynamic() async {
+    await analyze('''
+class C {
+  f() => 1;
+}
+''');
+    var decoratedType = decoratedMethodType('f').returnType;
+    expect(decoratedType.node, same(always));
+  }
+
+  test_method_returnType_inferred() async {
+    await analyze('''
+class B {
+  int f() => 1;
+}
+class C extends B {
+  f/*C*/() => 1;
+}
+''');
+    var decoratedType = decoratedMethodType('f/*C*/').returnType;
+    expect(decoratedType.node, TypeMatcher<NullabilityNodeMutable>());
+  }
+
   test_method_returnType_inferred_dynamic() async {
     await analyze('''
 class B {
@@ -571,19 +594,6 @@ class C extends B {
 ''');
     var decoratedType = decoratedMethodType('f/*C*/').returnType;
     expect(decoratedType.node, same(always));
-  }
-
-  test_method_returnType_inferred_normal() async {
-    await analyze('''
-class B {
-  int f() => 1;
-}
-class C extends B {
-  f/*C*/() => 1;
-}
-''');
-    var decoratedType = decoratedMethodType('f/*C*/').returnType;
-    expect(decoratedType.node, TypeMatcher<NullabilityNodeMutable>());
   }
 
   test_topLevelFunction_parameterType_implicit_dynamic() async {
