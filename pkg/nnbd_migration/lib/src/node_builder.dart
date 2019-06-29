@@ -229,7 +229,7 @@ $stackTrace''');
 
   @override
   DecoratedType visitSimpleFormalParameter(SimpleFormalParameter node) {
-    var type = decorateType(node.type, node);
+    var type = decorateType(node.type, node, node.declaredElement.type);
     var declaredElement = node.declaredElement;
     _variables.recordDecoratedElementType(declaredElement, type);
     if (declaredElement.isNamed) {

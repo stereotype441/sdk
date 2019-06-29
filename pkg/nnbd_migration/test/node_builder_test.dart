@@ -555,6 +555,78 @@ void f(List<int> x) {}
     expect(decoratedIntType.node, isNot(never));
   }
 
+  test_method_parameterType_implicit_dynamic() async {
+    await analyze('''
+class C {
+  void f(x) {}
+}
+''');
+    var decoratedType = decoratedMethodType('f').positionalParameters[0];
+    expect(decoratedType.node, same(always));
+  }
+
+  test_method_parameterType_implicit_dynamic_named() async {
+    await analyze('''
+class C {
+  void f({x}) {}
+}
+''');
+    var decoratedType = decoratedMethodType('f').namedParameters['x'];
+    expect(decoratedType.node, same(always));
+  }
+
+  test_method_parameterType_inferred() async {
+    await analyze('''
+class B {
+  void f(int x) {}
+}
+class C extends B {
+  void f/*C*/(x) {}
+}
+''');
+    var decoratedType = decoratedMethodType('f/*C*/').positionalParameters[0];
+    expect(decoratedType.node, TypeMatcher<NullabilityNodeMutable>());
+  }
+
+  test_method_parameterType_inferred_dynamic() async {
+    await analyze('''
+class B {
+  void f(dynamic x) {}
+}
+class C extends B {
+  void f/*C*/(x) {
+}
+''');
+    var decoratedType = decoratedMethodType('f/*C*/').positionalParameters[0];
+    expect(decoratedType.node, same(always));
+  }
+
+  test_method_parameterType_inferred_dynamic_named() async {
+    await analyze('''
+class B {
+  void f({dynamic x = 0}) {}
+}
+class C extends B {
+  void f/*C*/({x = 0}) {
+}
+''');
+    var decoratedType = decoratedMethodType('f/*C*/').positionalParameters[0];
+    expect(decoratedType.node, same(always));
+  }
+
+  test_method_parameterType_inferred_named() async {
+    await analyze('''
+class B {
+  void f({int x = 0}) {}
+}
+class C extends B {
+  void f/*C*/({x = 0}) {}
+}
+''');
+    var decoratedType = decoratedMethodType('f/*C*/').positionalParameters[0];
+    expect(decoratedType.node, TypeMatcher<NullabilityNodeMutable>());
+  }
+
   test_method_returnType_implicit_dynamic() async {
     await analyze('''
 class C {
