@@ -2341,6 +2341,16 @@ double get myPi => pi;
     assertEdge(never, myPiType.node, hard: false);
   }
 
+  test_topLevelVariable_type_inferred() async {
+    await analyze('''
+int f() => 1;
+var x = f();
+''');
+    var xType =
+        variables.decoratedElementType(findNode.simple('x').staticElement);
+    assertUnion(xType.node, decoratedTypeAnnotation('int').node);
+  }
+
   test_type_argument_explicit_bound() async {
     await analyze('''
 class C<T extends Object> {}

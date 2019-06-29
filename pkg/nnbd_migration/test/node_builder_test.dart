@@ -788,6 +788,34 @@ int f() => 0;
     expect(decoratedType.node, isNot(never));
   }
 
+  test_topLevelVariable_type_implicit_dynamic() async {
+    await analyze('''
+var x;
+''');
+    var decoratedType =
+        variables.decoratedElementType(findNode.simple('x').staticElement);
+    expect(decoratedType.node, same(always));
+  }
+
+  test_topLevelVariable_type_inferred() async {
+    await analyze('''
+var x = 1;
+''');
+    var decoratedType =
+        variables.decoratedElementType(findNode.simple('x').staticElement);
+    expect(decoratedType.node, TypeMatcher<NullabilityNodeMutable>());
+  }
+
+  test_topLevelVariable_type_inferred_dynamic() async {
+    await analyze('''
+dynamic f() {}
+var x = f();
+''');
+    var decoratedType =
+        variables.decoratedElementType(findNode.simple('x').staticElement);
+    expect(decoratedType.node, same(always));
+  }
+
   test_type_comment_bang() async {
     await analyze('''
 void f(int/*!*/ i) {}
