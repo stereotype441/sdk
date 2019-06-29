@@ -555,6 +555,40 @@ void f(List<int> x) {}
     expect(decoratedIntType.node, isNot(never));
   }
 
+  test_localVariable_type_implicit_dynamic() async {
+    await analyze('''
+main() {
+  var x;
+}
+''');
+    var decoratedType =
+        variables.decoratedElementType(findNode.simple('x').staticElement);
+    expect(decoratedType.node, same(always));
+  }
+
+  test_localVariable_type_inferred() async {
+    await analyze('''
+main() {
+  var i = 1;
+}
+''');
+    var decoratedType =
+        variables.decoratedElementType(findNode.simple('i').staticElement);
+    expect(decoratedType.node, TypeMatcher<NullabilityNodeMutable>());
+  }
+
+  test_localVariable_type_inferred_dynamic() async {
+    await analyze('''
+dynamic f() {};
+main() {
+  var x = f();
+}
+''');
+    var decoratedType =
+        variables.decoratedElementType(findNode.simple('x').staticElement);
+    expect(decoratedType.node, same(always));
+  }
+
   test_method_parameterType_implicit_dynamic() async {
     await analyze('''
 class C {

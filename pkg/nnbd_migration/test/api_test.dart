@@ -1042,6 +1042,27 @@ class C {
     await _checkSingleFileChanges(content, expected);
   }
 
+  test_localVariable_type_inferred() async {
+    var content = '''
+int f() => null;
+void main() {
+  var x = 1;
+  x = f();
+}
+''';
+    // The type of x is inferred from its initializer, so it is non-nullable,
+    // even though we try to assign a nullable value to it.  So a null check
+    // must be added.
+    var expected = '''
+int? f() => null;
+void main() {
+  var x = 1;
+  x = f()!;
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_named_parameter_no_default_unused() async {
     var content = '''
 void f({String s}) {}
