@@ -367,6 +367,40 @@ dynamic f() {}
     assertEdge(always, decoratedType.node, hard: false);
   }
 
+  test_field_type_implicit_dynamic() async {
+    await analyze('''
+class C {
+  var x;
+}
+''');
+    var decoratedType =
+        variables.decoratedElementType(findNode.simple('x').staticElement);
+    expect(decoratedType.node, same(always));
+  }
+
+  test_field_type_inferred() async {
+    await analyze('''
+class C {
+  var x = 1;
+}
+''');
+    var decoratedType =
+        variables.decoratedElementType(findNode.simple('x').staticElement);
+    expect(decoratedType.node, TypeMatcher<NullabilityNodeMutable>());
+  }
+
+  test_field_type_inferred_dynamic() async {
+    await analyze('''
+dynamic f() {}
+class C {
+  var x = f();
+}
+''');
+    var decoratedType =
+        variables.decoratedElementType(findNode.simple('x').staticElement);
+    expect(decoratedType.node, same(always));
+  }
+
   test_field_type_simple() async {
     await analyze('''
 class C {
