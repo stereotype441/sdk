@@ -1020,7 +1020,7 @@ $stackTrace''');
                 destination: overriddenFunctionType.returnType,
                 hard: true);
           }
-          int positionalParameterCount;
+          int positionalParameterCount = 0;
           for (var parameter in parameters.parameters) {
             NormalFormalParameter normalParameter;
             if (parameter is NormalFormalParameter) {
