@@ -2451,6 +2451,20 @@ void f(int i) {
         hard: true);
   }
 
+  test_visitFunctionExpressionInvocation_parameterType() async {
+    await analyze('''
+abstract class C {
+  void Function(int) f();
+}
+void g(C c, int i) {
+  c.f()(i);
+}
+''');
+    assertEdge(decoratedTypeAnnotation('int i').node,
+        decoratedTypeAnnotation('int)').node,
+        hard: true);
+  }
+
   test_visitFunctionExpressionInvocation_returnType() async {
     await analyze('''
 abstract class C {
