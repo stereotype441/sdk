@@ -878,6 +878,78 @@ int f(int x) {
     await _checkSingleFileChanges(content, expected);
   }
 
+  test_inferred_method_parameter_type_non_nullable() async {
+    var content = '''
+class B {
+  void f(int i) {
+    assert(i != null);
+  }
+}
+class C extends B {
+  void f(i) {}
+}
+void g(C c, int i, bool b) {
+  if (b) {
+    c.f(i);
+  }
+}
+void h(C c) {
+  g(c, null, false);
+}
+''';
+    // B.f's parameter type is `int`.  Since C.f's parameter type is inferred
+    // from B.f's, it has a parameter type of `int` too.  Therefore there must
+    // be a null check in g().
+    var expected = '''
+class B {
+  void f(int i) {
+    assert(i != null);
+  }
+}
+class C extends B {
+  void f(i) {}
+}
+void g(C c, int? i, bool b) {
+  if (b) {
+    c.f(i!);
+  }
+}
+void h(C c) {
+  g(c, null, false);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_inferred_method_parameter_type_nullable() async {
+    var content = '''
+class B {
+  void f(int i) {}
+}
+class C extends B {
+  void f(i) {}
+}
+void g(C c) {
+  c.f(null);
+}
+''';
+    // The call to C.f from g forces C.f's parameter to be nullable.  Since
+    // C.f's parameter type is inferred from B.f's parameter type, B.f's
+    // parameter must be nullable too.
+    var expected = '''
+class B {
+  void f(int? i) {}
+}
+class C extends B {
+  void f(i) {}
+}
+void g(C c) {
+  c.f(null);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_inferred_method_return_type_non_nullable() async {
     var content = '''
 class B {
