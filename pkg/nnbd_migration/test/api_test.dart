@@ -813,6 +813,28 @@ int f(int i) {
     await _checkSingleFileChanges(content, expected);
   }
 
+  test_field_formal_param_untyped() async {
+    var content = '''
+class C {
+  int i;
+  C(this.i);
+}
+main() {
+  C(null);
+}
+''';
+    var expected = '''
+class C {
+  int? i;
+  C(this.i);
+}
+main() {
+  C(null);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_field_type_inferred() async {
     var content = '''
 int f() => null;

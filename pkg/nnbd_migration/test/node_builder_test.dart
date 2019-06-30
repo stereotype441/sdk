@@ -415,6 +415,40 @@ class C {
         same(decoratedType));
   }
 
+  test_fieldFormalParameter_typed() async {
+    await analyze('''
+class C {
+  int i;
+  C.named(int this.i);
+}
+''');
+    var decoratedConstructorParamType =
+        decoratedConstructorDeclaration('named').positionalParameters[0];
+    expect(decoratedTypeAnnotation('int this'),
+        same(decoratedConstructorParamType));
+    expect(decoratedConstructorParamType.type.toString(), 'int');
+    expect(decoratedConstructorParamType.node,
+        TypeMatcher<NullabilityNodeMutable>());
+    // Note: the edge builder will connect this node to the node for the type of
+    // the field.
+  }
+
+  test_fieldFormalParameter_untyped() async {
+    await analyze('''
+class C {
+  int i;
+  C.named(this.i);
+}
+''');
+    var decoratedConstructorParamType =
+        decoratedConstructorDeclaration('named').positionalParameters[0];
+    expect(decoratedConstructorParamType.type.toString(), 'int');
+    expect(decoratedConstructorParamType.node,
+        TypeMatcher<NullabilityNodeMutable>());
+    // Note: the edge builder will unify this implicit type with the type of the
+    // field.
+  }
+
   test_generic_function_type_syntax_inferred_dynamic_return() async {
     await analyze('''
 abstract class C {
