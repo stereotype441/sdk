@@ -17,11 +17,6 @@ main() {
 
 @reflectiveTest
 class NodeBuilderTest extends MigrationVisitorTestBase {
-  /// Gets the [DecoratedType] associated with the constructor declaration whose
-  /// name matches [search].
-  DecoratedType decoratedConstructorDeclaration(String search) => variables
-      .decoratedElementType(findNode.constructor(search).declaredElement);
-
   /// Gets the [DecoratedType] associated with the function declaration whose
   /// name matches [search].
   DecoratedType decoratedFunctionType(String search) =>
