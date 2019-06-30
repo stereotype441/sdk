@@ -444,7 +444,7 @@ class C {
     // field.
   }
 
-  solo_test_functionTypedFormalParameter_namedParameter_typed() async {
+  test_functionTypedFormalParameter_namedParameter_typed() async {
     await analyze('''
 void f(void g({int i})) {}
 ''');
@@ -453,9 +453,8 @@ void f(void g({int i})) {}
     var fType = variables.decoratedElementType(f);
     var gType = variables.decoratedElementType(g);
     expect(fType.positionalParameters[0], same(gType));
-    expect(gType.namedParameters['i'].type.toString(), 'dynamic');
-    expect(
-        gType.namedParameters['i'].node, TypeMatcher<NullabilityNodeMutable>());
+    expect(gType.node, TypeMatcher<NullabilityNodeMutable>());
+    expect(gType.namedParameters['i'], same(decoratedTypeAnnotation('int')));
   }
 
   test_functionTypedFormalParameter_namedParameter_untyped() async {
@@ -467,7 +466,9 @@ void f(void g({i})) {}
     var fType = variables.decoratedElementType(f);
     var gType = variables.decoratedElementType(g);
     expect(fType.positionalParameters[0], same(gType));
-    expect(gType.namedParameters['i'], same(decoratedTypeAnnotation('int')));
+    expect(gType.node, TypeMatcher<NullabilityNodeMutable>());
+    expect(gType.namedParameters['i'].type.toString(), 'dynamic');
+    expect(gType.namedParameters['i'].node, same(always));
   }
 
   test_functionTypedFormalParameter_positionalParameter_typed() async {
@@ -479,6 +480,7 @@ void f(void g(int i)) {}
     var fType = variables.decoratedElementType(f);
     var gType = variables.decoratedElementType(g);
     expect(fType.positionalParameters[0], same(gType));
+    expect(gType.node, TypeMatcher<NullabilityNodeMutable>());
     expect(gType.positionalParameters[0], same(decoratedTypeAnnotation('int')));
   }
 
@@ -491,12 +493,12 @@ void f(void g(i)) {}
     var fType = variables.decoratedElementType(f);
     var gType = variables.decoratedElementType(g);
     expect(fType.positionalParameters[0], same(gType));
+    expect(gType.node, TypeMatcher<NullabilityNodeMutable>());
     expect(gType.positionalParameters[0].type.toString(), 'dynamic');
-    expect(gType.positionalParameters[0].node,
-        TypeMatcher<NullabilityNodeMutable>());
+    expect(gType.positionalParameters[0].node, same(always));
   }
 
-  test_functionTypedFormalParameter_returnType() async {
+  test_functionTypedFormalParameter_return_typed() async {
     await analyze('''
 void f(int g()) {}
 ''');
@@ -505,7 +507,22 @@ void f(int g()) {}
     var fType = variables.decoratedElementType(f);
     var gType = variables.decoratedElementType(g);
     expect(fType.positionalParameters[0], same(gType));
+    expect(gType.node, TypeMatcher<NullabilityNodeMutable>());
     expect(gType.returnType, same(decoratedTypeAnnotation('int')));
+  }
+
+  test_functionTypedFormalParameter_return_untyped() async {
+    await analyze('''
+void f(g()) {}
+''');
+    var f = findElement.function('f');
+    var g = f.parameters[0];
+    var fType = variables.decoratedElementType(f);
+    var gType = variables.decoratedElementType(g);
+    expect(fType.positionalParameters[0], same(gType));
+    expect(gType.node, TypeMatcher<NullabilityNodeMutable>());
+    expect(gType.returnType.type.toString(), 'dynamic');
+    expect(gType.returnType.node, same(always));
   }
 
   test_generic_function_type_syntax_inferred_dynamic_return() async {
