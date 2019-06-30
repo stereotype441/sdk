@@ -327,7 +327,7 @@ $stackTrace''');
       decoratedBound = bound.accept(this);
     } else {
       var nullabilityNode = NullabilityNode.forInferredType();
-      _graph.connect(_graph.always, nullabilityNode,
+      _graph.union(_graph.always, nullabilityNode,
           AlwaysNullableTypeOrigin(_source, node.offset));
       decoratedBound = DecoratedType(_typeProvider.objectType, nullabilityNode);
     }
