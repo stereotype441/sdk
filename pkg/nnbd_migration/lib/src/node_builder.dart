@@ -395,9 +395,6 @@ $stackTrace''');
       TypeAnnotation type,
       TypeParameterList typeParameters,
       FormalParameterList parameters) {
-    if (typeParameters != null || parameters != null) {
-      _unimplemented(parameters, 'FunctionTypedFormalParameter');
-    }
     metadata?.accept(this);
     var decoratedType = type != null
         ? type.accept(this)
@@ -407,6 +404,10 @@ $stackTrace''');
       _namedParameters[declaredElement.name] = decoratedType;
     } else {
       _positionalParameters.add(decoratedType);
+    }
+    if (parameters != null) {
+      TODO;
+      _unimplemented(parameters, 'FunctionTypedFormalParameter');
     }
     return decoratedType;
   }

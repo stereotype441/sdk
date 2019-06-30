@@ -444,7 +444,7 @@ class C {
     // field.
   }
 
-  test_functionTypedFormalParameter_namedParameter_typed() async {
+  solo_test_functionTypedFormalParameter_namedParameter_typed() async {
     await analyze('''
 void f(void g({int i})) {}
 ''');
