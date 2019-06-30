@@ -938,6 +938,26 @@ int? test(C c) {
     await _checkSingleFileChanges(content, expected);
   }
 
+  test_function_typed_formal_param() async {
+    var content = '''
+int f(int callback(int i), int j) => callback(j);
+int g(int i) => i;
+int test(int i) => f(g, i);
+main() {
+  test(null);
+}
+''';
+    var expected = '''
+int? f(int? callback(int? i), int? j) => callback(j);
+int? g(int? i) => i;
+int? test(int? i) => f(g, i);
+main() {
+  test(null);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_generic_function_type_syntax_inferred_dynamic_return() async {
     var content = '''
 abstract class C {

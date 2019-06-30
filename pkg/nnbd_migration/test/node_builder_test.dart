@@ -444,6 +444,70 @@ class C {
     // field.
   }
 
+  test_functionTypedFormalParameter_namedParameter_typed() async {
+    await analyze('''
+void f(void g({int i})) {}
+''');
+    var f = findElement.function('f');
+    var g = f.parameters[0];
+    var fType = variables.decoratedElementType(f);
+    var gType = variables.decoratedElementType(g);
+    expect(fType.positionalParameters[0], same(gType));
+    expect(gType.namedParameters['i'].type.toString(), 'dynamic');
+    expect(
+        gType.namedParameters['i'].node, TypeMatcher<NullabilityNodeMutable>());
+  }
+
+  test_functionTypedFormalParameter_namedParameter_untyped() async {
+    await analyze('''
+void f(void g({i})) {}
+''');
+    var f = findElement.function('f');
+    var g = f.parameters[0];
+    var fType = variables.decoratedElementType(f);
+    var gType = variables.decoratedElementType(g);
+    expect(fType.positionalParameters[0], same(gType));
+    expect(gType.namedParameters['i'], same(decoratedTypeAnnotation('int')));
+  }
+
+  test_functionTypedFormalParameter_positionalParameter_typed() async {
+    await analyze('''
+void f(void g(int i)) {}
+''');
+    var f = findElement.function('f');
+    var g = f.parameters[0];
+    var fType = variables.decoratedElementType(f);
+    var gType = variables.decoratedElementType(g);
+    expect(fType.positionalParameters[0], same(gType));
+    expect(gType.positionalParameters[0], same(decoratedTypeAnnotation('int')));
+  }
+
+  test_functionTypedFormalParameter_positionalParameter_untyped() async {
+    await analyze('''
+void f(void g(i)) {}
+''');
+    var f = findElement.function('f');
+    var g = f.parameters[0];
+    var fType = variables.decoratedElementType(f);
+    var gType = variables.decoratedElementType(g);
+    expect(fType.positionalParameters[0], same(gType));
+    expect(gType.positionalParameters[0].type.toString(), 'dynamic');
+    expect(gType.positionalParameters[0].node,
+        TypeMatcher<NullabilityNodeMutable>());
+  }
+
+  test_functionTypedFormalParameter_returnType() async {
+    await analyze('''
+void f(int g()) {}
+''');
+    var f = findElement.function('f');
+    var g = f.parameters[0];
+    var fType = variables.decoratedElementType(f);
+    var gType = variables.decoratedElementType(g);
+    expect(fType.positionalParameters[0], same(gType));
+    expect(gType.returnType, same(decoratedTypeAnnotation('int')));
+  }
+
   test_generic_function_type_syntax_inferred_dynamic_return() async {
     await analyze('''
 abstract class C {
