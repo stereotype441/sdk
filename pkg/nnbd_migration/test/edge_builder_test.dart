@@ -820,7 +820,7 @@ class C {
 ''');
     assertEdge(decoratedTypeAnnotation('int this').node,
         decoratedTypeAnnotation('int i').node,
-        hard: false);
+        hard: true);
   }
 
   test_fieldFormalParameter_untyped() async {
