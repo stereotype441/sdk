@@ -323,7 +323,7 @@ $stackTrace''');
     var element = node.declaredElement;
     var bound = node.bound;
     DecoratedType decoratedBound;
-    if (bound == null) {
+    if (bound != null) {
       decoratedBound = bound.accept(this);
     } else {
       var nullabilityNode = NullabilityNode.forInferredType();
