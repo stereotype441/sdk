@@ -79,7 +79,7 @@ class NullabilityEdge {
 class NullabilityGraph {
   /// Set this const to `true` to dump the nullability graph just before
   /// propagation.
-  static const _debugBeforePropagation = false;
+  static const _debugBeforePropagation = true;
 
   /// Set containing all [NullabilityNode]s that have been passed as the
   /// `sourceNode` argument to [connect].
