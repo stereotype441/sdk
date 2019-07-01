@@ -41,6 +41,34 @@ class DecoratedTypeTest extends AbstractSingleUnitTest {
     expect(decoratedType.toString(), 'dynamic Function({x: int?(type(1))})?');
   }
 
+  test_toString_normal_and_named_parameter() async {
+    await resolveTestUnit('''dynamic f(int x, {int y}) {}''');
+    var type = findElement.function('f').type;
+    var decoratedType = DecoratedType(type, always,
+        positionalParameters: [
+          DecoratedType(type.normalParameterTypes[0], _node(1))
+        ],
+        namedParameters: {
+          'y': DecoratedType(type.namedParameterTypes['y'], _node(2))
+        },
+        returnType: DecoratedType(type.returnType, always));
+    expect(decoratedType.toString(),
+        'dynamic Function(int?(type(1)), {y: int?(type(2))})?');
+  }
+
+  test_toString_normal_and_optional_parameter() async {
+    await resolveTestUnit('''dynamic f(int x, [int y]) {}''');
+    var type = findElement.function('f').type;
+    var decoratedType = DecoratedType(type, always,
+        positionalParameters: [
+          DecoratedType(type.normalParameterTypes[0], _node(1)),
+          DecoratedType(type.optionalParameterTypes[0], _node(2))
+        ],
+        returnType: DecoratedType(type.returnType, always));
+    expect(decoratedType.toString(),
+        'dynamic Function(int?(type(1)), [int?(type(2))])?');
+  }
+
   test_toString_normal_parameter() async {
     await resolveTestUnit('''dynamic f(int x) {}''');
     var type = findElement.function('f').type;
@@ -50,6 +78,17 @@ class DecoratedTypeTest extends AbstractSingleUnitTest {
         ],
         returnType: DecoratedType(type.returnType, always));
     expect(decoratedType.toString(), 'dynamic Function(int?(type(1)))?');
+  }
+
+  test_toString_optional_parameter() async {
+    await resolveTestUnit('''dynamic f([int x]) {}''');
+    var type = findElement.function('f').type;
+    var decoratedType = DecoratedType(type, always,
+        positionalParameters: [
+          DecoratedType(type.optionalParameterTypes[0], _node(1))
+        ],
+        returnType: DecoratedType(type.returnType, always));
+    expect(decoratedType.toString(), 'dynamic Function([int?(type(1))])?');
   }
 
   NullabilityNode _node(int offset) =>
