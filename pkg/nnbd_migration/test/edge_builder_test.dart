@@ -811,6 +811,28 @@ class C {
     assertUnion(xType.node, decoratedTypeAnnotation('int').node);
   }
 
+  test_fieldFormalParameter_function_typed() async {
+    await analyze('''
+class C {
+  int Function(int, {int j}) f;
+  C(int this.f(int i, {int j}));
+}
+''');
+    var ctorParamType = variables
+        .decoratedElementType(findElement.unnamedConstructor('C'))
+        .positionalParameters[0];
+    var fieldType = variables.decoratedElementType(findElement.field('f'));
+    assertEdge(ctorParamType.node, fieldType.node, hard: true);
+    assertEdge(ctorParamType.returnType.node, fieldType.returnType.node,
+        hard: true);
+    assertEdge(fieldType.positionalParameters[0].node,
+        ctorParamType.positionalParameters[0].node,
+        hard: true);
+    assertEdge(fieldType.namedParameters['j'].node,
+        ctorParamType.namedParameters['j'].node,
+        hard: true);
+  }
+
   test_fieldFormalParameter_typed() async {
     await analyze('''
 class C {
@@ -1580,6 +1602,21 @@ void g(C c, int j) {
     var nullable_j = decoratedTypeAnnotation('int j');
     assertNullCheck(checkExpression('j/*check*/'),
         assertEdge(nullable_j.node, never, hard: true));
+  }
+
+  test_methodInvocation_resolves_to_getter() async {
+    await analyze('''
+abstract class C {
+  int/*1*/ Function(int/*2*/ i) get f;
+}
+int/*3*/ g(C c, int/*4*/ i) => c.f(i);
+''');
+    assertEdge(decoratedTypeAnnotation('int/*4*/').node,
+        decoratedTypeAnnotation('int/*2*/').node,
+        hard: true);
+    assertEdge(decoratedTypeAnnotation('int/*1*/').node,
+        decoratedTypeAnnotation('int/*3*/').node,
+        hard: false);
   }
 
   test_methodInvocation_return_type() async {
