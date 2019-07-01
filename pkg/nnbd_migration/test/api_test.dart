@@ -962,7 +962,7 @@ int? test(C c) {
     await _checkSingleFileChanges(content, expected);
   }
 
-  solo_test_function_typed_field_formal_param() async {
+  test_function_typed_field_formal_param() async {
     var content = '''
 class C {
   int Function(int) f;
