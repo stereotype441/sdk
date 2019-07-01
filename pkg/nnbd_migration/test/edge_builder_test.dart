@@ -799,6 +799,43 @@ double f() {
     assertNoUpstreamNullability(decoratedTypeAnnotation('double').node);
   }
 
+  test_field_type_inferred() async {
+    await analyze('''
+int f() => 1;
+class C {
+  var x = f();
+}
+''');
+    var xType =
+        variables.decoratedElementType(findNode.simple('x').staticElement);
+    assertUnion(xType.node, decoratedTypeAnnotation('int').node);
+  }
+
+  test_fieldFormalParameter_typed() async {
+    await analyze('''
+class C {
+  int i;
+  C(int this.i);
+}
+''');
+    assertEdge(decoratedTypeAnnotation('int this').node,
+        decoratedTypeAnnotation('int i').node,
+        hard: true);
+  }
+
+  test_fieldFormalParameter_untyped() async {
+    await analyze('''
+class C {
+  int i;
+  C.named(this.i);
+}
+''');
+    var decoratedConstructorParamType =
+        decoratedConstructorDeclaration('named').positionalParameters[0];
+    assertUnion(decoratedConstructorParamType.node,
+        decoratedTypeAnnotation('int i').node);
+  }
+
   test_function_assignment() async {
     await analyze('''
 class C {
@@ -902,6 +939,32 @@ void g(int k) {
     assertEdge(decoratedTypeAnnotation('int i').node, never, hard: true);
     assertNoEdge(always, decoratedTypeAnnotation('int j').node);
     assertEdge(decoratedTypeAnnotation('int k').node, never, hard: true);
+  }
+
+  test_functionExpressionInvocation_parameterType() async {
+    await analyze('''
+abstract class C {
+  void Function(int) f();
+}
+void g(C c, int i) {
+  c.f()(i);
+}
+''');
+    assertEdge(decoratedTypeAnnotation('int i').node,
+        decoratedTypeAnnotation('int)').node,
+        hard: true);
+  }
+
+  test_functionExpressionInvocation_returnType() async {
+    await analyze('''
+abstract class C {
+  int Function() f();
+}
+int g(C c) => c.f()();
+''');
+    assertEdge(decoratedTypeAnnotation('int Function').node,
+        decoratedTypeAnnotation('int g').node,
+        hard: false);
   }
 
   test_functionInvocation_parameter_fromLocalParameter() async {
@@ -1166,6 +1229,35 @@ C f(C c) => c..[0];
     assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true);
   }
 
+  test_instanceCreation_generic() async {
+    await analyze('''
+class C<T> {}
+C<int> f() => C<int>();
+''');
+    assertEdge(decoratedTypeAnnotation('int>(').node,
+        decoratedTypeAnnotation('int> f').node,
+        hard: false);
+  }
+
+  test_instanceCreation_generic_parameter() async {
+    await analyze('''
+class C<T> {
+  C(T t);
+}
+f(int i) => C<int>(i/*check*/);
+''');
+    var nullable_i = decoratedTypeAnnotation('int i').node;
+    var nullable_c_t = decoratedTypeAnnotation('C<int>').typeArguments[0].node;
+    var nullable_t = decoratedTypeAnnotation('T t').node;
+    var check_i = checkExpression('i/*check*/');
+    var nullable_c_t_or_nullable_t =
+        check_i.edges.single.destinationNode as NullabilityNodeForSubstitution;
+    expect(nullable_c_t_or_nullable_t.innerNode, same(nullable_c_t));
+    expect(nullable_c_t_or_nullable_t.outerNode, same(nullable_t));
+    assertNullCheck(check_i,
+        assertEdge(nullable_i, nullable_c_t_or_nullable_t, hard: true));
+  }
+
   test_instanceCreation_parameter_named_optional() async {
     await analyze('''
 class C {
@@ -1298,6 +1390,60 @@ List<String> f() {
 ''');
     assertNoUpstreamNullability(decoratedTypeAnnotation('List').node);
     assertEdge(always, decoratedTypeAnnotation('String>[').node, hard: false);
+  }
+
+  test_localVariable_type_inferred() async {
+    await analyze('''
+int f() => 1;
+main() {
+  var x = f();
+}
+''');
+    var xType =
+        variables.decoratedElementType(findNode.simple('x').staticElement);
+    assertUnion(xType.node, decoratedTypeAnnotation('int').node);
+  }
+
+  test_method_parameterType_inferred() async {
+    await analyze('''
+class B {
+  void f/*B*/(int x) {}
+}
+class C extends B {
+  void f/*C*/(x) {}
+}
+''');
+    var bReturnType = decoratedMethodType('f/*B*/').positionalParameters[0];
+    var cReturnType = decoratedMethodType('f/*C*/').positionalParameters[0];
+    assertUnion(bReturnType.node, cReturnType.node);
+  }
+
+  test_method_parameterType_inferred_named() async {
+    await analyze('''
+class B {
+  void f/*B*/({int x = 0}) {}
+}
+class C extends B {
+  void f/*C*/({x = 0}) {}
+}
+''');
+    var bReturnType = decoratedMethodType('f/*B*/').namedParameters['x'];
+    var cReturnType = decoratedMethodType('f/*C*/').namedParameters['x'];
+    assertUnion(bReturnType.node, cReturnType.node);
+  }
+
+  test_method_returnType_inferred() async {
+    await analyze('''
+class B {
+  int f/*B*/() => 1;
+}
+class C extends B {
+  f/*C*/() => 1;
+}
+''');
+    var bReturnType = decoratedMethodType('f/*B*/').returnType;
+    var cReturnType = decoratedMethodType('f/*C*/').returnType;
+    assertUnion(bReturnType.node, cReturnType.node);
   }
 
   test_methodDeclaration_resets_unconditional_control_flow() async {
@@ -1866,6 +2012,80 @@ void test(C c) {
         assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true));
   }
 
+  test_redirecting_constructor_factory() async {
+    await analyze('''
+class C {
+  factory C(int/*1*/ i, {int/*2*/ j}) = D;
+}
+class D implements C {
+  D(int/*3*/ i, {int/*4*/ j});
+}
+''');
+    assertEdge(decoratedTypeAnnotation('int/*1*/').node,
+        decoratedTypeAnnotation('int/*3*/').node,
+        hard: true);
+    assertEdge(decoratedTypeAnnotation('int/*2*/').node,
+        decoratedTypeAnnotation('int/*4*/').node,
+        hard: true);
+  }
+
+  test_redirecting_constructor_factory_from_generic_to_generic() async {
+    await analyze('''
+class C<T> {
+  factory C(T/*1*/ t) = D<T/*2*/>;
+}
+class D<U> implements C<U> {
+  D(U/*3*/ u);
+}
+''');
+    var nullable_t1 = decoratedTypeAnnotation('T/*1*/').node;
+    var nullable_t2 = decoratedTypeAnnotation('T/*2*/').node;
+    var nullable_u3 = decoratedTypeAnnotation('U/*3*/').node;
+    var nullable_t2_or_nullable_u3 = graph
+        .getDownstreamEdges(nullable_t1)
+        .single
+        .destinationNode as NullabilityNodeForSubstitution;
+    expect(nullable_t2_or_nullable_u3.innerNode, same(nullable_t2));
+    expect(nullable_t2_or_nullable_u3.outerNode, same(nullable_u3));
+    assertEdge(nullable_t1, nullable_t2_or_nullable_u3, hard: true);
+  }
+
+  test_redirecting_constructor_factory_to_generic() async {
+    await analyze('''
+class C {
+  factory C(int/*1*/ i) = D<int/*2*/>;
+}
+class D<T> implements C {
+  D(T/*3*/ i);
+}
+''');
+    var nullable_i1 = decoratedTypeAnnotation('int/*1*/').node;
+    var nullable_i2 = decoratedTypeAnnotation('int/*2*/').node;
+    var nullable_t3 = decoratedTypeAnnotation('T/*3*/').node;
+    var nullable_i2_or_nullable_t3 = graph
+        .getDownstreamEdges(nullable_i1)
+        .single
+        .destinationNode as NullabilityNodeForSubstitution;
+    expect(nullable_i2_or_nullable_t3.innerNode, same(nullable_i2));
+    expect(nullable_i2_or_nullable_t3.outerNode, same(nullable_t3));
+    assertEdge(nullable_i1, nullable_i2_or_nullable_t3, hard: true);
+  }
+
+  test_redirecting_constructor_ordinary() async {
+    await analyze('''
+class C {
+  C(int/*1*/ i, int/*2*/ j) : this.named(j, i);
+  C.named(int/*3*/ j, int/*4*/ i);
+}
+''');
+    assertEdge(decoratedTypeAnnotation('int/*1*/').node,
+        decoratedTypeAnnotation('int/*4*/').node,
+        hard: true);
+    assertEdge(decoratedTypeAnnotation('int/*2*/').node,
+        decoratedTypeAnnotation('int/*3*/').node,
+        hard: true);
+  }
+
   test_return_function_type_simple() async {
     await analyze('''
 int/*1*/ Function() f(int/*2*/ Function() x) => x;
@@ -2201,6 +2421,16 @@ double get myPi => pi;
 ''');
     var myPiType = decoratedTypeAnnotation('double get');
     assertEdge(never, myPiType.node, hard: false);
+  }
+
+  test_topLevelVariable_type_inferred() async {
+    await analyze('''
+int f() => 1;
+var x = f();
+''');
+    var xType =
+        variables.decoratedElementType(findNode.simple('x').staticElement);
+    assertUnion(xType.node, decoratedTypeAnnotation('int').node);
   }
 
   test_type_argument_explicit_bound() async {

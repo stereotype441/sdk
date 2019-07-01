@@ -57,20 +57,6 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType> {
       : _nonNullableObjectType =
             DecoratedType(_typeProvider.objectType, _graph.never);
 
-  /// Creates and stores a [DecoratedType] object corresponding to the given
-  /// [type] AST, and returns it.
-  DecoratedType decorateType(TypeAnnotation type, AstNode enclosingNode) {
-    return type == null
-        // TODO(danrubel): Return something other than this
-        // to indicate that we should insert a type for the declaration
-        // that is missing a type reference.
-        ? new DecoratedType(
-            DynamicTypeImpl.instance,
-            NullabilityNode.forInferredDynamicType(
-                _graph, _source, enclosingNode.offset))
-        : type.accept(this);
-  }
-
   @override
   DecoratedType visitClassDeclaration(ClassDeclaration node) {
     node.metadata.accept(this);
@@ -126,8 +112,8 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType> {
 
   @override
   DecoratedType visitConstructorDeclaration(ConstructorDeclaration node) {
-    _handleExecutableDeclaration(
-        node.declaredElement, null, node.parameters, node.body, node);
+    _handleExecutableDeclaration(node.declaredElement, null, node.parameters,
+        node.body, node.redirectedConstructor, node);
     return null;
   }
 
@@ -148,26 +134,19 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType> {
 
   @override
   DecoratedType visitFieldFormalParameter(FieldFormalParameter node) {
-    // TODO(brianwilkerson)
-    _unimplemented(node, 'FieldFormalParameter');
-  }
-
-  @override
-  DecoratedType visitFormalParameter(FormalParameter node) {
-    // Do not visit children
-    // TODO(paulberry): handle all types of formal parameters
-    // - NormalFormalParameter
-    // - SimpleFormalParameter
-    // - FieldFormalParameter
-    // - FunctionTypedFormalParameter
-    // - DefaultFormalParameter
-    return null;
+    return _handleFormalParameter(node.declaredElement, node.metadata,
+        node.type, node.typeParameters, node.parameters);
   }
 
   @override
   DecoratedType visitFunctionDeclaration(FunctionDeclaration node) {
-    _handleExecutableDeclaration(node.declaredElement, node.returnType,
-        node.functionExpression.parameters, node.functionExpression.body, node);
+    _handleExecutableDeclaration(
+        node.declaredElement,
+        node.returnType,
+        node.functionExpression.parameters,
+        node.functionExpression.body,
+        null,
+        node);
     return null;
   }
 
@@ -180,14 +159,14 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType> {
   @override
   DecoratedType visitFunctionTypedFormalParameter(
       FunctionTypedFormalParameter node) {
-    // TODO(brianwilkerson)
-    _unimplemented(node, 'FunctionTypedFormalParameter');
+    return _handleFormalParameter(node.declaredElement, node.metadata,
+        node.returnType, node.typeParameters, node.parameters);
   }
 
   @override
   DecoratedType visitMethodDeclaration(MethodDeclaration node) {
     _handleExecutableDeclaration(node.declaredElement, node.returnType,
-        node.parameters, node.body, node);
+        node.parameters, node.body, null, node);
     return null;
   }
 
@@ -221,15 +200,8 @@ $stackTrace''');
 
   @override
   DecoratedType visitSimpleFormalParameter(SimpleFormalParameter node) {
-    var type = decorateType(node.type, node);
-    var declaredElement = node.declaredElement;
-    _variables.recordDecoratedElementType(declaredElement, type);
-    if (declaredElement.isNamed) {
-      _namedParameters[declaredElement.name] = type;
-    } else {
-      _positionalParameters.add(type);
-    }
-    return type;
+    return _handleFormalParameter(
+        node.declaredElement, node.metadata, node.type, null, null);
   }
 
   @override
@@ -247,7 +219,7 @@ $stackTrace''');
       return decoratedType;
     }
     var typeArguments = const <DecoratedType>[];
-    DecoratedType returnType;
+    DecoratedType decoratedReturnType;
     var positionalParameters = const <DecoratedType>[];
     var namedParameters = const <String, DecoratedType>{};
     if (type is InterfaceType && type.typeParameters.isNotEmpty) {
@@ -265,7 +237,10 @@ $stackTrace''');
       }
     }
     if (node is GenericFunctionType) {
-      returnType = decorateType(node.returnType, node);
+      var returnType = node.returnType;
+      decoratedReturnType = returnType == null
+          ? DecoratedType.forImplicitType(DynamicTypeImpl.instance, _graph)
+          : returnType.accept(this);
       if (node.typeParameters != null) {
         // TODO(paulberry)
         _unimplemented(node, 'Generic function type with type parameters');
@@ -298,7 +273,7 @@ $stackTrace''');
     }
     var decoratedType = DecoratedTypeAnnotation(type, nullabilityNode, node.end,
         typeArguments: typeArguments,
-        returnType: returnType,
+        returnType: decoratedReturnType,
         positionalParameters: positionalParameters,
         namedParameters: namedParameters);
     _variables.recordDecoratedTypeAnnotation(_source, node, decoratedType);
@@ -325,20 +300,31 @@ $stackTrace''');
   @override
   DecoratedType visitTypeParameter(TypeParameter node) {
     var element = node.declaredElement;
-    var decoratedBound = node.bound?.accept(this) ??
-        DecoratedType(
-            element.bound ?? _typeProvider.objectType,
-            NullabilityNode.forInferredDynamicType(
-                _graph, _source, node.offset));
+    var bound = node.bound;
+    DecoratedType decoratedBound;
+    if (bound != null) {
+      decoratedBound = bound.accept(this);
+    } else {
+      var nullabilityNode = NullabilityNode.forInferredType();
+      _graph.union(_graph.always, nullabilityNode,
+          AlwaysNullableTypeOrigin(_source, node.offset));
+      decoratedBound = DecoratedType(_typeProvider.objectType, nullabilityNode);
+    }
     _variables.recordDecoratedElementType(element, decoratedBound);
     return null;
   }
 
   @override
   DecoratedType visitVariableDeclarationList(VariableDeclarationList node) {
-    var type = decorateType(node.type, node);
+    node.metadata.accept(this);
+    var typeAnnotation = node.type;
+    var type = typeAnnotation?.accept(this);
     for (var variable in node.variables) {
-      _variables.recordDecoratedElementType(variable.declaredElement, type);
+      variable.metadata.accept(this);
+      var declaredElement = variable.declaredElement;
+      _variables.recordDecoratedElementType(declaredElement,
+          type ?? DecoratedType.forImplicitType(declaredElement.type, _graph));
+      variable.initializer?.accept(this);
     }
     return null;
   }
@@ -366,25 +352,32 @@ $stackTrace''');
       TypeAnnotation returnType,
       FormalParameterList parameters,
       FunctionBody body,
+      ConstructorName redirectedConstructor,
       AstNode enclosingNode) {
+    var functionType = declaredElement.type;
     DecoratedType decoratedReturnType;
-    if (returnType == null && declaredElement is ConstructorElement) {
+    if (returnType != null) {
+      decoratedReturnType = returnType.accept(this);
+    } else if (declaredElement is ConstructorElement) {
       // Constructors have no explicit return type annotation, so use the
       // implicit return type.
       decoratedReturnType = _createDecoratedTypeForClass(
           declaredElement.enclosingElement, parameters.parent);
     } else {
-      decoratedReturnType = decorateType(returnType, enclosingNode);
+      // Inferred return type.
+      decoratedReturnType =
+          DecoratedType.forImplicitType(functionType.returnType, _graph);
     }
     var previousPositionalParameters = _positionalParameters;
     var previousNamedParameters = _namedParameters;
     _positionalParameters = [];
     _namedParameters = {};
-    DecoratedType functionType;
+    DecoratedType decoratedFunctionType;
     try {
       parameters?.accept(this);
       body?.accept(this);
-      functionType = DecoratedType(declaredElement.type, _graph.never,
+      redirectedConstructor?.accept(this);
+      decoratedFunctionType = DecoratedType(functionType, _graph.never,
           returnType: decoratedReturnType,
           positionalParameters: _positionalParameters,
           namedParameters: _namedParameters);
@@ -392,7 +385,30 @@ $stackTrace''');
       _positionalParameters = previousPositionalParameters;
       _namedParameters = previousNamedParameters;
     }
-    _variables.recordDecoratedElementType(declaredElement, functionType);
+    _variables.recordDecoratedElementType(
+        declaredElement, decoratedFunctionType);
+  }
+
+  DecoratedType _handleFormalParameter(
+      ParameterElement declaredElement,
+      NodeList<Annotation> metadata,
+      TypeAnnotation type,
+      TypeParameterList typeParameters,
+      FormalParameterList parameters) {
+    if (typeParameters != null || parameters != null) {
+      _unimplemented(parameters, 'FunctionTypedFormalParameter');
+    }
+    metadata?.accept(this);
+    var decoratedType = type != null
+        ? type.accept(this)
+        : DecoratedType.forImplicitType(declaredElement.type, _graph);
+    _variables.recordDecoratedElementType(declaredElement, decoratedType);
+    if (declaredElement.isNamed) {
+      _namedParameters[declaredElement.name] = decoratedType;
+    } else {
+      _positionalParameters.add(decoratedType);
+    }
+    return decoratedType;
   }
 
   void _handleSupertypeClauses(
@@ -491,9 +507,10 @@ abstract class VariableRepository {
   /// Retrieves the [DecoratedType] associated with the static type of the given
   /// [element].
   ///
-  /// If [create] is `true`, and no decorated type is found for the given
-  /// element, one is synthesized using [DecoratedType.forElement].
-  DecoratedType decoratedElementType(Element element, {bool create: false});
+  /// If no decorated type is found for the given element, and the element is in
+  /// a library that's not being migrated, a decorated type is synthesized using
+  /// [DecoratedType.forElement].
+  DecoratedType decoratedElementType(Element element);
 
   /// Gets the [DecoratedType] associated with the given [typeAnnotation].
   DecoratedType decoratedTypeAnnotation(

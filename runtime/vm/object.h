@@ -5726,7 +5726,7 @@ class Bytecode : public Object {
 
   RawExternalTypedData* GetBinary(Zone* zone) const;
 
-  TokenPosition GetTokenIndexOfPC(uword pc) const;
+  TokenPosition GetTokenIndexOfPC(uword return_address) const;
   intptr_t GetTryIndexAtPc(uword return_address) const;
 
   intptr_t instructions_binary_offset() const {
@@ -7329,9 +7329,7 @@ class Smi : public Integer {
     return reinterpret_cast<intptr_t>(New(value));
   }
 
-  static bool IsValid(int64_t value) {
-    return (value >= kMinValue) && (value <= kMaxValue);
-  }
+  static bool IsValid(int64_t value) { return compiler::target::IsSmi(value); }
 
   void operator=(RawSmi* value) {
     raw_ = value;

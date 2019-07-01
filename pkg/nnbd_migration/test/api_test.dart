@@ -813,6 +813,147 @@ int f(int i) {
     await _checkSingleFileChanges(content, expected);
   }
 
+  test_field_formal_param_typed() async {
+    var content = '''
+class C {
+  int i;
+  C(int this.i);
+}
+main() {
+  C(null);
+}
+''';
+    var expected = '''
+class C {
+  int? i;
+  C(int? this.i);
+}
+main() {
+  C(null);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_field_formal_param_typed_non_nullable() async {
+    var content = '''
+class C {
+  int/*!*/ i;
+  C(int this.i);
+}
+void f(int i, bool b) {
+  if (b) {
+    C(i);
+  }
+}
+main() {
+  f(null, false);
+}
+''';
+    var expected = '''
+class C {
+  int/*!*/ i;
+  C(int this.i);
+}
+void f(int? i, bool b) {
+  if (b) {
+    C(i!);
+  }
+}
+main() {
+  f(null, false);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_field_formal_param_untyped() async {
+    var content = '''
+class C {
+  int i;
+  C(this.i);
+}
+main() {
+  C(null);
+}
+''';
+    var expected = '''
+class C {
+  int? i;
+  C(this.i);
+}
+main() {
+  C(null);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_field_type_inferred() async {
+    var content = '''
+int f() => null;
+class C {
+  var x = 1;
+  void g() {
+    x = f();
+  }
+}
+''';
+    // The type of x is inferred from its initializer, so it is non-nullable,
+    // even though we try to assign a nullable value to it.  So a null check
+    // must be added.
+    var expected = '''
+int? f() => null;
+class C {
+  var x = 1;
+  void g() {
+    x = f()!;
+  }
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_function_expression_invocation() async {
+    var content = '''
+abstract class C {
+  void Function(int) f();
+  int/*?*/ Function() g();
+}
+int test(C c) {
+  c.f()(null);
+  return c.g()();
+}
+''';
+    var expected = '''
+abstract class C {
+  void Function(int?) f();
+  int?/*?*/ Function() g();
+}
+int? test(C c) {
+  c.f()(null);
+  return c.g()();
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_generic_function_type_syntax_inferred_dynamic_return() async {
+    var content = '''
+abstract class C {
+  Function() f();
+}
+Object g(C c) => c.f()();
+''';
+    var expected = '''
+abstract class C {
+  Function() f();
+}
+Object? g(C c) => c.f()();
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_genericType_noTypeArguments() async {
     var content = '''
 void f(C c) {}
@@ -878,6 +1019,148 @@ int f(int x) {
     await _checkSingleFileChanges(content, expected);
   }
 
+  test_inferred_method_parameter_type_non_nullable() async {
+    var content = '''
+class B {
+  void f(int i) {
+    assert(i != null);
+  }
+}
+class C extends B {
+  void f(i) {}
+}
+void g(C c, int i, bool b) {
+  if (b) {
+    c.f(i);
+  }
+}
+void h(C c) {
+  g(c, null, false);
+}
+''';
+    // B.f's parameter type is `int`.  Since C.f's parameter type is inferred
+    // from B.f's, it has a parameter type of `int` too.  Therefore there must
+    // be a null check in g().
+    var expected = '''
+class B {
+  void f(int i) {
+    assert(i != null);
+  }
+}
+class C extends B {
+  void f(i) {}
+}
+void g(C c, int? i, bool b) {
+  if (b) {
+    c.f(i!);
+  }
+}
+void h(C c) {
+  g(c, null, false);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_inferred_method_parameter_type_nullable() async {
+    var content = '''
+class B {
+  void f(int i) {}
+}
+class C extends B {
+  void f(i) {}
+}
+void g(C c) {
+  c.f(null);
+}
+''';
+    // The call to C.f from g forces C.f's parameter to be nullable.  Since
+    // C.f's parameter type is inferred from B.f's parameter type, B.f's
+    // parameter must be nullable too.
+    var expected = '''
+class B {
+  void f(int? i) {}
+}
+class C extends B {
+  void f(i) {}
+}
+void g(C c) {
+  c.f(null);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_inferred_method_return_type_non_nullable() async {
+    var content = '''
+class B {
+  int f() => 1;
+}
+class C extends B {
+  f() => 1;
+}
+int g(C c) => c.f();
+''';
+    // B.f's return type is `int`.  Since C.f's return type is inferred from
+    // B.f's, it has a return type of `int` too.  Therefore g's return type
+    // must be `int`.
+    var expected = '''
+class B {
+  int f() => 1;
+}
+class C extends B {
+  f() => 1;
+}
+int g(C c) => c.f();
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_inferred_method_return_type_nullable() async {
+    var content = '''
+class B {
+  int f() => null;
+}
+class C extends B {
+  f() => 1;
+}
+int g(C c) => c.f();
+''';
+    // B.f's return type is `int?`.  Since C.f's return type is inferred from
+    // B.f's, it has a return type of `int?` too.  Therefore g's return type
+    // must be `int?`.
+    var expected = '''
+class B {
+  int? f() => null;
+}
+class C extends B {
+  f() => 1;
+}
+int? g(C c) => c.f();
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_instance_creation_generic() async {
+    var content = '''
+class C<T> {
+  C(T t);
+}
+main() {
+  C<int> c = C<int>(null);
+}
+''';
+    var expected = '''
+class C<T> {
+  C(T t);
+}
+main() {
+  C<int?> c = C<int?>(null);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_instanceCreation_noTypeArguments_noParameters() async {
     var content = '''
 void main() {
@@ -895,6 +1178,27 @@ void main() {
 }
 class C {
   int get length => 0;
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_localVariable_type_inferred() async {
+    var content = '''
+int f() => null;
+void main() {
+  var x = 1;
+  x = f();
+}
+''';
+    // The type of x is inferred from its initializer, so it is non-nullable,
+    // even though we try to assign a nullable value to it.  So a null check
+    // must be added.
+    var expected = '''
+int? f() => null;
+void main() {
+  var x = 1;
+  x = f()!;
 }
 ''';
     await _checkSingleFileChanges(content, expected);
@@ -1379,6 +1683,54 @@ main() {
     await _checkSingleFileChanges(content, expected);
   }
 
+  test_redirecting_constructor_factory() async {
+    var content = '''
+class C {
+  factory C(int i, int j) = D;
+}
+class D implements C {
+  D(int i, int j);
+}
+main() {
+  C(null, 1);
+}
+''';
+    var expected = '''
+class C {
+  factory C(int? i, int j) = D;
+}
+class D implements C {
+  D(int? i, int j);
+}
+main() {
+  C(null, 1);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_redirecting_constructor_ordinary() async {
+    var content = '''
+class C {
+  C(int i, int j) : this.named(j, i);
+  C.named(int j, int i);
+}
+main() {
+  C(null, 1);
+}
+''';
+    var expected = '''
+class C {
+  C(int? i, int j) : this.named(j, i);
+  C.named(int j, int? i);
+}
+main() {
+  C(null, 1);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_single_file_multiple_changes() async {
     var content = '''
 int f() => null;
@@ -1397,6 +1749,49 @@ int f() => null;
 ''';
     var expected = '''
 int? f() => null;
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_topLevelFunction_parameterType_implicit_dynamic() async {
+    var content = '''
+Object f(x) => x;
+''';
+    var expected = '''
+Object? f(x) => x;
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_topLevelFunction_returnType_implicit_dynamic() async {
+    var content = '''
+f() {}
+Object g() => f();
+''';
+    var expected = '''
+f() {}
+Object? g() => f();
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_topLevelVariable_type_inferred() async {
+    var content = '''
+int f() => null;
+var x = 1;
+void main() {
+  x = f();
+}
+''';
+    // The type of x is inferred from its initializer, so it is non-nullable,
+    // even though we try to assign a nullable value to it.  So a null check
+    // must be added.
+    var expected = '''
+int? f() => null;
+var x = 1;
+void main() {
+  x = f()!;
+}
 ''';
     await _checkSingleFileChanges(content, expected);
   }

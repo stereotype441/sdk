@@ -140,6 +140,11 @@ class MigrationVisitorTestBase extends AbstractSingleUnitTest {
     fail('Expected union between $x and $y, not found');
   }
 
+  /// Gets the [DecoratedType] associated with the constructor declaration whose
+  /// name matches [search].
+  DecoratedType decoratedConstructorDeclaration(String search) => variables
+      .decoratedElementType(findNode.constructor(search).declaredElement);
+
   Map<ClassElement, DecoratedType> decoratedDirectSupertypes(String name) {
     return variables.decoratedDirectSupertypes(findElement.classOrMixin(name));
   }
@@ -150,6 +155,11 @@ class MigrationVisitorTestBase extends AbstractSingleUnitTest {
     return variables.decoratedTypeAnnotation(
         testSource, findNode.genericFunctionType(text));
   }
+
+  /// Gets the [DecoratedType] associated with the method declaration whose
+  /// name matches [search].
+  DecoratedType decoratedMethodType(String search) => variables
+      .decoratedElementType(findNode.methodDeclaration(search).declaredElement);
 
   /// Gets the [DecoratedType] associated with the type annotation whose text
   /// is [text].

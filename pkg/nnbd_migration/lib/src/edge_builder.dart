@@ -125,8 +125,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
         baseElement.isSynthetic &&
         !baseElement.variable.isSynthetic) {
       var variable = baseElement.variable;
-      var decoratedElementType =
-          _variables.decoratedElementType(variable, create: true);
+      var decoratedElementType = _variables.decoratedElementType(variable);
       if (baseElement.isGetter) {
         decoratedBaseType = DecoratedType(baseElement.type, _graph.never,
             returnType: decoratedElementType);
@@ -137,12 +136,13 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
             returnType: _functionTypeReturn(baseElement.type));
       }
     } else {
-      decoratedBaseType =
-          _variables.decoratedElementType(baseElement, create: true);
+      decoratedBaseType = _variables.decoratedElementType(baseElement);
     }
     if (substitution != null) {
       DartType elementType;
       if (element is MethodElement) {
+        elementType = element.type;
+      } else if (element is ConstructorElement) {
         elementType = element.type;
       } else {
         throw element.runtimeType; // TODO(paulberry)
@@ -301,8 +301,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
           .substitute(_decoratedClassHierarchy
               .getDecoratedSupertype(classElement, superElement)
               .asSubstitution);
-      var superConstructorDecoratedType = _variables
-          .decoratedElementType(superConstructorElement, create: true);
+      var superConstructorDecoratedType =
+          _variables.decoratedElementType(superConstructorElement);
       var origin = ImplicitMixinSuperCallOrigin(_source, node.offset);
       _unionDecoratedTypeParameters(
           constructorDecoratedType, superConstructorDecoratedType, origin);
@@ -337,16 +337,21 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
 
   @override
   DecoratedType visitConstructorDeclaration(ConstructorDeclaration node) {
-    if (node.redirectedConstructor != null) {
-      _unimplemented(node, 'Redirected constructor');
-    }
-    _handleExecutableDeclaration(node.declaredElement, node.metadata, null,
-        node.parameters, node.initializers, node.body);
+    _handleExecutableDeclaration(
+        node,
+        node.declaredElement,
+        node.metadata,
+        null,
+        node.parameters,
+        node.initializers,
+        node.body,
+        node.redirectedConstructor);
     return null;
   }
 
   @override
   DecoratedType visitDefaultFormalParameter(DefaultFormalParameter node) {
+    node.parameter.accept(this);
     var defaultValue = node.defaultValue;
     if (defaultValue == null) {
       if (node.declaredElement.hasRequired) {
@@ -385,6 +390,21 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
   }
 
   @override
+  DecoratedType visitFieldFormalParameter(FieldFormalParameter node) {
+    var parameterElement = node.declaredElement as FieldFormalParameterElement;
+    var parameterType = _variables.decoratedElementType(parameterElement);
+    var fieldType = _variables.decoratedElementType(parameterElement.field);
+    var origin = FieldFormalParameterOrigin(_source, node.offset);
+    if (node.type == null) {
+      _unionDecoratedTypes(parameterType, fieldType, origin);
+    } else {
+      _checkAssignment(origin,
+          source: parameterType, destination: fieldType, hard: true);
+    }
+    return null;
+  }
+
+  @override
   DecoratedType visitFunctionDeclaration(FunctionDeclaration node) {
     node.functionExpression.parameters?.accept(this);
     assert(_currentFunctionType == null);
@@ -408,8 +428,9 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
   @override
   DecoratedType visitFunctionExpressionInvocation(
       FunctionExpressionInvocation node) {
-    // TODO(brianwilkerson)
-    _unimplemented(node, 'FunctionExpressionInvocation');
+    DecoratedType calleeType = node.function.accept(this);
+    return _handleInvocationArguments(node, node.argumentList.arguments,
+        node.typeArguments, calleeType, null);
   }
 
   @override
@@ -475,16 +496,22 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
   DecoratedType visitInstanceCreationExpression(
       InstanceCreationExpression node) {
     var callee = node.staticElement;
-    var calleeType = getOrComputeElementType(callee);
-    if (callee.enclosingElement.typeParameters.isNotEmpty) {
-      // If the class has type parameters then we might need to substitute the
-      // appropriate type arguments.
-      // TODO(brianwilkerson)
-      _unimplemented(node, 'Instance creation expression with type arguments');
+    var typeParameters = callee.enclosingElement.typeParameters;
+    List<DecoratedType> decoratedTypeArguments;
+    var typeArguments = node.constructorName.type.typeArguments;
+    if (typeArguments != null) {
+      decoratedTypeArguments = typeArguments.arguments
+          .map((t) => _variables.decoratedTypeAnnotation(_source, t))
+          .toList();
+    } else {
+      decoratedTypeArguments = const [];
     }
-    _handleInvocationArguments(
-        node.argumentList, node.constructorName.type.typeArguments, calleeType);
-    return calleeType.returnType;
+    var createdType = DecoratedType(node.staticType, _graph.never,
+        typeArguments: decoratedTypeArguments);
+    var calleeType = getOrComputeElementType(callee, targetType: createdType);
+    _handleInvocationArguments(node, node.argumentList.arguments, typeArguments,
+        calleeType, typeParameters);
+    return createdType;
   }
 
   @override
@@ -549,8 +576,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
     if (node.typeParameters != null) {
       _unimplemented(node, 'Generic method');
     }
-    _handleExecutableDeclaration(node.declaredElement, node.metadata,
-        node.returnType, node.parameters, null, node.body);
+    _handleExecutableDeclaration(node, node.declaredElement, node.metadata,
+        node.returnType, node.parameters, null, node.body, null);
     return null;
   }
 
@@ -573,9 +600,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
       _unimplemented(node, 'Unresolved method name');
     }
     var calleeType = getOrComputeElementType(callee, targetType: targetType);
-    // TODO(paulberry): substitute if necessary
-    var expressionType = _handleInvocationArguments(
-        node.argumentList, node.typeArguments, calleeType);
+    var expressionType = _handleInvocationArguments(node,
+        node.argumentList.arguments, node.typeArguments, calleeType, null);
     if (isConditional) {
       expressionType = expressionType.withNode(
           NullabilityNode.forLUB(targetType.node, expressionType.node));
@@ -684,6 +710,16 @@ $stackTrace''');
   @override
   DecoratedType visitPropertyAccess(PropertyAccess node) {
     return _handlePropertyAccess(node, node.realTarget, node.propertyName);
+  }
+
+  @override
+  DecoratedType visitRedirectingConstructorInvocation(
+      RedirectingConstructorInvocation node) {
+    var callee = node.constructorName.staticElement;
+    var calleeType = _variables.decoratedElementType(callee);
+    _handleInvocationArguments(
+        node, node.argumentList.arguments, null, calleeType, null);
+    return null;
   }
 
   @override
@@ -814,15 +850,13 @@ $stackTrace''');
         for (int i = 0; i < instantiatedType.typeArguments.length; i++) {
           _unionDecoratedTypes(
               instantiatedType.typeArguments[i],
-              _variables.decoratedElementType(element.typeParameters[i],
-                  create: true),
+              _variables.decoratedElementType(element.typeParameters[i]),
               origin);
         }
       } else {
         for (int i = 0; i < typeArguments.length; i++) {
           DecoratedType bound;
-          bound = _variables.decoratedElementType(element.typeParameters[i],
-              create: true);
+          bound = _variables.decoratedElementType(element.typeParameters[i]);
           var argumentType =
               _variables.decoratedTypeAnnotation(_source, typeArguments[i]);
           if (argumentType == null) {
@@ -838,29 +872,42 @@ $stackTrace''');
   }
 
   @override
-  DecoratedType visitVariableDeclaration(VariableDeclaration node) {
-    var destinationType = getOrComputeElementType(node.declaredElement);
-    var initializer = node.initializer;
-    if (initializer == null) {
-      // TODO(paulberry)
-      _unimplemented(node, 'Variable declaration with no initializer');
-    } else {
-      _handleAssignment(initializer, destinationType);
+  DecoratedType visitVariableDeclarationList(VariableDeclarationList node) {
+    node.metadata.accept(this);
+    var typeAnnotation = node.type;
+    for (var variable in node.variables) {
+      variable.metadata.accept(this);
+      var initializer = variable.initializer;
+      if (initializer != null) {
+        var destinationType = getOrComputeElementType(variable.declaredElement);
+        if (typeAnnotation == null) {
+          var initializerType = initializer.accept(this);
+          if (initializerType == null) {
+            throw StateError('No type computed for ${initializer.runtimeType} '
+                '(${initializer.toSource()}) offset=${initializer.offset}');
+          }
+          _unionDecoratedTypes(initializerType, destinationType,
+              InitializerInferenceOrigin(_source, variable.name.offset));
+        } else {
+          _handleAssignment(initializer, destinationType);
+        }
+      }
     }
     return null;
   }
 
   /// Creates the necessary constraint(s) for an assignment from [source] to
-  /// [destination].  [expressionChecks] tracks checks that might have to be
-  /// done on the type of an expression.  [hard] indicates whether a hard edge
-  /// should be created.
-  void _checkAssignment(ExpressionChecks expressionChecks,
+  /// [destination].  [origin] should be used as the origin for any edges
+  /// created.  [hard] indicates whether a hard edge should be created.
+  void _checkAssignment(EdgeOrigin origin,
       {@required DecoratedType source,
       @required DecoratedType destination,
       @required bool hard}) {
-    var edge = _graph.connect(source.node, destination.node, expressionChecks,
+    var edge = _graph.connect(source.node, destination.node, origin,
         guards: _guards, hard: hard);
-    expressionChecks?.edges?.add(edge);
+    if (origin is ExpressionChecks) {
+      origin.edges.add(edge);
+    }
     // TODO(paulberry): generalize this.
     if ((_isSimple(source) || destination.type.isObject) &&
         _isSimple(destination)) {
@@ -870,14 +917,14 @@ $stackTrace''');
         source.type.element == destination.type.element) {
       assert(source.typeArguments.length == destination.typeArguments.length);
       for (int i = 0; i < source.typeArguments.length; i++) {
-        _checkAssignment(expressionChecks,
+        _checkAssignment(origin,
             source: source.typeArguments[i],
             destination: destination.typeArguments[i],
             hard: false);
       }
     } else if (source.type is FunctionType &&
         destination.type is FunctionType) {
-      _checkAssignment(expressionChecks,
+      _checkAssignment(origin,
           source: source.returnType,
           destination: destination.returnType,
           hard: hard);
@@ -890,14 +937,14 @@ $stackTrace''');
               i < destination.positionalParameters.length;
           i++) {
         // Note: source and destination are swapped due to contravariance.
-        _checkAssignment(expressionChecks,
+        _checkAssignment(origin,
             source: destination.positionalParameters[i],
             destination: source.positionalParameters[i],
             hard: hard);
       }
       for (var entry in destination.namedParameters.entries) {
         // Note: source and destination are swapped due to contravariance.
-        _checkAssignment(expressionChecks,
+        _checkAssignment(origin,
             source: entry.value,
             destination: source.namedParameters[entry.key],
             hard: hard);
@@ -962,13 +1009,31 @@ $stackTrace''');
     return sourceType;
   }
 
+  void _handleConstructorRedirection(
+      FormalParameterList parameters, ConstructorName redirectedConstructor) {
+    var callee = redirectedConstructor.staticElement;
+    if (callee is ConstructorMember) {
+      callee = (callee as ConstructorMember).baseElement;
+    }
+    var redirectedClass = callee.enclosingElement;
+    var calleeType = _variables.decoratedElementType(callee);
+    _handleInvocationArguments(
+        redirectedConstructor,
+        parameters.parameters,
+        redirectedConstructor.type.typeArguments,
+        calleeType,
+        redirectedClass.typeParameters);
+  }
+
   void _handleExecutableDeclaration(
+      AstNode node,
       ExecutableElement declaredElement,
       NodeList<Annotation> metadata,
       TypeAnnotation returnType,
       FormalParameterList parameters,
       NodeList<ConstructorInitializer> initializers,
-      FunctionBody body) {
+      FunctionBody body,
+      ConstructorName redirectedConstructor) {
     assert(_currentFunctionType == null);
     metadata.accept(this);
     returnType?.accept(this);
@@ -978,8 +1043,12 @@ $stackTrace''');
     try {
       initializers?.accept(this);
       body.accept(this);
+      if (redirectedConstructor != null) {
+        _handleConstructorRedirection(parameters, redirectedConstructor);
+      }
       if (declaredElement is! ConstructorElement) {
         var classElement = declaredElement.enclosingElement as ClassElement;
+        var origin = InheritanceOrigin(_source, node.offset);
         for (var overridden in _inheritanceManager.getOverridden(
                 classElement.type,
                 Name(classElement.library.source.uri, declaredElement.name)) ??
@@ -993,11 +1062,61 @@ $stackTrace''');
           var decoratedSupertype = _decoratedClassHierarchy
               .getDecoratedSupertype(classElement, overriddenClass);
           var substitution = decoratedSupertype.asSubstitution;
-          _checkAssignment(null,
-              source: _currentFunctionType,
-              destination:
-                  decoratedOverriddenFunctionType.substitute(substitution),
-              hard: true);
+          var overriddenFunctionType =
+              decoratedOverriddenFunctionType.substitute(substitution);
+          if (returnType == null) {
+            _unionDecoratedTypes(_currentFunctionType.returnType,
+                overriddenFunctionType.returnType, origin);
+          } else {
+            _checkAssignment(origin,
+                source: _currentFunctionType.returnType,
+                destination: overriddenFunctionType.returnType,
+                hard: true);
+          }
+          if (parameters != null) {
+            int positionalParameterCount = 0;
+            for (var parameter in parameters.parameters) {
+              NormalFormalParameter normalParameter;
+              if (parameter is NormalFormalParameter) {
+                normalParameter = parameter;
+              } else {
+                normalParameter =
+                    (parameter as DefaultFormalParameter).parameter;
+              }
+              DecoratedType currentParameterType;
+              DecoratedType overriddenParameterType;
+              if (parameter.isNamed) {
+                var name = normalParameter.identifier.name;
+                currentParameterType =
+                    _currentFunctionType.namedParameters[name];
+                overriddenParameterType =
+                    overriddenFunctionType.namedParameters[name];
+              } else {
+                if (positionalParameterCount <
+                    _currentFunctionType.positionalParameters.length) {
+                  currentParameterType = _currentFunctionType
+                      .positionalParameters[positionalParameterCount];
+                }
+                if (positionalParameterCount <
+                    overriddenFunctionType.positionalParameters.length) {
+                  overriddenParameterType = overriddenFunctionType
+                      .positionalParameters[positionalParameterCount];
+                }
+                positionalParameterCount++;
+              }
+              if (overriddenParameterType != null) {
+                if (_isUntypedParameter(normalParameter)) {
+                  _unionDecoratedTypes(
+                      overriddenParameterType, currentParameterType, origin);
+                } else {
+                  _checkAssignment(origin,
+                      source: overriddenParameterType,
+                      destination: currentParameterType,
+                      hard: true);
+                }
+              }
+            }
+          }
         }
       }
     } finally {
@@ -1010,44 +1129,67 @@ $stackTrace''');
   ///
   /// Returns the decorated return type of the invocation, after any necessary
   /// substitutions.
-  DecoratedType _handleInvocationArguments(ArgumentList argumentList,
-      TypeArgumentList typeArguments, DecoratedType calleeType) {
-    var typeFormals = calleeType.typeFormals;
+  DecoratedType _handleInvocationArguments(
+      AstNode node,
+      Iterable<AstNode> arguments,
+      TypeArgumentList typeArguments,
+      DecoratedType calleeType,
+      List<TypeParameterElement> constructorTypeParameters) {
+    var typeFormals = constructorTypeParameters ?? calleeType.typeFormals;
     if (typeFormals.isNotEmpty) {
       if (typeArguments != null) {
-        calleeType = calleeType.instantiate(typeArguments.arguments
+        var argumentTypes = typeArguments.arguments
             .map((t) => _variables.decoratedTypeAnnotation(_source, t))
-            .toList());
+            .toList();
+        if (constructorTypeParameters != null) {
+          calleeType = calleeType.substitute(
+              Map<TypeParameterElement, DecoratedType>.fromIterables(
+                  constructorTypeParameters, argumentTypes));
+        } else {
+          calleeType = calleeType.instantiate(argumentTypes);
+        }
       } else {
-        _unimplemented(argumentList, 'Inferred type parameters in invocation');
+        _unimplemented(node, 'Inferred type parameters in invocation');
       }
     }
-    var arguments = argumentList.arguments;
     int i = 0;
     var suppliedNamedParameters = Set<String>();
-    for (var expression in arguments) {
-      if (expression is NamedExpression) {
-        var name = expression.name.label.name;
-        var parameterType = calleeType.namedParameters[name];
+    for (var argument in arguments) {
+      String name;
+      Expression expression;
+      if (argument is NamedExpression) {
+        name = argument.name.label.name;
+        expression = argument.expression;
+      } else if (argument is FormalParameter) {
+        if (argument.isNamed) {
+          name = argument.identifier.name;
+        }
+        expression = argument.identifier;
+      } else {
+        expression = argument;
+      }
+      DecoratedType parameterType;
+      if (name != null) {
+        parameterType = calleeType.namedParameters[name];
         if (parameterType == null) {
           // TODO(paulberry)
           _unimplemented(expression, 'Missing type for named parameter');
         }
-        _handleAssignment(expression.expression, parameterType);
         suppliedNamedParameters.add(name);
       } else {
         if (calleeType.positionalParameters.length <= i) {
           // TODO(paulberry)
-          _unimplemented(argumentList, 'Missing positional parameter at $i');
+          _unimplemented(node, 'Missing positional parameter at $i');
         }
-        _handleAssignment(expression, calleeType.positionalParameters[i++]);
+        parameterType = calleeType.positionalParameters[i++];
       }
+      _handleAssignment(expression, parameterType);
     }
     // Any parameters not supplied must be optional.
     for (var entry in calleeType.namedParameters.entries) {
       if (suppliedNamedParameters.contains(entry.key)) continue;
       entry.value.node.recordNamedParameterNotSupplied(_guards, _graph,
-          NamedParameterNotSuppliedOrigin(_source, argumentList.offset));
+          NamedParameterNotSuppliedOrigin(_source, node.offset));
     }
     return calleeType.returnType;
   }
@@ -1120,6 +1262,16 @@ $stackTrace''');
     if (type.type is! InterfaceType) return false;
     if ((type.type as InterfaceType).typeParameters.isNotEmpty) return false;
     return true;
+  }
+
+  bool _isUntypedParameter(NormalFormalParameter parameter) {
+    if (parameter is SimpleFormalParameter) {
+      return parameter.type == null;
+    } else if (parameter is FieldFormalParameter) {
+      return parameter.type == null;
+    } else {
+      return false;
+    }
   }
 
   bool _isVariableOrParameterReference(Expression expression) {
