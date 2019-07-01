@@ -395,7 +395,6 @@ $stackTrace''');
     var declaredElement = node.declaredElement;
     metadata?.accept(this);
     DecoratedType decoratedType;
-    // Whoops: DecoratedType.forImplicitType(parameters == null ? declaredElement.type : (declaredElement.type as FunctionType).returnType, _graph)
     if (parameters == null) {
       decoratedType = type != null
           ? type.accept(this)

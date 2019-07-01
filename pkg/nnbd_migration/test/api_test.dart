@@ -938,6 +938,32 @@ int? test(C c) {
     await _checkSingleFileChanges(content, expected);
   }
 
+  test_function_typed_field_formal_param() async {
+    var content = '''
+class C {
+  int Function(int) f;
+  C(int this.f(int i), int j);
+}
+int g(int i) => i;
+int test(int i) => C(g).f(i);
+main() {
+  test(null);
+}
+''';
+    var expected = '''
+class C {
+  int? Function(int?) f;
+  C(int? this.f(int? i), int j);
+}
+int? g(int? i) => i;
+int? test(int? i) => C(g).f(i);
+main() {
+  test(null);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_function_typed_formal_param() async {
     var content = '''
 int f(int callback(int i), int j) => callback(j);

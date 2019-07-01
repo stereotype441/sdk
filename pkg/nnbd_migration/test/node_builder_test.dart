@@ -410,6 +410,107 @@ class C {
         same(decoratedType));
   }
 
+  test_fieldFormalParameter_function_namedParameter_typed() async {
+    await analyze('''
+class C {
+  Object f;
+  C(void this.f({int i}));
+}
+''');
+    var ctor = findElement.unnamedConstructor('C');
+    var ctorParam = ctor.parameters[0];
+    var ctorType = variables.decoratedElementType(ctor);
+    var ctorParamType = variables.decoratedElementType(ctorParam);
+    expect(ctorType.positionalParameters[0], same(ctorParamType));
+    expect(ctorParamType.node, TypeMatcher<NullabilityNodeMutable>());
+    expect(ctorParamType.namedParameters['i'],
+        same(decoratedTypeAnnotation('int')));
+  }
+
+  test_fieldFormalParameter_function_namedParameter_untyped() async {
+    await analyze('''
+class C {
+  Object f;
+  C(void this.f({i}));
+}
+''');
+    var ctor = findElement.unnamedConstructor('C');
+    var ctorParam = ctor.parameters[0];
+    var ctorType = variables.decoratedElementType(ctor);
+    var ctorParamType = variables.decoratedElementType(ctorParam);
+    expect(ctorType.positionalParameters[0], same(ctorParamType));
+    expect(ctorParamType.node, TypeMatcher<NullabilityNodeMutable>());
+    expect(ctorParamType.namedParameters['i'].type.toString(), 'dynamic');
+    expect(ctorParamType.namedParameters['i'].node, same(always));
+  }
+
+  test_fieldFormalParameter_function_positionalParameter_typed() async {
+    await analyze('''
+class C {
+  Object f;
+  C(void this.f(int i));
+}
+''');
+    var ctor = findElement.unnamedConstructor('C');
+    var ctorParam = ctor.parameters[0];
+    var ctorType = variables.decoratedElementType(ctor);
+    var ctorParamType = variables.decoratedElementType(ctorParam);
+    expect(ctorType.positionalParameters[0], same(ctorParamType));
+    expect(ctorParamType.node, TypeMatcher<NullabilityNodeMutable>());
+    expect(ctorParamType.positionalParameters[0],
+        same(decoratedTypeAnnotation('int')));
+  }
+
+  test_fieldFormalParameter_function_positionalParameter_untyped() async {
+    await analyze('''
+class C {
+  Object f;
+  C(void this.f(i));
+}
+''');
+    var ctor = findElement.unnamedConstructor('C');
+    var ctorParam = ctor.parameters[0];
+    var ctorType = variables.decoratedElementType(ctor);
+    var ctorParamType = variables.decoratedElementType(ctorParam);
+    expect(ctorType.positionalParameters[0], same(ctorParamType));
+    expect(ctorParamType.node, TypeMatcher<NullabilityNodeMutable>());
+    expect(ctorParamType.positionalParameters[0].type.toString(), 'dynamic');
+    expect(ctorParamType.positionalParameters[0].node, same(always));
+  }
+
+  test_fieldFormalParameter_function_return_typed() async {
+    await analyze('''
+class C {
+  Object f;
+  C(int this.f());
+}
+''');
+    var ctor = findElement.unnamedConstructor('C');
+    var ctorParam = ctor.parameters[0];
+    var ctorType = variables.decoratedElementType(ctor);
+    var ctorParamType = variables.decoratedElementType(ctorParam);
+    expect(ctorType.positionalParameters[0], same(ctorParamType));
+    expect(ctorParamType.node, TypeMatcher<NullabilityNodeMutable>());
+    expect(ctorParamType.returnType, same(decoratedTypeAnnotation('int')));
+  }
+
+  test_fieldFormalParameter_function_return_untyped() async {
+    await analyze('''
+class C {
+  Object f;
+  C(this.f()) {}
+}
+''');
+    var ctor = findElement.unnamedConstructor('C');
+    var ctorParam = ctor.parameters[0];
+    var ctorType = variables.decoratedElementType(ctor);
+    var ctorParamType = variables.decoratedElementType(ctorParam);
+    expect(ctorType.positionalParameters[0], same(ctorParamType));
+    expect(ctorParamType.node, TypeMatcher<NullabilityNodeMutable>());
+    expect(ctorParamType.returnType.type.toString(), 'dynamic');
+    expect(ctorParamType.returnType.node, same(always));
+  }
+
   test_fieldFormalParameter_typed() async {
     await analyze('''
 class C {
