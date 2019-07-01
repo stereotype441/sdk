@@ -167,7 +167,9 @@ class NullabilityGraph {
       var destinations =
           edges.where((edge) => edge.primarySource == source).map((edge) {
         var suffixes = <Object>[];
-        if (edge.hard) {
+        if (edge.isUnion) {
+          suffixes.add('union');
+        } else if (edge.hard) {
           suffixes.add('hard');
         }
         suffixes.addAll(edge.guards);
@@ -313,18 +315,6 @@ abstract class NullabilityNode {
   /// whose type is determined by the `??` operator.
   factory NullabilityNode.forIfNotNull() =>
       _NullabilityNodeSimple('?? operator');
-
-  /// Creates a [NullabilityNode] representing the nullability of a variable
-  /// whose type is `dynamic` due to type inference.
-  ///
-  /// TODO(paulberry): this should go away; we should decorate the actual
-  /// inferred type rather than assuming `dynamic`.
-  factory NullabilityNode.forInferredDynamicType(
-      NullabilityGraph graph, Source source, int offset) {
-    var node = _NullabilityNodeSimple('inferredDynamic($offset)');
-    graph.union(node, graph.always, AlwaysNullableTypeOrigin(source, offset));
-    return node;
-  }
 
   /// Creates a [NullabilityNode] representing the nullability of a variable
   /// whose type is determined by type inference.

@@ -799,6 +799,62 @@ double f() {
     assertNoUpstreamNullability(decoratedTypeAnnotation('double').node);
   }
 
+  test_field_type_inferred() async {
+    await analyze('''
+int f() => 1;
+class C {
+  var x = f();
+}
+''');
+    var xType =
+        variables.decoratedElementType(findNode.simple('x').staticElement);
+    assertUnion(xType.node, decoratedTypeAnnotation('int').node);
+  }
+
+  test_fieldFormalParameter_typed() async {
+    await analyze('''
+class C {
+  int i;
+  C(int this.i);
+}
+''');
+    assertEdge(decoratedTypeAnnotation('int this').node,
+        decoratedTypeAnnotation('int i').node,
+        hard: true);
+  }
+
+  test_fieldFormalParameter_untyped() async {
+    await analyze('''
+class C {
+  int i;
+  C.named(this.i);
+}
+''');
+    var decoratedConstructorParamType =
+        decoratedConstructorDeclaration('named').positionalParameters[0];
+    assertUnion(decoratedConstructorParamType.node,
+        decoratedTypeAnnotation('int i').node);
+  }
+
+  test_function_assignment() async {
+    await analyze('''
+class C {
+  void f1(String message) {}
+  void f2(String message) {}
+}
+foo(C c, bool flag) {
+  Function(String message) out = flag ? c.f1 : c.f2;
+  out('hello');
+}
+bar() {
+  foo(C(), true);
+  foo(C(), false);
+}
+''');
+    var type = decoratedTypeAnnotation('Function(String message)');
+    expect(type.returnType, isNotNull);
+  }
+
   test_functionDeclaration_expression_body() async {
     await analyze('''
 int/*1*/ f(int/*2*/ i) => i/*3*/;
@@ -883,6 +939,32 @@ void g(int k) {
     assertEdge(decoratedTypeAnnotation('int i').node, never, hard: true);
     assertNoEdge(always, decoratedTypeAnnotation('int j').node);
     assertEdge(decoratedTypeAnnotation('int k').node, never, hard: true);
+  }
+
+  test_functionExpressionInvocation_parameterType() async {
+    await analyze('''
+abstract class C {
+  void Function(int) f();
+}
+void g(C c, int i) {
+  c.f()(i);
+}
+''');
+    assertEdge(decoratedTypeAnnotation('int i').node,
+        decoratedTypeAnnotation('int)').node,
+        hard: true);
+  }
+
+  test_functionExpressionInvocation_returnType() async {
+    await analyze('''
+abstract class C {
+  int Function() f();
+}
+int g(C c) => c.f()();
+''');
+    assertEdge(decoratedTypeAnnotation('int Function').node,
+        decoratedTypeAnnotation('int g').node,
+        hard: false);
   }
 
   test_functionInvocation_parameter_fromLocalParameter() async {
@@ -1308,6 +1390,60 @@ List<String> f() {
 ''');
     assertNoUpstreamNullability(decoratedTypeAnnotation('List').node);
     assertEdge(always, decoratedTypeAnnotation('String>[').node, hard: false);
+  }
+
+  test_localVariable_type_inferred() async {
+    await analyze('''
+int f() => 1;
+main() {
+  var x = f();
+}
+''');
+    var xType =
+        variables.decoratedElementType(findNode.simple('x').staticElement);
+    assertUnion(xType.node, decoratedTypeAnnotation('int').node);
+  }
+
+  test_method_parameterType_inferred() async {
+    await analyze('''
+class B {
+  void f/*B*/(int x) {}
+}
+class C extends B {
+  void f/*C*/(x) {}
+}
+''');
+    var bReturnType = decoratedMethodType('f/*B*/').positionalParameters[0];
+    var cReturnType = decoratedMethodType('f/*C*/').positionalParameters[0];
+    assertUnion(bReturnType.node, cReturnType.node);
+  }
+
+  test_method_parameterType_inferred_named() async {
+    await analyze('''
+class B {
+  void f/*B*/({int x = 0}) {}
+}
+class C extends B {
+  void f/*C*/({x = 0}) {}
+}
+''');
+    var bReturnType = decoratedMethodType('f/*B*/').namedParameters['x'];
+    var cReturnType = decoratedMethodType('f/*C*/').namedParameters['x'];
+    assertUnion(bReturnType.node, cReturnType.node);
+  }
+
+  test_method_returnType_inferred() async {
+    await analyze('''
+class B {
+  int f/*B*/() => 1;
+}
+class C extends B {
+  f/*C*/() => 1;
+}
+''');
+    var bReturnType = decoratedMethodType('f/*B*/').returnType;
+    var cReturnType = decoratedMethodType('f/*C*/').returnType;
+    assertUnion(bReturnType.node, cReturnType.node);
   }
 
   test_methodDeclaration_resets_unconditional_control_flow() async {
@@ -2285,6 +2421,16 @@ double get myPi => pi;
 ''');
     var myPiType = decoratedTypeAnnotation('double get');
     assertEdge(never, myPiType.node, hard: false);
+  }
+
+  test_topLevelVariable_type_inferred() async {
+    await analyze('''
+int f() => 1;
+var x = f();
+''');
+    var xType =
+        variables.decoratedElementType(findNode.simple('x').staticElement);
+    assertUnion(xType.node, decoratedTypeAnnotation('int').node);
   }
 
   test_type_argument_explicit_bound() async {

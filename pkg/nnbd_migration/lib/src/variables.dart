@@ -29,6 +29,9 @@ class Variables implements VariableRecorder, VariableRepository {
   Variables(this._graph);
 
   @override
+  NullabilityNode get always => _graph.always;
+
+  @override
   Map<ClassElement, DecoratedType> decoratedDirectSupertypes(
       ClassElement class_) {
     assert(class_ is! ClassElementHandle);
@@ -75,7 +78,16 @@ class Variables implements VariableRecorder, VariableRepository {
   }
 
   void recordDecoratedElementType(Element element, DecoratedType type) {
-    assert(_graph.isBeingMigrated(element.library.source));
+    assert(() {
+      var library = element.library;
+      if (library == null) {
+        // No problem; the element is probably a parameter of a function type
+        // expressed using new-style Function syntax.
+      } else {
+        assert(_graph.isBeingMigrated(library.source));
+      }
+      return true;
+    }());
     _decoratedElementTypes[element] = type;
   }
 

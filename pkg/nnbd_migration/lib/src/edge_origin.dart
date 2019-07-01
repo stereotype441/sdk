@@ -34,6 +34,12 @@ abstract class EdgeOriginWithLocation extends EdgeOrigin {
   EdgeOriginWithLocation(this.source, this.offset);
 }
 
+/// Edge origin resulting from the relationship between a field formal parameter
+/// and the corresponding field.
+class FieldFormalParameterOrigin extends EdgeOriginWithLocation {
+  FieldFormalParameterOrigin(Source source, int offset) : super(source, offset);
+}
+
 /// Edge origin resulting from the presence of a `??` operator.
 class IfNullOrigin extends EdgeOriginWithLocation {
   IfNullOrigin(Source source, int offset) : super(source, offset);
@@ -55,6 +61,16 @@ class IfNullOrigin extends EdgeOriginWithLocation {
 class ImplicitMixinSuperCallOrigin extends EdgeOriginWithLocation {
   ImplicitMixinSuperCallOrigin(Source source, int offset)
       : super(source, offset);
+}
+
+/// Edge origin resulting from an inheritance relationship between two methods.
+class InheritanceOrigin extends EdgeOriginWithLocation {
+  InheritanceOrigin(Source source, int offset) : super(source, offset);
+}
+
+/// Edge origin resulting from a type that is inferred from its initializer.
+class InitializerInferenceOrigin extends EdgeOriginWithLocation {
+  InitializerInferenceOrigin(Source source, int offset) : super(source, offset);
 }
 
 /// Edge origin resulting from a class that is instantiated to bounds.

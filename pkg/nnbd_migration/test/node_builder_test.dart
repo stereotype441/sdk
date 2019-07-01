@@ -17,11 +17,6 @@ main() {
 
 @reflectiveTest
 class NodeBuilderTest extends MigrationVisitorTestBase {
-  /// Gets the [DecoratedType] associated with the constructor declaration whose
-  /// name matches [search].
-  DecoratedType decoratedConstructorDeclaration(String search) => variables
-      .decoratedElementType(findNode.constructor(search).declaredElement);
-
   /// Gets the [DecoratedType] associated with the function declaration whose
   /// name matches [search].
   DecoratedType decoratedFunctionType(String search) =>
@@ -367,6 +362,40 @@ dynamic f() {}
     assertEdge(always, decoratedType.node, hard: false);
   }
 
+  test_field_type_implicit_dynamic() async {
+    await analyze('''
+class C {
+  var x;
+}
+''');
+    var decoratedType =
+        variables.decoratedElementType(findNode.simple('x').staticElement);
+    expect(decoratedType.node, same(always));
+  }
+
+  test_field_type_inferred() async {
+    await analyze('''
+class C {
+  var x = 1;
+}
+''');
+    var decoratedType =
+        variables.decoratedElementType(findNode.simple('x').staticElement);
+    expect(decoratedType.node, TypeMatcher<NullabilityNodeMutable>());
+  }
+
+  test_field_type_inferred_dynamic() async {
+    await analyze('''
+dynamic f() {}
+class C {
+  var x = f();
+}
+''');
+    var decoratedType =
+        variables.decoratedElementType(findNode.simple('x').staticElement);
+    expect(decoratedType.node, same(always));
+  }
+
   test_field_type_simple() async {
     await analyze('''
 class C {
@@ -379,6 +408,53 @@ class C {
         variables.decoratedElementType(
             findNode.fieldDeclaration('f').fields.variables[0].declaredElement),
         same(decoratedType));
+  }
+
+  test_fieldFormalParameter_typed() async {
+    await analyze('''
+class C {
+  int i;
+  C.named(int this.i);
+}
+''');
+    var decoratedConstructorParamType =
+        decoratedConstructorDeclaration('named').positionalParameters[0];
+    expect(decoratedTypeAnnotation('int this'),
+        same(decoratedConstructorParamType));
+    expect(decoratedConstructorParamType.type.toString(), 'int');
+    expect(decoratedConstructorParamType.node,
+        TypeMatcher<NullabilityNodeMutable>());
+    // Note: the edge builder will connect this node to the node for the type of
+    // the field.
+  }
+
+  test_fieldFormalParameter_untyped() async {
+    await analyze('''
+class C {
+  int i;
+  C.named(this.i);
+}
+''');
+    var decoratedConstructorParamType =
+        decoratedConstructorDeclaration('named').positionalParameters[0];
+    expect(decoratedConstructorParamType.type.toString(), 'int');
+    expect(decoratedConstructorParamType.node,
+        TypeMatcher<NullabilityNodeMutable>());
+    // Note: the edge builder will unify this implicit type with the type of the
+    // field.
+  }
+
+  test_generic_function_type_syntax_inferred_dynamic_return() async {
+    await analyze('''
+abstract class C {
+  Function() f();
+}
+''');
+    var decoratedFType = decoratedMethodType('f');
+    var decoratedFReturnType = decoratedFType.returnType;
+    var decoratedFReturnReturnType = decoratedFReturnType.returnType;
+    expect(decoratedFReturnReturnType.type.toString(), 'dynamic');
+    expect(decoratedFReturnReturnType.node, same(always));
   }
 
   test_genericFunctionType_namedParameterType() async {
@@ -555,6 +631,148 @@ void f(List<int> x) {}
     expect(decoratedIntType.node, isNot(never));
   }
 
+  test_localVariable_type_implicit_dynamic() async {
+    await analyze('''
+main() {
+  var x;
+}
+''');
+    var decoratedType =
+        variables.decoratedElementType(findNode.simple('x').staticElement);
+    expect(decoratedType.node, same(always));
+  }
+
+  test_localVariable_type_inferred() async {
+    await analyze('''
+main() {
+  var x = 1;
+}
+''');
+    var decoratedType =
+        variables.decoratedElementType(findNode.simple('x').staticElement);
+    expect(decoratedType.node, TypeMatcher<NullabilityNodeMutable>());
+  }
+
+  test_localVariable_type_inferred_dynamic() async {
+    await analyze('''
+dynamic f() {}
+main() {
+  var x = f();
+}
+''');
+    var decoratedType =
+        variables.decoratedElementType(findNode.simple('x').staticElement);
+    expect(decoratedType.node, same(always));
+  }
+
+  test_method_parameterType_implicit_dynamic() async {
+    await analyze('''
+class C {
+  void f(x) {}
+}
+''');
+    var decoratedType = decoratedMethodType('f').positionalParameters[0];
+    expect(decoratedType.node, same(always));
+  }
+
+  test_method_parameterType_implicit_dynamic_named() async {
+    await analyze('''
+class C {
+  void f({x}) {}
+}
+''');
+    var decoratedType = decoratedMethodType('f').namedParameters['x'];
+    expect(decoratedType.node, same(always));
+  }
+
+  test_method_parameterType_inferred() async {
+    await analyze('''
+class B {
+  void f(int x) {}
+}
+class C extends B {
+  void f/*C*/(x) {}
+}
+''');
+    var decoratedType = decoratedMethodType('f/*C*/').positionalParameters[0];
+    expect(decoratedType.node, TypeMatcher<NullabilityNodeMutable>());
+  }
+
+  test_method_parameterType_inferred_dynamic() async {
+    await analyze('''
+class B {
+  void f(dynamic x) {}
+}
+class C extends B {
+  void f/*C*/(x) {}
+}
+''');
+    var decoratedType = decoratedMethodType('f/*C*/').positionalParameters[0];
+    expect(decoratedType.node, same(always));
+  }
+
+  test_method_parameterType_inferred_dynamic_named() async {
+    await analyze('''
+class B {
+  void f({dynamic x = 0}) {}
+}
+class C extends B {
+  void f/*C*/({x = 0}) {}
+}
+''');
+    var decoratedType = decoratedMethodType('f/*C*/').namedParameters['x'];
+    expect(decoratedType.node, same(always));
+  }
+
+  test_method_parameterType_inferred_named() async {
+    await analyze('''
+class B {
+  void f({int x = 0}) {}
+}
+class C extends B {
+  void f/*C*/({x = 0}) {}
+}
+''');
+    var decoratedType = decoratedMethodType('f/*C*/').namedParameters['x'];
+    expect(decoratedType.node, TypeMatcher<NullabilityNodeMutable>());
+  }
+
+  test_method_returnType_implicit_dynamic() async {
+    await analyze('''
+class C {
+  f() => 1;
+}
+''');
+    var decoratedType = decoratedMethodType('f').returnType;
+    expect(decoratedType.node, same(always));
+  }
+
+  test_method_returnType_inferred() async {
+    await analyze('''
+class B {
+  int f() => 1;
+}
+class C extends B {
+  f/*C*/() => 1;
+}
+''');
+    var decoratedType = decoratedMethodType('f/*C*/').returnType;
+    expect(decoratedType.node, TypeMatcher<NullabilityNodeMutable>());
+  }
+
+  test_method_returnType_inferred_dynamic() async {
+    await analyze('''
+class B {
+  dynamic f() => 1;
+}
+class C extends B {
+  f/*C*/() => 1;
+}
+''');
+    var decoratedType = decoratedMethodType('f/*C*/').returnType;
+    expect(decoratedType.node, same(always));
+  }
+
   test_topLevelFunction_parameterType_implicit_dynamic() async {
     await analyze('''
 void f(x) {}
@@ -564,7 +782,6 @@ void f(x) {}
     expect(decoratedFunctionType('f').positionalParameters[0],
         same(decoratedType));
     expect(decoratedType.type.isDynamic, isTrue);
-    assertUnion(always, decoratedType.node);
   }
 
   test_topLevelFunction_parameterType_named_no_default() async {
@@ -635,7 +852,6 @@ f() {}
 ''');
     var decoratedType = decoratedFunctionType('f').returnType;
     expect(decoratedType.type.isDynamic, isTrue);
-    assertUnion(always, decoratedType.node);
   }
 
   test_topLevelFunction_returnType_simple() async {
@@ -646,6 +862,34 @@ int f() => 0;
     expect(decoratedFunctionType('f').returnType, same(decoratedType));
     expect(decoratedType.node, isNotNull);
     expect(decoratedType.node, isNot(never));
+  }
+
+  test_topLevelVariable_type_implicit_dynamic() async {
+    await analyze('''
+var x;
+''');
+    var decoratedType =
+        variables.decoratedElementType(findNode.simple('x').staticElement);
+    expect(decoratedType.node, same(always));
+  }
+
+  test_topLevelVariable_type_inferred() async {
+    await analyze('''
+var x = 1;
+''');
+    var decoratedType =
+        variables.decoratedElementType(findNode.simple('x').staticElement);
+    expect(decoratedType.node, TypeMatcher<NullabilityNodeMutable>());
+  }
+
+  test_topLevelVariable_type_inferred_dynamic() async {
+    await analyze('''
+dynamic f() {}
+var x = f();
+''');
+    var decoratedType =
+        variables.decoratedElementType(findNode.simple('x').staticElement);
+    expect(decoratedType.node, same(always));
   }
 
   test_type_comment_bang() async {
