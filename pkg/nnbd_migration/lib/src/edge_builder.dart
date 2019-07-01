@@ -987,7 +987,7 @@ $stackTrace''');
     if (returnType.isDynamic || returnType.isVoid) {
       return DecoratedType(returnType, _variables.always);
     }
-    return _variables.decoratedElementType(returnType.element, create: true);
+    return _variables.decoratedElementType(returnType.element);
   }
 
   /// Creates the necessary constraint(s) for an assignment of the given
