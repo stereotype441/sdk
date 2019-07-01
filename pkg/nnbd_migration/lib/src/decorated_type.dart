@@ -237,10 +237,24 @@ class DecoratedType {
       if (type.typeFormals.isNotEmpty) {
         formals = '<${type.typeFormals.join(', ')}>';
       }
-      List<Object> argStrings =
-          positionalParameters.map((p) => p.toString()).toList();
-      for (var entry in namedParameters.entries) {
-        argStrings.add('${entry.key}: ${entry.value}');
+      List<String> argStrings = [];
+      for (int i = 0; i < positionalParameters.length; i++) {
+        var prefix = '';
+        if (i == type.normalParameterTypes.length) {
+          prefix = '[';
+        }
+        argStrings.add('$prefix${positionalParameters[i]}');
+      }
+      if (type.normalParameterTypes.length < positionalParameters.length) {
+        argStrings.last += ']';
+      }
+      if (namedParameters.isNotEmpty) {
+        var prefix = '{';
+        for (var entry in namedParameters.entries) {
+          argStrings.add('$prefix${entry.key}: ${entry.value}');
+          prefix = '';
+        }
+        argStrings.last += '}';
       }
       var args = argStrings.join(', ');
       return '$returnType Function$formals($args)$trailing';
