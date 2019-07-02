@@ -1027,6 +1027,7 @@ $stackTrace''');
                 left.positionalParameters[positionalParameterCount];
             rightParameterType =
                 right.positionalParameters[positionalParameterCount];
+            positionalParameterCount++;
           }
           var decoratedParameterType = _decorateUpperOrLowerBound(astNode,
               parameter.type, leftParameterType, rightParameterType, !isLUB);
