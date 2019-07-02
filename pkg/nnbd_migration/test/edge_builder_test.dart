@@ -74,6 +74,22 @@ class EdgeBuilderTest extends MigrationVisitorTestBase {
     return variables.decoratedExpressionType(findNode.expression(text));
   }
 
+  solo_test_prefixedIdentifier_tearoff() async {
+    await analyze('''
+abstract class C {
+  int f(int i);
+}
+int Function(int) g(C c) => c.f;
+''');
+    var fType = variables.decoratedElementType(findElement.method('f'));
+    var gReturnType =
+        variables.decoratedElementType(findElement.function('g')).returnType;
+    assertEdge(fType.returnType.node, gReturnType.returnType.node, hard: false);
+    assertEdge(gReturnType.positionalParameters[0].node,
+        fType.positionalParameters[0].node,
+        hard: false);
+  }
+
   test_assert_demonstrates_non_null_intent() async {
     await analyze('''
 void f(int i) {
