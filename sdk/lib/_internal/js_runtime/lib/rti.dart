@@ -329,27 +329,61 @@ bool _generalIsTestImplementation(object) {
   // This static method is installed on an Rti object as a JavaScript instance
   // method. The Rti object is 'this'.
   Rti testRti = _castToRti(JS('', 'this'));
-  throw UnimplementedError(
-      '${Error.safeToString(object)} is ${_rtiToString(testRti, null)}');
+  Rti objectRti = instanceType(object);
+  return isSubtype(_theUniverse(), objectRti, testRti);
 }
 
 /// Called from generated code.
 _generalAsCheckImplementation(object) {
+  if (object == null) return object;
   // This static method is installed on an Rti object as a JavaScript instance
   // method. The Rti object is 'this'.
   Rti testRti = _castToRti(JS('', 'this'));
-  throw UnimplementedError(
-      '${Error.safeToString(object)} as ${_rtiToString(testRti, null)}');
+  Rti objectRti = instanceType(object);
+  if (isSubtype(_theUniverse(), objectRti, testRti)) return object;
+  var message = "${Error.safeToString(object)}:"
+      " type '${_rtiToString(objectRti, null)}'"
+      " is not a subtype of type '${_rtiToString(testRti, null)}'";
+  throw new _CastError.fromMessage('CastError: $message');
 }
 
 /// Called from generated code.
 _generalTypeCheckImplementation(object) {
+  if (object == null) return object;
   // This static method is installed on an Rti object as a JavaScript instance
   // method. The Rti object is 'this'.
   Rti testRti = _castToRti(JS('', 'this'));
-  throw UnimplementedError(
-      '${Error.safeToString(object)} as ${_rtiToString(testRti, null)}'
-      ' (TypeError)');
+  Rti objectRti = instanceType(object);
+  if (isSubtype(_theUniverse(), objectRti, testRti)) return object;
+  var message = "${Error.safeToString(object)}:"
+      " type '${_rtiToString(objectRti, null)}'"
+      " is not a subtype of type '${_rtiToString(testRti, null)}'";
+  throw new _TypeError.fromMessage('TypeError: $message');
+}
+
+/// Called from generated code.
+checkTypeBound(Rti type, Rti bound, variable) {
+  if (isSubtype(_theUniverse(), type, bound)) return type;
+  var message = "Type '${_rtiToString(type, null)}'"
+      " is not a subtype of type '${_rtiToString(bound, null)}'"
+      " of '${_Utils.asString(variable)}'";
+  throw _TypeError.fromMessage('TypeError: $message');
+}
+
+class _CastError extends Error implements CastError {
+  final String message;
+  _CastError.fromMessage(this.message);
+
+  @override
+  String toString() => message;
+}
+
+class _TypeError extends Error implements TypeError {
+  final String message;
+  _TypeError.fromMessage(this.message);
+
+  @override
+  String toString() => message;
 }
 
 String _rtiToString(Rti rti, List<String> genericContext) {
@@ -1042,8 +1076,20 @@ class TypeRule {
 
 // Future entry point from compiled code.
 bool isSubtype(universe, Rti s, Rti t) {
+  // TODO(sra): When more tests are working, remove this rediculous hack.
+  // Temporary 'metering' of isSubtype calls to force tests that endlessly loop
+  // to fail.
+  int next = JS('int', '(#||0) + 1', _ticks);
+  _ticks = next;
+  if (next > 10 * 1000 * 1000) {
+    throw StateError('Too many isSubtype calls'
+        '  ${_rtiToString(s, null)}  <:  ${_rtiToString(t, null)}');
+  }
+
   return _isSubtype(universe, s, null, t, null);
 }
+
+int _ticks = 0;
 
 bool _isSubtype(universe, Rti s, sEnv, Rti t, tEnv) {
   // TODO(fishythefish): Update for NNBD. See

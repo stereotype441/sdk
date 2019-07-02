@@ -40,7 +40,52 @@ class DecoratedType {
       this.positionalParameters = const [],
       this.namedParameters = const {},
       this.typeArguments = const []}) {
-    assert(node != null);
+    assert(() {
+      assert(node != null);
+      var type = this.type;
+      if (type is InterfaceType) {
+        assert(returnType == null);
+        assert(positionalParameters.isEmpty);
+        assert(namedParameters.isEmpty);
+        assert(typeArguments.length == type.typeArguments.length);
+        for (int i = 0; i < typeArguments.length; i++) {
+          assert(typeArguments[i].type == type.typeArguments[i]);
+        }
+      } else if (type is FunctionType) {
+        assert(returnType.type == type.returnType);
+        int positionalParameterCount = 0;
+        int namedParameterCount = 0;
+        for (var parameter in type.parameters) {
+          if (parameter.isNamed) {
+            assert(namedParameters[parameter.name].type == parameter.type);
+            namedParameterCount++;
+          } else {
+            if (positionalParameters.length <= positionalParameterCount) {
+              // TODO(danrubel): Track down why this happens
+              // and remove this if statement
+            } else {
+              assert(positionalParameters[positionalParameterCount].type ==
+                  parameter.type);
+              positionalParameterCount++;
+            }
+          }
+        }
+        assert(positionalParameters.length == positionalParameterCount);
+        assert(namedParameters.length == namedParameterCount);
+        assert(typeArguments.isEmpty);
+      } else if (node is TypeParameterType) {
+        assert(returnType == null);
+        assert(positionalParameters.isEmpty);
+        assert(namedParameters.isEmpty);
+        assert(typeArguments.isEmpty);
+      } else {
+        assert(returnType == null);
+        assert(positionalParameters.isEmpty);
+        assert(namedParameters.isEmpty);
+        assert(typeArguments.isEmpty);
+      }
+      return true;
+    }());
   }
 
   /// Creates a [DecoratedType] corresponding to the given [element], which is
@@ -237,26 +282,26 @@ class DecoratedType {
       if (type.typeFormals.isNotEmpty) {
         formals = '<${type.typeFormals.join(', ')}>';
       }
-      List<String> argStrings = [];
+      List<String> paramStrings = [];
       for (int i = 0; i < positionalParameters.length; i++) {
         var prefix = '';
         if (i == type.normalParameterTypes.length) {
           prefix = '[';
         }
-        argStrings.add('$prefix${positionalParameters[i]}');
+        paramStrings.add('$prefix${positionalParameters[i]}');
       }
       if (type.normalParameterTypes.length < positionalParameters.length) {
-        argStrings.last += ']';
+        paramStrings.last += ']';
       }
       if (namedParameters.isNotEmpty) {
         var prefix = '{';
         for (var entry in namedParameters.entries) {
-          argStrings.add('$prefix${entry.key}: ${entry.value}');
+          paramStrings.add('$prefix${entry.key}: ${entry.value}');
           prefix = '';
         }
-        argStrings.last += '}';
+        paramStrings.last += '}';
       }
-      var args = argStrings.join(', ');
+      var args = paramStrings.join(', ');
       return '$returnType Function$formals($args)$trailing';
     } else if (type is DynamicTypeImpl) {
       return 'dynamic';
