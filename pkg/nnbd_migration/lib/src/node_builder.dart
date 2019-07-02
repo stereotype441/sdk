@@ -135,7 +135,7 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType> {
   @override
   DecoratedType visitFieldFormalParameter(FieldFormalParameter node) {
     return _handleFormalParameter(
-        node, node.metadata, node.type, node.typeParameters, node.parameters);
+        node, node.type, node.typeParameters, node.parameters);
   }
 
   @override
@@ -159,8 +159,8 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType> {
   @override
   DecoratedType visitFunctionTypedFormalParameter(
       FunctionTypedFormalParameter node) {
-    return _handleFormalParameter(node, node.metadata, node.returnType,
-        node.typeParameters, node.parameters);
+    return _handleFormalParameter(
+        node, node.returnType, node.typeParameters, node.parameters);
   }
 
   @override
@@ -200,7 +200,7 @@ $stackTrace''');
 
   @override
   DecoratedType visitSimpleFormalParameter(SimpleFormalParameter node) {
-    return _handleFormalParameter(node, node.metadata, node.type, null, null);
+    return _handleFormalParameter(node, node.type, null, null);
   }
 
   @override
@@ -388,12 +388,11 @@ $stackTrace''');
 
   DecoratedType _handleFormalParameter(
       FormalParameter node,
-      NodeList<Annotation> metadata,
       TypeAnnotation type,
       TypeParameterList typeParameters,
       FormalParameterList parameters) {
     var declaredElement = node.declaredElement;
-    metadata?.accept(this);
+    node.metadata?.accept(this);
     DecoratedType decoratedType;
     if (parameters == null) {
       decoratedType = type != null
