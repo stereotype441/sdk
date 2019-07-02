@@ -274,7 +274,7 @@ class DecoratedType {
       var name = type.element.name;
       var args = '';
       if (type.typeArguments.isNotEmpty) {
-        args = '<${type.typeArguments.join(', ')}>';
+        args = '<${typeArguments.join(', ')}>';
       }
       return '$name$args$trailing';
     } else if (type is FunctionType) {
