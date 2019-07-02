@@ -990,15 +990,15 @@ $stackTrace''');
             if (!isLUB) {
               _unimplemented(astNode, 'GLB with substitution');
             }
-            left = _decoratedClassHierarchy.getDecoratedSupertype(
-                leftType.element, type.element);
+            left = _decoratedClassHierarchy.asSupertype(
+                left, type.element);
           }
           if (rightType.element != type.element) {
             if (!isLUB) {
               _unimplemented(astNode, 'GLB with substitution');
             }
-            right = _decoratedClassHierarchy.getDecoratedSupertype(
-                rightType.element, type.element);
+            right = _decoratedClassHierarchy.asSupertype(
+                right, type.element);
           }
           List<DecoratedType> newTypeArguments = [];
           for (int i = 0; i < type.typeArguments.length; i++) {

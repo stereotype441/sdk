@@ -872,7 +872,7 @@ void f(bool b, Map<int, String> x, Map<int, String> y) {
         yType.typeArguments[1].node);
   }
 
-  solo_test_conditionalExpression_generic_substituted() async {
+  test_conditionalExpression_generic_substituted() async {
     await analyze('''
 class C<T> {}
 class D<U> extends C<List<U>> {}
@@ -890,7 +890,7 @@ void f(bool b, C<List<int>> x, D<int> y) {
     var substitutedNode = (resultType.typeArguments[0].typeArguments[0].node
             as NullabilityNodeForLUB)
         .right as NullabilityNodeForSubstitution;
-    expect(substitutedNode.innerNode, same(yType.typeArguments[0]));
+    expect(substitutedNode.innerNode, same(yType.typeArguments[0].node));
     expect(
         substitutedNode.outerNode, same(decoratedTypeAnnotation('U>>').node));
     assertLUB(resultType.typeArguments[0].typeArguments[0].node,
