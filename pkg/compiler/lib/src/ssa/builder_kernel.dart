@@ -1460,12 +1460,16 @@ class KernelSsaGraphBuilder extends ir.Visitor {
         if (!bound.isDynamic &&
             !bound.isVoid &&
             bound != _commonElements.objectType) {
-          _assertIsType(
-              newParameter,
-              bound,
-              "The type argument '",
-              "' is not a subtype of the type variable bound '",
-              "' of type variable '${local.name}' in '${method.name}'.");
+          if (options.experimentNewRti) {
+            _checkTypeBound(newParameter, bound, local.name);
+          } else {
+            _assertIsType(
+                newParameter,
+                bound,
+                "The type argument '",
+                "' is not a subtype of the type variable bound '",
+                "' of type variable '${local.name}' in '${method.name}'.");
+          }
         }
       }
     }
@@ -5224,6 +5228,24 @@ class KernelSsaGraphBuilder extends ir.Visitor {
     add(assertIsSubtype);
   }
 
+  void _checkTypeBound(
+      HInstruction typeInstruction, DartType bound, String variableName) {
+    HInstruction boundInstruction = _typeBuilder.analyzeTypeArgumentNewRti(
+        localsHandler.substInContext(bound), sourceElement);
+
+    HInstruction variableNameInstruction =
+        graph.addConstantString(variableName, closedWorld);
+    FunctionEntity element = _commonElements.checkTypeBound;
+    var inputs = <HInstruction>[
+      typeInstruction,
+      boundInstruction,
+      variableNameInstruction
+    ];
+    HInstruction checkBound = new HInvokeStatic(
+        element, inputs, typeInstruction.instructionType, const <DartType>[]);
+    add(checkBound);
+  }
+
   @override
   void visitConstructorInvocation(ir.ConstructorInvocation node) {
     SourceInformation sourceInformation =
@@ -5299,6 +5321,13 @@ class KernelSsaGraphBuilder extends ir.Visitor {
 
     if (typeValue.treatAsDynamic) {
       stack.add(graph.addConstantBool(true, closedWorld));
+      return;
+    }
+
+    if (options.experimentNewRti) {
+      HInstruction rti =
+          _typeBuilder.analyzeTypeArgumentNewRti(typeValue, sourceElement);
+      push(HIsTest(typeValue, expression, rti, _abstractValueDomain.boolType));
       return;
     }
 
