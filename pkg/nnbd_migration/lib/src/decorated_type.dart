@@ -277,26 +277,26 @@ class DecoratedType {
       if (type.typeFormals.isNotEmpty) {
         formals = '<${type.typeFormals.join(', ')}>';
       }
-      List<String> argStrings = [];
+      List<String> paramStrings = [];
       for (int i = 0; i < positionalParameters.length; i++) {
         var prefix = '';
         if (i == type.normalParameterTypes.length) {
           prefix = '[';
         }
-        argStrings.add('$prefix${positionalParameters[i]}');
+        paramStrings.add('$prefix${positionalParameters[i]}');
       }
       if (type.normalParameterTypes.length < positionalParameters.length) {
-        argStrings.last += ']';
+        paramStrings.last += ']';
       }
       if (namedParameters.isNotEmpty) {
         var prefix = '{';
         for (var entry in namedParameters.entries) {
-          argStrings.add('$prefix${entry.key}: ${entry.value}');
+          paramStrings.add('$prefix${entry.key}: ${entry.value}');
           prefix = '';
         }
-        argStrings.last += '}';
+        paramStrings.last += '}';
       }
-      var args = argStrings.join(', ');
+      var args = paramStrings.join(', ');
       return '$returnType Function$formals($args)$trailing';
     } else if (type is DynamicTypeImpl) {
       return 'dynamic';

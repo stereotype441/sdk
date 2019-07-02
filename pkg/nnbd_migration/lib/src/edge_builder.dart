@@ -327,6 +327,14 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
     assert(_isSimple(elseType)); // TODO(paulberry)
 
     DartType staticType = node.staticType;
+    DecoratedType returnType;
+    if (staticType is FunctionType) {
+      DartType functReturnType = staticType.returnType;
+      returnType = functReturnType.isDynamic || functReturnType.isVoid
+          // TODO(danrubel): handle LUB for constituent types
+          ? DecoratedType(functReturnType, _graph.always)
+          : _variables.decoratedElementType(functReturnType.element);
+    }
     var overallType = DecoratedType(
         staticType, NullabilityNode.forLUB(thenType.node, elseType.node),
         returnType: staticType is FunctionType
