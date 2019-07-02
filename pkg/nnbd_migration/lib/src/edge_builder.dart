@@ -1261,7 +1261,9 @@ $stackTrace''');
       }
       return calleeType.positionalParameters[0];
     } else {
-      var expressionType = calleeType.returnType;
+      var expressionType = callee is PropertyAccessorElement
+          ? calleeType.returnType
+          : calleeType;
       if (isConditional) {
         expressionType = expressionType.withNode(
             NullabilityNode.forLUB(targetType.node, expressionType.node));
