@@ -986,9 +986,19 @@ $stackTrace''');
         var leftType = left.type;
         var rightType = right.type;
         if (leftType is InterfaceType && rightType is InterfaceType) {
-          if (leftType.element != type.element ||
-              rightType.element != type.element) {
-            _unimplemented(astNode, 'LUB/GLB with substitution');
+          if (leftType.element != type.element) {
+            if (!isLUB) {
+              _unimplemented(astNode, 'GLB with substitution');
+            }
+            left = _decoratedClassHierarchy.getDecoratedSupertype(
+                leftType.element, type.element);
+          }
+          if (rightType.element != type.element) {
+            if (!isLUB) {
+              _unimplemented(astNode, 'GLB with substitution');
+            }
+            right = _decoratedClassHierarchy.getDecoratedSupertype(
+                rightType.element, type.element);
           }
           List<DecoratedType> newTypeArguments = [];
           for (int i = 0; i < type.typeArguments.length; i++) {
@@ -1048,6 +1058,8 @@ $stackTrace''');
       }
     } else if (type is TypeParameterType) {
       _unimplemented(astNode, 'LUB/GLB with type parameter types');
+    } else if (type.isBottom) {
+      return DecoratedType(type, node);
     }
     _unimplemented(astNode, '_decorateUpperOrLowerBound');
   }

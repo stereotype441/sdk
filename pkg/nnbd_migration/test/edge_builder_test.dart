@@ -668,6 +668,27 @@ void f(
     expect(resultType.namedParameters, isEmpty);
   }
 
+  test_conditionalExpression_functionTyped_mixedParameters_contravariant() async {
+    await analyze('''
+void f(bool b, void Function(void Function(int a, [int b])) x,
+    void Function(void Function(int a, {int c})) y) {
+  (b ? x : y);
+}
+''');
+    var xType = decoratedGenericFunctionTypeAnnotation(
+        'void Function(int a, [int b])) x');
+    var yType = decoratedGenericFunctionTypeAnnotation(
+        'void Function(int a, {int c})) y');
+    // No function can take both named and optional positional parameters, so
+    // the GLB between xType and yType should be `Never`, with nullability
+    // determined from the nullabilities of xType and yType.
+    var resultType = decoratedExpressionType('(b ?').positionalParameters[0];
+    expect(resultType.type.isBottom, true);
+    assertGLB(resultType.node, xType.node, yType.node);
+    expect(resultType.positionalParameters, isEmpty);
+    expect(resultType.namedParameters, isEmpty);
+  }
+
   test_conditionalExpression_functionTyped_namedParameter() async {
     await analyze('''
 void f(bool b, void Function({int p}) x, void Function({int p}) y) {
@@ -831,6 +852,31 @@ void f(bool b, Map<int, String> x, Map<int, String> y) {
         yType.typeArguments[0].node);
     assertLUB(resultType.typeArguments[1].node, xType.typeArguments[1].node,
         yType.typeArguments[1].node);
+  }
+
+  solo_test_conditionalExpression_generic_substituted() async {
+    await analyze('''
+class C<T> {}
+class D<U> extends C<List<U>> {}
+void f(bool b, C<List<int>> x, D<int> y) {
+  (b ? x : y);
+}
+''');
+    var xType = decoratedTypeAnnotation('C<List<int>> x');
+    var yType = decoratedTypeAnnotation('D<int> y');
+    var resultType = decoratedExpressionType('(b ?');
+    expect(resultType.type.toString(), 'C<List<int>>');
+    assertLUB(resultType.node, xType.node, yType.node);
+    assertLUB(resultType.typeArguments[0].node, xType.typeArguments[0].node,
+        decoratedTypeAnnotation('List<U>').node);
+    var substitutedNode = (resultType.typeArguments[0].typeArguments[0].node
+            as NullabilityNodeForLUB)
+        .right as NullabilityNodeForSubstitution;
+    expect(substitutedNode.innerNode, same(yType.typeArguments[0]));
+    expect(
+        substitutedNode.outerNode, same(decoratedTypeAnnotation('U>>').node));
+    assertLUB(resultType.typeArguments[0].typeArguments[0].node,
+        xType.typeArguments[0].typeArguments[0].node, substitutedNode);
   }
 
   test_conditionalExpression_left_non_null() async {
