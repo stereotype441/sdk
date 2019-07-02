@@ -324,7 +324,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
     var thenType = node.thenExpression.accept(this);
     var elseType = node.elseExpression.accept(this);
 
-    var overallType = _decorateUpperOrLowerBound(node, node.staticType, thenType, elseType, true);
+    var overallType = _decorateUpperOrLowerBound(
+        node, node.staticType, thenType, elseType, true);
     _variables.recordDecoratedExpressionType(node, overallType);
     return overallType;
   }
@@ -976,24 +977,39 @@ $stackTrace''');
         ? NullabilityNode.forLUB(left.node, right.node)
         : _nullabilityNodeForGLB(astNode, left.node, right.node);
     if (type is InterfaceType) {
-      var leftType = left.type as InterfaceType;
-      var rightType = right.type as InterfaceType;
-      if (leftType.element != type.element ||
-          rightType.element != type.element) {
-        _unimplemented(astNode, 'LUB/GLB with substitution');
+      var leftType = left.type;
+      var rightType = right.type;
+      if (leftType is InterfaceType && rightType is InterfaceType) {
+        if (leftType.element != type.element ||
+            rightType.element != type.element) {
+          _unimplemented(astNode, 'LUB/GLB with substitution');
+        }
+        List<DecoratedType> newTypeArguments = [];
+        for (int i = 0; i < type.typeArguments.length; i++) {
+          newTypeArguments.add(_decorateUpperOrLowerBound(
+              astNode,
+              type.typeArguments[i],
+              left.typeArguments[i],
+              right.typeArguments[i],
+              isLUB));
+        }
+        return DecoratedType(type, node, typeArguments: newTypeArguments);
+      } else {
+        _unimplemented(astNode, 'LUB/GLB with inconsistent types');
       }
-      List<DecoratedType> newTypeArguments = [];
-      for (int i = 0; i < type.typeArguments.length; i++) {
-        newTypeArguments.add(_decorateUpperOrLowerBound(
-            astNode,
-            type.typeArguments[i],
-            left.typeArguments[i],
-            right.typeArguments[i],
-            isLUB));
-      }
-      return DecoratedType(type, node, typeArguments: newTypeArguments);
     } else if (type is FunctionType) {
-      _unimplemented(astNode, 'LUB/GLB with function types');
+      var leftType = left.type;
+      var rightType = right.type;
+      if (leftType is FunctionType && rightType is FunctionType) {
+        var returnType = _decorateUpperOrLowerBound(
+            astNode, type.returnType, left.returnType, right.returnType, isLUB);
+        for (var parameter in type.parameters) {
+          _unimplemented(astNode, 'LUB/GLB with function parameter');
+        }
+        return DecoratedType(type, node, returnType: returnType);
+      } else {
+        _unimplemented(astNode, 'LUB/GLB with inconsistent types');
+      }
     } else if (type is TypeParameterType) {
       _unimplemented(astNode, 'LUB/GLB with type parameter types');
       return DecoratedType(type, NullabilityNode.forInferredType());

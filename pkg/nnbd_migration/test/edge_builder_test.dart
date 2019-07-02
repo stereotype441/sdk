@@ -642,6 +642,20 @@ int f(bool b, int i, int j) {
     assertNullCheck(check_b, assertEdge(nullable_b, never, hard: true));
   }
 
+  test_conditionalExpression_functionTyped_returnType() async {
+    await analyze('''
+void f(bool b, int Function() x, int Function() y) {
+  (b ? x : y);
+}
+''');
+    var xType = decoratedGenericFunctionTypeAnnotation('int Function() x');
+    var yType = decoratedGenericFunctionTypeAnnotation('int Function() y');
+    var resultType = decoratedExpressionType('(b ?');
+    assertConditional(resultType.node, xType.node, yType.node);
+    assertConditional(resultType.returnType.node, xType.returnType.node,
+        yType.returnType.node);
+  }
+
   test_conditionalExpression_general() async {
     await analyze('''
 int f(bool b, int i, int j) {
