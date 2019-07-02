@@ -650,6 +650,24 @@ int f(bool b, int i, int j) {
     assertNullCheck(check_b, assertEdge(nullable_b, never, hard: true));
   }
 
+  test_conditionalExpression_functionTyped_mixedParameters() async {
+    await analyze('''
+void f(
+    bool b, void Function(int a, [int b]) x, void Function(int a, {int c}) y) {
+  (b ? x : y);
+}
+''');
+    var xType = decoratedGenericFunctionTypeAnnotation(
+        'void Function(int a, [int b]) x');
+    var yType = decoratedGenericFunctionTypeAnnotation(
+        'void Function(int a, {int c}) y');
+    var resultType = decoratedExpressionType('(b ?');
+    assertLUB(resultType.node, xType.node, yType.node);
+    assertGLB(resultType.positionalParameters[0].node,
+        xType.positionalParameters[0].node, yType.positionalParameters[0].node);
+    expect(resultType.namedParameters, isEmpty);
+  }
+
   test_conditionalExpression_functionTyped_namedParameter() async {
     await analyze('''
 void f(bool b, void Function({int p}) x, void Function({int p}) y) {
@@ -664,6 +682,20 @@ void f(bool b, void Function({int p}) x, void Function({int p}) y) {
     assertLUB(resultType.node, xType.node, yType.node);
     assertGLB(resultType.namedParameters['p'].node,
         xType.namedParameters['p'].node, yType.namedParameters['p'].node);
+  }
+
+  test_conditionalExpression_functionTyped_namedParameter_orNone() async {
+    await analyze('''
+void f(bool b, void Function({int p}) x, void Function() y) {
+  (b ? x : y);
+}
+''');
+    var xType =
+        decoratedGenericFunctionTypeAnnotation('void Function({int p}) x');
+    var yType = decoratedGenericFunctionTypeAnnotation('void Function() y');
+    var resultType = decoratedExpressionType('(b ?');
+    assertLUB(resultType.node, xType.node, yType.node);
+    expect(resultType.namedParameters, isEmpty);
   }
 
   test_conditionalExpression_functionTyped_normalParameter() async {
@@ -694,6 +726,20 @@ void f(bool b, void Function([int]) x, void Function([int]) y) {
     assertLUB(resultType.node, xType.node, yType.node);
     assertGLB(resultType.positionalParameters[0].node,
         xType.positionalParameters[0].node, yType.positionalParameters[0].node);
+  }
+
+  test_conditionalExpression_functionTyped_optionalParameter_orNone() async {
+    await analyze('''
+void f(bool b, void Function([int]) x, void Function() y) {
+  (b ? x : y);
+}
+''');
+    var xType =
+        decoratedGenericFunctionTypeAnnotation('void Function([int]) x');
+    var yType = decoratedGenericFunctionTypeAnnotation('void Function() y');
+    var resultType = decoratedExpressionType('(b ?');
+    assertLUB(resultType.node, xType.node, yType.node);
+    expect(resultType.positionalParameters, isEmpty);
   }
 
   test_conditionalExpression_functionTyped_returnType() async {
