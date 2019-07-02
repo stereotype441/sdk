@@ -26,6 +26,19 @@ class DecoratedClassHierarchy {
 
   DecoratedClassHierarchy(this._variables, this._graph);
 
+  /// Returns the most specific supertype of [decoratedType] corresponding to
+  /// the given [superclass].  [decoratedType] must be an interface type.
+  ///
+  /// If the class corresponding to [decoratedType] does not implement
+  /// [superclass], raises an exception.
+  DecoratedType asSupertype(
+      DecoratedType decoratedType, ClassElement superclass) {
+    var class_ = (decoratedType.type as InterfaceType).element;
+    var typeToSubstitute = getDecoratedSupertype(class_, superclass);
+    var substitution = _substitutionForSupertype(decoratedType);
+    return typeToSubstitute.substitute(substitution);
+  }
+
   /// Retrieves a [DecoratedType] describing how [class_] implements
   /// [superclass].
   ///
@@ -59,14 +72,7 @@ class DecoratedClassHierarchy {
       for (var entry in decoratedDirectSupertypes.entries) {
         var superclass = entry.key;
         var decoratedSupertype = entry.value;
-        var supertype = decoratedSupertype.type as InterfaceType;
-        // Compute a type substitution to determine how [class_] relates to
-        // this specific [superclass].
-        Map<TypeParameterElement, DecoratedType> substitution = {};
-        for (int i = 0; i < supertype.typeArguments.length; i++) {
-          substitution[supertype.typeParameters[i]] =
-              decoratedSupertype.typeArguments[i];
-        }
+        var substitution = _substitutionForSupertype(decoratedSupertype);
         // Apply that substitution to the relation between [superclass] and
         // each of its transitive superclasses, to determine the relation
         // between [class_] and the transitive superclass.
@@ -81,5 +87,18 @@ class DecoratedClassHierarchy {
       }
     }
     return decorations;
+  }
+
+  Map<TypeParameterElement, DecoratedType> _substitutionForSupertype(
+      DecoratedType decoratedSupertype) {
+    var supertype = decoratedSupertype.type as InterfaceType;
+    // Compute a type substitution to determine how [class_] relates to
+    // this specific [superclass].
+    Map<TypeParameterElement, DecoratedType> substitution = {};
+    for (int i = 0; i < supertype.typeArguments.length; i++) {
+      substitution[supertype.typeParameters[i]] =
+          decoratedSupertype.typeArguments[i];
+    }
+    return substitution;
   }
 }
