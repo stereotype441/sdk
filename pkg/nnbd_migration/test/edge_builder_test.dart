@@ -742,6 +742,22 @@ void f(bool b, void Function([int]) x, void Function() y) {
     expect(resultType.positionalParameters, isEmpty);
   }
 
+  test_conditionalExpression_functionTyped_optionalParameter_orNone_contravariant() async {
+    await analyze('''
+void f(bool b, void Function(void Function([int])) x,
+    void Function(void Function()) y) {
+  (b ? x : y);
+}
+''');
+    var xType =
+        decoratedGenericFunctionTypeAnnotation('void Function([int])) x');
+    var yType = decoratedGenericFunctionTypeAnnotation('void Function()) y');
+    var resultType = decoratedExpressionType('(b ?').positionalParameters[0];
+    assertGLB(resultType.node, xType.node, yType.node);
+    expect(resultType.positionalParameters[0].node,
+        same(xType.positionalParameters[0].node));
+  }
+
   test_conditionalExpression_functionTyped_returnType() async {
     await analyze('''
 void f(bool b, int Function() x, int Function() y) {

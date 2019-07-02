@@ -977,8 +977,8 @@ $stackTrace''');
       return DecoratedType(type, _graph.always);
     }
     node ??= isLUB
-        ? NullabilityNode.forLUB(left.node, right.node)
-        : _nullabilityNodeForGLB(astNode, left.node, right.node);
+        ? _nullabilityNodeForLUB(left, right)
+        : _nullabilityNodeForGLB(astNode, left, right);
     if (type is InterfaceType) {
       if (type.typeArguments.isEmpty) {
         return DecoratedType(type, node);
@@ -1023,10 +1023,10 @@ $stackTrace''');
             leftParameterType = left.namedParameters[parameter.name];
             rightParameterType = right.namedParameters[parameter.name];
           } else {
-            leftParameterType =
-                left.positionalParameters[positionalParameterCount];
-            rightParameterType =
-                right.positionalParameters[positionalParameterCount];
+            leftParameterType = _safeLookup(
+                left.positionalParameters, positionalParameterCount);
+            rightParameterType = _safeLookup(
+                right.positionalParameters, positionalParameterCount);
           }
           var decoratedParameterType = _decorateUpperOrLowerBound(astNode,
               parameter.type, leftParameterType, rightParameterType, !isLUB);
@@ -1353,13 +1353,30 @@ $stackTrace''');
   }
 
   NullabilityNode _nullabilityNodeForGLB(
-      AstNode astNode, NullabilityNode leftNode, NullabilityNode rightNode) {
+      AstNode astNode, DecoratedType left, DecoratedType right) {
+    if (left == null) return right.node;
+    if (right == null) return left.node;
     var node = NullabilityNode.forGLB();
     var origin = GreatestLowerBoundOrigin(_source, astNode.offset);
-    _graph.connect(leftNode, node, origin, guards: [rightNode]);
-    _graph.connect(node, leftNode, origin);
-    _graph.connect(node, rightNode, origin);
+    _graph.connect(left.node, node, origin, guards: [(right.node)]);
+    _graph.connect(node, left.node, origin);
+    _graph.connect(node, right.node, origin);
     return node;
+  }
+
+  NullabilityNode _nullabilityNodeForLUB(
+      DecoratedType left, DecoratedType right) {
+    if (left == null) return right.node;
+    if (right == null) return left.node;
+    return NullabilityNode.forLUB(left.node, right.node);
+  }
+
+  DecoratedType _safeLookup(List<DecoratedType> decoratedTypes, int i) {
+    if (i < decoratedTypes.length) {
+      return decoratedTypes[i];
+    } else {
+      return null;
+    }
   }
 
   @alwaysThrows
