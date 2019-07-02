@@ -800,7 +800,8 @@ $stackTrace''');
     var staticElement = node.staticElement;
     if (staticElement is ParameterElement ||
         staticElement is LocalVariableElement ||
-        staticElement is FunctionElement) {
+        staticElement is FunctionElement ||
+        staticElement is MethodElement) {
       return getOrComputeElementType(staticElement);
     } else if (staticElement is PropertyAccessorElement) {
       var elementType = getOrComputeElementType(staticElement);

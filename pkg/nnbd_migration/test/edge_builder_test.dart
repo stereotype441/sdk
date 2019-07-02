@@ -74,14 +74,12 @@ class EdgeBuilderTest extends MigrationVisitorTestBase {
     return variables.decoratedExpressionType(findNode.expression(text));
   }
 
-  solo_test_prefixedIdentifier_tearoff() async {
+  solo_test_simpleIdentifier_tearoff_function() async {
     await analyze('''
-abstract class C {
-  int f(int i);
-}
-int Function(int) g(C c) => c.f;
+int f(int i) => 0;
+int Function(int) g() => f;
 ''');
-    var fType = variables.decoratedElementType(findElement.method('f'));
+    var fType = variables.decoratedElementType(findElement.function('f'));
     var gReturnType =
         variables.decoratedElementType(findElement.function('g')).returnType;
     assertEdge(fType.returnType.node, gReturnType.returnType.node, hard: false);
@@ -1980,6 +1978,22 @@ void test(C c) {
     assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true);
   }
 
+  test_prefixedIdentifier_tearoff() async {
+    await analyze('''
+abstract class C {
+  int f(int i);
+}
+int Function(int) g(C c) => c.f;
+''');
+    var fType = variables.decoratedElementType(findElement.method('f'));
+    var gReturnType =
+        variables.decoratedElementType(findElement.function('g')).returnType;
+    assertEdge(fType.returnType.node, gReturnType.returnType.node, hard: false);
+    assertEdge(gReturnType.positionalParameters[0].node,
+        fType.positionalParameters[0].node,
+        hard: false);
+  }
+
   test_prefixExpression_bang() async {
     await analyze('''
 bool f(bool b) {
@@ -2382,6 +2396,22 @@ main() {
     assertEdge(decoratedTypeAnnotation('int i').node,
         decoratedTypeAnnotation('int j').node,
         hard: true);
+  }
+
+  test_simpleIdentifier_tearoff_method() async {
+    await analyze('''
+abstract class C {
+  int f(int i);
+  int Function(int) g() => f;
+}
+''');
+    var fType = variables.decoratedElementType(findElement.method('f'));
+    var gReturnType =
+        variables.decoratedElementType(findElement.method('g')).returnType;
+    assertEdge(fType.returnType.node, gReturnType.returnType.node, hard: false);
+    assertEdge(gReturnType.positionalParameters[0].node,
+        fType.positionalParameters[0].node,
+        hard: false);
   }
 
   test_skipDirectives() async {
