@@ -1005,10 +1005,21 @@ $stackTrace''');
       if (leftType is FunctionType && rightType is FunctionType) {
         var returnType = _decorateUpperOrLowerBound(
             astNode, type.returnType, left.returnType, right.returnType, isLUB);
+        List<DecoratedType> positionalParameters = [];
+        int positionalParameterCount = 0;
         for (var parameter in type.parameters) {
-          _unimplemented(astNode, 'LUB/GLB with function parameter');
+          if (parameter.isNamed || parameter.isOptional) {
+            _unimplemented(astNode, 'LUB/GLB with named/optional parameter');
+          }
+          positionalParameters.add(_decorateUpperOrLowerBound(
+              astNode,
+              parameter.type,
+              left.positionalParameters[positionalParameterCount],
+              right.positionalParameters[positionalParameterCount],
+              !isLUB));
         }
-        return DecoratedType(type, node, returnType: returnType);
+        return DecoratedType(type, node,
+            returnType: returnType, positionalParameters: positionalParameters);
       } else {
         _unimplemented(astNode, 'LUB/GLB with inconsistent types');
       }
@@ -1319,7 +1330,12 @@ $stackTrace''');
 
   NullabilityNode _nullabilityNodeForGLB(
       AstNode astNode, NullabilityNode leftNode, NullabilityNode rightNode) {
-    _unimplemented(astNode, 'Nullability node for GLB');
+    var node = NullabilityNode.forGLB();
+    var origin = GreatestLowerBoundOrigin(_source, astNode.offset);
+    _graph.connect(leftNode, node, origin, guards: [rightNode]);
+    _graph.connect(node, leftNode, origin);
+    _graph.connect(node, rightNode, origin);
+    return node;
   }
 
   @alwaysThrows

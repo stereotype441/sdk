@@ -35,11 +35,9 @@ class EdgeBuilderTest extends MigrationVisitorTestBase {
   void assertGLB(
       NullabilityNode node, NullabilityNode left, NullabilityNode right) {
     expect(node, isNot(TypeMatcher<NullabilityNodeForLUB>()));
-    var conditionalNode = node as NullabilityNodeForLUB;
-    var upstreamNodes =
-        graph.getUpstreamEdges(node).map((edge) => edge.primarySource).toList();
-    expect(upstreamNodes, contains(conditionalNode.left));
-    expect(upstreamNodes, contains(conditionalNode.right));
+    assertEdge(left, node, hard: false, guards: [right]);
+    assertEdge(node, left, hard: false);
+    assertEdge(node, right, hard: false);
   }
 
   void assertLUB(
