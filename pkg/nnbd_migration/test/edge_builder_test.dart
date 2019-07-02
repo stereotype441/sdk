@@ -749,6 +749,24 @@ void f(bool b, void Function(int) x, void Function(int) y) {
         xType.positionalParameters[0].node, yType.positionalParameters[0].node);
   }
 
+  test_conditionalExpression_functionTyped_normalParameters() async {
+    await analyze('''
+void f(bool b, void Function(int, int) x, void Function(int, int) y) {
+  (b ? x : y);
+}
+''');
+    var xType =
+        decoratedGenericFunctionTypeAnnotation('void Function(int, int) x');
+    var yType =
+        decoratedGenericFunctionTypeAnnotation('void Function(int, int) y');
+    var resultType = decoratedExpressionType('(b ?');
+    assertLUB(resultType.node, xType.node, yType.node);
+    assertGLB(resultType.positionalParameters[0].node,
+        xType.positionalParameters[0].node, yType.positionalParameters[0].node);
+    assertGLB(resultType.positionalParameters[1].node,
+        xType.positionalParameters[1].node, yType.positionalParameters[1].node);
+  }
+
   test_conditionalExpression_functionTyped_optionalParameter() async {
     await analyze('''
 void f(bool b, void Function([int]) x, void Function([int]) y) {
