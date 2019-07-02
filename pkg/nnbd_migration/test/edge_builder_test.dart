@@ -658,6 +658,22 @@ int f(bool b, int i, int j) {
         assertEdge(nullable_conditional, nullable_return, hard: false));
   }
 
+  test_conditionalExpression_generic() async {
+    await analyze('''
+void f(bool b, Map<int, String> x, Map<int, String> y) {
+  (b ? x : y);
+}
+''');
+    var xType = decoratedTypeAnnotation('Map<int, String> x');
+    var yType = decoratedTypeAnnotation('Map<int, String> y');
+    var resultType = decoratedExpressionType('(b ?');
+    assertConditional(resultType.node, xType.node, yType.node);
+    assertConditional(resultType.typeArguments[0].node,
+        xType.typeArguments[0].node, yType.typeArguments[0].node);
+    assertConditional(resultType.typeArguments[1].node,
+        xType.typeArguments[1].node, yType.typeArguments[1].node);
+  }
+
   test_conditionalExpression_left_non_null() async {
     await analyze('''
 int f(bool b, int i) {

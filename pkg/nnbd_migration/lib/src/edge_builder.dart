@@ -322,22 +322,9 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
     _handleAssignment(node.condition, _notNullType);
     // TODO(paulberry): guard anything inside the true and false branches
     var thenType = node.thenExpression.accept(this);
-    assert(_isSimple(thenType)); // TODO(paulberry)
     var elseType = node.elseExpression.accept(this);
-    assert(_isSimple(elseType)); // TODO(paulberry)
 
-    DartType staticType = node.staticType;
-    DecoratedType returnType;
-    if (staticType is FunctionType) {
-      DartType functReturnType = staticType.returnType;
-      returnType = functReturnType.isDynamic || functReturnType.isVoid
-          // TODO(danrubel): handle LUB for constituent types
-          ? DecoratedType(functReturnType, _graph.always)
-          : _variables.decoratedElementType(functReturnType.element);
-    }
-    var overallType = DecoratedType(
-        staticType, NullabilityNode.forLUB(thenType.node, elseType.node),
-        returnType: returnType);
+    var overallType = _decorateUpperOrLowerBound(node, node.staticType, thenType, elseType, true);
     _variables.recordDecoratedExpressionType(node, overallType);
     return overallType;
   }
@@ -978,6 +965,42 @@ $stackTrace''');
     assert(name != 'runtimeType');
   }
 
+  DecoratedType _decorateUpperOrLowerBound(AstNode astNode, DartType type,
+      DecoratedType left, DecoratedType right, bool isLUB,
+      {NullabilityNode node}) {
+    if (type.isDynamic || type.isVoid) {
+      _unimplemented(astNode, 'LUB/GLB with dynamic/void');
+      return DecoratedType(type, _graph.always);
+    }
+    node ??= isLUB
+        ? NullabilityNode.forLUB(left.node, right.node)
+        : _nullabilityNodeForGLB(astNode, left.node, right.node);
+    if (type is InterfaceType) {
+      var leftType = left.type as InterfaceType;
+      var rightType = right.type as InterfaceType;
+      if (leftType.element != type.element ||
+          rightType.element != type.element) {
+        _unimplemented(astNode, 'LUB/GLB with substitution');
+      }
+      List<DecoratedType> newTypeArguments = [];
+      for (int i = 0; i < type.typeArguments.length; i++) {
+        newTypeArguments.add(_decorateUpperOrLowerBound(
+            astNode,
+            type.typeArguments[i],
+            left.typeArguments[i],
+            right.typeArguments[i],
+            isLUB));
+      }
+      return DecoratedType(type, node, typeArguments: newTypeArguments);
+    } else if (type is FunctionType) {
+      _unimplemented(astNode, 'LUB/GLB with function types');
+    } else if (type is TypeParameterType) {
+      _unimplemented(astNode, 'LUB/GLB with type parameter types');
+      return DecoratedType(type, NullabilityNode.forInferredType());
+    }
+    _unimplemented(astNode, '_decorateUpperOrLowerBound');
+  }
+
   /// Creates the necessary constraint(s) for an assignment of the given
   /// [expression] to a destination whose type is [destinationType].
   DecoratedType _handleAssignment(
@@ -1274,6 +1297,11 @@ $stackTrace''');
       if (element is ParameterElement) return true;
     }
     return false;
+  }
+
+  NullabilityNode _nullabilityNodeForGLB(
+      AstNode astNode, NullabilityNode leftNode, NullabilityNode rightNode) {
+    _unimplemented(astNode, 'Nullability node for GLB');
   }
 
   @alwaysThrows
