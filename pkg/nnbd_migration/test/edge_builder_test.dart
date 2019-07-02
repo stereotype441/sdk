@@ -662,8 +662,8 @@ void f(bool b, void Function({int p}) x, void Function({int p}) y) {
         decoratedGenericFunctionTypeAnnotation('void Function({int p}) y');
     var resultType = decoratedExpressionType('(b ?');
     assertLUB(resultType.node, xType.node, yType.node);
-    assertGLB(resultType.positionalParameters[0].node,
-        xType.positionalParameters[0].node, yType.positionalParameters[0].node);
+    assertGLB(resultType.namedParameters['p'].node,
+        xType.namedParameters['p'].node, yType.namedParameters['p'].node);
   }
 
   test_conditionalExpression_functionTyped_normalParameter() async {
