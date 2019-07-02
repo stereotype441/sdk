@@ -32,7 +32,17 @@ class EdgeBuilderTest extends MigrationVisitorTestBase {
     return unit;
   }
 
-  void assertConditional(
+  void assertGLB(
+      NullabilityNode node, NullabilityNode left, NullabilityNode right) {
+    expect(node, isNot(TypeMatcher<NullabilityNodeForLUB>()));
+    var conditionalNode = node as NullabilityNodeForLUB;
+    var upstreamNodes =
+        graph.getUpstreamEdges(node).map((edge) => edge.primarySource).toList();
+    expect(upstreamNodes, contains(conditionalNode.left));
+    expect(upstreamNodes, contains(conditionalNode.right));
+  }
+
+  void assertLUB(
       NullabilityNode node, NullabilityNode left, NullabilityNode right) {
     var conditionalNode = node as NullabilityNodeForLUB;
     expect(conditionalNode.left, same(left));
@@ -642,6 +652,52 @@ int f(bool b, int i, int j) {
     assertNullCheck(check_b, assertEdge(nullable_b, never, hard: true));
   }
 
+  test_conditionalExpression_functionTyped_namedParameter() async {
+    await analyze('''
+void f(bool b, void Function({int p}) x, void Function({int p}) y) {
+  (b ? x : y);
+}
+''');
+    var xType =
+        decoratedGenericFunctionTypeAnnotation('void Function({int p}) x');
+    var yType =
+        decoratedGenericFunctionTypeAnnotation('void Function({int p}) y');
+    var resultType = decoratedExpressionType('(b ?');
+    assertLUB(resultType.node, xType.node, yType.node);
+    assertGLB(resultType.positionalParameters[0].node,
+        xType.positionalParameters[0].node, yType.positionalParameters[0].node);
+  }
+
+  test_conditionalExpression_functionTyped_normalParameter() async {
+    await analyze('''
+void f(bool b, void Function(int) x, void Function(int) y) {
+  (b ? x : y);
+}
+''');
+    var xType = decoratedGenericFunctionTypeAnnotation('void Function(int) x');
+    var yType = decoratedGenericFunctionTypeAnnotation('void Function(int) y');
+    var resultType = decoratedExpressionType('(b ?');
+    assertLUB(resultType.node, xType.node, yType.node);
+    assertGLB(resultType.positionalParameters[0].node,
+        xType.positionalParameters[0].node, yType.positionalParameters[0].node);
+  }
+
+  test_conditionalExpression_functionTyped_optionalParameter() async {
+    await analyze('''
+void f(bool b, void Function([int]) x, void Function([int]) y) {
+  (b ? x : y);
+}
+''');
+    var xType =
+        decoratedGenericFunctionTypeAnnotation('void Function([int]) x');
+    var yType =
+        decoratedGenericFunctionTypeAnnotation('void Function([int]) y');
+    var resultType = decoratedExpressionType('(b ?');
+    assertLUB(resultType.node, xType.node, yType.node);
+    assertGLB(resultType.positionalParameters[0].node,
+        xType.positionalParameters[0].node, yType.positionalParameters[0].node);
+  }
+
   test_conditionalExpression_functionTyped_returnType() async {
     await analyze('''
 void f(bool b, int Function() x, int Function() y) {
@@ -651,9 +707,22 @@ void f(bool b, int Function() x, int Function() y) {
     var xType = decoratedGenericFunctionTypeAnnotation('int Function() x');
     var yType = decoratedGenericFunctionTypeAnnotation('int Function() y');
     var resultType = decoratedExpressionType('(b ?');
-    assertConditional(resultType.node, xType.node, yType.node);
-    assertConditional(resultType.returnType.node, xType.returnType.node,
+    assertLUB(resultType.node, xType.node, yType.node);
+    assertLUB(resultType.returnType.node, xType.returnType.node,
         yType.returnType.node);
+  }
+
+  test_conditionalExpression_functionTyped_returnType_void() async {
+    await analyze('''
+void f(bool b, void Function() x, void Function() y) {
+  (b ? x : y);
+}
+''');
+    var xType = decoratedGenericFunctionTypeAnnotation('void Function() x');
+    var yType = decoratedGenericFunctionTypeAnnotation('void Function() y');
+    var resultType = decoratedExpressionType('(b ?');
+    assertLUB(resultType.node, xType.node, yType.node);
+    expect(resultType.returnType.node, same(always));
   }
 
   test_conditionalExpression_general() async {
@@ -666,7 +735,7 @@ int f(bool b, int i, int j) {
     var nullable_i = decoratedTypeAnnotation('int i').node;
     var nullable_j = decoratedTypeAnnotation('int j').node;
     var nullable_conditional = decoratedExpressionType('(b ?').node;
-    assertConditional(nullable_conditional, nullable_i, nullable_j);
+    assertLUB(nullable_conditional, nullable_i, nullable_j);
     var nullable_return = decoratedTypeAnnotation('int f').node;
     assertNullCheck(checkExpression('(b ? i : j)'),
         assertEdge(nullable_conditional, nullable_return, hard: false));
@@ -681,11 +750,11 @@ void f(bool b, Map<int, String> x, Map<int, String> y) {
     var xType = decoratedTypeAnnotation('Map<int, String> x');
     var yType = decoratedTypeAnnotation('Map<int, String> y');
     var resultType = decoratedExpressionType('(b ?');
-    assertConditional(resultType.node, xType.node, yType.node);
-    assertConditional(resultType.typeArguments[0].node,
-        xType.typeArguments[0].node, yType.typeArguments[0].node);
-    assertConditional(resultType.typeArguments[1].node,
-        xType.typeArguments[1].node, yType.typeArguments[1].node);
+    assertLUB(resultType.node, xType.node, yType.node);
+    assertLUB(resultType.typeArguments[0].node, xType.typeArguments[0].node,
+        yType.typeArguments[0].node);
+    assertLUB(resultType.typeArguments[1].node, xType.typeArguments[1].node,
+        yType.typeArguments[1].node);
   }
 
   test_conditionalExpression_left_non_null() async {
@@ -700,7 +769,7 @@ int f(bool b, int i) {
         decoratedExpressionType('(b ?').node as NullabilityNodeForLUB;
     var nullable_throw = nullable_conditional.left;
     assertNoUpstreamNullability(nullable_throw);
-    assertConditional(nullable_conditional, nullable_throw, nullable_i);
+    assertLUB(nullable_conditional, nullable_throw, nullable_i);
   }
 
   test_conditionalExpression_left_null() async {
@@ -712,7 +781,7 @@ int f(bool b, int i) {
 
     var nullable_i = decoratedTypeAnnotation('int i').node;
     var nullable_conditional = decoratedExpressionType('(b ?').node;
-    assertConditional(nullable_conditional, always, nullable_i);
+    assertLUB(nullable_conditional, always, nullable_i);
   }
 
   test_conditionalExpression_right_non_null() async {
@@ -727,7 +796,7 @@ int f(bool b, int i) {
         decoratedExpressionType('(b ?').node as NullabilityNodeForLUB;
     var nullable_throw = nullable_conditional.right;
     assertNoUpstreamNullability(nullable_throw);
-    assertConditional(nullable_conditional, nullable_i, nullable_throw);
+    assertLUB(nullable_conditional, nullable_i, nullable_throw);
   }
 
   test_conditionalExpression_right_null() async {
@@ -739,7 +808,7 @@ int f(bool b, int i) {
 
     var nullable_i = decoratedTypeAnnotation('int i').node;
     var nullable_conditional = decoratedExpressionType('(b ?').node;
-    assertConditional(nullable_conditional, nullable_i, always);
+    assertLUB(nullable_conditional, nullable_i, always);
   }
 
   test_constructor_named() async {

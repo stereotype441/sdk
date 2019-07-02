@@ -970,7 +970,9 @@ $stackTrace''');
       DecoratedType left, DecoratedType right, bool isLUB,
       {NullabilityNode node}) {
     if (type.isDynamic || type.isVoid) {
-      _unimplemented(astNode, 'LUB/GLB with dynamic/void');
+      if (type.isDynamic) {
+        _unimplemented(astNode, 'LUB/GLB with dynamic');
+      }
       return DecoratedType(type, _graph.always);
     }
     node ??= isLUB
