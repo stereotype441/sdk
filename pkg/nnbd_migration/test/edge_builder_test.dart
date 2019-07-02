@@ -74,20 +74,6 @@ class EdgeBuilderTest extends MigrationVisitorTestBase {
     return variables.decoratedExpressionType(findNode.expression(text));
   }
 
-  solo_test_simpleIdentifier_tearoff_function() async {
-    await analyze('''
-int f(int i) => 0;
-int Function(int) g() => f;
-''');
-    var fType = variables.decoratedElementType(findElement.function('f'));
-    var gReturnType =
-        variables.decoratedElementType(findElement.function('g')).returnType;
-    assertEdge(fType.returnType.node, gReturnType.returnType.node, hard: false);
-    assertEdge(gReturnType.positionalParameters[0].node,
-        fType.positionalParameters[0].node,
-        hard: false);
-  }
-
   test_assert_demonstrates_non_null_intent() async {
     await analyze('''
 void f(int i) {
@@ -2396,6 +2382,20 @@ main() {
     assertEdge(decoratedTypeAnnotation('int i').node,
         decoratedTypeAnnotation('int j').node,
         hard: true);
+  }
+
+  test_simpleIdentifier_tearoff_function() async {
+    await analyze('''
+int f(int i) => 0;
+int Function(int) g() => f;
+''');
+    var fType = variables.decoratedElementType(findElement.function('f'));
+    var gReturnType =
+        variables.decoratedElementType(findElement.function('g')).returnType;
+    assertEdge(fType.returnType.node, gReturnType.returnType.node, hard: false);
+    assertEdge(gReturnType.positionalParameters[0].node,
+        fType.positionalParameters[0].node,
+        hard: false);
   }
 
   test_simpleIdentifier_tearoff_method() async {
