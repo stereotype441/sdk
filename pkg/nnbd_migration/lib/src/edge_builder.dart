@@ -690,7 +690,6 @@ $stackTrace''');
 
   @override
   DecoratedType visitPrefixExpression(PrefixExpression node) {
-    /* DecoratedType operandType = */
     var targetType = _handleAssignment(node.operand, _notNullType);
     var operatorType = node.operator.type;
     if (operatorType == TokenType.BANG) {
