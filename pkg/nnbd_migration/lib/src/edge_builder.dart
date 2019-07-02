@@ -1008,8 +1008,8 @@ $stackTrace''');
         List<DecoratedType> positionalParameters = [];
         int positionalParameterCount = 0;
         for (var parameter in type.parameters) {
-          if (parameter.isNamed || parameter.isOptional) {
-            _unimplemented(astNode, 'LUB/GLB with named/optional parameter');
+          if (parameter.isNamed) {
+            _unimplemented(astNode, 'LUB/GLB with named parameter');
           }
           positionalParameters.add(_decorateUpperOrLowerBound(
               astNode,
