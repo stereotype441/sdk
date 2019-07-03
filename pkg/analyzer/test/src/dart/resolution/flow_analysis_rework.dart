@@ -12,12 +12,22 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:path/path.dart' as path;
 import 'package:test_reflective_loader/test_reflective_loader.dart';
 
+import 'flow_analysis_rework_generated.dart';
+
 main() {
   var inputPath = path.join(Directory.current.path, 'test', 'src', 'dart',
       'resolution', 'flow_analysis_test.dart');
   var input = File(inputPath).readAsStringSync();
   var parsed = parseString(content: input);
-  parsed.unit.accept(TestTransformer());
+  var testTransformer = TestTransformer();
+  parsed.unit.accept(testTransformer);
+  var output = input;
+  for (var edit in testTransformer.edits.reversed) {
+    output = output.substring(0, edit.offset) +
+        edit.replacement +
+        output.substring(edit.offset + edit.length);
+  }
+  print(output);
 }
 
 List<List<Object>> _accumulatedTestData = [];
@@ -506,6 +516,12 @@ class RecordAllDone {
 }
 
 class TestTransformer extends GeneralizingAstVisitor<void> {
+  bool updateSearchStrings = false;
+
+  int testIndex = -1;
+
+  final List<_Edit> edits = [];
+
   @override
   void visitMethodInvocation(MethodInvocation node) {
     if (node.target == null) {
@@ -515,24 +531,58 @@ class TestTransformer extends GeneralizingAstVisitor<void> {
           name == 'assertNotPromoted' ||
           name == 'assertPromoted' ||
           name == 'verify') {
+        updateSearchStrings = true;
+        super.visitMethodInvocation(node);
+        updateSearchStrings = false;
         return;
       }
     }
-    return super.visitMethodInvocation(node);
+    super.visitMethodInvocation(node);
   }
 
   @override
   void visitSimpleStringLiteral(SimpleStringLiteral node) {
     var s = node.stringValue;
-    try {
-      var parsed = parseString(content: s);
-      print(parsed.unit.accept(DslTransformer({})));
-    } catch (e) {
-      print('Error in $s: $e');
-      rethrow;
+    if (updateSearchStrings) {
+      var parent = node.parent;
+      if (parent is ArgumentList &&
+          parent.arguments.length > 1 &&
+          identical(node, parent.arguments[1])) {
+        var grandParent = parent.parent;
+        if (grandParent is MethodInvocation &&
+            grandParent.methodName.name == 'assertPromoted') {
+          // Second argument of assertPromoted isn't transformed.
+          return;
+        }
+      }
+      Map<String, Object> searchMap = testData[testIndex][2];
+      var replacement = searchMap[s];
+      if (replacement == null) {
+        throw '${json.encode(s)} not found in search map '
+            '${json.encode(searchMap)}';
+      }
+      edits.add(_Edit(node.offset, node.length, replacement));
+    } else {
+      testIndex++;
+      if (testData[testIndex][0] != s) {
+        throw 'Test code mismatch.  Expected ${json.encode(testData[testIndex][0])},'
+            ' got ${json.encode(s)}';
+      }
+      var parent = node.parent;
+      var grandParent = parent.parent;
+      edits.add(_Edit(
+          grandParent.offset, grandParent.length, testData[testIndex][1]));
     }
   }
 
   @override
   void visitUriBasedDirective(UriBasedDirective node) {}
+}
+
+class _Edit {
+  final int offset;
+  final int length;
+  final String replacement;
+
+  _Edit(this.offset, this.length, this.replacement);
 }
