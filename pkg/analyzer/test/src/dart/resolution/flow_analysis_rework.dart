@@ -413,17 +413,24 @@ class DslTransformer extends ThrowingAstVisitor<List<Object>> {
     return call('Case', [node.labels, node.expression, node.statements]);
   }
 
-  List<Object> visitSwitchStatement(SwitchStatement node) =>
-      call('Switch', [node.expression, node.members]);
+  List<Object> visitSwitchStatement(SwitchStatement node) => searchable(
+      'Switch',
+      node,
+      'statement',
+      call('Switch', [node.expression, node.members]));
 
   List<Object> visitThrowExpression(ThrowExpression node) =>
       call('Throw', [node.expression]);
 
-  List<Object> visitTryStatement(TryStatement node) => call('Try', [
+  List<Object> visitTryStatement(TryStatement node) => searchable(
+      'Try',
+      node,
+      'statement',
+      call('Try', [
         node.body,
         node.catchClauses,
         if (node.finallyBlock != null) node.finallyBlock
-      ]);
+      ]));
 
   List<Object> visitTypeName(TypeName node) {
     _unused(node.typeArguments);
@@ -446,8 +453,8 @@ class DslTransformer extends ThrowingAstVisitor<List<Object>> {
       searchable('Locals', node, 'statement',
           call('Locals', [node.variables.variables]));
 
-  List<Object> visitWhileStatement(WhileStatement node) =>
-      call('While', [node.condition, node.body]);
+  List<Object> visitWhileStatement(WhileStatement node) => searchable(
+      'While', node, 'statement', call('While', [node.condition, node.body]));
 
   List<Object> _declared(String method, SimpleIdentifier name) {
     return extractable(name.staticElement, call(method, [name.name]));

@@ -25,10 +25,6 @@ main() {
 class NullableFlowTest extends DriverResolutionTest {
   FlowAnalysisResult flowResult;
 
-  void tearDown() {
-    recordTestDone();
-  }
-
   @override
   AnalysisOptionsImpl get analysisOptions =>
       AnalysisOptionsImpl()..enabledExperiments = [EnableString.non_nullable];
@@ -65,6 +61,10 @@ class NullableFlowTest extends DriverResolutionTest {
       return found;
     }).toList();
     expect(flowResult.nullableNodes, unorderedEquals(expected));
+  }
+
+  void tearDown() {
+    recordTestDone();
   }
 
   test_assign_toNonNull() async {
@@ -394,13 +394,13 @@ void f(int x) {
 class ReachableFlowTest extends DriverResolutionTest {
   FlowAnalysisResult flowResult;
 
-  void tearDown() {
-    recordTestDone();
-  }
-
   @override
   AnalysisOptionsImpl get analysisOptions =>
       AnalysisOptionsImpl()..enabledExperiments = [EnableString.non_nullable];
+
+  void tearDown() {
+    recordTestDone();
+  }
 
   test_conditional_false() async {
     await trackCode(r'''
@@ -875,10 +875,6 @@ void f() { // f
 class TypePromotionFlowTest extends DriverResolutionTest {
   FlowAnalysisResult flowResult;
 
-  void tearDown() {
-    recordTestDone();
-  }
-
   @override
   AnalysisOptionsImpl get analysisOptions =>
       AnalysisOptionsImpl()..enabledExperiments = [EnableString.non_nullable];
@@ -898,6 +894,10 @@ class TypePromotionFlowTest extends DriverResolutionTest {
       fail('$expectedType expected, but actually not promoted\n$search');
     }
     assertElementTypeString(actualType, expectedType);
+  }
+
+  void tearDown() {
+    recordTestDone();
   }
 
   test_assignment() async {
