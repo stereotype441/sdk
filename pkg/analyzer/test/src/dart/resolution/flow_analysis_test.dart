@@ -17,12 +17,17 @@ main() {
     defineReflectiveTests(NullableFlowTest);
     defineReflectiveTests(ReachableFlowTest);
     defineReflectiveTests(TypePromotionFlowTest);
+    defineReflectiveTests(RecordAllDone);
   });
 }
 
 @reflectiveTest
 class NullableFlowTest extends DriverResolutionTest {
   FlowAnalysisResult flowResult;
+
+  void tearDown() {
+    recordTestDone();
+  }
 
   @override
   AnalysisOptionsImpl get analysisOptions =>
@@ -37,8 +42,11 @@ class NullableFlowTest extends DriverResolutionTest {
   ]) {
     var expected = [search1, search2, search3, search4, search5]
         .where((i) => i != null)
-        .map((search) => findNode.simple(search))
-        .toList();
+        .map((search) {
+      var found = findNode.simple(search);
+      recordSearch(search, found);
+      return found;
+    }).toList();
     expect(flowResult.nonNullableNodes, unorderedEquals(expected));
   }
 
@@ -51,8 +59,11 @@ class NullableFlowTest extends DriverResolutionTest {
   ]) {
     var expected = [search1, search2, search3, search4, search5]
         .where((i) => i != null)
-        .map((search) => findNode.simple(search))
-        .toList();
+        .map((search) {
+      var found = findNode.simple(search);
+      recordSearch(search, found);
+      return found;
+    }).toList();
     expect(flowResult.nullableNodes, unorderedEquals(expected));
   }
 
@@ -374,7 +385,7 @@ void f(int x) {
     await resolveTestFile();
 
     var unit = result.unit;
-    print(unit.accept(DslTransformer()).join(''));
+    recordRework(code, unit);
     flowResult = FlowAnalysisResult.getFromNode(unit);
   }
 }
@@ -382,6 +393,10 @@ void f(int x) {
 @reflectiveTest
 class ReachableFlowTest extends DriverResolutionTest {
   FlowAnalysisResult flowResult;
+
+  void tearDown() {
+    recordTestDone();
+  }
 
   @override
   AnalysisOptionsImpl get analysisOptions =>
@@ -436,6 +451,7 @@ void f() { // f
     await trackCode(r'''
 void f(bool b, int i) { // f
   return;
+  Object _;
   do {} while (b);
   for (;;) {}
   for (_ in []) {}
@@ -447,6 +463,7 @@ void f(bool b, int i) { // f
 ''');
     verify(
       unreachableStatements: [
+        'Object _',
         'do {}',
         'for (;;',
         'for (_',
@@ -492,6 +509,7 @@ void f() { // f
   test_forEach() async {
     await trackCode(r'''
 void f() {
+  Object _;
   for (_ in [0, 1, 2]) {
     1;
     return;
@@ -811,6 +829,7 @@ void f() { // f
     await resolveTestFile();
 
     var unit = result.unit;
+    recordRework(code, unit);
     flowResult = FlowAnalysisResult.getFromNode(unit);
   }
 
@@ -821,10 +840,18 @@ void f() { // f
   }) {
     var expectedUnreachableNodes = <AstNode>[];
     expectedUnreachableNodes.addAll(
-      unreachableStatements.map((search) => findNode.statement(search)),
+      unreachableStatements.map((search) {
+        var found = findNode.statement(search);
+        recordSearch(search, found);
+        return found;
+      }),
     );
     expectedUnreachableNodes.addAll(
-      unreachableExpressions.map((search) => findNode.expression(search)),
+      unreachableExpressions.map((search) {
+        var found = findNode.expression(search);
+        recordSearch(search, found);
+        return found;
+      }),
     );
 
     expect(
@@ -834,9 +861,11 @@ void f() { // f
     expect(
       flowResult.functionBodiesThatDontComplete,
       unorderedEquals(
-        functionBodiesThatDontComplete
-            .map((search) => findNode.functionBody(search))
-            .toList(),
+        functionBodiesThatDontComplete.map((search) {
+          var found = findNode.functionBody(search);
+          recordSearch(search, found);
+          return found;
+        }).toList(),
       ),
     );
   }
@@ -846,18 +875,24 @@ void f() { // f
 class TypePromotionFlowTest extends DriverResolutionTest {
   FlowAnalysisResult flowResult;
 
+  void tearDown() {
+    recordTestDone();
+  }
+
   @override
   AnalysisOptionsImpl get analysisOptions =>
       AnalysisOptionsImpl()..enabledExperiments = [EnableString.non_nullable];
 
   void assertNotPromoted(String search) {
     var node = findNode.simple(search);
+    recordSearch(search, node);
     var actualType = flowResult.promotedTypes[node];
     expect(actualType, isNull, reason: search);
   }
 
   void assertPromoted(String search, String expectedType) {
     var node = findNode.simple(search);
+    recordSearch(search, node);
     var actualType = flowResult.promotedTypes[node];
     if (actualType == null) {
       fail('$expectedType expected, but actually not promoted\n$search');
@@ -1085,6 +1120,7 @@ void f(bool b, Object x) {
   test_forEach_outerIsType_loopAssigned() async {
     await trackCode(r'''
 void f(Object x) {
+  Object v1;
   if (x is String) {
     for (var _ in (v1 = [0, 1, 2])) {
       x; // 1
@@ -1634,6 +1670,7 @@ void f(bool b, Object x) {
     await resolveTestFile();
 
     var unit = result.unit;
+    recordRework(code, unit);
     flowResult = FlowAnalysisResult.getFromNode(unit);
   }
 }
