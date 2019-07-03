@@ -1,7 +1,7 @@
 List<List<Object>> testData = [
   [
     "void f(int x) {\n  if (x != null) return;\n  x; // 1\n  x = 0;\n  x; // 2\n}\n",
-    "Get x0;\nGet x1;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([If(NotEq(Get(x), Null()), Return()), (x0 = Get(x)), Set(x, Int(0)), (x1 = Get(x))])]));",
+    "Get x0;\nGet x1;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([If(NotEq(Get(x), NullLiteral()), Return()), (x0 = Get(x)), Set(x, Int(0)), (x1 = Get(x))])]));",
     {
       "x; // 1": "x0",
       "x; // 2": "x1"
@@ -9,7 +9,7 @@ List<List<Object>> testData = [
   ],
   [
     "void f(int x) {\n  if (x == null) return;\n  x; // 1\n  x = null;\n  x; // 2\n}\n",
-    "Get x0;\nGet x1;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([If(Eq(Get(x), Null()), Return()), (x0 = Get(x)), Set(x, Null()), (x1 = Get(x))])]));",
+    "Get x0;\nGet x1;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([If(Eq(Get(x), NullLiteral()), Return()), (x0 = Get(x)), Set(x, NullLiteral()), (x1 = Get(x))])]));",
     {
       "x; // 1": "x0",
       "x; // 2": "x1"
@@ -17,35 +17,35 @@ List<List<Object>> testData = [
   ],
   [
     "void f(int a, int b) {\n  if (a == null) return;\n  a; // 1\n  a = b;\n  a; // 2\n}\n",
-    "Get a0;\nvar a = Param(TypeAnnotation(\"int\"), \"a\");\nvar b = Param(TypeAnnotation(\"int\"), \"b\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [a, b])..body = Block([If(Eq(Get(a), Null()), Return()), (a0 = Get(a)), Set(a, Get(b)), Get(a)])]));",
+    "Get a0;\nvar a = Param(TypeAnnotation(\"int\"), \"a\");\nvar b = Param(TypeAnnotation(\"int\"), \"b\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [a, b])..body = Block([If(Eq(Get(a), NullLiteral()), Return()), (a0 = Get(a)), Set(a, Get(b)), Get(a)])]));",
     {
       "a; // 1": "a0"
     }
   ],
   [
     "void f(int a, int b) {\n  if (a != null) return;\n  a; // 1\n  a = b;\n  a; // 2\n}\n",
-    "Get a0;\nvar a = Param(TypeAnnotation(\"int\"), \"a\");\nvar b = Param(TypeAnnotation(\"int\"), \"b\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [a, b])..body = Block([If(NotEq(Get(a), Null()), Return()), (a0 = Get(a)), Set(a, Get(b)), Get(a)])]));",
+    "Get a0;\nvar a = Param(TypeAnnotation(\"int\"), \"a\");\nvar b = Param(TypeAnnotation(\"int\"), \"b\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [a, b])..body = Block([If(NotEq(Get(a), NullLiteral()), Return()), (a0 = Get(a)), Set(a, Get(b)), Get(a)])]));",
     {
       "a; // 1": "a0"
     }
   ],
   [
     "void f(int x) {\n  x == null && x.isEven;\n}\n",
-    "Get x0;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([And(Eq(Get(x), Null()), PropertyGet((x0 = Get(x)), \"isEven\"))])]));",
+    "Get x0;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([And(Eq(Get(x), NullLiteral()), PropertyGet((x0 = Get(x)), \"isEven\"))])]));",
     {
       "x.isEven": "x0"
     }
   ],
   [
     "void f(int x) {\n  x == null || x.isEven;\n}\n",
-    "Get x0;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([Or(Eq(Get(x), Null()), PropertyGet((x0 = Get(x)), \"isEven\"))])]));",
+    "Get x0;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([Or(Eq(Get(x), NullLiteral()), PropertyGet((x0 = Get(x)), \"isEven\"))])]));",
     {
       "x.isEven": "x0"
     }
   ],
   [
     "class C {\n  C(int x) {\n    if (x == null) {\n      x; // 1\n    } else {\n      x; // 2\n    }\n  }\n}\n",
-    "Get x0;\nGet x1;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Class(\"C\", [Constructor(null, [x], Block([If(Eq(Get(x), Null()), Block([(x0 = Get(x))]), Block([(x1 = Get(x))]))]))])]));",
+    "Get x0;\nGet x1;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Class(\"C\", [Constructor(null, [x], Block([If(Eq(Get(x), NullLiteral()), Block([(x0 = Get(x))]), Block([(x1 = Get(x))]))]))])]));",
     {
       "x; // 1": "x0",
       "x; // 2": "x1"
@@ -53,7 +53,7 @@ List<List<Object>> testData = [
   ],
   [
     "void f(int a, int b) {\n  if (a == null) {\n    a; // 1\n    if (b == null) return;\n    b; // 2\n  } else {\n    a; // 3\n    if (b == null) return;\n    b; // 4\n  }\n  a; // 5\n  b; // 6\n}\n",
-    "Get a0;\nGet b0;\nGet a1;\nGet b1;\nGet b2;\nvar a = Param(TypeAnnotation(\"int\"), \"a\");\nvar b = Param(TypeAnnotation(\"int\"), \"b\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [a, b])..body = Block([If(Eq(Get(a), Null()), Block([(a0 = Get(a)), If(Eq(Get(b), Null()), Return()), (b0 = Get(b))]), Block([(a1 = Get(a)), If(Eq(Get(b), Null()), Return()), (b1 = Get(b))])), Get(a), (b2 = Get(b))])]));",
+    "Get a0;\nGet b0;\nGet a1;\nGet b1;\nGet b2;\nvar a = Param(TypeAnnotation(\"int\"), \"a\");\nvar b = Param(TypeAnnotation(\"int\"), \"b\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [a, b])..body = Block([If(Eq(Get(a), NullLiteral()), Block([(a0 = Get(a)), If(Eq(Get(b), NullLiteral()), Return()), (b0 = Get(b))]), Block([(a1 = Get(a)), If(Eq(Get(b), NullLiteral()), Return()), (b1 = Get(b))])), Get(a), (b2 = Get(b))])]));",
     {
       "a; // 1": "a0",
       "b; // 2": "b0",
@@ -64,35 +64,35 @@ List<List<Object>> testData = [
   ],
   [
     "void f(int x) {\n  if (null != x) return;\n  x; // 1\n}\n",
-    "Get x0;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([If(NotEq(Null(), Get(x)), Return()), (x0 = Get(x))])]));",
+    "Get x0;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([If(NotEq(NullLiteral(), Get(x)), Return()), (x0 = Get(x))])]));",
     {
       "x; // 1": "x0"
     }
   ],
   [
     "void f(int x) {\n  if (x != null) return;\n  x; // 1\n}\n",
-    "Get x0;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([If(NotEq(Get(x), Null()), Return()), (x0 = Get(x))])]));",
+    "Get x0;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([If(NotEq(Get(x), NullLiteral()), Return()), (x0 = Get(x))])]));",
     {
       "x; // 1": "x0"
     }
   ],
   [
     "void f(int x) {\n  if (null == x) return;\n  x; // 1\n}\n",
-    "Get x0;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([If(Eq(Null(), Get(x)), Return()), (x0 = Get(x))])]));",
+    "Get x0;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([If(Eq(NullLiteral(), Get(x)), Return()), (x0 = Get(x))])]));",
     {
       "x; // 1": "x0"
     }
   ],
   [
     "void f(int x) {\n  if (x == null) return;\n  x; // 1\n}\n",
-    "Get x0;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([If(Eq(Get(x), Null()), Return()), (x0 = Get(x))])]));",
+    "Get x0;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([If(Eq(Get(x), NullLiteral()), Return()), (x0 = Get(x))])]));",
     {
       "x; // 1": "x0"
     }
   ],
   [
     "void f(int x) {\n  if (x == null) {\n    x; // 1\n  } else {\n    x; // 2\n  }\n}\n",
-    "Get x0;\nGet x1;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([If(Eq(Get(x), Null()), Block([(x0 = Get(x))]), Block([(x1 = Get(x))]))])]));",
+    "Get x0;\nGet x1;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([If(Eq(Get(x), NullLiteral()), Block([(x0 = Get(x))]), Block([(x1 = Get(x))]))])]));",
     {
       "x; // 1": "x0",
       "x; // 2": "x1"
@@ -100,7 +100,7 @@ List<List<Object>> testData = [
   ],
   [
     "class C {\n  void f(int x) {\n    if (x == null) {\n      x; // 1\n    } else {\n      x; // 2\n    }\n  }\n}\n",
-    "Get x0;\nGet x1;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Class(\"C\", [Method(TypeAnnotation(\"void\"), \"f\", [x], Block([If(Eq(Get(x), Null()), Block([(x0 = Get(x))]), Block([(x1 = Get(x))]))]))])]));",
+    "Get x0;\nGet x1;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Class(\"C\", [Method(TypeAnnotation(\"void\"), \"f\", [x], Block([If(Eq(Get(x), NullLiteral()), Block([(x0 = Get(x))]), Block([(x1 = Get(x))]))]))])]));",
     {
       "x; // 1": "x0",
       "x; // 2": "x1"
@@ -108,12 +108,12 @@ List<List<Object>> testData = [
   ],
   [
     "f(int a, int b) {\n  localFunction() {\n    a = b;\n  }\n\n  if (a == null) {\n    a; // 1\n    localFunction();\n    a; // 2\n  }\n}\n",
-    "var a = Param(TypeAnnotation(\"int\"), \"a\");\nvar b = Param(TypeAnnotation(\"int\"), \"b\");\nvar localFunction = Func(null, \"localFunction\", []);\nawait trackCode(Unit([Func(null, \"f\", [a, b])..body = Block([localFunction..body = Block([Set(a, Get(b))]), If(Eq(Get(a), Null()), Block([Get(a), StaticCall(localFunction, []), Get(a)]))])]));",
+    "var a = Param(TypeAnnotation(\"int\"), \"a\");\nvar b = Param(TypeAnnotation(\"int\"), \"b\");\nvar localFunction = Func(null, \"localFunction\", []);\nawait trackCode(Unit([Func(null, \"f\", [a, b])..body = Block([localFunction..body = Block([Set(a, Get(b))]), If(Eq(Get(a), NullLiteral()), Block([Get(a), StaticCall(localFunction, []), Get(a)]))])]));",
     {}
   ],
   [
     "void f(int x) {\n  try {\n    if (x == null) return;\n    x; // 1\n  } finally {\n    x; // 2\n  }\n  x; // 3\n}\n",
-    "Get x0;\nGet x1;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([Try(Block([If(Eq(Get(x), Null()), Return()), (x0 = Get(x))]), [], Block([Get(x)])), (x1 = Get(x))])]));",
+    "Get x0;\nGet x1;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([Try(Block([If(Eq(Get(x), NullLiteral()), Return()), (x0 = Get(x))]), [], Block([Get(x)])), (x1 = Get(x))])]));",
     {
       "x; // 1": "x0",
       "x; // 3": "x1"
@@ -121,7 +121,7 @@ List<List<Object>> testData = [
   ],
   [
     "void f(int x) {\n  try {\n    x; // 1\n  } finally {\n    if (x == null) return;\n    x; // 2\n  }\n  x; // 3\n}\n",
-    "Get x0;\nGet x1;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([Try(Block([Get(x)]), [], Block([If(Eq(Get(x), Null()), Return()), (x0 = Get(x))])), (x1 = Get(x))])]));",
+    "Get x0;\nGet x1;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([Try(Block([Get(x)]), [], Block([If(Eq(Get(x), NullLiteral()), Return()), (x0 = Get(x))])), (x1 = Get(x))])]));",
     {
       "x; // 2": "x0",
       "x; // 3": "x1"
@@ -129,21 +129,21 @@ List<List<Object>> testData = [
   ],
   [
     "void f(int a, int b) {\n  if (a != null) return;\n  try {\n    a; // 1\n    a = b;\n    a; // 2\n  } finally {\n    a; // 3\n  }\n  a; // 4\n}\n",
-    "Get a0;\nvar a = Param(TypeAnnotation(\"int\"), \"a\");\nvar b = Param(TypeAnnotation(\"int\"), \"b\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [a, b])..body = Block([If(NotEq(Get(a), Null()), Return()), Try(Block([(a0 = Get(a)), Set(a, Get(b)), Get(a)]), [], Block([Get(a)])), Get(a)])]));",
+    "Get a0;\nvar a = Param(TypeAnnotation(\"int\"), \"a\");\nvar b = Param(TypeAnnotation(\"int\"), \"b\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [a, b])..body = Block([If(NotEq(Get(a), NullLiteral()), Return()), Try(Block([(a0 = Get(a)), Set(a, Get(b)), Get(a)]), [], Block([Get(a)])), Get(a)])]));",
     {
       "a; // 1": "a0"
     }
   ],
   [
     "void f(int a, int b) {\n  if (a == null) return;\n  try {\n    a; // 1\n    a = b;\n    a; // 2\n  } finally {\n    a; // 3\n  }\n  a; // 4\n}\n",
-    "Get a0;\nvar a = Param(TypeAnnotation(\"int\"), \"a\");\nvar b = Param(TypeAnnotation(\"int\"), \"b\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [a, b])..body = Block([If(Eq(Get(a), Null()), Return()), Try(Block([(a0 = Get(a)), Set(a, Get(b)), Get(a)]), [], Block([Get(a)])), Get(a)])]));",
+    "Get a0;\nvar a = Param(TypeAnnotation(\"int\"), \"a\");\nvar b = Param(TypeAnnotation(\"int\"), \"b\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [a, b])..body = Block([If(Eq(Get(a), NullLiteral()), Return()), Try(Block([(a0 = Get(a)), Set(a, Get(b)), Get(a)]), [], Block([Get(a)])), Get(a)])]));",
     {
       "a; // 1": "a0"
     }
   ],
   [
     "void f(int a, int b) {\n  if (a == null) return;\n  try {\n    a; // 1\n  } finally {\n    a; // 2\n    a = b;\n    a; // 3\n  }\n  a; // 4\n}\n",
-    "Get a0;\nGet a1;\nvar a = Param(TypeAnnotation(\"int\"), \"a\");\nvar b = Param(TypeAnnotation(\"int\"), \"b\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [a, b])..body = Block([If(Eq(Get(a), Null()), Return()), Try(Block([(a0 = Get(a))]), [], Block([(a1 = Get(a)), Set(a, Get(b)), Get(a)])), Get(a)])]));",
+    "Get a0;\nGet a1;\nvar a = Param(TypeAnnotation(\"int\"), \"a\");\nvar b = Param(TypeAnnotation(\"int\"), \"b\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [a, b])..body = Block([If(Eq(Get(a), NullLiteral()), Return()), Try(Block([(a0 = Get(a))]), [], Block([(a1 = Get(a)), Set(a, Get(b)), Get(a)])), Get(a)])]));",
     {
       "a; // 1": "a0",
       "a; // 2": "a1"
@@ -151,7 +151,7 @@ List<List<Object>> testData = [
   ],
   [
     "void f(int x) {\n  while (x == null) {\n    x; // 1\n  }\n  x; // 2\n}\n",
-    "Get x0;\nGet x1;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([While(Eq(Get(x), Null()), Block([(x0 = Get(x))])), (x1 = Get(x))])]));",
+    "Get x0;\nGet x1;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([While(Eq(Get(x), NullLiteral()), Block([(x0 = Get(x))])), (x1 = Get(x))])]));",
     {
       "x; // 1": "x0",
       "x; // 2": "x1"
@@ -159,7 +159,7 @@ List<List<Object>> testData = [
   ],
   [
     "void f(int x) {\n  while (x != null) {\n    x; // 1\n  }\n  x; // 2\n}\n",
-    "Get x0;\nGet x1;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([While(NotEq(Get(x), Null()), Block([(x0 = Get(x))])), (x1 = Get(x))])]));",
+    "Get x0;\nGet x1;\nvar x = Param(TypeAnnotation(\"int\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([While(NotEq(Get(x), NullLiteral()), Block([(x0 = Get(x))])), (x1 = Get(x))])]));",
     {
       "x; // 1": "x0",
       "x; // 2": "x1"
