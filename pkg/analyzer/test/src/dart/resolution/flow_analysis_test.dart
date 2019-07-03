@@ -935,7 +935,7 @@ void f(Object x) {
   do {
     x; // 1
     x = '';
-  } while (x is! String)
+  } while (x is! String);
   x; // 2
 }
 ''');
@@ -948,7 +948,7 @@ void f(Object x) {
 void f(Object x) {
   do {
     x; // 1
-  } while (x is String)
+  } while (x is String);
   x; // 2
 }
 ''');
@@ -1137,7 +1137,7 @@ void f(Object x) {
 
     g = () {
       x; // 2
-    }
+    };
   }
 
   x = 42;
