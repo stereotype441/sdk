@@ -568,10 +568,9 @@ class TestTransformer extends GeneralizingAstVisitor<void> {
         throw 'Test code mismatch.  Expected ${json.encode(testData[testIndex][0])},'
             ' got ${json.encode(s)}';
       }
-      var parent = node.parent;
-      var grandParent = parent.parent;
-      edits.add(_Edit(
-          grandParent.offset, grandParent.length, testData[testIndex][1]));
+      var greatGrandParent = node.parent.parent.parent;
+      edits.add(_Edit(greatGrandParent.offset, greatGrandParent.length,
+          testData[testIndex][1]));
     }
   }
 
