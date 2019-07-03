@@ -10,6 +10,7 @@ import 'package:test/test.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
 
 import 'driver_resolution.dart';
+import 'flow_analysis_rework.dart';
 
 main() {
   defineReflectiveSuite(() {
@@ -373,6 +374,7 @@ void f(int x) {
     await resolveTestFile();
 
     var unit = result.unit;
+    print(unit.accept(DslTransformer()).join(''));
     flowResult = FlowAnalysisResult.getFromNode(unit);
   }
 }
