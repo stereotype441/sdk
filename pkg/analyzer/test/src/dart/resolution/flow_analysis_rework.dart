@@ -444,7 +444,7 @@ class DslTransformer extends ThrowingAstVisitor<List<Object>> {
 
   List<Object> visitTypeName(TypeName node) {
     _unused(node.typeArguments);
-    return call('Type', [(node.name as SimpleIdentifier).name]);
+    return call('DartType', [(node.name as SimpleIdentifier).name]);
   }
 
   List<Object> visitVariableDeclaration(VariableDeclaration node) {
