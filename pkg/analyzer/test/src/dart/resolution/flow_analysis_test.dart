@@ -2,7 +2,7 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-//import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/src/dart/analysis/experiments.dart';
 import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
 import 'package:analyzer/src/generated/engine.dart';
@@ -381,7 +381,7 @@ void f(int x) {
   }
 
   /// Resolve the given [code] and track nullability in the unit.
-  Future<void> trackCode(Unit code) async {
+  Future<void> trackCode(String code) async {
     addTestFile(code);
     await resolveTestFile();
 
