@@ -2,7 +2,6 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/src/dart/analysis/experiments.dart';
 import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
 import 'package:analyzer/src/generated/engine.dart';
@@ -31,36 +30,26 @@ class NullableFlowTest extends DriverResolutionTest {
       AnalysisOptionsImpl()..enabledExperiments = [EnableString.non_nullable];
 
   void assertNonNullable([
-    String search1,
-    String search2,
-    String search3,
-    String search4,
-    String search5,
+    Get search1,
+    Get search2,
+    Get search3,
+    Get search4,
+    Get search5,
   ]) {
     var expected = [search1, search2, search3, search4, search5]
-        .where((i) => i != null)
-        .map((search) {
-      var found = findNode.simple(search);
-      recordSearch(search, found);
-      return found;
-    }).toList();
+        .where((i) => i != null).toList();
     expect(flowResult.nonNullableNodes, unorderedEquals(expected));
   }
 
   void assertNullable([
-    String search1,
-    String search2,
-    String search3,
-    String search4,
-    String search5,
+    Get search1,
+    Get search2,
+    Get search3,
+    Get search4,
+    Get search5,
   ]) {
     var expected = [search1, search2, search3, search4, search5]
-        .where((i) => i != null)
-        .map((search) {
-      var found = findNode.simple(search);
-      recordSearch(search, found);
-      return found;
-    }).toList();
+        .where((i) => i != null).toList();
     expect(flowResult.nullableNodes, unorderedEquals(expected));
   }
 
@@ -446,13 +435,8 @@ class NullableFlowTest extends DriverResolutionTest {
   }
 
   /// Resolve the given [code] and track nullability in the unit.
-  Future<void> trackCode(String code) async {
-    addTestFile(code);
-    await resolveTestFile();
-
-    var unit = result.unit;
-    recordRework(code, unit);
-    flowResult = FlowAnalysisResult.getFromNode(unit);
+  Future<void> trackCode(Unit code) async {
+    throw UnimplementedError('TODO(paulberry)');
   }
 }
 
@@ -927,34 +911,21 @@ class ReachableFlowTest extends DriverResolutionTest {
   }
 
   /// Resolve the given [code] and track unreachable nodes in the unit.
-  Future<void> trackCode(String code) async {
-    addTestFile(code);
-    await resolveTestFile();
-
-    var unit = result.unit;
-    recordRework(code, unit);
-    flowResult = FlowAnalysisResult.getFromNode(unit);
+  Future<void> trackCode(Unit code) async {
+    throw UnimplementedError('TODO(paulberry)');
   }
 
   void verify({
-    List<String> unreachableExpressions = const [],
-    List<String> unreachableStatements = const [],
-    List<String> functionBodiesThatDontComplete = const [],
+    List<Expression> unreachableExpressions = const [],
+    List<Statement> unreachableStatements = const [],
+    List<Statement> functionBodiesThatDontComplete = const [],
   }) {
-    var expectedUnreachableNodes = <AstNode>[];
+    var expectedUnreachableNodes = <Statement>[];
     expectedUnreachableNodes.addAll(
-      unreachableStatements.map((search) {
-        var found = findNode.statement(search);
-        recordSearch(search, found);
-        return found;
-      }),
+      unreachableStatements
     );
     expectedUnreachableNodes.addAll(
-      unreachableExpressions.map((search) {
-        var found = findNode.expression(search);
-        recordSearch(search, found);
-        return found;
-      }),
+      unreachableExpressions
     );
 
     expect(
@@ -964,11 +935,7 @@ class ReachableFlowTest extends DriverResolutionTest {
     expect(
       flowResult.functionBodiesThatDontComplete,
       unorderedEquals(
-        functionBodiesThatDontComplete.map((search) {
-          var found = findNode.functionBody(search);
-          recordSearch(search, found);
-          return found;
-        }).toList(),
+        functionBodiesThatDontComplete
       ),
     );
   }
@@ -982,19 +949,15 @@ class TypePromotionFlowTest extends DriverResolutionTest {
   AnalysisOptionsImpl get analysisOptions =>
       AnalysisOptionsImpl()..enabledExperiments = [EnableString.non_nullable];
 
-  void assertNotPromoted(String search) {
-    var node = findNode.simple(search);
-    recordSearch(search, node);
+  void assertNotPromoted(Get node) {
     var actualType = flowResult.promotedTypes[node];
-    expect(actualType, isNull, reason: search);
+    expect(actualType, isNull, reason: node.toString());
   }
 
-  void assertPromoted(String search, String expectedType) {
-    var node = findNode.simple(search);
-    recordSearch(search, node);
+  void assertPromoted(Get node, String expectedType) {
     var actualType = flowResult.promotedTypes[node];
     if (actualType == null) {
-      fail('$expectedType expected, but actually not promoted\n$search');
+      fail('$expectedType expected, but actually not promoted\n$node');
     }
     assertElementTypeString(actualType, expectedType);
   }
@@ -2042,12 +2005,7 @@ class TypePromotionFlowTest extends DriverResolutionTest {
   }
 
   /// Resolve the given [code] and track assignments in the unit.
-  Future<void> trackCode(String code) async {
-    addTestFile(code);
-    await resolveTestFile();
-
-    var unit = result.unit;
-    recordRework(code, unit);
-    flowResult = FlowAnalysisResult.getFromNode(unit);
+  Future<void> trackCode(Unit code) async {
+    throw UnimplementedError('TODO(paulberry)');
   }
 }
