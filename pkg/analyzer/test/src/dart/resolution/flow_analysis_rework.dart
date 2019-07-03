@@ -360,7 +360,7 @@ class DslTransformer extends ThrowingAstVisitor<List<Object>> {
     throw 'TODO';
   }
 
-  List<Object> visitNullLiteral(NullLiteral node) => call('Null', []);
+  List<Object> visitNullLiteral(NullLiteral node) => call('NullLiteral', []);
 
   List<Object> visitParenthesizedExpression(ParenthesizedExpression node) =>
       searchable(
