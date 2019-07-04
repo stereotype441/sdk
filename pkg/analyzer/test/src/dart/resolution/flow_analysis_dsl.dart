@@ -415,7 +415,11 @@ class InterfaceType extends DartType {
   InterfaceType(this.class_, [this.typeArguments = const []]) : super._();
 
   DartType getPropertyType(String propertyName) {
-    throw UnimplementedError('TODO(paulberry)');
+    switch (propertyName) {
+      case 'isEven': return InterfaceType('bool');
+      default:
+        throw StateError('Unexpected property get: $propertyName');
+    }
   }
 
   String toString() {
@@ -504,7 +508,8 @@ class Locals implements Statement {
   @override
   void run(FlowAnalyzer flowAnalyzer) {
     for (var variable in variables) {
-      flowAnalyzer._flowAnalysis.add(variable);
+      // TODO(paulberry): test some examples of variables with initializers
+      flowAnalyzer._flowAnalysis.add(variable, assigned: false);
     }
   }
 }
@@ -620,7 +625,7 @@ class Return implements Statement {
 
   @override
   void run(FlowAnalyzer flowAnalyzer) {
-    value.run(flowAnalyzer);
+    value?.run(flowAnalyzer);
   }
 }
 
