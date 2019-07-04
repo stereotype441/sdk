@@ -10,14 +10,12 @@ import 'package:test_reflective_loader/test_reflective_loader.dart';
 
 import 'driver_resolution.dart';
 import 'flow_analysis_dsl.dart';
-import 'flow_analysis_rework.dart';
 
 main() {
   defineReflectiveSuite(() {
     defineReflectiveTests(NullableFlowTest);
     defineReflectiveTests(ReachableFlowTest);
     defineReflectiveTests(TypePromotionFlowTest);
-    defineReflectiveTests(RecordAllDone);
   });
 }
 
@@ -51,10 +49,6 @@ class NullableFlowTest extends DriverResolutionTest {
     var expected = [search1, search2, search3, search4, search5]
         .where((i) => i != null).toList();
     expect(flowResult.nullableNodes, unorderedEquals(expected));
-  }
-
-  void tearDown() {
-    recordTestDone();
   }
 
   test_assign_toNonNull() async {
@@ -447,10 +441,6 @@ class ReachableFlowTest extends DriverResolutionTest {
   @override
   AnalysisOptionsImpl get analysisOptions =>
       AnalysisOptionsImpl()..enabledExperiments = [EnableString.non_nullable];
-
-  void tearDown() {
-    recordTestDone();
-  }
 
   test_conditional_false() async {
     Int value_1;
@@ -960,10 +950,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
       fail('$expectedType expected, but actually not promoted\n$node');
     }
     assertElementTypeString(actualType, expectedType);
-  }
-
-  void tearDown() {
-    recordTestDone();
   }
 
   test_assignment() async {

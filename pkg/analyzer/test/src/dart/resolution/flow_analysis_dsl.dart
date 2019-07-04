@@ -45,6 +45,11 @@ class Method implements Declaration {
 
   Method(this.returnType, this.name, this.parameters, [this.body]);
 }
+class StringLiteral implements Expression {
+  final String value;
+
+  StringLiteral(this.value);
+}
 class Block implements Statement {
   final List<Statement> statements;
 
