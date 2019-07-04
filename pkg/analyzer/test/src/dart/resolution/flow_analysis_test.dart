@@ -27,11 +27,11 @@ class FlowTestBase {
 @reflectiveTest
 class NullableFlowTest extends FlowTestBase {
   void assertNonNullable([
-    Get search1,
-    Get search2,
-    Get search3,
-    Get search4,
-    Get search5,
+    GetVariable search1,
+    GetVariable search2,
+    GetVariable search3,
+    GetVariable search4,
+    GetVariable search5,
   ]) {
     var expected = [search1, search2, search3, search4, search5]
         .where((i) => i != null)
@@ -40,11 +40,11 @@ class NullableFlowTest extends FlowTestBase {
   }
 
   void assertNullable([
-    Get search1,
-    Get search2,
-    Get search3,
-    Get search4,
-    Get search5,
+    GetVariable search1,
+    GetVariable search2,
+    GetVariable search3,
+    GetVariable search4,
+    GetVariable search5,
   ]) {
     var expected = [search1, search2, search3, search4, search5]
         .where((i) => i != null)
@@ -918,12 +918,12 @@ class TypePromotionFlowTest extends FlowTestBase {
     expect(type.toString(), expectedType);
   }
 
-  void assertNotPromoted(Get node) {
+  void assertNotPromoted(GetVariable node) {
     var actualType = flowResult.promotedTypes[node];
     expect(actualType, isNull, reason: node.toString());
   }
 
-  void assertPromoted(Get node, String expectedType) {
+  void assertPromoted(GetVariable node, String expectedType) {
     var actualType = flowResult.promotedTypes[node];
     if (actualType == null) {
       fail('$expectedType expected, but actually not promoted\n$node');

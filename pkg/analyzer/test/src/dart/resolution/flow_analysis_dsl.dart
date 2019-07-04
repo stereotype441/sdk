@@ -37,6 +37,16 @@ class Break implements Statement {
   R accept<R>(Visitor<R> visitor) => visitor.visitBreak(this);
 }
 
+class CallVariable implements Expression {
+  final Variable variable;
+  final List<Expression> arguments;
+
+  CallVariable(this.variable, this.arguments);
+
+  @override
+  R accept<R>(Visitor<R> visitor) => visitor.visitCallVariable(this);
+}
+
 class Case {
   final List<Label> labels;
   final Expression value;
@@ -213,6 +223,13 @@ class FlowAnalysisDriver extends Visitor<DartType>
     return InterfaceType('bool');
   }
 
+  DartType visitCallVariable(CallVariable callVariable) {
+    for (var argument in callVariable.arguments) {
+      argument.accept(this);
+    }
+    return (callVariable.variable.declaredType as FunctionType).returnType;
+  }
+
   @override
   visitClosure(Closure closure) {
     for (var parameter in closure.parameters) {
@@ -252,8 +269,8 @@ class FlowAnalysisDriver extends Visitor<DartType>
     return null;
   }
 
-  DartType visitGet(Get get) {
-    return get.variable.declaredType;
+  DartType visitGetVariable(GetVariable getVariable) {
+    return getVariable.variable.declaredType;
   }
 
   DartType visitGt(Gt gt) {
@@ -289,13 +306,6 @@ class FlowAnalysisDriver extends Visitor<DartType>
     return null;
   }
 
-  DartType visitLocalCall(LocalCall localCall) {
-    for (var argument in localCall.arguments) {
-      argument.accept(this);
-    }
-    return (localCall.variable.declaredType as FunctionType).returnType;
-  }
-
   DartType visitNot(Not not) {
     not.operand.accept(this);
     return InterfaceType('bool');
@@ -324,9 +334,9 @@ class FlowAnalysisDriver extends Visitor<DartType>
       (propertyGet.target.accept(this) as InterfaceType)
           .getPropertyType(propertyGet.propertyName);
 
-  DartType visitSet(Set set) {
-    set.value.accept(this);
-    return set.variable.declaredType;
+  DartType visitSetVariable(SetVariable setVariable) {
+    setVariable.value.accept(this);
+    return setVariable.variable.declaredType;
   }
 
   DartType visitStaticCall(StaticCall staticCall) {
@@ -352,11 +362,11 @@ class FlowAnalysisDriver extends Visitor<DartType>
 }
 
 class FlowAnalysisResult {
-  final List<Get> nullableNodes = [];
-  final List<Get> nonNullableNodes = [];
+  final List<GetVariable> nullableNodes = [];
+  final List<GetVariable> nonNullableNodes = [];
   final List<Statement> unreachableNodes = [];
   final List<Statement> functionBodiesThatDontComplete = [];
-  final Map<Get, DartType> promotedTypes = {};
+  final Map<GetVariable, DartType> promotedTypes = {};
 }
 
 class ForEachDeclared implements Statement {
@@ -421,13 +431,13 @@ class FunctionType extends DartType {
   String toString() => '$returnType Function(${paramTypes.join(', ')})';
 }
 
-class Get implements Expression {
+class GetVariable implements Expression {
   final Variable variable;
 
-  Get(this.variable);
+  GetVariable(this.variable);
 
   @override
-  R accept<R>(Visitor<R> visitor) => visitor.visitGet(this);
+  R accept<R>(Visitor<R> visitor) => visitor.visitGetVariable(this);
 }
 
 class Gt implements Expression {
@@ -531,16 +541,6 @@ class Local extends Variable {
       : super(isPotentiallyMutatedInClosure: isPotentiallyMutatedInClosure);
 
   R accept<R>(Visitor<R> visitor) => visitor.visitLocal(this);
-}
-
-class LocalCall implements Expression {
-  final Variable variable;
-  final List<Expression> arguments;
-
-  LocalCall(this.variable, this.arguments);
-
-  @override
-  R accept<R>(Visitor<R> visitor) => visitor.visitLocalCall(this);
 }
 
 class Locals implements Statement {
@@ -661,16 +661,16 @@ class Return implements Statement {
   R accept<R>(Visitor<R> visitor) => visitor.visitReturn(this);
 }
 
-class Set implements Expression {
+class SetVariable implements Expression {
   final Variable variable;
   final Expression value;
 
-  Set(this.variable, this.value) {
+  SetVariable(this.variable, this.value) {
     variable.isPotentiallyMutatedInScope = true;
   }
 
   @override
-  R accept<R>(Visitor<R> visitor) => visitor.visitSet(this);
+  R accept<R>(Visitor<R> visitor) => visitor.visitSetVariable(this);
 }
 
 abstract class Statement {
@@ -769,6 +769,13 @@ abstract class Visitor<R> {
 
   R visitBreak(Break break_) => defaultStatement();
 
+  R visitCallVariable(CallVariable callVariable) {
+    for (var argument in callVariable.arguments) {
+      argument.accept(this);
+    }
+    return defaultExpression();
+  }
+
   visitCase(Case case_) {
     case_.value.accept(this);
     for (var statement in case_.body) {
@@ -854,7 +861,7 @@ abstract class Visitor<R> {
     return defaultStatement();
   }
 
-  R visitGet(Get get) => defaultExpression();
+  R visitGetVariable(GetVariable getVariable) => defaultExpression();
 
   R visitGt(Gt gt) {
     gt.left.accept(this);
@@ -889,13 +896,6 @@ abstract class Visitor<R> {
   }
 
   R visitLocal(Local local) => defaultNode();
-
-  R visitLocalCall(LocalCall localCall) {
-    for (var argument in localCall.arguments) {
-      argument.accept(this);
-    }
-    return defaultExpression();
-  }
 
   R visitlocals(Locals locals) {
     for (var variable in locals.variables) {
@@ -944,8 +944,8 @@ abstract class Visitor<R> {
     return defaultStatement();
   }
 
-  R visitSet(Set set) {
-    set.value.accept(this);
+  R visitSetVariable(SetVariable setVariable) {
+    setVariable.value.accept(this);
     return defaultStatement();
   }
 
