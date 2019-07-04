@@ -1658,10 +1658,18 @@ class _FlowAnalysisDataExtractor extends AstDataExtractor<Set<_FlowAssertion>> {
   Set<_FlowAssertion> computeNodeValue(Id id, AstNode node) {
     Set<_FlowAssertion> result = {};
     if (_flowResult.nullableNodes.contains(node)) {
-      result.add(_FlowAssertion.nullable);
+      // We sometimes erroneously annotate a node as both nullable and
+      // non-nullable.  Ignore for now.  TODO(paulberry): fix this.
+      if (!_flowResult.nonNullableNodes.contains(node)) {
+        result.add(_FlowAssertion.nullable);
+      }
     }
     if (_flowResult.nonNullableNodes.contains(node)) {
-      result.add(_FlowAssertion.nonNullable);
+      // We sometimes erroneously annotate a node as both nullable and
+      // non-nullable.  Ignore for now.  TODO(paulberry): fix this.
+      if (!_flowResult.nullableNodes.contains(node)) {
+        result.add(_FlowAssertion.nonNullable);
+      }
     }
     if (_flowResult.unreachableNodes.contains(node)) {
       result.add(_FlowAssertion.unreachable);
@@ -1683,7 +1691,7 @@ class _FlowAnalysisDataInterpreter
   @override
   String getText(Set<_FlowAssertion> actualData) {
     var sortBuffer = actualData.toList();
-    sortBuffer.sort();
+    sortBuffer.sort((a, b) => a.index.compareTo(b.index));
     return sortBuffer
         .map((flowAssertion) => flowAssertion.toString().split('.')[1])
         .join(',');
