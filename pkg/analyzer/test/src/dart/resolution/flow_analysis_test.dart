@@ -1689,34 +1689,33 @@ class _FlowAnalysisDataInterpreter
   const _FlowAnalysisDataInterpreter();
 
   @override
-  String getText(Set<_FlowAssertion> actualData) {
-    var sortBuffer = actualData.toList();
-    sortBuffer.sort((a, b) => a.index.compareTo(b.index));
-    return sortBuffer
-        .map((flowAssertion) => flowAssertion.toString().split('.')[1])
-        .join(',');
-  }
+  String getText(Set<_FlowAssertion> actualData) =>
+      _sortedRepresentation(_toStrings(actualData));
 
   @override
   String isAsExpected(Set<_FlowAssertion> actualData, String expectedData) {
-    if (expectedData == null) {
-      return 'none';
+    var actualStrings = _toStrings(actualData);
+    var actualSorted = _sortedRepresentation(actualStrings);
+    var expectedSorted = _sortedRepresentation(expectedData.split(','));
+    if (actualSorted == expectedSorted) {
+      return null;
+    } else {
+      return 'Expected $expectedData, got $actualSorted';
     }
-    switch (expectedData) {
-      case 'nullable':
-        return actualData.contains(_FlowAssertion.nullable)
-            ? null
-            : 'expected nullable';
-      case 'nonNullable':
-        return actualData.contains(_FlowAssertion.nonNullable)
-            ? null
-            : 'expected non-nullable';
-    }
-    throw UnimplementedError('Unrecognized expectation $expectedData');
   }
 
   @override
   bool isEmpty(Set<_FlowAssertion> actualData) => actualData.isEmpty;
+
+  String _sortedRepresentation(Iterable<String> values) {
+    var list = values.toList();
+    list.sort();
+    return list.join(',');
+  }
+
+  List<String> _toStrings(Set<_FlowAssertion> actualData) => actualData
+      .map((flowAssertion) => flowAssertion.toString().split('.')[1])
+      .toList();
 }
 
 enum _FlowAssertion {
