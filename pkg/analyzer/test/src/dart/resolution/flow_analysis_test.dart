@@ -359,7 +359,7 @@ void f() { // f
   do {
     1;
   } while (true);
-  /*statement: unreachable*//*unreachable*/ 2;
+  /*statement: unreachable*/ 2;
 }
 ''');
     verify(
@@ -403,7 +403,7 @@ void f() { // f
   for (; true;) {
     1;
   }
-  /*statement: unreachable*//*unreachable*/ 2;
+  /*statement: unreachable*/ 2;
 }
 ''');
     verify(
@@ -418,7 +418,7 @@ void f() { // f
   for (;;) {
     1;
   }
-  /*statement: unreachable*//*unreachable*/ 2;
+  /*statement: unreachable*/ 2;
 }
 ''');
     verify(
@@ -493,7 +493,7 @@ void f() { // f
   if (true) {
     return;
   }
-  /*statement: unreachable*//*unreachable*/ 2;
+  /*statement: unreachable*/ 2;
 }
 ''');
     verify(
@@ -544,7 +544,7 @@ void f(bool b, int i) {
       } else {
         return;
       }
-      /*statement: unreachable*//*unreachable*/ 2;
+      /*statement: unreachable*/ 2;
   }
   3;
 }
@@ -572,7 +572,7 @@ void f() {
   try {
     1;
     return;
-    /*statement: unreachable*//*unreachable*/ 2;
+    /*statement: unreachable*/ 2;
   } catch (_) {
     3;
   }
@@ -590,7 +590,7 @@ void f() {
   } catch (_) {
     2;
     return;
-    /*statement: unreachable*//*unreachable*/ 3;
+    /*statement: unreachable*/ 3;
   }
   4;
 }
@@ -627,7 +627,7 @@ void f() { // f
   } finally {
     3;
   }
-  /*statement: unreachable*//*unreachable*/ 4;
+  /*statement: unreachable*/ 4;
 }
 ''');
     verify(
@@ -662,7 +662,7 @@ void f() { // f
   } finally {
     2;
   }
-  /*statement: unreachable*//*unreachable*/ 3;
+  /*statement: unreachable*/ 3;
 }
 ''');
     verify(
@@ -689,8 +689,8 @@ void f() { // f
   while (true) {
     1;
   }
-  /*statement: unreachable*//*unreachable*/ 2;
-  /*statement: unreachable*//*unreachable*/ 3;
+  /*statement: unreachable*/ 2;
+  /*statement: unreachable*/ 3;
 }
 ''');
     verify(
@@ -705,7 +705,7 @@ void f() {
   while (true) {
     1;
     break;
-    /*statement: unreachable*//*unreachable*/ 2;
+    /*statement: unreachable*/ 2;
   }
   3;
 }
@@ -733,9 +733,9 @@ void f() { // f
   while (true) {
     1;
     continue;
-    /*statement: unreachable*//*unreachable*/ 2;
+    /*statement: unreachable*/ 2;
   }
-  /*statement: unreachable*//*unreachable*/ 3;
+  /*statement: unreachable*/ 3;
 }
 ''');
     verify(
