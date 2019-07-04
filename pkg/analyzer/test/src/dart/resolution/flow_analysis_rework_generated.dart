@@ -415,7 +415,7 @@ List<List<Object>> testData = [
   ],
   [
     "void f(Object x) {\n  do {\n    x; // 1\n    x = '';\n  } while (x is! String);\n  x; // 2\n}\n",
-    "Get x0;\nGet x1;\nvar x = Param(TypeAnnotation(\"Object\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([Do(Block([(x0 = Get(x)), Set(x, StringLiteral())]), Is(Get(x), TypeAnnotation(\"String\"))), (x1 = Get(x))])]));",
+    "Get x0;\nGet x1;\nvar x = Param(TypeAnnotation(\"Object\"), \"x\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([Do(Block([(x0 = Get(x)), Set(x, StringLiteral(\"\"))]), Is(Get(x), TypeAnnotation(\"String\"))), (x1 = Get(x))])]));",
     {
       "x; // 1": "x0",
       "x; // 2": "x1"
