@@ -10,12 +10,14 @@ import 'package:test/test.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
 
 import 'driver_resolution.dart';
+import 'flow_analysis_rework.dart';
 
 main() {
   defineReflectiveSuite(() {
     defineReflectiveTests(NullableFlowTest);
     defineReflectiveTests(ReachableFlowTest);
     defineReflectiveTests(TypePromotionFlowTest);
+    defineReflectiveTests(RecordAllDone);
   });
 }
 
@@ -36,8 +38,11 @@ class NullableFlowTest extends DriverResolutionTest {
   ]) {
     var expected = [search1, search2, search3, search4, search5]
         .where((i) => i != null)
-        .map((search) => findNode.simple(search))
-        .toList();
+        .map((search) {
+      var found = findNode.simple(search);
+      recordSearch(search, found);
+      return found;
+    }).toList();
     expect(flowResult.nonNullableNodes, unorderedEquals(expected));
   }
 
@@ -50,9 +55,16 @@ class NullableFlowTest extends DriverResolutionTest {
   ]) {
     var expected = [search1, search2, search3, search4, search5]
         .where((i) => i != null)
-        .map((search) => findNode.simple(search))
-        .toList();
+        .map((search) {
+      var found = findNode.simple(search);
+      recordSearch(search, found);
+      return found;
+    }).toList();
     expect(flowResult.nullableNodes, unorderedEquals(expected));
+  }
+
+  void tearDown() {
+    recordTestDone();
   }
 
   test_assign_toNonNull() async {
@@ -373,6 +385,7 @@ void f(int x) {
     await resolveTestFile();
 
     var unit = result.unit;
+    recordRework(code, unit);
     flowResult = FlowAnalysisResult.getFromNode(unit);
   }
 }
@@ -384,6 +397,10 @@ class ReachableFlowTest extends DriverResolutionTest {
   @override
   AnalysisOptionsImpl get analysisOptions =>
       AnalysisOptionsImpl()..enabledExperiments = [EnableString.non_nullable];
+
+  void tearDown() {
+    recordTestDone();
+  }
 
   test_conditional_false() async {
     await trackCode(r'''
@@ -812,6 +829,7 @@ void f() { // f
     await resolveTestFile();
 
     var unit = result.unit;
+    recordRework(code, unit);
     flowResult = FlowAnalysisResult.getFromNode(unit);
   }
 
@@ -822,10 +840,18 @@ void f() { // f
   }) {
     var expectedUnreachableNodes = <AstNode>[];
     expectedUnreachableNodes.addAll(
-      unreachableStatements.map((search) => findNode.statement(search)),
+      unreachableStatements.map((search) {
+        var found = findNode.statement(search);
+        recordSearch(search, found);
+        return found;
+      }),
     );
     expectedUnreachableNodes.addAll(
-      unreachableExpressions.map((search) => findNode.expression(search)),
+      unreachableExpressions.map((search) {
+        var found = findNode.expression(search);
+        recordSearch(search, found);
+        return found;
+      }),
     );
 
     expect(
@@ -835,9 +861,11 @@ void f() { // f
     expect(
       flowResult.functionBodiesThatDontComplete,
       unorderedEquals(
-        functionBodiesThatDontComplete
-            .map((search) => findNode.functionBody(search))
-            .toList(),
+        functionBodiesThatDontComplete.map((search) {
+          var found = findNode.functionBody(search);
+          recordSearch(search, found);
+          return found;
+        }).toList(),
       ),
     );
   }
@@ -853,17 +881,23 @@ class TypePromotionFlowTest extends DriverResolutionTest {
 
   void assertNotPromoted(String search) {
     var node = findNode.simple(search);
+    recordSearch(search, node);
     var actualType = flowResult.promotedTypes[node];
     expect(actualType, isNull, reason: search);
   }
 
   void assertPromoted(String search, String expectedType) {
     var node = findNode.simple(search);
+    recordSearch(search, node);
     var actualType = flowResult.promotedTypes[node];
     if (actualType == null) {
       fail('$expectedType expected, but actually not promoted\n$search');
     }
     assertElementTypeString(actualType, expectedType);
+  }
+
+  void tearDown() {
+    recordTestDone();
   }
 
   test_assignment() async {
@@ -1636,6 +1670,7 @@ void f(bool b, Object x) {
     await resolveTestFile();
 
     var unit = result.unit;
+    recordRework(code, unit);
     flowResult = FlowAnalysisResult.getFromNode(unit);
   }
 }
