@@ -496,7 +496,7 @@ List<List<Object>> testData = [
   ],
   [
     "void f(Object x) {\n  Object v1;\n  if (x is String) {\n    for (var _ in (v1 = [0, 1, 2])) {\n      x; // 1\n      x = 42;\n    }\n    x; // 2\n  }\n}\n",
-    "Get x0;\nGet x1;\nvar x = Param(TypeAnnotation(\"Object\"), \"x\");\nvar v1 = Local(\"v1\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([Locals([v1]), If(Is(Get(x), TypeAnnotation(\"String\")), Block([ForEachDeclared([ForEachVariable(\"_\")], Parens(Set(v1, ListLiteral(null, [Int(0), Int(1), Int(2)]))), Block([(x0 = Get(x)), Set(x, Int(42))])), (x1 = Get(x))]))])]));",
+    "Get x0;\nGet x1;\nvar x = Param(TypeAnnotation(\"Object\"), \"x\");\nvar v1 = Local(\"v1\");\nawait trackCode(Unit([Func(TypeAnnotation(\"void\"), \"f\", [x])..body = Block([Locals([v1]), If(Is(Get(x), TypeAnnotation(\"String\")), Block([ForEachDeclared(ForEachVariable(null, \"_\"), Parens(Set(v1, ListLiteral(null, [Int(0), Int(1), Int(2)]))), Block([(x0 = Get(x)), Set(x, Int(42))])), (x1 = Get(x))]))])]));",
     {
       "x; // 1": "x0",
       "x; // 2": "x1"
