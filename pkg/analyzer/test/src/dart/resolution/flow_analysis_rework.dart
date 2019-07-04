@@ -315,6 +315,11 @@ class DslTransformer extends ThrowingAstVisitor<List<Object>> {
     return call('Closure', [node.parameters.parameters, node.body]);
   }
 
+  List<Object> visitGenericFunctionType(GenericFunctionType node) {
+    _unused(node.typeParameters);
+    return call('FunctionType', [node.returnType, node.parameters.parameters]);
+  }
+
   List<Object> visitIfStatement(IfStatement node) => searchable(
       'If',
       node,
@@ -450,7 +455,7 @@ class DslTransformer extends ThrowingAstVisitor<List<Object>> {
 
   List<Object> visitTypeName(TypeName node) {
     _unused(node.typeArguments);
-    return call('TypeAnnotation', [(node.name as SimpleIdentifier).name]);
+    return call('InterfaceType', [(node.name as SimpleIdentifier).name]);
   }
 
   List<Object> visitVariableDeclaration(VariableDeclaration node) {
@@ -465,9 +470,11 @@ class DslTransformer extends ThrowingAstVisitor<List<Object>> {
   }
 
   List<Object> visitVariableDeclarationStatement(
-          VariableDeclarationStatement node) =>
-      searchable('Locals', node, 'statement',
-          call('Locals', [node.variables.variables]));
+      VariableDeclarationStatement node) {
+    _unusedList(node.variables.metadata);
+    return searchable('Locals', node, 'statement',
+        call('Locals', [node.variables.type, node.variables.variables]));
+  }
 
   List<Object> visitWhileStatement(WhileStatement node) => searchable(
       'While', node, 'statement', call('While', [node.condition, node.body]));
