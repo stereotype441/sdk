@@ -1122,7 +1122,7 @@ class TypePromotionFlowTest extends DriverResolutionTest {
     await trackCode(Unit([
       Func(TypeAnnotation("void"), "f", [x])
         ..body = Block([
-          Do(Block([(x0 = Get(x)), Set(x, String())]),
+          Do(Block([(x0 = Get(x)), Set(x, StringLiteral())]),
               Is(Get(x), TypeAnnotation("String"))),
           (x1 = Get(x))
         ])
