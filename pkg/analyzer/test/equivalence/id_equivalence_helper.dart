@@ -7,75 +7,174 @@ import 'package:analyzer/dart/ast/ast.dart' hide Annotation;
 import 'package:sourcemap_testing/src/annotated_code_helper.dart';
 
 import 'helpers.dart';
-import 'source_span.dart';
 import 'id_equivalence.dart';
+import 'source_span.dart';
 
-abstract class DataComputer<T> {
-  const DataComputer();
+/// Checks [compiledData] against the expected data in [expectedMap] derived
+/// from [code].
+Future<bool> checkCode<T>(
+    String mode,
+    Uri mainFileUri,
+    Map<Uri, AnnotatedCode> code,
+    MemberAnnotations<IdValue> expectedMaps,
+    CompiledData compiledData,
+    DataInterpreter<T> dataValidator,
+    {bool filterActualData(IdValue expected, ActualData<T> actualData),
+    bool fatalErrors: true}) async {
+  IdData<T> data = new IdData<T>(code, expectedMaps, compiledData);
+  bool hasFailure = false;
+  Set<Uri> neededDiffs = new Set<Uri>();
 
-  /// Function that computes a data mapping for [unit].
-  ///
-  /// Fills [actualMap] with the data and [sourceSpanMap] with the source spans
-  /// for the data origin.
-  void computeUnitData(
-      CompilationUnit unit, Map<Id, ActualData<T>> actualMap);
+  void checkActualMap(
+      Map<Id, ActualData<T>> actualMap, Map<Id, IdValue> expectedMap,
+      [Uri uri]) {
+    bool hasLocalFailure = false;
+    actualMap.forEach((Id id, ActualData<T> actualData) {
+      T actual = actualData.value;
+      String actualText = dataValidator.getText(actual);
 
-  DataInterpreter<T> get dataValidator;
+      if (!expectedMap.containsKey(id)) {
+        if (!dataValidator.isEmpty(actual)) {
+          reportError(
+              actualData.sourceSpan,
+              'EXTRA $mode DATA for ${id.descriptor}:\n '
+              'object   : ${actualData.objectText}\n '
+              'actual   : ${colorizeActual('${IdValue.idToString(id, actualText)}')}\n '
+              'Data was expected for these ids: ${expectedMap.keys}');
+          if (filterActualData == null || filterActualData(null, actualData)) {
+            hasLocalFailure = true;
+          }
+        }
+      } else {
+        IdValue expected = expectedMap[id];
+        String unexpectedMessage =
+            dataValidator.isAsExpected(actual, expected.value);
+        if (unexpectedMessage != null) {
+          reportError(
+              actualData.sourceSpan,
+              'UNEXPECTED $mode DATA for ${id.descriptor}:\n '
+              'detail  : ${colorizeMessage(unexpectedMessage)}\n '
+              'object  : ${actualData.objectText}\n '
+              'expected: ${colorizeExpected('$expected')}\n '
+              'actual  : ${colorizeActual('${IdValue.idToString(id, actualText)}')}');
+          if (filterActualData == null ||
+              filterActualData(expected, actualData)) {
+            hasLocalFailure = true;
+          }
+        }
+      }
+    });
+    if (hasLocalFailure) {
+      hasFailure = true;
+      if (uri != null) {
+        neededDiffs.add(uri);
+      }
+    }
+  }
+
+  data.actualMaps.forEach((Uri uri, Map<Id, ActualData<T>> actualMap) {
+    checkActualMap(actualMap, data.expectedMaps[uri], uri);
+  });
+  checkActualMap(data.actualMaps.globalData, data.expectedMaps.globalData);
+
+  Set<Id> missingIds = new Set<Id>();
+  void checkMissing(
+      Map<Id, IdValue> expectedMap, Map<Id, ActualData<T>> actualMap,
+      [Uri uri]) {
+    expectedMap.forEach((Id id, IdValue expected) {
+      if (!actualMap.containsKey(id)) {
+        missingIds.add(id);
+        String message = 'MISSING $mode DATA for ${id.descriptor}: '
+            'Expected ${colorizeExpected('$expected')}';
+        if (uri != null) {
+          var begin = data.getOffsetFromId(id, uri);
+          reportError(SourceSpan(uri, begin, begin + 1), message);
+        } else {
+          print(message);
+        }
+      }
+    });
+    if (missingIds.isNotEmpty && uri != null) {
+      neededDiffs.add(uri);
+    }
+  }
+
+  data.expectedMaps.forEach((Uri uri, Map<Id, IdValue> expectedMap) {
+    checkMissing(expectedMap, data.actualMaps[uri], uri);
+  });
+  checkMissing(data.expectedMaps.globalData, data.actualMaps.globalData);
+  for (Uri uri in neededDiffs) {
+    print('--annotations diff [${uri.pathSegments.last}]-------------');
+    print(data.diffCode(uri, dataValidator));
+    print('----------------------------------------------------------');
+  }
+  if (missingIds.isNotEmpty) {
+    print("MISSING ids: $missingIds.");
+    hasFailure = true;
+  }
+  if (hasFailure && fatalErrors) {
+    throw StateError('Errors found.');
+  }
+  return hasFailure;
 }
 
-/// Encapsulates the member data computed for each source file of interest.
-/// It's a glorified wrapper around a map of maps, but written this way to
-/// provide a little more information about what it's doing. [DataType] refers
-/// to the type this map is holding -- it is either [IdValue] or [ActualData].
-class MemberAnnotations<DataType> {
-  /// For each Uri, we create a map associating an element id with its
-  /// corresponding annotations.
-  final Map<Uri, Map<Id, DataType>> _computedDataForEachFile =
-  new Map<Uri, Map<Id, DataType>>();
+Future<bool> checkTests<T>(
+    String rawCode,
+    Future<ResolvedUnitResult> resultComputer(String rawCode),
+    DataComputer<T> dataComputer) async {
+  AnnotatedCode code =
+      new AnnotatedCode.fromText(rawCode, commentStart, commentEnd);
+  var result = await resultComputer(code.sourceCode);
+  var uri = result.libraryElement.source.uri;
+  var marker = 'normal';
+  Map<String, MemberAnnotations<IdValue>> expectedMaps = {
+    marker: new MemberAnnotations<IdValue>(),
+  };
+  computeExpectedMap(uri, code, expectedMaps);
+  MemberAnnotations<IdValue> annotations = expectedMaps[marker];
+  Map<Id, ActualData<T>> actualMap = {};
+  dataComputer.computeUnitData(result.unit, actualMap);
+  var compiledData = CompiledData<T>(uri, {uri: actualMap}, {});
+  return await checkCode(marker, uri, {uri: code}, annotations, compiledData,
+      dataComputer.dataValidator);
+}
 
-  /// Member or class annotations that don't refer to any of the user files.
-  final Map<Id, DataType> globalData = <Id, DataType>{};
+/// Colorize the actual annotation [text], if ANSI colors are supported.
+String colorizeActual(String text) {
+  return text;
+}
 
-  void operator []=(Uri file, Map<Id, DataType> computedData) {
-    _computedDataForEachFile[file] = computedData;
-  }
+/// Colorize annotation delimiters [start] and [end] surrounding [text], if
+/// ANSI colors are supported.
+String colorizeAnnotation(String start, String text, String end) {
+  return '${colorizeDelimiter(start)}$text${colorizeDelimiter(end)}';
+}
 
-  void forEach(void f(Uri file, Map<Id, DataType> computedData)) {
-    _computedDataForEachFile.forEach(f);
-  }
+/// Colorize delimiter [text], if ANSI colors are supported.
+String colorizeDelimiter(String text) {
+  return text;
+}
 
-  Map<Id, DataType> operator [](Uri file) {
-    if (!_computedDataForEachFile.containsKey(file)) {
-      _computedDataForEachFile[file] = <Id, DataType>{};
-    }
-    return _computedDataForEachFile[file];
-  }
+/// Colorize diffs [expected] and [actual] and [delimiter], if ANSI colors are
+/// supported.
+String colorizeDiff(String expected, String delimiter, String actual) {
+  return '${colorizeExpected(expected)}'
+      '${colorizeDelimiter(delimiter)}${colorizeActual(actual)}';
+}
 
-  @override
-  String toString() {
-    StringBuffer sb = new StringBuffer();
-    sb.write('MemberAnnotations(');
-    String comma = '';
-    if (_computedDataForEachFile.isNotEmpty &&
-        (_computedDataForEachFile.length > 1 ||
-            _computedDataForEachFile.values.single.isNotEmpty)) {
-      sb.write('data:{');
-      _computedDataForEachFile.forEach((Uri uri, Map<Id, DataType> data) {
-        sb.write(comma);
-        sb.write('$uri:');
-        sb.write(data);
-        comma = ',';
-      });
-      sb.write('}');
-    }
-    if (globalData.isNotEmpty) {
-      sb.write(comma);
-      sb.write('global:');
-      sb.write(globalData);
-    }
-    sb.write(')');
-    return sb.toString();
-  }
+/// Colorize an expected annotation [text], if ANSI colors are supported.
+String colorizeExpected(String text) {
+  return text;
+}
+
+/// Colorize a matching annotation [text], if ANSI colors are supported.
+String colorizeMatch(String text) {
+  return text;
+}
+
+/// Colorize a message [text], if ANSI colors are supported.
+String colorizeMessage(String text) {
+  return text;
 }
 
 /// Compute three [MemberAnnotations] objects from [code] specifying the
@@ -107,17 +206,44 @@ void computeExpectedMap(Uri sourceUri, AnnotatedCode code,
         _expectFalse(
             fileAnnotations.globalData.containsKey(idValue.id),
             "Duplicate annotations for ${idValue.id} in $marker: "
-                "${idValue} and ${fileAnnotations.globalData[idValue.id]}.");
+            "$idValue and ${fileAnnotations.globalData[idValue.id]}.");
         fileAnnotations.globalData[idValue.id] = idValue;
       } else {
         _expectFalse(
             expectedValues.containsKey(idValue.id),
             "Duplicate annotations for ${idValue.id} in $marker: "
-                "${idValue} and ${expectedValues[idValue.id]}.");
+            "$idValue and ${expectedValues[idValue.id]}.");
         expectedValues[idValue.id] = idValue;
       }
     }
   });
+}
+
+/// Reports [message] as an error using [spannable] as error location.
+void reportError(SourceSpan span, String message) {
+  reportHere(span, message);
+}
+
+String withAnnotations(String sourceCode, Map<int, List<String>> annotations) {
+  StringBuffer sb = new StringBuffer();
+  int end = 0;
+  for (int offset in annotations.keys.toList()..sort()) {
+    if (offset >= sourceCode.length) {
+      sb.write('...');
+      return sb.toString();
+    }
+    if (offset > end) {
+      sb.write(sourceCode.substring(end, offset));
+    }
+    for (String annotation in annotations[offset]) {
+      sb.write(colorizeAnnotation('/*', annotation, '*/'));
+    }
+    end = offset;
+  }
+  if (end < sourceCode.length) {
+    sb.write(sourceCode.substring(end));
+  }
+  return sb.toString();
 }
 
 void _expectFalse(bool b, String message) {
@@ -126,35 +252,12 @@ void _expectFalse(bool b, String message) {
   }
 }
 
-/// Colorize the actual annotation [text], if ANSI colors are supported.
-String colorizeActual(String text) {
-    return text;
-}
-
-/// Colorize diffs [expected] and [actual] and [delimiter], if ANSI colors are
-/// supported.
-String colorizeDiff(String expected, String delimiter, String actual) {
-  return '${colorizeExpected(expected)}'
-      '${colorizeDelimiter(delimiter)}${colorizeActual(actual)}';
-}
-
-/// Colorize an expected annotation [text], if ANSI colors are supported.
-String colorizeExpected(String text) {
-    return text;
-}
-
-/// Colorize delimiter [text], if ANSI colors are supported.
-String colorizeDelimiter(String text) {
-    return text;
-}
-
 class CompiledData<T> {
   final Uri mainUri;
   final Map<Uri, Map<Id, ActualData<T>>> actualMaps;
   final Map<Id, ActualData<T>> globalData;
 
-  CompiledData(this.mainUri,
-      this.actualMaps, this.globalData);
+  CompiledData(this.mainUri, this.actualMaps, this.globalData);
 
   Map<int, List<String>> computeAnnotations(Uri uri) {
     Map<Id, ActualData<T>> thisMap = actualMaps[uri];
@@ -199,37 +302,30 @@ class CompiledData<T> {
   }
 }
 
-/// Colorize a matching annotation [text], if ANSI colors are supported.
-String colorizeMatch(String text) {
-    return text;
+abstract class DataComputer<T> {
+  const DataComputer();
+
+  DataInterpreter<T> get dataValidator;
+
+  /// Function that computes a data mapping for [unit].
+  ///
+  /// Fills [actualMap] with the data and [sourceSpanMap] with the source spans
+  /// for the data origin.
+  void computeUnitData(CompilationUnit unit, Map<Id, ActualData<T>> actualMap);
 }
 
-String withAnnotations(String sourceCode, Map<int, List<String>> annotations) {
-  StringBuffer sb = new StringBuffer();
-  int end = 0;
-  for (int offset in annotations.keys.toList()..sort()) {
-    if (offset >= sourceCode.length) {
-      sb.write('...');
-      return sb.toString();
-    }
-    if (offset > end) {
-      sb.write(sourceCode.substring(end, offset));
-    }
-    for (String annotation in annotations[offset]) {
-      sb.write(colorizeAnnotation('/*', annotation, '*/'));
-    }
-    end = offset;
-  }
-  if (end < sourceCode.length) {
-    sb.write(sourceCode.substring(end));
-  }
-  return sb.toString();
-}
+/// Interface used for interpreting annotations.
+abstract class DataInterpreter<T> {
+  /// Returns a textual representation of [actualData].
+  String getText(T actualData);
 
-/// Colorize annotation delimiters [start] and [end] surrounding [text], if
-/// ANSI colors are supported.
-String colorizeAnnotation(String start, String text, String end) {
-  return '${colorizeDelimiter(start)}$text${colorizeDelimiter(end)}';
+  /// Returns `null` if [actualData] satisfies the [expectedData] annotation.
+  /// Otherwise, a message is returned contain the information about the
+  /// problems found.
+  String isAsExpected(T actualData, String expectedData);
+
+  /// Returns `true` if [actualData] corresponds to empty data.
+  bool isEmpty(T actualData);
 }
 
 /// Data collected by [computeData].
@@ -246,8 +342,8 @@ class IdData<T> {
     _actualMaps.globalData.addAll(_compiledData.globalData);
   }
 
-  Uri get mainUri => _compiledData.mainUri;
   MemberAnnotations<ActualData<T>> get actualMaps => _actualMaps;
+  Uri get mainUri => _compiledData.mainUri;
 
   String actualCode(Uri uri) {
     Map<int, List<String>> annotations = <int, List<String>>{};
@@ -265,14 +361,14 @@ class IdData<T> {
       IdValue expectedValue = expectedMaps[uri][id];
       T actualValue = data.value;
       String unexpectedMessage =
-      dataValidator.isAsExpected(actualValue, expectedValue?.value);
+          dataValidator.isAsExpected(actualValue, expectedValue?.value);
       if (unexpectedMessage != null) {
         String expected = expectedValue?.toString() ?? '';
         String actual = dataValidator.getText(actualValue);
         int offset = getOffsetFromId(id, uri);
         if (offset != null) {
-          String value1 = '${expected}';
-          String value2 = IdValue.idToString(id, '${actual}');
+          String value1 = '$expected';
+          String value2 = IdValue.idToString(id, '$actual');
           annotations
               .putIfAbsent(offset, () => [])
               .add(colorizeDiff(value1, ' | ', value2));
@@ -283,7 +379,7 @@ class IdData<T> {
       if (!actualMaps[uri].containsKey(id)) {
         int offset = getOffsetFromId(id, uri);
         if (offset != null) {
-          String value1 = '${expected}';
+          String value1 = '$expected';
           String value2 = '---';
           annotations
               .putIfAbsent(offset, () => [])
@@ -303,154 +399,57 @@ class IdData<T> {
   }
 }
 
-/// Reports [message] as an error using [spannable] as error location.
-void reportError(
-    SourceSpan span, String message) {
-  reportHere(span, message);
-}
+/// Encapsulates the member data computed for each source file of interest.
+/// It's a glorified wrapper around a map of maps, but written this way to
+/// provide a little more information about what it's doing. [DataType] refers
+/// to the type this map is holding -- it is either [IdValue] or [ActualData].
+class MemberAnnotations<DataType> {
+  /// For each Uri, we create a map associating an element id with its
+  /// corresponding annotations.
+  final Map<Uri, Map<Id, DataType>> _computedDataForEachFile =
+      new Map<Uri, Map<Id, DataType>>();
 
-/// Colorize a message [text], if ANSI colors are supported.
-String colorizeMessage(String text) {
-    return text;
-}
+  /// Member or class annotations that don't refer to any of the user files.
+  final Map<Id, DataType> globalData = <Id, DataType>{};
 
-Future<bool> checkTests<T>(String rawCode, Future<ResolvedUnitResult> resultComputer(String rawCode), DataComputer<T> dataComputer) async {
-  AnnotatedCode code =
-  new AnnotatedCode.fromText(rawCode, commentStart, commentEnd);
-  var result = await resultComputer(code.sourceCode);
-  var uri = result.libraryElement.source.uri;
-  var marker = 'normal';
-  Map<String, MemberAnnotations<IdValue>> expectedMaps = {
-    marker: new MemberAnnotations<IdValue>(),
-  };
-  computeExpectedMap(uri, code, expectedMaps);
-  MemberAnnotations<IdValue> annotations = expectedMaps[marker];
-  Map<Id, ActualData<T>> actualMap = {};
-  dataComputer.computeUnitData(result.unit, actualMap);
-  var compiledData = CompiledData<T>(uri, {uri: actualMap}, {});
-  return await checkCode(marker, uri,{uri: code}, annotations,
-  compiledData, dataComputer.dataValidator);
-}
-
-/// Checks [compiledData] against the expected data in [expectedMap] derived
-/// from [code].
-Future<bool> checkCode<T>(
-    String mode,
-    Uri mainFileUri,
-    Map<Uri, AnnotatedCode> code,
-    MemberAnnotations<IdValue> expectedMaps,
-    CompiledData compiledData,
-    DataInterpreter<T> dataValidator,
-    {bool filterActualData(IdValue expected, ActualData<T> actualData),
-      bool fatalErrors: true}) async {
-  IdData<T> data = new IdData<T>(code, expectedMaps, compiledData);
-  bool hasFailure = false;
-  Set<Uri> neededDiffs = new Set<Uri>();
-
-  void checkActualMap(
-      Map<Id, ActualData<T>> actualMap, Map<Id, IdValue> expectedMap,
-      [Uri uri]) {
-    bool hasLocalFailure = false;
-    actualMap.forEach((Id id, ActualData<T> actualData) {
-      T actual = actualData.value;
-      String actualText = dataValidator.getText(actual);
-
-      if (!expectedMap.containsKey(id)) {
-        if (!dataValidator.isEmpty(actual)) {
-          reportError(
-              actualData.sourceSpan,
-              'EXTRA $mode DATA for ${id.descriptor}:\n '
-                  'object   : ${actualData.objectText}\n '
-                  'actual   : ${colorizeActual('${IdValue.idToString(id, actualText)}')}\n '
-                  'Data was expected for these ids: ${expectedMap.keys}');
-          if (filterActualData == null || filterActualData(null, actualData)) {
-            hasLocalFailure = true;
-          }
-        }
-      } else {
-        IdValue expected = expectedMap[id];
-        String unexpectedMessage =
-        dataValidator.isAsExpected(actual, expected.value);
-        if (unexpectedMessage != null) {
-          reportError(
-              actualData.sourceSpan,
-              'UNEXPECTED $mode DATA for ${id.descriptor}:\n '
-                  'detail  : ${colorizeMessage(unexpectedMessage)}\n '
-                  'object  : ${actualData.objectText}\n '
-                  'expected: ${colorizeExpected('$expected')}\n '
-                  'actual  : ${colorizeActual('${IdValue.idToString(id, actualText)}')}');
-          if (filterActualData == null ||
-              filterActualData(expected, actualData)) {
-            hasLocalFailure = true;
-          }
-        }
-      }
-    });
-    if (hasLocalFailure) {
-      hasFailure = true;
-      if (uri != null) {
-        neededDiffs.add(uri);
-      }
+  Map<Id, DataType> operator [](Uri file) {
+    if (!_computedDataForEachFile.containsKey(file)) {
+      _computedDataForEachFile[file] = <Id, DataType>{};
     }
+    return _computedDataForEachFile[file];
   }
 
-  data.actualMaps.forEach((Uri uri, Map<Id, ActualData<T>> actualMap) {
-    checkActualMap(actualMap, data.expectedMaps[uri], uri);
-  });
-  checkActualMap(data.actualMaps.globalData, data.expectedMaps.globalData);
+  void operator []=(Uri file, Map<Id, DataType> computedData) {
+    _computedDataForEachFile[file] = computedData;
+  }
 
-  Set<Id> missingIds = new Set<Id>();
-  void checkMissing(
-      Map<Id, IdValue> expectedMap, Map<Id, ActualData<T>> actualMap,
-      [Uri uri]) {
-    expectedMap.forEach((Id id, IdValue expected) {
-      if (!actualMap.containsKey(id)) {
-        missingIds.add(id);
-        String message = 'MISSING $mode DATA for ${id.descriptor}: '
-            'Expected ${colorizeExpected('$expected')}';
-        if (uri != null) {
-          var begin = data.getOffsetFromId(id, uri);
-          reportError(
-              SourceSpan(uri, begin, begin + 1), message);
-        } else {
-          print(message);
-        }
-      }
-    });
-    if (missingIds.isNotEmpty && uri != null) {
-      neededDiffs.add(uri);
+  void forEach(void f(Uri file, Map<Id, DataType> computedData)) {
+    _computedDataForEachFile.forEach(f);
+  }
+
+  @override
+  String toString() {
+    StringBuffer sb = new StringBuffer();
+    sb.write('MemberAnnotations(');
+    String comma = '';
+    if (_computedDataForEachFile.isNotEmpty &&
+        (_computedDataForEachFile.length > 1 ||
+            _computedDataForEachFile.values.single.isNotEmpty)) {
+      sb.write('data:{');
+      _computedDataForEachFile.forEach((Uri uri, Map<Id, DataType> data) {
+        sb.write(comma);
+        sb.write('$uri:');
+        sb.write(data);
+        comma = ',';
+      });
+      sb.write('}');
     }
+    if (globalData.isNotEmpty) {
+      sb.write(comma);
+      sb.write('global:');
+      sb.write(globalData);
+    }
+    sb.write(')');
+    return sb.toString();
   }
-
-  data.expectedMaps.forEach((Uri uri, Map<Id, IdValue> expectedMap) {
-    checkMissing(expectedMap, data.actualMaps[uri], uri);
-  });
-  checkMissing(data.expectedMaps.globalData, data.actualMaps.globalData);
-  for (Uri uri in neededDiffs) {
-    print('--annotations diff [${uri.pathSegments.last}]-------------');
-    print(data.diffCode(uri, dataValidator));
-    print('----------------------------------------------------------');
-  }
-  if (missingIds.isNotEmpty) {
-    print("MISSING ids: ${missingIds}.");
-    hasFailure = true;
-  }
-  if (hasFailure && fatalErrors) {
-    throw StateError('Errors found.');
-  }
-  return hasFailure;
-}
-
-/// Interface used for interpreting annotations.
-abstract class DataInterpreter<T> {
-  /// Returns `null` if [actualData] satisfies the [expectedData] annotation.
-  /// Otherwise, a message is returned contain the information about the
-  /// problems found.
-  String isAsExpected(T actualData, String expectedData);
-
-  /// Returns `true` if [actualData] corresponds to empty data.
-  bool isEmpty(T actualData);
-
-  /// Returns a textual representation of [actualData].
-  String getText(T actualData);
 }

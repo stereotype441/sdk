@@ -105,28 +105,6 @@ abstract class AstDataExtractor<T> extends GeneralizingAstVisitor<dynamic>
     super.visitStatement(node);
   }
 
-  NodeId _createCurrentId(ForEachParts node) =>
-      NodeId(_nodeOffset(node), IdKind.current);
-
-  NodeId _createGotoId(AstNode node) => computeDefaultNodeId(node);
-  NodeId _createInvokeId(AstNode node) =>
-      NodeId(_nodeOffset(node), IdKind.invoke);
-  NodeId _createIteratorId(ForEachParts node) =>
-      NodeId(_nodeOffset(node), IdKind.iterator);
-  NodeId _createLabeledStatementId(LabeledStatement node) =>
-      computeDefaultNodeId(node.statement);
-  NodeId _createLoopId(AstNode node) => computeDefaultNodeId(node);
-
-  NodeId _createMoveNextId(ForEachParts node) =>
-      NodeId(_nodeOffset(node), IdKind.moveNext);
-
-  NodeId _createSwitchCaseId(SwitchCase node) => computeDefaultNodeId(node);
-
-  NodeId _createSwitchId(SwitchStatement node) => computeDefaultNodeId(node);
-
-  NodeId _createUpdateId(AstNode node) =>
-      NodeId(_nodeOffset(node), IdKind.update);
-
   int _nodeOffset(AstNode node) {
     var offset = node.offset;
     assert(offset != null && offset >= 0,
@@ -141,11 +119,10 @@ abstract class DataRegistry<T> {
   void registerValue(SourceSpan sourceSpan, Id id, T value, Object object) {
     if (actualMap.containsKey(id)) {
       ActualData<T> existingData = actualMap[id];
-      reportHere(
-          sourceSpan, "Duplicate id ${id}, value=$value, object=$object");
+      reportHere(sourceSpan, "Duplicate id $id, value=$value, object=$object");
       reportHere(
           sourceSpan,
-          "Duplicate id ${id}, value=${existingData.value}, "
+          "Duplicate id $id, value=${existingData.value}, "
           "object=${existingData.object}");
       throw StateError("Duplicate id $id.");
     }
