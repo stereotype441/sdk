@@ -329,7 +329,7 @@ void f() {
   false ? /*unreachable*/ 1 : 2;
 }
 ''');
-    verify(unreachableExpressions: ['1']);
+    verify();
   }
 
   test_conditional_true() async {
@@ -338,7 +338,7 @@ void f() {
   true ? 1 : /*unreachable*/ 2;
 }
 ''');
-    verify(unreachableExpressions: ['2']);
+    verify();
   }
 
   test_do_false() async {
@@ -363,7 +363,6 @@ void f() { // f
 }
 ''');
     verify(
-      unreachableStatements: ['2;'],
       functionBodiesThatDontComplete: ['{ // f'],
     );
   }
@@ -383,16 +382,6 @@ void f(bool b, int i) { // f
 }
 ''');
     verify(
-      unreachableStatements: [
-        'Object _',
-        'do {}',
-        'for (;;',
-        'for (_',
-        'if (b)',
-        'try {',
-        'switch (i)',
-        'while (b) {}'
-      ],
       functionBodiesThatDontComplete: ['{ // f'],
     );
   }
@@ -407,7 +396,6 @@ void f() { // f
 }
 ''');
     verify(
-      unreachableStatements: ['2;'],
       functionBodiesThatDontComplete: ['{ // f'],
     );
   }
@@ -422,7 +410,6 @@ void f() { // f
 }
 ''');
     verify(
-      unreachableStatements: ['2;'],
       functionBodiesThatDontComplete: ['{ // f'],
     );
   }
@@ -483,7 +470,7 @@ void f() {
   3;
 }
 ''');
-    verify(unreachableStatements: ['{ // 1']);
+    verify();
   }
 
   test_if_true_return() async {
@@ -497,7 +484,6 @@ void f() { // f
 }
 ''');
     verify(
-      unreachableStatements: ['2;'],
       functionBodiesThatDontComplete: ['{ // f'],
     );
   }
@@ -512,7 +498,7 @@ void f() {
   3;
 }
 ''');
-    verify(unreachableStatements: ['{ // 2']);
+    verify();
   }
 
   test_logicalAnd_leftFalse() async {
@@ -521,7 +507,7 @@ void f(int x) {
   false && /*unreachable*/ (x == 1);
 }
 ''');
-    verify(unreachableExpressions: ['(x == 1)']);
+    verify();
   }
 
   test_logicalOr_leftTrue() async {
@@ -530,7 +516,7 @@ void f(int x) {
   true || /*unreachable*/ (x == 1);
 }
 ''');
-    verify(unreachableExpressions: ['(x == 1)']);
+    verify();
   }
 
   test_switch_case_neverCompletes() async {
@@ -549,7 +535,7 @@ void f(bool b, int i) {
   3;
 }
 ''');
-    verify(unreachableStatements: ['2;']);
+    verify();
   }
 
   test_tryCatch() async {
@@ -579,7 +565,7 @@ void f() {
   4;
 }
 ''');
-    verify(unreachableStatements: ['2;']);
+    verify();
   }
 
   test_tryCatch_return_catch() async {
@@ -595,7 +581,7 @@ void f() {
   4;
 }
 ''');
-    verify(unreachableStatements: ['3;']);
+    verify();
   }
 
   test_tryCatchFinally_return_body() async {
@@ -631,7 +617,6 @@ void f() { // f
 }
 ''');
     verify(
-      unreachableStatements: ['4;'],
       functionBodiesThatDontComplete: ['{ // f'],
     );
   }
@@ -666,7 +651,6 @@ void f() { // f
 }
 ''');
     verify(
-      unreachableStatements: ['3;'],
       functionBodiesThatDontComplete: ['{ // f'],
     );
   }
@@ -680,7 +664,7 @@ void f() {
   2;
 }
 ''');
-    verify(unreachableStatements: ['{ // 1']);
+    verify();
   }
 
   test_while_true() async {
@@ -694,7 +678,6 @@ void f() { // f
 }
 ''');
     verify(
-      unreachableStatements: ['2;', '3;'],
       functionBodiesThatDontComplete: ['{ // f'],
     );
   }
@@ -710,7 +693,7 @@ void f() {
   3;
 }
 ''');
-    verify(unreachableStatements: ['2;']);
+    verify();
   }
 
   test_while_true_breakIf() async {
@@ -739,28 +722,13 @@ void f() { // f
 }
 ''');
     verify(
-      unreachableStatements: ['2;', '3;'],
       functionBodiesThatDontComplete: ['{ // f'],
     );
   }
 
   void verify({
-    List<String> unreachableExpressions = const [],
-    List<String> unreachableStatements = const [],
     List<String> functionBodiesThatDontComplete = const [],
   }) {
-    var expectedUnreachableNodes = <AstNode>[];
-    expectedUnreachableNodes.addAll(
-      unreachableStatements.map((search) => findNode.statement(search)),
-    );
-    expectedUnreachableNodes.addAll(
-      unreachableExpressions.map((search) => findNode.expression(search)),
-    );
-
-    expect(
-      flowResult.unreachableNodes,
-      unorderedEquals(expectedUnreachableNodes),
-    );
     expect(
       flowResult.functionBodiesThatDontComplete,
       unorderedEquals(
