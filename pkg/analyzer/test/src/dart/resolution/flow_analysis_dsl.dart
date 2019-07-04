@@ -1,12 +1,15 @@
+import 'package:analyzer/src/dart/resolver/flow_analysis.dart';
+
 class And implements Expression {
   final Expression left;
   final Expression right;
 
   And(this.left, this.right);
 
-  DartType visit() {
-    left.visit();
-    right.visit();
+  @override
+  DartType run(FlowAnalyzer flowAnalyzer) {
+    left.run(flowAnalyzer);
+    right.run(flowAnalyzer);
     return InterfaceType('bool');
   }
 }
@@ -16,9 +19,10 @@ class Block implements Statement {
 
   Block(this.statements);
 
-  void visit() {
+  @override
+  void run(FlowAnalyzer flowAnalyzer) {
     for (var statement in statements) {
-      statement.visit();
+      statement.run(flowAnalyzer);
     }
   }
 }
@@ -28,7 +32,8 @@ class Bool implements Expression {
 
   Bool(this.value);
 
-  DartType visit() {
+  @override
+  DartType run(FlowAnalyzer flowAnalyzer) {
     return InterfaceType('bool');
   }
 }
@@ -38,7 +43,8 @@ class Break implements Statement {
 
   Break([this.label]);
 
-  void visit() {}
+  @override
+  void run(FlowAnalyzer flowAnalyzer) {}
 }
 
 class Case {
@@ -48,10 +54,10 @@ class Case {
 
   Case(this.labels, this.value, this.body);
 
-  void visit() {
-    value.visit();
+  void run(FlowAnalyzer flowAnalyzer) {
+    value.run(flowAnalyzer);
     for (var statement in body) {
-      statement.visit();
+      statement.run(flowAnalyzer);
     }
   }
 }
@@ -62,8 +68,8 @@ class Catch {
 
   Catch(this.exception, this.body);
 
-  void visit() {
-    body.visit();
+  void run(FlowAnalyzer flowAnalyzer) {
+    body.run(flowAnalyzer);
   }
 }
 
@@ -78,6 +84,13 @@ class Class implements Declaration {
   final List<Declaration> members;
 
   Class(this.name, this.members);
+
+  @override
+  void run(FlowAnalyzer flowAnalyzer) {
+    for (var member in members) {
+      member.run(flowAnalyzer);
+    }
+  }
 }
 
 class Closure implements Expression {
@@ -86,13 +99,14 @@ class Closure implements Expression {
 
   Closure(this.parameters, [this.body]);
 
-  DartType visit() {
+  @override
+  DartType run(FlowAnalyzer flowAnalyzer) {
     DartType bodyReturnType;
     var body = this.body;
     if (body is Expression) {
-      bodyReturnType = body.visit();
+      bodyReturnType = body.run(flowAnalyzer);
     } else {
-      body.visit();
+      body.run(flowAnalyzer);
       bodyReturnType = VoidType();
     }
     return FunctionType(
@@ -107,10 +121,11 @@ class Conditional implements Expression {
 
   Conditional(this.condition, this.thenExpression, this.elseExpression);
 
-  DartType visit() {
-    condition.visit();
-    var thenType = thenExpression.visit();
-    var elseType = elseExpression.visit();
+  @override
+  DartType run(FlowAnalyzer flowAnalyzer) {
+    condition.run(flowAnalyzer);
+    var thenType = thenExpression.run(flowAnalyzer);
+    var elseType = elseExpression.run(flowAnalyzer);
     return DartType.LUB(thenType, elseType);
   }
 }
@@ -121,6 +136,11 @@ class Constructor implements Declaration {
   Statement body;
 
   Constructor(this.name, this.parameters, [this.body]);
+
+  @override
+  void run(FlowAnalyzer flowAnalyzer) {
+    body.run(flowAnalyzer);
+  }
 }
 
 class Continue implements Statement {
@@ -128,7 +148,8 @@ class Continue implements Statement {
 
   Continue([this.label]);
 
-  void visit() {}
+  @override
+  void run(FlowAnalyzer flowAnalyzer) {}
 }
 
 abstract class DartType {
@@ -137,9 +158,15 @@ abstract class DartType {
   }
 
   DartType._();
+
+  static bool isSubtypeOf(DartType a, DartType b) {
+    throw new UnimplementedError('TODO(paulberry)');
+  }
 }
 
-class Declaration {}
+abstract class Declaration {
+  void run(FlowAnalyzer flowAnalyzer);
+}
 
 class Do implements Statement {
   final Statement body;
@@ -147,10 +174,21 @@ class Do implements Statement {
 
   Do(this.body, this.condition);
 
-  void visit() {
-    body.visit();
-    condition.visit();
+  @override
+  void run(FlowAnalyzer flowAnalyzer) {
+    body.run(flowAnalyzer);
+    condition.run(flowAnalyzer);
   }
+}
+
+abstract class Element {
+  DartType get declaredType;
+
+  bool get isLocalVariable;
+
+  bool get isPotentiallyMutatedInClosure;
+
+  bool get isPotentiallyMutatedInScope;
 }
 
 class Eq implements Expression {
@@ -159,15 +197,72 @@ class Eq implements Expression {
 
   Eq(this.left, this.right);
 
-  DartType visit() {
-    left.visit();
-    right.visit();
+  @override
+  DartType run(FlowAnalyzer flowAnalyzer) {
+    left.run(flowAnalyzer);
+    right.run(flowAnalyzer);
     return InterfaceType('bool');
   }
 }
 
 abstract class Expression implements Statement {
-  DartType visit();
+  @override
+  DartType run(FlowAnalyzer flowAnalyzer);
+}
+
+class FlowAnalysisResult {
+  final List<Get> nullableNodes = [];
+  final List<Get> nonNullableNodes = [];
+  final List<Statement> unreachableNodes = [];
+  final List<Statement> functionBodiesThatDontComplete = [];
+  final Map<Get, DartType> promotedTypes = {};
+}
+
+class FlowAnalyzer
+    implements
+        FunctionBodyAccess<Element>,
+        TypeOperations<Element, DartType>,
+        NodeOperations<Expression> {
+  FlowAnalysis<Statement, Expression, Element, DartType> _flowAnalysis;
+
+  final _result = FlowAnalysisResult();
+
+  FlowAnalyzer() {
+    _flowAnalysis = FlowAnalysis<Statement, Expression, Element, DartType>(
+        this, this, this);
+  }
+
+  @override
+  DartType elementType(Element element) => element.declaredType;
+
+  @override
+  bool isLocalVariable(Element element) => element.isLocalVariable;
+
+  @override
+  bool isPotentiallyMutatedInClosure(Element variable) =>
+      variable.isPotentiallyMutatedInClosure;
+
+  @override
+  bool isPotentiallyMutatedInScope(Element variable) =>
+      variable.isPotentiallyMutatedInScope;
+
+  @override
+  bool isSubtypeOf(DartType leftType, DartType rightType) =>
+      DartType.isSubtypeOf(leftType, rightType);
+
+  @override
+  Expression unwrapParenthesized(Expression node) {
+    while (node is Parens) {
+      node = (node as Parens).contents;
+    }
+    return node;
+  }
+
+  static FlowAnalysisResult run(Unit code) {
+    var flowAnalyzer = FlowAnalyzer();
+    code.run(flowAnalyzer);
+    return flowAnalyzer._result;
+  }
 }
 
 class ForEachDeclared implements Statement {
@@ -177,9 +272,10 @@ class ForEachDeclared implements Statement {
 
   ForEachDeclared(this.variable, this.iterable, this.body);
 
-  void visit() {
-    iterable.visit();
-    body.visit();
+  @override
+  void run(FlowAnalyzer flowAnalyzer) {
+    iterable.run(flowAnalyzer);
+    body.run(flowAnalyzer);
   }
 }
 
@@ -190,9 +286,10 @@ class ForEachIdentifier implements Statement {
 
   ForEachIdentifier(this.variable, this.iterable, this.body);
 
-  void visit() {
-    iterable.visit();
-    body.visit();
+  @override
+  void run(FlowAnalyzer flowAnalyzer) {
+    iterable.run(flowAnalyzer);
+    body.run(flowAnalyzer);
   }
 }
 
@@ -211,12 +308,13 @@ class ForExpr implements Statement {
 
   ForExpr(this.initializer, this.condition, this.updaters, this.body);
 
-  void visit() {
-    initializer.visit();
-    condition.visit();
-    body.visit();
+  @override
+  void run(FlowAnalyzer flowAnalyzer) {
+    initializer.run(flowAnalyzer);
+    condition.run(flowAnalyzer);
+    body.run(flowAnalyzer);
     for (var updater in updaters) {
-      updater.visit();
+      updater.run(flowAnalyzer);
     }
   }
 }
@@ -229,8 +327,9 @@ class Func implements Declaration, Statement {
 
   Func(this.returnType, this.name, this.parameters, [this.body]);
 
-  void visit() {
-    body.visit();
+  @override
+  void run(FlowAnalyzer flowAnalyzer) {
+    body.run(flowAnalyzer);
   }
 }
 
@@ -248,7 +347,8 @@ class Get implements Expression {
 
   Get(this.variable);
 
-  DartType visit() {
+  @override
+  DartType run(FlowAnalyzer flowAnalyzer) {
     return variable.declaredType;
   }
 }
@@ -259,9 +359,10 @@ class Gt implements Expression {
 
   Gt(this.left, this.right);
 
-  DartType visit() {
-    left.visit();
-    right.visit();
+  @override
+  DartType run(FlowAnalyzer flowAnalyzer) {
+    left.run(flowAnalyzer);
+    right.run(flowAnalyzer);
     return InterfaceType('bool');
   }
 }
@@ -273,10 +374,11 @@ class If implements Statement {
 
   If(this.condition, this.thenStatement, [this.elseStatement]);
 
-  void visit() {
-    condition.visit();
-    thenStatement.visit();
-    elseStatement.visit();
+  @override
+  void run(FlowAnalyzer flowAnalyzer) {
+    condition.run(flowAnalyzer);
+    thenStatement.run(flowAnalyzer);
+    elseStatement.run(flowAnalyzer);
   }
 }
 
@@ -286,9 +388,10 @@ class IfNull implements Expression {
 
   IfNull(this.left, this.right);
 
-  DartType visit() {
-    var leftType = left.visit();
-    var rightType = right.visit();
+  @override
+  DartType run(FlowAnalyzer flowAnalyzer) {
+    var leftType = left.run(flowAnalyzer);
+    var rightType = right.run(flowAnalyzer);
     return DartType.LUB(leftType, rightType);
   }
 }
@@ -298,7 +401,8 @@ class Int implements Expression {
 
   Int(this.value);
 
-  DartType visit() {
+  @override
+  DartType run(FlowAnalyzer flowAnalyzer) {
     return InterfaceType('int');
   }
 }
@@ -329,7 +433,8 @@ class Is implements Expression {
 
   Is(this.expression, this.type);
 
-  DartType visit() {
+  @override
+  DartType run(FlowAnalyzer flowAnalyzer) {
     return InterfaceType('bool');
   }
 }
@@ -346,21 +451,28 @@ class ListLiteral implements Expression {
 
   ListLiteral(this.type, this.values);
 
-  DartType visit() {
+  @override
+  DartType run(FlowAnalyzer flowAnalyzer) {
     for (var value in values) {
-      value.visit();
+      value.run(flowAnalyzer);
     }
     return InterfaceType('List', [type]);
   }
 }
 
-class Local implements Variable {
+class Local extends Variable implements Element {
   final String name;
 
   @override
   DartType declaredType;
 
-  Local(this.name);
+  @override
+  final bool isPotentiallyMutatedInClosure;
+
+  Local(this.name, {this.isPotentiallyMutatedInClosure = false});
+
+  @override
+  bool get isLocalVariable => true;
 }
 
 class LocalCall implements Expression {
@@ -369,9 +481,10 @@ class LocalCall implements Expression {
 
   LocalCall(this.variable, this.arguments);
 
-  DartType visit() {
+  @override
+  DartType run(FlowAnalyzer flowAnalyzer) {
     for (var argument in arguments) {
-      argument.visit();
+      argument.run(flowAnalyzer);
     }
     return (variable.declaredType as FunctionType).returnType;
   }
@@ -389,7 +502,11 @@ class Locals implements Statement {
   }
 
   @override
-  void visit() {}
+  void run(FlowAnalyzer flowAnalyzer) {
+    for (var variable in variables) {
+      flowAnalyzer._flowAnalysis.add(variable);
+    }
+  }
 }
 
 class Method implements Declaration {
@@ -399,6 +516,11 @@ class Method implements Declaration {
   Statement body;
 
   Method(this.returnType, this.name, this.parameters, [this.body]);
+
+  @override
+  void run(FlowAnalyzer flowAnalyzer) {
+    body.run(flowAnalyzer);
+  }
 }
 
 class NeverType extends DartType {
@@ -412,8 +534,9 @@ class Not implements Expression {
 
   Not(this.operand);
 
-  DartType visit() {
-    operand.visit();
+  @override
+  DartType run(FlowAnalyzer flowAnalyzer) {
+    operand.run(flowAnalyzer);
     return InterfaceType('bool');
   }
 }
@@ -424,15 +547,17 @@ class NotEq implements Expression {
 
   NotEq(this.left, this.right);
 
-  DartType visit() {
-    left.visit();
-    right.visit();
+  @override
+  DartType run(FlowAnalyzer flowAnalyzer) {
+    left.run(flowAnalyzer);
+    right.run(flowAnalyzer);
     return InterfaceType('bool');
   }
 }
 
 class NullLiteral implements Expression {
-  DartType visit() => NullType();
+  @override
+  DartType run(FlowAnalyzer flowAnalyzer) => NullType();
 }
 
 class NullType extends DartType {
@@ -447,14 +572,15 @@ class Or implements Expression {
 
   Or(this.left, this.right);
 
-  DartType visit() {
-    left.visit();
-    right.visit();
+  @override
+  DartType run(FlowAnalyzer flowAnalyzer) {
+    left.run(flowAnalyzer);
+    right.run(flowAnalyzer);
     return InterfaceType('bool');
   }
 }
 
-class Param implements Variable {
+class Param extends Variable {
   @override
   final DartType declaredType;
   final String name;
@@ -467,7 +593,8 @@ class Parens implements Expression {
 
   Parens(this.contents);
 
-  DartType visit() => contents.visit();
+  @override
+  DartType run(FlowAnalyzer flowAnalyzer) => contents.run(flowAnalyzer);
 }
 
 class PropertyGet implements Expression {
@@ -476,12 +603,14 @@ class PropertyGet implements Expression {
 
   PropertyGet(this.target, this.propertyName);
 
-  DartType visit() =>
-      (target.visit() as InterfaceType).getPropertyType(propertyName);
+  @override
+  DartType run(FlowAnalyzer flowAnalyzer) =>
+      (target.run(flowAnalyzer) as InterfaceType).getPropertyType(propertyName);
 }
 
 class Rethrow implements Statement {
-  void visit() {}
+  @override
+  void run(FlowAnalyzer flowAnalyzer) {}
 }
 
 class Return implements Statement {
@@ -490,8 +619,8 @@ class Return implements Statement {
   Return([this.value]);
 
   @override
-  void visit() {
-    value.visit();
+  void run(FlowAnalyzer flowAnalyzer) {
+    value.run(flowAnalyzer);
   }
 }
 
@@ -499,17 +628,19 @@ class Set implements Expression {
   final Variable variable;
   final Expression value;
 
-  Set(this.variable, this.value);
+  Set(this.variable, this.value) {
+    variable.isPotentiallyMutatedInScope = true;
+  }
 
   @override
-  DartType visit() {
-    value.visit();
+  DartType run(FlowAnalyzer flowAnalyzer) {
+    value.run(flowAnalyzer);
     return variable.declaredType;
   }
 }
 
 abstract class Statement {
-  void visit();
+  void run(FlowAnalyzer flowAnalyzer);
 }
 
 class StaticCall implements Expression {
@@ -519,9 +650,9 @@ class StaticCall implements Expression {
   StaticCall(this.target, this.arguments);
 
   @override
-  DartType visit() {
+  DartType run(FlowAnalyzer flowAnalyzer) {
     for (var argument in arguments) {
-      argument.visit();
+      argument.run(flowAnalyzer);
     }
     return target.returnType;
   }
@@ -532,7 +663,8 @@ class StringLiteral implements Expression {
 
   StringLiteral(this.value);
 
-  DartType visit() => InterfaceType('String');
+  @override
+  DartType run(FlowAnalyzer flowAnalyzer) => InterfaceType('String');
 }
 
 class Switch implements Statement {
@@ -541,10 +673,11 @@ class Switch implements Statement {
 
   Switch(this.value, this.cases);
 
-  void visit() {
-    value.visit();
+  @override
+  void run(FlowAnalyzer flowAnalyzer) {
+    value.run(flowAnalyzer);
     for (var case_ in cases) {
-      case_.visit();
+      case_.run(flowAnalyzer);
     }
   }
 }
@@ -555,7 +688,7 @@ class Throw implements Expression {
   Throw(this.exception);
 
   @override
-  DartType visit() {
+  DartType run(FlowAnalyzer flowAnalyzer) {
     return InterfaceType('Never');
   }
 }
@@ -568,12 +701,12 @@ class Try implements Statement {
   Try(this.body, this.catches, [this.finally_]);
 
   @override
-  void visit() {
-    body.visit();
+  void run(FlowAnalyzer flowAnalyzer) {
+    body.run(flowAnalyzer);
     for (var catch_ in catches) {
-      catch_.visit();
+      catch_.run(flowAnalyzer);
     }
-    finally_.visit();
+    finally_.run(flowAnalyzer);
   }
 }
 
@@ -581,9 +714,17 @@ class Unit {
   final List<Declaration> declarations;
 
   Unit(this.declarations);
+
+  void run(FlowAnalyzer flowAnalyzer) {
+    for (var declaration in declarations) {
+      declaration.run(flowAnalyzer);
+    }
+  }
 }
 
 abstract class Variable {
+  bool isPotentiallyMutatedInScope = false;
+
   DartType get declaredType;
 }
 
@@ -600,8 +741,8 @@ class While implements Statement {
   While(this.condition, this.body);
 
   @override
-  void visit() {
-    condition.visit();
-    body.visit();
+  void run(FlowAnalyzer flowAnalyzer) {
+    condition.run(flowAnalyzer);
+    body.run(flowAnalyzer);
   }
 }
