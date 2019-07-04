@@ -82,23 +82,22 @@ class Class implements Declaration {
 
 class Closure implements Expression {
   final List<Param> parameters;
-  Expression body;
+  Statement body;
 
   Closure(this.parameters, [this.body]);
 
   DartType visit() {
-    var bodyType = body.visit();
-    return FunctionType(bodyType, parameters.map((p) => p.declaredType).toList());
+    DartType bodyReturnType;
+    var body = this.body;
+    if (body is Expression) {
+      bodyReturnType = body.visit();
+    } else {
+      body.visit();
+      bodyReturnType = VoidType();
+    }
+    return FunctionType(
+        bodyReturnType, parameters.map((p) => p.declaredType).toList());
   }
-}
-
-class FunctionType extends DartType {
-  final DartType returnType;
-  final List<DartType> paramTypes;
-
-  FunctionType(this.returnType, this.paramTypes) : super._();
-
-  String toString() => '$returnType Function(${paramTypes.join(', ')})';
 }
 
 class Conditional implements Expression {
@@ -133,11 +132,11 @@ class Continue implements Statement {
 }
 
 abstract class DartType {
-  DartType._();
-
   factory DartType.LUB(DartType a, DartType b) {
     throw new UnimplementedError('TODO(paulberry)');
   }
+
+  DartType._();
 }
 
 class Declaration {}
@@ -148,7 +147,7 @@ class Do implements Statement {
 
   Do(this.body, this.condition);
 
-  DartType visit() {
+  void visit() {
     body.visit();
     condition.visit();
   }
@@ -235,6 +234,15 @@ class Func implements Declaration, Statement {
   }
 }
 
+class FunctionType extends DartType {
+  final DartType returnType;
+  final List<DartType> paramTypes;
+
+  FunctionType(this.returnType, this.paramTypes) : super._();
+
+  String toString() => '$returnType Function(${paramTypes.join(', ')})';
+}
+
 class Get implements Expression {
   final Variable variable;
 
@@ -295,6 +303,26 @@ class Int implements Expression {
   }
 }
 
+class InterfaceType extends DartType {
+  final String class_;
+
+  final List<DartType> typeArguments;
+
+  InterfaceType(this.class_, [this.typeArguments = const []]) : super._();
+
+  DartType getPropertyType(String propertyName) {
+    throw UnimplementedError('TODO(paulberry)');
+  }
+
+  String toString() {
+    if (typeArguments.isEmpty) {
+      return class_;
+    } else {
+      return '$class_<${typeArguments.join(', ')}>';
+    }
+  }
+}
+
 class Is implements Expression {
   final Expression expression;
   final DartType type;
@@ -340,7 +368,7 @@ class LocalCall implements Expression {
   final List<Expression> arguments;
 
   LocalCall(this.variable, this.arguments);
-  
+
   DartType visit() {
     for (var argument in arguments) {
       argument.visit();
@@ -351,7 +379,7 @@ class LocalCall implements Expression {
 
 class Locals implements Statement {
   final DartType type;
-  
+
   final List<Local> variables;
 
   Locals(this.type, this.variables) {
@@ -373,11 +401,17 @@ class Method implements Declaration {
   Method(this.returnType, this.name, this.parameters, [this.body]);
 }
 
+class NeverType extends DartType {
+  NeverType() : super._();
+
+  String toString() => 'Never';
+}
+
 class Not implements Expression {
   final Expression operand;
 
   Not(this.operand);
-  
+
   DartType visit() {
     operand.visit();
     return InterfaceType('bool');
@@ -389,7 +423,7 @@ class NotEq implements Expression {
   final Expression right;
 
   NotEq(this.left, this.right);
-  
+
   DartType visit() {
     left.visit();
     right.visit();
@@ -398,7 +432,13 @@ class NotEq implements Expression {
 }
 
 class NullLiteral implements Expression {
-  DartType visit() => InterfaceType('Null');
+  DartType visit() => NullType();
+}
+
+class NullType extends DartType {
+  NullType() : super._();
+
+  String toString() => 'Null';
 }
 
 class Or implements Expression {
@@ -426,7 +466,7 @@ class Parens implements Expression {
   final Expression contents;
 
   Parens(this.contents);
-  
+
   DartType visit() => contents.visit();
 }
 
@@ -435,8 +475,9 @@ class PropertyGet implements Expression {
   final String propertyName;
 
   PropertyGet(this.target, this.propertyName);
-  
-  DartType visit() => (target.visit() as InterfaceType).getPropertyType(propertyName);
+
+  DartType visit() =>
+      (target.visit() as InterfaceType).getPropertyType(propertyName);
 }
 
 class Rethrow implements Statement {
@@ -490,7 +531,7 @@ class StringLiteral implements Expression {
   final String value;
 
   StringLiteral(this.value);
-  
+
   DartType visit() => InterfaceType('String');
 }
 
@@ -499,7 +540,7 @@ class Switch implements Statement {
   final List<Case> cases;
 
   Switch(this.value, this.cases);
-  
+
   void visit() {
     value.visit();
     for (var case_ in cases) {
@@ -536,26 +577,6 @@ class Try implements Statement {
   }
 }
 
-class InterfaceType extends DartType {
-  final String class_;
-  
-  final List<DartType> typeArguments;
-
-  InterfaceType(this.class_, [this.typeArguments = const []]) : super._();
-
-  String toString() {
-    if (typeArguments.isEmpty) {
-      return class_;
-    } else {
-      return '$class_<${typeArguments.join(', ')}>';
-    }
-  }
-
-  DartType getPropertyType(String propertyName) {
-    throw UnimplementedError('TODO(paulberry)');
-  }
-}
-
 class Unit {
   final List<Declaration> declarations;
 
@@ -564,6 +585,12 @@ class Unit {
 
 abstract class Variable {
   DartType get declaredType;
+}
+
+class VoidType extends DartType {
+  VoidType() : super._();
+
+  String toString() => 'void';
 }
 
 class While implements Statement {
