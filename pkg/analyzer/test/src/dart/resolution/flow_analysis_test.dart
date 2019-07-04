@@ -20,7 +20,7 @@ class FlowTestBase {
 
   /// Resolve the given [code] and track nullability in the unit.
   void trackCode(Unit code) {
-    flowResult = FlowAnalyzer.run(code);
+    flowResult = FlowAnalysisDriver.run(code);
   }
 }
 
