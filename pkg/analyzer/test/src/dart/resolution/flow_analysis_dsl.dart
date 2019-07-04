@@ -7,7 +7,7 @@ class And implements Expression {
   DartType visit() {
     left.visit();
     right.visit();
-    return DartType('bool');
+    return InterfaceType('bool');
   }
 }
 
@@ -29,7 +29,7 @@ class Bool implements Expression {
   Bool(this.value);
 
   DartType visit() {
-    return DartType('bool');
+    return InterfaceType('bool');
   }
 }
 
@@ -47,6 +47,13 @@ class Case {
   final List<Statement> body;
 
   Case(this.labels, this.value, this.body);
+
+  void visit() {
+    value.visit();
+    for (var statement in body) {
+      statement.visit();
+    }
+  }
 }
 
 class Catch {
@@ -54,6 +61,10 @@ class Catch {
   final Statement body;
 
   Catch(this.exception, this.body);
+
+  void visit() {
+    body.visit();
+  }
 }
 
 class CatchVariable {
@@ -76,10 +87,18 @@ class Closure implements Expression {
   Closure(this.parameters, [this.body]);
 
   DartType visit() {
-    var paramNames = parameters.map((p) => p.name).join(', ');
     var bodyType = body.visit();
-    return DartType('$bodyType Function($paramNames)');
+    return FunctionType(bodyType, parameters.map((p) => p.declaredType).toList());
   }
+}
+
+class FunctionType extends DartType {
+  final DartType returnType;
+  final List<DartType> paramTypes;
+
+  FunctionType(this.returnType, this.paramTypes) : super._();
+
+  String toString() => '$returnType Function(${paramTypes.join(', ')})';
 }
 
 class Conditional implements Expression {
@@ -113,10 +132,8 @@ class Continue implements Statement {
   void visit() {}
 }
 
-class DartType {
-  final String name;
-
-  DartType(this.name);
+abstract class DartType {
+  DartType._();
 
   factory DartType.LUB(DartType a, DartType b) {
     throw new UnimplementedError('TODO(paulberry)');
@@ -146,7 +163,7 @@ class Eq implements Expression {
   DartType visit() {
     left.visit();
     right.visit();
-    return DartType('bool');
+    return InterfaceType('bool');
   }
 }
 
@@ -181,7 +198,7 @@ class ForEachIdentifier implements Statement {
 }
 
 class ForEachVariable {
-  final TypeAnnotation type;
+  final DartType type;
   final String name;
 
   ForEachVariable(this.type, this.name);
@@ -206,7 +223,7 @@ class ForExpr implements Statement {
 }
 
 class Func implements Declaration, Statement {
-  final TypeAnnotation returnType;
+  final DartType returnType;
   final String name;
   final List<Param> parameters;
   Statement body;
@@ -237,7 +254,7 @@ class Gt implements Expression {
   DartType visit() {
     left.visit();
     right.visit();
-    return DartType('bool');
+    return InterfaceType('bool');
   }
 }
 
@@ -274,18 +291,18 @@ class Int implements Expression {
   Int(this.value);
 
   DartType visit() {
-    return DartType('int');
+    return InterfaceType('int');
   }
 }
 
 class Is implements Expression {
   final Expression expression;
-  final TypeAnnotation type;
+  final DartType type;
 
   Is(this.expression, this.type);
 
   DartType visit() {
-    return DartType('bool');
+    return InterfaceType('bool');
   }
 }
 
@@ -296,7 +313,7 @@ class Label {
 }
 
 class ListLiteral implements Expression {
-  final TypeAnnotation type;
+  final DartType type;
   final List<Expression> values;
 
   ListLiteral(this.type, this.values);
@@ -305,7 +322,7 @@ class ListLiteral implements Expression {
     for (var value in values) {
       value.visit();
     }
-    return DartType('List<$type>');
+    return InterfaceType('List', [type]);
   }
 }
 
@@ -323,20 +340,32 @@ class LocalCall implements Expression {
   final List<Expression> arguments;
 
   LocalCall(this.variable, this.arguments);
+  
+  DartType visit() {
+    for (var argument in arguments) {
+      argument.visit();
+    }
+    return (variable.declaredType as FunctionType).returnType;
+  }
 }
 
 class Locals implements Statement {
+  final DartType type;
+  
   final List<Local> variables;
 
-  Locals(this.variables) {
+  Locals(this.type, this.variables) {
     for (var variable in variables) {
       variable.declaredType = type;
     }
   }
+
+  @override
+  void visit() {}
 }
 
 class Method implements Declaration {
-  final TypeAnnotation returnType;
+  final DartType returnType;
   final String name;
   final List<Param> parameters;
   Statement body;
@@ -348,6 +377,11 @@ class Not implements Expression {
   final Expression operand;
 
   Not(this.operand);
+  
+  DartType visit() {
+    operand.visit();
+    return InterfaceType('bool');
+  }
 }
 
 class NotEq implements Expression {
@@ -355,28 +389,45 @@ class NotEq implements Expression {
   final Expression right;
 
   NotEq(this.left, this.right);
+  
+  DartType visit() {
+    left.visit();
+    right.visit();
+    return InterfaceType('bool');
+  }
 }
 
-class NullLiteral implements Expression {}
+class NullLiteral implements Expression {
+  DartType visit() => InterfaceType('Null');
+}
 
 class Or implements Expression {
   final Expression left;
   final Expression right;
 
   Or(this.left, this.right);
+
+  DartType visit() {
+    left.visit();
+    right.visit();
+    return InterfaceType('bool');
+  }
 }
 
 class Param implements Variable {
-  final TypeAnnotation type;
+  @override
+  final DartType declaredType;
   final String name;
 
-  Param(this.type, this.name);
+  Param(this.declaredType, this.name);
 }
 
 class Parens implements Expression {
   final Expression contents;
 
   Parens(this.contents);
+  
+  DartType visit() => contents.visit();
 }
 
 class PropertyGet implements Expression {
@@ -384,6 +435,8 @@ class PropertyGet implements Expression {
   final String propertyName;
 
   PropertyGet(this.target, this.propertyName);
+  
+  DartType visit() => (target.visit() as InterfaceType).getPropertyType(propertyName);
 }
 
 class Rethrow implements Statement {
@@ -394,6 +447,11 @@ class Return implements Statement {
   final Expression value;
 
   Return([this.value]);
+
+  @override
+  void visit() {
+    value.visit();
+  }
 }
 
 class Set implements Expression {
@@ -401,6 +459,12 @@ class Set implements Expression {
   final Expression value;
 
   Set(this.variable, this.value);
+
+  @override
+  DartType visit() {
+    value.visit();
+    return variable.declaredType;
+  }
 }
 
 abstract class Statement {
@@ -412,12 +476,22 @@ class StaticCall implements Expression {
   final List<Expression> arguments;
 
   StaticCall(this.target, this.arguments);
+
+  @override
+  DartType visit() {
+    for (var argument in arguments) {
+      argument.visit();
+    }
+    return target.returnType;
+  }
 }
 
 class StringLiteral implements Expression {
   final String value;
 
   StringLiteral(this.value);
+  
+  DartType visit() => InterfaceType('String');
 }
 
 class Switch implements Statement {
@@ -425,28 +499,61 @@ class Switch implements Statement {
   final List<Case> cases;
 
   Switch(this.value, this.cases);
+  
+  void visit() {
+    value.visit();
+    for (var case_ in cases) {
+      case_.visit();
+    }
+  }
 }
 
 class Throw implements Expression {
   final Expression exception;
 
   Throw(this.exception);
+
+  @override
+  DartType visit() {
+    return InterfaceType('Never');
+  }
 }
 
-class Try implements Expression {
+class Try implements Statement {
   final Statement body;
   final List<Catch> catches;
-  final Statement finallyClause;
+  final Statement finally_;
 
-  Try(this.body, this.catches, [this.finallyClause]);
+  Try(this.body, this.catches, [this.finally_]);
+
+  @override
+  void visit() {
+    body.visit();
+    for (var catch_ in catches) {
+      catch_.visit();
+    }
+    finally_.visit();
+  }
 }
 
-class TypeAnnotation {
+class InterfaceType extends DartType {
   final String class_;
+  
+  final List<DartType> typeArguments;
 
-  TypeAnnotation(this.class_);
+  InterfaceType(this.class_, [this.typeArguments = const []]) : super._();
 
-  String toString() => class_;
+  String toString() {
+    if (typeArguments.isEmpty) {
+      return class_;
+    } else {
+      return '$class_<${typeArguments.join(', ')}>';
+    }
+  }
+
+  DartType getPropertyType(String propertyName) {
+    throw UnimplementedError('TODO(paulberry)');
+  }
 }
 
 class Unit {
@@ -459,9 +566,15 @@ abstract class Variable {
   DartType get declaredType;
 }
 
-class While implements Expression {
+class While implements Statement {
   final Expression condition;
   final Statement body;
 
   While(this.condition, this.body);
+
+  @override
+  void visit() {
+    condition.visit();
+    body.visit();
+  }
 }
