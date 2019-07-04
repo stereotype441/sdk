@@ -48,34 +48,6 @@ class NullableFlowTest extends FlowTestBase {
   AnalysisOptionsImpl get analysisOptions =>
       AnalysisOptionsImpl()..enabledExperiments = [EnableString.non_nullable];
 
-  void assertNonNullable([
-    String search1,
-    String search2,
-    String search3,
-    String search4,
-    String search5,
-  ]) {
-    var expected = [search1, search2, search3, search4, search5]
-        .where((i) => i != null)
-        .map((search) => findNode.simple(search))
-        .toList();
-    expect(flowResult.nonNullableNodes, unorderedEquals(expected));
-  }
-
-  void assertNullable([
-    String search1,
-    String search2,
-    String search3,
-    String search4,
-    String search5,
-  ]) {
-    var expected = [search1, search2, search3, search4, search5]
-        .where((i) => i != null)
-        .map((search) => findNode.simple(search))
-        .toList();
-    expect(flowResult.nullableNodes, unorderedEquals(expected));
-  }
-
   test_assign_toNonNull() async {
     await trackCode(r'''
 void f(int x) {
@@ -85,8 +57,6 @@ void f(int x) {
   /*nonNullable*/ x; // 2
 }
 ''');
-    assertNullable('x; // 1');
-    assertNonNullable('x; // 2');
   }
 
   test_assign_toNull() async {
@@ -98,8 +68,6 @@ void f(int x) {
   /*nullable*/ x; // 2
 }
 ''');
-    assertNullable('x; // 2');
-    assertNonNullable('x; // 1');
   }
 
   test_assign_toUnknown_fromNotNull() async {
@@ -111,8 +79,6 @@ void f(int a, int b) {
   a; // 2
 }
 ''');
-    assertNullable();
-    assertNonNullable('a; // 1');
   }
 
   test_assign_toUnknown_fromNull() async {
@@ -124,8 +90,6 @@ void f(int a, int b) {
   a; // 2
 }
 ''');
-    assertNullable('a; // 1');
-    assertNonNullable();
   }
 
   test_binaryExpression_logicalAnd() async {
@@ -134,8 +98,6 @@ void f(int x) {
   x == null && /*nullable*/ x.isEven;
 }
 ''');
-    assertNullable('x.isEven');
-    assertNonNullable();
   }
 
   test_binaryExpression_logicalOr() async {
@@ -144,8 +106,6 @@ void f(int x) {
   x == null || /*nonNullable*/ x.isEven;
 }
 ''');
-    assertNullable();
-    assertNonNullable('x.isEven');
   }
 
   test_constructor_if_then_else() async {
@@ -160,8 +120,6 @@ class C {
   }
 }
 ''');
-    assertNullable('x; // 1');
-    assertNonNullable('x; // 2');
   }
 
   test_if_joinThenElse_ifNull() async {
@@ -180,8 +138,6 @@ void f(int a, int b) {
   /*nonNullable*/ b; // 6
 }
 ''');
-    assertNullable('a; // 1');
-    assertNonNullable('b; // 2', 'a; // 3', 'b; // 4', 'b; // 6');
   }
 
   test_if_notNull_thenExit_left() async {
@@ -191,8 +147,6 @@ void f(int x) {
   /*nullable*/ x; // 1
 }
 ''');
-    assertNullable('x; // 1');
-    assertNonNullable();
   }
 
   test_if_notNull_thenExit_right() async {
@@ -202,8 +156,6 @@ void f(int x) {
   /*nullable*/ x; // 1
 }
 ''');
-    assertNullable('x; // 1');
-    assertNonNullable();
   }
 
   test_if_null_thenExit_left() async {
@@ -213,8 +165,6 @@ void f(int x) {
   /*nonNullable*/ x; // 1
 }
 ''');
-    assertNullable();
-    assertNonNullable('x; // 1');
   }
 
   test_if_null_thenExit_right() async {
@@ -224,8 +174,6 @@ void f(int x) {
   /*nonNullable*/ x; // 1
 }
 ''');
-    assertNullable();
-    assertNonNullable('x; // 1');
   }
 
   test_if_then_else() async {
@@ -238,8 +186,6 @@ void f(int x) {
   }
 }
 ''');
-    assertNullable('x; // 1');
-    assertNonNullable('x; // 2');
   }
 
   test_method_if_then_else() async {
@@ -254,8 +200,6 @@ class C {
   }
 }
 ''');
-    assertNullable('x; // 1');
-    assertNonNullable('x; // 2');
   }
 
   test_potentiallyMutatedInClosure() async {
@@ -272,8 +216,6 @@ f(int a, int b) {
   }
 }
 ''');
-    assertNullable();
-    assertNonNullable();
   }
 
   test_tryFinally_eqNullExit_body() async {
@@ -288,8 +230,6 @@ void f(int x) {
   /*nonNullable*/ x; // 3
 }
 ''');
-    assertNullable();
-    assertNonNullable('x; // 1', 'x; // 3');
   }
 
   test_tryFinally_eqNullExit_finally() async {
@@ -304,8 +244,6 @@ void f(int x) {
   /*nonNullable*/ x; // 3
 }
 ''');
-    assertNullable();
-    assertNonNullable('x; // 2', 'x; // 3');
   }
 
   test_tryFinally_outerEqNotNullExit_assignUnknown_body() async {
@@ -322,8 +260,6 @@ void f(int a, int b) {
   a; // 4
 }
 ''');
-    assertNullable('a; // 1');
-    assertNonNullable();
   }
 
   test_tryFinally_outerEqNullExit_assignUnknown_body() async {
@@ -340,8 +276,6 @@ void f(int a, int b) {
   a; // 4
 }
 ''');
-    assertNullable();
-    assertNonNullable('a; // 1');
   }
 
   test_tryFinally_outerEqNullExit_assignUnknown_finally() async {
@@ -358,8 +292,6 @@ void f(int a, int b) {
   a; // 4
 }
 ''');
-    assertNullable();
-    assertNonNullable('a; // 1', 'a; // 2');
   }
 
   test_while_eqNull() async {
@@ -371,8 +303,6 @@ void f(int x) {
   /*nonNullable*/ x; // 2
 }
 ''');
-    assertNullable('x; // 1');
-    assertNonNullable('x; // 2');
   }
 
   test_while_notEqNull() async {
@@ -384,8 +314,6 @@ void f(int x) {
   /*nullable*/ x; // 2
 }
 ''');
-    assertNullable('x; // 2');
-    assertNonNullable('x; // 1');
   }
 }
 
