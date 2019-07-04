@@ -1287,9 +1287,10 @@ class TypePromotionFlowTest extends DriverResolutionTest {
           If(
               Is(Get(x), TypeAnnotation("String")),
               Block([
-                ForEachDeclared([
-                  ForEachVariable("_")
-                ], Parens(Set(v1, ListLiteral(null, [Int(0), Int(1), Int(2)]))),
+                ForEachDeclared(
+                    ForEachVariable(null, "_"),
+                    Parens(
+                        Set(v1, ListLiteral(null, [Int(0), Int(1), Int(2)]))),
                     Block([(x0 = Get(x)), Set(x, Int(42))])),
                 (x1 = Get(x))
               ]))
