@@ -434,6 +434,7 @@ void f() { // f
     await trackCode(r'''
 void f(bool b, int i) { // f
   return;
+  Object _;
   do {} while (b);
   for (;;) {}
   for (_ in []) {}
@@ -445,6 +446,7 @@ void f(bool b, int i) { // f
 ''');
     verify(
       unreachableStatements: [
+        'Object _',
         'do {}',
         'for (;;',
         'for (_',
@@ -490,6 +492,7 @@ void f() { // f
   test_forEach() async {
     await trackCode(r'''
 void f() {
+  Object _;
   for (_ in [0, 1, 2]) {
     1;
     return;
@@ -935,7 +938,7 @@ void f(Object x) {
   do {
     x; // 1
     x = '';
-  } while (x is! String)
+  } while (x is! String);
   x; // 2
 }
 ''');
@@ -948,7 +951,7 @@ void f(Object x) {
 void f(Object x) {
   do {
     x; // 1
-  } while (x is String)
+  } while (x is String);
   x; // 2
 }
 ''');
@@ -1083,6 +1086,7 @@ void f(bool b, Object x) {
   test_forEach_outerIsType_loopAssigned() async {
     await trackCode(r'''
 void f(Object x) {
+  Object v1;
   if (x is String) {
     for (var _ in (v1 = [0, 1, 2])) {
       x; // 1
@@ -1137,7 +1141,7 @@ void f(Object x) {
 
     g = () {
       x; // 2
-    }
+    };
   }
 
   x = 42;
