@@ -17,10 +17,16 @@ class Bool implements Expression {
   Bool(this.value);
 }
 
-class Break implements Statement {}
+class Rethrow implements Statement {}
+
+class Break implements Statement {
+  final Label label;
+
+  Break([this.label]);
+}
 
 class Case {
-  final List<String> labels;
+  final List<Label> labels;
   final Expression value;
   final List<Statement> body;
 
@@ -47,6 +53,13 @@ class Class implements Declaration {
   Class(this.name, this.members);
 }
 
+class Closure implements Expression {
+  final List<Param> parameters;
+  Statement body;
+
+  Closure(this.parameters, [this.body]);
+}
+
 class Conditional implements Expression {
   final Expression condition;
   final Expression thenExpression;
@@ -63,7 +76,11 @@ class Constructor implements Declaration {
   Constructor(this.name, this.parameters, [this.body]);
 }
 
-class Continue implements Statement {}
+class Continue implements Statement {
+  final Label label;
+
+  Continue([this.label]);
+}
 
 class Declaration {}
 
@@ -84,11 +101,11 @@ class Eq implements Expression {
 class Expression implements Statement {}
 
 class ForEachDeclared implements Statement {
-  final List<ForEachVariable> variables;
+  final ForEachVariable variable;
   final Expression iterable;
   final Statement body;
 
-  ForEachDeclared(this.variables, this.iterable, this.body);
+  ForEachDeclared(this.variable, this.iterable, this.body);
 }
 
 class ForEachIdentifier implements Statement {
@@ -99,7 +116,12 @@ class ForEachIdentifier implements Statement {
   ForEachIdentifier(this.variable, this.iterable, this.body);
 }
 
-class ForEachVariable {}
+class ForEachVariable {
+  final TypeAnnotation type;
+  final String name;
+
+  ForEachVariable(this.type, this.name);
+}
 
 class ForExpr implements Statement {
   final Expression initializer;
@@ -188,6 +210,18 @@ class Method implements Declaration {
   Method(this.returnType, this.name, this.parameters, [this.body]);
 }
 
+class Label {
+  final String name;
+
+  Label(this.name);
+}
+
+class Not implements Expression {
+  final Expression operand;
+
+  Not(this.operand);
+}
+
 class NotEq implements Expression {
   final Expression left;
   final Expression right;
@@ -238,6 +272,13 @@ class Set implements Expression {
 }
 
 class Statement {}
+
+class LocalCall implements Expression {
+  final Variable variable;
+  final List<Expression> arguments;
+
+  LocalCall(this.variable, this.arguments);
+}
 
 class StaticCall implements Expression {
   final Func target;
