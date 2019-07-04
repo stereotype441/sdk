@@ -326,7 +326,7 @@ class ReachableFlowTest extends FlowTestBase {
   test_conditional_false() async {
     await trackCode(r'''
 void f() {
-  false ? 1 : 2;
+  false ? /*unreachable*/ 1 : 2;
 }
 ''');
     verify(unreachableExpressions: ['1']);
@@ -335,7 +335,7 @@ void f() {
   test_conditional_true() async {
     await trackCode(r'''
 void f() {
-  true ? 1 : 2;
+  true ? 1 : /*unreachable*/ 2;
 }
 ''');
     verify(unreachableExpressions: ['2']);
@@ -359,7 +359,7 @@ void f() { // f
   do {
     1;
   } while (true);
-  2;
+  /*unreachable*/ 2;
 }
 ''');
     verify(
@@ -372,14 +372,14 @@ void f() { // f
     await trackCode(r'''
 void f(bool b, int i) { // f
   return;
-  Object _;
-  do {} while (b);
-  for (;;) {}
-  for (_ in []) {}
-  if (b) {}
-  switch (i) {}
-  try {} finally {}
-  while (b) {}
+  /*unreachable*/ Object _;
+  /*unreachable*/ do {} while (b);
+  /*unreachable*/ for (;;) {}
+  /*unreachable*/ for (_ in []) {}
+  /*unreachable*/ if (b) {}
+  /*unreachable*/ switch (i) {}
+  /*unreachable*/ try {} finally {}
+  /*unreachable*/ while (b) {}
 }
 ''');
     verify(
@@ -403,7 +403,7 @@ void f() { // f
   for (; true;) {
     1;
   }
-  2;
+  /*unreachable*/ 2;
 }
 ''');
     verify(
@@ -418,7 +418,7 @@ void f() { // f
   for (;;) {
     1;
   }
-  2;
+  /*unreachable*/ 2;
 }
 ''');
     verify(
@@ -476,7 +476,7 @@ void f(bool b) {
   test_if_false_then_else() async {
     await trackCode(r'''
 void f() {
-  if (false) { // 1
+  if (false) /*unreachable*/ { // 1
     1;
   } else { // 2
   }
@@ -493,7 +493,7 @@ void f() { // f
   if (true) {
     return;
   }
-  2;
+  /*unreachable*/ 2;
 }
 ''');
     verify(
@@ -506,7 +506,7 @@ void f() { // f
     await trackCode(r'''
 void f() {
   if (true) { // 1
-  } else { // 2
+  } else /*unreachable*/ { // 2
     2;
   }
   3;
@@ -518,7 +518,7 @@ void f() {
   test_logicalAnd_leftFalse() async {
     await trackCode(r'''
 void f(int x) {
-  false && (x == 1);
+  false && /*unreachable*/ (x == 1);
 }
 ''');
     verify(unreachableExpressions: ['(x == 1)']);
@@ -527,7 +527,7 @@ void f(int x) {
   test_logicalOr_leftTrue() async {
     await trackCode(r'''
 void f(int x) {
-  true || (x == 1);
+  true || /*unreachable*/ (x == 1);
 }
 ''');
     verify(unreachableExpressions: ['(x == 1)']);
@@ -544,7 +544,7 @@ void f(bool b, int i) {
       } else {
         return;
       }
-      2;
+      /*unreachable*/ 2;
   }
   3;
 }
@@ -572,7 +572,7 @@ void f() {
   try {
     1;
     return;
-    2;
+    /*unreachable*/ 2;
   } catch (_) {
     3;
   }
@@ -590,7 +590,7 @@ void f() {
   } catch (_) {
     2;
     return;
-    3;
+    /*unreachable*/ 3;
   }
   4;
 }
@@ -627,7 +627,7 @@ void f() { // f
   } finally {
     3;
   }
-  4;
+  /*unreachable*/ 4;
 }
 ''');
     verify(
@@ -662,7 +662,7 @@ void f() { // f
   } finally {
     2;
   }
-  3;
+  /*unreachable*/ 3;
 }
 ''');
     verify(
@@ -674,7 +674,7 @@ void f() { // f
   test_while_false() async {
     await trackCode(r'''
 void f() {
-  while (false) { // 1
+  while (false) /*unreachable*/ { // 1
     1;
   }
   2;
@@ -689,8 +689,8 @@ void f() { // f
   while (true) {
     1;
   }
-  2;
-  3;
+  /*unreachable*/ 2;
+  /*unreachable*/ 3;
 }
 ''');
     verify(
@@ -705,7 +705,7 @@ void f() {
   while (true) {
     1;
     break;
-    2;
+    /*unreachable*/ 2;
   }
   3;
 }
@@ -733,9 +733,9 @@ void f() { // f
   while (true) {
     1;
     continue;
-    2;
+    /*unreachable*/ 2;
   }
-  3;
+  /*unreachable*/ 3;
 }
 ''');
     verify(
