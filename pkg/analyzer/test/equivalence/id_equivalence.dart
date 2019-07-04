@@ -56,6 +56,12 @@ abstract class AstDataExtractor<T> extends GeneralizingAstVisitor<dynamic>
     registerValue(computeSourceSpan(node), id, value, node);
   }
 
+  void computeForFunctionBody(FunctionBody node, NodeId id) {
+    if (id == null) return;
+    T value = computeNodeValue(id, node);
+    registerValue(computeSourceSpan(node), id, value, node);
+  }
+
   void computeForStatement(Statement node, NodeId id) {
     if (id == null) return;
     T value = computeNodeValue(id, node);
@@ -71,7 +77,10 @@ abstract class AstDataExtractor<T> extends GeneralizingAstVisitor<dynamic>
     return SourceSpan(this.uri, node.offset, node.end);
   }
 
-  NodeId createStatementId(AstNode node) =>
+  NodeId createFunctionBodyId(FunctionBody node) =>
+      NodeId(_nodeOffset(node), IdKind.functionBody);
+
+  NodeId createStatementId(Statement node) =>
       NodeId(_nodeOffset(node), IdKind.statement);
 
   void run(CompilationUnit unit) {
@@ -82,6 +91,12 @@ abstract class AstDataExtractor<T> extends GeneralizingAstVisitor<dynamic>
   visitExpression(Expression node) {
     computeForExpression(node, computeDefaultNodeId(node));
     super.visitExpression(node);
+  }
+
+  @override
+  visitFunctionBody(FunctionBody node) {
+    computeForFunctionBody(node, createFunctionBodyId(node));
+    super.visitFunctionBody(node);
   }
 
   @override
@@ -157,6 +172,7 @@ enum IdKind {
   current,
   moveNext,
   statement,
+  functionBody,
 }
 
 class IdValue {
@@ -172,6 +188,8 @@ class IdValue {
   static const String moveNextPrefix = "moveNext: ";
 
   static const String statementPrefix = "statement: ";
+
+  static const String functionBodyPrefix = "functionBody: ";
 
   final Id id;
 
@@ -209,6 +227,9 @@ class IdValue {
     } else if (text.startsWith(statementPrefix)) {
       id = new NodeId(offset, IdKind.statement);
       expected = text.substring(statementPrefix.length);
+    } else if (text.startsWith(functionBodyPrefix)) {
+      id = new NodeId(offset, IdKind.functionBody);
+      expected = text.substring(functionBodyPrefix.length);
     } else {
       id = new NodeId(offset, IdKind.node);
       expected = text;
@@ -234,6 +255,8 @@ class IdValue {
         return '$moveNextPrefix$value';
       case IdKind.statement:
         return '$statementPrefix$value';
+      case IdKind.functionBody:
+        return '$functionBodyPrefix$value';
     }
     throw new UnsupportedError("Unexpected id kind: ${id.kind}");
   }
