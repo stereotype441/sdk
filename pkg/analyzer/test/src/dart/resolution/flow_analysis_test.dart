@@ -329,7 +329,6 @@ void f() {
   false ? /*unreachable*/ 1 : 2;
 }
 ''');
-    verify();
   }
 
   test_conditional_true() async {
@@ -338,7 +337,6 @@ void f() {
   true ? 1 : /*unreachable*/ 2;
 }
 ''');
-    verify();
   }
 
   test_do_false() async {
@@ -350,7 +348,6 @@ void f() {
   2;
 }
 ''');
-    verify();
   }
 
   test_do_true() async {
@@ -362,9 +359,6 @@ void f() /*functionBody: doesNotComplete*/ { // f
   /*statement: unreachable*/ 2;
 }
 ''');
-    verify(
-      functionBodiesThatDontComplete: ['{ // f'],
-    );
   }
 
   test_exit_beforeSplitStatement() async {
@@ -381,9 +375,6 @@ void f(bool b, int i) /*functionBody: doesNotComplete*/ { // f
   /*statement: unreachable*/ while (b) {}
 }
 ''');
-    verify(
-      functionBodiesThatDontComplete: ['{ // f'],
-    );
   }
 
   test_for_condition_true() async {
@@ -395,9 +386,6 @@ void f() /*functionBody: doesNotComplete*/ { // f
   /*statement: unreachable*/ 2;
 }
 ''');
-    verify(
-      functionBodiesThatDontComplete: ['{ // f'],
-    );
   }
 
   test_for_condition_true_implicit() async {
@@ -409,9 +397,6 @@ void f() /*functionBody: doesNotComplete*/ { // f
   /*statement: unreachable*/ 2;
 }
 ''');
-    verify(
-      functionBodiesThatDontComplete: ['{ // f'],
-    );
   }
 
   test_forEach() async {
@@ -425,7 +410,6 @@ void f() {
   2;
 }
 ''');
-    verify();
   }
 
   test_functionBody_hasReturn() async {
@@ -434,7 +418,6 @@ int f() /*functionBody: doesNotComplete*/ { // f
   return 42;
 }
 ''');
-    verify(functionBodiesThatDontComplete: ['{ // f']);
   }
 
   test_functionBody_noReturn() async {
@@ -443,7 +426,6 @@ void f() {
   1;
 }
 ''');
-    verify();
   }
 
   test_if_condition() async {
@@ -457,7 +439,6 @@ void f(bool b) {
   3;
 }
 ''');
-    verify();
   }
 
   test_if_false_then_else() async {
@@ -470,7 +451,6 @@ void f() {
   3;
 }
 ''');
-    verify();
   }
 
   test_if_true_return() async {
@@ -483,9 +463,6 @@ void f() /*functionBody: doesNotComplete*/ { // f
   /*statement: unreachable*/ 2;
 }
 ''');
-    verify(
-      functionBodiesThatDontComplete: ['{ // f'],
-    );
   }
 
   test_if_true_then_else() async {
@@ -498,7 +475,6 @@ void f() {
   3;
 }
 ''');
-    verify();
   }
 
   test_logicalAnd_leftFalse() async {
@@ -507,7 +483,6 @@ void f(int x) {
   false && /*unreachable*/ (x == 1);
 }
 ''');
-    verify();
   }
 
   test_logicalOr_leftTrue() async {
@@ -516,7 +491,6 @@ void f(int x) {
   true || /*unreachable*/ (x == 1);
 }
 ''');
-    verify();
   }
 
   test_switch_case_neverCompletes() async {
@@ -535,7 +509,6 @@ void f(bool b, int i) {
   3;
 }
 ''');
-    verify();
   }
 
   test_tryCatch() async {
@@ -549,7 +522,6 @@ void f() {
   3;
 }
 ''');
-    verify();
   }
 
   test_tryCatch_return_body() async {
@@ -565,7 +537,6 @@ void f() {
   4;
 }
 ''');
-    verify();
   }
 
   test_tryCatch_return_catch() async {
@@ -581,7 +552,6 @@ void f() {
   4;
 }
 ''');
-    verify();
   }
 
   test_tryCatchFinally_return_body() async {
@@ -598,7 +568,6 @@ void f() {
   4;
 }
 ''');
-    verify();
   }
 
   test_tryCatchFinally_return_bodyCatch() async {
@@ -616,9 +585,6 @@ void f() /*functionBody: doesNotComplete*/ { // f
   /*statement: unreachable*/ 4;
 }
 ''');
-    verify(
-      functionBodiesThatDontComplete: ['{ // f'],
-    );
   }
 
   test_tryCatchFinally_return_catch() async {
@@ -635,7 +601,6 @@ void f() {
   4;
 }
 ''');
-    verify();
   }
 
   test_tryFinally_return_body() async {
@@ -650,9 +615,6 @@ void f() /*functionBody: doesNotComplete*/ { // f
   /*statement: unreachable*/ 3;
 }
 ''');
-    verify(
-      functionBodiesThatDontComplete: ['{ // f'],
-    );
   }
 
   test_while_false() async {
@@ -664,7 +626,6 @@ void f() {
   2;
 }
 ''');
-    verify();
   }
 
   test_while_true() async {
@@ -677,9 +638,6 @@ void f() /*functionBody: doesNotComplete*/ { // f
   /*statement: unreachable*/ 3;
 }
 ''');
-    verify(
-      functionBodiesThatDontComplete: ['{ // f'],
-    );
   }
 
   test_while_true_break() async {
@@ -693,7 +651,6 @@ void f() {
   3;
 }
 ''');
-    verify();
   }
 
   test_while_true_breakIf() async {
@@ -707,7 +664,6 @@ void f(bool b) {
   3;
 }
 ''');
-    verify();
   }
 
   test_while_true_continue() async {
@@ -721,22 +677,6 @@ void f() /*functionBody: doesNotComplete*/ { // f
   /*statement: unreachable*/ 3;
 }
 ''');
-    verify(
-      functionBodiesThatDontComplete: ['{ // f'],
-    );
-  }
-
-  void verify({
-    List<String> functionBodiesThatDontComplete = const [],
-  }) {
-    expect(
-      flowResult.functionBodiesThatDontComplete,
-      unorderedEquals(
-        functionBodiesThatDontComplete
-            .map((search) => findNode.functionBody(search))
-            .toList(),
-      ),
-    );
   }
 }
 
