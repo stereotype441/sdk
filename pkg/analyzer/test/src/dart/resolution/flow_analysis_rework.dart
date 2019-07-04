@@ -417,7 +417,7 @@ class DslTransformer extends ThrowingAstVisitor<List<Object>> {
   }
 
   List<Object> visitSimpleStringLiteral(SimpleStringLiteral node) =>
-      ['String(', node.value, ')'];
+      ['StringLiteral(', node.value, ')'];
 
   List<Object> visitSwitchCase(SwitchCase node) {
     return call('Case', [node.labels, node.expression, node.statements]);
