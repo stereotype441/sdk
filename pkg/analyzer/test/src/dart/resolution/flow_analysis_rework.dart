@@ -179,8 +179,11 @@ class DslTransformer extends ThrowingAstVisitor<List<Object>> {
   List<Object> visitCatchClause(CatchClause node) {
     _unused(node.exceptionType);
     _unused(node.stackTraceParameter);
-    return call('Catch',
-        [..._declared('CatchVariable', node.exceptionParameter), node.body]);
+    return call('Catch', [
+      ...extractable(node.exceptionParameter.staticElement,
+          call('CatchVariable', [node.exceptionParameter.name])),
+      node.body
+    ]);
   }
 
   List<Object> visitClassDeclaration(ClassDeclaration node) {
@@ -276,7 +279,10 @@ class DslTransformer extends ThrowingAstVisitor<List<Object>> {
       throw '${element.runtimeType}';
     } else if (parts is ForEachPartsWithDeclaration) {
       return call('ForEachDeclared', [
-        _declared('ForEachVariable', parts.loopVariable.identifier),
+        ...extractable(
+            parts.loopVariable.identifier.staticElement,
+            call('ForEachVariable',
+                [parts.loopVariable.type, parts.loopVariable.identifier.name])),
         parts.iterable,
         node.body
       ]);
@@ -465,10 +471,6 @@ class DslTransformer extends ThrowingAstVisitor<List<Object>> {
 
   List<Object> visitWhileStatement(WhileStatement node) => searchable(
       'While', node, 'statement', call('While', [node.condition, node.body]));
-
-  List<Object> _declared(String method, SimpleIdentifier name) {
-    return extractable(name.staticElement, call(method, [name.name]));
-  }
 
   String _uniqueRefName(String prefix) {
     if (prefix == null || prefix.isEmpty) prefix = '_';
