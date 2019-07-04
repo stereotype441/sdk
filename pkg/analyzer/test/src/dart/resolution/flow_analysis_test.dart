@@ -19,10 +19,21 @@ main() {
   });
 }
 
-@reflectiveTest
-class NullableFlowTest extends DriverResolutionTest {
+class FlowTestBase extends DriverResolutionTest {
   FlowAnalysisResult flowResult;
 
+  /// Resolve the given [code] and track nullability in the unit.
+  Future<void> trackCode(String code) async {
+    addTestFile(code);
+    await resolveTestFile();
+
+    var unit = result.unit;
+    flowResult = FlowAnalysisResult.getFromNode(unit);
+  }
+}
+
+@reflectiveTest
+class NullableFlowTest extends FlowTestBase {
   @override
   AnalysisOptionsImpl get analysisOptions =>
       AnalysisOptionsImpl()..enabledExperiments = [EnableString.non_nullable];
@@ -365,15 +376,6 @@ void f(int x) {
 ''');
     assertNullable('x; // 2');
     assertNonNullable('x; // 1');
-  }
-
-  /// Resolve the given [code] and track nullability in the unit.
-  Future<void> trackCode(String code) async {
-    addTestFile(code);
-    await resolveTestFile();
-
-    var unit = result.unit;
-    flowResult = FlowAnalysisResult.getFromNode(unit);
   }
 }
 
