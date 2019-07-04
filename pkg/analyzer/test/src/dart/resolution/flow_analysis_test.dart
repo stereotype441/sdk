@@ -850,21 +850,6 @@ class TypePromotionFlowTest extends FlowTestBase {
   AnalysisOptionsImpl get analysisOptions =>
       AnalysisOptionsImpl()..enabledExperiments = [EnableString.non_nullable];
 
-  void assertNotPromoted(String search) {
-    var node = findNode.simple(search);
-    var actualType = flowResult.promotedTypes[node];
-    expect(actualType, isNull, reason: search);
-  }
-
-  void assertPromoted(String search, String expectedType) {
-    var node = findNode.simple(search);
-    var actualType = flowResult.promotedTypes[node];
-    if (actualType == null) {
-      fail('$expectedType expected, but actually not promoted\n$search');
-    }
-    assertElementTypeString(actualType, expectedType);
-  }
-
   test_assignment() async {
     await trackCode(r'''
 f(Object x) {
@@ -874,7 +859,6 @@ f(Object x) {
   }
 }
 ''');
-    assertNotPromoted('x; // 1');
   }
 
   test_binaryExpression_ifNull() async {
@@ -884,7 +868,6 @@ void f(Object x) {
   /*promoted*/ x; // 1
 }
 ''');
-    assertPromoted('x; // 1', 'num');
   }
 
   test_binaryExpression_ifNull_rightUnPromote() async {
@@ -897,8 +880,6 @@ void f(Object x, Object y, Object z) {
   }
 }
 ''');
-    assertPromoted('x; // 1', 'int');
-    assertNotPromoted('x; // 2');
   }
 
   test_conditional_both() async {
@@ -908,7 +889,6 @@ void f(bool b, Object x) {
   /*promoted*/ x; // 1
 }
 ''');
-    assertPromoted('x; // 1', 'num');
   }
 
   test_conditional_else() async {
@@ -918,7 +898,6 @@ void f(bool b, Object x) {
   x; // 1
 }
 ''');
-    assertNotPromoted('x; // 1');
   }
 
   test_conditional_then() async {
@@ -928,7 +907,6 @@ void f(bool b, Object x) {
   x; // 1
 }
 ''');
-    assertNotPromoted('x; // 1');
   }
 
   test_do_condition_isNotType() async {
@@ -941,8 +919,6 @@ void f(Object x) {
   /*nonNullable,promoted*/ x; // 2
 }
 ''');
-    assertNotPromoted('x; // 1');
-    assertPromoted('x; // 2', 'String');
   }
 
   test_do_condition_isType() async {
@@ -954,8 +930,6 @@ void f(Object x) {
   x; // 2
 }
 ''');
-    assertNotPromoted('x; // 1');
-    assertNotPromoted('x; // 2');
   }
 
   test_do_outerIsType() async {
@@ -969,8 +943,6 @@ void f(bool b, Object x) {
   }
 }
 ''');
-    assertPromoted('x; // 1', 'String');
-    assertPromoted('x; // 2', 'String');
   }
 
   test_do_outerIsType_loopAssigned_body() async {
@@ -985,8 +957,6 @@ void f(bool b, Object x) {
   }
 }
 ''');
-    assertNotPromoted('x; // 1');
-    assertNotPromoted('x; // 2');
   }
 
   test_do_outerIsType_loopAssigned_condition() async {
@@ -1001,9 +971,6 @@ void f(bool b, Object x) {
   }
 }
 ''');
-    assertNotPromoted('x != 0');
-    assertNotPromoted('x; // 1');
-    assertNotPromoted('x; // 2');
   }
 
   test_do_outerIsType_loopAssigned_condition2() async {
@@ -1017,8 +984,6 @@ void f(bool b, Object x) {
   }
 }
 ''');
-    assertNotPromoted('x; // 1');
-    assertNotPromoted('x; // 2');
   }
 
   test_for_outerIsType() async {
@@ -1032,8 +997,6 @@ void f(bool b, Object x) {
   }
 }
 ''');
-    assertPromoted('x; // 1', 'String');
-    assertPromoted('x; // 2', 'String');
   }
 
   test_for_outerIsType_loopAssigned_body() async {
@@ -1048,8 +1011,6 @@ void f(bool b, Object x) {
   }
 }
 ''');
-    assertNotPromoted('x; // 1');
-    assertNotPromoted('x; // 2');
   }
 
   test_for_outerIsType_loopAssigned_condition() async {
@@ -1063,8 +1024,6 @@ void f(Object x) {
   }
 }
 ''');
-    assertNotPromoted('x; // 1');
-    assertNotPromoted('x; // 2');
   }
 
   test_for_outerIsType_loopAssigned_updaters() async {
@@ -1078,8 +1037,6 @@ void f(bool b, Object x) {
   }
 }
 ''');
-    assertNotPromoted('x; // 1');
-    assertNotPromoted('x; // 2');
   }
 
   test_forEach_outerIsType_loopAssigned() async {
@@ -1095,8 +1052,6 @@ void f(Object x) {
   }
 }
 ''');
-    assertNotPromoted('x; // 1');
-    assertNotPromoted('x; // 2');
   }
 
   test_functionExpression_isType() async {
@@ -1110,7 +1065,6 @@ void f() {
   }
 }
 ''');
-    assertPromoted('x; // 1', 'String');
   }
 
   test_functionExpression_isType_mutatedInClosure2() async {
@@ -1127,7 +1081,6 @@ void f() {
   }
 }
 ''');
-    assertNotPromoted('x; // 1');
   }
 
   test_functionExpression_outerIsType_assignedOutside() async {
@@ -1148,9 +1101,6 @@ void f(Object x) {
   g();
 }
 ''');
-    assertPromoted('x; // 1', 'String');
-    assertNotPromoted('x; // 2');
-    assertNotPromoted('x; // 3');
   }
 
   test_if_combine_empty() async {
@@ -1164,7 +1114,6 @@ main(bool b, Object v) {
   v; // 3
 }
 ''');
-    assertNotPromoted('v; // 3');
   }
 
   test_if_conditional_isNotType() async {
@@ -1178,9 +1127,6 @@ f(bool b, Object v) {
   v; // 3
 }
 ''');
-    assertNotPromoted('v; // 1');
-    assertPromoted('v; // 2', 'num');
-    assertNotPromoted('v; // 3');
   }
 
   test_if_conditional_isType() async {
@@ -1194,9 +1140,6 @@ f(bool b, Object v) {
   v; // 3
 }
 ''');
-    assertPromoted('v; // 1', 'num');
-    assertNotPromoted('v; // 2');
-    assertNotPromoted('v; // 3');
   }
 
   test_if_isNotType() async {
@@ -1210,9 +1153,6 @@ main(v) {
   v; // 3
 }
 ''');
-    assertNotPromoted('v; // 1');
-    assertPromoted('v; // 2', 'String');
-    assertNotPromoted('v; // 3');
   }
 
   test_if_isNotType_return() async {
@@ -1222,7 +1162,6 @@ main(v) {
   /*promoted*/ v; // ref
 }
 ''');
-    assertPromoted('v; // ref', 'String');
   }
 
   test_if_isNotType_throw() async {
@@ -1232,7 +1171,6 @@ main(v) {
   /*promoted*/ v; // ref
 }
 ''');
-    assertPromoted('v; // ref', 'String');
   }
 
   test_if_isType() async {
@@ -1246,9 +1184,6 @@ main(v) {
   v; // 3
 }
 ''');
-    assertPromoted('v; // 1', 'String');
-    assertNotPromoted('v; // 2');
-    assertNotPromoted('v; // 3');
   }
 
   test_if_isType_thenNonBoolean() async {
@@ -1259,7 +1194,6 @@ f(Object x) {
   }
 }
 ''');
-    assertNotPromoted('x; // 1');
   }
 
   test_if_logicalNot_isType() async {
@@ -1273,9 +1207,6 @@ main(v) {
   v; // 3
 }
 ''');
-    assertNotPromoted('v; // 1');
-    assertPromoted('v; // 2', 'String');
-    assertNotPromoted('v; // 3');
   }
 
   test_if_then_isNotType_return() async {
@@ -1287,7 +1218,6 @@ void f(bool b, Object x) {
   x; // 1
 }
 ''');
-    assertNotPromoted('x; // 1');
   }
 
   test_logicalOr_throw() async {
@@ -1297,7 +1227,6 @@ main(v) {
   /*promoted*/ v; // ref
 }
 ''');
-    assertPromoted('v; // ref', 'String');
   }
 
   test_potentiallyMutatedInClosure() async {
@@ -1313,7 +1242,6 @@ f(Object x) {
   }
 }
 ''');
-    assertNotPromoted('x; // 1');
   }
 
   test_potentiallyMutatedInScope() async {
@@ -1326,7 +1254,6 @@ f(Object x) {
   x = 42;
 }
 ''');
-    assertPromoted('x; // 1', 'String');
   }
 
   test_switch_outerIsType_assignedInCase() async {
@@ -1348,9 +1275,6 @@ void f(int e, Object x) {
   }
 }
 ''');
-    assertNotPromoted('x; // 1');
-    assertPromoted('x; // 2', 'String');
-    assertNotPromoted('x; // 3');
   }
 
   test_tryCatch_assigned_body() async {
@@ -1369,9 +1293,6 @@ void f(Object x) {
 
 void g() {}
 ''');
-    assertPromoted('x; // 1', 'String');
-    assertPromoted('x; // 2', 'String');
-    assertNotPromoted('x; // 3');
   }
 
   test_tryCatch_isNotType_exit_body() async {
@@ -1386,8 +1307,6 @@ void f(Object x) {
 
 void g() {}
 ''');
-    assertPromoted('x; // 1', 'String');
-    assertNotPromoted('x; // 2');
   }
 
   test_tryCatch_isNotType_exit_body_catch() async {
@@ -1405,9 +1324,6 @@ void f(Object x) {
 
 void g() {}
 ''');
-    assertPromoted('x; // 1', 'String');
-    assertPromoted('x; // 2', 'String');
-    assertPromoted('x; // 3', 'String');
   }
 
   test_tryCatch_isNotType_exit_body_catchRethrow() async {
@@ -1425,9 +1341,6 @@ void f(Object x) {
 
 void g() {}
 ''');
-    assertPromoted('x; // 1', 'String');
-    assertNotPromoted('x; // 2');
-    assertPromoted('x; // 3', 'String');
   }
 
   test_tryCatch_isNotType_exit_catch() async {
@@ -1443,8 +1356,6 @@ void f(Object x) {
 
 void g() {}
 ''');
-    assertPromoted('x; // 1', 'String');
-    assertNotPromoted('x; // 2');
   }
 
   test_tryCatchFinally_outerIsType() async {
@@ -1464,10 +1375,6 @@ void f(Object x) {
 
 void g() {}
 ''');
-    assertPromoted('x; // 1', 'String');
-    assertPromoted('x; // 2', 'String');
-    assertPromoted('x; // 3', 'String');
-    assertPromoted('x; // 4', 'String');
   }
 
   test_tryCatchFinally_outerIsType_assigned_body() async {
@@ -1489,10 +1396,6 @@ void f(Object x) {
 
 void g() {}
 ''');
-    assertPromoted('x; // 1', 'String');
-    assertNotPromoted('x; // 2');
-    assertNotPromoted('x; // 3');
-    assertNotPromoted('x; // 4');
   }
 
   test_tryCatchFinally_outerIsType_assigned_catch() async {
@@ -1511,10 +1414,6 @@ void f(Object x) {
   }
 }
 ''');
-    assertPromoted('x; // 1', 'String');
-    assertPromoted('x; // 2', 'String');
-    assertNotPromoted('x; // 3');
-    assertNotPromoted('x; // 4');
   }
 
   test_tryFinally_outerIsType_assigned_body() async {
@@ -1531,9 +1430,6 @@ void f(Object x) {
   }
 }
 ''');
-    assertPromoted('x; // 1', 'String');
-    assertNotPromoted('x; // 2');
-    assertNotPromoted('x; // 3');
   }
 
   test_tryFinally_outerIsType_assigned_finally() async {
@@ -1550,9 +1446,6 @@ void f(Object x) {
   }
 }
 ''');
-    assertPromoted('x; // 1', 'String');
-    assertPromoted('x; // 2', 'String');
-    assertNotPromoted('x; // 3');
   }
 
   test_while_condition_false() async {
@@ -1564,8 +1457,6 @@ void f(Object x) {
   /*promoted*/ x; // 2
 }
 ''');
-    assertNotPromoted('x; // 1');
-    assertPromoted('x; // 2', 'String');
   }
 
   test_while_condition_true() async {
@@ -1577,8 +1468,6 @@ void f(Object x) {
   x; // 2
 }
 ''');
-    assertPromoted('x; // 1', 'String');
-    assertNotPromoted('x; // 2');
   }
 
   test_while_outerIsType() async {
@@ -1592,8 +1481,6 @@ void f(bool b, Object x) {
   }
 }
 ''');
-    assertPromoted('x; // 1', 'String');
-    assertPromoted('x; // 2', 'String');
   }
 
   test_while_outerIsType_loopAssigned_body() async {
@@ -1608,8 +1495,6 @@ void f(bool b, Object x) {
   }
 }
 ''');
-    assertNotPromoted('x; // 1');
-    assertNotPromoted('x; // 2');
   }
 
   test_while_outerIsType_loopAssigned_condition() async {
@@ -1624,9 +1509,6 @@ void f(bool b, Object x) {
   }
 }
 ''');
-    assertNotPromoted('x != 0');
-    assertNotPromoted('x; // 1');
-    assertNotPromoted('x; // 2');
   }
 }
 
