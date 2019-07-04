@@ -220,7 +220,7 @@ class DslTransformer extends ThrowingAstVisitor<List<Object>> {
     if (unsatisfiedReferences.isNotEmpty) {
       throw 'Unsatisfied references: $unsatisfiedReferences';
     }
-    result.addAll(['await trackCode(', ...exprResult, ');']);
+    result.addAll(['await trackCode(', ...exprResult, ')']);
     for (var entry in this.searches.entries) {
       for (var searchTerm in entry.value) {
         if (!searchVars.containsKey(searchTerm)) {
