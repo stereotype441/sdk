@@ -139,7 +139,7 @@ class DslTransformer extends ThrowingAstVisitor<List<Object>> {
       var lhsElement = lhs.staticElement;
       if (lhsElement is ParameterElement ||
           lhsElement is LocalVariableElement) {
-        return call('Set', [ref(lhsElement), node.rightHandSide]);
+        return call('SetVariable', [ref(lhsElement), node.rightHandSide]);
       }
     }
     throw 'TODO';
@@ -366,7 +366,7 @@ class DslTransformer extends ThrowingAstVisitor<List<Object>> {
           'StaticCall', [ref(staticElement), node.argumentList.arguments]);
     } else if (staticElement is LocalVariableElement) {
       return call(
-          'LocalCall', [ref(staticElement), node.argumentList.arguments]);
+          'CallVariable', [ref(staticElement), node.argumentList.arguments]);
     }
     throw 'TODO';
   }
@@ -416,8 +416,8 @@ class DslTransformer extends ThrowingAstVisitor<List<Object>> {
     } else if (node.inGetterContext()) {
       var staticElement = node.staticElement;
       if (staticElement is ParameterElement) {
-        return searchable(
-            'Get', node, node.name, call('Get', [ref(staticElement)]));
+        return searchable('GetVariable', node, node.name,
+            call('GetVariable', [ref(staticElement)]));
       }
       throw '${staticElement.runtimeType}';
     } else if (node.inSetterContext()) {
