@@ -184,13 +184,10 @@ class FlowAnalysisDriver extends Visitor<DartType>
   }
 
   @override
-  defaultExpression() => throw UnimplementedError('Should be overridden');
+  DartType defaultExpression() => throw UnimplementedError('Should be overridden');
 
   @override
-  defaultNode() => null;
-
-  @override
-  defaultStatement() => null;
+  DartType defaultNode() => null;
 
   @override
   DartType elementType(Element element) => element.declaredType;
@@ -258,6 +255,12 @@ class FlowAnalysisDriver extends Visitor<DartType>
     _flowAnalysis.conditional_end(
         conditional, conditional.elseExpression, isBool);
     return DartType.LUB(thenType, elseType);
+  }
+
+  Set<Element> _findAssignments(Statement statement) {
+    var visitor = _FindAssignmentsVisitor();
+    statement.accept(visitor);
+    return visitor.assignments;
   }
 
   DartType visitDo(Do do_) {
@@ -359,6 +362,9 @@ class FlowAnalysisDriver extends Visitor<DartType>
     code.accept(flowAnalyzer);
     return flowAnalyzer._result;
   }
+}
+
+class _FindAssignmentsVisitor extends Visitor<void> {
 }
 
 class FlowAnalysisResult {
@@ -746,11 +752,11 @@ abstract class Variable implements Element {
 }
 
 abstract class Visitor<R> {
-  R defaultExpression();
+  R defaultExpression() => defaultNode();
 
   R defaultNode();
 
-  R defaultStatement();
+  R defaultStatement() => defaultNode();
 
   R visitAnd(And and) {
     and.left.accept(this);
