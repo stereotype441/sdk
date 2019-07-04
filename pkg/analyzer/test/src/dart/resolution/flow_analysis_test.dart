@@ -64,7 +64,6 @@ class NullableFlowTest extends DriverResolutionTest {
           (x1 = Get(x))
         ])
     ]));
-    ;
     assertNullable(x0);
     assertNonNullable(x1);
   }
@@ -82,7 +81,6 @@ class NullableFlowTest extends DriverResolutionTest {
           (x1 = Get(x))
         ])
     ]));
-    ;
     assertNullable(x1);
     assertNonNullable(x0);
   }
@@ -100,7 +98,6 @@ class NullableFlowTest extends DriverResolutionTest {
           Get(a)
         ])
     ]));
-    ;
     assertNullable();
     assertNonNullable(a0);
   }
@@ -118,7 +115,6 @@ class NullableFlowTest extends DriverResolutionTest {
           Get(a)
         ])
     ]));
-    ;
     assertNullable(a0);
     assertNonNullable();
   }
@@ -132,7 +128,6 @@ class NullableFlowTest extends DriverResolutionTest {
           And(Eq(Get(x), NullLiteral()), PropertyGet((x0 = Get(x)), "isEven"))
         ])
     ]));
-    ;
     assertNullable(x0);
     assertNonNullable();
   }
@@ -146,7 +141,6 @@ class NullableFlowTest extends DriverResolutionTest {
           Or(Eq(Get(x), NullLiteral()), PropertyGet((x0 = Get(x)), "isEven"))
         ])
     ]));
-    ;
     assertNullable();
     assertNonNullable(x0);
   }
@@ -166,7 +160,6 @@ class NullableFlowTest extends DriverResolutionTest {
             ]))
       ])
     ]));
-    ;
     assertNullable(x0);
     assertNonNullable(x1);
   }
@@ -198,7 +191,6 @@ class NullableFlowTest extends DriverResolutionTest {
           (b2 = Get(b))
         ])
     ]));
-    ;
     assertNullable(a0);
     assertNonNullable(b0, a1, b1, b2);
   }
@@ -211,7 +203,6 @@ class NullableFlowTest extends DriverResolutionTest {
         ..body =
             Block([If(NotEq(NullLiteral(), Get(x)), Return()), (x0 = Get(x))])
     ]));
-    ;
     assertNullable(x0);
     assertNonNullable();
   }
@@ -224,7 +215,6 @@ class NullableFlowTest extends DriverResolutionTest {
         ..body =
             Block([If(NotEq(Get(x), NullLiteral()), Return()), (x0 = Get(x))])
     ]));
-    ;
     assertNullable(x0);
     assertNonNullable();
   }
@@ -236,7 +226,6 @@ class NullableFlowTest extends DriverResolutionTest {
       Func(TypeAnnotation("void"), "f", [x])
         ..body = Block([If(Eq(NullLiteral(), Get(x)), Return()), (x0 = Get(x))])
     ]));
-    ;
     assertNullable();
     assertNonNullable(x0);
   }
@@ -248,7 +237,6 @@ class NullableFlowTest extends DriverResolutionTest {
       Func(TypeAnnotation("void"), "f", [x])
         ..body = Block([If(Eq(Get(x), NullLiteral()), Return()), (x0 = Get(x))])
     ]));
-    ;
     assertNullable();
     assertNonNullable(x0);
   }
@@ -264,7 +252,6 @@ class NullableFlowTest extends DriverResolutionTest {
               Block([(x1 = Get(x))]))
         ])
     ]));
-    ;
     assertNullable(x0);
     assertNonNullable(x1);
   }
@@ -285,7 +272,6 @@ class NullableFlowTest extends DriverResolutionTest {
             ]))
       ])
     ]));
-    ;
     assertNullable(x0);
     assertNonNullable(x1);
   }
@@ -302,7 +288,6 @@ class NullableFlowTest extends DriverResolutionTest {
               Block([Get(a), StaticCall(localFunction, []), Get(a)]))
         ])
     ]));
-    ;
     assertNullable();
     assertNonNullable();
   }
@@ -319,7 +304,6 @@ class NullableFlowTest extends DriverResolutionTest {
           (x1 = Get(x))
         ])
     ]));
-    ;
     assertNullable();
     assertNonNullable(x0, x1);
   }
@@ -336,7 +320,6 @@ class NullableFlowTest extends DriverResolutionTest {
           (x1 = Get(x))
         ])
     ]));
-    ;
     assertNullable();
     assertNonNullable(x0, x1);
   }
@@ -354,7 +337,6 @@ class NullableFlowTest extends DriverResolutionTest {
           Get(a)
         ])
     ]));
-    ;
     assertNullable(a0);
     assertNonNullable();
   }
@@ -372,7 +354,6 @@ class NullableFlowTest extends DriverResolutionTest {
           Get(a)
         ])
     ]));
-    ;
     assertNullable();
     assertNonNullable(a0);
   }
@@ -391,7 +372,6 @@ class NullableFlowTest extends DriverResolutionTest {
           Get(a)
         ])
     ]));
-    ;
     assertNullable();
     assertNonNullable(a0, a1);
   }
@@ -407,7 +387,6 @@ class NullableFlowTest extends DriverResolutionTest {
           (x1 = Get(x))
         ])
     ]));
-    ;
     assertNullable(x0);
     assertNonNullable(x1);
   }
@@ -423,7 +402,6 @@ class NullableFlowTest extends DriverResolutionTest {
           (x1 = Get(x))
         ])
     ]));
-    ;
     assertNullable(x1);
     assertNonNullable(x0);
   }
@@ -448,7 +426,6 @@ class ReachableFlowTest extends DriverResolutionTest {
       Func(TypeAnnotation("void"), "f", [])
         ..body = Block([Conditional(Bool(false), (value_1 = Int(1)), Int(2))])
     ]));
-    ;
     verify(unreachableExpressions: [value_1]);
   }
 
@@ -458,7 +435,6 @@ class ReachableFlowTest extends DriverResolutionTest {
       Func(TypeAnnotation("void"), "f", [])
         ..body = Block([Conditional(Bool(true), Int(1), (value_2 = Int(2)))])
     ]));
-    ;
     verify(unreachableExpressions: [value_2]);
   }
 
@@ -470,7 +446,6 @@ class ReachableFlowTest extends DriverResolutionTest {
           Int(2)
         ])
     ]));
-    ;
     verify();
   }
 
@@ -484,7 +459,6 @@ class ReachableFlowTest extends DriverResolutionTest {
           (statement = Int(2))
         ]))
     ]));
-    ;
     verify(
       unreachableStatements: [statement],
       functionBodiesThatDontComplete: [statement0],
@@ -518,7 +492,6 @@ class ReachableFlowTest extends DriverResolutionTest {
           (statement6 = While(Get(b), Block([])))
         ]))
     ]));
-    ;
     verify(
       unreachableStatements: [
         statement,
@@ -544,7 +517,6 @@ class ReachableFlowTest extends DriverResolutionTest {
           (statement = Int(2))
         ]))
     ]));
-    ;
     verify(
       unreachableStatements: [statement],
       functionBodiesThatDontComplete: [statement0],
@@ -561,7 +533,6 @@ class ReachableFlowTest extends DriverResolutionTest {
           (statement = Int(2))
         ]))
     ]));
-    ;
     verify(
       unreachableStatements: [statement],
       functionBodiesThatDontComplete: [statement0],
@@ -579,7 +550,6 @@ class ReachableFlowTest extends DriverResolutionTest {
           Int(2)
         ])
     ]));
-    ;
     verify();
   }
 
@@ -589,7 +559,6 @@ class ReachableFlowTest extends DriverResolutionTest {
       Func(TypeAnnotation("int"), "f", [])
         ..body = (statement = Block([Return(Int(42))]))
     ]));
-    ;
     verify(functionBodiesThatDontComplete: [statement]);
   }
 
@@ -597,7 +566,6 @@ class ReachableFlowTest extends DriverResolutionTest {
     await trackCode(Unit([
       Func(TypeAnnotation("void"), "f", [])..body = Block([Int(1)])
     ]));
-    ;
     verify();
   }
 
@@ -610,7 +578,6 @@ class ReachableFlowTest extends DriverResolutionTest {
           Int(3)
         ])
     ]));
-    ;
     verify();
   }
 
@@ -623,7 +590,6 @@ class ReachableFlowTest extends DriverResolutionTest {
           Int(3)
         ])
     ]));
-    ;
     verify(unreachableStatements: [statement]);
   }
 
@@ -638,7 +604,6 @@ class ReachableFlowTest extends DriverResolutionTest {
           (statement = Int(2))
         ]))
     ]));
-    ;
     verify(
       unreachableStatements: [statement],
       functionBodiesThatDontComplete: [statement0],
@@ -654,7 +619,6 @@ class ReachableFlowTest extends DriverResolutionTest {
           Int(3)
         ])
     ]));
-    ;
     verify(unreachableStatements: [statement]);
   }
 
@@ -666,7 +630,6 @@ class ReachableFlowTest extends DriverResolutionTest {
         ..body =
             Block([And(Bool(false), (expression = Parens(Eq(Get(x), Int(1)))))])
     ]));
-    ;
     verify(unreachableExpressions: [expression]);
   }
 
@@ -678,7 +641,6 @@ class ReachableFlowTest extends DriverResolutionTest {
         ..body =
             Block([Or(Bool(true), (expression = Parens(Eq(Get(x), Int(1)))))])
     ]));
-    ;
     verify(unreachableExpressions: [expression]);
   }
 
@@ -702,7 +664,6 @@ class ReachableFlowTest extends DriverResolutionTest {
           Int(3)
         ])
     ]));
-    ;
     verify(unreachableStatements: [statement]);
   }
 
@@ -716,7 +677,6 @@ class ReachableFlowTest extends DriverResolutionTest {
           Int(3)
         ])
     ]));
-    ;
     verify();
   }
 
@@ -731,7 +691,6 @@ class ReachableFlowTest extends DriverResolutionTest {
           Int(4)
         ])
     ]));
-    ;
     verify(unreachableStatements: [statement]);
   }
 
@@ -747,7 +706,6 @@ class ReachableFlowTest extends DriverResolutionTest {
           Int(4)
         ])
     ]));
-    ;
     verify(unreachableStatements: [statement]);
   }
 
@@ -764,7 +722,6 @@ class ReachableFlowTest extends DriverResolutionTest {
           Int(4)
         ])
     ]));
-    ;
     verify();
   }
 
@@ -783,7 +740,6 @@ class ReachableFlowTest extends DriverResolutionTest {
           (statement = Int(4))
         ]))
     ]));
-    ;
     verify(
       unreachableStatements: [statement],
       functionBodiesThatDontComplete: [statement0],
@@ -803,7 +759,6 @@ class ReachableFlowTest extends DriverResolutionTest {
           Int(4)
         ])
     ]));
-    ;
     verify();
   }
 
@@ -817,7 +772,6 @@ class ReachableFlowTest extends DriverResolutionTest {
           (statement = Int(3))
         ]))
     ]));
-    ;
     verify(
       unreachableStatements: [statement],
       functionBodiesThatDontComplete: [statement0],
@@ -833,7 +787,6 @@ class ReachableFlowTest extends DriverResolutionTest {
           Int(2)
         ])
     ]));
-    ;
     verify(unreachableStatements: [statement]);
   }
 
@@ -849,7 +802,6 @@ class ReachableFlowTest extends DriverResolutionTest {
           (statement0 = Int(3))
         ]))
     ]));
-    ;
     verify(
       unreachableStatements: [statement, statement0],
       functionBodiesThatDontComplete: [statement1],
@@ -865,7 +817,6 @@ class ReachableFlowTest extends DriverResolutionTest {
           Int(3)
         ])
     ]));
-    ;
     verify(unreachableStatements: [statement]);
   }
 
@@ -878,7 +829,6 @@ class ReachableFlowTest extends DriverResolutionTest {
           Int(3)
         ])
     ]));
-    ;
     verify();
   }
 
@@ -893,7 +843,6 @@ class ReachableFlowTest extends DriverResolutionTest {
           (statement0 = Int(3))
         ]))
     ]));
-    ;
     verify(
       unreachableStatements: [statement, statement0],
       functionBodiesThatDontComplete: [statement1],
@@ -962,7 +911,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
               Block([Set(x, Int(42)), (x0 = Get(x))]))
         ])
     ]));
-    ;
     assertNotPromoted(x0);
   }
 
@@ -980,7 +928,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
           (x0 = Get(x))
         ])
     ]));
-    ;
     assertPromoted(x0, 'num');
   }
 
@@ -1002,7 +949,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
               ]))
         ])
     ]));
-    ;
     assertPromoted(x0, 'int');
     assertNotPromoted(x1);
   }
@@ -1023,7 +969,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
           (x0 = Get(x))
         ])
     ]));
-    ;
     assertPromoted(x0, 'num');
   }
 
@@ -1042,7 +987,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
           (x0 = Get(x))
         ])
     ]));
-    ;
     assertNotPromoted(x0);
   }
 
@@ -1061,7 +1005,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
           (x0 = Get(x))
         ])
     ]));
-    ;
     assertNotPromoted(x0);
   }
 
@@ -1077,7 +1020,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
           (x1 = Get(x))
         ])
     ]));
-    ;
     assertNotPromoted(x0);
     assertPromoted(x1, 'String');
   }
@@ -1093,7 +1035,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
           (x1 = Get(x))
         ])
     ]));
-    ;
     assertNotPromoted(x0);
     assertNotPromoted(x1);
   }
@@ -1114,7 +1055,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
               ]))
         ])
     ]));
-    ;
     assertPromoted(x0, 'String');
     assertPromoted(x1, 'String');
   }
@@ -1138,7 +1078,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
               ]))
         ])
     ]));
-    ;
     assertNotPromoted(x0);
     assertNotPromoted(x1);
   }
@@ -1162,7 +1101,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
               ]))
         ])
     ]));
-    ;
     assertNotPromoted(x1);
     assertNotPromoted(x0);
     assertNotPromoted(x2);
@@ -1184,7 +1122,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
               ]))
         ])
     ]));
-    ;
     assertNotPromoted(x0);
     assertNotPromoted(x1);
   }
@@ -1205,7 +1142,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
               ]))
         ])
     ]));
-    ;
     assertPromoted(x0, 'String');
     assertPromoted(x1, 'String');
   }
@@ -1227,7 +1163,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
               ]))
         ])
     ]));
-    ;
     assertNotPromoted(x0);
     assertNotPromoted(x1);
   }
@@ -1248,7 +1183,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
               ]))
         ])
     ]));
-    ;
     assertNotPromoted(x0);
     assertNotPromoted(x1);
   }
@@ -1270,7 +1204,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
               ]))
         ])
     ]));
-    ;
     assertNotPromoted(x0);
     assertNotPromoted(x1);
   }
@@ -1296,7 +1229,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
               ]))
         ])
     ]));
-    ;
     assertNotPromoted(x0);
     assertNotPromoted(x1);
   }
@@ -1314,7 +1246,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
             ])
         ])
     ]));
-    ;
     assertPromoted(x0, 'String');
   }
 
@@ -1332,7 +1263,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
             ])
         ])
     ]));
-    ;
     assertNotPromoted(x0);
   }
 
@@ -1357,7 +1287,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
           LocalCall(g, [])
         ])
     ]));
-    ;
     assertPromoted(x0, 'String');
     assertNotPromoted(x1);
     assertNotPromoted(x2);
@@ -1381,7 +1310,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
           (v0 = Get(v))
         ])
     ]));
-    ;
     assertNotPromoted(v0);
   }
 
@@ -1402,7 +1330,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
           (v2 = Get(v))
         ])
     ]));
-    ;
     assertNotPromoted(v0);
     assertPromoted(v1, 'num');
     assertNotPromoted(v2);
@@ -1425,7 +1352,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
           (v2 = Get(v))
         ])
     ]));
-    ;
     assertPromoted(v0, 'num');
     assertNotPromoted(v1);
     assertNotPromoted(v2);
@@ -1444,7 +1370,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
           (v2 = Get(v))
         ])
     ]));
-    ;
     assertNotPromoted(v0);
     assertPromoted(v1, 'String');
     assertNotPromoted(v2);
@@ -1458,7 +1383,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
         ..body = Block(
             [If(Is(Get(v), TypeAnnotation("String")), Return()), (v0 = Get(v))])
     ]));
-    ;
     assertPromoted(v0, 'String');
   }
 
@@ -1472,7 +1396,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
           (v0 = Get(v))
         ])
     ]));
-    ;
     assertPromoted(v0, 'String');
   }
 
@@ -1489,7 +1412,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
           (v2 = Get(v))
         ])
     ]));
-    ;
     assertPromoted(v0, 'String');
     assertNotPromoted(v1);
     assertNotPromoted(v2);
@@ -1505,7 +1427,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
               Block([(x0 = Get(x))]))
         ])
     ]));
-    ;
     assertNotPromoted(x0);
   }
 
@@ -1522,7 +1443,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
           (v2 = Get(v))
         ])
     ]));
-    ;
     assertNotPromoted(v0);
     assertPromoted(v1, 'String');
     assertNotPromoted(v2);
@@ -1540,7 +1460,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
           (x0 = Get(x))
         ])
     ]));
-    ;
     assertNotPromoted(x0);
   }
 
@@ -1554,7 +1473,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
           (v0 = Get(v))
         ])
     ]));
-    ;
     assertPromoted(v0, 'String');
   }
 
@@ -1570,7 +1488,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
               Block([StaticCall(localFunction, []), (x0 = Get(x))]))
         ])
     ]));
-    ;
     assertNotPromoted(x0);
   }
 
@@ -1584,7 +1501,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
           Set(x, Int(42))
         ])
     ]));
-    ;
     assertPromoted(x0, 'String');
   }
 
@@ -1610,7 +1526,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
               ]))
         ])
     ]));
-    ;
     assertNotPromoted(x0);
     assertPromoted(x1, 'String');
     assertNotPromoted(x2);
@@ -1639,7 +1554,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
         ]),
       g..body = Block([])
     ]));
-    ;
     assertPromoted(x0, 'String');
     assertPromoted(x1, 'String');
     assertNotPromoted(x2);
@@ -1662,7 +1576,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
         ]),
       Func(TypeAnnotation("void"), "g", [])..body = Block([])
     ]));
-    ;
     assertPromoted(x0, 'String');
     assertNotPromoted(x1);
   }
@@ -1692,7 +1605,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
         ]),
       Func(TypeAnnotation("void"), "g", [])..body = Block([])
     ]));
-    ;
     assertPromoted(x0, 'String');
     assertPromoted(x1, 'String');
     assertPromoted(x2, 'String');
@@ -1718,7 +1630,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
         ]),
       Func(TypeAnnotation("void"), "g", [])..body = Block([])
     ]));
-    ;
     assertPromoted(x0, 'String');
     assertNotPromoted(x1);
     assertPromoted(x2, 'String');
@@ -1743,7 +1654,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
         ]),
       Func(TypeAnnotation("void"), "g", [])..body = Block([])
     ]));
-    ;
     assertPromoted(x0, 'String');
     assertNotPromoted(x1);
   }
@@ -1771,7 +1681,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
         ]),
       Func(TypeAnnotation("void"), "g", [])..body = Block([])
     ]));
-    ;
     assertPromoted(x0, 'String');
     assertPromoted(x1, 'String');
     assertPromoted(x2, 'String');
@@ -1802,7 +1711,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
         ]),
       g..body = Block([])
     ]));
-    ;
     assertPromoted(x0, 'String');
     assertNotPromoted(x1);
     assertNotPromoted(x2);
@@ -1832,7 +1740,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
               ]))
         ])
     ]));
-    ;
     assertPromoted(x0, 'String');
     assertPromoted(x1, 'String');
     assertNotPromoted(x2);
@@ -1856,7 +1763,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
               ]))
         ])
     ]));
-    ;
     assertPromoted(x0, 'String');
     assertNotPromoted(x1);
     assertNotPromoted(x2);
@@ -1879,7 +1785,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
               ]))
         ])
     ]));
-    ;
     assertPromoted(x0, 'String');
     assertPromoted(x1, 'String');
     assertNotPromoted(x2);
@@ -1896,7 +1801,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
           (x1 = Get(x))
         ])
     ]));
-    ;
     assertNotPromoted(x0);
     assertPromoted(x1, 'String');
   }
@@ -1912,7 +1816,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
           (x1 = Get(x))
         ])
     ]));
-    ;
     assertPromoted(x0, 'String');
     assertNotPromoted(x1);
   }
@@ -1933,7 +1836,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
               ]))
         ])
     ]));
-    ;
     assertPromoted(x0, 'String');
     assertPromoted(x1, 'String');
   }
@@ -1959,7 +1861,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
               ]))
         ])
     ]));
-    ;
     assertNotPromoted(x0);
     assertNotPromoted(x1);
   }
@@ -1985,7 +1886,6 @@ class TypePromotionFlowTest extends DriverResolutionTest {
               ]))
         ])
     ]));
-    ;
     assertNotPromoted(x0);
     assertNotPromoted(x1);
     assertNotPromoted(x2);
