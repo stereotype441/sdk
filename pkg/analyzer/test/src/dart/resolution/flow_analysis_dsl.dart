@@ -208,6 +208,11 @@ class FlowAnalysisDriver extends Visitor<DartType>
     return node;
   }
 
+  DartType visitBool(Bool bool_) {
+    _flowAnalysis.booleanLiteral(bool_, bool_.value);
+    return InterfaceType('bool');
+  }
+
   @override
   visitClosure(Closure closure) {
     for (var parameter in closure.parameters) {
@@ -239,8 +244,11 @@ class FlowAnalysisDriver extends Visitor<DartType>
   }
 
   DartType visitDo(Do do_) {
+    _flowAnalysis.doStatement_bodyBegin(do_, _findAssignments(do_.body));
     do_.body.accept(this);
+    _flowAnalysis.doStatement_conditionBegin();
     do_.condition.accept(this);
+    _flowAnalysis.doStatement_end(do_, do_.condition);
     return null;
   }
 
@@ -278,6 +286,7 @@ class FlowAnalysisDriver extends Visitor<DartType>
   DartType visitLocal(Local local) {
     // TODO(paulberry): test some examples of variables with initializers
     _flowAnalysis.add(local, assigned: false);
+    return null;
   }
 
   DartType visitLocalCall(LocalCall localCall) {
@@ -753,6 +762,7 @@ abstract class Visitor<R> {
     for (var statement in block.statements) {
       statement.accept(this);
     }
+    return defaultStatement();
   }
 
   R visitBool(Bool bool_) => defaultExpression();
@@ -775,6 +785,7 @@ abstract class Visitor<R> {
     for (var member in class_.members) {
       member.accept(this);
     }
+    return defaultNode();
   }
 
   visitClosure(Closure closure) {
@@ -796,6 +807,7 @@ abstract class Visitor<R> {
       parameter.accept(this);
     }
     constructor.body.accept(this);
+    return defaultNode();
   }
 
   R visitContinue() => defaultStatement();
@@ -803,6 +815,7 @@ abstract class Visitor<R> {
   R visitDo(Do do_) {
     do_.body.accept(this);
     do_.condition.accept(this);
+    return defaultStatement();
   }
 
   R visitEq(Eq eq) {
