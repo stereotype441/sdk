@@ -70,9 +70,9 @@ class NullableFlowTest extends DriverResolutionTest {
   test_assign_toNonNull() async {
     Get x0;
     Get x1;
-    var x = Param(TypeAnnotation("int"), "x");
+    var x = Param(InterfaceType("int"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([
           If(NotEq(Get(x), NullLiteral()), Return()),
           (x0 = Get(x)),
@@ -87,9 +87,9 @@ class NullableFlowTest extends DriverResolutionTest {
   test_assign_toNull() async {
     Get x0;
     Get x1;
-    var x = Param(TypeAnnotation("int"), "x");
+    var x = Param(InterfaceType("int"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([
           If(Eq(Get(x), NullLiteral()), Return()),
           (x0 = Get(x)),
@@ -103,10 +103,10 @@ class NullableFlowTest extends DriverResolutionTest {
 
   test_assign_toUnknown_fromNotNull() async {
     Get a0;
-    var a = Param(TypeAnnotation("int"), "a");
-    var b = Param(TypeAnnotation("int"), "b");
+    var a = Param(InterfaceType("int"), "a");
+    var b = Param(InterfaceType("int"), "b");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [a, b])
+      Func(InterfaceType("void"), "f", [a, b])
         ..body = Block([
           If(Eq(Get(a), NullLiteral()), Return()),
           (a0 = Get(a)),
@@ -120,10 +120,10 @@ class NullableFlowTest extends DriverResolutionTest {
 
   test_assign_toUnknown_fromNull() async {
     Get a0;
-    var a = Param(TypeAnnotation("int"), "a");
-    var b = Param(TypeAnnotation("int"), "b");
+    var a = Param(InterfaceType("int"), "a");
+    var b = Param(InterfaceType("int"), "b");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [a, b])
+      Func(InterfaceType("void"), "f", [a, b])
         ..body = Block([
           If(NotEq(Get(a), NullLiteral()), Return()),
           (a0 = Get(a)),
@@ -137,9 +137,9 @@ class NullableFlowTest extends DriverResolutionTest {
 
   test_binaryExpression_logicalAnd() async {
     Get x0;
-    var x = Param(TypeAnnotation("int"), "x");
+    var x = Param(InterfaceType("int"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([
           And(Eq(Get(x), NullLiteral()), PropertyGet((x0 = Get(x)), "isEven"))
         ])
@@ -150,9 +150,9 @@ class NullableFlowTest extends DriverResolutionTest {
 
   test_binaryExpression_logicalOr() async {
     Get x0;
-    var x = Param(TypeAnnotation("int"), "x");
+    var x = Param(InterfaceType("int"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([
           Or(Eq(Get(x), NullLiteral()), PropertyGet((x0 = Get(x)), "isEven"))
         ])
@@ -164,7 +164,7 @@ class NullableFlowTest extends DriverResolutionTest {
   test_constructor_if_then_else() async {
     Get x0;
     Get x1;
-    var x = Param(TypeAnnotation("int"), "x");
+    var x = Param(InterfaceType("int"), "x");
     await trackCode(Unit([
       Class("C", [
         Constructor(
@@ -186,10 +186,10 @@ class NullableFlowTest extends DriverResolutionTest {
     Get a1;
     Get b1;
     Get b2;
-    var a = Param(TypeAnnotation("int"), "a");
-    var b = Param(TypeAnnotation("int"), "b");
+    var a = Param(InterfaceType("int"), "a");
+    var b = Param(InterfaceType("int"), "b");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [a, b])
+      Func(InterfaceType("void"), "f", [a, b])
         ..body = Block([
           If(
               Eq(Get(a), NullLiteral()),
@@ -213,9 +213,9 @@ class NullableFlowTest extends DriverResolutionTest {
 
   test_if_notNull_thenExit_left() async {
     Get x0;
-    var x = Param(TypeAnnotation("int"), "x");
+    var x = Param(InterfaceType("int"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body =
             Block([If(NotEq(NullLiteral(), Get(x)), Return()), (x0 = Get(x))])
     ]));
@@ -225,9 +225,9 @@ class NullableFlowTest extends DriverResolutionTest {
 
   test_if_notNull_thenExit_right() async {
     Get x0;
-    var x = Param(TypeAnnotation("int"), "x");
+    var x = Param(InterfaceType("int"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body =
             Block([If(NotEq(Get(x), NullLiteral()), Return()), (x0 = Get(x))])
     ]));
@@ -237,9 +237,9 @@ class NullableFlowTest extends DriverResolutionTest {
 
   test_if_null_thenExit_left() async {
     Get x0;
-    var x = Param(TypeAnnotation("int"), "x");
+    var x = Param(InterfaceType("int"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([If(Eq(NullLiteral(), Get(x)), Return()), (x0 = Get(x))])
     ]));
     assertNullable();
@@ -248,9 +248,9 @@ class NullableFlowTest extends DriverResolutionTest {
 
   test_if_null_thenExit_right() async {
     Get x0;
-    var x = Param(TypeAnnotation("int"), "x");
+    var x = Param(InterfaceType("int"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([If(Eq(Get(x), NullLiteral()), Return()), (x0 = Get(x))])
     ]));
     assertNullable();
@@ -260,9 +260,9 @@ class NullableFlowTest extends DriverResolutionTest {
   test_if_then_else() async {
     Get x0;
     Get x1;
-    var x = Param(TypeAnnotation("int"), "x");
+    var x = Param(InterfaceType("int"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([
           If(Eq(Get(x), NullLiteral()), Block([(x0 = Get(x))]),
               Block([(x1 = Get(x))]))
@@ -275,11 +275,11 @@ class NullableFlowTest extends DriverResolutionTest {
   test_method_if_then_else() async {
     Get x0;
     Get x1;
-    var x = Param(TypeAnnotation("int"), "x");
+    var x = Param(InterfaceType("int"), "x");
     await trackCode(Unit([
       Class("C", [
         Method(
-            TypeAnnotation("void"),
+            InterfaceType("void"),
             "f",
             [x],
             Block([
@@ -293,8 +293,8 @@ class NullableFlowTest extends DriverResolutionTest {
   }
 
   test_potentiallyMutatedInClosure() async {
-    var a = Param(TypeAnnotation("int"), "a");
-    var b = Param(TypeAnnotation("int"), "b");
+    var a = Param(InterfaceType("int"), "a");
+    var b = Param(InterfaceType("int"), "b");
     var localFunction = Func(null, "localFunction", []);
     await trackCode(Unit([
       Func(null, "f", [a, b])
@@ -311,9 +311,9 @@ class NullableFlowTest extends DriverResolutionTest {
   test_tryFinally_eqNullExit_body() async {
     Get x0;
     Get x1;
-    var x = Param(TypeAnnotation("int"), "x");
+    var x = Param(InterfaceType("int"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([
           Try(Block([If(Eq(Get(x), NullLiteral()), Return()), (x0 = Get(x))]),
               [], Block([Get(x)])),
@@ -327,9 +327,9 @@ class NullableFlowTest extends DriverResolutionTest {
   test_tryFinally_eqNullExit_finally() async {
     Get x0;
     Get x1;
-    var x = Param(TypeAnnotation("int"), "x");
+    var x = Param(InterfaceType("int"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([
           Try(Block([Get(x)]), [],
               Block([If(Eq(Get(x), NullLiteral()), Return()), (x0 = Get(x))])),
@@ -342,10 +342,10 @@ class NullableFlowTest extends DriverResolutionTest {
 
   test_tryFinally_outerEqNotNullExit_assignUnknown_body() async {
     Get a0;
-    var a = Param(TypeAnnotation("int"), "a");
-    var b = Param(TypeAnnotation("int"), "b");
+    var a = Param(InterfaceType("int"), "a");
+    var b = Param(InterfaceType("int"), "b");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [a, b])
+      Func(InterfaceType("void"), "f", [a, b])
         ..body = Block([
           If(NotEq(Get(a), NullLiteral()), Return()),
           Try(Block([(a0 = Get(a)), Set(a, Get(b)), Get(a)]), [],
@@ -359,10 +359,10 @@ class NullableFlowTest extends DriverResolutionTest {
 
   test_tryFinally_outerEqNullExit_assignUnknown_body() async {
     Get a0;
-    var a = Param(TypeAnnotation("int"), "a");
-    var b = Param(TypeAnnotation("int"), "b");
+    var a = Param(InterfaceType("int"), "a");
+    var b = Param(InterfaceType("int"), "b");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [a, b])
+      Func(InterfaceType("void"), "f", [a, b])
         ..body = Block([
           If(Eq(Get(a), NullLiteral()), Return()),
           Try(Block([(a0 = Get(a)), Set(a, Get(b)), Get(a)]), [],
@@ -377,10 +377,10 @@ class NullableFlowTest extends DriverResolutionTest {
   test_tryFinally_outerEqNullExit_assignUnknown_finally() async {
     Get a0;
     Get a1;
-    var a = Param(TypeAnnotation("int"), "a");
-    var b = Param(TypeAnnotation("int"), "b");
+    var a = Param(InterfaceType("int"), "a");
+    var b = Param(InterfaceType("int"), "b");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [a, b])
+      Func(InterfaceType("void"), "f", [a, b])
         ..body = Block([
           If(Eq(Get(a), NullLiteral()), Return()),
           Try(Block([(a0 = Get(a))]), [],
@@ -395,9 +395,9 @@ class NullableFlowTest extends DriverResolutionTest {
   test_while_eqNull() async {
     Get x0;
     Get x1;
-    var x = Param(TypeAnnotation("int"), "x");
+    var x = Param(InterfaceType("int"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([
           While(Eq(Get(x), NullLiteral()), Block([(x0 = Get(x))])),
           (x1 = Get(x))
@@ -410,9 +410,9 @@ class NullableFlowTest extends DriverResolutionTest {
   test_while_notEqNull() async {
     Get x0;
     Get x1;
-    var x = Param(TypeAnnotation("int"), "x");
+    var x = Param(InterfaceType("int"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([
           While(NotEq(Get(x), NullLiteral()), Block([(x0 = Get(x))])),
           (x1 = Get(x))
@@ -448,7 +448,7 @@ class ReachableFlowTest extends DriverResolutionTest {
   test_conditional_false() async {
     Int value_1;
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [])
+      Func(InterfaceType("void"), "f", [])
         ..body = Block([Conditional(Bool(false), (value_1 = Int(1)), Int(2))])
     ]));
     verify(unreachableExpressions: [value_1]);
@@ -457,7 +457,7 @@ class ReachableFlowTest extends DriverResolutionTest {
   test_conditional_true() async {
     Int value_2;
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [])
+      Func(InterfaceType("void"), "f", [])
         ..body = Block([Conditional(Bool(true), Int(1), (value_2 = Int(2)))])
     ]));
     verify(unreachableExpressions: [value_2]);
@@ -465,7 +465,7 @@ class ReachableFlowTest extends DriverResolutionTest {
 
   test_do_false() async {
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [])
+      Func(InterfaceType("void"), "f", [])
         ..body = Block([
           Do(Block([Int(1)]), Bool(false)),
           Int(2)
@@ -478,7 +478,7 @@ class ReachableFlowTest extends DriverResolutionTest {
     Expression statement;
     Statement statement0;
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [])
+      Func(InterfaceType("void"), "f", [])
         ..body = (statement0 = Block([
           Do(Block([Int(1)]), Bool(true)),
           (statement = Int(2))
@@ -500,14 +500,14 @@ class ReachableFlowTest extends DriverResolutionTest {
     Try statement5;
     While statement6;
     Statement statement7;
-    var b = Param(TypeAnnotation("bool"), "b");
-    var i = Param(TypeAnnotation("int"), "i");
+    var b = Param(InterfaceType("bool"), "b");
+    var i = Param(InterfaceType("int"), "i");
     var _ = Local("_");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [b, i])
+      Func(InterfaceType("void"), "f", [b, i])
         ..body = (statement7 = Block([
           Return(),
-          (statement = Locals([_])),
+          (statement = Locals(InterfaceType("Object"), [_])),
           (statement0 = Do(Block([]), Get(b))),
           (statement1 = ForExpr(null, null, [], Block([]))),
           (statement2 = ForEachIdentifier(_, ListLiteral(null, []), Block([]))),
@@ -536,7 +536,7 @@ class ReachableFlowTest extends DriverResolutionTest {
     Expression statement;
     Statement statement0;
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [])
+      Func(InterfaceType("void"), "f", [])
         ..body = (statement0 = Block([
           ForExpr(null, Bool(true), [], Block([Int(1)])),
           (statement = Int(2))
@@ -552,7 +552,7 @@ class ReachableFlowTest extends DriverResolutionTest {
     Expression statement;
     Statement statement0;
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [])
+      Func(InterfaceType("void"), "f", [])
         ..body = (statement0 = Block([
           ForExpr(null, null, [], Block([Int(1)])),
           (statement = Int(2))
@@ -567,9 +567,9 @@ class ReachableFlowTest extends DriverResolutionTest {
   test_forEach() async {
     var _ = Local("_");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [])
+      Func(InterfaceType("void"), "f", [])
         ..body = Block([
-          Locals([_]),
+          Locals(InterfaceType("Object"), [_]),
           ForEachIdentifier(_, ListLiteral(null, [Int(0), Int(1), Int(2)]),
               Block([Int(1), Return()])),
           Int(2)
@@ -581,7 +581,7 @@ class ReachableFlowTest extends DriverResolutionTest {
   test_functionBody_hasReturn() async {
     Statement statement;
     await trackCode(Unit([
-      Func(TypeAnnotation("int"), "f", [])
+      Func(InterfaceType("int"), "f", [])
         ..body = (statement = Block([Return(Int(42))]))
     ]));
     verify(functionBodiesThatDontComplete: [statement]);
@@ -589,15 +589,15 @@ class ReachableFlowTest extends DriverResolutionTest {
 
   test_functionBody_noReturn() async {
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [])..body = Block([Int(1)])
+      Func(InterfaceType("void"), "f", [])..body = Block([Int(1)])
     ]));
     verify();
   }
 
   test_if_condition() async {
-    var b = Param(TypeAnnotation("bool"), "b");
+    var b = Param(InterfaceType("bool"), "b");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [b])
+      Func(InterfaceType("void"), "f", [b])
         ..body = Block([
           If(Get(b), Block([Int(1)]), Block([Int(2)])),
           Int(3)
@@ -609,7 +609,7 @@ class ReachableFlowTest extends DriverResolutionTest {
   test_if_false_then_else() async {
     Block statement;
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [])
+      Func(InterfaceType("void"), "f", [])
         ..body = Block([
           If(Bool(false), (statement = Block([Int(1)])), Block([])),
           Int(3)
@@ -622,7 +622,7 @@ class ReachableFlowTest extends DriverResolutionTest {
     Expression statement;
     Statement statement0;
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [])
+      Func(InterfaceType("void"), "f", [])
         ..body = (statement0 = Block([
           Int(1),
           If(Bool(true), Block([Return()])),
@@ -638,7 +638,7 @@ class ReachableFlowTest extends DriverResolutionTest {
   test_if_true_then_else() async {
     Block statement;
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [])
+      Func(InterfaceType("void"), "f", [])
         ..body = Block([
           If(Bool(true), Block([]), (statement = Block([Int(2)]))),
           Int(3)
@@ -649,9 +649,9 @@ class ReachableFlowTest extends DriverResolutionTest {
 
   test_logicalAnd_leftFalse() async {
     Expression expression;
-    var x = Param(TypeAnnotation("int"), "x");
+    var x = Param(InterfaceType("int"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body =
             Block([And(Bool(false), (expression = Parens(Eq(Get(x), Int(1)))))])
     ]));
@@ -660,9 +660,9 @@ class ReachableFlowTest extends DriverResolutionTest {
 
   test_logicalOr_leftTrue() async {
     Expression expression;
-    var x = Param(TypeAnnotation("int"), "x");
+    var x = Param(InterfaceType("int"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body =
             Block([Or(Bool(true), (expression = Parens(Eq(Get(x), Int(1)))))])
     ]));
@@ -671,10 +671,10 @@ class ReachableFlowTest extends DriverResolutionTest {
 
   test_switch_case_neverCompletes() async {
     Expression statement;
-    var b = Param(TypeAnnotation("bool"), "b");
-    var i = Param(TypeAnnotation("int"), "i");
+    var b = Param(InterfaceType("bool"), "b");
+    var i = Param(InterfaceType("int"), "i");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [b, i])
+      Func(InterfaceType("void"), "f", [b, i])
         ..body = Block([
           Switch(Get(i), [
             Case(
@@ -694,7 +694,7 @@ class ReachableFlowTest extends DriverResolutionTest {
 
   test_tryCatch() async {
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [])
+      Func(InterfaceType("void"), "f", [])
         ..body = Block([
           Try(Block([Int(1)]), [
             Catch(CatchVariable("_"), Block([Int(2)]))
@@ -708,7 +708,7 @@ class ReachableFlowTest extends DriverResolutionTest {
   test_tryCatch_return_body() async {
     Expression statement;
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [])
+      Func(InterfaceType("void"), "f", [])
         ..body = Block([
           Try(Block([Int(1), Return(), (statement = Int(2))]), [
             Catch(CatchVariable("_"), Block([Int(3)]))
@@ -722,7 +722,7 @@ class ReachableFlowTest extends DriverResolutionTest {
   test_tryCatch_return_catch() async {
     Expression statement;
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [])
+      Func(InterfaceType("void"), "f", [])
         ..body = Block([
           Try(Block([Int(1)]), [
             Catch(CatchVariable("_"),
@@ -736,7 +736,7 @@ class ReachableFlowTest extends DriverResolutionTest {
 
   test_tryCatchFinally_return_body() async {
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [])
+      Func(InterfaceType("void"), "f", [])
         ..body = Block([
           Try(
               Block([Int(1), Return()]),
@@ -754,7 +754,7 @@ class ReachableFlowTest extends DriverResolutionTest {
     Expression statement;
     Statement statement0;
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [])
+      Func(InterfaceType("void"), "f", [])
         ..body = (statement0 = Block([
           Try(
               Block([Int(1), Return()]),
@@ -773,7 +773,7 @@ class ReachableFlowTest extends DriverResolutionTest {
 
   test_tryCatchFinally_return_catch() async {
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [])
+      Func(InterfaceType("void"), "f", [])
         ..body = Block([
           Try(
               Block([Int(1)]),
@@ -791,7 +791,7 @@ class ReachableFlowTest extends DriverResolutionTest {
     Expression statement;
     Statement statement0;
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [])
+      Func(InterfaceType("void"), "f", [])
         ..body = (statement0 = Block([
           Try(Block([Int(1), Return()]), [], Block([Int(2)])),
           (statement = Int(3))
@@ -806,7 +806,7 @@ class ReachableFlowTest extends DriverResolutionTest {
   test_while_false() async {
     Block statement;
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [])
+      Func(InterfaceType("void"), "f", [])
         ..body = Block([
           While(Bool(false), (statement = Block([Int(1)]))),
           Int(2)
@@ -820,7 +820,7 @@ class ReachableFlowTest extends DriverResolutionTest {
     Expression statement0;
     Statement statement1;
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [])
+      Func(InterfaceType("void"), "f", [])
         ..body = (statement1 = Block([
           While(Bool(true), Block([Int(1)])),
           (statement = Int(2)),
@@ -836,7 +836,7 @@ class ReachableFlowTest extends DriverResolutionTest {
   test_while_true_break() async {
     Expression statement;
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [])
+      Func(InterfaceType("void"), "f", [])
         ..body = Block([
           While(Bool(true), Block([Int(1), Break(), (statement = Int(2))])),
           Int(3)
@@ -846,9 +846,9 @@ class ReachableFlowTest extends DriverResolutionTest {
   }
 
   test_while_true_breakIf() async {
-    var b = Param(TypeAnnotation("bool"), "b");
+    var b = Param(InterfaceType("bool"), "b");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [b])
+      Func(InterfaceType("void"), "f", [b])
         ..body = Block([
           While(Bool(true), Block([Int(1), If(Get(b), Break()), Int(2)])),
           Int(3)
@@ -862,7 +862,7 @@ class ReachableFlowTest extends DriverResolutionTest {
     Expression statement0;
     Statement statement1;
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [])
+      Func(InterfaceType("void"), "f", [])
         ..body = (statement1 = Block([
           While(Bool(true), Block([Int(1), Continue(), (statement = Int(2))])),
           (statement0 = Int(3))
@@ -953,11 +953,11 @@ class TypePromotionFlowTest extends DriverResolutionTest {
 
   test_assignment() async {
     Get x0;
-    var x = Param(TypeAnnotation("Object"), "x");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
       Func(null, "f", [x])
         ..body = Block([
-          If(Is(Get(x), TypeAnnotation("String")),
+          If(Is(Get(x), InterfaceType("String")),
               Block([Set(x, Int(42)), (x0 = Get(x))]))
         ])
     ]));
@@ -966,14 +966,14 @@ class TypePromotionFlowTest extends DriverResolutionTest {
 
   test_binaryExpression_ifNull() async {
     Get x0;
-    var x = Param(TypeAnnotation("Object"), "x");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([
           IfNull(
-              Parens(Or(Parens(Is(Get(x), TypeAnnotation("num"))),
+              Parens(Or(Parens(Is(Get(x), InterfaceType("num"))),
                   Parens(Throw(Int(1))))),
-              Parens(Or(Parens(Is(Get(x), TypeAnnotation("int"))),
+              Parens(Or(Parens(Is(Get(x), InterfaceType("int"))),
                   Parens(Throw(Int(2)))))),
           (x0 = Get(x))
         ])
@@ -984,14 +984,14 @@ class TypePromotionFlowTest extends DriverResolutionTest {
   test_binaryExpression_ifNull_rightUnPromote() async {
     Get x0;
     Get x1;
-    var x = Param(TypeAnnotation("Object"), "x");
-    var y = Param(TypeAnnotation("Object"), "y");
-    var z = Param(TypeAnnotation("Object"), "z");
+    var x = Param(InterfaceType("Object"), "x");
+    var y = Param(InterfaceType("Object"), "y");
+    var z = Param(InterfaceType("Object"), "z");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x, y, z])
+      Func(InterfaceType("void"), "f", [x, y, z])
         ..body = Block([
           If(
-              Is(Get(x), TypeAnnotation("int")),
+              Is(Get(x), InterfaceType("int")),
               Block([
                 (x0 = Get(x)),
                 IfNull(Get(y), Parens(Set(x, Get(z)))),
@@ -1005,16 +1005,16 @@ class TypePromotionFlowTest extends DriverResolutionTest {
 
   test_conditional_both() async {
     Get x0;
-    var b = Param(TypeAnnotation("bool"), "b");
-    var x = Param(TypeAnnotation("Object"), "x");
+    var b = Param(InterfaceType("bool"), "b");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [b, x])
+      Func(InterfaceType("void"), "f", [b, x])
         ..body = Block([
           Conditional(
               Get(b),
-              Parens(Or(Parens(Is(Get(x), TypeAnnotation("num"))),
+              Parens(Or(Parens(Is(Get(x), InterfaceType("num"))),
                   Parens(Throw(Int(1))))),
-              Parens(Or(Parens(Is(Get(x), TypeAnnotation("int"))),
+              Parens(Or(Parens(Is(Get(x), InterfaceType("int"))),
                   Parens(Throw(Int(2)))))),
           (x0 = Get(x))
         ])
@@ -1024,15 +1024,15 @@ class TypePromotionFlowTest extends DriverResolutionTest {
 
   test_conditional_else() async {
     Get x0;
-    var b = Param(TypeAnnotation("bool"), "b");
-    var x = Param(TypeAnnotation("Object"), "x");
+    var b = Param(InterfaceType("bool"), "b");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [b, x])
+      Func(InterfaceType("void"), "f", [b, x])
         ..body = Block([
           Conditional(
               Get(b),
               Int(0),
-              Parens(Or(Parens(Is(Get(x), TypeAnnotation("int"))),
+              Parens(Or(Parens(Is(Get(x), InterfaceType("int"))),
                   Parens(Throw(Int(2)))))),
           (x0 = Get(x))
         ])
@@ -1042,14 +1042,14 @@ class TypePromotionFlowTest extends DriverResolutionTest {
 
   test_conditional_then() async {
     Get x0;
-    var b = Param(TypeAnnotation("bool"), "b");
-    var x = Param(TypeAnnotation("Object"), "x");
+    var b = Param(InterfaceType("bool"), "b");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [b, x])
+      Func(InterfaceType("void"), "f", [b, x])
         ..body = Block([
           Conditional(
               Get(b),
-              Parens(Or(Parens(Is(Get(x), TypeAnnotation("num"))),
+              Parens(Or(Parens(Is(Get(x), InterfaceType("num"))),
                   Parens(Throw(Int(1))))),
               Int(0)),
           (x0 = Get(x))
@@ -1061,12 +1061,12 @@ class TypePromotionFlowTest extends DriverResolutionTest {
   test_do_condition_isNotType() async {
     Get x0;
     Get x1;
-    var x = Param(TypeAnnotation("Object"), "x");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([
           Do(Block([(x0 = Get(x)), Set(x, StringLiteral(""))]),
-              Is(Get(x), TypeAnnotation("String"))),
+              Is(Get(x), InterfaceType("String"))),
           (x1 = Get(x))
         ])
     ]));
@@ -1077,11 +1077,11 @@ class TypePromotionFlowTest extends DriverResolutionTest {
   test_do_condition_isType() async {
     Get x0;
     Get x1;
-    var x = Param(TypeAnnotation("Object"), "x");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([
-          Do(Block([(x0 = Get(x))]), Is(Get(x), TypeAnnotation("String"))),
+          Do(Block([(x0 = Get(x))]), Is(Get(x), InterfaceType("String"))),
           (x1 = Get(x))
         ])
     ]));
@@ -1092,13 +1092,13 @@ class TypePromotionFlowTest extends DriverResolutionTest {
   test_do_outerIsType() async {
     Get x0;
     Get x1;
-    var b = Param(TypeAnnotation("bool"), "b");
-    var x = Param(TypeAnnotation("Object"), "x");
+    var b = Param(InterfaceType("bool"), "b");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [b, x])
+      Func(InterfaceType("void"), "f", [b, x])
         ..body = Block([
           If(
-              Is(Get(x), TypeAnnotation("String")),
+              Is(Get(x), InterfaceType("String")),
               Block([
                 Do(Block([(x0 = Get(x))]), Get(b)),
                 (x1 = Get(x))
@@ -1112,13 +1112,13 @@ class TypePromotionFlowTest extends DriverResolutionTest {
   test_do_outerIsType_loopAssigned_body() async {
     Get x0;
     Get x1;
-    var b = Param(TypeAnnotation("bool"), "b");
-    var x = Param(TypeAnnotation("Object"), "x");
+    var b = Param(InterfaceType("bool"), "b");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [b, x])
+      Func(InterfaceType("void"), "f", [b, x])
         ..body = Block([
           If(
-              Is(Get(x), TypeAnnotation("String")),
+              Is(Get(x), InterfaceType("String")),
               Block([
                 Do(
                     Block(
@@ -1136,12 +1136,12 @@ class TypePromotionFlowTest extends DriverResolutionTest {
     Get x0;
     Get x1;
     Get x2;
-    var x = Param(TypeAnnotation("Object"), "x");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [Param(TypeAnnotation("bool"), "b"), x])
+      Func(InterfaceType("void"), "f", [Param(InterfaceType("bool"), "b"), x])
         ..body = Block([
           If(
-              Is(Get(x), TypeAnnotation("String")),
+              Is(Get(x), InterfaceType("String")),
               Block([
                 Do(
                     Block(
@@ -1159,12 +1159,12 @@ class TypePromotionFlowTest extends DriverResolutionTest {
   test_do_outerIsType_loopAssigned_condition2() async {
     Get x0;
     Get x1;
-    var x = Param(TypeAnnotation("Object"), "x");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [Param(TypeAnnotation("bool"), "b"), x])
+      Func(InterfaceType("void"), "f", [Param(InterfaceType("bool"), "b"), x])
         ..body = Block([
           If(
-              Is(Get(x), TypeAnnotation("String")),
+              Is(Get(x), InterfaceType("String")),
               Block([
                 Do(Block([(x0 = Get(x))]),
                     NotEq(Parens(Set(x, Int(1))), Int(0))),
@@ -1179,13 +1179,13 @@ class TypePromotionFlowTest extends DriverResolutionTest {
   test_for_outerIsType() async {
     Get x0;
     Get x1;
-    var b = Param(TypeAnnotation("bool"), "b");
-    var x = Param(TypeAnnotation("Object"), "x");
+    var b = Param(InterfaceType("bool"), "b");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [b, x])
+      Func(InterfaceType("void"), "f", [b, x])
         ..body = Block([
           If(
-              Is(Get(x), TypeAnnotation("String")),
+              Is(Get(x), InterfaceType("String")),
               Block([
                 ForExpr(null, Get(b), [], Block([(x0 = Get(x))])),
                 (x1 = Get(x))
@@ -1199,13 +1199,13 @@ class TypePromotionFlowTest extends DriverResolutionTest {
   test_for_outerIsType_loopAssigned_body() async {
     Get x0;
     Get x1;
-    var b = Param(TypeAnnotation("bool"), "b");
-    var x = Param(TypeAnnotation("Object"), "x");
+    var b = Param(InterfaceType("bool"), "b");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [b, x])
+      Func(InterfaceType("void"), "f", [b, x])
         ..body = Block([
           If(
-              Is(Get(x), TypeAnnotation("String")),
+              Is(Get(x), InterfaceType("String")),
               Block([
                 ForExpr(
                     null, Get(b), [], Block([(x0 = Get(x)), Set(x, Int(42))])),
@@ -1220,12 +1220,12 @@ class TypePromotionFlowTest extends DriverResolutionTest {
   test_for_outerIsType_loopAssigned_condition() async {
     Get x0;
     Get x1;
-    var x = Param(TypeAnnotation("Object"), "x");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([
           If(
-              Is(Get(x), TypeAnnotation("String")),
+              Is(Get(x), InterfaceType("String")),
               Block([
                 ForExpr(null, Gt(Parens(Set(x, Int(42))), Int(0)), [],
                     Block([(x0 = Get(x))])),
@@ -1240,13 +1240,13 @@ class TypePromotionFlowTest extends DriverResolutionTest {
   test_for_outerIsType_loopAssigned_updaters() async {
     Get x0;
     Get x1;
-    var b = Param(TypeAnnotation("bool"), "b");
-    var x = Param(TypeAnnotation("Object"), "x");
+    var b = Param(InterfaceType("bool"), "b");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [b, x])
+      Func(InterfaceType("void"), "f", [b, x])
         ..body = Block([
           If(
-              Is(Get(x), TypeAnnotation("String")),
+              Is(Get(x), InterfaceType("String")),
               Block([
                 ForExpr(
                     null, Get(b), [Set(x, Int(42))], Block([(x0 = Get(x))])),
@@ -1261,14 +1261,14 @@ class TypePromotionFlowTest extends DriverResolutionTest {
   test_forEach_outerIsType_loopAssigned() async {
     Get x0;
     Get x1;
-    var x = Param(TypeAnnotation("Object"), "x");
+    var x = Param(InterfaceType("Object"), "x");
     var v1 = Local("v1");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([
-          Locals([v1]),
+          Locals(InterfaceType("Object"), [v1]),
           If(
-              Is(Get(x), TypeAnnotation("String")),
+              Is(Get(x), InterfaceType("String")),
               Block([
                 ForEachDeclared(
                     ForEachVariable(null, "_"),
@@ -1285,13 +1285,13 @@ class TypePromotionFlowTest extends DriverResolutionTest {
 
   test_functionExpression_isType() async {
     Get x0;
-    var x = Param(TypeAnnotation("Object"), "x");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [])
+      Func(InterfaceType("void"), "f", [])
         ..body = Block([
-          Func(TypeAnnotation("void"), "g", [x])
+          Func(InterfaceType("void"), "g", [x])
             ..body = Block([
-              If(Is(Get(x), TypeAnnotation("String")), Block([(x0 = Get(x))])),
+              If(Is(Get(x), InterfaceType("String")), Block([(x0 = Get(x))])),
               Set(x, Int(42))
             ])
         ])
@@ -1301,14 +1301,14 @@ class TypePromotionFlowTest extends DriverResolutionTest {
 
   test_functionExpression_isType_mutatedInClosure2() async {
     Get x0;
-    var x = Param(TypeAnnotation("Object"), "x");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [])
+      Func(InterfaceType("void"), "f", [])
         ..body = Block([
-          Func(TypeAnnotation("void"), "g", [x])
+          Func(InterfaceType("void"), "g", [x])
             ..body = Block([
-              If(Is(Get(x), TypeAnnotation("String")), Block([(x0 = Get(x))])),
-              Func(TypeAnnotation("void"), "h", [])
+              If(Is(Get(x), InterfaceType("String")), Block([(x0 = Get(x))])),
+              Func(InterfaceType("void"), "h", [])
                 ..body = Block([Set(x, Int(42))])
             ])
         ])
@@ -1320,14 +1320,14 @@ class TypePromotionFlowTest extends DriverResolutionTest {
     Get x0;
     Get x1;
     Get x2;
-    var x = Param(TypeAnnotation("Object"), "x");
+    var x = Param(InterfaceType("Object"), "x");
     var g = Local("g");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([
-          Locals([g]),
+          Locals(FunctionType(InterfaceType("void"), []), [g]),
           If(
-              Is(Get(x), TypeAnnotation("String")),
+              Is(Get(x), InterfaceType("String")),
               Block([
                 (x0 = Get(x)),
                 Set(g, Closure([], Block([(x1 = Get(x))])))
@@ -1344,18 +1344,18 @@ class TypePromotionFlowTest extends DriverResolutionTest {
 
   test_if_combine_empty() async {
     Get v0;
-    var b = Param(TypeAnnotation("bool"), "b");
-    var v = Param(TypeAnnotation("Object"), "v");
+    var b = Param(InterfaceType("bool"), "b");
+    var v = Param(InterfaceType("Object"), "v");
     await trackCode(Unit([
       Func(null, "main", [b, v])
         ..body = Block([
           If(
               Get(b),
               Block([
-                Or(Is(Get(v), TypeAnnotation("int")), Parens(Throw(Int(1))))
+                Or(Is(Get(v), InterfaceType("int")), Parens(Throw(Int(1))))
               ]),
               Block([
-                Or(Is(Get(v), TypeAnnotation("String")), Parens(Throw(Int(2))))
+                Or(Is(Get(v), InterfaceType("String")), Parens(Throw(Int(2))))
               ])),
           (v0 = Get(v))
         ])
@@ -1367,14 +1367,14 @@ class TypePromotionFlowTest extends DriverResolutionTest {
     Get v0;
     Get v1;
     Get v2;
-    var b = Param(TypeAnnotation("bool"), "b");
-    var v = Param(TypeAnnotation("Object"), "v");
+    var b = Param(InterfaceType("bool"), "b");
+    var v = Param(InterfaceType("Object"), "v");
     await trackCode(Unit([
       Func(null, "f", [b, v])
         ..body = Block([
           If(
-              Conditional(Get(b), Parens(Is(Get(v), TypeAnnotation("int"))),
-                  Parens(Is(Get(v), TypeAnnotation("num")))),
+              Conditional(Get(b), Parens(Is(Get(v), InterfaceType("int"))),
+                  Parens(Is(Get(v), InterfaceType("num")))),
               Block([(v0 = Get(v))]),
               Block([(v1 = Get(v))])),
           (v2 = Get(v))
@@ -1389,14 +1389,14 @@ class TypePromotionFlowTest extends DriverResolutionTest {
     Get v0;
     Get v1;
     Get v2;
-    var b = Param(TypeAnnotation("bool"), "b");
-    var v = Param(TypeAnnotation("Object"), "v");
+    var b = Param(InterfaceType("bool"), "b");
+    var v = Param(InterfaceType("Object"), "v");
     await trackCode(Unit([
       Func(null, "f", [b, v])
         ..body = Block([
           If(
-              Conditional(Get(b), Parens(Is(Get(v), TypeAnnotation("int"))),
-                  Parens(Is(Get(v), TypeAnnotation("num")))),
+              Conditional(Get(b), Parens(Is(Get(v), InterfaceType("int"))),
+                  Parens(Is(Get(v), InterfaceType("num")))),
               Block([(v0 = Get(v))]),
               Block([(v1 = Get(v))])),
           (v2 = Get(v))
@@ -1415,7 +1415,7 @@ class TypePromotionFlowTest extends DriverResolutionTest {
     await trackCode(Unit([
       Func(null, "main", [v])
         ..body = Block([
-          If(Is(Get(v), TypeAnnotation("String")), Block([(v0 = Get(v))]),
+          If(Is(Get(v), InterfaceType("String")), Block([(v0 = Get(v))]),
               Block([(v1 = Get(v))])),
           (v2 = Get(v))
         ])
@@ -1431,7 +1431,7 @@ class TypePromotionFlowTest extends DriverResolutionTest {
     await trackCode(Unit([
       Func(null, "main", [v])
         ..body = Block(
-            [If(Is(Get(v), TypeAnnotation("String")), Return()), (v0 = Get(v))])
+            [If(Is(Get(v), InterfaceType("String")), Return()), (v0 = Get(v))])
     ]));
     assertPromoted(v0, 'String');
   }
@@ -1442,7 +1442,7 @@ class TypePromotionFlowTest extends DriverResolutionTest {
     await trackCode(Unit([
       Func(null, "main", [v])
         ..body = Block([
-          If(Is(Get(v), TypeAnnotation("String")), Throw(Int(42))),
+          If(Is(Get(v), InterfaceType("String")), Throw(Int(42))),
           (v0 = Get(v))
         ])
     ]));
@@ -1457,7 +1457,7 @@ class TypePromotionFlowTest extends DriverResolutionTest {
     await trackCode(Unit([
       Func(null, "main", [v])
         ..body = Block([
-          If(Is(Get(v), TypeAnnotation("String")), Block([(v0 = Get(v))]),
+          If(Is(Get(v), InterfaceType("String")), Block([(v0 = Get(v))]),
               Block([(v1 = Get(v))])),
           (v2 = Get(v))
         ])
@@ -1469,11 +1469,11 @@ class TypePromotionFlowTest extends DriverResolutionTest {
 
   test_if_isType_thenNonBoolean() async {
     Get x0;
-    var x = Param(TypeAnnotation("Object"), "x");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
       Func(null, "f", [x])
         ..body = Block([
-          If(NotEq(Parens(Is(Get(x), TypeAnnotation("String"))), Int(3)),
+          If(NotEq(Parens(Is(Get(x), InterfaceType("String"))), Int(3)),
               Block([(x0 = Get(x))]))
         ])
     ]));
@@ -1488,7 +1488,7 @@ class TypePromotionFlowTest extends DriverResolutionTest {
     await trackCode(Unit([
       Func(null, "main", [v])
         ..body = Block([
-          If(Not(Parens(Is(Get(v), TypeAnnotation("String")))),
+          If(Not(Parens(Is(Get(v), InterfaceType("String")))),
               Block([(v0 = Get(v))]), Block([(v1 = Get(v))])),
           (v2 = Get(v))
         ])
@@ -1500,13 +1500,13 @@ class TypePromotionFlowTest extends DriverResolutionTest {
 
   test_if_then_isNotType_return() async {
     Get x0;
-    var b = Param(TypeAnnotation("bool"), "b");
-    var x = Param(TypeAnnotation("Object"), "x");
+    var b = Param(InterfaceType("bool"), "b");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [b, x])
+      Func(InterfaceType("void"), "f", [b, x])
         ..body = Block([
           If(Get(b),
-              Block([If(Is(Get(x), TypeAnnotation("String")), Return())])),
+              Block([If(Is(Get(x), InterfaceType("String")), Return())])),
           (x0 = Get(x))
         ])
     ]));
@@ -1519,7 +1519,7 @@ class TypePromotionFlowTest extends DriverResolutionTest {
     await trackCode(Unit([
       Func(null, "main", [v])
         ..body = Block([
-          Or(Is(Get(v), TypeAnnotation("String")), Parens(Throw(Int(42)))),
+          Or(Is(Get(v), InterfaceType("String")), Parens(Throw(Int(42)))),
           (v0 = Get(v))
         ])
     ]));
@@ -1528,13 +1528,13 @@ class TypePromotionFlowTest extends DriverResolutionTest {
 
   test_potentiallyMutatedInClosure() async {
     Get x0;
-    var x = Param(TypeAnnotation("Object"), "x");
+    var x = Param(InterfaceType("Object"), "x");
     var localFunction = Func(null, "localFunction", []);
     await trackCode(Unit([
       Func(null, "f", [x])
         ..body = Block([
           localFunction..body = Block([Set(x, Int(42))]),
-          If(Is(Get(x), TypeAnnotation("String")),
+          If(Is(Get(x), InterfaceType("String")),
               Block([StaticCall(localFunction, []), (x0 = Get(x))]))
         ])
     ]));
@@ -1543,11 +1543,11 @@ class TypePromotionFlowTest extends DriverResolutionTest {
 
   test_potentiallyMutatedInScope() async {
     Get x0;
-    var x = Param(TypeAnnotation("Object"), "x");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
       Func(null, "f", [x])
         ..body = Block([
-          If(Is(Get(x), TypeAnnotation("String")), Block([(x0 = Get(x))])),
+          If(Is(Get(x), InterfaceType("String")), Block([(x0 = Get(x))])),
           Set(x, Int(42))
         ])
     ]));
@@ -1558,14 +1558,14 @@ class TypePromotionFlowTest extends DriverResolutionTest {
     Get x0;
     Get x1;
     Get x2;
-    var e = Param(TypeAnnotation("int"), "e");
-    var x = Param(TypeAnnotation("Object"), "x");
+    var e = Param(InterfaceType("int"), "e");
+    var x = Param(InterfaceType("Object"), "x");
     var L = Label("L");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [e, x])
+      Func(InterfaceType("void"), "f", [e, x])
         ..body = Block([
           If(
-              Is(Get(x), TypeAnnotation("String")),
+              Is(Get(x), InterfaceType("String")),
               Block([
                 Switch(Get(e), [
                   Case([L], Int(1), [(x0 = Get(x)), Break()]),
@@ -1585,18 +1585,18 @@ class TypePromotionFlowTest extends DriverResolutionTest {
     Get x0;
     Get x1;
     Get x2;
-    var x = Param(TypeAnnotation("Object"), "x");
-    var g = Func(TypeAnnotation("void"), "g", []);
+    var x = Param(InterfaceType("Object"), "x");
+    var g = Func(InterfaceType("void"), "g", []);
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([
-          If(Is(Get(x), TypeAnnotation("String")), Return()),
+          If(Is(Get(x), InterfaceType("String")), Return()),
           (x0 = Get(x)),
           Try(
               Block([
                 Set(x, Int(42)),
                 StaticCall(g, []),
-                If(Is(Get(x), TypeAnnotation("String")), Return()),
+                If(Is(Get(x), InterfaceType("String")), Return()),
                 (x1 = Get(x))
               ]),
               [Catch(CatchVariable("_"), Block([]))]),
@@ -1612,19 +1612,19 @@ class TypePromotionFlowTest extends DriverResolutionTest {
   test_tryCatch_isNotType_exit_body() async {
     Get x0;
     Get x1;
-    var x = Param(TypeAnnotation("Object"), "x");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([
           Try(
               Block([
-                If(Is(Get(x), TypeAnnotation("String")), Return()),
+                If(Is(Get(x), InterfaceType("String")), Return()),
                 (x0 = Get(x))
               ]),
               [Catch(CatchVariable("_"), Block([]))]),
           (x1 = Get(x))
         ]),
-      Func(TypeAnnotation("void"), "g", [])..body = Block([])
+      Func(InterfaceType("void"), "g", [])..body = Block([])
     ]));
     assertPromoted(x0, 'String');
     assertNotPromoted(x1);
@@ -1634,26 +1634,26 @@ class TypePromotionFlowTest extends DriverResolutionTest {
     Get x0;
     Get x1;
     Get x2;
-    var x = Param(TypeAnnotation("Object"), "x");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([
           Try(
               Block([
-                If(Is(Get(x), TypeAnnotation("String")), Return()),
+                If(Is(Get(x), InterfaceType("String")), Return()),
                 (x0 = Get(x))
               ]),
               [
                 Catch(
                     CatchVariable("_"),
                     Block([
-                      If(Is(Get(x), TypeAnnotation("String")), Return()),
+                      If(Is(Get(x), InterfaceType("String")), Return()),
                       (x1 = Get(x))
                     ]))
               ]),
           (x2 = Get(x))
         ]),
-      Func(TypeAnnotation("void"), "g", [])..body = Block([])
+      Func(InterfaceType("void"), "g", [])..body = Block([])
     ]));
     assertPromoted(x0, 'String');
     assertPromoted(x1, 'String');
@@ -1664,13 +1664,13 @@ class TypePromotionFlowTest extends DriverResolutionTest {
     Get x0;
     Get x1;
     Get x2;
-    var x = Param(TypeAnnotation("Object"), "x");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([
           Try(
               Block([
-                If(Is(Get(x), TypeAnnotation("String")), Return()),
+                If(Is(Get(x), InterfaceType("String")), Return()),
                 (x0 = Get(x))
               ]),
               [
@@ -1678,7 +1678,7 @@ class TypePromotionFlowTest extends DriverResolutionTest {
               ]),
           (x2 = Get(x))
         ]),
-      Func(TypeAnnotation("void"), "g", [])..body = Block([])
+      Func(InterfaceType("void"), "g", [])..body = Block([])
     ]));
     assertPromoted(x0, 'String');
     assertNotPromoted(x1);
@@ -1688,21 +1688,21 @@ class TypePromotionFlowTest extends DriverResolutionTest {
   test_tryCatch_isNotType_exit_catch() async {
     Get x0;
     Get x1;
-    var x = Param(TypeAnnotation("Object"), "x");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([
           Try(Block([]), [
             Catch(
                 CatchVariable("_"),
                 Block([
-                  If(Is(Get(x), TypeAnnotation("String")), Return()),
+                  If(Is(Get(x), InterfaceType("String")), Return()),
                   (x0 = Get(x))
                 ]))
           ]),
           (x1 = Get(x))
         ]),
-      Func(TypeAnnotation("void"), "g", [])..body = Block([])
+      Func(InterfaceType("void"), "g", [])..body = Block([])
     ]));
     assertPromoted(x0, 'String');
     assertNotPromoted(x1);
@@ -1713,12 +1713,12 @@ class TypePromotionFlowTest extends DriverResolutionTest {
     Get x1;
     Get x2;
     Get x3;
-    var x = Param(TypeAnnotation("Object"), "x");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([
           If(
-              Is(Get(x), TypeAnnotation("String")),
+              Is(Get(x), InterfaceType("String")),
               Block([
                 Try(
                     Block([(x0 = Get(x))]),
@@ -1729,7 +1729,7 @@ class TypePromotionFlowTest extends DriverResolutionTest {
                 (x3 = Get(x))
               ]))
         ]),
-      Func(TypeAnnotation("void"), "g", [])..body = Block([])
+      Func(InterfaceType("void"), "g", [])..body = Block([])
     ]));
     assertPromoted(x0, 'String');
     assertPromoted(x1, 'String');
@@ -1742,13 +1742,13 @@ class TypePromotionFlowTest extends DriverResolutionTest {
     Get x1;
     Get x2;
     Get x3;
-    var x = Param(TypeAnnotation("Object"), "x");
-    var g = Func(TypeAnnotation("void"), "g", []);
+    var x = Param(InterfaceType("Object"), "x");
+    var g = Func(InterfaceType("void"), "g", []);
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([
           If(
-              Is(Get(x), TypeAnnotation("String")),
+              Is(Get(x), InterfaceType("String")),
               Block([
                 Try(
                     Block([(x0 = Get(x)), Set(x, Int(42)), StaticCall(g, [])]),
@@ -1772,12 +1772,12 @@ class TypePromotionFlowTest extends DriverResolutionTest {
     Get x1;
     Get x2;
     Get x3;
-    var x = Param(TypeAnnotation("Object"), "x");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([
           If(
-              Is(Get(x), TypeAnnotation("String")),
+              Is(Get(x), InterfaceType("String")),
               Block([
                 Try(
                     Block([(x0 = Get(x))]),
@@ -1800,12 +1800,12 @@ class TypePromotionFlowTest extends DriverResolutionTest {
     Get x0;
     Get x1;
     Get x2;
-    var x = Param(TypeAnnotation("Object"), "x");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([
           If(
-              Is(Get(x), TypeAnnotation("String")),
+              Is(Get(x), InterfaceType("String")),
               Block([
                 Try(Block([(x0 = Get(x)), Set(x, Int(42))]), [],
                     Block([(x1 = Get(x))])),
@@ -1822,12 +1822,12 @@ class TypePromotionFlowTest extends DriverResolutionTest {
     Get x0;
     Get x1;
     Get x2;
-    var x = Param(TypeAnnotation("Object"), "x");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([
           If(
-              Is(Get(x), TypeAnnotation("String")),
+              Is(Get(x), InterfaceType("String")),
               Block([
                 Try(Block([(x0 = Get(x))]), [],
                     Block([(x1 = Get(x)), Set(x, Int(42))])),
@@ -1843,11 +1843,11 @@ class TypePromotionFlowTest extends DriverResolutionTest {
   test_while_condition_false() async {
     Get x0;
     Get x1;
-    var x = Param(TypeAnnotation("Object"), "x");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([
-          While(Is(Get(x), TypeAnnotation("String")), Block([(x0 = Get(x))])),
+          While(Is(Get(x), InterfaceType("String")), Block([(x0 = Get(x))])),
           (x1 = Get(x))
         ])
     ]));
@@ -1858,11 +1858,11 @@ class TypePromotionFlowTest extends DriverResolutionTest {
   test_while_condition_true() async {
     Get x0;
     Get x1;
-    var x = Param(TypeAnnotation("Object"), "x");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [x])
+      Func(InterfaceType("void"), "f", [x])
         ..body = Block([
-          While(Is(Get(x), TypeAnnotation("String")), Block([(x0 = Get(x))])),
+          While(Is(Get(x), InterfaceType("String")), Block([(x0 = Get(x))])),
           (x1 = Get(x))
         ])
     ]));
@@ -1873,13 +1873,13 @@ class TypePromotionFlowTest extends DriverResolutionTest {
   test_while_outerIsType() async {
     Get x0;
     Get x1;
-    var b = Param(TypeAnnotation("bool"), "b");
-    var x = Param(TypeAnnotation("Object"), "x");
+    var b = Param(InterfaceType("bool"), "b");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [b, x])
+      Func(InterfaceType("void"), "f", [b, x])
         ..body = Block([
           If(
-              Is(Get(x), TypeAnnotation("String")),
+              Is(Get(x), InterfaceType("String")),
               Block([
                 While(Get(b), Block([(x0 = Get(x))])),
                 (x1 = Get(x))
@@ -1893,13 +1893,13 @@ class TypePromotionFlowTest extends DriverResolutionTest {
   test_while_outerIsType_loopAssigned_body() async {
     Get x0;
     Get x1;
-    var b = Param(TypeAnnotation("bool"), "b");
-    var x = Param(TypeAnnotation("Object"), "x");
+    var b = Param(InterfaceType("bool"), "b");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [b, x])
+      Func(InterfaceType("void"), "f", [b, x])
         ..body = Block([
           If(
-              Is(Get(x), TypeAnnotation("String")),
+              Is(Get(x), InterfaceType("String")),
               Block([
                 While(
                     Get(b),
@@ -1919,12 +1919,12 @@ class TypePromotionFlowTest extends DriverResolutionTest {
     Get x0;
     Get x1;
     Get x2;
-    var x = Param(TypeAnnotation("Object"), "x");
+    var x = Param(InterfaceType("Object"), "x");
     await trackCode(Unit([
-      Func(TypeAnnotation("void"), "f", [Param(TypeAnnotation("bool"), "b"), x])
+      Func(InterfaceType("void"), "f", [Param(InterfaceType("bool"), "b"), x])
         ..body = Block([
           If(
-              Is(Get(x), TypeAnnotation("String")),
+              Is(Get(x), InterfaceType("String")),
               Block([
                 While(
                     NotEq((x0 = Get(x)), Int(0)),
