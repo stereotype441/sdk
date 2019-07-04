@@ -880,7 +880,7 @@ f(Object x) {
   test_binaryExpression_ifNull() async {
     await trackCode(r'''
 void f(Object x) {
-  ((x is num) || (throw 1)) ?? ((x is int) || (throw 2));
+  ((x is num) || (throw 1)) ?? ((/*promoted*/ x is int) || (throw 2));
   /*promoted*/ x; // 1
 }
 ''');
@@ -937,8 +937,8 @@ void f(Object x) {
   do {
     x; // 1
     x = '';
-  } while (x is! String);
-  /*promoted*/ x; // 2
+  } while (/*nonNullable*/ x is! String);
+  /*nonNullable,promoted*/ x; // 2
 }
 ''');
     assertNotPromoted('x; // 1');
@@ -1013,7 +1013,7 @@ void f(bool b, Object x) {
     do {
       x; // 1
     } while ((x = 1) != 0);
-    x; // 2
+    /*nonNullable*/ x; // 2
   }
 }
 ''');
@@ -1057,9 +1057,9 @@ void f(bool b, Object x) {
 void f(Object x) {
   if (x is String) {
     for (; (x = 42) > 0;) {
-      x; // 1
+      /*nonNullable*/ x; // 1
     }
-    x; // 2
+    /*nonNullable*/ x; // 2
   }
 }
 ''');
@@ -1144,7 +1144,7 @@ void f(Object x) {
   }
 
   x = 42;
-  x; // 3
+  /*nonNullable*/ x; // 3
   g();
 }
 ''');
@@ -1219,7 +1219,7 @@ main(v) {
     await trackCode(r'''
 main(v) {
   if (v is! String) return;
-  v; // ref
+  /*promoted*/ v; // ref
 }
 ''');
     assertPromoted('v; // ref', 'String');
@@ -1361,8 +1361,8 @@ void f(Object x) {
   try {
     x = 42;
     g(); // might throw
-    if (x is! String) return;
-    /*promoted*/ x; // 2
+    if (/*nonNullable*/ x is! String) return;
+    /*nonNullable,promoted*/ x; // 2
   } catch (_) {}
   x; // 3
 }
@@ -1527,7 +1527,7 @@ void f(Object x) {
     } finally {
       x; // 2
     }
-    x; // 3
+    /*nonNullable*/ x; // 3
   }
 }
 ''');
@@ -1546,7 +1546,7 @@ void f(Object x) {
       /*promoted*/ x; // 2
       x = 42;
     }
-    x; // 3
+    /*nonNullable*/ x; // 3
   }
 }
 ''');
@@ -1696,7 +1696,7 @@ class _FlowAnalysisDataInterpreter
   String isAsExpected(Set<_FlowAssertion> actualData, String expectedData) {
     var actualStrings = _toStrings(actualData);
     var actualSorted = _sortedRepresentation(actualStrings);
-    var expectedSorted = _sortedRepresentation(expectedData.split(','));
+    var expectedSorted = _sortedRepresentation(expectedData?.split(','));
     if (actualSorted == expectedSorted) {
       return null;
     } else {
@@ -1708,7 +1708,7 @@ class _FlowAnalysisDataInterpreter
   bool isEmpty(Set<_FlowAssertion> actualData) => actualData.isEmpty;
 
   String _sortedRepresentation(Iterable<String> values) {
-    var list = values.toList();
+    var list = values == null || values.isEmpty ? ['none'] : values.toList();
     list.sort();
     return list.join(',');
   }
