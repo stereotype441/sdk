@@ -359,7 +359,7 @@ void f() { // f
   do {
     1;
   } while (true);
-  /*unreachable*/ 2;
+  /*statement: unreachable*//*unreachable*/ 2;
 }
 ''');
     verify(
@@ -372,14 +372,14 @@ void f() { // f
     await trackCode(r'''
 void f(bool b, int i) { // f
   return;
-  /*unreachable*/ Object _;
-  /*unreachable*/ do {} while (b);
-  /*unreachable*/ for (;;) {}
-  /*unreachable*/ for (_ in []) {}
-  /*unreachable*/ if (b) {}
-  /*unreachable*/ switch (i) {}
-  /*unreachable*/ try {} finally {}
-  /*unreachable*/ while (b) {}
+  /*statement: unreachable*/ Object _;
+  /*statement: unreachable*/ do {} while (b);
+  /*statement: unreachable*/ for (;;) {}
+  /*statement: unreachable*/ for (_ in []) {}
+  /*statement: unreachable*/ if (b) {}
+  /*statement: unreachable*/ switch (i) {}
+  /*statement: unreachable*/ try {} finally {}
+  /*statement: unreachable*/ while (b) {}
 }
 ''');
     verify(
@@ -403,7 +403,7 @@ void f() { // f
   for (; true;) {
     1;
   }
-  /*unreachable*/ 2;
+  /*statement: unreachable*//*unreachable*/ 2;
 }
 ''');
     verify(
@@ -418,7 +418,7 @@ void f() { // f
   for (;;) {
     1;
   }
-  /*unreachable*/ 2;
+  /*statement: unreachable*//*unreachable*/ 2;
 }
 ''');
     verify(
@@ -476,7 +476,7 @@ void f(bool b) {
   test_if_false_then_else() async {
     await trackCode(r'''
 void f() {
-  if (false) /*unreachable*/ { // 1
+  if (false) /*statement: unreachable*/ { // 1
     1;
   } else { // 2
   }
@@ -493,7 +493,7 @@ void f() { // f
   if (true) {
     return;
   }
-  /*unreachable*/ 2;
+  /*statement: unreachable*//*unreachable*/ 2;
 }
 ''');
     verify(
@@ -506,7 +506,7 @@ void f() { // f
     await trackCode(r'''
 void f() {
   if (true) { // 1
-  } else /*unreachable*/ { // 2
+  } else /*statement: unreachable*/ { // 2
     2;
   }
   3;
@@ -544,7 +544,7 @@ void f(bool b, int i) {
       } else {
         return;
       }
-      /*unreachable*/ 2;
+      /*statement: unreachable*//*unreachable*/ 2;
   }
   3;
 }
@@ -572,7 +572,7 @@ void f() {
   try {
     1;
     return;
-    /*unreachable*/ 2;
+    /*statement: unreachable*//*unreachable*/ 2;
   } catch (_) {
     3;
   }
@@ -590,7 +590,7 @@ void f() {
   } catch (_) {
     2;
     return;
-    /*unreachable*/ 3;
+    /*statement: unreachable*//*unreachable*/ 3;
   }
   4;
 }
@@ -627,7 +627,7 @@ void f() { // f
   } finally {
     3;
   }
-  /*unreachable*/ 4;
+  /*statement: unreachable*//*unreachable*/ 4;
 }
 ''');
     verify(
@@ -662,7 +662,7 @@ void f() { // f
   } finally {
     2;
   }
-  /*unreachable*/ 3;
+  /*statement: unreachable*//*unreachable*/ 3;
 }
 ''');
     verify(
@@ -674,7 +674,7 @@ void f() { // f
   test_while_false() async {
     await trackCode(r'''
 void f() {
-  while (false) /*unreachable*/ { // 1
+  while (false) /*statement: unreachable*/ { // 1
     1;
   }
   2;
@@ -689,8 +689,8 @@ void f() { // f
   while (true) {
     1;
   }
-  /*unreachable*/ 2;
-  /*unreachable*/ 3;
+  /*statement: unreachable*//*unreachable*/ 2;
+  /*statement: unreachable*//*unreachable*/ 3;
 }
 ''');
     verify(
@@ -705,7 +705,7 @@ void f() {
   while (true) {
     1;
     break;
-    /*unreachable*/ 2;
+    /*statement: unreachable*//*unreachable*/ 2;
   }
   3;
 }
@@ -733,9 +733,9 @@ void f() { // f
   while (true) {
     1;
     continue;
-    /*unreachable*/ 2;
+    /*statement: unreachable*//*unreachable*/ 2;
   }
-  /*unreachable*/ 3;
+  /*statement: unreachable*//*unreachable*/ 3;
 }
 ''');
     verify(

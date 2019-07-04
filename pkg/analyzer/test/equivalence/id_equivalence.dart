@@ -50,7 +50,13 @@ abstract class AstDataExtractor<T> extends GeneralizingAstVisitor<dynamic>
   NodeId computeDefaultNodeId(AstNode node) =>
       NodeId(_nodeOffset(node), IdKind.node);
 
-  void computeForNode(AstNode node, NodeId id) {
+  void computeForExpression(Expression node, NodeId id) {
+    if (id == null) return;
+    T value = computeNodeValue(id, node);
+    registerValue(computeSourceSpan(node), id, value, node);
+  }
+
+  void computeForStatement(Statement node, NodeId id) {
     if (id == null) return;
     T value = computeNodeValue(id, node);
     registerValue(computeSourceSpan(node), id, value, node);
@@ -65,25 +71,22 @@ abstract class AstDataExtractor<T> extends GeneralizingAstVisitor<dynamic>
     return SourceSpan(this.uri, node.offset, node.end);
   }
 
+  NodeId createStatementId(AstNode node) =>
+      NodeId(_nodeOffset(node), IdKind.statement);
+
   void run(CompilationUnit unit) {
     unit.accept(this);
   }
 
   @override
   visitExpression(Expression node) {
-    computeForNode(node, computeDefaultNodeId(node));
+    computeForExpression(node, computeDefaultNodeId(node));
     super.visitExpression(node);
   }
 
   @override
-  visitSimpleIdentifier(SimpleIdentifier node) {
-    computeForNode(node, computeDefaultNodeId(node));
-    super.visitSimpleIdentifier(node);
-  }
-
-  @override
   visitStatement(Statement node) {
-    computeForNode(node, computeDefaultNodeId(node));
+    computeForStatement(node, createStatementId(node));
     super.visitStatement(node);
   }
 
@@ -91,7 +94,6 @@ abstract class AstDataExtractor<T> extends GeneralizingAstVisitor<dynamic>
       NodeId(_nodeOffset(node), IdKind.current);
 
   NodeId _createGotoId(AstNode node) => computeDefaultNodeId(node);
-
   NodeId _createInvokeId(AstNode node) =>
       NodeId(_nodeOffset(node), IdKind.invoke);
   NodeId _createIteratorId(ForEachParts node) =>
@@ -99,6 +101,7 @@ abstract class AstDataExtractor<T> extends GeneralizingAstVisitor<dynamic>
   NodeId _createLabeledStatementId(LabeledStatement node) =>
       computeDefaultNodeId(node.statement);
   NodeId _createLoopId(AstNode node) => computeDefaultNodeId(node);
+
   NodeId _createMoveNextId(ForEachParts node) =>
       NodeId(_nodeOffset(node), IdKind.moveNext);
 
@@ -153,6 +156,7 @@ enum IdKind {
   iterator,
   current,
   moveNext,
+  statement,
 }
 
 class IdValue {
@@ -167,6 +171,8 @@ class IdValue {
 
   static const String moveNextPrefix = "moveNext: ";
 
+  static const String statementPrefix = "statement: ";
+
   final Id id;
 
   final String value;
@@ -179,6 +185,7 @@ class IdValue {
     if (other is! IdValue) return false;
     return id == other.id && value == other.value;
   }
+
   @override
   String toString() => idToString(id, value);
   static IdValue decode(int offset, String text) {
@@ -199,6 +206,9 @@ class IdValue {
     } else if (text.startsWith(moveNextPrefix)) {
       id = new NodeId(offset, IdKind.moveNext);
       expected = text.substring(moveNextPrefix.length);
+    } else if (text.startsWith(statementPrefix)) {
+      id = new NodeId(offset, IdKind.statement);
+      expected = text.substring(statementPrefix.length);
     } else {
       id = new NodeId(offset, IdKind.node);
       expected = text;
@@ -222,6 +232,8 @@ class IdValue {
         return '$currentPrefix$value';
       case IdKind.moveNext:
         return '$moveNextPrefix$value';
+      case IdKind.statement:
+        return '$statementPrefix$value';
     }
     throw new UnsupportedError("Unexpected id kind: ${id.kind}");
   }
