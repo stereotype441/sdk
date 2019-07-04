@@ -2,6 +2,7 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/src/dart/analysis/experiments.dart';
 import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
@@ -9,6 +10,8 @@ import 'package:analyzer/src/generated/engine.dart';
 import 'package:test/test.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
 
+import '../../../equivalence/id_equivalence.dart';
+import '../../../equivalence/id_equivalence_helper.dart';
 import 'driver_resolution.dart';
 
 main() {
@@ -24,11 +27,18 @@ class FlowTestBase extends DriverResolutionTest {
 
   /// Resolve the given [code] and track nullability in the unit.
   Future<void> trackCode(String code) async {
+    if (await checkTests(
+        code, _resultComputer, const _FlowAnalysisDataComputer())) {
+      fail('Failure(s)');
+    }
+  }
+
+  Future<ResolvedUnitResult> _resultComputer(String code) async {
     addTestFile(code);
     await resolveTestFile();
-
     var unit = result.unit;
     flowResult = FlowAnalysisResult.getFromNode(unit);
+    return result;
   }
 }
 
@@ -70,9 +80,9 @@ class NullableFlowTest extends FlowTestBase {
     await trackCode(r'''
 void f(int x) {
   if (x != null) return;
-  x; // 1
+  /*nullable*/ x; // 1
   x = 0;
-  x; // 2
+  /*nonNullable*/ x; // 2
 }
 ''');
     assertNullable('x; // 1');
@@ -83,9 +93,9 @@ void f(int x) {
     await trackCode(r'''
 void f(int x) {
   if (x == null) return;
-  x; // 1
+  /*nonNullable*/ x; // 1
   x = null;
-  x; // 2
+  /*nullable*/ x; // 2
 }
 ''');
     assertNullable('x; // 2');
@@ -96,7 +106,7 @@ void f(int x) {
     await trackCode(r'''
 void f(int a, int b) {
   if (a == null) return;
-  a; // 1
+  /*nonNullable*/ a; // 1
   a = b;
   a; // 2
 }
@@ -109,7 +119,7 @@ void f(int a, int b) {
     await trackCode(r'''
 void f(int a, int b) {
   if (a != null) return;
-  a; // 1
+  /*nullable*/ a; // 1
   a = b;
   a; // 2
 }
@@ -121,7 +131,7 @@ void f(int a, int b) {
   test_binaryExpression_logicalAnd() async {
     await trackCode(r'''
 void f(int x) {
-  x == null && x.isEven;
+  x == null && /*nullable*/ x.isEven;
 }
 ''');
     assertNullable('x.isEven');
@@ -131,7 +141,7 @@ void f(int x) {
   test_binaryExpression_logicalOr() async {
     await trackCode(r'''
 void f(int x) {
-  x == null || x.isEven;
+  x == null || /*nonNullable*/ x.isEven;
 }
 ''');
     assertNullable();
@@ -143,9 +153,9 @@ void f(int x) {
 class C {
   C(int x) {
     if (x == null) {
-      x; // 1
+      /*nullable*/ x; // 1
     } else {
-      x; // 2
+      /*nonNullable*/ x; // 2
     }
   }
 }
@@ -158,16 +168,16 @@ class C {
     await trackCode(r'''
 void f(int a, int b) {
   if (a == null) {
-    a; // 1
+    /*nullable*/ a; // 1
     if (b == null) return;
-    b; // 2
+    /*nonNullable*/ b; // 2
   } else {
-    a; // 3
+    /*nonNullable*/ a; // 3
     if (b == null) return;
-    b; // 4
+    /*nonNullable*/ b; // 4
   }
   a; // 5
-  b; // 6
+  /*nonNullable*/ b; // 6
 }
 ''');
     assertNullable('a; // 1');
@@ -178,7 +188,7 @@ void f(int a, int b) {
     await trackCode(r'''
 void f(int x) {
   if (null != x) return;
-  x; // 1
+  /*nullable*/ x; // 1
 }
 ''');
     assertNullable('x; // 1');
@@ -189,7 +199,7 @@ void f(int x) {
     await trackCode(r'''
 void f(int x) {
   if (x != null) return;
-  x; // 1
+  /*nullable*/ x; // 1
 }
 ''');
     assertNullable('x; // 1');
@@ -200,7 +210,7 @@ void f(int x) {
     await trackCode(r'''
 void f(int x) {
   if (null == x) return;
-  x; // 1
+  /*nonNullable*/ x; // 1
 }
 ''');
     assertNullable();
@@ -211,7 +221,7 @@ void f(int x) {
     await trackCode(r'''
 void f(int x) {
   if (x == null) return;
-  x; // 1
+  /*nonNullable*/ x; // 1
 }
 ''');
     assertNullable();
@@ -222,9 +232,9 @@ void f(int x) {
     await trackCode(r'''
 void f(int x) {
   if (x == null) {
-    x; // 1
+    /*nullable*/ x; // 1
   } else {
-    x; // 2
+    /*nonNullable*/ x; // 2
   }
 }
 ''');
@@ -237,9 +247,9 @@ void f(int x) {
 class C {
   void f(int x) {
     if (x == null) {
-      x; // 1
+      /*nullable*/ x; // 1
     } else {
-      x; // 2
+      /*nonNullable*/ x; // 2
     }
   }
 }
@@ -271,11 +281,11 @@ f(int a, int b) {
 void f(int x) {
   try {
     if (x == null) return;
-    x; // 1
+    /*nonNullable*/ x; // 1
   } finally {
     x; // 2
   }
-  x; // 3
+  /*nonNullable*/ x; // 3
 }
 ''');
     assertNullable();
@@ -289,9 +299,9 @@ void f(int x) {
     x; // 1
   } finally {
     if (x == null) return;
-    x; // 2
+    /*nonNullable*/ x; // 2
   }
-  x; // 3
+  /*nonNullable*/ x; // 3
 }
 ''');
     assertNullable();
@@ -303,7 +313,7 @@ void f(int x) {
 void f(int a, int b) {
   if (a != null) return;
   try {
-    a; // 1
+    /*nullable*/ a; // 1
     a = b;
     a; // 2
   } finally {
@@ -321,7 +331,7 @@ void f(int a, int b) {
 void f(int a, int b) {
   if (a == null) return;
   try {
-    a; // 1
+    /*nonNullable*/ a; // 1
     a = b;
     a; // 2
   } finally {
@@ -339,9 +349,9 @@ void f(int a, int b) {
 void f(int a, int b) {
   if (a == null) return;
   try {
-    a; // 1
+    /*nonNullable*/ a; // 1
   } finally {
-    a; // 2
+    /*nonNullable*/ a; // 2
     a = b;
     a; // 3
   }
@@ -356,9 +366,9 @@ void f(int a, int b) {
     await trackCode(r'''
 void f(int x) {
   while (x == null) {
-    x; // 1
+    /*nullable*/ x; // 1
   }
-  x; // 2
+  /*nonNullable*/ x; // 2
 }
 ''');
     assertNullable('x; // 1');
@@ -369,9 +379,9 @@ void f(int x) {
     await trackCode(r'''
 void f(int x) {
   while (x != null) {
-    x; // 1
+    /*nonNullable*/ x; // 1
   }
-  x; // 2
+  /*nullable*/ x; // 2
 }
 ''');
     assertNullable('x; // 2');
@@ -380,9 +390,7 @@ void f(int x) {
 }
 
 @reflectiveTest
-class ReachableFlowTest extends DriverResolutionTest {
-  FlowAnalysisResult flowResult;
-
+class ReachableFlowTest extends FlowTestBase {
   @override
   AnalysisOptionsImpl get analysisOptions =>
       AnalysisOptionsImpl()..enabledExperiments = [EnableString.non_nullable];
@@ -808,15 +816,6 @@ void f() { // f
     );
   }
 
-  /// Resolve the given [code] and track unreachable nodes in the unit.
-  Future<void> trackCode(String code) async {
-    addTestFile(code);
-    await resolveTestFile();
-
-    var unit = result.unit;
-    flowResult = FlowAnalysisResult.getFromNode(unit);
-  }
-
   void verify({
     List<String> unreachableExpressions = const [],
     List<String> unreachableStatements = const [],
@@ -846,9 +845,7 @@ void f() { // f
 }
 
 @reflectiveTest
-class TypePromotionFlowTest extends DriverResolutionTest {
-  FlowAnalysisResult flowResult;
-
+class TypePromotionFlowTest extends FlowTestBase {
   @override
   AnalysisOptionsImpl get analysisOptions =>
       AnalysisOptionsImpl()..enabledExperiments = [EnableString.non_nullable];
@@ -1631,13 +1628,93 @@ void f(bool b, Object x) {
     assertNotPromoted('x; // 1');
     assertNotPromoted('x; // 2');
   }
+}
 
-  /// Resolve the given [code] and track assignments in the unit.
-  Future<void> trackCode(String code) async {
-    addTestFile(code);
-    await resolveTestFile();
+class _FlowAnalysisDataComputer extends DataComputer<Set<_FlowAssertion>> {
+  const _FlowAnalysisDataComputer();
 
-    var unit = result.unit;
-    flowResult = FlowAnalysisResult.getFromNode(unit);
+  @override
+  DataInterpreter<Set<_FlowAssertion>> get dataValidator =>
+      const _FlowAnalysisDataInterpreter();
+
+  @override
+  void computeUnitData(CompilationUnit unit,
+      Map<Id, ActualData<Set<_FlowAssertion>>> actualMap) {
+    var flowResult = FlowAnalysisResult.getFromNode(unit);
+    _FlowAnalysisDataExtractor(
+            unit.declaredElement.source.uri, actualMap, flowResult)
+        .run(unit);
   }
+}
+
+class _FlowAnalysisDataExtractor extends AstDataExtractor<Set<_FlowAssertion>> {
+  FlowAnalysisResult _flowResult;
+
+  _FlowAnalysisDataExtractor(Uri uri,
+      Map<Id, ActualData<Set<_FlowAssertion>>> actualMap, this._flowResult)
+      : super(uri, actualMap);
+
+  @override
+  Set<_FlowAssertion> computeNodeValue(Id id, AstNode node) {
+    Set<_FlowAssertion> result = {};
+    if (_flowResult.nullableNodes.contains(node)) {
+      result.add(_FlowAssertion.nullable);
+    }
+    if (_flowResult.nonNullableNodes.contains(node)) {
+      result.add(_FlowAssertion.nonNullable);
+    }
+    if (_flowResult.unreachableNodes.contains(node)) {
+      result.add(_FlowAssertion.unreachable);
+    }
+    if (_flowResult.functionBodiesThatDontComplete.contains(node)) {
+      result.add(_FlowAssertion.doesNotComplete);
+    }
+    if (_flowResult.promotedTypes.containsKey(node)) {
+      result.add(_FlowAssertion.promoted);
+    }
+    return result.isEmpty ? null : result;
+  }
+}
+
+class _FlowAnalysisDataInterpreter
+    implements DataInterpreter<Set<_FlowAssertion>> {
+  const _FlowAnalysisDataInterpreter();
+
+  @override
+  String getText(Set<_FlowAssertion> actualData) {
+    var sortBuffer = actualData.toList();
+    sortBuffer.sort();
+    return sortBuffer
+        .map((flowAssertion) => flowAssertion.toString().split('.')[1])
+        .join(',');
+  }
+
+  @override
+  String isAsExpected(Set<_FlowAssertion> actualData, String expectedData) {
+    if (expectedData == null) {
+      return 'none';
+    }
+    switch (expectedData) {
+      case 'nullable':
+        return actualData.contains(_FlowAssertion.nullable)
+            ? null
+            : 'expected nullable';
+      case 'nonNullable':
+        return actualData.contains(_FlowAssertion.nonNullable)
+            ? null
+            : 'expected non-nullable';
+    }
+    throw UnimplementedError('Unrecognized expectation $expectedData');
+  }
+
+  @override
+  bool isEmpty(Set<_FlowAssertion> actualData) => actualData.isEmpty;
+}
+
+enum _FlowAssertion {
+  doesNotComplete,
+  nonNullable,
+  nullable,
+  promoted,
+  unreachable,
 }
