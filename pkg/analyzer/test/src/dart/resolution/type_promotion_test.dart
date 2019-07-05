@@ -13,7 +13,7 @@ import 'package:front_end/src/testing/id.dart' show ActualData, Id;
 import 'package:test/test.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
 
-import '../../../equivalence/id_equivalence_helper.dart';
+import '../../../util/id_equivalence_helper.dart';
 import 'driver_resolution.dart';
 
 main() {
