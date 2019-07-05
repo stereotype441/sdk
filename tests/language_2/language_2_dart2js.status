@@ -36,7 +36,6 @@ const_constructor3_test/04: MissingCompileTimeError # OK - Subtype check uses JS
 const_constructor_nonconst_param_test/01: MissingCompileTimeError
 const_dynamic_type_literal_test/03: Pass # but it shouldn't until we fix issue 17207
 const_evaluation_test/01: RuntimeError
-const_list_test: RuntimeError
 const_map2_test/00: MissingCompileTimeError
 const_map3_test/00: MissingCompileTimeError
 const_switch_test/02: RuntimeError, OK # constant identity based on JS constants
@@ -116,7 +115,6 @@ library_env_test/has_mirror_support: RuntimeError
 library_env_test/has_mirror_support: Fail # mirrors not supported on web
 library_env_test/has_no_html_support: RuntimeError, OK
 library_env_test/has_no_mirror_support: Pass # fails for the wrong reason.
-list_test: CompileTimeError, OK # Error if web int literal cannot be represented exactly, see http://dartbug.com/33351
 local_function2_test/none: RuntimeError
 local_function3_test/none: RuntimeError
 local_function_test/none: RuntimeError
@@ -196,7 +194,7 @@ super_bound_closure_test/none: CompileTimeError
 super_call4_test/01: MissingCompileTimeError
 super_test: RuntimeError
 tearoff_dynamic_test: RuntimeError
-truncdiv_test: RuntimeError # non JS number semantics - Issue 15246
+truncdiv_zero_test: RuntimeError # non JS number semantics - Issue 15246
 type_constants_test/none: RuntimeError # Issue 35052
 type_error_test: RuntimeError
 type_literal_canonicalization_test: RuntimeError
@@ -493,7 +491,7 @@ stacktrace_rethrow_nonerror_test: RuntimeError # Issue 12698
 stacktrace_test: RuntimeError # Issue 12698
 symbol_literal_test/01: MissingCompileTimeError
 tearoff_dynamic_test: RuntimeError
-truncdiv_test: RuntimeError # non JS number semantics - Issue 15246
+truncdiv_zero_test: RuntimeError # non JS number semantics - Issue 15246
 type_check_const_function_typedef2_test: MissingCompileTimeError
 type_literal_canonicalization_test: RuntimeError
 type_parameter_test/06: Crash # Internal Error: Unexpected type variable in static context.
