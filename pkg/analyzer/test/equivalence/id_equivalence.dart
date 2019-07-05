@@ -5,9 +5,8 @@
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:front_end/src/testing/id.dart'
-    show ActualData, Id, IdKind, NodeId;
-
-import 'helpers.dart';
+    show ActualData, DataRegistry, Id, IdKind, NodeId;
+import 'package:test/test.dart' as test;
 
 /// Abstract IR visitor for computing data corresponding to a node or element,
 /// and record it with a generic [Id]
@@ -54,6 +53,17 @@ abstract class AstDataExtractor<T> extends GeneralizingAstVisitor<dynamic>
   NodeId createStatementId(Statement node) =>
       NodeId(_nodeOffset(node), IdKind.statement);
 
+  @override
+  void fail(String message) {
+    test.fail(message);
+  }
+
+  @override
+  void report(Uri uri, int offset, String message) {
+    // TODO(paulberry): find a way to print the error more nicely.
+    print('$uri:$offset: $message');
+  }
+
   void run(CompilationUnit unit) {
     unit.accept(this);
   }
@@ -81,24 +91,5 @@ abstract class AstDataExtractor<T> extends GeneralizingAstVisitor<dynamic>
     assert(offset != null && offset >= 0,
         "No fileOffset on $node (${node.runtimeType})");
     return offset;
-  }
-}
-
-abstract class DataRegistry<T> {
-  Map<Id, ActualData<T>> get actualMap;
-
-  void registerValue(Uri uri, int offset, Id id, T value, Object object) {
-    if (actualMap.containsKey(id)) {
-      ActualData<T> existingData = actualMap[id];
-      reportHere(offset, "Duplicate id $id, value=$value, object=$object");
-      reportHere(
-          offset,
-          "Duplicate id $id, value=${existingData.value}, "
-          "object=${existingData.object}");
-      throw StateError("Duplicate id $id.");
-    }
-    if (value != null) {
-      actualMap[id] = new ActualData<T>(id, value, uri, offset, object);
-    }
   }
 }
