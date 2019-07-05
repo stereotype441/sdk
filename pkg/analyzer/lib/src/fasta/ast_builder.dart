@@ -207,7 +207,7 @@ class AstBuilder extends StackListener {
 
     SimpleIdentifier name;
     if (nameToken != null) {
-      name = ast.simpleIdentifier(nameToken);
+      name = ast.simpleIdentifier(nameToken, isDeclaration: true);
     }
 
     extensionDeclaration = ast.extensionDeclaration(
@@ -1447,8 +1447,8 @@ class AstBuilder extends StackListener {
   }
 
   @override
-  void endMethod(
-      Token getOrSet, Token beginToken, Token beginParam, Token endToken) {
+  void endMethod(Token getOrSet, Token beginToken, Token beginParam,
+      Token beginInitializers, Token endToken) {
     assert(getOrSet == null ||
         optional('get', getOrSet) ||
         optional('set', getOrSet));
