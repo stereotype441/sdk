@@ -22,31 +22,17 @@ main() {
   });
 }
 
-class FlowTestBase extends DriverResolutionTest {
-  /// Resolve the given [code] and track assignments in the unit.
-  Future<void> trackCode(String code) async {
-    if (await checkTests(
-        code, _resultComputer, const _TypePromotionDataComputer())) {
-      fail('Failure(s)');
-    }
-  }
-
-  Future<ResolvedUnitResult> _resultComputer(String code) async {
-    addTestFile(code);
-    await resolveTestFile();
-    return result;
-  }
-}
-
 @reflectiveTest
-class TypePromotionTest extends FlowTestBase {
+class TypePromotionTest extends DriverResolutionTest {
   @override
   AnalysisOptionsImpl get analysisOptions =>
       AnalysisOptionsImpl()..enabledExperiments = [EnableString.non_nullable];
 
   Future<void> resolveCode(String code) async {
-    addTestFile(code);
-    await resolveTestFile();
+    if (await checkTests(
+        code, _resultComputer, const _TypePromotionDataComputer())) {
+      fail('Failure(s)');
+    }
   }
 
   test_assignment() async {
@@ -707,6 +693,12 @@ void f(bool b, Object x) {
   }
 }
 ''');
+  }
+
+  Future<ResolvedUnitResult> _resultComputer(String code) async {
+    addTestFile(code);
+    await resolveTestFile();
+    return result;
   }
 }
 
