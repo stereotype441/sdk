@@ -8,8 +8,6 @@ import 'package:front_end/src/testing/id.dart'
     show ActualData, Id, IdValue, NodeId;
 import 'package:sourcemap_testing/src/annotated_code_helper.dart';
 
-import 'helpers.dart';
-
 /// Checks [compiledData] against the expected data in [expectedMap] derived
 /// from [code].
 Future<bool> checkCode<T>(
@@ -221,7 +219,7 @@ void computeExpectedMap(Uri sourceUri, AnnotatedCode code,
 
 /// Reports [message] as an error using [spannable] as error location.
 void reportError(int offset, String message) {
-  reportHere(offset, message);
+  print('$offset: $message');
 }
 
 String withAnnotations(String sourceCode, Map<int, List<String>> annotations) {

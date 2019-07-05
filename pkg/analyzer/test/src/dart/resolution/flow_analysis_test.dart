@@ -7,11 +7,11 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/src/dart/analysis/experiments.dart';
 import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
 import 'package:analyzer/src/generated/engine.dart';
+import 'package:analyzer/src/util/ast_data_extractor.dart';
 import 'package:front_end/src/testing/id.dart' show ActualData, Id;
 import 'package:test/test.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
 
-import '../../../equivalence/id_equivalence.dart';
 import '../../../equivalence/id_equivalence_helper.dart';
 import 'driver_resolution.dart';
 

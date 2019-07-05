@@ -6,7 +6,6 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:front_end/src/testing/id.dart'
     show ActualData, DataRegistry, Id, IdKind, NodeId;
-import 'package:test/test.dart' as test;
 
 /// Abstract IR visitor for computing data corresponding to a node or element,
 /// and record it with a generic [Id]
@@ -55,7 +54,7 @@ abstract class AstDataExtractor<T> extends GeneralizingAstVisitor<dynamic>
 
   @override
   void fail(String message) {
-    test.fail(message);
+    throw _Failure(message);
   }
 
   @override
@@ -91,5 +90,16 @@ abstract class AstDataExtractor<T> extends GeneralizingAstVisitor<dynamic>
     assert(offset != null && offset >= 0,
         "No fileOffset on $node (${node.runtimeType})");
     return offset;
+  }
+}
+
+class _Failure implements Exception {
+  final message;
+
+  _Failure([this.message]);
+
+  String toString() {
+    if (message == null) return "Exception";
+    return "Exception: $message";
   }
 }
