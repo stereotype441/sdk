@@ -1,8 +1,17 @@
 #if defined(__aarch64__) /* HOST_ARCH_ARM64 */
 
 .text
+
+#if defined(__ANDROID__) || defined(__linux__) || defined(__FreeBSD__)
+/* HOST_OS_ANDROID || HOST_OS_LINUX */
 .global FfiTrampolineCall
+.align 2
 FfiTrampolineCall:
+#else /* HOST_OS_MACOS */
+.global _FfiTrampolineCall
+.align 2
+_FfiTrampolineCall:
+#endif
 
 /* Save argument in scratch register. */
 stp   x19,  x20, [sp, #-16]! /* Push x19 and x20, we use x19 as scratch. */
@@ -27,6 +36,7 @@ mov   sp,   x11
 cmp   x9,   #0              /* Check if number of stack arguments is 0. */
 beq   .done                 /* Skip loop if no stack arguments. */
 add   x19,  x19, #(8*19)    /* Offset r19 to point to stack arguments. */
+.align 2
 .loop:                      /* Copy stack arguments loop. */
 sub   x9,   x9,   #8        /* Decrement stack argument iterator. */
 ldr   x10,  [x19, x9]       /* Load value from ffi_marshalled_args. */
@@ -34,6 +44,7 @@ str   x10,  [sp,  x9]       /* Store value on stack. */
 cmp   x9,   #0              /* Compare iterator with 0 */
 bne   .loop                 /* Loop while iterator is not 0 */
 sub   x19,  x19, #(8*19)    /* Restore r19 to original value. */
+.align 2
 .done:                      /* End stack arguments loop. */
 
 /* Copy registers and fpu registers. */
