@@ -51,9 +51,9 @@ class NullableFlowTest extends FlowTestBase {
     await trackCode(r'''
 void f(int x) {
   if (x != null) return;
-  /*nullable*/ x; // 1
+  /*nullable*/ x;
   x = 0;
-  /*nonNullable*/ x; // 2
+  /*nonNullable*/ x;
 }
 ''');
   }
@@ -62,9 +62,9 @@ void f(int x) {
     await trackCode(r'''
 void f(int x) {
   if (x == null) return;
-  /*nonNullable*/ x; // 1
+  /*nonNullable*/ x;
   x = null;
-  /*nullable*/ x; // 2
+  /*nullable*/ x;
 }
 ''');
   }
@@ -73,9 +73,9 @@ void f(int x) {
     await trackCode(r'''
 void f(int a, int b) {
   if (a == null) return;
-  /*nonNullable*/ a; // 1
+  /*nonNullable*/ a;
   a = b;
-  a; // 2
+  a;
 }
 ''');
   }
@@ -84,9 +84,9 @@ void f(int a, int b) {
     await trackCode(r'''
 void f(int a, int b) {
   if (a != null) return;
-  /*nullable*/ a; // 1
+  /*nullable*/ a;
   a = b;
-  a; // 2
+  a;
 }
 ''');
   }
@@ -112,9 +112,9 @@ void f(int x) {
 class C {
   C(int x) {
     if (x == null) {
-      /*nullable*/ x; // 1
+      /*nullable*/ x;
     } else {
-      /*nonNullable*/ x; // 2
+      /*nonNullable*/ x;
     }
   }
 }
@@ -125,16 +125,16 @@ class C {
     await trackCode(r'''
 void f(int a, int b) {
   if (a == null) {
-    /*nullable*/ a; // 1
+    /*nullable*/ a;
     if (b == null) return;
-    /*nonNullable*/ b; // 2
+    /*nonNullable*/ b;
   } else {
-    /*nonNullable*/ a; // 3
+    /*nonNullable*/ a;
     if (b == null) return;
-    /*nonNullable*/ b; // 4
+    /*nonNullable*/ b;
   }
-  a; // 5
-  /*nonNullable*/ b; // 6
+  a;
+  /*nonNullable*/ b;
 }
 ''');
   }
@@ -143,7 +143,7 @@ void f(int a, int b) {
     await trackCode(r'''
 void f(int x) {
   if (null != x) return;
-  /*nullable*/ x; // 1
+  /*nullable*/ x;
 }
 ''');
   }
@@ -152,7 +152,7 @@ void f(int x) {
     await trackCode(r'''
 void f(int x) {
   if (x != null) return;
-  /*nullable*/ x; // 1
+  /*nullable*/ x;
 }
 ''');
   }
@@ -161,7 +161,7 @@ void f(int x) {
     await trackCode(r'''
 void f(int x) {
   if (null == x) return;
-  /*nonNullable*/ x; // 1
+  /*nonNullable*/ x;
 }
 ''');
   }
@@ -170,7 +170,7 @@ void f(int x) {
     await trackCode(r'''
 void f(int x) {
   if (x == null) return;
-  /*nonNullable*/ x; // 1
+  /*nonNullable*/ x;
 }
 ''');
   }
@@ -179,9 +179,9 @@ void f(int x) {
     await trackCode(r'''
 void f(int x) {
   if (x == null) {
-    /*nullable*/ x; // 1
+    /*nullable*/ x;
   } else {
-    /*nonNullable*/ x; // 2
+    /*nonNullable*/ x;
   }
 }
 ''');
@@ -192,9 +192,9 @@ void f(int x) {
 class C {
   void f(int x) {
     if (x == null) {
-      /*nullable*/ x; // 1
+      /*nullable*/ x;
     } else {
-      /*nonNullable*/ x; // 2
+      /*nonNullable*/ x;
     }
   }
 }
@@ -209,9 +209,9 @@ f(int a, int b) {
   }
 
   if (a == null) {
-    a; // 1
+    a;
     localFunction();
-    a; // 2
+    a;
   }
 }
 ''');
@@ -222,11 +222,11 @@ f(int a, int b) {
 void f(int x) {
   try {
     if (x == null) return;
-    /*nonNullable*/ x; // 1
+    /*nonNullable*/ x;
   } finally {
-    x; // 2
+    x;
   }
-  /*nonNullable*/ x; // 3
+  /*nonNullable*/ x;
 }
 ''');
   }
@@ -235,12 +235,12 @@ void f(int x) {
     await trackCode(r'''
 void f(int x) {
   try {
-    x; // 1
+    x;
   } finally {
     if (x == null) return;
-    /*nonNullable*/ x; // 2
+    /*nonNullable*/ x;
   }
-  /*nonNullable*/ x; // 3
+  /*nonNullable*/ x;
 }
 ''');
   }
@@ -250,13 +250,13 @@ void f(int x) {
 void f(int a, int b) {
   if (a != null) return;
   try {
-    /*nullable*/ a; // 1
+    /*nullable*/ a;
     a = b;
-    a; // 2
+    a;
   } finally {
-    a; // 3
+    a;
   }
-  a; // 4
+  a;
 }
 ''');
   }
@@ -266,13 +266,13 @@ void f(int a, int b) {
 void f(int a, int b) {
   if (a == null) return;
   try {
-    /*nonNullable*/ a; // 1
+    /*nonNullable*/ a;
     a = b;
-    a; // 2
+    a;
   } finally {
-    a; // 3
+    a;
   }
-  a; // 4
+  a;
 }
 ''');
   }
@@ -282,13 +282,13 @@ void f(int a, int b) {
 void f(int a, int b) {
   if (a == null) return;
   try {
-    /*nonNullable*/ a; // 1
+    /*nonNullable*/ a;
   } finally {
-    /*nonNullable*/ a; // 2
+    /*nonNullable*/ a;
     a = b;
-    a; // 3
+    a;
   }
-  a; // 4
+  a;
 }
 ''');
   }
@@ -297,9 +297,9 @@ void f(int a, int b) {
     await trackCode(r'''
 void f(int x) {
   while (x == null) {
-    /*nullable*/ x; // 1
+    /*nullable*/ x;
   }
-  /*nonNullable*/ x; // 2
+  /*nonNullable*/ x;
 }
 ''');
   }
@@ -308,9 +308,9 @@ void f(int x) {
     await trackCode(r'''
 void f(int x) {
   while (x != null) {
-    /*nonNullable*/ x; // 1
+    /*nonNullable*/ x;
   }
-  /*nullable*/ x; // 2
+  /*nullable*/ x;
 }
 ''');
   }
@@ -351,7 +351,7 @@ void f() {
 
   test_do_true() async {
     await trackCode(r'''
-void f() /*functionBody: doesNotComplete*/ { // f
+void f() /*functionBody: doesNotComplete*/ {
   do {
     1;
   } while (true);
@@ -362,7 +362,7 @@ void f() /*functionBody: doesNotComplete*/ { // f
 
   test_exit_beforeSplitStatement() async {
     await trackCode(r'''
-void f(bool b, int i) /*functionBody: doesNotComplete*/ { // f
+void f(bool b, int i) /*functionBody: doesNotComplete*/ {
   return;
   /*statement: unreachable*/ Object _;
   /*statement: unreachable*/ do {} while (b);
@@ -378,7 +378,7 @@ void f(bool b, int i) /*functionBody: doesNotComplete*/ { // f
 
   test_for_condition_true() async {
     await trackCode(r'''
-void f() /*functionBody: doesNotComplete*/ { // f
+void f() /*functionBody: doesNotComplete*/ {
   for (; true;) {
     1;
   }
@@ -389,7 +389,7 @@ void f() /*functionBody: doesNotComplete*/ { // f
 
   test_for_condition_true_implicit() async {
     await trackCode(r'''
-void f() /*functionBody: doesNotComplete*/ { // f
+void f() /*functionBody: doesNotComplete*/ {
   for (;;) {
     1;
   }
@@ -413,7 +413,7 @@ void f() {
 
   test_functionBody_hasReturn() async {
     await trackCode(r'''
-int f() /*functionBody: doesNotComplete*/ { // f
+int f() /*functionBody: doesNotComplete*/ {
   return 42;
 }
 ''');
@@ -443,9 +443,9 @@ void f(bool b) {
   test_if_false_then_else() async {
     await trackCode(r'''
 void f() {
-  if (false) /*statement: unreachable*/ { // 1
+  if (false) /*statement: unreachable*/ {
     1;
-  } else { // 2
+  } else {
   }
   3;
 }
@@ -454,7 +454,7 @@ void f() {
 
   test_if_true_return() async {
     await trackCode(r'''
-void f() /*functionBody: doesNotComplete*/ { // f
+void f() /*functionBody: doesNotComplete*/ {
   1;
   if (true) {
     return;
@@ -467,8 +467,8 @@ void f() /*functionBody: doesNotComplete*/ { // f
   test_if_true_then_else() async {
     await trackCode(r'''
 void f() {
-  if (true) { // 1
-  } else /*statement: unreachable*/ { // 2
+  if (true) {
+  } else /*statement: unreachable*/ {
     2;
   }
   3;
@@ -571,7 +571,7 @@ void f() {
 
   test_tryCatchFinally_return_bodyCatch() async {
     await trackCode(r'''
-void f() /*functionBody: doesNotComplete*/ { // f
+void f() /*functionBody: doesNotComplete*/ {
   try {
     1;
     return;
@@ -604,7 +604,7 @@ void f() {
 
   test_tryFinally_return_body() async {
     await trackCode(r'''
-void f() /*functionBody: doesNotComplete*/ { // f
+void f() /*functionBody: doesNotComplete*/ {
   try {
     1;
     return;
@@ -619,7 +619,7 @@ void f() /*functionBody: doesNotComplete*/ { // f
   test_while_false() async {
     await trackCode(r'''
 void f() {
-  while (false) /*statement: unreachable*/ { // 1
+  while (false) /*statement: unreachable*/ {
     1;
   }
   2;
@@ -629,7 +629,7 @@ void f() {
 
   test_while_true() async {
     await trackCode(r'''
-void f() /*functionBody: doesNotComplete*/ { // f
+void f() /*functionBody: doesNotComplete*/ {
   while (true) {
     1;
   }
@@ -667,7 +667,7 @@ void f(bool b) {
 
   test_while_true_continue() async {
     await trackCode(r'''
-void f() /*functionBody: doesNotComplete*/ { // f
+void f() /*functionBody: doesNotComplete*/ {
   while (true) {
     1;
     continue;
