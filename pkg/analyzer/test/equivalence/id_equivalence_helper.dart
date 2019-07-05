@@ -4,11 +4,11 @@
 
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart' hide Annotation;
+import 'package:front_end/src/testing/id.dart'
+    show ActualData, Id, IdValue, NodeId;
 import 'package:sourcemap_testing/src/annotated_code_helper.dart';
 
 import 'helpers.dart';
-import 'id_equivalence.dart';
-import 'source_span.dart';
 
 /// Checks [compiledData] against the expected data in [expectedMap] derived
 /// from [code].
@@ -36,7 +36,7 @@ Future<bool> checkCode<T>(
       if (!expectedMap.containsKey(id)) {
         if (!dataValidator.isEmpty(actual)) {
           reportError(
-              actualData.sourceSpan,
+              actualData.offset,
               'EXTRA $mode DATA for ${id.descriptor}:\n '
               'object   : ${actualData.objectText}\n '
               'actual   : ${colorizeActual('${IdValue.idToString(id, actualText)}')}\n '
@@ -51,7 +51,7 @@ Future<bool> checkCode<T>(
             dataValidator.isAsExpected(actual, expected.value);
         if (unexpectedMessage != null) {
           reportError(
-              actualData.sourceSpan,
+              actualData.offset,
               'UNEXPECTED $mode DATA for ${id.descriptor}:\n '
               'detail  : ${colorizeMessage(unexpectedMessage)}\n '
               'object  : ${actualData.objectText}\n '
@@ -88,7 +88,7 @@ Future<bool> checkCode<T>(
             'Expected ${colorizeExpected('$expected')}';
         if (uri != null) {
           var begin = data.getOffsetFromId(id, uri);
-          reportError(SourceSpan(uri, begin, begin + 1), message);
+          reportError(begin, message);
         } else {
           print(message);
         }
@@ -220,8 +220,8 @@ void computeExpectedMap(Uri sourceUri, AnnotatedCode code,
 }
 
 /// Reports [message] as an error using [spannable] as error location.
-void reportError(SourceSpan span, String message) {
-  reportHere(span, message);
+void reportError(int offset, String message) {
+  reportHere(offset, message);
 }
 
 String withAnnotations(String sourceCode, Map<int, List<String>> annotations) {
@@ -348,9 +348,7 @@ class IdData<T> {
   String actualCode(Uri uri) {
     Map<int, List<String>> annotations = <int, List<String>>{};
     actualMaps[uri].forEach((Id id, ActualData<T> data) {
-      annotations
-          .putIfAbsent(data.sourceSpan.begin, () => [])
-          .add('${data.value}');
+      annotations.putIfAbsent(data.offset, () => []).add('${data.value}');
     });
     return withAnnotations(code[uri].sourceCode, annotations);
   }
