@@ -53,7 +53,7 @@ class TypePromotionTest extends FlowTestBase {
 f(Object x) {
   if (x is String) {
     x = 42;
-    /*nonNullable*/ x; // 1
+    x; // 1
   }
 }
 ''');
@@ -62,8 +62,8 @@ f(Object x) {
   test_binaryExpression_ifNull() async {
     await resolveCode(r'''
 void f(Object x) {
-  ((x is num) || (throw 1)) ?? ((/*promoted*/ x is int) || (throw 2));
-  /*promoted*/ x; // 1
+  ((x is num) || (throw 1)) ?? ((/*num*/ x is int) || (throw 2));
+  /*num*/ x; // 1
 }
 ''');
   }
@@ -72,7 +72,7 @@ void f(Object x) {
     await resolveCode(r'''
 void f(Object x, Object y, Object z) {
   if (x is int) {
-    /*promoted*/ x; // 1
+    /*int*/ x; // 1
     y ?? (x = z);
     x; // 2
   }
@@ -84,7 +84,7 @@ void f(Object x, Object y, Object z) {
     await resolveCode(r'''
 void f(bool b, Object x) {
   b ? ((x is num) || (throw 1)) : ((x is int) || (throw 2));
-  /*promoted*/ x; // 1
+  /*num*/ x; // 1
 }
 ''');
   }
@@ -112,8 +112,8 @@ void f(bool b, Object x) {
 void f(Object x) {
   do {
     x; // 1
-  } while (/*nonNullable*/ x is! String);
-  /*nonNullable,promoted*/ x; // 2
+  } while (x is! String);
+  /*String*/ x; // 2
 }
 ''');
   }
@@ -134,9 +134,9 @@ void f(Object x) {
 void f(bool b, Object x) {
   if (x is String) {
     do {
-      /*promoted*/ x; // 1
+      /*String*/ x; // 1
     } while (b);
-    /*promoted*/ x; // 2
+    /*String*/ x; // 2
   }
 }
 ''');
@@ -177,7 +177,7 @@ void f(bool b, Object x) {
     do {
       x; // 1
     } while ((x = 1) != 0);
-    /*nonNullable*/ x; // 2
+    x; // 2
   }
 }
 ''');
@@ -188,9 +188,9 @@ void f(bool b, Object x) {
 void f(bool b, Object x) {
   if (x is String) {
     for (; b;) {
-      /*promoted*/ x; // 1
+      /*String*/ x; // 1
     }
-    /*promoted*/ x; // 2
+    /*String*/ x; // 2
   }
 }
 ''');
@@ -215,9 +215,9 @@ void f(bool b, Object x) {
 void f(Object x) {
   if (x is String) {
     for (; (x = 42) > 0;) {
-      /*nonNullable*/ x; // 1
+      x; // 1
     }
-    /*nonNullable*/ x; // 2
+    x; // 2
   }
 }
 ''');
@@ -256,7 +256,7 @@ void f(Object x) {
 void f() {
   void g(Object x) {
     if (x is String) {
-      /*promoted*/ x; // 1
+      /*String*/ x; // 1
     }
     x = 42;
   }
@@ -286,7 +286,7 @@ void f(Object x) {
   void Function() g;
   
   if (x is String) {
-    /*promoted*/ x; // 1
+    /*String*/ x; // 1
 
     g = () {
       x; // 2
@@ -294,7 +294,7 @@ void f(Object x) {
   }
 
   x = 42;
-  /*nonNullable*/ x; // 3
+  x; // 3
   g();
 }
 ''');
@@ -319,7 +319,7 @@ f(bool b, Object v) {
   if (b ? (v is! int) : (v is! num)) {
     v; // 1
   } else {
-    /*promoted*/ v; // 2
+    /*num*/ v; // 2
   }
   v; // 3
 }
@@ -330,7 +330,7 @@ f(bool b, Object v) {
     await resolveCode(r'''
 f(bool b, Object v) {
   if (b ? (v is int) : (v is num)) {
-    /*promoted*/ v; // 1
+    /*num*/ v; // 1
   } else {
     v; // 2
   }
@@ -345,7 +345,7 @@ main(v) {
   if (v is! String) {
     v; // 1
   } else {
-    /*promoted*/ v; // 2
+    /*String*/ v; // 2
   }
   v; // 3
 }
@@ -356,7 +356,7 @@ main(v) {
     await resolveCode(r'''
 main(v) {
   if (v is! String) return;
-  /*promoted*/ v; // ref
+  /*String*/ v; // ref
 }
 ''');
   }
@@ -365,7 +365,7 @@ main(v) {
     await resolveCode(r'''
 main(v) {
   if (v is! String) throw 42;
-  /*promoted*/ v; // ref
+  /*String*/ v; // ref
 }
 ''');
   }
@@ -374,7 +374,7 @@ main(v) {
     await resolveCode(r'''
 main(v) {
   if (v is String) {
-    /*promoted*/ v; // 1
+    /*String*/ v; // 1
   } else {
     v; // 2
   }
@@ -399,7 +399,7 @@ main(v) {
   if (!(v is String)) {
     v; // 1
   } else {
-    /*promoted*/ v; // 2
+    /*String*/ v; // 2
   }
   v; // 3
 }
@@ -421,7 +421,7 @@ void f(bool b, Object x) {
     await resolveCode(r'''
 main(v) {
   v is String || (throw 42);
-  /*promoted*/ v; // ref
+  /*String*/ v; // ref
 }
 ''');
   }
@@ -445,7 +445,7 @@ f(Object x) {
     await resolveCode(r'''
 f(Object x) {
   if (x is String) {
-    /*promoted*/ x; // 1
+    /*String*/ x; // 1
   }
 
   x = 42;
@@ -462,7 +462,7 @@ void f(int e, Object x) {
         x; // 1
         break;
       case 2: // no label
-        /*promoted*/ x; // 2
+        /*String*/ x; // 2
         break;
       case 3:
         x = 42;
@@ -478,12 +478,12 @@ void f(int e, Object x) {
     await resolveCode(r'''
 void f(Object x) {
   if (x is! String) return;
-  /*promoted*/ x; // 1
+  /*String*/ x; // 1
   try {
     x = 42;
     g(); // might throw
-    if (/*nonNullable*/ x is! String) return;
-    /*nonNullable,promoted*/ x; // 2
+    if (x is! String) return;
+    /*String*/ x; // 2
   } catch (_) {}
   x; // 3
 }
@@ -497,7 +497,7 @@ void g() {}
 void f(Object x) {
   try {
     if (x is! String) return;
-    /*promoted*/ x; // 1
+    /*String*/ x; // 1
   } catch (_) {}
   x; // 2
 }
@@ -511,12 +511,12 @@ void g() {}
 void f(Object x) {
   try {
     if (x is! String) return;
-    /*promoted*/ x; // 1
+    /*String*/ x; // 1
   } catch (_) {
     if (x is! String) return;
-    /*promoted*/ x; // 2
+    /*String*/ x; // 2
   }
-  /*promoted*/ x; // 3
+  /*String*/ x; // 3
 }
 
 void g() {}
@@ -528,12 +528,12 @@ void g() {}
 void f(Object x) {
   try {
     if (x is! String) return;
-    /*promoted*/ x; // 1
+    /*String*/ x; // 1
   } catch (_) {
     x; // 2
     rethrow;
   }
-  /*promoted*/ x; // 3
+  /*String*/ x; // 3
 }
 
 void g() {}
@@ -546,7 +546,7 @@ void f(Object x) {
   try {
   } catch (_) {
     if (x is! String) return;
-    /*promoted*/ x; // 1
+    /*String*/ x; // 1
   }
   x; // 2
 }
@@ -560,13 +560,13 @@ void g() {}
 void f(Object x) {
   if (x is String) {
     try {
-      /*promoted*/ x; // 1
+      /*String*/ x; // 1
     } catch (_) {
-      /*promoted*/ x; // 2
+      /*String*/ x; // 2
     } finally {
-      /*promoted*/ x; // 3
+      /*String*/ x; // 3
     }
-    /*promoted*/ x; // 4
+    /*String*/ x; // 4
   }
 }
 
@@ -579,7 +579,7 @@ void g() {}
 void f(Object x) {
   if (x is String) {
     try {
-      /*promoted*/ x; // 1
+      /*String*/ x; // 1
       x = 42;
       g();
     } catch (_) {
@@ -600,9 +600,9 @@ void g() {}
 void f(Object x) {
   if (x is String) {
     try {
-      /*promoted*/ x; // 1
+      /*String*/ x; // 1
     } catch (_) {
-      /*promoted*/ x; // 2
+      /*String*/ x; // 2
       x = 42;
     } finally {
       x; // 3
@@ -618,12 +618,12 @@ void f(Object x) {
 void f(Object x) {
   if (x is String) {
     try {
-      /*promoted*/ x; // 1
+      /*String*/ x; // 1
       x = 42;
     } finally {
       x; // 2
     }
-    /*nonNullable*/ x; // 3
+    x; // 3
   }
 }
 ''');
@@ -634,12 +634,12 @@ void f(Object x) {
 void f(Object x) {
   if (x is String) {
     try {
-      /*promoted*/ x; // 1
+      /*String*/ x; // 1
     } finally {
-      /*promoted*/ x; // 2
+      /*String*/ x; // 2
       x = 42;
     }
-    /*nonNullable*/ x; // 3
+    x; // 3
   }
 }
 ''');
@@ -651,7 +651,7 @@ void f(Object x) {
   while (x is! String) {
     x; // 1
   }
-  /*promoted*/ x; // 2
+  /*String*/ x; // 2
 }
 ''');
   }
@@ -660,7 +660,7 @@ void f(Object x) {
     await resolveCode(r'''
 void f(Object x) {
   while (x is String) {
-    /*promoted*/ x; // 1
+    /*String*/ x; // 1
   }
   x; // 2
 }
@@ -672,9 +672,9 @@ void f(Object x) {
 void f(bool b, Object x) {
   if (x is String) {
     while (b) {
-      /*promoted*/ x; // 1
+      /*String*/ x; // 1
     }
-    /*promoted*/ x; // 2
+    /*String*/ x; // 2
   }
 }
 ''');
