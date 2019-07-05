@@ -368,11 +368,11 @@ void f() {
 void f(bool b, int i) {
   return;
   /*stmt: unreachable*/ Object _;
-  // TODO(paulberry): b should not be flagged with nonNullable nor nullable.
-  /*stmt: unreachable*/ do {} while (/*nonNullable,nullable*/ b);
+  /*stmt: unreachable*/ do {} while (b);
   /*stmt: unreachable*/ for (;;) {}
   /*stmt: unreachable*/ for (_ in []) {}
-  /*stmt: unreachable*/ if (b) {}
+  // TODO(paulberry): b should not be flagged with nonNullable nor nullable.
+  /*stmt: unreachable*/ if (/*nonNullable,nullable*/ b) {}
   // TODO(paulberry): i should not be flagged with nonNullable nor nullable.
   /*stmt: unreachable*/ switch (/*nonNullable,nullable*/ i) {}
   /*stmt: unreachable*/ try {} finally {}
