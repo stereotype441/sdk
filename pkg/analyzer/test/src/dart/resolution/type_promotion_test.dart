@@ -3,7 +3,9 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'package:analyzer/dart/analysis/results.dart';
+import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/analysis/experiments.dart';
 import 'package:analyzer/src/generated/engine.dart';
 import 'package:test/test.dart';
@@ -20,12 +22,10 @@ main() {
 }
 
 class FlowTestBase extends DriverResolutionTest {
-  FlowAnalysisResult flowResult;
-
   /// Resolve the given [code] and track assignments in the unit.
   Future<void> trackCode(String code) async {
     if (await checkTests(
-        code, _resultComputer, const _FlowAnalysisDataComputer())) {
+        code, _resultComputer, const _TypePromotionDataComputer())) {
       fail('Failure(s)');
     }
   }
@@ -33,8 +33,6 @@ class FlowTestBase extends DriverResolutionTest {
   Future<ResolvedUnitResult> _resultComputer(String code) async {
     addTestFile(code);
     await resolveTestFile();
-    var unit = result.unit;
-    flowResult = FlowAnalysisResult.getFromNode(unit);
     return result;
   }
 }
@@ -711,98 +709,56 @@ void f(bool b, Object x) {
   }
 }
 
-class _FlowAnalysisDataComputer extends DataComputer<Set<_FlowAssertion>> {
-  const _FlowAnalysisDataComputer();
+class _TypePromotionDataComputer extends DataComputer<DartType> {
+  const _TypePromotionDataComputer();
 
   @override
-  DataInterpreter<Set<_FlowAssertion>> get dataValidator =>
-      const _FlowAnalysisDataInterpreter();
+  DataInterpreter<DartType> get dataValidator =>
+      const _TypePromotionDataInterpreter();
 
   @override
-  void computeUnitData(CompilationUnit unit,
-      Map<Id, ActualData<Set<_FlowAssertion>>> actualMap) {
-    var flowResult = FlowAnalysisResult.getFromNode(unit);
-    _FlowAnalysisDataExtractor(
-            unit.declaredElement.source.uri, actualMap, flowResult)
+  void computeUnitData(
+      CompilationUnit unit, Map<Id, ActualData<DartType>> actualMap) {
+    _TypePromotionDataExtractor(unit.declaredElement.source.uri, actualMap)
         .run(unit);
   }
 }
 
-class _FlowAnalysisDataExtractor extends AstDataExtractor<Set<_FlowAssertion>> {
-  FlowAnalysisResult _flowResult;
-
-  _FlowAnalysisDataExtractor(Uri uri,
-      Map<Id, ActualData<Set<_FlowAssertion>>> actualMap, this._flowResult)
+class _TypePromotionDataExtractor extends AstDataExtractor<DartType> {
+  _TypePromotionDataExtractor(Uri uri, Map<Id, ActualData<DartType>> actualMap)
       : super(uri, actualMap);
 
   @override
-  Set<_FlowAssertion> computeNodeValue(Id id, AstNode node) {
-    Set<_FlowAssertion> result = {};
-    if (_flowResult.nullableNodes.contains(node)) {
-      // We sometimes erroneously annotate a node as both nullable and
-      // non-nullable.  Ignore for now.  TODO(paulberry): fix this.
-      if (!_flowResult.nonNullableNodes.contains(node)) {
-        result.add(_FlowAssertion.nullable);
+  DartType computeNodeValue(Id id, AstNode node) {
+    if (node is SimpleIdentifier && node.inGetterContext()) {
+      var element = node.staticElement;
+      if (element is VariableElement &&
+          (element is LocalVariableElement || element is ParameterElement)) {
+        var promotedType = node.staticType;
+        if (promotedType != element.type) {
+          return promotedType;
+        }
       }
     }
-    if (_flowResult.nonNullableNodes.contains(node)) {
-      // We sometimes erroneously annotate a node as both nullable and
-      // non-nullable.  Ignore for now.  TODO(paulberry): fix this.
-      if (!_flowResult.nullableNodes.contains(node)) {
-        result.add(_FlowAssertion.nonNullable);
-      }
-    }
-    if (_flowResult.unreachableNodes.contains(node)) {
-      result.add(_FlowAssertion.unreachable);
-    }
-    if (_flowResult.functionBodiesThatDontComplete.contains(node)) {
-      result.add(_FlowAssertion.doesNotComplete);
-    }
-    if (_flowResult.promotedTypes.containsKey(node)) {
-      result.add(_FlowAssertion.promoted);
-    }
-    return result.isEmpty ? null : result;
+    return null;
   }
 }
 
-class _FlowAnalysisDataInterpreter
-    implements DataInterpreter<Set<_FlowAssertion>> {
-  const _FlowAnalysisDataInterpreter();
+class _TypePromotionDataInterpreter implements DataInterpreter<DartType> {
+  const _TypePromotionDataInterpreter();
 
   @override
-  String getText(Set<_FlowAssertion> actualData) =>
-      _sortedRepresentation(_toStrings(actualData));
+  String getText(DartType actualData) => actualData.toString();
 
   @override
-  String isAsExpected(Set<_FlowAssertion> actualData, String expectedData) {
-    var actualStrings = _toStrings(actualData);
-    var actualSorted = _sortedRepresentation(actualStrings);
-    var expectedSorted = _sortedRepresentation(expectedData?.split(','));
-    if (actualSorted == expectedSorted) {
+  String isAsExpected(DartType actualData, String expectedData) {
+    if (actualData.toString() == expectedData) {
       return null;
     } else {
-      return 'Expected $expectedData, got $actualSorted';
+      return 'Expected $expectedData, got $actualData';
     }
   }
 
   @override
-  bool isEmpty(Set<_FlowAssertion> actualData) => actualData.isEmpty;
-
-  String _sortedRepresentation(Iterable<String> values) {
-    var list = values == null || values.isEmpty ? ['none'] : values.toList();
-    list.sort();
-    return list.join(',');
-  }
-
-  List<String> _toStrings(Set<_FlowAssertion> actualData) => actualData
-      .map((flowAssertion) => flowAssertion.toString().split('.')[1])
-      .toList();
-}
-
-enum _FlowAssertion {
-  doesNotComplete,
-  nonNullable,
-  nullable,
-  promoted,
-  unreachable,
+  bool isEmpty(DartType actualData) => actualData == null;
 }

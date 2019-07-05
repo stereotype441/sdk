@@ -726,9 +726,6 @@ class _FlowAnalysisDataExtractor extends AstDataExtractor<Set<_FlowAssertion>> {
     if (_flowResult.functionBodiesThatDontComplete.contains(node)) {
       result.add(_FlowAssertion.doesNotComplete);
     }
-    if (_flowResult.promotedTypes.containsKey(node)) {
-      result.add(_FlowAssertion.promoted);
-    }
     return result.isEmpty ? null : result;
   }
 }
@@ -771,6 +768,5 @@ enum _FlowAssertion {
   doesNotComplete,
   nonNullable,
   nullable,
-  promoted,
   unreachable,
 }
