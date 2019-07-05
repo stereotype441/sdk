@@ -1002,6 +1002,15 @@ main() {
     // No assertions; just checking that it doesn't crash.
   }
 
+  test_for_with_var() async {
+    await analyze('''
+main() {
+  for (var i in <int>[1, 2, 3]) { print(i); }
+}
+''');
+    // No assertions; just checking that it doesn't crash.
+  }
+
   test_function_assignment() async {
     await analyze('''
 class C {
@@ -1031,6 +1040,17 @@ int/*1*/ f(int/*2*/ i) => i/*3*/;
         assertEdge(decoratedTypeAnnotation('int/*2*/').node,
             decoratedTypeAnnotation('int/*1*/').node,
             hard: true));
+  }
+
+  test_functionDeclaration_parameter_named_default_listConst() async {
+    await analyze('''
+void f({List<int/*1*/> i = const <int/*2*/>[]}) {}
+''');
+
+    assertNoUpstreamNullability(decoratedTypeAnnotation('List<int/*1*/>').node);
+    assertEdge(decoratedTypeAnnotation('int/*2*/').node,
+        decoratedTypeAnnotation('int/*1*/').node,
+        hard: false);
   }
 
   test_functionDeclaration_parameter_named_default_notNull() async {
@@ -2295,6 +2315,27 @@ class C {
     assertEdge(decoratedTypeAnnotation('int/*2*/').node,
         decoratedTypeAnnotation('int/*3*/').node,
         hard: true);
+  }
+
+  test_return_from_async_future() async {
+    await analyze('''
+Future<int> f() async {
+  return g();
+}
+int g() => 1;
+''');
+    // No assertions; just checking that it doesn't crash.
+  }
+
+  test_return_from_async_futureOr() async {
+    await analyze('''
+import 'dart:async';
+FutureOr<int> f() async {
+  return g();
+}
+int g() => 1;
+''');
+    // No assertions; just checking that it doesn't crash.
   }
 
   test_return_function_type_simple() async {

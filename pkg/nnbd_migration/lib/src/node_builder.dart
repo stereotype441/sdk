@@ -136,7 +136,9 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType> {
     DecoratedType type = node.type?.accept(this);
     if (node.identifier != null) {
       _variables.recordDecoratedElementType(
-          node.identifier.staticElement, type);
+          node.identifier.staticElement,
+          type ??
+              DecoratedType.forImplicitType(node.declaredElement.type, _graph));
     }
     return type;
   }
@@ -144,7 +146,10 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType> {
   @override
   DecoratedType visitDefaultFormalParameter(DefaultFormalParameter node) {
     var decoratedType = node.parameter.accept(this);
-    if (node.declaredElement.hasRequired || node.defaultValue != null) {
+    if (node.defaultValue != null) {
+      node.defaultValue.accept(this);
+      return null;
+    } else if (node.declaredElement.hasRequired) {
       return null;
     }
     if (decoratedType == null) {
