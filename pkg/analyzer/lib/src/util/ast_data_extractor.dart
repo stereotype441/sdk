@@ -47,9 +47,6 @@ abstract class AstDataExtractor<T> extends GeneralizingAstVisitor<dynamic>
   /// If `null` is returned, [node] has no associated data.
   T computeNodeValue(Id id, AstNode node);
 
-  NodeId createFunctionBodyId(FunctionBody node) =>
-      NodeId(_nodeOffset(node), IdKind.functionBody);
-
   Id createMemberId(Declaration node) {
     var element = node.declaredElement;
     if (element.enclosingElement is CompilationUnitElement) {
