@@ -352,7 +352,8 @@ void f() {
 
   test_do_true() async {
     await trackCode(r'''
-void f() /*functionBody: doesNotComplete*/ {
+/*member: f:doesNotComplete*/
+void f() {
   do {
     1;
   } while (true);
@@ -724,8 +725,12 @@ class _FlowAnalysisDataExtractor extends AstDataExtractor<Set<_FlowAssertion>> {
     if (_flowResult.unreachableNodes.contains(node)) {
       result.add(_FlowAssertion.unreachable);
     }
-    if (_flowResult.functionBodiesThatDontComplete.contains(node)) {
-      result.add(_FlowAssertion.doesNotComplete);
+    if (node is FunctionDeclaration) {
+      var body = node.functionExpression.body;
+      if (body != null &&
+          _flowResult.functionBodiesThatDontComplete.contains(body)) {
+        result.add(_FlowAssertion.doesNotComplete);
+      }
     }
     return result.isEmpty ? null : result;
   }
