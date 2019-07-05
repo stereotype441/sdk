@@ -2,6 +2,12 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+// Note: this file contains code that was mostly copied from
+// tests/compiler/dart2js/equivalence/id_equivalence_helper.dart
+// and then tweaked to work with the analyzer.
+// TODO(paulberry,johnniwinther): share this code between the analyzer and
+// dart2js.
+
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart' hide Annotation;
 import 'package:front_end/src/testing/id.dart'
