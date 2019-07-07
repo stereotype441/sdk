@@ -17,6 +17,10 @@ enum IdKind {
 /// Id for a code point or element.
 abstract class Id {
   IdKind get kind;
+
+  /// Indicates whether the id refers to an element defined outside of the test
+  /// case itself (e.g. some tests may need to refer to properties of elements
+  /// in `dart:core`).
   bool get isGlobal;
 
   /// Display name for this id.
