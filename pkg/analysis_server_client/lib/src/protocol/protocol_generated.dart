@@ -14444,7 +14444,7 @@ class FileKind implements Enum {
 }
 
 /**
- * flutter.getChangeAddForDesignTimeConstructor params
+ * flutter.getWidgetDescription params
  *
  * {
  *   "file": FilePath
@@ -14453,19 +14453,18 @@ class FileKind implements Enum {
  *
  * Clients may not extend, implement or mix-in this class.
  */
-class FlutterGetChangeAddForDesignTimeConstructorParams
-    implements RequestParams {
+class FlutterGetWidgetDescriptionParams implements RequestParams {
   String _file;
 
   int _offset;
 
   /**
-   * The file containing the code of the class.
+   * The file where the widget instance is created.
    */
   String get file => _file;
 
   /**
-   * The file containing the code of the class.
+   * The file where the widget instance is created.
    */
   void set file(String value) {
     assert(value != null);
@@ -14473,24 +14472,24 @@ class FlutterGetChangeAddForDesignTimeConstructorParams
   }
 
   /**
-   * The offset of the class in the code.
+   * The offset in the file where the widget instance is created.
    */
   int get offset => _offset;
 
   /**
-   * The offset of the class in the code.
+   * The offset in the file where the widget instance is created.
    */
   void set offset(int value) {
     assert(value != null);
     this._offset = value;
   }
 
-  FlutterGetChangeAddForDesignTimeConstructorParams(String file, int offset) {
+  FlutterGetWidgetDescriptionParams(String file, int offset) {
     this.file = file;
     this.offset = offset;
   }
 
-  factory FlutterGetChangeAddForDesignTimeConstructorParams.fromJson(
+  factory FlutterGetWidgetDescriptionParams.fromJson(
       JsonDecoder jsonDecoder, String jsonPath, Object json) {
     if (json == null) {
       json = {};
@@ -14508,17 +14507,15 @@ class FlutterGetChangeAddForDesignTimeConstructorParams
       } else {
         throw jsonDecoder.mismatch(jsonPath, "offset");
       }
-      return new FlutterGetChangeAddForDesignTimeConstructorParams(
-          file, offset);
+      return new FlutterGetWidgetDescriptionParams(file, offset);
     } else {
-      throw jsonDecoder.mismatch(jsonPath,
-          "flutter.getChangeAddForDesignTimeConstructor params", json);
+      throw jsonDecoder.mismatch(
+          jsonPath, "flutter.getWidgetDescription params", json);
     }
   }
 
-  factory FlutterGetChangeAddForDesignTimeConstructorParams.fromRequest(
-      Request request) {
-    return new FlutterGetChangeAddForDesignTimeConstructorParams.fromJson(
+  factory FlutterGetWidgetDescriptionParams.fromRequest(Request request) {
+    return new FlutterGetWidgetDescriptionParams.fromJson(
         new RequestDecoder(request), "params", request.params);
   }
 
@@ -14532,8 +14529,7 @@ class FlutterGetChangeAddForDesignTimeConstructorParams
 
   @override
   Request toRequest(String id) {
-    return new Request(
-        id, "flutter.getChangeAddForDesignTimeConstructor", toJson());
+    return new Request(id, "flutter.getWidgetDescription", toJson());
   }
 
   @override
@@ -14541,7 +14537,7 @@ class FlutterGetChangeAddForDesignTimeConstructorParams
 
   @override
   bool operator ==(other) {
-    if (other is FlutterGetChangeAddForDesignTimeConstructorParams) {
+    if (other is FlutterGetWidgetDescriptionParams) {
       return file == other.file && offset == other.offset;
     }
     return false;
@@ -14557,60 +14553,66 @@ class FlutterGetChangeAddForDesignTimeConstructorParams
 }
 
 /**
- * flutter.getChangeAddForDesignTimeConstructor result
+ * flutter.getWidgetDescription result
  *
  * {
- *   "change": SourceChange
+ *   "properties": List<FlutterWidgetProperty>
  * }
  *
  * Clients may not extend, implement or mix-in this class.
  */
-class FlutterGetChangeAddForDesignTimeConstructorResult
-    implements ResponseResult {
-  SourceChange _change;
+class FlutterGetWidgetDescriptionResult implements ResponseResult {
+  List<FlutterWidgetProperty> _properties;
 
   /**
-   * The change that adds the forDesignTime() constructor. If the change cannot
-   * be produced, an error is returned.
+   * The list of properties of the widget. Some of the properties might be read
+   * only, when their editor is not set. This might be because they have type
+   * that we don't know how to edit, or for compound properties that work as
+   * containers for sub-properties.
    */
-  SourceChange get change => _change;
+  List<FlutterWidgetProperty> get properties => _properties;
 
   /**
-   * The change that adds the forDesignTime() constructor. If the change cannot
-   * be produced, an error is returned.
+   * The list of properties of the widget. Some of the properties might be read
+   * only, when their editor is not set. This might be because they have type
+   * that we don't know how to edit, or for compound properties that work as
+   * containers for sub-properties.
    */
-  void set change(SourceChange value) {
+  void set properties(List<FlutterWidgetProperty> value) {
     assert(value != null);
-    this._change = value;
+    this._properties = value;
   }
 
-  FlutterGetChangeAddForDesignTimeConstructorResult(SourceChange change) {
-    this.change = change;
+  FlutterGetWidgetDescriptionResult(List<FlutterWidgetProperty> properties) {
+    this.properties = properties;
   }
 
-  factory FlutterGetChangeAddForDesignTimeConstructorResult.fromJson(
+  factory FlutterGetWidgetDescriptionResult.fromJson(
       JsonDecoder jsonDecoder, String jsonPath, Object json) {
     if (json == null) {
       json = {};
     }
     if (json is Map) {
-      SourceChange change;
-      if (json.containsKey("change")) {
-        change = new SourceChange.fromJson(
-            jsonDecoder, jsonPath + ".change", json["change"]);
+      List<FlutterWidgetProperty> properties;
+      if (json.containsKey("properties")) {
+        properties = jsonDecoder.decodeList(
+            jsonPath + ".properties",
+            json["properties"],
+            (String jsonPath, Object json) =>
+                new FlutterWidgetProperty.fromJson(
+                    jsonDecoder, jsonPath, json));
       } else {
-        throw jsonDecoder.mismatch(jsonPath, "change");
+        throw jsonDecoder.mismatch(jsonPath, "properties");
       }
-      return new FlutterGetChangeAddForDesignTimeConstructorResult(change);
+      return new FlutterGetWidgetDescriptionResult(properties);
     } else {
-      throw jsonDecoder.mismatch(jsonPath,
-          "flutter.getChangeAddForDesignTimeConstructor result", json);
+      throw jsonDecoder.mismatch(
+          jsonPath, "flutter.getWidgetDescription result", json);
     }
   }
 
-  factory FlutterGetChangeAddForDesignTimeConstructorResult.fromResponse(
-      Response response) {
-    return new FlutterGetChangeAddForDesignTimeConstructorResult.fromJson(
+  factory FlutterGetWidgetDescriptionResult.fromResponse(Response response) {
+    return new FlutterGetWidgetDescriptionResult.fromJson(
         new ResponseDecoder(REQUEST_ID_REFACTORING_KINDS.remove(response.id)),
         "result",
         response.result);
@@ -14619,7 +14621,9 @@ class FlutterGetChangeAddForDesignTimeConstructorResult
   @override
   Map<String, dynamic> toJson() {
     Map<String, dynamic> result = {};
-    result["change"] = change.toJson();
+    result["properties"] = properties
+        .map((FlutterWidgetProperty value) => value.toJson())
+        .toList();
     return result;
   }
 
@@ -14633,8 +14637,9 @@ class FlutterGetChangeAddForDesignTimeConstructorResult
 
   @override
   bool operator ==(other) {
-    if (other is FlutterGetChangeAddForDesignTimeConstructorResult) {
-      return change == other.change;
+    if (other is FlutterGetWidgetDescriptionResult) {
+      return listEqual(properties, other.properties,
+          (FlutterWidgetProperty a, FlutterWidgetProperty b) => a == b);
     }
     return false;
   }
@@ -14642,7 +14647,7 @@ class FlutterGetChangeAddForDesignTimeConstructorResult
   @override
   int get hashCode {
     int hash = 0;
-    hash = JenkinsSmiHash.combine(hash, change.hashCode);
+    hash = JenkinsSmiHash.combine(hash, properties.hashCode);
     return JenkinsSmiHash.finish(hash);
   }
 }
@@ -14663,12 +14668,6 @@ class FlutterGetChangeAddForDesignTimeConstructorResult
  *   "parentAssociationLabel": optional String
  *   "variableName": optional String
  *   "children": optional List<FlutterOutline>
- *   "id": optional int
- *   "isWidgetClass": optional bool
- *   "renderConstructor": optional String
- *   "stateClassName": optional String
- *   "stateOffset": optional int
- *   "stateLength": optional int
  * }
  *
  * Clients may not extend, implement or mix-in this class.
@@ -14697,18 +14696,6 @@ class FlutterOutline implements HasToJson {
   String _variableName;
 
   List<FlutterOutline> _children;
-
-  int _id;
-
-  bool _isWidgetClass;
-
-  String _renderConstructor;
-
-  String _stateClassName;
-
-  int _stateOffset;
-
-  int _stateLength;
 
   /**
    * The kind of the node.
@@ -14881,102 +14868,6 @@ class FlutterOutline implements HasToJson {
     this._children = value;
   }
 
-  /**
-   * If the node is a widget, and it is instrumented, the unique identifier of
-   * this widget, that can be used to associate rendering information with this
-   * node.
-   */
-  int get id => _id;
-
-  /**
-   * If the node is a widget, and it is instrumented, the unique identifier of
-   * this widget, that can be used to associate rendering information with this
-   * node.
-   */
-  void set id(int value) {
-    this._id = value;
-  }
-
-  /**
-   * True if the node is a widget class, so it can potentially be rendered,
-   * even if it does not yet have the rendering constructor. This field is
-   * omitted if the node is not a widget class.
-   */
-  bool get isWidgetClass => _isWidgetClass;
-
-  /**
-   * True if the node is a widget class, so it can potentially be rendered,
-   * even if it does not yet have the rendering constructor. This field is
-   * omitted if the node is not a widget class.
-   */
-  void set isWidgetClass(bool value) {
-    this._isWidgetClass = value;
-  }
-
-  /**
-   * If the node is a widget class that can be rendered for IDE, the name of
-   * the constructor that should be used to instantiate the widget. Empty
-   * string for default constructor. Absent if the node is not a widget class
-   * that can be rendered.
-   */
-  String get renderConstructor => _renderConstructor;
-
-  /**
-   * If the node is a widget class that can be rendered for IDE, the name of
-   * the constructor that should be used to instantiate the widget. Empty
-   * string for default constructor. Absent if the node is not a widget class
-   * that can be rendered.
-   */
-  void set renderConstructor(String value) {
-    this._renderConstructor = value;
-  }
-
-  /**
-   * If the node is a StatefulWidget, and its state class is defined in the
-   * same file, the name of the state class.
-   */
-  String get stateClassName => _stateClassName;
-
-  /**
-   * If the node is a StatefulWidget, and its state class is defined in the
-   * same file, the name of the state class.
-   */
-  void set stateClassName(String value) {
-    this._stateClassName = value;
-  }
-
-  /**
-   * If the node is a StatefulWidget that can be rendered, and its state class
-   * is defined in the same file, the offset of the state class code in the
-   * file.
-   */
-  int get stateOffset => _stateOffset;
-
-  /**
-   * If the node is a StatefulWidget that can be rendered, and its state class
-   * is defined in the same file, the offset of the state class code in the
-   * file.
-   */
-  void set stateOffset(int value) {
-    this._stateOffset = value;
-  }
-
-  /**
-   * If the node is a StatefulWidget that can be rendered, and its state class
-   * is defined in the same file, the length of the state class code in the
-   * file.
-   */
-  int get stateLength => _stateLength;
-
-  /**
-   * If the node is a StatefulWidget that can be rendered, and its state class
-   * is defined in the same file, the length of the state class code in the
-   * file.
-   */
-  void set stateLength(int value) {
-    this._stateLength = value;
-  }
-
   FlutterOutline(FlutterOutlineKind kind, int offset, int length,
       int codeOffset, int codeLength,
       {String label,
@@ -14985,13 +14876,7 @@ class FlutterOutline implements HasToJson {
       String className,
       String parentAssociationLabel,
       String variableName,
-      List<FlutterOutline> children,
-      int id,
-      bool isWidgetClass,
-      String renderConstructor,
-      String stateClassName,
-      int stateOffset,
-      int stateLength}) {
+      List<FlutterOutline> children}) {
     this.kind = kind;
     this.offset = offset;
     this.length = length;
@@ -15004,12 +14889,6 @@ class FlutterOutline implements HasToJson {
     this.parentAssociationLabel = parentAssociationLabel;
     this.variableName = variableName;
     this.children = children;
-    this.id = id;
-    this.isWidgetClass = isWidgetClass;
-    this.renderConstructor = renderConstructor;
-    this.stateClassName = stateClassName;
-    this.stateOffset = stateOffset;
-    this.stateLength = stateLength;
   }
 
   factory FlutterOutline.fromJson(
@@ -15093,35 +14972,6 @@ class FlutterOutline implements HasToJson {
             (String jsonPath, Object json) =>
                 new FlutterOutline.fromJson(jsonDecoder, jsonPath, json));
       }
-      int id;
-      if (json.containsKey("id")) {
-        id = jsonDecoder.decodeInt(jsonPath + ".id", json["id"]);
-      }
-      bool isWidgetClass;
-      if (json.containsKey("isWidgetClass")) {
-        isWidgetClass = jsonDecoder.decodeBool(
-            jsonPath + ".isWidgetClass", json["isWidgetClass"]);
-      }
-      String renderConstructor;
-      if (json.containsKey("renderConstructor")) {
-        renderConstructor = jsonDecoder.decodeString(
-            jsonPath + ".renderConstructor", json["renderConstructor"]);
-      }
-      String stateClassName;
-      if (json.containsKey("stateClassName")) {
-        stateClassName = jsonDecoder.decodeString(
-            jsonPath + ".stateClassName", json["stateClassName"]);
-      }
-      int stateOffset;
-      if (json.containsKey("stateOffset")) {
-        stateOffset = jsonDecoder.decodeInt(
-            jsonPath + ".stateOffset", json["stateOffset"]);
-      }
-      int stateLength;
-      if (json.containsKey("stateLength")) {
-        stateLength = jsonDecoder.decodeInt(
-            jsonPath + ".stateLength", json["stateLength"]);
-      }
       return new FlutterOutline(kind, offset, length, codeOffset, codeLength,
           label: label,
           dartElement: dartElement,
@@ -15129,13 +14979,7 @@ class FlutterOutline implements HasToJson {
           className: className,
           parentAssociationLabel: parentAssociationLabel,
           variableName: variableName,
-          children: children,
-          id: id,
-          isWidgetClass: isWidgetClass,
-          renderConstructor: renderConstructor,
-          stateClassName: stateClassName,
-          stateOffset: stateOffset,
-          stateLength: stateLength);
+          children: children);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "FlutterOutline", json);
     }
@@ -15173,24 +15017,6 @@ class FlutterOutline implements HasToJson {
       result["children"] =
           children.map((FlutterOutline value) => value.toJson()).toList();
     }
-    if (id != null) {
-      result["id"] = id;
-    }
-    if (isWidgetClass != null) {
-      result["isWidgetClass"] = isWidgetClass;
-    }
-    if (renderConstructor != null) {
-      result["renderConstructor"] = renderConstructor;
-    }
-    if (stateClassName != null) {
-      result["stateClassName"] = stateClassName;
-    }
-    if (stateOffset != null) {
-      result["stateOffset"] = stateOffset;
-    }
-    if (stateLength != null) {
-      result["stateLength"] = stateLength;
-    }
     return result;
   }
 
@@ -15216,13 +15042,7 @@ class FlutterOutline implements HasToJson {
           parentAssociationLabel == other.parentAssociationLabel &&
           variableName == other.variableName &&
           listEqual(children, other.children,
-              (FlutterOutline a, FlutterOutline b) => a == b) &&
-          id == other.id &&
-          isWidgetClass == other.isWidgetClass &&
-          renderConstructor == other.renderConstructor &&
-          stateClassName == other.stateClassName &&
-          stateOffset == other.stateOffset &&
-          stateLength == other.stateLength;
+              (FlutterOutline a, FlutterOutline b) => a == b);
     }
     return false;
   }
@@ -15242,12 +15062,6 @@ class FlutterOutline implements HasToJson {
     hash = JenkinsSmiHash.combine(hash, parentAssociationLabel.hashCode);
     hash = JenkinsSmiHash.combine(hash, variableName.hashCode);
     hash = JenkinsSmiHash.combine(hash, children.hashCode);
-    hash = JenkinsSmiHash.combine(hash, id.hashCode);
-    hash = JenkinsSmiHash.combine(hash, isWidgetClass.hashCode);
-    hash = JenkinsSmiHash.combine(hash, renderConstructor.hashCode);
-    hash = JenkinsSmiHash.combine(hash, stateClassName.hashCode);
-    hash = JenkinsSmiHash.combine(hash, stateOffset.hashCode);
-    hash = JenkinsSmiHash.combine(hash, stateLength.hashCode);
     return JenkinsSmiHash.finish(hash);
   }
 }
@@ -15555,7 +15369,6 @@ class FlutterOutlineKind implements Enum {
  * {
  *   "file": FilePath
  *   "outline": FlutterOutline
- *   "instrumentedCode": optional String
  * }
  *
  * Clients may not extend, implement or mix-in this class.
@@ -15564,8 +15377,6 @@ class FlutterOutlineParams implements HasToJson {
   String _file;
 
   FlutterOutline _outline;
-
-  String _instrumentedCode;
 
   /**
    * The file with which the outline is associated.
@@ -15593,29 +15404,9 @@ class FlutterOutlineParams implements HasToJson {
     this._outline = value;
   }
 
-  /**
-   * If the file has Flutter widgets that can be rendered, this field has the
-   * instrumented content of the file, that allows associating widgets with
-   * corresponding outline nodes. If there are no widgets to render, this field
-   * is absent.
-   */
-  String get instrumentedCode => _instrumentedCode;
-
-  /**
-   * If the file has Flutter widgets that can be rendered, this field has the
-   * instrumented content of the file, that allows associating widgets with
-   * corresponding outline nodes. If there are no widgets to render, this field
-   * is absent.
-   */
-  void set instrumentedCode(String value) {
-    this._instrumentedCode = value;
-  }
-
-  FlutterOutlineParams(String file, FlutterOutline outline,
-      {String instrumentedCode}) {
+  FlutterOutlineParams(String file, FlutterOutline outline) {
     this.file = file;
     this.outline = outline;
-    this.instrumentedCode = instrumentedCode;
   }
 
   factory FlutterOutlineParams.fromJson(
@@ -15637,13 +15428,7 @@ class FlutterOutlineParams implements HasToJson {
       } else {
         throw jsonDecoder.mismatch(jsonPath, "outline");
       }
-      String instrumentedCode;
-      if (json.containsKey("instrumentedCode")) {
-        instrumentedCode = jsonDecoder.decodeString(
-            jsonPath + ".instrumentedCode", json["instrumentedCode"]);
-      }
-      return new FlutterOutlineParams(file, outline,
-          instrumentedCode: instrumentedCode);
+      return new FlutterOutlineParams(file, outline);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "flutter.outline params", json);
     }
@@ -15659,9 +15444,6 @@ class FlutterOutlineParams implements HasToJson {
     Map<String, dynamic> result = {};
     result["file"] = file;
     result["outline"] = outline.toJson();
-    if (instrumentedCode != null) {
-      result["instrumentedCode"] = instrumentedCode;
-    }
     return result;
   }
 
@@ -15675,9 +15457,7 @@ class FlutterOutlineParams implements HasToJson {
   @override
   bool operator ==(other) {
     if (other is FlutterOutlineParams) {
-      return file == other.file &&
-          outline == other.outline &&
-          instrumentedCode == other.instrumentedCode;
+      return file == other.file && outline == other.outline;
     }
     return false;
   }
@@ -15687,7 +15467,6 @@ class FlutterOutlineParams implements HasToJson {
     int hash = 0;
     hash = JenkinsSmiHash.combine(hash, file.hashCode);
     hash = JenkinsSmiHash.combine(hash, outline.hashCode);
-    hash = JenkinsSmiHash.combine(hash, instrumentedCode.hashCode);
     return JenkinsSmiHash.finish(hash);
   }
 }
@@ -15862,6 +15641,1065 @@ class FlutterSetSubscriptionsResult implements ResponseResult {
   @override
   int get hashCode {
     return 628296315;
+  }
+}
+
+/**
+ * flutter.setWidgetPropertyValue params
+ *
+ * {
+ *   "id": int
+ *   "value": optional FlutterWidgetPropertyValue
+ * }
+ *
+ * Clients may not extend, implement or mix-in this class.
+ */
+class FlutterSetWidgetPropertyValueParams implements RequestParams {
+  int _id;
+
+  FlutterWidgetPropertyValue _value;
+
+  /**
+   * The identifier of the property, previously returned as a part of a
+   * FlutterWidgetProperty.
+   *
+   * An error of type FLUTTER_SET_WIDGET_PROPERTY_VALUE_INVALID_ID is generated
+   * if the identifier is not valid.
+   */
+  int get id => _id;
+
+  /**
+   * The identifier of the property, previously returned as a part of a
+   * FlutterWidgetProperty.
+   *
+   * An error of type FLUTTER_SET_WIDGET_PROPERTY_VALUE_INVALID_ID is generated
+   * if the identifier is not valid.
+   */
+  void set id(int value) {
+    assert(value != null);
+    this._id = value;
+  }
+
+  /**
+   * The new value to set for the property.
+   *
+   * If absent, indicates that the property should be removed. If the property
+   * corresponds to an optional parameter, the corresponding named argument is
+   * removed. If the property isRequired is true,
+   * FLUTTER_SET_WIDGET_PROPERTY_VALUE_IS_REQUIRED error is generated.
+   */
+  FlutterWidgetPropertyValue get value => _value;
+
+  /**
+   * The new value to set for the property.
+   *
+   * If absent, indicates that the property should be removed. If the property
+   * corresponds to an optional parameter, the corresponding named argument is
+   * removed. If the property isRequired is true,
+   * FLUTTER_SET_WIDGET_PROPERTY_VALUE_IS_REQUIRED error is generated.
+   */
+  void set value(FlutterWidgetPropertyValue value) {
+    this._value = value;
+  }
+
+  FlutterSetWidgetPropertyValueParams(int id,
+      {FlutterWidgetPropertyValue value}) {
+    this.id = id;
+    this.value = value;
+  }
+
+  factory FlutterSetWidgetPropertyValueParams.fromJson(
+      JsonDecoder jsonDecoder, String jsonPath, Object json) {
+    if (json == null) {
+      json = {};
+    }
+    if (json is Map) {
+      int id;
+      if (json.containsKey("id")) {
+        id = jsonDecoder.decodeInt(jsonPath + ".id", json["id"]);
+      } else {
+        throw jsonDecoder.mismatch(jsonPath, "id");
+      }
+      FlutterWidgetPropertyValue value;
+      if (json.containsKey("value")) {
+        value = new FlutterWidgetPropertyValue.fromJson(
+            jsonDecoder, jsonPath + ".value", json["value"]);
+      }
+      return new FlutterSetWidgetPropertyValueParams(id, value: value);
+    } else {
+      throw jsonDecoder.mismatch(
+          jsonPath, "flutter.setWidgetPropertyValue params", json);
+    }
+  }
+
+  factory FlutterSetWidgetPropertyValueParams.fromRequest(Request request) {
+    return new FlutterSetWidgetPropertyValueParams.fromJson(
+        new RequestDecoder(request), "params", request.params);
+  }
+
+  @override
+  Map<String, dynamic> toJson() {
+    Map<String, dynamic> result = {};
+    result["id"] = id;
+    if (value != null) {
+      result["value"] = value.toJson();
+    }
+    return result;
+  }
+
+  @override
+  Request toRequest(String id) {
+    return new Request(id, "flutter.setWidgetPropertyValue", toJson());
+  }
+
+  @override
+  String toString() => json.encode(toJson());
+
+  @override
+  bool operator ==(other) {
+    if (other is FlutterSetWidgetPropertyValueParams) {
+      return id == other.id && value == other.value;
+    }
+    return false;
+  }
+
+  @override
+  int get hashCode {
+    int hash = 0;
+    hash = JenkinsSmiHash.combine(hash, id.hashCode);
+    hash = JenkinsSmiHash.combine(hash, value.hashCode);
+    return JenkinsSmiHash.finish(hash);
+  }
+}
+
+/**
+ * flutter.setWidgetPropertyValue result
+ *
+ * {
+ *   "change": SourceChange
+ * }
+ *
+ * Clients may not extend, implement or mix-in this class.
+ */
+class FlutterSetWidgetPropertyValueResult implements ResponseResult {
+  SourceChange _change;
+
+  /**
+   * The change that should be applied.
+   */
+  SourceChange get change => _change;
+
+  /**
+   * The change that should be applied.
+   */
+  void set change(SourceChange value) {
+    assert(value != null);
+    this._change = value;
+  }
+
+  FlutterSetWidgetPropertyValueResult(SourceChange change) {
+    this.change = change;
+  }
+
+  factory FlutterSetWidgetPropertyValueResult.fromJson(
+      JsonDecoder jsonDecoder, String jsonPath, Object json) {
+    if (json == null) {
+      json = {};
+    }
+    if (json is Map) {
+      SourceChange change;
+      if (json.containsKey("change")) {
+        change = new SourceChange.fromJson(
+            jsonDecoder, jsonPath + ".change", json["change"]);
+      } else {
+        throw jsonDecoder.mismatch(jsonPath, "change");
+      }
+      return new FlutterSetWidgetPropertyValueResult(change);
+    } else {
+      throw jsonDecoder.mismatch(
+          jsonPath, "flutter.setWidgetPropertyValue result", json);
+    }
+  }
+
+  factory FlutterSetWidgetPropertyValueResult.fromResponse(Response response) {
+    return new FlutterSetWidgetPropertyValueResult.fromJson(
+        new ResponseDecoder(REQUEST_ID_REFACTORING_KINDS.remove(response.id)),
+        "result",
+        response.result);
+  }
+
+  @override
+  Map<String, dynamic> toJson() {
+    Map<String, dynamic> result = {};
+    result["change"] = change.toJson();
+    return result;
+  }
+
+  @override
+  Response toResponse(String id) {
+    return new Response(id, result: toJson());
+  }
+
+  @override
+  String toString() => json.encode(toJson());
+
+  @override
+  bool operator ==(other) {
+    if (other is FlutterSetWidgetPropertyValueResult) {
+      return change == other.change;
+    }
+    return false;
+  }
+
+  @override
+  int get hashCode {
+    int hash = 0;
+    hash = JenkinsSmiHash.combine(hash, change.hashCode);
+    return JenkinsSmiHash.finish(hash);
+  }
+}
+
+/**
+ * FlutterWidgetProperty
+ *
+ * {
+ *   "id": int
+ *   "name": String
+ *   "documentation": optional String
+ *   "expression": optional String
+ *   "isRequired": bool
+ *   "isSafeToUpdate": bool
+ *   "editor": optional FlutterWidgetPropertyEditor
+ *   "children": optional List<FlutterWidgetProperty>
+ *   "value": optional FlutterWidgetPropertyValue
+ * }
+ *
+ * Clients may not extend, implement or mix-in this class.
+ */
+class FlutterWidgetProperty implements HasToJson {
+  int _id;
+
+  String _name;
+
+  String _documentation;
+
+  String _expression;
+
+  bool _isRequired;
+
+  bool _isSafeToUpdate;
+
+  FlutterWidgetPropertyEditor _editor;
+
+  List<FlutterWidgetProperty> _children;
+
+  FlutterWidgetPropertyValue _value;
+
+  /**
+   * The unique identifier of the property, must be passed back to the server
+   * when updating the property value. Identifiers become invalid on any source
+   * code change.
+   */
+  int get id => _id;
+
+  /**
+   * The unique identifier of the property, must be passed back to the server
+   * when updating the property value. Identifiers become invalid on any source
+   * code change.
+   */
+  void set id(int value) {
+    assert(value != null);
+    this._id = value;
+  }
+
+  /**
+   * The name of the property to display to the user.
+   */
+  String get name => _name;
+
+  /**
+   * The name of the property to display to the user.
+   */
+  void set name(String value) {
+    assert(value != null);
+    this._name = value;
+  }
+
+  /**
+   * The documentation of the property to show to the user. Omitted if the
+   * server does not know the documentation, e.g. because the corresponding
+   * field is not documented.
+   */
+  String get documentation => _documentation;
+
+  /**
+   * The documentation of the property to show to the user. Omitted if the
+   * server does not know the documentation, e.g. because the corresponding
+   * field is not documented.
+   */
+  void set documentation(String value) {
+    this._documentation = value;
+  }
+
+  /**
+   * If the value of this property is set, the Dart code of the expression of
+   * this property.
+   */
+  String get expression => _expression;
+
+  /**
+   * If the value of this property is set, the Dart code of the expression of
+   * this property.
+   */
+  void set expression(String value) {
+    this._expression = value;
+  }
+
+  /**
+   * True if the property is required, e.g. because it corresponds to a
+   * required parameter of a constructor.
+   */
+  bool get isRequired => _isRequired;
+
+  /**
+   * True if the property is required, e.g. because it corresponds to a
+   * required parameter of a constructor.
+   */
+  void set isRequired(bool value) {
+    assert(value != null);
+    this._isRequired = value;
+  }
+
+  /**
+   * If the property expression is a concrete value (e.g. a literal, or an enum
+   * constant), then it is safe to replace the expression with another concrete
+   * value. In this case this field is true. Otherwise, for example when the
+   * expression is a reference to a field, so that its value is provided from
+   * outside, this field is false.
+   */
+  bool get isSafeToUpdate => _isSafeToUpdate;
+
+  /**
+   * If the property expression is a concrete value (e.g. a literal, or an enum
+   * constant), then it is safe to replace the expression with another concrete
+   * value. In this case this field is true. Otherwise, for example when the
+   * expression is a reference to a field, so that its value is provided from
+   * outside, this field is false.
+   */
+  void set isSafeToUpdate(bool value) {
+    assert(value != null);
+    this._isSafeToUpdate = value;
+  }
+
+  /**
+   * The editor that should be used by the client. This field is omitted if the
+   * server does not know the editor for this property, for example because it
+   * does not have one of the supported types.
+   */
+  FlutterWidgetPropertyEditor get editor => _editor;
+
+  /**
+   * The editor that should be used by the client. This field is omitted if the
+   * server does not know the editor for this property, for example because it
+   * does not have one of the supported types.
+   */
+  void set editor(FlutterWidgetPropertyEditor value) {
+    this._editor = value;
+  }
+
+  /**
+   * The list of children properties, if any. For example any property of type
+   * EdgeInsets will have four children properties of type double - left / top
+   * / right / bottom.
+   */
+  List<FlutterWidgetProperty> get children => _children;
+
+  /**
+   * The list of children properties, if any. For example any property of type
+   * EdgeInsets will have four children properties of type double - left / top
+   * / right / bottom.
+   */
+  void set children(List<FlutterWidgetProperty> value) {
+    this._children = value;
+  }
+
+  /**
+   * If the expression is set, and the server knows the value of the
+   * expression, this field is set.
+   */
+  FlutterWidgetPropertyValue get value => _value;
+
+  /**
+   * If the expression is set, and the server knows the value of the
+   * expression, this field is set.
+   */
+  void set value(FlutterWidgetPropertyValue value) {
+    this._value = value;
+  }
+
+  FlutterWidgetProperty(
+      int id, String name, bool isRequired, bool isSafeToUpdate,
+      {String documentation,
+      String expression,
+      FlutterWidgetPropertyEditor editor,
+      List<FlutterWidgetProperty> children,
+      FlutterWidgetPropertyValue value}) {
+    this.id = id;
+    this.name = name;
+    this.documentation = documentation;
+    this.expression = expression;
+    this.isRequired = isRequired;
+    this.isSafeToUpdate = isSafeToUpdate;
+    this.editor = editor;
+    this.children = children;
+    this.value = value;
+  }
+
+  factory FlutterWidgetProperty.fromJson(
+      JsonDecoder jsonDecoder, String jsonPath, Object json) {
+    if (json == null) {
+      json = {};
+    }
+    if (json is Map) {
+      int id;
+      if (json.containsKey("id")) {
+        id = jsonDecoder.decodeInt(jsonPath + ".id", json["id"]);
+      } else {
+        throw jsonDecoder.mismatch(jsonPath, "id");
+      }
+      String name;
+      if (json.containsKey("name")) {
+        name = jsonDecoder.decodeString(jsonPath + ".name", json["name"]);
+      } else {
+        throw jsonDecoder.mismatch(jsonPath, "name");
+      }
+      String documentation;
+      if (json.containsKey("documentation")) {
+        documentation = jsonDecoder.decodeString(
+            jsonPath + ".documentation", json["documentation"]);
+      }
+      String expression;
+      if (json.containsKey("expression")) {
+        expression = jsonDecoder.decodeString(
+            jsonPath + ".expression", json["expression"]);
+      }
+      bool isRequired;
+      if (json.containsKey("isRequired")) {
+        isRequired = jsonDecoder.decodeBool(
+            jsonPath + ".isRequired", json["isRequired"]);
+      } else {
+        throw jsonDecoder.mismatch(jsonPath, "isRequired");
+      }
+      bool isSafeToUpdate;
+      if (json.containsKey("isSafeToUpdate")) {
+        isSafeToUpdate = jsonDecoder.decodeBool(
+            jsonPath + ".isSafeToUpdate", json["isSafeToUpdate"]);
+      } else {
+        throw jsonDecoder.mismatch(jsonPath, "isSafeToUpdate");
+      }
+      FlutterWidgetPropertyEditor editor;
+      if (json.containsKey("editor")) {
+        editor = new FlutterWidgetPropertyEditor.fromJson(
+            jsonDecoder, jsonPath + ".editor", json["editor"]);
+      }
+      List<FlutterWidgetProperty> children;
+      if (json.containsKey("children")) {
+        children = jsonDecoder.decodeList(
+            jsonPath + ".children",
+            json["children"],
+            (String jsonPath, Object json) =>
+                new FlutterWidgetProperty.fromJson(
+                    jsonDecoder, jsonPath, json));
+      }
+      FlutterWidgetPropertyValue value;
+      if (json.containsKey("value")) {
+        value = new FlutterWidgetPropertyValue.fromJson(
+            jsonDecoder, jsonPath + ".value", json["value"]);
+      }
+      return new FlutterWidgetProperty(id, name, isRequired, isSafeToUpdate,
+          documentation: documentation,
+          expression: expression,
+          editor: editor,
+          children: children,
+          value: value);
+    } else {
+      throw jsonDecoder.mismatch(jsonPath, "FlutterWidgetProperty", json);
+    }
+  }
+
+  @override
+  Map<String, dynamic> toJson() {
+    Map<String, dynamic> result = {};
+    result["id"] = id;
+    result["name"] = name;
+    if (documentation != null) {
+      result["documentation"] = documentation;
+    }
+    if (expression != null) {
+      result["expression"] = expression;
+    }
+    result["isRequired"] = isRequired;
+    result["isSafeToUpdate"] = isSafeToUpdate;
+    if (editor != null) {
+      result["editor"] = editor.toJson();
+    }
+    if (children != null) {
+      result["children"] = children
+          .map((FlutterWidgetProperty value) => value.toJson())
+          .toList();
+    }
+    if (value != null) {
+      result["value"] = value.toJson();
+    }
+    return result;
+  }
+
+  @override
+  String toString() => json.encode(toJson());
+
+  @override
+  bool operator ==(other) {
+    if (other is FlutterWidgetProperty) {
+      return id == other.id &&
+          name == other.name &&
+          documentation == other.documentation &&
+          expression == other.expression &&
+          isRequired == other.isRequired &&
+          isSafeToUpdate == other.isSafeToUpdate &&
+          editor == other.editor &&
+          listEqual(children, other.children,
+              (FlutterWidgetProperty a, FlutterWidgetProperty b) => a == b) &&
+          value == other.value;
+    }
+    return false;
+  }
+
+  @override
+  int get hashCode {
+    int hash = 0;
+    hash = JenkinsSmiHash.combine(hash, id.hashCode);
+    hash = JenkinsSmiHash.combine(hash, name.hashCode);
+    hash = JenkinsSmiHash.combine(hash, documentation.hashCode);
+    hash = JenkinsSmiHash.combine(hash, expression.hashCode);
+    hash = JenkinsSmiHash.combine(hash, isRequired.hashCode);
+    hash = JenkinsSmiHash.combine(hash, isSafeToUpdate.hashCode);
+    hash = JenkinsSmiHash.combine(hash, editor.hashCode);
+    hash = JenkinsSmiHash.combine(hash, children.hashCode);
+    hash = JenkinsSmiHash.combine(hash, value.hashCode);
+    return JenkinsSmiHash.finish(hash);
+  }
+}
+
+/**
+ * FlutterWidgetPropertyEditor
+ *
+ * {
+ *   "kind": FlutterWidgetPropertyEditorKind
+ *   "enumItems": optional List<FlutterWidgetPropertyValueEnumItem>
+ * }
+ *
+ * Clients may not extend, implement or mix-in this class.
+ */
+class FlutterWidgetPropertyEditor implements HasToJson {
+  FlutterWidgetPropertyEditorKind _kind;
+
+  List<FlutterWidgetPropertyValueEnumItem> _enumItems;
+
+  FlutterWidgetPropertyEditorKind get kind => _kind;
+
+  void set kind(FlutterWidgetPropertyEditorKind value) {
+    assert(value != null);
+    this._kind = value;
+  }
+
+  List<FlutterWidgetPropertyValueEnumItem> get enumItems => _enumItems;
+
+  void set enumItems(List<FlutterWidgetPropertyValueEnumItem> value) {
+    this._enumItems = value;
+  }
+
+  FlutterWidgetPropertyEditor(FlutterWidgetPropertyEditorKind kind,
+      {List<FlutterWidgetPropertyValueEnumItem> enumItems}) {
+    this.kind = kind;
+    this.enumItems = enumItems;
+  }
+
+  factory FlutterWidgetPropertyEditor.fromJson(
+      JsonDecoder jsonDecoder, String jsonPath, Object json) {
+    if (json == null) {
+      json = {};
+    }
+    if (json is Map) {
+      FlutterWidgetPropertyEditorKind kind;
+      if (json.containsKey("kind")) {
+        kind = new FlutterWidgetPropertyEditorKind.fromJson(
+            jsonDecoder, jsonPath + ".kind", json["kind"]);
+      } else {
+        throw jsonDecoder.mismatch(jsonPath, "kind");
+      }
+      List<FlutterWidgetPropertyValueEnumItem> enumItems;
+      if (json.containsKey("enumItems")) {
+        enumItems = jsonDecoder.decodeList(
+            jsonPath + ".enumItems",
+            json["enumItems"],
+            (String jsonPath, Object json) =>
+                new FlutterWidgetPropertyValueEnumItem.fromJson(
+                    jsonDecoder, jsonPath, json));
+      }
+      return new FlutterWidgetPropertyEditor(kind, enumItems: enumItems);
+    } else {
+      throw jsonDecoder.mismatch(jsonPath, "FlutterWidgetPropertyEditor", json);
+    }
+  }
+
+  @override
+  Map<String, dynamic> toJson() {
+    Map<String, dynamic> result = {};
+    result["kind"] = kind.toJson();
+    if (enumItems != null) {
+      result["enumItems"] = enumItems
+          .map((FlutterWidgetPropertyValueEnumItem value) => value.toJson())
+          .toList();
+    }
+    return result;
+  }
+
+  @override
+  String toString() => json.encode(toJson());
+
+  @override
+  bool operator ==(other) {
+    if (other is FlutterWidgetPropertyEditor) {
+      return kind == other.kind &&
+          listEqual(
+              enumItems,
+              other.enumItems,
+              (FlutterWidgetPropertyValueEnumItem a,
+                      FlutterWidgetPropertyValueEnumItem b) =>
+                  a == b);
+    }
+    return false;
+  }
+
+  @override
+  int get hashCode {
+    int hash = 0;
+    hash = JenkinsSmiHash.combine(hash, kind.hashCode);
+    hash = JenkinsSmiHash.combine(hash, enumItems.hashCode);
+    return JenkinsSmiHash.finish(hash);
+  }
+}
+
+/**
+ * FlutterWidgetPropertyEditorKind
+ *
+ * enum {
+ *   BOOL
+ *   DOUBLE
+ *   ENUM
+ *   INT
+ *   STRING
+ * }
+ *
+ * Clients may not extend, implement or mix-in this class.
+ */
+class FlutterWidgetPropertyEditorKind implements Enum {
+  /**
+   * The editor for a property of type bool.
+   */
+  static const FlutterWidgetPropertyEditorKind BOOL =
+      const FlutterWidgetPropertyEditorKind._("BOOL");
+
+  /**
+   * The editor for a property of the type double.
+   */
+  static const FlutterWidgetPropertyEditorKind DOUBLE =
+      const FlutterWidgetPropertyEditorKind._("DOUBLE");
+
+  /**
+   * The editor for choosing an items of an enumeration, see the enumItems
+   * field of FlutterWidgetPropertyEditor.
+   */
+  static const FlutterWidgetPropertyEditorKind ENUM =
+      const FlutterWidgetPropertyEditorKind._("ENUM");
+
+  /**
+   * The editor for a property of type int.
+   */
+  static const FlutterWidgetPropertyEditorKind INT =
+      const FlutterWidgetPropertyEditorKind._("INT");
+
+  /**
+   * The editor for a property of the type String.
+   */
+  static const FlutterWidgetPropertyEditorKind STRING =
+      const FlutterWidgetPropertyEditorKind._("STRING");
+
+  /**
+   * A list containing all of the enum values that are defined.
+   */
+  static const List<FlutterWidgetPropertyEditorKind> VALUES =
+      const <FlutterWidgetPropertyEditorKind>[BOOL, DOUBLE, ENUM, INT, STRING];
+
+  @override
+  final String name;
+
+  const FlutterWidgetPropertyEditorKind._(this.name);
+
+  factory FlutterWidgetPropertyEditorKind(String name) {
+    switch (name) {
+      case "BOOL":
+        return BOOL;
+      case "DOUBLE":
+        return DOUBLE;
+      case "ENUM":
+        return ENUM;
+      case "INT":
+        return INT;
+      case "STRING":
+        return STRING;
+    }
+    throw new Exception('Illegal enum value: $name');
+  }
+
+  factory FlutterWidgetPropertyEditorKind.fromJson(
+      JsonDecoder jsonDecoder, String jsonPath, Object json) {
+    if (json is String) {
+      try {
+        return new FlutterWidgetPropertyEditorKind(json);
+      } catch (_) {
+        // Fall through
+      }
+    }
+    throw jsonDecoder.mismatch(
+        jsonPath, "FlutterWidgetPropertyEditorKind", json);
+  }
+
+  @override
+  String toString() => "FlutterWidgetPropertyEditorKind.$name";
+
+  String toJson() => name;
+}
+
+/**
+ * FlutterWidgetPropertyValue
+ *
+ * {
+ *   "boolValue": optional bool
+ *   "doubleValue": optional double
+ *   "intValue": optional int
+ *   "stringValue": optional String
+ *   "enumValue": optional FlutterWidgetPropertyValueEnumItem
+ * }
+ *
+ * Clients may not extend, implement or mix-in this class.
+ */
+class FlutterWidgetPropertyValue implements HasToJson {
+  bool _boolValue;
+
+  double _doubleValue;
+
+  int _intValue;
+
+  String _stringValue;
+
+  FlutterWidgetPropertyValueEnumItem _enumValue;
+
+  bool get boolValue => _boolValue;
+
+  void set boolValue(bool value) {
+    this._boolValue = value;
+  }
+
+  double get doubleValue => _doubleValue;
+
+  void set doubleValue(double value) {
+    this._doubleValue = value;
+  }
+
+  int get intValue => _intValue;
+
+  void set intValue(int value) {
+    this._intValue = value;
+  }
+
+  String get stringValue => _stringValue;
+
+  void set stringValue(String value) {
+    this._stringValue = value;
+  }
+
+  FlutterWidgetPropertyValueEnumItem get enumValue => _enumValue;
+
+  void set enumValue(FlutterWidgetPropertyValueEnumItem value) {
+    this._enumValue = value;
+  }
+
+  FlutterWidgetPropertyValue(
+      {bool boolValue,
+      double doubleValue,
+      int intValue,
+      String stringValue,
+      FlutterWidgetPropertyValueEnumItem enumValue}) {
+    this.boolValue = boolValue;
+    this.doubleValue = doubleValue;
+    this.intValue = intValue;
+    this.stringValue = stringValue;
+    this.enumValue = enumValue;
+  }
+
+  factory FlutterWidgetPropertyValue.fromJson(
+      JsonDecoder jsonDecoder, String jsonPath, Object json) {
+    if (json == null) {
+      json = {};
+    }
+    if (json is Map) {
+      bool boolValue;
+      if (json.containsKey("boolValue")) {
+        boolValue =
+            jsonDecoder.decodeBool(jsonPath + ".boolValue", json["boolValue"]);
+      }
+      double doubleValue;
+      if (json.containsKey("doubleValue")) {
+        doubleValue = jsonDecoder.decodeDouble(
+            jsonPath + ".doubleValue", json["doubleValue"]);
+      }
+      int intValue;
+      if (json.containsKey("intValue")) {
+        intValue =
+            jsonDecoder.decodeInt(jsonPath + ".intValue", json["intValue"]);
+      }
+      String stringValue;
+      if (json.containsKey("stringValue")) {
+        stringValue = jsonDecoder.decodeString(
+            jsonPath + ".stringValue", json["stringValue"]);
+      }
+      FlutterWidgetPropertyValueEnumItem enumValue;
+      if (json.containsKey("enumValue")) {
+        enumValue = new FlutterWidgetPropertyValueEnumItem.fromJson(
+            jsonDecoder, jsonPath + ".enumValue", json["enumValue"]);
+      }
+      return new FlutterWidgetPropertyValue(
+          boolValue: boolValue,
+          doubleValue: doubleValue,
+          intValue: intValue,
+          stringValue: stringValue,
+          enumValue: enumValue);
+    } else {
+      throw jsonDecoder.mismatch(jsonPath, "FlutterWidgetPropertyValue", json);
+    }
+  }
+
+  @override
+  Map<String, dynamic> toJson() {
+    Map<String, dynamic> result = {};
+    if (boolValue != null) {
+      result["boolValue"] = boolValue;
+    }
+    if (doubleValue != null) {
+      result["doubleValue"] = doubleValue;
+    }
+    if (intValue != null) {
+      result["intValue"] = intValue;
+    }
+    if (stringValue != null) {
+      result["stringValue"] = stringValue;
+    }
+    if (enumValue != null) {
+      result["enumValue"] = enumValue.toJson();
+    }
+    return result;
+  }
+
+  @override
+  String toString() => json.encode(toJson());
+
+  @override
+  bool operator ==(other) {
+    if (other is FlutterWidgetPropertyValue) {
+      return boolValue == other.boolValue &&
+          doubleValue == other.doubleValue &&
+          intValue == other.intValue &&
+          stringValue == other.stringValue &&
+          enumValue == other.enumValue;
+    }
+    return false;
+  }
+
+  @override
+  int get hashCode {
+    int hash = 0;
+    hash = JenkinsSmiHash.combine(hash, boolValue.hashCode);
+    hash = JenkinsSmiHash.combine(hash, doubleValue.hashCode);
+    hash = JenkinsSmiHash.combine(hash, intValue.hashCode);
+    hash = JenkinsSmiHash.combine(hash, stringValue.hashCode);
+    hash = JenkinsSmiHash.combine(hash, enumValue.hashCode);
+    return JenkinsSmiHash.finish(hash);
+  }
+}
+
+/**
+ * FlutterWidgetPropertyValueEnumItem
+ *
+ * {
+ *   "libraryUri": String
+ *   "className": String
+ *   "name": String
+ *   "documentation": optional String
+ * }
+ *
+ * Clients may not extend, implement or mix-in this class.
+ */
+class FlutterWidgetPropertyValueEnumItem implements HasToJson {
+  String _libraryUri;
+
+  String _className;
+
+  String _name;
+
+  String _documentation;
+
+  /**
+   * The URI of the library containing the className. When the enum item is
+   * passed back, this will allow the server to import the corresponding
+   * library if necessary.
+   */
+  String get libraryUri => _libraryUri;
+
+  /**
+   * The URI of the library containing the className. When the enum item is
+   * passed back, this will allow the server to import the corresponding
+   * library if necessary.
+   */
+  void set libraryUri(String value) {
+    assert(value != null);
+    this._libraryUri = value;
+  }
+
+  /**
+   * The name of the class or enum.
+   */
+  String get className => _className;
+
+  /**
+   * The name of the class or enum.
+   */
+  void set className(String value) {
+    assert(value != null);
+    this._className = value;
+  }
+
+  /**
+   * The name of the field in the enumeration, or the static field in the
+   * class.
+   */
+  String get name => _name;
+
+  /**
+   * The name of the field in the enumeration, or the static field in the
+   * class.
+   */
+  void set name(String value) {
+    assert(value != null);
+    this._name = value;
+  }
+
+  /**
+   * The documentation to show to the user. Omitted if the server does not know
+   * the documentation, e.g. because the corresponding field is not documented.
+   */
+  String get documentation => _documentation;
+
+  /**
+   * The documentation to show to the user. Omitted if the server does not know
+   * the documentation, e.g. because the corresponding field is not documented.
+   */
+  void set documentation(String value) {
+    this._documentation = value;
+  }
+
+  FlutterWidgetPropertyValueEnumItem(
+      String libraryUri, String className, String name,
+      {String documentation}) {
+    this.libraryUri = libraryUri;
+    this.className = className;
+    this.name = name;
+    this.documentation = documentation;
+  }
+
+  factory FlutterWidgetPropertyValueEnumItem.fromJson(
+      JsonDecoder jsonDecoder, String jsonPath, Object json) {
+    if (json == null) {
+      json = {};
+    }
+    if (json is Map) {
+      String libraryUri;
+      if (json.containsKey("libraryUri")) {
+        libraryUri = jsonDecoder.decodeString(
+            jsonPath + ".libraryUri", json["libraryUri"]);
+      } else {
+        throw jsonDecoder.mismatch(jsonPath, "libraryUri");
+      }
+      String className;
+      if (json.containsKey("className")) {
+        className = jsonDecoder.decodeString(
+            jsonPath + ".className", json["className"]);
+      } else {
+        throw jsonDecoder.mismatch(jsonPath, "className");
+      }
+      String name;
+      if (json.containsKey("name")) {
+        name = jsonDecoder.decodeString(jsonPath + ".name", json["name"]);
+      } else {
+        throw jsonDecoder.mismatch(jsonPath, "name");
+      }
+      String documentation;
+      if (json.containsKey("documentation")) {
+        documentation = jsonDecoder.decodeString(
+            jsonPath + ".documentation", json["documentation"]);
+      }
+      return new FlutterWidgetPropertyValueEnumItem(libraryUri, className, name,
+          documentation: documentation);
+    } else {
+      throw jsonDecoder.mismatch(
+          jsonPath, "FlutterWidgetPropertyValueEnumItem", json);
+    }
+  }
+
+  @override
+  Map<String, dynamic> toJson() {
+    Map<String, dynamic> result = {};
+    result["libraryUri"] = libraryUri;
+    result["className"] = className;
+    result["name"] = name;
+    if (documentation != null) {
+      result["documentation"] = documentation;
+    }
+    return result;
+  }
+
+  @override
+  String toString() => json.encode(toJson());
+
+  @override
+  bool operator ==(other) {
+    if (other is FlutterWidgetPropertyValueEnumItem) {
+      return libraryUri == other.libraryUri &&
+          className == other.className &&
+          name == other.name &&
+          documentation == other.documentation;
+    }
+    return false;
+  }
+
+  @override
+  int get hashCode {
+    int hash = 0;
+    hash = JenkinsSmiHash.combine(hash, libraryUri.hashCode);
+    hash = JenkinsSmiHash.combine(hash, className.hashCode);
+    hash = JenkinsSmiHash.combine(hash, name.hashCode);
+    hash = JenkinsSmiHash.combine(hash, documentation.hashCode);
+    return JenkinsSmiHash.finish(hash);
   }
 }
 
@@ -18740,6 +19578,8 @@ class RequestError implements HasToJson {
  *   CONTENT_MODIFIED
  *   DEBUG_PORT_COULD_NOT_BE_OPENED
  *   FILE_NOT_ANALYZED
+ *   FLUTTER_SET_WIDGET_PROPERTY_VALUE_INVALID_ID
+ *   FLUTTER_SET_WIDGET_PROPERTY_VALUE_IS_REQUIRED
  *   FORMAT_INVALID_FILE
  *   FORMAT_WITH_ERRORS
  *   GET_ERRORS_INVALID_FILE
@@ -18791,6 +19631,21 @@ class RequestErrorCode implements Enum {
    */
   static const RequestErrorCode FILE_NOT_ANALYZED =
       const RequestErrorCode._("FILE_NOT_ANALYZED");
+
+  /**
+   * The given property identifier is not valid. It might have never been
+   * valid, or a change to code invalidated it, or its TTL was exceeded.
+   */
+  static const RequestErrorCode FLUTTER_SET_WIDGET_PROPERTY_VALUE_INVALID_ID =
+      const RequestErrorCode._("FLUTTER_SET_WIDGET_PROPERTY_VALUE_INVALID_ID");
+
+  /**
+   * The value of the property cannot be removed, for example because the
+   * corresponding constructor argument is required, and the server does not
+   * know what default value to use.
+   */
+  static const RequestErrorCode FLUTTER_SET_WIDGET_PROPERTY_VALUE_IS_REQUIRED =
+      const RequestErrorCode._("FLUTTER_SET_WIDGET_PROPERTY_VALUE_IS_REQUIRED");
 
   /**
    * An "edit.format" request specified a FilePath which does not match a Dart
@@ -18984,6 +19839,8 @@ class RequestErrorCode implements Enum {
     CONTENT_MODIFIED,
     DEBUG_PORT_COULD_NOT_BE_OPENED,
     FILE_NOT_ANALYZED,
+    FLUTTER_SET_WIDGET_PROPERTY_VALUE_INVALID_ID,
+    FLUTTER_SET_WIDGET_PROPERTY_VALUE_IS_REQUIRED,
     FORMAT_INVALID_FILE,
     FORMAT_WITH_ERRORS,
     GET_ERRORS_INVALID_FILE,
@@ -19025,6 +19882,10 @@ class RequestErrorCode implements Enum {
         return DEBUG_PORT_COULD_NOT_BE_OPENED;
       case "FILE_NOT_ANALYZED":
         return FILE_NOT_ANALYZED;
+      case "FLUTTER_SET_WIDGET_PROPERTY_VALUE_INVALID_ID":
+        return FLUTTER_SET_WIDGET_PROPERTY_VALUE_INVALID_ID;
+      case "FLUTTER_SET_WIDGET_PROPERTY_VALUE_IS_REQUIRED":
+        return FLUTTER_SET_WIDGET_PROPERTY_VALUE_IS_REQUIRED;
       case "FORMAT_INVALID_FILE":
         return FORMAT_INVALID_FILE;
       case "FORMAT_WITH_ERRORS":

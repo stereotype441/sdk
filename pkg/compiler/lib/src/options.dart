@@ -120,8 +120,8 @@ class CompilerOptions implements DiagnosticOptions {
   /// Sets a combination of flags for benchmarking 'production' mode.
   bool benchmarkingProduction = false;
 
-  /// Sets a combination of flags for golem experiment benchmarking mode.
-  bool golemExperiment = false;
+  /// Sets a combination of flags for benchmarking 'experiment' mode.
+  bool benchmarkingExperiment = false;
 
   /// ID associated with this sdk build.
   String buildId = _UNDETERMINED_BUILD_ID;
@@ -255,34 +255,29 @@ class CompilerOptions implements DiagnosticOptions {
   /// Whether to omit implicit strong mode checks.
   bool omitImplicitChecks = false;
 
-  /// Whether to omit as casts.
-  bool omitAsCasts = false;
+  /// Whether to omit as casts by default.
+  bool defaultOmitAsCasts = false;
 
   /// Whether to omit class type arguments only needed for `toString` on
   /// `Object.runtimeType`.
   bool laxRuntimeTypeToString = false;
 
-  /// What should the compiler do with type assertions of assignments.
-  ///
-  /// This is an internal configuration option derived from other flags.
-  CheckPolicy assignmentCheckPolicy;
-
   /// What should the compiler do with parameter type assertions.
   ///
   /// This is an internal configuration option derived from other flags.
-  CheckPolicy parameterCheckPolicy;
+  CheckPolicy defaultParameterCheckPolicy;
 
   /// What should the compiler do with implicit downcasts.
   ///
   /// This is an internal configuration option derived from other flags.
-  CheckPolicy implicitDowncastCheckPolicy;
+  CheckPolicy defaultImplicitDowncastCheckPolicy;
 
   /// What the compiler should do with a boolean value in a condition context
   /// when the language specification says it is a runtime error for it to be
   /// null.
   ///
   /// This is an internal configuration option derived from other flags.
-  CheckPolicy conditionCheckPolicy;
+  CheckPolicy defaultConditionCheckPolicy;
 
   /// Whether to generate code compliant with content security policy (CSP).
   bool useContentSecurityPolicy = false;
@@ -362,7 +357,8 @@ class CompilerOptions implements DiagnosticOptions {
       ..allowMockCompilation = _hasOption(options, Flags.allowMockCompilation)
       ..benchmarkingProduction =
           _hasOption(options, Flags.benchmarkingProduction)
-      ..golemExperiment = _hasOption(options, Flags.golemExperiment)
+      ..benchmarkingExperiment =
+          _hasOption(options, Flags.benchmarkingExperiment)
       ..buildId =
           _extractStringOption(options, '--build-id=', _UNDETERMINED_BUILD_ID)
       ..compileForServer = _hasOption(options, Flags.serverMode)
@@ -409,7 +405,7 @@ class CompilerOptions implements DiagnosticOptions {
           platformBinaries ?? _extractUriOption(options, '--platform-binaries=')
       ..sourceMapUri = _extractUriOption(options, '--source-map=')
       ..omitImplicitChecks = _hasOption(options, Flags.omitImplicitChecks)
-      ..omitAsCasts = _hasOption(options, Flags.omitAsCasts)
+      ..defaultOmitAsCasts = _hasOption(options, Flags.omitAsCasts)
       ..laxRuntimeTypeToString =
           _hasOption(options, Flags.laxRuntimeTypeToString)
       ..testMode = _hasOption(options, Flags.testMode)
@@ -466,9 +462,9 @@ class CompilerOptions implements DiagnosticOptions {
       omitImplicitChecks = true;
     }
 
-    if (golemExperiment) {
-      // TODO(sra): Set flags implied by '--golem-x'. Initially this will be
-      // --experiment-new-rti, and later NNBD.
+    if (benchmarkingExperiment) {
+      // TODO(sra): Set flags implied by '--benchmarking-x'. Initially this will
+      // be --experiment-new-rti, and later NNBD.
     }
 
     if (optimizationLevel != null) {
@@ -491,15 +487,14 @@ class CompilerOptions implements DiagnosticOptions {
 
     // Strong mode always trusts type annotations (inferred or explicit), so
     // assignments checks should be trusted.
-    assignmentCheckPolicy = CheckPolicy.trusted;
     if (omitImplicitChecks) {
-      parameterCheckPolicy = CheckPolicy.trusted;
-      implicitDowncastCheckPolicy = CheckPolicy.trusted;
-      conditionCheckPolicy = CheckPolicy.trusted;
+      defaultParameterCheckPolicy = CheckPolicy.trusted;
+      defaultImplicitDowncastCheckPolicy = CheckPolicy.trusted;
+      defaultConditionCheckPolicy = CheckPolicy.trusted;
     } else {
-      parameterCheckPolicy = CheckPolicy.checked;
-      implicitDowncastCheckPolicy = CheckPolicy.checked;
-      conditionCheckPolicy = CheckPolicy.checked;
+      defaultParameterCheckPolicy = CheckPolicy.checked;
+      defaultImplicitDowncastCheckPolicy = CheckPolicy.checked;
+      defaultConditionCheckPolicy = CheckPolicy.checked;
     }
 
     if (_disableMinification) {

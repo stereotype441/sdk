@@ -20,7 +20,7 @@ class DartUnitOutlineComputer {
   final bool withBasicFlutter;
   final Flutter flutter;
 
-  DartUnitOutlineComputer(this.resolvedUnit, {this.withBasicFlutter: false})
+  DartUnitOutlineComputer(this.resolvedUnit, {this.withBasicFlutter = false})
       : flutter = Flutter.of(resolvedUnit);
 
   /**
@@ -463,7 +463,7 @@ class _FunctionBodyOutlinesVisitor extends RecursiveAstVisitor {
     engine.ExecutableElement executableElement = nameElement;
 
     String extractString(NodeList<Expression> arguments) {
-      if (arguments != null && arguments.length > 0) {
+      if (arguments != null && arguments.isNotEmpty) {
         Expression argument = arguments[0];
         if (argument is StringLiteral) {
           String value = argument.stringValue;

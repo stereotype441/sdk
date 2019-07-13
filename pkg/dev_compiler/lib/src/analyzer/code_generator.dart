@@ -25,7 +25,7 @@ import 'package:analyzer/src/generated/resolver.dart'
 import 'package:analyzer/src/generated/type_system.dart' show Dart2TypeSystem;
 import 'package:analyzer/src/summary/package_bundle_reader.dart';
 import 'package:analyzer/src/task/strong/ast_properties.dart';
-import 'package:path/path.dart' as path;
+import 'package:path/path.dart' as p;
 import 'package:source_span/source_span.dart' show SourceLocation;
 
 import '../compiler/js_metalet.dart' as js_ast;
@@ -262,8 +262,8 @@ class CodeGenerator extends Object
   /// errors, and computes the output module code and optionally the source map.
   js_ast.Program compile(List<CompilationUnit> compilationUnits) {
     _libraryRoot = options.libraryRoot;
-    if (!_libraryRoot.endsWith(path.separator)) {
-      _libraryRoot += path.separator;
+    if (!_libraryRoot.endsWith(p.separator)) {
+      _libraryRoot += p.separator;
     }
 
     if (moduleItems.isNotEmpty) {
@@ -437,9 +437,9 @@ class CodeGenerator extends Object
       // E.g., "foo/bar.dart" and "foo$47bar.dart" would collide.
       qualifiedPath = uri.pathSegments.skip(1).join(encodedSeparator);
     } else {
-      qualifiedPath = path
+      qualifiedPath = p
           .relative(uri.toFilePath(), from: _libraryRoot)
-          .replaceAll(path.separator, encodedSeparator)
+          .replaceAll(p.separator, encodedSeparator)
           .replaceAll('..', encodedSeparator);
     }
     return pathToJSIdentifier(qualifiedPath);
@@ -454,7 +454,7 @@ class CodeGenerator extends Object
 
     var filePath = uri.toFilePath();
     // Relative path to the library.
-    return path.relative(filePath, from: _libraryRoot);
+    return p.relative(filePath, from: _libraryRoot);
   }
 
   /// Returns true if the library [l] is dart:_runtime.
@@ -3105,7 +3105,7 @@ class CodeGenerator extends Object
   js_ast.Expression _emitClassMemberElement(
       ClassMemberElement element, Element accessor, Expression node) {
     bool isStatic = element.isStatic;
-    var classElem = element.enclosingElement;
+    var classElem = element.enclosingElement as ClassElement;
     var type = classElem.type;
     var member = _emitMemberName(element.name,
         isStatic: isStatic, type: type, element: accessor);
@@ -3300,7 +3300,7 @@ class CodeGenerator extends Object
   /// [_emitTopLevelName] on the class, but if the member is external, then the
   /// native class name will be used, for direct access to the native member.
   js_ast.Expression _emitStaticClassName(ClassMemberElement member) {
-    var c = member.enclosingElement;
+    var c = member.enclosingElement as ClassElement;
     _declareBeforeUse(c);
 
     // A static native element should just forward directly to the JS type's
@@ -3593,7 +3593,7 @@ class CodeGenerator extends Object
   /// Emits assignment to a static field element or property.
   js_ast.Expression _emitSetField(Expression right, FieldElement field,
       js_ast.Expression jsTarget, SimpleIdentifier id) {
-    var classElem = field.enclosingElement;
+    var classElem = field.enclosingElement as ClassElement;
     var isStatic = field.isStatic;
     var member = _emitMemberName(field.name,
         isStatic: isStatic, type: classElem.type, element: field.setter);
@@ -4511,6 +4511,10 @@ class CodeGenerator extends Object
         return _emitConstList(type.typeArguments[0],
             value.toListValue().map(_emitDartObject).toList());
       }
+      if (type.element == types.setType.element) {
+        return _emitConstSet(type.typeArguments[0],
+            value.toSetValue().map(_emitDartObject).toList());
+      }
       if (type.element == types.mapType.element) {
         var entries = <js_ast.Expression>[];
         value.toMapValue().forEach((key, value) {
@@ -4577,7 +4581,10 @@ class CodeGenerator extends Object
     DartType getType(TypeAnnotation typeNode) {
       if (typeNode is NamedType && typeNode.typeArguments != null) {
         var e = typeNode.name.staticElement;
-        if (e is TypeParameterizedElement) {
+        if (e is ClassElement) {
+          return e.type.instantiate(
+              typeNode.typeArguments.arguments.map(getType).toList());
+        } else if (e is FunctionTypedElement) {
           return e.type.instantiate(
               typeNode.typeArguments.arguments.map(getType).toList());
         }
@@ -5806,6 +5813,12 @@ class CodeGenerator extends Object
     identity ??= jsTypeRep.isPrimitive(typeArgs[0]);
     type = identity ? identityHashMapImplType : linkedHashMapImplType;
     return _emitType(type.instantiate(typeArgs));
+  }
+
+  js_ast.Expression _emitConstSet(
+      DartType elementType, List<js_ast.Expression> elements) {
+    return cacheConst(
+        runtimeCall('constSet([#], #)', [elements, _emitType(elementType)]));
   }
 
   js_ast.Expression _emitSetImplType(InterfaceType type, {bool identity}) {

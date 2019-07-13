@@ -15,6 +15,7 @@ import 'package:analyzer/src/dart/ast/ast.dart'
         CompilationUnitImpl,
         ExtensionDeclarationImpl,
         MixinDeclarationImpl;
+import 'package:analyzer/src/error/codes.dart';
 import 'package:analyzer/src/fasta/error_converter.dart';
 import 'package:analyzer/src/generated/utilities_dart.dart';
 import 'package:front_end/src/fasta/messages.dart'
@@ -563,12 +564,6 @@ class AstBuilder extends StackListener {
     push(ast.awaitExpression(awaitKeyword, pop()));
   }
 
-  void endInvalidAwaitExpression(
-      Token awaitKeyword, Token endToken, MessageCode errorCode) {
-    debugEvent("InvalidAwaitExpression");
-    endAwaitExpression(awaitKeyword, endToken);
-  }
-
   @override
   void endBinaryExpression(Token operatorToken) {
     assert(operatorToken.isOperator ||
@@ -875,6 +870,15 @@ class AstBuilder extends StackListener {
           ast.simpleIdentifier(typeName.identifier.token, isDeclaration: true);
     }
 
+    if (extensionDeclaration != null) {
+      // TODO(brianwilkerson) Decide how to handle constructor and field
+      //  declarations within extensions. They are invalid, but we might want to
+      //  resolve them in order to get navigation, search, etc.
+      errorReporter.errorReporter.reportErrorForNode(
+          CompileTimeErrorCode.EXTENSION_DECLARES_CONSTRUCTOR,
+          name ?? returnType);
+      return;
+    }
     currentDeclarationMembers.add(ast.constructorDeclaration(
         comment,
         metadata,
@@ -917,6 +921,17 @@ class AstBuilder extends StackListener {
     Token covariantKeyword = covariantToken;
     List<Annotation> metadata = pop();
     Comment comment = _findComment(metadata, beginToken);
+    if (extensionDeclaration != null && staticToken == null) {
+      // TODO(brianwilkerson) Decide how to handle constructor and field
+      //  declarations within extensions. They are invalid, but we might want to
+      //  resolve them in order to get navigation, search, etc.
+      for (VariableDeclaration variable in variables) {
+        errorReporter.errorReporter.reportErrorForNode(
+            CompileTimeErrorCode.EXTENSION_DECLARES_INSTANCE_FIELD,
+            variable.name);
+      }
+      return;
+    }
     currentDeclarationMembers.add(ast.fieldDeclaration2(
         comment: comment,
         metadata: metadata,
@@ -982,8 +997,14 @@ class AstBuilder extends StackListener {
   }
 
   @override
-  void endFormalParameter(Token thisKeyword, Token periodAfterThis,
-      Token nameToken, FormalParameterKind kind, MemberKind memberKind) {
+  void endFormalParameter(
+      Token thisKeyword,
+      Token periodAfterThis,
+      Token nameToken,
+      Token initializerStart,
+      Token initializerEnd,
+      FormalParameterKind kind,
+      MemberKind memberKind) {
     assert(optionalOrNull('this', thisKeyword));
     assert(thisKeyword == null
         ? periodAfterThis == null
@@ -1338,6 +1359,12 @@ class AstBuilder extends StackListener {
     push(initializers);
   }
 
+  void endInvalidAwaitExpression(
+      Token awaitKeyword, Token endToken, MessageCode errorCode) {
+    debugEvent("InvalidAwaitExpression");
+    endAwaitExpression(awaitKeyword, endToken);
+  }
+
   @override
   void endLabeledStatement(int labelCount) {
     debugEvent("LabeledStatement");
@@ -1522,6 +1549,15 @@ class AstBuilder extends StackListener {
           initializers,
           redirectedConstructor,
           body);
+      if (extensionDeclaration != null) {
+        // TODO(brianwilkerson) Decide how to handle constructor and field
+        //  declarations within extensions. They are invalid, but we might want
+        //  to resolve them in order to get navigation, search, etc.
+        errorReporter.errorReporter.reportErrorForNode(
+            CompileTimeErrorCode.EXTENSION_DECLARES_CONSTRUCTOR,
+            name ?? prefixOrName);
+        return;
+      }
       currentDeclarationMembers.add(constructor);
       if (mixinDeclaration != null) {
         // TODO (danrubel): Report an error if this is a mixin declaration.
@@ -1535,6 +1571,11 @@ class AstBuilder extends StackListener {
             messageConstMethod, modifiers.constKeyword, modifiers.constKeyword);
       }
       checkFieldFormalParameters(parameters);
+      if (extensionDeclaration != null && body is EmptyFunctionBody) {
+        errorReporter.errorReporter.reportErrorForNode(
+            CompileTimeErrorCode.EXTENSION_DECLARES_ABSTRACT_METHOD, name);
+        return;
+      }
       currentDeclarationMembers.add(ast.methodDeclaration(
           comment,
           metadata,
@@ -2102,7 +2143,7 @@ class AstBuilder extends StackListener {
     SimpleIdentifier stackTrace;
     if (catchParameterList != null) {
       List<FormalParameter> catchParameters = catchParameterList.parameters;
-      if (catchParameters.length > 0) {
+      if (catchParameters.isNotEmpty) {
         exception = catchParameters[0].identifier;
         localDeclarations[exception.offset] = exception;
       }

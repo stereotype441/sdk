@@ -66,13 +66,13 @@ const String symbolForTypeCast = ' in type cast';
 void generateBytecode(
   ast.Component component, {
   BytecodeOptions options,
-  ErrorReporter errorReporter,
   List<Library> libraries,
+  CoreTypes coreTypes,
   ClassHierarchy hierarchy,
 }) {
   options ??= new BytecodeOptions();
   verifyBytecodeInstructionDeclarations();
-  final coreTypes = new CoreTypes(component);
+  coreTypes ??= new CoreTypes(component);
   void ignoreAmbiguousSupertypes(Class cls, Supertype a, Supertype b) {}
   hierarchy ??= new ClassHierarchy(component,
       onAmbiguousSupertypes: ignoreAmbiguousSupertypes);
@@ -379,12 +379,8 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
     }
     final savedConstantEvaluator = constantEvaluator;
     if (constantEvaluator == null) {
-      constantEvaluator = new ConstantEvaluator(
-          constantsBackend,
-          options.environmentDefines,
-          typeEnvironment,
-          options.enableAsserts,
-          errorReporter)
+      constantEvaluator = new ConstantEvaluator(constantsBackend,
+          options.environmentDefines, typeEnvironment, errorReporter)
         ..env = new EvaluationEnvironment();
     }
     List<Constant> constants = nodes.map(_evaluateConstantExpression).toList();
@@ -1342,12 +1338,8 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       functionTypeParametersSet = functionTypeParameters.toSet();
     }
     // TODO(alexmarkov): improve caching in ConstantEvaluator and reuse it
-    constantEvaluator = new ConstantEvaluator(
-        constantsBackend,
-        options.environmentDefines,
-        typeEnvironment,
-        options.enableAsserts,
-        errorReporter)
+    constantEvaluator = new ConstantEvaluator(constantsBackend,
+        options.environmentDefines, typeEnvironment, errorReporter)
       ..env = new EvaluationEnvironment();
 
     if (node.isAbstract || node is Field && !hasInitializerCode(node)) {
@@ -1660,6 +1652,23 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       function.positionalParameters.forEach(_copyParamIfCaptured);
       locals.sortedNamedParameters.forEach(_copyParamIfCaptured);
     }
+
+    if (options.emitDebuggerStops) {
+      // DebugCheck instruction should be emitted after parameter variables
+      // are declared and copied into context.
+      // The debugger expects the source position to correspond to the
+      // declaration position of the last parameter, if any, or of the function.
+      if (options.emitSourcePositions && function != null) {
+        var pos = function.fileOffset;
+        if (function.namedParameters.isNotEmpty) {
+          pos = function.namedParameters.last.fileOffset;
+        } else if (function.positionalParameters.isNotEmpty) {
+          pos = function.positionalParameters.last.fileOffset;
+        }
+        _recordSourcePosition(pos);
+      }
+      asm.emitDebugCheck();
+    }
   }
 
   void _copyParamIfCaptured(VariableDeclaration variable) {
@@ -1667,8 +1676,8 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       _genPushContextForVariable(variable);
       asm.emitPush(locals.getOriginalParamSlotIndex(variable));
       _genStoreVar(variable);
-      // TODO(alexmarkov): Do we need to store null at the original parameter
-      // location?
+      // TODO(alexmarkov): We need to store null at the original parameter
+      // location, because the original value may need to be GC'ed.
     }
   }
 

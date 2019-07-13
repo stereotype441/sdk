@@ -31,6 +31,8 @@ import 'package:build_integration/file_system/multi_root.dart';
 import 'package:front_end/src/api_prototype/memory_file_system.dart';
 import 'package:front_end/src/api_unstable/vm.dart';
 import 'package:kernel/binary/ast_to_binary.dart';
+import 'package:kernel/class_hierarchy.dart' show ClassHierarchy;
+import 'package:kernel/core_types.dart' show CoreTypes;
 import 'package:kernel/kernel.dart' show Component, Procedure;
 import 'package:kernel/target/targets.dart' show TargetFlags;
 import 'package:vm/bytecode/gen_bytecode.dart' show generateBytecode;
@@ -70,10 +72,11 @@ bool allowDartInternalImport = false;
 abstract class Compiler {
   final FileSystem fileSystem;
   final Uri platformKernelPath;
-  bool suppressWarnings;
-  List<String> experimentalFlags;
-  bool bytecode;
-  String packageConfig;
+  final bool suppressWarnings;
+  final bool enableAsserts;
+  final List<String> experimentalFlags;
+  final bool bytecode;
+  final String packageConfig;
 
   final List<String> errors = new List<String>();
 
@@ -81,6 +84,7 @@ abstract class Compiler {
 
   Compiler(this.fileSystem, this.platformKernelPath,
       {this.suppressWarnings: false,
+      this.enableAsserts: false,
       this.experimentalFlags: null,
       this.bytecode: false,
       this.packageConfig: null}) {
@@ -116,6 +120,7 @@ abstract class Compiler {
       ..experimentalFlags =
           parseExperimentalFlags(expFlags, (msg) => errors.add(msg))
       ..environmentDefines = new EnvironmentMap()
+      ..enableAsserts = enableAsserts
       ..onDiagnostic = (DiagnosticMessage message) {
         bool printMessage;
         switch (message.severity) {
@@ -146,16 +151,18 @@ abstract class Compiler {
 
       if (options.bytecode && errors.isEmpty) {
         await runWithFrontEndCompilerContext(script, options, component, () {
-          // TODO(alexmarkov): disable source positions, local variables info
-          //  and source files in VM PRODUCT mode.
-          // TODO(alexmarkov): disable asserts if they are not enabled in VM.
+          // TODO(alexmarkov): disable source positions, local variables info,
+          //  debugger stops and source files in VM PRODUCT mode.
           // TODO(rmacnak): disable annotations if mirrors are not enabled.
           generateBytecode(component,
+              coreTypes: getCoreTypes(component),
+              hierarchy: getClassHierarchy(component),
               options: new BytecodeOptions(
-                  enableAsserts: true,
+                  enableAsserts: enableAsserts,
                   environmentDefines: options.environmentDefines,
                   emitSourcePositions: true,
                   emitLocalVarInfo: true,
+                  emitDebuggerStops: true,
                   emitSourceFiles: true,
                   emitAnnotations: true));
         });
@@ -164,6 +171,9 @@ abstract class Compiler {
       return component;
     });
   }
+
+  CoreTypes getCoreTypes(Component component);
+  ClassHierarchy getClassHierarchy(Component component);
 
   Future<Component> compileInternal(Uri script);
 }
@@ -209,14 +219,23 @@ class IncrementalCompilerWrapper extends Compiler {
 
   IncrementalCompilerWrapper(FileSystem fileSystem, Uri platformKernelPath,
       {bool suppressWarnings: false,
+      bool enableAsserts: false,
       List<String> experimentalFlags: null,
       bool bytecode: false,
       String packageConfig: null})
       : super(fileSystem, platformKernelPath,
             suppressWarnings: suppressWarnings,
+            enableAsserts: enableAsserts,
             experimentalFlags: experimentalFlags,
             bytecode: bytecode,
             packageConfig: packageConfig);
+
+  @override
+  CoreTypes getCoreTypes(Component component) => generator.getCoreTypes();
+
+  @override
+  ClassHierarchy getClassHierarchy(Component component) =>
+      generator.getClassHierarchy();
 
   @override
   Future<Component> compileInternal(Uri script) async {
@@ -234,6 +253,7 @@ class IncrementalCompilerWrapper extends Compiler {
     IncrementalCompilerWrapper clone = IncrementalCompilerWrapper(
         fileSystem, platformKernelPath,
         suppressWarnings: suppressWarnings,
+        enableAsserts: enableAsserts,
         experimentalFlags: experimentalFlags,
         bytecode: bytecode,
         packageConfig: packageConfig);
@@ -262,14 +282,25 @@ class SingleShotCompilerWrapper extends Compiler {
   SingleShotCompilerWrapper(FileSystem fileSystem, Uri platformKernelPath,
       {this.requireMain: false,
       bool suppressWarnings: false,
+      bool enableAsserts: false,
       List<String> experimentalFlags: null,
       bool bytecode: false,
       String packageConfig: null})
       : super(fileSystem, platformKernelPath,
             suppressWarnings: suppressWarnings,
+            enableAsserts: enableAsserts,
             experimentalFlags: experimentalFlags,
             bytecode: bytecode,
             packageConfig: packageConfig);
+
+  @override
+  CoreTypes getCoreTypes(Component component) => new CoreTypes(component);
+
+  // TODO(alexmarkov): creating class hierarchy is an expensive operation.
+  // Reuse class hierarchy from CFE.
+  @override
+  ClassHierarchy getClassHierarchy(Component component) =>
+      new ClassHierarchy(component);
 
   @override
   Future<Component> compileInternal(Uri script) async {
@@ -291,6 +322,7 @@ IncrementalCompilerWrapper lookupIncrementalCompiler(int isolateId) {
 Future<Compiler> lookupOrBuildNewIncrementalCompiler(int isolateId,
     List sourceFiles, Uri platformKernelPath, List<int> platformKernel,
     {bool suppressWarnings: false,
+    bool enableAsserts: false,
     List<String> experimentalFlags: null,
     bool bytecode: false,
     String packageConfig: null,
@@ -320,6 +352,7 @@ Future<Compiler> lookupOrBuildNewIncrementalCompiler(int isolateId,
       // isolate was shut down. Message should be handled here in this script.
       compiler = new IncrementalCompilerWrapper(fileSystem, platformKernelPath,
           suppressWarnings: suppressWarnings,
+          enableAsserts: enableAsserts,
           experimentalFlags: experimentalFlags,
           bytecode: bytecode,
           packageConfig: packageConfig);
@@ -498,20 +531,13 @@ Future _processLoadRequest(request) async {
   final int isolateId = request[6];
   final List sourceFiles = request[7];
   final bool suppressWarnings = request[8];
+  final bool enableAsserts = request[9];
   final List<String> experimentalFlags =
-      request[9] != null ? request[9].cast<String>() : null;
-  final bool bytecode = request[10];
-  final String packageConfig = request[11];
-  final String multirootFilepaths = request[12];
-  final String multirootScheme = request[13];
-
-  if (bytecode) {
-    // Bytecode generator is hooked into kernel service after kernel component
-    // is produced. In case of incremental compilation resulting component
-    // doesn't have core libraries which are needed for bytecode generation.
-    // TODO(alexmarkov): Support bytecode generation in incremental compiler.
-    incremental = false;
-  }
+      request[10] != null ? request[10].cast<String>() : null;
+  final bool bytecode = request[11];
+  final String packageConfig = request[12];
+  final String multirootFilepaths = request[13];
+  final String multirootScheme = request[14];
 
   Uri platformKernelPath = null;
   List<int> platformKernel = null;
@@ -567,6 +593,7 @@ Future _processLoadRequest(request) async {
     compiler = await lookupOrBuildNewIncrementalCompiler(
         isolateId, sourceFiles, platformKernelPath, platformKernel,
         suppressWarnings: suppressWarnings,
+        enableAsserts: enableAsserts,
         experimentalFlags: experimentalFlags,
         bytecode: bytecode,
         packageConfig: packageConfig,
@@ -578,6 +605,7 @@ Future _processLoadRequest(request) async {
     compiler = new SingleShotCompilerWrapper(fileSystem, platformKernelPath,
         requireMain: false,
         suppressWarnings: suppressWarnings,
+        enableAsserts: enableAsserts,
         experimentalFlags: experimentalFlags,
         bytecode: bytecode,
         packageConfig: packageConfig);
@@ -703,6 +731,7 @@ train(String scriptUri, String platformKernelPath) {
     1 /* isolateId chosen randomly */,
     [] /* source files */,
     false /* suppress warnings */,
+    false /* enable asserts */,
     null /* experimental_flags */,
     false /* generate bytecode */,
     null /* package_config */,

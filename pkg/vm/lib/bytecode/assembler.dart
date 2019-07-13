@@ -390,7 +390,6 @@ class BytecodeAssembler {
   }
 
   void emitNativeCall(int rd) {
-    emitSourcePosition();
     _emitInstructionD(Opcode.kNativeCall, rd);
   }
 
@@ -512,6 +511,11 @@ class BytecodeAssembler {
   void emitCheckStack(int ra) {
     emitSourcePosition();
     _emitInstructionA(Opcode.kCheckStack, ra);
+  }
+
+  void emitDebugCheck() {
+    emitSourcePosition();
+    _emitInstruction0(Opcode.kDebugCheck);
   }
 
   void emitCheckFunctionTypeArgs(int ra, int re) {

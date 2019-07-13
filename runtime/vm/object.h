@@ -1705,7 +1705,6 @@ class ICData : public Object {
 #endif
 
   void Reset(Zone* zone) const;
-  void ResetSwitchable(Zone* zone) const;
 
 // Note: only deopts with reasons before Unknown in this list are recorded in
 // the ICData. All other reasons are used purely for informational messages
@@ -1907,6 +1906,7 @@ class ICData : public Object {
   // Used for printing and optimizations.
   RawICData* AsUnaryClassChecksSortedByCount() const;
 
+  RawUnlinkedCall* AsUnlinkedCall() const;
   RawMegamorphicCache* AsMegamorphicCache() const;
 
   // Consider only used entries.
@@ -5729,6 +5729,9 @@ class Bytecode : public Object {
   TokenPosition GetTokenIndexOfPC(uword return_address) const;
   intptr_t GetTryIndexAtPc(uword return_address) const;
 
+  // Return the pc after the first 'debug checked' opcode in the range.
+  uword GetDebugCheckedOpcodePc(uword from_offset, uword to_offset) const;
+
   intptr_t instructions_binary_offset() const {
     return raw_ptr()->instructions_binary_offset_;
   }
@@ -5780,6 +5783,7 @@ class Bytecode : public Object {
 
   const char* Name() const;
   const char* QualifiedName() const;
+  const char* FullyQualifiedName() const;
 
   class SlowFindRawBytecodeVisitor : public FindObjectVisitor {
    public:
@@ -6535,6 +6539,10 @@ class TypeArguments : public Instance {
                             const TypeArguments& other,
                             intptr_t other_length,
                             intptr_t total_length) const;
+
+  // Concatenate [this] and [other] vectors of type parameters.
+  RawTypeArguments* ConcatenateTypeParameters(Zone* zone,
+                                              const TypeArguments& other) const;
 
   // Check if the subvector of length 'len' starting at 'from_index' of this
   // type argument vector consists solely of DynamicType, ObjectType, or

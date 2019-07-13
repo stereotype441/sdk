@@ -499,14 +499,14 @@ class CodeChecker extends RecursiveAstVisitor {
     DartType type = DynamicTypeImpl.instance;
     if (node.typeArguments != null) {
       NodeList<TypeAnnotation> targs = node.typeArguments.arguments;
-      if (targs.length > 0) {
+      if (targs.isNotEmpty) {
         type = targs[0].type;
       }
     } else {
       DartType staticType = node.staticType;
       if (staticType is InterfaceType) {
         List<DartType> targs = staticType.typeArguments;
-        if (targs != null && targs.length > 0) {
+        if (targs != null && targs.isNotEmpty) {
           type = targs[0];
         }
       }
@@ -605,7 +605,7 @@ class CodeChecker extends RecursiveAstVisitor {
       DartType valueType = DynamicTypeImpl.instance;
       if (node.typeArguments != null) {
         NodeList<TypeAnnotation> typeArguments = node.typeArguments.arguments;
-        if (typeArguments.length > 0) {
+        if (typeArguments.isNotEmpty) {
           keyType = typeArguments[0].type;
         }
         if (typeArguments.length > 1) {
@@ -616,7 +616,7 @@ class CodeChecker extends RecursiveAstVisitor {
         if (staticType is InterfaceType) {
           List<DartType> typeArguments = staticType.typeArguments;
           if (typeArguments != null) {
-            if (typeArguments.length > 0) {
+            if (typeArguments.isNotEmpty) {
               keyType = typeArguments[0];
             }
             if (typeArguments.length > 1) {
@@ -633,14 +633,14 @@ class CodeChecker extends RecursiveAstVisitor {
       DartType type = DynamicTypeImpl.instance;
       if (node.typeArguments != null) {
         NodeList<TypeAnnotation> typeArguments = node.typeArguments.arguments;
-        if (typeArguments.length > 0) {
+        if (typeArguments.isNotEmpty) {
           type = typeArguments[0].type;
         }
       } else {
         DartType staticType = node.staticType;
         if (staticType is InterfaceType) {
           List<DartType> typeArguments = staticType.typeArguments;
-          if (typeArguments != null && typeArguments.length > 0) {
+          if (typeArguments != null && typeArguments.isNotEmpty) {
             type = typeArguments[0];
           }
         }
@@ -1278,7 +1278,7 @@ class CodeChecker extends RecursiveAstVisitor {
       _failure = true;
     }
     if (errorCode.type == ErrorType.HINT &&
-        errorCode.name.startsWith('STRONG_MODE_TOP_LEVEL_')) {
+        errorCode.name.startsWith('TOP_LEVEL_')) {
       severity = ErrorSeverity.ERROR;
     }
     if (severity != ErrorSeverity.INFO || _options.strongModeHints) {

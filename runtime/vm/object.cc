@@ -2087,7 +2087,7 @@ RawString* Object::DictionaryName() const {
 
 void Object::InitializeObject(uword address, intptr_t class_id, intptr_t size) {
   uword initial_value = (class_id == kInstructionsCid)
-                            ? Assembler::GetBreakInstructionFiller()
+                            ? compiler::Assembler::GetBreakInstructionFiller()
                             : reinterpret_cast<uword>(null_);
   uword cur = address;
   uword end = address + size;
@@ -2156,12 +2156,17 @@ RawObject* Object::Allocate(intptr_t cls_id, intptr_t size, Heap::Space space) {
     address = heap->Allocate(size, space);
   }
   if (UNLIKELY(address == 0)) {
-    // Use the preallocated out of memory exception to avoid calling
-    // into dart code or allocating any code.
-    const Instance& exception =
-        Instance::Handle(thread->isolate()->object_store()->out_of_memory());
-    Exceptions::Throw(thread, exception);
-    UNREACHABLE();
+    if (thread->top_exit_frame_info() != 0) {
+      // Use the preallocated out of memory exception to avoid calling
+      // into dart code or allocating any code.
+      const Instance& exception =
+          Instance::Handle(thread->isolate()->object_store()->out_of_memory());
+      Exceptions::Throw(thread, exception);
+      UNREACHABLE();
+    } else {
+      // No Dart to propagate an exception to.
+      OUT_OF_MEMORY();
+    }
   }
 #ifndef PRODUCT
   ClassTable* class_table = thread->isolate()->class_table();
@@ -4950,6 +4955,26 @@ RawTypeArguments* TypeArguments::Prepend(Zone* zone,
     result.SetTypeAt(i, type);
   }
   return result.Canonicalize();
+}
+
+RawTypeArguments* TypeArguments::ConcatenateTypeParameters(
+    Zone* zone,
+    const TypeArguments& other) const {
+  ASSERT(!IsNull() && !other.IsNull());
+  const intptr_t this_len = Length();
+  const intptr_t other_len = other.Length();
+  const auto& result = TypeArguments::Handle(
+      zone, TypeArguments::New(this_len + other_len, Heap::kNew));
+  auto& type = AbstractType::Handle(zone);
+  for (intptr_t i = 0; i < this_len; ++i) {
+    type = TypeAt(i);
+    result.SetTypeAt(i, type);
+  }
+  for (intptr_t i = 0; i < other_len; ++i) {
+    type = other.TypeAt(i);
+    result.SetTypeAt(this_len + i, type);
+  }
+  return result.raw();
 }
 
 RawString* TypeArguments::SubvectorName(intptr_t from_index,
@@ -13367,12 +13392,6 @@ void ICData::SetReceiversStaticType(const AbstractType& type) const {
 }
 #endif
 
-void ICData::ResetSwitchable(Zone* zone) const {
-  ASSERT(NumArgsTested() == 1);
-  ASSERT(!is_tracking_exactness());
-  set_entries(Array::Handle(zone, CachedEmptyICDataArray(1, false)));
-}
-
 const char* ICData::ToCString() const {
   Zone* zone = Thread::Current()->zone();
   const String& name = String::Handle(zone, target_name());
@@ -14171,7 +14190,18 @@ RawICData* ICData::AsUnaryClassChecksSortedByCount() const {
   return result.raw();
 }
 
+RawUnlinkedCall* ICData::AsUnlinkedCall() const {
+  ASSERT(NumArgsTested() == 1);
+  ASSERT(!is_tracking_exactness());
+  const UnlinkedCall& result = UnlinkedCall::Handle(UnlinkedCall::New());
+  result.set_target_name(String::Handle(target_name()));
+  result.set_args_descriptor(Array::Handle(arguments_descriptor()));
+  return result.raw();
+}
+
 RawMegamorphicCache* ICData::AsMegamorphicCache() const {
+  ASSERT(NumArgsTested() == 1);
+  ASSERT(!is_tracking_exactness());
   const String& name = String::Handle(target_name());
   const Array& descriptor = Array::Handle(arguments_descriptor());
   return MegamorphicCacheTable::Lookup(Isolate::Current(), name, descriptor);
@@ -14822,7 +14852,7 @@ RawCode* Code::FinalizeCodeAndNotify(const char* name,
 }
 
 RawCode* Code::FinalizeCode(FlowGraphCompiler* compiler,
-                            Assembler* assembler,
+                            compiler::Assembler* assembler,
                             PoolAttachment pool_attachment,
                             bool optimized,
                             CodeStatistics* stats /* = nullptr */) {
@@ -15319,7 +15349,7 @@ TokenPosition Bytecode::GetTokenIndexOfPC(uword return_address) const {
     return TokenPosition::kNoSource;
   }
   uword pc_offset = return_address - PayloadStart();
-  // PC could equal to bytecode size if the last instruction is Throw.
+  // pc_offset could equal to bytecode size if the last instruction is Throw.
   ASSERT(pc_offset <= static_cast<uword>(Size()));
   kernel::BytecodeSourcePositionsIterator iter(Thread::Current()->zone(),
                                                *this);
@@ -15360,6 +15390,26 @@ intptr_t Bytecode::GetTryIndexAtPc(uword return_address) const {
     }
   }
   return try_index;
+#endif
+}
+
+uword Bytecode::GetDebugCheckedOpcodePc(uword from_offset,
+                                        uword to_offset) const {
+#if defined(DART_PRECOMPILED_RUNTIME)
+  UNREACHABLE();
+#else
+  uword pc = PayloadStart() + from_offset;
+  uword end_pc = pc + (to_offset - from_offset);
+  while (pc < end_pc) {
+    uword next_pc = KernelBytecode::Next(pc);
+    if (KernelBytecode::IsDebugCheckedOpcode(
+            reinterpret_cast<const KBCInstr*>(pc))) {
+      // Return the pc after the opcode, i.e. its 'return address'.
+      return next_pc;
+    }
+    pc = next_pc;
+  }
+  return 0;
 #endif
 }
 
@@ -15405,6 +15455,16 @@ const char* Bytecode::QualifiedName() const {
   }
   const char* function_name =
       String::Handle(zone, fun.QualifiedScrubbedName()).ToCString();
+  return zone->PrintToString("[Bytecode] %s", function_name);
+}
+
+const char* Bytecode::FullyQualifiedName() const {
+  Zone* zone = Thread::Current()->zone();
+  const Function& fun = Function::Handle(zone, function());
+  if (fun.IsNull()) {
+    return BytecodeStubName(*this);
+  }
+  const char* function_name = fun.ToFullyQualifiedCString();
   return zone->PrintToString("[Bytecode] %s", function_name);
 }
 

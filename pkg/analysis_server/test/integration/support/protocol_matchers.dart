@@ -617,12 +617,6 @@ final Matcher isFilePath = isString;
  *   "parentAssociationLabel": optional String
  *   "variableName": optional String
  *   "children": optional List<FlutterOutline>
- *   "id": optional int
- *   "isWidgetClass": optional bool
- *   "renderConstructor": optional String
- *   "stateClassName": optional String
- *   "stateOffset": optional int
- *   "stateLength": optional int
  * }
  */
 final Matcher isFlutterOutline =
@@ -639,13 +633,7 @@ final Matcher isFlutterOutline =
           "className": isString,
           "parentAssociationLabel": isString,
           "variableName": isString,
-          "children": isListOf(isFlutterOutline),
-          "id": isInt,
-          "isWidgetClass": isBool,
-          "renderConstructor": isString,
-          "stateClassName": isString,
-          "stateOffset": isInt,
-          "stateLength": isInt
+          "children": isListOf(isFlutterOutline)
         }));
 
 /**
@@ -698,6 +686,100 @@ final Matcher isFlutterOutlineKind = new MatchesEnum("FlutterOutlineKind", [
  * }
  */
 final Matcher isFlutterService = new MatchesEnum("FlutterService", ["OUTLINE"]);
+
+/**
+ * FlutterWidgetProperty
+ *
+ * {
+ *   "id": int
+ *   "name": String
+ *   "documentation": optional String
+ *   "expression": optional String
+ *   "isRequired": bool
+ *   "isSafeToUpdate": bool
+ *   "editor": optional FlutterWidgetPropertyEditor
+ *   "children": optional List<FlutterWidgetProperty>
+ *   "value": optional FlutterWidgetPropertyValue
+ * }
+ */
+final Matcher isFlutterWidgetProperty =
+    new LazyMatcher(() => new MatchesJsonObject("FlutterWidgetProperty", {
+          "id": isInt,
+          "name": isString,
+          "isRequired": isBool,
+          "isSafeToUpdate": isBool
+        }, optionalFields: {
+          "documentation": isString,
+          "expression": isString,
+          "editor": isFlutterWidgetPropertyEditor,
+          "children": isListOf(isFlutterWidgetProperty),
+          "value": isFlutterWidgetPropertyValue
+        }));
+
+/**
+ * FlutterWidgetPropertyEditor
+ *
+ * {
+ *   "kind": FlutterWidgetPropertyEditorKind
+ *   "enumItems": optional List<FlutterWidgetPropertyValueEnumItem>
+ * }
+ */
+final Matcher isFlutterWidgetPropertyEditor = new LazyMatcher(() =>
+    new MatchesJsonObject("FlutterWidgetPropertyEditor", {
+      "kind": isFlutterWidgetPropertyEditorKind
+    }, optionalFields: {
+      "enumItems": isListOf(isFlutterWidgetPropertyValueEnumItem)
+    }));
+
+/**
+ * FlutterWidgetPropertyEditorKind
+ *
+ * enum {
+ *   BOOL
+ *   DOUBLE
+ *   ENUM
+ *   INT
+ *   STRING
+ * }
+ */
+final Matcher isFlutterWidgetPropertyEditorKind = new MatchesEnum(
+    "FlutterWidgetPropertyEditorKind",
+    ["BOOL", "DOUBLE", "ENUM", "INT", "STRING"]);
+
+/**
+ * FlutterWidgetPropertyValue
+ *
+ * {
+ *   "boolValue": optional bool
+ *   "doubleValue": optional double
+ *   "intValue": optional int
+ *   "stringValue": optional String
+ *   "enumValue": optional FlutterWidgetPropertyValueEnumItem
+ * }
+ */
+final Matcher isFlutterWidgetPropertyValue = new LazyMatcher(() =>
+    new MatchesJsonObject("FlutterWidgetPropertyValue", null, optionalFields: {
+      "boolValue": isBool,
+      "doubleValue": isDouble,
+      "intValue": isInt,
+      "stringValue": isString,
+      "enumValue": isFlutterWidgetPropertyValueEnumItem
+    }));
+
+/**
+ * FlutterWidgetPropertyValueEnumItem
+ *
+ * {
+ *   "libraryUri": String
+ *   "className": String
+ *   "name": String
+ *   "documentation": optional String
+ * }
+ */
+final Matcher isFlutterWidgetPropertyValueEnumItem = new LazyMatcher(() =>
+    new MatchesJsonObject("FlutterWidgetPropertyValueEnumItem",
+        {"libraryUri": isString, "className": isString, "name": isString},
+        optionalFields: {"documentation": isString}));
 
 /**
  * FoldingKind
@@ -1438,6 +1520,8 @@ final Matcher isRequestError = new LazyMatcher(() => new MatchesJsonObject(
  *   CONTENT_MODIFIED
  *   DEBUG_PORT_COULD_NOT_BE_OPENED
  *   FILE_NOT_ANALYZED
+ *   FLUTTER_SET_WIDGET_PROPERTY_VALUE_INVALID_ID
+ *   FLUTTER_SET_WIDGET_PROPERTY_VALUE_IS_REQUIRED
  *   FORMAT_INVALID_FILE
  *   FORMAT_WITH_ERRORS
  *   GET_ERRORS_INVALID_FILE
@@ -1470,6 +1554,8 @@ final Matcher isRequestErrorCode = new MatchesEnum("RequestErrorCode", [
   "CONTENT_MODIFIED",
   "DEBUG_PORT_COULD_NOT_BE_OPENED",
   "FILE_NOT_ANALYZED",
+  "FLUTTER_SET_WIDGET_PROPERTY_VALUE_INVALID_ID",
+  "FLUTTER_SET_WIDGET_PROPERTY_VALUE_IS_REQUIRED",
   "FORMAT_INVALID_FILE",
   "FORMAT_WITH_ERRORS",
   "GET_ERRORS_INVALID_FILE",
@@ -3027,29 +3113,27 @@ final Matcher isExtractWidgetOptions = new LazyMatcher(
     () => new MatchesJsonObject("extractWidget options", {"name": isString}));
 
 /**
- * flutter.getChangeAddForDesignTimeConstructor params
+ * flutter.getWidgetDescription params
  *
  * {
  *   "file": FilePath
  *   "offset": int
  * }
  */
-final Matcher isFlutterGetChangeAddForDesignTimeConstructorParams =
-    new LazyMatcher(() => new MatchesJsonObject(
-        "flutter.getChangeAddForDesignTimeConstructor params",
+final Matcher isFlutterGetWidgetDescriptionParams = new LazyMatcher(() =>
+    new MatchesJsonObject("flutter.getWidgetDescription params",
         {"file": isFilePath, "offset": isInt}));
 
 /**
- * flutter.getChangeAddForDesignTimeConstructor result
+ * flutter.getWidgetDescription result
  *
  * {
- *   "change": SourceChange
+ *   "properties": List<FlutterWidgetProperty>
  * }
  */
-final Matcher isFlutterGetChangeAddForDesignTimeConstructorResult =
-    new LazyMatcher(() => new MatchesJsonObject(
-        "flutter.getChangeAddForDesignTimeConstructor result",
-        {"change": isSourceChange}));
+final Matcher isFlutterGetWidgetDescriptionResult = new LazyMatcher(() =>
+    new MatchesJsonObject("flutter.getWidgetDescription result",
+        {"properties": isListOf(isFlutterWidgetProperty)}));
 
 /**
  * flutter.outline params
@@ -3057,13 +3141,11 @@ final Matcher isFlutterGetChangeAddForDesignTimeConstructorResult =
  * {
  *   "file": FilePath
  *   "outline": FlutterOutline
- *   "instrumentedCode": optional String
  * }
  */
 final Matcher isFlutterOutlineParams = new LazyMatcher(() =>
     new MatchesJsonObject("flutter.outline params",
-        {"file": isFilePath, "outline": isFlutterOutline},
-        optionalFields: {"instrumentedCode": isString}));
+        {"file": isFilePath, "outline": isFlutterOutline}));
 
 /**
  * flutter.setSubscriptions params
@@ -3080,6 +3162,30 @@ final Matcher isFlutterSetSubscriptionsParams = new LazyMatcher(() =>
  * flutter.setSubscriptions result
  */
 final Matcher isFlutterSetSubscriptionsResult = isNull;
+
+/**
+ * flutter.setWidgetPropertyValue params
+ *
+ * {
+ *   "id": int
+ *   "value": optional FlutterWidgetPropertyValue
+ * }
+ */
+final Matcher isFlutterSetWidgetPropertyValueParams = new LazyMatcher(() =>
+    new MatchesJsonObject(
+        "flutter.setWidgetPropertyValue params", {"id": isInt},
+        optionalFields: {"value": isFlutterWidgetPropertyValue}));
+
+/**
+ * flutter.setWidgetPropertyValue result
+ *
+ * {
+ *   "change": SourceChange
+ * }
+ */
+final Matcher isFlutterSetWidgetPropertyValueResult = new LazyMatcher(() =>
+    new MatchesJsonObject(
+        "flutter.setWidgetPropertyValue result", {"change": isSourceChange}));
 
 /**
  * inlineLocalVariable feedback

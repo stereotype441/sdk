@@ -989,9 +989,9 @@ class Instruction : public ZoneAllocated {
 };
 
 struct BranchLabels {
-  Label* true_label;
-  Label* false_label;
-  Label* fall_through;
+  compiler::Label* true_label;
+  compiler::Label* false_label;
+  compiler::Label* fall_through;
 };
 
 class PureInstruction : public Instruction {
@@ -4502,12 +4502,12 @@ class StoreInstanceFieldInstr : public TemplateInstruction<2, NoThrow> {
 
   intptr_t OffsetInBytes() const { return slot().offset_in_bytes(); }
 
-  Assembler::CanBeSmi CanValueBeSmi() const {
+  compiler::Assembler::CanBeSmi CanValueBeSmi() const {
     const intptr_t cid = value()->Type()->ToNullableCid();
     // Write barrier is skipped for nullable and non-nullable smis.
     ASSERT(cid != kSmiCid);
-    return cid == kDynamicCid ? Assembler::kValueCanBeSmi
-                              : Assembler::kValueIsNotSmi;
+    return cid == kDynamicCid ? compiler::Assembler::kValueCanBeSmi
+                              : compiler::Assembler::kValueIsNotSmi;
   }
 
   const Slot& slot_;
@@ -4667,12 +4667,12 @@ class StoreStaticFieldInstr : public TemplateDefinition<1, NoThrow> {
   PRINT_OPERANDS_TO_SUPPORT
 
  private:
-  Assembler::CanBeSmi CanValueBeSmi() const {
+  compiler::Assembler::CanBeSmi CanValueBeSmi() const {
     const intptr_t cid = value()->Type()->ToNullableCid();
     // Write barrier is skipped for nullable and non-nullable smis.
     ASSERT(cid != kSmiCid);
-    return cid == kDynamicCid ? Assembler::kValueCanBeSmi
-                              : Assembler::kValueIsNotSmi;
+    return cid == kDynamicCid ? compiler::Assembler::kValueCanBeSmi
+                              : compiler::Assembler::kValueIsNotSmi;
   }
 
   const Field& field_;
@@ -4939,8 +4939,8 @@ class StoreIndexedInstr : public TemplateInstruction<3, NoThrow> {
   virtual bool HasUnknownSideEffects() const { return false; }
 
  private:
-  Assembler::CanBeSmi CanValueBeSmi() const {
-    return Assembler::kValueCanBeSmi;
+  compiler::Assembler::CanBeSmi CanValueBeSmi() const {
+    return compiler::Assembler::kValueCanBeSmi;
   }
 
   const StoreBarrierType emit_store_barrier_;
@@ -5562,27 +5562,25 @@ class InstantiateTypeArgumentsInstr : public TemplateDefinition<2, Throws> {
 class AllocateContextInstr : public TemplateAllocation<0, NoThrow> {
  public:
   AllocateContextInstr(TokenPosition token_pos,
-                       const GrowableArray<LocalVariable*>& context_variables)
-      : token_pos_(token_pos), context_variables_(context_variables) {}
+                       const ZoneGrowableArray<const Slot*>& context_slots)
+      : token_pos_(token_pos), context_slots_(context_slots) {}
 
   DECLARE_INSTRUCTION(AllocateContext)
   virtual CompileType ComputeType() const;
 
   virtual TokenPosition token_pos() const { return token_pos_; }
-  const GrowableArray<LocalVariable*>& context_variables() const {
-    return context_variables_;
+  const ZoneGrowableArray<const Slot*>& context_slots() const {
+    return context_slots_;
   }
 
-  intptr_t num_context_variables() const {
-    return context_variables().length();
-  }
+  intptr_t num_context_variables() const { return context_slots().length(); }
 
   virtual bool ComputeCanDeoptimize() const { return false; }
 
   virtual bool HasUnknownSideEffects() const { return false; }
 
   virtual bool WillAllocateNewOrRemembered() const {
-    return WillAllocateNewOrRemembered(context_variables().length());
+    return WillAllocateNewOrRemembered(context_slots().length());
   }
 
   static bool WillAllocateNewOrRemembered(intptr_t num_context_variables) {
@@ -5595,7 +5593,7 @@ class AllocateContextInstr : public TemplateAllocation<0, NoThrow> {
 
  private:
   const TokenPosition token_pos_;
-  const GrowableArray<LocalVariable*>& context_variables_;
+  const ZoneGrowableArray<const Slot*>& context_slots_;
 
   DISALLOW_COPY_AND_ASSIGN(AllocateContextInstr);
 };
@@ -5629,19 +5627,19 @@ class CloneContextInstr : public TemplateDefinition<1, NoThrow> {
  public:
   CloneContextInstr(TokenPosition token_pos,
                     Value* context_value,
-                    const GrowableArray<LocalVariable*>& context_variables,
+                    const ZoneGrowableArray<const Slot*>& context_slots,
                     intptr_t deopt_id)
       : TemplateDefinition(deopt_id),
         token_pos_(token_pos),
-        context_variables_(context_variables) {
+        context_slots_(context_slots) {
     SetInputAt(0, context_value);
   }
 
   virtual TokenPosition token_pos() const { return token_pos_; }
   Value* context_value() const { return inputs_[0]; }
 
-  const GrowableArray<LocalVariable*>& context_variables() const {
-    return context_variables_;
+  const ZoneGrowableArray<const Slot*>& context_slots() const {
+    return context_slots_;
   }
 
   DECLARE_INSTRUCTION(CloneContext)
@@ -5653,7 +5651,7 @@ class CloneContextInstr : public TemplateDefinition<1, NoThrow> {
 
  private:
   const TokenPosition token_pos_;
-  const GrowableArray<LocalVariable*>& context_variables_;
+  const ZoneGrowableArray<const Slot*>& context_slots_;
 
   DISALLOW_COPY_AND_ASSIGN(CloneContextInstr);
 };
@@ -7492,15 +7490,15 @@ class CheckClassInstr : public TemplateInstruction<1, NoThrow> {
                    intptr_t cid_start,
                    intptr_t cid_end,
                    bool is_last,
-                   Label* is_ok,
-                   Label* deopt,
+                   compiler::Label* is_ok,
+                   compiler::Label* deopt,
                    bool use_near_jump);
   void EmitBitTest(FlowGraphCompiler* compiler,
                    intptr_t min,
                    intptr_t max,
                    intptr_t mask,
-                   Label* deopt);
-  void EmitNullCheck(FlowGraphCompiler* compiler, Label* deopt);
+                   compiler::Label* deopt);
+  void EmitNullCheck(FlowGraphCompiler* compiler, compiler::Label* deopt);
 
   DISALLOW_COPY_AND_ASSIGN(CheckClassInstr);
 };

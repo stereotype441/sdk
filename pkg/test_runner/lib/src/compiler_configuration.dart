@@ -22,7 +22,7 @@ List<String> _replaceDartFiles(List<String> list, String replacement) {
 class CommandArtifact {
   final List<Command> commands;
 
-  /// Expected result of running [command].
+  /// Expected result of running [commands].
   final String filename;
 
   /// MIME type of [filename].
@@ -35,8 +35,6 @@ abstract class CompilerConfiguration {
   final TestConfiguration _configuration;
 
   bool get _isDebug => _configuration.mode.isDebug;
-
-  bool get _isChecked => _configuration.isChecked;
 
   bool get _isHostChecked => _configuration.isHostChecked;
 
@@ -234,7 +232,7 @@ class VMKernelCompilerConfiguration extends CompilerConfiguration
     if (runtimeConfiguration is DartkAdbRuntimeConfiguration) {
       // On Android the Dill file will be pushed to a different directory on the
       // device. Use that one instead.
-      filename = "${DartkAdbRuntimeConfiguration.DeviceTestDir}/out.dill";
+      filename = "${DartkAdbRuntimeConfiguration.deviceTestDir}/out.dill";
     }
 
     return [
@@ -362,8 +360,9 @@ class ComposedCompilerConfiguration extends CompilerConfiguration {
 
 /// Common configuration for dart2js-based tools, such as dart2js.
 class Dart2xCompilerConfiguration extends CompilerConfiguration {
+  static final Map<String, List<Uri>> _bootstrapDependenciesCache = {};
+
   final String moniker;
-  static Map<String, List<Uri>> _bootstrapDependenciesCache = {};
 
   Dart2xCompilerConfiguration(this.moniker, TestConfiguration configuration)
       : super._subclass(configuration);
@@ -441,7 +440,7 @@ class Dart2jsCompilerConfiguration extends Dart2xCompilerConfiguration {
     // TODO(athom): input filename extraction is copied from DDC. Maybe this
     // should be passed to computeCompilationArtifact, instead?
     var inputFile = arguments.last;
-    var inputFilename = (Uri.file(inputFile)).pathSegments.last;
+    var inputFilename = Uri.file(inputFile).pathSegments.last;
     var out = "$tempDir/${inputFilename.replaceAll('.dart', '.js')}";
     var babel = _configuration.babel;
     var babelOut = out;
@@ -603,7 +602,7 @@ class DevCompilerConfiguration extends CompilerConfiguration {
     // computeCompilerArguments() to here seems hacky. Is there a cleaner way?
     var sharedOptions = arguments.sublist(0, arguments.length - 1);
     var inputFile = arguments.last;
-    var inputFilename = (Uri.file(inputFile)).pathSegments.last;
+    var inputFilename = Uri.file(inputFile).pathSegments.last;
     var outputFile = "$tempDir/${inputFilename.replaceAll('.dart', '.js')}";
 
     return CommandArtifact(
@@ -832,7 +831,7 @@ class PrecompilerCompilerConfiguration extends CompilerConfiguration
     if (runtimeConfiguration is DartPrecompiledAdbRuntimeConfiguration) {
       // On android the precompiled snapshot will be pushed to a different
       // directory on the device, use that one instead.
-      dir = DartPrecompiledAdbRuntimeConfiguration.DeviceTestDir;
+      dir = DartPrecompiledAdbRuntimeConfiguration.deviceTestDir;
     }
     originalArguments =
         _replaceDartFiles(originalArguments, "$dir/out.aotsnapshot");
@@ -1056,7 +1055,7 @@ abstract class VMKernelCompilerMixin {
   Command computeCompileToKernelCommand(String tempDir, List<String> arguments,
       Map<String, String> environmentOverrides) {
     final pkgVmDir = Platform.script.resolve('../../../pkg/vm').toFilePath();
-    final genKernel = '${pkgVmDir}/tool/gen_kernel${executableScriptSuffix}';
+    final genKernel = '$pkgVmDir/tool/gen_kernel$executableScriptSuffix';
 
     final String useAbiVersion = arguments.firstWhere(
         (arg) => arg.startsWith('--use-abi-version='),

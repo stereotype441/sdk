@@ -514,13 +514,13 @@ static void GenerateDeoptimizationSequence(Assembler* assembler,
   // The code in this frame may not cause GC. kDeoptimizeCopyFrameRuntimeEntry
   // and kDeoptimizeFillFrameRuntimeEntry are leaf runtime calls.
   const intptr_t saved_result_slot_from_fp =
-      compiler::target::frame_layout.first_local_from_fp + 1 -
+      target::frame_layout.first_local_from_fp + 1 -
       (kNumberOfCpuRegisters - EAX);
   const intptr_t saved_exception_slot_from_fp =
-      compiler::target::frame_layout.first_local_from_fp + 1 -
+      target::frame_layout.first_local_from_fp + 1 -
       (kNumberOfCpuRegisters - EAX);
   const intptr_t saved_stacktrace_slot_from_fp =
-      compiler::target::frame_layout.first_local_from_fp + 1 -
+      target::frame_layout.first_local_from_fp + 1 -
       (kNumberOfCpuRegisters - EDX);
   // Result in EAX is preserved as part of pushing all registers below.
 
@@ -583,18 +583,14 @@ static void GenerateDeoptimizationSequence(Assembler* assembler,
   __ CallRuntime(kDeoptimizeFillFrameRuntimeEntry, 1);
   if (kind == kLazyDeoptFromReturn) {
     // Restore result into EBX.
-    __ movl(EBX,
-            Address(EBP, compiler::target::frame_layout.first_local_from_fp *
-                             target::kWordSize));
+    __ movl(EBX, Address(EBP, target::frame_layout.first_local_from_fp *
+                                  target::kWordSize));
   } else if (kind == kLazyDeoptFromThrow) {
     // Restore result into EBX.
-    __ movl(EBX,
-            Address(EBP, compiler::target::frame_layout.first_local_from_fp *
-                             target::kWordSize));
-    __ movl(
-        ECX,
-        Address(EBP, (compiler::target::frame_layout.first_local_from_fp - 1) *
-                         target::kWordSize));
+    __ movl(EBX, Address(EBP, target::frame_layout.first_local_from_fp *
+                                  target::kWordSize));
+    __ movl(ECX, Address(EBP, (target::frame_layout.first_local_from_fp - 1) *
+                                  target::kWordSize));
   }
   // Code above cannot cause GC.
   __ LeaveFrame();
@@ -2672,15 +2668,6 @@ void StubCodeCompiler::GenerateMegamorphicCallStub(Assembler* assembler) {
   __ Bind(&smi_case);
   __ movl(EAX, Immediate(kSmiCid));
   __ jmp(&cid_loaded);
-}
-
-// Called from switchable IC calls.
-//  EBX: receiver
-//  ECX: ICData (preserved)
-// Passed to target:
-//  EDX: arguments descriptor
-void StubCodeCompiler::GenerateICCallThroughFunctionStub(Assembler* assembler) {
-  __ int3();  // AOT only.
 }
 
 void StubCodeCompiler::GenerateICCallThroughCodeStub(Assembler* assembler) {

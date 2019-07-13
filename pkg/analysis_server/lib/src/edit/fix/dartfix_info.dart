@@ -8,15 +8,13 @@ import 'package:analysis_server/src/edit/fix/dartfix_listener.dart';
 import 'package:analysis_server/src/edit/fix/dartfix_registrar.dart';
 import 'package:analysis_server/src/edit/fix/fix_error_task.dart';
 import 'package:analysis_server/src/edit/fix/non_nullable_fix.dart';
-import 'package:analysis_server/src/edit/fix/prefer_for_elements_to_map_fromIterable_fix.dart';
-import 'package:analysis_server/src/edit/fix/prefer_if_elements_to_conditional_expressions_fix.dart';
-import 'package:analysis_server/src/edit/fix/prefer_int_literals_fix.dart';
 import 'package:analysis_server/src/edit/fix/prefer_mixin_fix.dart';
-import 'package:analysis_server/src/edit/fix/prefer_spread_collections_fix.dart';
+import 'package:analysis_server/src/edit/fix/basic_fix_lint_assist_task.dart';
+import 'package:analysis_server/src/edit/fix/basic_fix_lint_error_task.dart';
 
 const allFixes = <DartFixInfo>[
   //
-  // Fixes enabled by default
+  // Required fixes due to errors or upcoming language changes
   //
   const DartFixInfo(
     'fix-named-constructor-type-arguments',
@@ -51,7 +49,7 @@ a message is displayed and the class is not converted to a mixin.''',
     isRequired: true,
   ),
   //
-  // Fixes that may be explicitly enabled
+  // Fixes enabled by default
   //
   const DartFixInfo(
     'double-to-int',
@@ -64,8 +62,49 @@ For example, this
 
 will be converted to
   const double myDouble = 8;''',
-    PreferIntLiteralsFix.task,
+    BasicFixLintAssistTask.preferIntLiterals,
   ),
+  const DartFixInfo(
+    'prefer-equal-for-default-values',
+    '''
+Convert declarations to use = to separate a named parameter from its default value.
+
+For example, this
+  f({a: 1}) { }
+
+will be converted to
+  f({a = 1}) { }''',
+    BasicFixLintErrorTask.preferEqualForDefaultValues,
+  ),
+  const DartFixInfo(
+    'prefer-is-empty',
+    '''
+Convert to using 'isEmpty' when checking if a collection or iterable is empty.
+
+For example, this
+  if (lunchBox.length == 0) return 'so hungry...';
+
+will be converted to
+  if (lunchBox.isEmpty) return 'so hungry...';''',
+    BasicFixLintErrorTask.preferIsEmpty,
+    isDefault: false,
+  ),
+  const DartFixInfo(
+    'prefer-is-not-empty',
+    '''
+Convert to using 'isNotEmpty' when checking if a collection or iterable is not empty.
+
+For example, this
+  if (words.length != 0) return words.join(' ');
+
+will be converted to
+  if (words.isNotEmpty) return words.join(' ');''',
+    BasicFixLintErrorTask.preferIsNotEmpty,
+    isDefault: false,
+  ),
+  //
+  // Fixes that may be explicitly enabled
+  //
   const DartFixInfo(
     'use-spread-collections',
     '''
@@ -78,7 +117,7 @@ For example, this
 will be converted to
   var l1 = ['b'];
   var l2 = ['a', ...l1];''',
-    PreferSpreadCollectionsFix.task,
+    BasicFixLintAssistTask.preferSpreadCollections,
     isDefault: false,
   ),
   const DartFixInfo(
@@ -91,7 +130,7 @@ For example, this
 
 will be converted to
   f(bool b) => ['a', if (b) 'c' else 'd', 'e'];''',
-    PreferIfElementsToConditionalExpressionsFix.task,
+    BasicFixLintAssistTask.preferIfElementsToConditionalExpressions,
     isDefault: false,
   ),
   const DartFixInfo(
@@ -104,7 +143,7 @@ For example, this
 
 will be converted to
   <int, int>{ for(int i in [1, 2, 3]) i : i * 2, }''',
-    PreferForElementsToMapFromIterableFix.task,
+    BasicFixLintAssistTask.preferForElementsToMapFromIterable,
     isDefault: false,
   ),
   //

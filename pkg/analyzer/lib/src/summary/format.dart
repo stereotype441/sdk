@@ -22464,6 +22464,7 @@ class UnlinkedExtensionBuilder extends Object
   UnlinkedDocumentationCommentBuilder _documentationComment;
   List<UnlinkedExecutableBuilder> _executables;
   EntityRefBuilder _extendedType;
+  List<UnlinkedVariableBuilder> _fields;
   String _name;
   int _nameOffset;
   List<UnlinkedTypeParamBuilder> _typeParameters;
@@ -22514,6 +22515,15 @@ class UnlinkedExtensionBuilder extends Object
   }
 
   @override
+  List<UnlinkedVariableBuilder> get fields =>
+      _fields ??= <UnlinkedVariableBuilder>[];
+
+  /// Field declarations contained in the extension.
+  set fields(List<UnlinkedVariableBuilder> value) {
+    this._fields = value;
+  }
+
+  @override
   String get name => _name ??= '';
 
   /// Name of the extension, or an empty string if there is no name.
@@ -22546,6 +22556,7 @@ class UnlinkedExtensionBuilder extends Object
       UnlinkedDocumentationCommentBuilder documentationComment,
       List<UnlinkedExecutableBuilder> executables,
       EntityRefBuilder extendedType,
+      List<UnlinkedVariableBuilder> fields,
       String name,
       int nameOffset,
       List<UnlinkedTypeParamBuilder> typeParameters})
@@ -22554,6 +22565,7 @@ class UnlinkedExtensionBuilder extends Object
         _documentationComment = documentationComment,
         _executables = executables,
         _extendedType = extendedType,
+        _fields = fields,
         _name = name,
         _nameOffset = nameOffset,
         _typeParameters = typeParameters;
@@ -22565,6 +22577,7 @@ class UnlinkedExtensionBuilder extends Object
     _documentationComment = null;
     _executables?.forEach((b) => b.flushInformative());
     _extendedType?.flushInformative();
+    _fields?.forEach((b) => b.flushInformative());
     _nameOffset = null;
     _typeParameters?.forEach((b) => b.flushInformative());
   }
@@ -22598,6 +22611,14 @@ class UnlinkedExtensionBuilder extends Object
         x?.collectApiSignature(signature);
       }
     }
+    if (this._fields == null) {
+      signature.addInt(0);
+    } else {
+      signature.addInt(this._fields.length);
+      for (var x in this._fields) {
+        x?.collectApiSignature(signature);
+      }
+    }
   }
 
   fb.Offset finish(fb.Builder fbBuilder) {
@@ -22606,6 +22627,7 @@ class UnlinkedExtensionBuilder extends Object
     fb.Offset offset_documentationComment;
     fb.Offset offset_executables;
     fb.Offset offset_extendedType;
+    fb.Offset offset_fields;
     fb.Offset offset_name;
     fb.Offset offset_typeParameters;
     if (!(_annotations == null || _annotations.isEmpty)) {
@@ -22624,6 +22646,10 @@ class UnlinkedExtensionBuilder extends Object
     }
     if (_extendedType != null) {
       offset_extendedType = _extendedType.finish(fbBuilder);
+    }
+    if (!(_fields == null || _fields.isEmpty)) {
+      offset_fields =
+          fbBuilder.writeList(_fields.map((b) => b.finish(fbBuilder)).toList());
     }
     if (_name != null) {
       offset_name = fbBuilder.writeString(_name);
@@ -22647,6 +22673,9 @@ class UnlinkedExtensionBuilder extends Object
     }
     if (offset_extendedType != null) {
       fbBuilder.addOffset(3, offset_extendedType);
+    }
+    if (offset_fields != null) {
+      fbBuilder.addOffset(8, offset_fields);
     }
     if (offset_name != null) {
       fbBuilder.addOffset(0, offset_name);
@@ -22682,6 +22711,7 @@ class _UnlinkedExtensionImpl extends Object
   idl.UnlinkedDocumentationComment _documentationComment;
   List<idl.UnlinkedExecutable> _executables;
   idl.EntityRef _extendedType;
+  List<idl.UnlinkedVariable> _fields;
   String _name;
   int _nameOffset;
   List<idl.UnlinkedTypeParam> _typeParameters;
@@ -22723,6 +22753,14 @@ class _UnlinkedExtensionImpl extends Object
   }
 
   @override
+  List<idl.UnlinkedVariable> get fields {
+    _fields ??= const fb.ListReader<idl.UnlinkedVariable>(
+            const _UnlinkedVariableReader())
+        .vTableGet(_bc, _bcOffset, 8, const <idl.UnlinkedVariable>[]);
+    return _fields;
+  }
+
+  @override
   String get name {
     _name ??= const fb.StringReader().vTableGet(_bc, _bcOffset, 0, '');
     return _name;
@@ -22757,6 +22795,8 @@ abstract class _UnlinkedExtensionMixin implements idl.UnlinkedExtension {
       _result["executables"] =
           executables.map((_value) => _value.toJson()).toList();
     if (extendedType != null) _result["extendedType"] = extendedType.toJson();
+    if (fields.isNotEmpty)
+      _result["fields"] = fields.map((_value) => _value.toJson()).toList();
     if (name != '') _result["name"] = name;
     if (nameOffset != 0) _result["nameOffset"] = nameOffset;
     if (typeParameters.isNotEmpty)
@@ -22772,6 +22812,7 @@ abstract class _UnlinkedExtensionMixin implements idl.UnlinkedExtension {
         "documentationComment": documentationComment,
         "executables": executables,
         "extendedType": extendedType,
+        "fields": fields,
         "name": name,
         "nameOffset": nameOffset,
         "typeParameters": typeParameters,
@@ -26577,11 +26618,11 @@ class UnlinkedUnitBuilder extends Object
     implements idl.UnlinkedUnit {
   List<int> _apiSignature;
   List<UnlinkedClassBuilder> _classes;
-  List<UnlinkedExtensionBuilder> _extensions;
   CodeRangeBuilder _codeRange;
   List<UnlinkedEnumBuilder> _enums;
   List<UnlinkedExecutableBuilder> _executables;
   List<UnlinkedExportNonPublicBuilder> _exports;
+  List<UnlinkedExtensionBuilder> _extensions;
   List<UnlinkedImportBuilder> _imports;
   bool _isNNBD;
   bool _isPartOf;
@@ -26619,15 +26660,6 @@ class UnlinkedUnitBuilder extends Object
   }
 
   @override
-  List<UnlinkedExtensionBuilder> get extensions =>
-      _extensions ??= <UnlinkedExtensionBuilder>[];
-
-  /// Extensions declared in the compilation unit.
-  set extensions(List<UnlinkedExtensionBuilder> value) {
-    this._extensions = value;
-  }
-
-  @override
   CodeRangeBuilder get codeRange => _codeRange;
 
   /// Code range of the unit.
@@ -26660,6 +26692,15 @@ class UnlinkedUnitBuilder extends Object
   /// Export declarations in the compilation unit.
   set exports(List<UnlinkedExportNonPublicBuilder> value) {
     this._exports = value;
+  }
+
+  @override
+  List<UnlinkedExtensionBuilder> get extensions =>
+      _extensions ??= <UnlinkedExtensionBuilder>[];
+
+  /// Extensions declared in the compilation unit.
+  set extensions(List<UnlinkedExtensionBuilder> value) {
+    this._extensions = value;
   }
 
   @override
@@ -26806,11 +26847,11 @@ class UnlinkedUnitBuilder extends Object
   UnlinkedUnitBuilder(
       {List<int> apiSignature,
       List<UnlinkedClassBuilder> classes,
-      List<UnlinkedExtensionBuilder> extensions,
       CodeRangeBuilder codeRange,
       List<UnlinkedEnumBuilder> enums,
       List<UnlinkedExecutableBuilder> executables,
       List<UnlinkedExportNonPublicBuilder> exports,
+      List<UnlinkedExtensionBuilder> extensions,
       List<UnlinkedImportBuilder> imports,
       bool isNNBD,
       bool isPartOf,
@@ -26828,11 +26869,11 @@ class UnlinkedUnitBuilder extends Object
       List<UnlinkedVariableBuilder> variables})
       : _apiSignature = apiSignature,
         _classes = classes,
-        _extensions = extensions,
         _codeRange = codeRange,
         _enums = enums,
         _executables = executables,
         _exports = exports,
+        _extensions = extensions,
         _imports = imports,
         _isNNBD = isNNBD,
         _isPartOf = isPartOf,
@@ -26852,11 +26893,11 @@ class UnlinkedUnitBuilder extends Object
   /// Flush [informative] data recursively.
   void flushInformative() {
     _classes?.forEach((b) => b.flushInformative());
-    _extensions?.forEach((b) => b.flushInformative());
     _codeRange = null;
     _enums?.forEach((b) => b.flushInformative());
     _executables?.forEach((b) => b.flushInformative());
     _exports?.forEach((b) => b.flushInformative());
+    _extensions?.forEach((b) => b.flushInformative());
     _imports?.forEach((b) => b.flushInformative());
     _libraryAnnotations?.forEach((b) => b.flushInformative());
     _libraryDocumentationComment = null;
@@ -26992,11 +27033,11 @@ class UnlinkedUnitBuilder extends Object
   fb.Offset finish(fb.Builder fbBuilder) {
     fb.Offset offset_apiSignature;
     fb.Offset offset_classes;
-    fb.Offset offset_extensions;
     fb.Offset offset_codeRange;
     fb.Offset offset_enums;
     fb.Offset offset_executables;
     fb.Offset offset_exports;
+    fb.Offset offset_extensions;
     fb.Offset offset_imports;
     fb.Offset offset_libraryAnnotations;
     fb.Offset offset_libraryDocumentationComment;
@@ -27015,10 +27056,6 @@ class UnlinkedUnitBuilder extends Object
       offset_classes = fbBuilder
           .writeList(_classes.map((b) => b.finish(fbBuilder)).toList());
     }
-    if (!(_extensions == null || _extensions.isEmpty)) {
-      offset_extensions = fbBuilder
-          .writeList(_extensions.map((b) => b.finish(fbBuilder)).toList());
-    }
     if (_codeRange != null) {
       offset_codeRange = _codeRange.finish(fbBuilder);
     }
@@ -27033,6 +27070,10 @@ class UnlinkedUnitBuilder extends Object
     if (!(_exports == null || _exports.isEmpty)) {
       offset_exports = fbBuilder
           .writeList(_exports.map((b) => b.finish(fbBuilder)).toList());
+    }
+    if (!(_extensions == null || _extensions.isEmpty)) {
+      offset_extensions = fbBuilder
+          .writeList(_extensions.map((b) => b.finish(fbBuilder)).toList());
     }
     if (!(_imports == null || _imports.isEmpty)) {
       offset_imports = fbBuilder
@@ -27082,9 +27123,6 @@ class UnlinkedUnitBuilder extends Object
     if (offset_classes != null) {
       fbBuilder.addOffset(2, offset_classes);
     }
-    if (offset_extensions != null) {
-      fbBuilder.addOffset(22, offset_extensions);
-    }
     if (offset_codeRange != null) {
       fbBuilder.addOffset(15, offset_codeRange);
     }
@@ -27096,6 +27134,9 @@ class UnlinkedUnitBuilder extends Object
     }
     if (offset_exports != null) {
       fbBuilder.addOffset(13, offset_exports);
+    }
+    if (offset_extensions != null) {
+      fbBuilder.addOffset(22, offset_extensions);
     }
     if (offset_imports != null) {
       fbBuilder.addOffset(5, offset_imports);
@@ -27169,11 +27210,11 @@ class _UnlinkedUnitImpl extends Object
 
   List<int> _apiSignature;
   List<idl.UnlinkedClass> _classes;
-  List<idl.UnlinkedExtension> _extensions;
   idl.CodeRange _codeRange;
   List<idl.UnlinkedEnum> _enums;
   List<idl.UnlinkedExecutable> _executables;
   List<idl.UnlinkedExportNonPublic> _exports;
+  List<idl.UnlinkedExtension> _extensions;
   List<idl.UnlinkedImport> _imports;
   bool _isNNBD;
   bool _isPartOf;
@@ -27206,14 +27247,6 @@ class _UnlinkedUnitImpl extends Object
   }
 
   @override
-  List<idl.UnlinkedExtension> get extensions {
-    _extensions ??= const fb.ListReader<idl.UnlinkedExtension>(
-            const _UnlinkedExtensionReader())
-        .vTableGet(_bc, _bcOffset, 22, const <idl.UnlinkedExtension>[]);
-    return _extensions;
-  }
-
-  @override
   idl.CodeRange get codeRange {
     _codeRange ??= const _CodeRangeReader().vTableGet(_bc, _bcOffset, 15, null);
     return _codeRange;
@@ -27241,6 +27274,14 @@ class _UnlinkedUnitImpl extends Object
             const _UnlinkedExportNonPublicReader())
         .vTableGet(_bc, _bcOffset, 13, const <idl.UnlinkedExportNonPublic>[]);
     return _exports;
+  }
+
+  @override
+  List<idl.UnlinkedExtension> get extensions {
+    _extensions ??= const fb.ListReader<idl.UnlinkedExtension>(
+            const _UnlinkedExtensionReader())
+        .vTableGet(_bc, _bcOffset, 22, const <idl.UnlinkedExtension>[]);
+    return _extensions;
   }
 
   @override
@@ -27364,9 +27405,6 @@ abstract class _UnlinkedUnitMixin implements idl.UnlinkedUnit {
     if (apiSignature.isNotEmpty) _result["apiSignature"] = apiSignature;
     if (classes.isNotEmpty)
       _result["classes"] = classes.map((_value) => _value.toJson()).toList();
-    if (extensions.isNotEmpty)
-      _result["extensions"] =
-          extensions.map((_value) => _value.toJson()).toList();
     if (codeRange != null) _result["codeRange"] = codeRange.toJson();
     if (enums.isNotEmpty)
       _result["enums"] = enums.map((_value) => _value.toJson()).toList();
@@ -27375,6 +27413,9 @@ abstract class _UnlinkedUnitMixin implements idl.UnlinkedUnit {
           executables.map((_value) => _value.toJson()).toList();
     if (exports.isNotEmpty)
       _result["exports"] = exports.map((_value) => _value.toJson()).toList();
+    if (extensions.isNotEmpty)
+      _result["extensions"] =
+          extensions.map((_value) => _value.toJson()).toList();
     if (imports.isNotEmpty)
       _result["imports"] = imports.map((_value) => _value.toJson()).toList();
     if (isNNBD != false) _result["isNNBD"] = isNNBD;
@@ -27412,11 +27453,11 @@ abstract class _UnlinkedUnitMixin implements idl.UnlinkedUnit {
   Map<String, Object> toMap() => {
         "apiSignature": apiSignature,
         "classes": classes,
-        "extensions": extensions,
         "codeRange": codeRange,
         "enums": enums,
         "executables": executables,
         "exports": exports,
+        "extensions": extensions,
         "imports": imports,
         "isNNBD": isNNBD,
         "isPartOf": isPartOf,

@@ -166,7 +166,7 @@ class CompileTimeErrorCode extends ErrorCode {
   //
   // ```dart
   // union(Map<String, String> a, List<String> b, Map<String, String> c) =>
-  //     {...a, ...b, ...c};
+  //     [!{...a, ...b, ...c}!];
   // ```
   //
   // The list `b` can only be spread into a set, and the maps `a` and `c` can
@@ -224,7 +224,7 @@ class CompileTimeErrorCode extends ErrorCode {
   // The following code produces this diagnostic:
   //
   // ```dart
-  // union(a, b) => !{...a, ...b}!;
+  // union(a, b) => [!{...a, ...b}!];
   // ```
   //
   // The problem occurs because there are no type arguments, and there is no
@@ -914,7 +914,7 @@ class CompileTimeErrorCode extends ErrorCode {
           'DEFAULT_LIST_CONSTRUCTOR_MISMATCH',
           "A list whose values cannot be 'null' cannot be given an initial length "
               "because the initial values would all be 'null'.",
-          correction: "Try removing the argument.");
+          correction: "Try removing the argument or using 'List.filled'.");
 
   /**
    * 6.2.1 Required Formals: By means of a function signature that names the
@@ -954,7 +954,7 @@ class CompileTimeErrorCode extends ErrorCode {
   // The following code generates this diagnostic:
   //
   // ```dart
-  // void log({required String !message! = 'no message'}) {}
+  // void log({required String [!message!] = 'no message'}) {}
   // ```
   //
   // #### Common fixes
@@ -1094,7 +1094,7 @@ class CompileTimeErrorCode extends ErrorCode {
   // The following code generates this diagnostic:
   //
   // ```dart
-  // var map = <String, int>{'a': 0, 'b': 1, !'c'!};
+  // var map = <String, int>{'a': 0, 'b': 1, [!'c'!]};
   // ```
   //
   // #### Common fix
@@ -1173,6 +1173,31 @@ class CompileTimeErrorCode extends ErrorCode {
           'EXTENDS_DEFERRED_CLASS', "Classes can't extend deferred classes.",
           correction: "Try specifying a different superclass, or "
               "removing the extends clause.");
+
+  /**
+   * No parameters.
+   */
+  static const CompileTimeErrorCode EXTENSION_DECLARES_ABSTRACT_METHOD =
+      const CompileTimeErrorCode('EXTENSION_DECLARES_ABSTRACT_METHOD',
+          "Extensions can't declare abstract methods.",
+          correction: "Try providing an implementation for the method.");
+
+  /**
+   * No parameters.
+   */
+  static const CompileTimeErrorCode EXTENSION_DECLARES_CONSTRUCTOR =
+      const CompileTimeErrorCode('EXTENSION_DECLARES_CONSTRUCTOR',
+          "Extensions can't declare constructors.",
+          correction: "Try removing the constructor declaration.");
+
+  /**
+   * No parameters.
+   */
+  static const CompileTimeErrorCode EXTENSION_DECLARES_INSTANCE_FIELD =
+      const CompileTimeErrorCode('EXTENSION_DECLARES_INSTANCE_FIELD',
+          "Extensions can't declare instance fields.",
+          correction:
+              "Try removing the field declaration or making it a static field.");
 
   /**
    * 12.14.2 Binding Actuals to Formals: It is a static warning if <i>m &lt;
@@ -1591,11 +1616,11 @@ class CompileTimeErrorCode extends ErrorCode {
       const CompileTimeErrorCode(
           'INTEGER_LITERAL_IMPRECISE_AS_DOUBLE',
           "The integer literal is being used as a double, but can't be "
-              'represented as a 64 bit double without overflow and/or loss of '
-              'precision: {0}',
+              "represented as a 64 bit double without overflow and/or loss of "
+              "precision: {0}",
           correction:
-              'Try using the BigInt class, or switch to the closest valid '
-              'double: {1}');
+              "Try using the BigInt class, or switch to the closest valid "
+              "double: {1}");
 
   /**
    * 15 Metadata: Metadata consists of a series of annotations, each of which
@@ -1698,7 +1723,8 @@ class CompileTimeErrorCode extends ErrorCode {
           "The parameter '{0}' cannot have a value of 'null' because of its "
               "type, but no default value it valid, so it must be a required "
               "parameter.",
-          correction: "Try making this nullable (by adding a '?') or "
+          correction: "Try making this nullable (by adding a '?'), "
+              "adding a default value, or "
               "making this a required parameter.");
 
   /**
@@ -1898,7 +1924,7 @@ class CompileTimeErrorCode extends ErrorCode {
   // The following code generates this diagnostic:
   //
   // ```dart
-  // void log({String !message!}) {}
+  // void log({String [!message!]}) {}
   // ```
   //
   // #### Common fixes
@@ -2511,7 +2537,7 @@ class CompileTimeErrorCode extends ErrorCode {
   //
   // ```dart
   // var m = <String, int>{'a': 0, 'b': 1};
-  // var s = <String>{...m};
+  // var s = <String>{...[!m!]};
   // ```
   //
   // #### Common fix
@@ -2581,7 +2607,7 @@ class CompileTimeErrorCode extends ErrorCode {
   // The following code generates this diagnostic:
   //
   // ```dart
-  // class Invalid extends !Duration?! {}
+  // class Invalid extends [!Duration?!] {}
   // ```
   //
   // #### Common fixes
@@ -2985,9 +3011,9 @@ class CompileTimeErrorCode extends ErrorCode {
    */
   static const CompileTimeErrorCode GENERIC_FUNCTION_TYPE_CANNOT_BE_BOUND =
       const CompileTimeErrorCode('GENERIC_FUNCTION_TYPE_CANNOT_BE_BOUND',
-          'Generic function types may not be used as type parameter bounds',
-          correction: 'Try making the free variable in the function type part'
-              ' of the larger declaration signature');
+          "Generic function types may not be used as type parameter bounds",
+          correction: "Try making the free variable in the function type part"
+              " of the larger declaration signature");
 
   static const CompileTimeErrorCode FOR_IN_WITH_CONST_VARIABLE =
       const CompileTimeErrorCode('FOR_IN_WITH_CONST_VARIABLE',
@@ -4882,10 +4908,46 @@ class StaticWarningCode extends ErrorCode {
   static const StaticWarningCode UNCHECKED_USE_OF_NULLABLE_VALUE =
       const StaticWarningCode(
           'UNCHECKED_USE_OF_NULLABLE_VALUE',
-          'The expression is nullable and must be null-checked before it can be'
-              ' used.',
+          "The expression is nullable and must be null-checked before it can be"
+              " used.",
           correction:
-              'Try casting or check the value is not null before using it.');
+              "Try casting or check the value is not null before using it.");
+
+  /**
+   * When the '...?' operator is used on a value that we know to be non-null,
+   * it is unnecessary.
+   */
+  static const StaticWarningCode UNNECESSARY_NULL_AWARE_SPREAD =
+      const StaticWarningCode('UNNECESSARY_NULL_AWARE_SPREAD',
+          "The target expression cannot be null, and so '?' is not necessary.",
+          correction: "Replace the '...?' with a '...' in the spread.");
+
+  /**
+   * For the purposes of experimenting with potential non-null type semantics.
+   *
+   * Whereas [UNCHECKED_USE_OF_NULLABLE] refers to using a value of type T? as
+   * if it were a T, this refers to using a value of type [Null] itself. These
+   * occur at many of the same times ([Null] is a potentially nullable type) but
+   * it indicates a different type of programmer error and has different
+   * corrections.
+   *
+   * Parameters: none
+   */
+  static const StaticWarningCode INVALID_USE_OF_NULL_VALUE =
+      const StaticWarningCode('INVALID_USE_OF_NULL_VALUE',
+          "This expression is invalid as it will always be null.",
+          correction:
+              'Try changing the type, or casting, to a more useful type like'
+              ' dynamic');
+
+  /**
+   * When the '?.' operator is used on a target that we know to be non-null,
+   * it is unnecessary.
+   */
+  static const StaticWarningCode UNNECESSARY_NULL_AWARE_CALL =
+      const StaticWarningCode('UNNECESSARY_NULL_AWARE_CALL',
+          "The target expression cannot be null, and so '?.' is not necessary.",
+          correction: "Replace the '?.' with a '.' in the invocation.");
 
   /**
    * It is a static warning to assign void to any non-void type in dart.
@@ -4898,9 +4960,9 @@ class StaticWarningCode extends ErrorCode {
       'USE_OF_VOID_RESULT',
       "The expression here has a type of 'void', and therefore cannot be used.",
       correction:
-          'Check if you are using the correct API; there may be a function or'
+          "Check if you are using the correct API; there may be a function or"
           " call that returns void you didn't expect. Also check type parameters"
-          ' and variables which, in rare cases, may be void as well.');
+          " and variables which, in rare cases, may be void as well.");
 
   @override
   final ErrorSeverity errorSeverity;
@@ -4934,8 +4996,6 @@ class StaticWarningCode extends ErrorCode {
  *
  * These error codes tend to use the same message across different severity
  * levels, so they are grouped for clarity.
- *
- * All of these error codes also use the "STRONG_MODE_" prefix in their name.
  */
 class StrongModeCode extends ErrorCode {
   static const String _implicitCastMessage =
@@ -5189,7 +5249,7 @@ class StrongModeCode extends ErrorCode {
   const StrongModeCode(ErrorType type, String name, String message,
       {String correction, bool hasPublishedDocs})
       : type = type,
-        super.temporary('STRONG_MODE_$name', message,
+        super.temporary(name, message,
             correction: correction, hasPublishedDocs: hasPublishedDocs);
 
   @override

@@ -192,6 +192,12 @@ class KernelLibraryBuilder
   // TODO(dmitryas):  Find a way to mark inferred types.
   final Set<DartType> inferredTypes = new Set<DartType>.identity();
 
+  // A library to use for Names generated when compiling code in this library.
+  // This allows code generated in one library to use the private namespace of
+  // another, for example during expression compilation (debugging).
+  Library get nameOrigin => _nameOrigin ?? library;
+  final Library _nameOrigin;
+
   /// Exports that can't be serialized.
   ///
   /// The key is the name of the exported member.
@@ -208,9 +214,10 @@ class KernelLibraryBuilder
   List<KernelFieldBuilder> implicitlyTypedFields;
 
   KernelLibraryBuilder(Uri uri, Uri fileUri, Loader loader, this.actualOrigin,
-      [Scope scope, Library target])
+      {Scope scope, Library target, Library nameOrigin})
       : library = target ??
             (actualOrigin?.library ?? new Library(uri, fileUri: fileUri)),
+        _nameOrigin = nameOrigin,
         super(loader, fileUri, scope);
 
   @override
@@ -687,11 +694,6 @@ class KernelLibraryBuilder
         charOpenParenOffset,
         charEndOffset,
         nativeMethodName);
-    if (formals != null) {
-      for (int i = 0; i < formals.length; i++) {
-        formals[i].parent = procedure;
-      }
-    }
     metadataCollector?.setDocumentationComment(
         procedure.target, documentationComment);
     metadataCollector?.setConstructorNameOffset(procedure.target, name);
@@ -704,7 +706,7 @@ class KernelLibraryBuilder
       currentDeclaration?.hasConstConstructor = true;
       // const constructors will have their initializers compiled and written
       // into the outline.
-      procedure.beginInitializers = beginInitializers;
+      procedure.beginInitializers = beginInitializers ?? Token.eof(-1);
     }
   }
 
@@ -901,12 +903,14 @@ class KernelLibraryBuilder
       KernelTypeBuilder type,
       String name,
       bool hasThis,
-      int charOffset) {
+      int charOffset,
+      Token initializerToken) {
     if (hasThis) {
       modifiers |= initializingFormalMask;
     }
     KernelFormalParameterBuilder formal = new KernelFormalParameterBuilder(
         metadata, modifiers, type, name, this, charOffset);
+    formal.initializerToken = initializerToken;
     if (legacyMode && hasThis && type == null) {
       (untypedInitializingFormals ??= <KernelFormalParameterBuilder>[])
           .add(formal);

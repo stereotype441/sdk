@@ -269,8 +269,7 @@ void StubCodeCompiler::GenerateBuildMethodExtractorStub(
     Assembler* assembler,
     const Object& closure_allocation_stub,
     const Object& context_allocation_stub) {
-  const intptr_t kReceiverOffset =
-      compiler::target::frame_layout.param_end_from_fp + 1;
+  const intptr_t kReceiverOffset = target::frame_layout.param_end_from_fp + 1;
 
   __ EnterStubFrame();
 
@@ -762,13 +761,13 @@ static void GenerateDeoptimizationSequence(Assembler* assembler,
   // The code in this frame may not cause GC. kDeoptimizeCopyFrameRuntimeEntry
   // and kDeoptimizeFillFrameRuntimeEntry are leaf runtime calls.
   const intptr_t saved_result_slot_from_fp =
-      compiler::target::frame_layout.first_local_from_fp + 1 -
+      target::frame_layout.first_local_from_fp + 1 -
       (kNumberOfCpuRegisters - R0);
   const intptr_t saved_exception_slot_from_fp =
-      compiler::target::frame_layout.first_local_from_fp + 1 -
+      target::frame_layout.first_local_from_fp + 1 -
       (kNumberOfCpuRegisters - R0);
   const intptr_t saved_stacktrace_slot_from_fp =
-      compiler::target::frame_layout.first_local_from_fp + 1 -
+      target::frame_layout.first_local_from_fp + 1 -
       (kNumberOfCpuRegisters - R1);
   // Result in R0 is preserved as part of pushing all registers below.
 
@@ -837,16 +836,14 @@ static void GenerateDeoptimizationSequence(Assembler* assembler,
   if (kind == kLazyDeoptFromReturn) {
     // Restore result into R1.
     __ LoadFromOffset(
-        R1, FP,
-        compiler::target::frame_layout.first_local_from_fp * target::kWordSize);
+        R1, FP, target::frame_layout.first_local_from_fp * target::kWordSize);
   } else if (kind == kLazyDeoptFromThrow) {
     // Restore result into R1.
     __ LoadFromOffset(
-        R1, FP,
-        compiler::target::frame_layout.first_local_from_fp * target::kWordSize);
-    __ LoadFromOffset(R2, FP,
-                      (compiler::target::frame_layout.first_local_from_fp - 1) *
-                          target::kWordSize);
+        R1, FP, target::frame_layout.first_local_from_fp * target::kWordSize);
+    __ LoadFromOffset(
+        R2, FP,
+        (target::frame_layout.first_local_from_fp - 1) * target::kWordSize);
   }
   // Code above cannot cause GC.
   // There is a Dart Frame on the stack. We must restore PP and leave frame.
@@ -961,9 +958,8 @@ void StubCodeCompiler::GenerateMegamorphicMissStub(Assembler* assembler) {
   // Load the receiver.
   __ LoadFieldFromOffset(R2, R4, target::ArgumentsDescriptor::count_offset());
   __ add(TMP, FP, Operand(R2, LSL, 2));  // R2 is Smi.
-  __ LoadFromOffset(
-      R6, TMP,
-      compiler::target::frame_layout.param_end_from_fp * target::kWordSize);
+  __ LoadFromOffset(R6, TMP,
+                    target::frame_layout.param_end_from_fp * target::kWordSize);
 
   // Preserve IC data and arguments descriptor.
   __ Push(R5);
@@ -3227,50 +3223,6 @@ void StubCodeCompiler::GenerateMegamorphicCallStub(Assembler* assembler) {
   __ Bind(&smi_case);
   __ LoadImmediate(R0, kSmiCid);
   __ b(&cid_loaded);
-}
-
-// Called from switchable IC calls.
-//  R0: receiver
-//  R5: ICData (preserved)
-// Passed to target:
-//  CODE_REG: target Code object
-//  R4: arguments descriptor
-void StubCodeCompiler::GenerateICCallThroughFunctionStub(Assembler* assembler) {
-  Label loop, found, miss;
-  __ ldr(ARGS_DESC_REG,
-         FieldAddress(R5, target::ICData::arguments_descriptor_offset()));
-  __ ldr(R8, FieldAddress(R5, target::ICData::entries_offset()));
-  __ AddImmediate(R8, target::Array::data_offset() - kHeapObjectTag);
-  // R8: first IC entry
-  __ LoadTaggedClassIdMayBeSmi(R1, R0);
-  // R1: receiver cid as Smi
-
-  __ Bind(&loop);
-  __ ldr(R2, Address(R8, 0));
-  __ cmp(R1, Operand(R2));
-  __ b(&found, EQ);
-  __ CompareImmediate(R2, target::ToRawSmi(kIllegalCid));
-  __ b(&miss, EQ);
-
-  const intptr_t entry_length =
-      target::ICData::TestEntryLengthFor(1, /*tracking_exactness=*/false) *
-      target::kWordSize;
-  __ AddImmediate(R8, entry_length);  // Next entry.
-  __ b(&loop);
-
-  __ Bind(&found);
-  const intptr_t target_offset =
-      target::ICData::TargetIndexFor(1) * target::kWordSize;
-  __ ldr(R0, Address(R8, target_offset));
-  __ ldr(R1, FieldAddress(R0, target::Function::entry_point_offset()));
-  __ ldr(CODE_REG, FieldAddress(R0, target::Function::code_offset()));
-  __ br(R1);
-
-  __ Bind(&miss);
-  __ LoadIsolate(R2);
-  __ ldr(CODE_REG, Address(R2, target::Isolate::ic_miss_code_offset()));
-  __ ldr(R1, FieldAddress(CODE_REG, target::Code::entry_point_offset()));
-  __ br(R1);
 }
 
 void StubCodeCompiler::GenerateICCallThroughCodeStub(Assembler* assembler) {

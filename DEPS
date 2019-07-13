@@ -55,6 +55,7 @@ vars = {
   "args_tag": "1.4.4",
   "async_tag": "2.0.8",
   "bazel_worker_tag": "bazel_worker-v0.1.20",
+  "benchmark_harness_tag": "81641290dea44c34138a109a37e215482f405f81",
   "boolean_selector_tag" : "1.0.4",
   "boringssl_gen_rev": "bbf52f18f425e29b1185f2f6753bec02ed8c5880",
   "boringssl_rev" : "702e2b6d3831486535e958f262a05c75a5cb312e",
@@ -81,11 +82,11 @@ vars = {
   # For more details, see https://github.com/dart-lang/sdk/issues/30164
   "dart_style_tag": "1.2.8",  # Please see the note above before updating.
 
-  "dartdoc_tag" : "v0.28.2",
+  "dartdoc_tag" : "0.28.4",
   "fixnum_tag": "0.10.9",
   "glob_tag": "1.1.7",
   "html_tag" : "0.14.0+1",
-  "http_io_rev": "0b05781c273a040ef521b5f7771dbc0356305872",
+  "http_io_rev": "2fa188caf7937e313026557713f7feffedd4978b",
   "http_multi_server_tag" : "2.0.5",
   "http_parser_tag" : "3.1.3",
   "http_retry_tag": "0.1.1",
@@ -96,7 +97,7 @@ vars = {
   "intl_tag": "0.15.7",
   "jinja2_rev": "2222b31554f03e62600cd7e383376a7c187967a1",
   "json_rpc_2_tag": "2.0.9",
-  "linter_tag": "0.1.93",
+  "linter_tag": "0.1.94",
   "logging_tag": "0.11.3+2",
   "markupsafe_rev": "8f45f5cfa0009d2a70589bcda0349b8cb2b72783",
   "markdown_tag": "2.0.3",
@@ -157,7 +158,7 @@ deps = {
   Var("dart_root") + "/tools/sdks": {
       "packages": [{
           "package": "dart/dart-sdk/${{platform}}",
-          "version": "version:2.3.3-dev.0.0",
+          "version": "version:2.4.0",
       }],
       "dep_type": "cipd",
   },
@@ -236,6 +237,9 @@ deps = {
       Var("dart_git") + "async.git" + "@" + Var("async_tag"),
   Var("dart_root") + "/third_party/pkg/bazel_worker":
       Var("dart_git") + "bazel_worker.git" + "@" + Var("bazel_worker_tag"),
+  Var("dart_root") + "/third_party/pkg/benchmark_harness":
+      Var("dart_git") + "benchmark_harness.git" + "@" +
+      Var("benchmark_harness_tag"),
   Var("dart_root") + "/third_party/pkg/boolean_selector":
       Var("dart_git") + "boolean_selector.git" +
       "@" + Var("boolean_selector_tag"),

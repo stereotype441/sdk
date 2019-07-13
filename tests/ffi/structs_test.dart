@@ -12,6 +12,7 @@ import "package:expect/expect.dart";
 
 import 'coordinate_bare.dart' as bare;
 import 'coordinate.dart';
+import 'utf8.dart';
 
 void main() {
   testStructAllocate();
@@ -19,6 +20,7 @@ void main() {
   testStructWithNulls();
   testBareStruct();
   testTypeTest();
+  testUtf8();
 }
 
 /// allocates each coordinate separately in c memory
@@ -116,4 +118,12 @@ void testTypeTest() {
   Coordinate c = Coordinate.allocate(10, 10, nullptr.cast<Coordinate>());
   Expect.isTrue(c is Struct);
   Expect.isTrue(c is Struct<Coordinate>);
+  c.addressOf.free();
+}
+
+void testUtf8() {
+  final String test = 'Hasta Mañana';
+  final Pointer<Utf8> medium = Utf8.toUtf8(test);
+  Expect.equals(test, Utf8.fromUtf8(medium));
+  medium.free();
 }

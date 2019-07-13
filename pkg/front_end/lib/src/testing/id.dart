@@ -264,6 +264,9 @@ class ActualData<T> {
 abstract class DataRegistry<T> {
   Map<Id, ActualData<T>> get actualMap;
 
+  /// Registers [value] with [id] in [actualMap].
+  ///
+  /// Checks for duplicate data for [id].
   void registerValue(Uri uri, int offset, Id id, T value, Object object) {
     if (actualMap.containsKey(id)) {
       ActualData<T> existingData = actualMap[id];
@@ -280,7 +283,9 @@ abstract class DataRegistry<T> {
     }
   }
 
+  /// Called to report duplicate errors.
   void report(Uri uri, int offset, String message);
 
+  /// Called to raise an exception on duplicate errors.
   void fail(String message);
 }

@@ -275,7 +275,7 @@ class BaseFlowGraphBuilder {
 
   Fragment AssertBool(TokenPosition position);
   Fragment BooleanNegate();
-  Fragment AllocateContext(const GrowableArray<LocalVariable*>& scope);
+  Fragment AllocateContext(const ZoneGrowableArray<const Slot*>& scope);
   Fragment AllocateClosure(TokenPosition position,
                            const Function& closure_function);
   Fragment CreateArray();
@@ -300,6 +300,8 @@ class BaseFlowGraphBuilder {
   Fragment AllocateObject(TokenPosition position,
                           const Class& klass,
                           intptr_t argument_count);
+
+  Fragment DebugStepCheck(TokenPosition position);
 
  protected:
   intptr_t AllocateBlockId() { return ++last_used_block_id_; }

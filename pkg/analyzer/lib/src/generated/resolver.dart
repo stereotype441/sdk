@@ -96,6 +96,13 @@ class AstRewriteVisitor extends ScopedVisitor {
             astFactory.instanceCreationExpression(
                 _getKeyword(node), constructorName, node.argumentList);
         NodeReplacer.replace(node, instanceCreationExpression);
+      } else if (element is ExtensionElement) {
+        AstFactory astFactory = new AstFactoryImpl();
+        ExtensionOverride extensionOverride = astFactory.extensionOverride(
+            extensionName: methodName,
+            typeArguments: node.typeArguments,
+            argumentList: node.argumentList);
+        NodeReplacer.replace(node, extensionOverride);
       }
     } else if (target is SimpleIdentifier) {
       // Possible cases: C.n(), p.C() or p.C<>()
@@ -144,6 +151,15 @@ class AstRewriteVisitor extends ScopedVisitor {
               astFactory.instanceCreationExpression(
                   _getKeyword(node), constructorName, node.argumentList);
           NodeReplacer.replace(node, instanceCreationExpression);
+        } else if (prefixedElement is ExtensionElement) {
+          AstFactory astFactory = new AstFactoryImpl();
+          PrefixedIdentifier extensionName =
+              astFactory.prefixedIdentifier(target, node.operator, methodName);
+          ExtensionOverride extensionOverride = astFactory.extensionOverride(
+              extensionName: extensionName,
+              typeArguments: node.typeArguments,
+              argumentList: node.argumentList);
+          NodeReplacer.replace(node, extensionOverride);
         }
       }
     } else if (target is PrefixedIdentifier) {
@@ -728,7 +744,7 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
         // or have the logic centralized elsewhere, instead of doing this logic
         // here.
         displayName = element.enclosingElement.displayName;
-        if (!element.displayName.isEmpty) {
+        if (element.displayName.isNotEmpty) {
           displayName = "$displayName.${element.displayName}";
         }
       } else if (element is LibraryElement) {
@@ -4188,23 +4204,6 @@ class ResolverVisitor extends ScopedVisitor {
       enclosingClass = outerType;
       _enclosingClassDeclaration = null;
     }
-  }
-
-  /// Implementation of this method should be synchronized with
-  /// [visitClassDeclaration].
-  void visitClassDeclarationIncrementally(ClassDeclaration node) {
-    //
-    // Resolve the metadata in the library scope.
-    //
-    node.metadata?.accept(this);
-    _enclosingClassDeclaration = node;
-    //
-    // Continue the class resolution.
-    //
-    enclosingClass = node.declaredElement;
-    typeAnalyzer.thisType = enclosingClass?.type;
-    node.accept(elementResolver);
-    node.accept(typeAnalyzer);
   }
 
   @override
@@ -8040,7 +8039,7 @@ class TypeResolverVisitor extends ScopedVisitor {
         variable.declaredType = element.returnType;
       } else if (variable.type == null) {
         List<ParameterElement> parameters = element.parameters;
-        DartType type = parameters != null && parameters.length > 0
+        DartType type = parameters != null && parameters.isNotEmpty
             ? parameters[0].type
             : _dynamicType;
         variable.declaredType = type;

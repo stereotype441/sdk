@@ -645,6 +645,9 @@ class OutlineBuilder extends StackListener {
     if (isAbstract) {
       modifiers |= abstractMask;
     }
+    if (nativeMethodName != null) {
+      modifiers |= externalMask;
+    }
     List<MetadataBuilder> metadata = pop();
     checkEmpty(beginToken.charOffset);
     library
@@ -826,6 +829,9 @@ class OutlineBuilder extends StackListener {
       }
     }
     int modifiers = Modifier.validate(pop(), isAbstract: isAbstract);
+    if (nativeMethodName != null) {
+      modifiers |= externalMask;
+    }
     if ((modifiers & externalMask) != 0) {
       modifiers &= ~abstractMask;
     }
@@ -1015,8 +1021,14 @@ class OutlineBuilder extends StackListener {
   }
 
   @override
-  void endFormalParameter(Token thisKeyword, Token periodAfterThis,
-      Token nameToken, FormalParameterKind kind, MemberKind memberKind) {
+  void endFormalParameter(
+      Token thisKeyword,
+      Token periodAfterThis,
+      Token nameToken,
+      Token initializerStart,
+      Token initializerEnd,
+      FormalParameterKind kind,
+      MemberKind memberKind) {
     debugEvent("FormalParameter");
     int charOffset = pop();
     Object name = pop();
@@ -1026,8 +1038,8 @@ class OutlineBuilder extends StackListener {
     if (name is ParserRecovery) {
       push(name);
     } else {
-      push(library.addFormalParameter(
-          metadata, modifiers, type, name, thisKeyword != null, charOffset));
+      push(library.addFormalParameter(metadata, modifiers, type, name,
+          thisKeyword != null, charOffset, initializerStart));
     }
   }
 
@@ -1501,6 +1513,9 @@ class OutlineBuilder extends StackListener {
     int charOffset = pop();
     Object name = pop();
     int modifiers = pop();
+    if (nativeMethodName != null) {
+      modifiers |= externalMask;
+    }
     List<MetadataBuilder> metadata = pop();
     if (name is ParserRecovery) {
       library.endNestedDeclaration("<syntax-error>");

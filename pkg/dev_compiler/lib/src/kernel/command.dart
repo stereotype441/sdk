@@ -15,7 +15,7 @@ import 'package:kernel/class_hierarchy.dart' show ClassHierarchy;
 import 'package:kernel/target/targets.dart';
 import 'package:kernel/text/ast_to_text.dart' as kernel show Printer;
 import 'package:kernel/binary/ast_to_binary.dart' as kernel show BinaryPrinter;
-import 'package:path/path.dart' as path;
+import 'package:path/path.dart' as p;
 import 'package:source_maps/source_maps.dart' show SourceMapBuilder;
 
 import '../compiler/js_names.dart' as js_ast;
@@ -76,7 +76,7 @@ Future<CompilerResult> _compile(List<String> args,
   var argParser = ArgParser(allowTrailingOptions: true)
     ..addFlag('help',
         abbr: 'h', help: 'Display this message.', negatable: false)
-    ..addOption('out', abbr: 'o', help: 'Output file (required).')
+    ..addMultiOption('out', abbr: 'o', help: 'Output file (required).')
     ..addOption('packages', help: 'The package spec file to use.')
     // TODO(jmesserly): is this still useful for us, or can we remove it now?
     ..addFlag('summarize-text',
@@ -95,6 +95,8 @@ Future<CompilerResult> _compile(List<String> args,
         help: 'The directories to search when encountering uris with the '
             'specified multi-root scheme.',
         defaultsTo: [Uri.base.path])
+    ..addOption('multi-root-output-path',
+        help: 'Path to set multi-root files relative to.', hide: true)
     ..addOption('dart-sdk',
         help: '(unsupported with --kernel) path to the Dart SDK.', hide: true)
     ..addFlag('compile-sdk',
@@ -113,12 +115,15 @@ Future<CompilerResult> _compile(List<String> args,
     return CompilerResult(64);
   }
 
-  var output = argResults['out'] as String;
-  if (output == null) {
+  var outPaths = argResults['out'] as List<String>;
+  var moduleFormats = parseModuleFormatOption(argResults);
+  if (outPaths.isEmpty) {
     print('Please specify the output file location. For example:\n'
-        '    -o PATH/TO/OUTPUT_FILE.js'
-        '');
-    print(_usageMessage(argParser));
+        '    -o PATH/TO/OUTPUT_FILE.js');
+    return CompilerResult(64);
+  } else if (outPaths.length != moduleFormats.length) {
+    print('Number of output files (${outPaths.length}) must match '
+        'number of module formats (${moduleFormats.length}).');
     return CompilerResult(64);
   }
 
@@ -136,8 +141,17 @@ Future<CompilerResult> _compile(List<String> args,
   var multiRootPaths = (argResults['multi-root'] as Iterable<String>)
       .map(Uri.base.resolve)
       .toList();
-  var multiRootOutputPath =
-      _longestPrefixingPath(path.absolute(output), multiRootPaths);
+  var multiRootOutputPath = argResults['multi-root-output-path'] as String;
+  if (multiRootOutputPath == null) {
+    if (outPaths.length > 1) {
+      print(
+          'If multiple output files (found ${outPaths.length}) are specified, '
+          'then --multi-root-output-path must be explicitly provided.');
+      return CompilerResult(64);
+    }
+    multiRootOutputPath = _longestPrefixingPath(
+        sourcePathToUri(p.absolute(outPaths.first)), multiRootPaths);
+  }
 
   var fileSystem = MultiRootFileSystem(
       multiRootScheme, multiRootPaths, fe.StandardFileSystem.instance);
@@ -181,10 +195,9 @@ Future<CompilerResult> _compile(List<String> args,
     //
     // Another option: we could make an in-memory file with the relevant info.
     librarySpecPath =
-        path.join(path.dirname(path.dirname(sdkSummaryPath)), "libraries.json");
+        p.join(p.dirname(p.dirname(sdkSummaryPath)), "libraries.json");
     if (!File(librarySpecPath).existsSync()) {
-      librarySpecPath =
-          path.join(path.dirname(sdkSummaryPath), "libraries.json");
+      librarySpecPath = p.join(p.dirname(sdkSummaryPath), "libraries.json");
     }
   }
 
@@ -246,7 +259,8 @@ Future<CompilerResult> _compile(List<String> args,
         DevCompilerTarget(
             TargetFlags(trackWidgetCreation: trackWidgetCreation)),
         fileSystem: fileSystem,
-        experiments: experiments);
+        experiments: experiments,
+        environmentDefines: declaredVariables);
   } else {
     doneInputSummaries = List<Component>(summaryModules.length);
     compilerState = await fe.initializeIncrementalCompiler(
@@ -262,7 +276,8 @@ Future<CompilerResult> _compile(List<String> args,
         DevCompilerTarget(
             TargetFlags(trackWidgetCreation: trackWidgetCreation)),
         fileSystem: fileSystem,
-        experiments: experiments);
+        experiments: experiments,
+        environmentDefines: declaredVariables);
     incrementalCompiler = compilerState.incrementalCompiler;
     cachedSdkInput =
         compilerState.workerInputCache[sourcePathToUri(sdkSummaryPath)];
@@ -289,6 +304,7 @@ Future<CompilerResult> _compile(List<String> args,
   if (useAnalyzer || !useIncrementalCompiler) {
     result = await fe.compile(compilerState, inputs, diagnosticMessageHandler);
   } else {
+    compilerState.options.onDiagnostic = diagnosticMessageHandler;
     Component incrementalComponent = await incrementalCompiler.computeDelta(
         entryPoints: inputs, fullComponent: true);
     hierarchy = incrementalCompiler.userCode.loader.hierarchy;
@@ -304,6 +320,8 @@ Future<CompilerResult> _compile(List<String> args,
       }
     }
   }
+  compilerState.options.onDiagnostic = null; // See http://dartbug.com/36983.
+
   if (result == null || !succeeded) {
     return CompilerResult(1, kernelState: compilerState);
   }
@@ -313,12 +331,15 @@ Future<CompilerResult> _compile(List<String> args,
     return CompilerResult(1, kernelState: compilerState);
   }
 
-  var file = File(output);
-  await file.parent.create(recursive: true);
-
   // Output files can be written in parallel, so collect the futures.
   var outFiles = <Future>[];
   if (argResults['summarize'] as bool) {
+    if (outPaths.length > 1) {
+      print(
+          'If multiple output files (found ${outPaths.length}) are specified, '
+          'the --summarize option is not supported.');
+      return CompilerResult(64);
+    }
     // TODO(jmesserly): CFE mutates the Kernel tree, so we can't save the dill
     // file if we successfully reused a cached library. If compiler state is
     // unchanged, it means we used the cache.
@@ -328,16 +349,22 @@ Future<CompilerResult> _compile(List<String> args,
     if (identical(compilerState, oldCompilerState)) {
       component.unbindCanonicalNames();
     }
-    var sink = File(path.withoutExtension(output) + '.dill').openWrite();
+    var sink = File(p.withoutExtension(outPaths.first) + '.dill').openWrite();
     // TODO(jmesserly): this appears to save external libraries.
     // Do we need to run them through an outlining step so they can be saved?
     kernel.BinaryPrinter(sink).writeComponentFile(component);
     outFiles.add(sink.flush().then((_) => sink.close()));
   }
   if (argResults['summarize-text'] as bool) {
+    if (outPaths.length > 1) {
+      print(
+          'If multiple output files (found ${outPaths.length}) are specified, '
+          'the --summarize-text option is not supported.');
+      return CompilerResult(64);
+    }
     StringBuffer sb = StringBuffer();
     kernel.Printer(sb, showExternal: false).writeComponentFile(component);
-    outFiles.add(File(output + '.txt').writeAsString(sb.toString()));
+    outFiles.add(File(outPaths.first + '.txt').writeAsString(sb.toString()));
   }
   if (hierarchy == null) {
     var target = compilerState.options.target as DevCompilerTarget;
@@ -350,24 +377,28 @@ Future<CompilerResult> _compile(List<String> args,
   var jsModule = compiler.emitModule(
       component, result.inputSummaries, inputSummaries, summaryModules);
 
-  // TODO(jmesserly): support for multiple output formats?
-  //
   // Also the old Analyzer backend had some code to make debugging better when
   // --single-out-file is used, but that option does not appear to be used by
   // any of our build systems.
-  var jsCode = jsProgramToCode(jsModule, options.moduleFormats.first,
-      buildSourceMap: options.sourceMap,
-      inlineSourceMap: options.inlineSourceMap,
-      jsUrl: path.toUri(output).toString(),
-      mapUrl: path.toUri(output + '.map').toString(),
-      bazelMapping: options.bazelMapping,
-      customScheme: multiRootScheme,
-      multiRootOutputPath: multiRootOutputPath);
+  for (var i = 0; i < outPaths.length; ++i) {
+    var output = outPaths[i];
+    var moduleFormat = moduleFormats[i];
+    var file = File(output);
+    await file.parent.create(recursive: true);
+    var jsCode = jsProgramToCode(jsModule, moduleFormat,
+        buildSourceMap: options.sourceMap,
+        inlineSourceMap: options.inlineSourceMap,
+        jsUrl: p.toUri(output).toString(),
+        mapUrl: p.toUri(output + '.map').toString(),
+        bazelMapping: options.bazelMapping,
+        customScheme: multiRootScheme,
+        multiRootOutputPath: multiRootOutputPath);
 
-  outFiles.add(file.writeAsString(jsCode.code));
-  if (jsCode.sourceMap != null) {
-    outFiles.add(
-        File(output + '.map').writeAsString(json.encode(jsCode.sourceMap)));
+    outFiles.add(file.writeAsString(jsCode.code));
+    if (jsCode.sourceMap != null) {
+      outFiles.add(
+          File(output + '.map').writeAsString(json.encode(jsCode.sourceMap)));
+    }
   }
 
   await Future.wait(outFiles);
@@ -421,10 +452,10 @@ JSCode jsProgramToCode(js_ast.Program moduleTree, ModuleFormat format,
     builtMap = placeSourceMap(
         sourceMap.build(jsUrl), mapUrl, bazelMapping, customScheme,
         multiRootOutputPath: multiRootOutputPath);
-    var jsDir = path.dirname(path.fromUri(jsUrl));
-    var relative = path.relative(path.fromUri(mapUrl), from: jsDir);
-    var relativeMapUrl = path.toUri(relative).toString();
-    assert(path.dirname(jsUrl) == path.dirname(mapUrl));
+    var jsDir = p.dirname(p.fromUri(jsUrl));
+    var relative = p.relative(p.fromUri(mapUrl), from: jsDir);
+    var relativeMapUrl = p.toUri(relative).toString();
+    assert(p.dirname(jsUrl) == p.dirname(mapUrl));
     printer.emit('\n//# sourceMappingURL=');
     printer.emit(relativeMapUrl);
     printer.emit('\n');
@@ -469,12 +500,12 @@ Map<String, String> parseAndRemoveDeclaredVariables(List<String> args) {
 
 /// The default path of the kernel summary for the Dart SDK.
 final defaultSdkSummaryPath =
-    path.join(getSdkPath(), 'lib', '_internal', 'ddc_sdk.dill');
+    p.join(getSdkPath(), 'lib', '_internal', 'ddc_sdk.dill');
 
-final defaultLibrarySpecPath = path.join(getSdkPath(), 'lib', 'libraries.json');
+final defaultLibrarySpecPath = p.join(getSdkPath(), 'lib', 'libraries.json');
 
 final defaultAnalyzerSdkSummaryPath =
-    path.join(getSdkPath(), 'lib', '_internal', 'ddc_sdk.sum');
+    p.join(getSdkPath(), 'lib', '_internal', 'ddc_sdk.sum');
 
 bool _checkForDartMirrorsImport(Component component) {
   for (var library in component.libraries) {
@@ -506,7 +537,7 @@ String _findPackagesFilePath() {
 
   // Check for $cwd/.packages
   while (true) {
-    var file = File(path.join(dir.path, ".packages"));
+    var file = File(p.join(dir.path, ".packages"));
     if (file.existsSync()) return file.path;
 
     // If we didn't find it, search the parent directory.
@@ -518,7 +549,8 @@ String _findPackagesFilePath() {
 }
 
 /// Inputs must be absolute paths. Returns null if no prefixing path is found.
-String _longestPrefixingPath(String basePath, List<Uri> prefixingPaths) {
+String _longestPrefixingPath(Uri baseUri, List<Uri> prefixingPaths) {
+  var basePath = baseUri.path;
   return prefixingPaths.fold(null, (String previousValue, Uri element) {
     if (basePath.startsWith(element.path) &&
         (previousValue == null || previousValue.length < element.path.length)) {

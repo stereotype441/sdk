@@ -28,6 +28,28 @@
   * `File.openRead()`
   * `HttpRequest`
   * `HttpClientResponse`
+  * `Socket`
+
+  **Possible errors and how to fix them**
+
+    * > The argument type 'Utf8Decoder' can't be assigned to the parameter type 'StreamTransformer<Uint8List, dynamic>'
+
+      > type 'Utf8Decoder' is not a subtype of type 'StreamTransformer' of 'streamTransformer'"
+
+      You can fix these call sites by updating your code to use
+      `StreamTransformer.bind()` instead of `Stream.transform()`, like so:
+
+      *Before:* `stream.transform(utf8.decoder)`
+      *After:* `utf8.decoder.bind(stream)`
+
+    * > The argument type 'IOSink' can't be assigned to the parameter type 'StreamConsumer<Uint8List>'
+
+      > type '_IOSinkImpl' is not a subtype of type 'StreamConsumer<Uint8List>' of 'streamConsumer'
+
+      You can fix these call sites by casting your stream instance to a `Stream<List<int>>` before calling `.pipe()` on the stream, like so:
+
+      *Before:* `stream.pipe(consumer)`
+      *After:* `stream.cast<List<int>>().pipe(consumer)`
 
   Finally, the following typed lists were updated to have their `sublist()`
   methods declare a return type that is the same as the source list:
@@ -47,7 +69,11 @@
   * `Uint32List.sublist()` → `Uint32List`
   * `Uint64List.sublist()` → `Uint64List`
 
-  
+#### `dart:async`
+
+* Add `value` and `error` constructors on `Stream`
+  to allow easily creating single-value or single-error streams.
+
 #### `dart:core`
 
 * Update `Uri` class to support [RFC6874](https://tools.ietf.org/html/rfc6874):
@@ -91,12 +117,18 @@
 #### Pub
 
  * Clean-up invalid git repositories in cache when fetching from git.
+ * **Breaking change**  [#36765](https://github.com/dart-lang/sdk/issues/36765):
+   Packages published to [pub.dev](https://pub.dev) can no longer contain git
+   dependencies. These packages will be rejected by the server.
 
 #### Linter
 
-The Linter was updated to `0.1.93`, which includes the following changes:
+The Linter was updated to `0.1.94`, which includes a number of internal fixes.
 
-* new lint: `avoid_print`
+#### Dartdoc
+
+Dartdoc was updated to `0.28.4`; this version includes several fixes and is based
+on a newer version of the analyzer package.
 
 ## 2.4.0 - 2019-06-27
 

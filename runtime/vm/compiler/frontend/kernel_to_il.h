@@ -133,7 +133,7 @@ class FlowGraphBuilder : public BaseFlowGraphBuilder {
                            bool is_synthesized);
   Fragment TryCatch(int try_handler_index);
   Fragment CheckStackOverflowInPrologue(TokenPosition position);
-  Fragment CloneContext(const GrowableArray<LocalVariable*>& context_variables);
+  Fragment CloneContext(const ZoneGrowableArray<const Slot*>& context_slots);
 
   Fragment InstanceCall(
       TokenPosition position,
@@ -212,7 +212,6 @@ class FlowGraphBuilder : public BaseFlowGraphBuilder {
 
   bool NeedsDebugStepCheck(const Function& function, TokenPosition position);
   bool NeedsDebugStepCheck(Value* value, TokenPosition position);
-  Fragment DebugStepCheck(TokenPosition position);
 
   // Truncates (instead of deoptimizing) if the origin does not fit into the
   // target representation.

@@ -1146,6 +1146,8 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
       _checkForAssignmentToFinal(node.operand);
       _checkForIntNotAssignable(node.operand);
       _checkForNullableDereference(node.operand);
+    } else {
+      _checkForUseOfVoidResult(node);
     }
     super.visitPostfixExpression(node);
   }
@@ -1303,6 +1305,8 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
   void visitSpreadElement(SpreadElement node) {
     if (node.spreadOperator.type != TokenType.PERIOD_PERIOD_PERIOD_QUESTION) {
       _checkForNullableDereference(node.expression);
+    } else {
+      _checkForUnnecessaryNullAware(node.expression, node.spreadOperator);
     }
     super.visitSpreadElement(node);
   }
@@ -1752,7 +1756,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
 
     String name = identifier.name;
     if (element is MethodElement && element.isOperator && name == '-') {
-      if (element.parameters.length == 0) {
+      if (element.parameters.isEmpty) {
         name = 'unary-';
       }
     }
@@ -3114,7 +3118,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
     LibraryElement prevLibrary = _nameToExportElement[name];
     if (prevLibrary != null) {
       if (prevLibrary != exportedLibrary) {
-        if (!name.isEmpty) {
+        if (name.isNotEmpty) {
           _errorReporter.reportErrorForNode(
               StaticWarningCode.EXPORT_DUPLICATED_LIBRARY_NAMED, directive, [
             prevLibrary.definingCompilationUnit.source.uri.toString(),
@@ -3697,7 +3701,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
     // check if there is another imported library with the same name
     LibraryElement prevLibrary = _nameToImportElement[name];
     if (prevLibrary != null) {
-      if (prevLibrary != nodeLibrary && !name.isEmpty) {
+      if (prevLibrary != nodeLibrary && name.isNotEmpty) {
         _errorReporter.reportErrorForNode(
             StaticWarningCode.IMPORT_DUPLICATED_LIBRARY_NAMED, directive, [
           prevLibrary.definingCompilationUnit.source.uri,
@@ -4749,7 +4753,9 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
       return false;
     }
 
-    StaticWarningCode code = StaticWarningCode.UNCHECKED_USE_OF_NULLABLE_VALUE;
+    StaticWarningCode code = expression.staticType == _typeProvider.nullType
+        ? StaticWarningCode.INVALID_USE_OF_NULL_VALUE
+        : StaticWarningCode.UNCHECKED_USE_OF_NULLABLE_VALUE;
 
     if (expression is MethodInvocation) {
       SimpleIdentifier methodName = expression.methodName;
@@ -5428,7 +5434,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
       int loopThroughIndex =
           math.min(typeArguments.length, parameterElements.length);
       bool shouldSubstitute =
-          arguments.length != 0 && arguments.length == parameterTypes.length;
+          arguments.isNotEmpty && arguments.length == parameterTypes.length;
       for (int i = 0; i < loopThroughIndex; i++) {
         DartType argType = typeArguments[i];
         TypeAnnotation argumentNode =
@@ -5570,15 +5576,22 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
   }
 
   void _checkForUnnecessaryNullAware(Expression target, Token operator) {
-    if (operator.type != TokenType.QUESTION_PERIOD || !_isNonNullable) {
+    if (!_isNonNullable) {
+      return;
+    }
+
+    ErrorCode errorCode;
+    if (operator.type == TokenType.QUESTION_PERIOD) {
+      errorCode = StaticWarningCode.UNNECESSARY_NULL_AWARE_CALL;
+    } else if (operator.type == TokenType.PERIOD_PERIOD_PERIOD_QUESTION) {
+      errorCode = StaticWarningCode.UNNECESSARY_NULL_AWARE_SPREAD;
+    } else {
       return;
     }
 
     if (target.staticType != null &&
-        (target.staticType as TypeImpl).nullabilitySuffix ==
-            NullabilitySuffix.none) {
-      _errorReporter.reportErrorForToken(
-          HintCode.UNNECESSARY_NULL_AWARE_CALL, operator, []);
+        _typeSystem.isNonNullable(target.staticType)) {
+      _errorReporter.reportErrorForToken(errorCode, operator, []);
     }
   }
 
@@ -6150,6 +6163,9 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
   /// [1] https://pub.dartlang.org/documentation/meta/latest/meta/mustCallSuper-constant.html
   MethodElement _findOverriddenMemberThatMustCallSuper(MethodDeclaration node) {
     Element member = node.declaredElement;
+    if (member.enclosingElement is! ClassElement) {
+      return null;
+    }
     ClassElement classElement = member.enclosingElement;
     String name = member.name;
 
@@ -6287,7 +6303,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
     // Get the parameters for MethodDeclaration or FunctionDeclaration
     List<ParameterElement> setterParameters = setter.parameters;
     // If there are no setter parameters, return no type.
-    if (setterParameters.length == 0) {
+    if (setterParameters.isEmpty) {
       return null;
     }
     return setterParameters[0].type;

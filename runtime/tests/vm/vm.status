@@ -74,9 +74,13 @@ cc/GenKernelKernelLoadKernel: Skip # Issue 34542.
 cc/GenKernelKernelMaxRSS: Skip # Issue 34393.
 cc/GenKernelKernelReadAllBytecode: Skip # Issue 34393.
 dart/appjit_bytecode_simple_test: Skip # Issue 34393.
+dart/disassemble_determinism_test: Slow # Times out on slower bots.
 
 [ !$strong ]
 dart/callee_side_type_checks_test: SkipByDesign
+
+[ $arch == ia32 && $mode == debug && $system == windows ]
+dart/transferable_test: Skip # This is performance test and somehow debug win ia32 bot's performance is unpredictable
 
 [ $arch != simarm && $arch != simarm64 && $arch != simdbc64 && $hot_reload && ($compiler == dartk || $compiler == dartkb) ]
 dart/data_uri_import_test/base64: Crash
@@ -89,6 +93,7 @@ dart/data_uri_import_test/wrongmime: Crash
 [ $builder_tag == obfuscated && $compiler == dartkp ]
 dart/optimized_stacktrace_line_and_column_test: SkipByDesign # Looks for filenames in stacktrace output
 dart/optimized_stacktrace_line_test: SkipByDesign # Looks for filenames in stacktrace output
+dart/regress_37382_test: SkipByDesign # Matches the type arguments names
 
 [ $compiler == dartk && $mode == product && $runtime == vm ]
 cc/CorelibIsolateStartup: Timeout, Pass
