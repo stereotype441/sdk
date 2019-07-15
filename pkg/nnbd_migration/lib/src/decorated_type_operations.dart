@@ -30,4 +30,9 @@ class DecoratedTypeOperations
   bool isSubtypeOf(DecoratedType leftType, DecoratedType rightType) {
     return _typeSystem.isSubtypeOf(leftType.type, rightType.type);
   }
+
+  @override
+  DecoratedType promoteToNonNull(DecoratedType type) {
+    throw new UnimplementedError('TODO(paulberry)');
+  }
 }

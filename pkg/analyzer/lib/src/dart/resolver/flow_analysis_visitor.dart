@@ -251,13 +251,7 @@ class FlowAnalysisHelper {
     var isLocalVariable = element is LocalVariableElement;
     if (isLocalVariable || element is ParameterElement) {
       if (node.inGetterContext() && !node.inDeclarationContext()) {
-        if (flow.isNullable(element)) {
-          result.nullableNodes.add(node);
-        }
-
-        if (flow.isNonNullable(element)) {
-          result.nonNullableNodes.add(node);
-        }
+        throw UnimplementedError('TODO(paulberry): what to do here?');
       }
     }
   }
@@ -333,14 +327,6 @@ class FlowAnalysisHelper {
 /// The result of performing flow analysis on a unit.
 class FlowAnalysisResult {
   static const _astKey = 'FlowAnalysisResult';
-
-  /// The list of identifiers, resolved to a local variable or a parameter,
-  /// where the variable is known to be nullable.
-  final List<SimpleIdentifier> nullableNodes = [];
-
-  /// The list of identifiers, resolved to a local variable or a parameter,
-  /// where the variable is known to be non-nullable.
-  final List<SimpleIdentifier> nonNullableNodes = [];
 
   /// The list of nodes, [Expression]s or [Statement]s, that cannot be reached,
   /// for example because a previous statement always exits.
@@ -511,4 +497,7 @@ class _TypeSystemTypeOperations
   bool isSubtypeOf(DartType leftType, DartType rightType) {
     return typeSystem.isSubtypeOf(leftType, rightType);
   }
+
+  @override
+  DartType promoteToNonNull(DartType type) => typeSystem.promoteToNonNull(type);
 }

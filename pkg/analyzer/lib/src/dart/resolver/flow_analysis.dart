@@ -86,8 +86,6 @@ class FlowAnalysis<Statement, Expression, Element, Type> {
     var identifyState = _State<Element, Type>(
       false,
       emptySet,
-      emptySet,
-      emptySet,
       const {},
     );
     return FlowAnalysis._(
@@ -108,8 +106,6 @@ class FlowAnalysis<Statement, Expression, Element, Type> {
   ) {
     _current = _State<Element, Type>(
       true,
-      _emptySet,
-      _emptySet,
       _emptySet,
       const {},
     );
@@ -191,8 +187,9 @@ class FlowAnalysis<Statement, Expression, Element, Type> {
     }
 
     _condition = binaryExpression;
-    _conditionTrue = _current.markNullable(_emptySet, variable);
-    _conditionFalse = _current.markNonNullable(_emptySet, variable);
+    _conditionTrue = _current;
+    _conditionFalse =
+        _current.markNonNullable(typeOperations, _emptySet, variable);
   }
 
   /// The [binaryExpression] checks that the [variable] is not equal to `null`.
@@ -202,8 +199,9 @@ class FlowAnalysis<Statement, Expression, Element, Type> {
     }
 
     _condition = binaryExpression;
-    _conditionTrue = _current.markNonNullable(_emptySet, variable);
-    _conditionFalse = _current.markNullable(_emptySet, variable);
+    _conditionTrue =
+        _current.markNonNullable(typeOperations, _emptySet, variable);
+    _conditionFalse = _current;
   }
 
   void doStatement_bodyBegin(Statement doStatement, Set<Element> loopAssigned) {
@@ -374,16 +372,6 @@ class FlowAnalysis<Statement, Expression, Element, Type> {
       _conditionTrue = _current.promote(typeOperations, variable, type);
       _conditionFalse = _current;
     }
-  }
-
-  /// Return `true` if the [variable] is known to be be non-nullable.
-  bool isNonNullable(Element variable) {
-    return !_current.notNonNullable.contains(variable);
-  }
-
-  /// Return `true` if the [variable] is known to be be nullable.
-  bool isNullable(Element variable) {
-    return !_current.notNullable.contains(variable);
   }
 
   void logicalAnd_end(Expression andExpression, Expression rightOperand) {
@@ -601,8 +589,6 @@ class FlowAnalysis<Statement, Expression, Element, Type> {
 
     var newReachable = first.reachable || second.reachable;
     var newNotAssigned = first.notAssigned.union(second.notAssigned);
-    var newNotNullable = first.notNullable.union(second.notNullable);
-    var newNotNonNullable = first.notNonNullable.union(second.notNonNullable);
     var newPromoted = _joinPromoted(first.promoted, second.promoted);
 
     return _State._identicalOrNew(
@@ -610,8 +596,6 @@ class FlowAnalysis<Statement, Expression, Element, Type> {
       second,
       newReachable,
       newNotAssigned,
-      newNotNullable,
-      newNotNonNullable,
       newPromoted,
     );
   }
@@ -676,6 +660,14 @@ abstract class TypeOperations<Element, Type> {
 
   /// Return `true` if the [leftType] is a subtype of the [rightType].
   bool isSubtypeOf(Type leftType, Type rightType);
+
+  /// Returns the non-null promoted version of [type].  For example, given
+  /// `int?`, returns `int`.
+  ///
+  /// Note that some types don't have a non-nullable version (e.g.
+  /// `FutureOr<int?>`), so [type] may be returned unchanged even if it is
+  /// nullable.
+  Type promoteToNonNull(Type type);
 }
 
 /// List based immutable set of elements.
@@ -773,35 +765,25 @@ class _ElementSet<Element> {
 class _State<Element, Type> {
   final bool reachable;
   final _ElementSet<Element> notAssigned;
-  final _ElementSet<Element> notNullable;
-  final _ElementSet<Element> notNonNullable;
   final Map<Element, Type> promoted;
 
   _State(
     this.reachable,
     this.notAssigned,
-    this.notNullable,
-    this.notNonNullable,
     this.promoted,
   );
 
   /// Add a new [variable] to track definite assignment.
   _State<Element, Type> add(Element variable, {bool assigned: false}) {
     var newNotAssigned = assigned ? notAssigned : notAssigned.add(variable);
-    var newNotNullable = notNullable.add(variable);
-    var newNotNonNullable = notNonNullable.add(variable);
 
-    if (identical(newNotAssigned, notAssigned) &&
-        identical(newNotNullable, notNullable) &&
-        identical(newNotNonNullable, notNonNullable)) {
+    if (identical(newNotAssigned, notAssigned)) {
       return this;
     }
 
     return _State<Element, Type>(
       reachable,
       newNotAssigned,
-      newNotNullable,
-      newNotNonNullable,
       promoted,
     );
   }
@@ -810,48 +792,29 @@ class _State<Element, Type> {
     return _State<Element, Type>(
       false,
       notAssigned,
-      notNullable,
-      notNonNullable,
       promoted,
     );
   }
 
   _State<Element, Type> markNonNullable(
-      _ElementSet<Element> emptySet, Element variable) {
-    var newNotNullable = notNullable.add(variable);
-    var newNotNonNullable = notNonNullable.remove(emptySet, variable);
+      TypeOperations<Element, Type> typeOperations,
+      _ElementSet<Element> emptySet,
+      Element variable) {
+    var previousType = promoted[variable];
+    previousType ??= typeOperations.elementType(variable);
+    var type = typeOperations.promoteToNonNull(previousType);
 
-    if (identical(newNotNullable, notNullable) &&
-        identical(newNotNonNullable, notNonNullable)) {
-      return this;
+    if (type != previousType) {
+      var newPromoted = <Element, Type>{}..addAll(promoted);
+      newPromoted[variable] = type;
+      return _State<Element, Type>(
+        reachable,
+        notAssigned,
+        newPromoted,
+      );
     }
 
-    return _State<Element, Type>(
-      reachable,
-      notAssigned,
-      newNotNullable,
-      newNotNonNullable,
-      promoted,
-    );
-  }
-
-  _State<Element, Type> markNullable(
-      _ElementSet<Element> emptySet, Element variable) {
-    var newNotNullable = notNullable.remove(emptySet, variable);
-    var newNotNonNullable = notNonNullable.add(variable);
-
-    if (identical(newNotNullable, notNullable) &&
-        identical(newNotNonNullable, notNonNullable)) {
-      return this;
-    }
-
-    return _State<Element, Type>(
-      reachable,
-      notAssigned,
-      newNotNullable,
-      newNotNonNullable,
-      promoted,
-    );
+    return this;
   }
 
   _State<Element, Type> promote(
@@ -869,8 +832,6 @@ class _State<Element, Type> {
       return _State<Element, Type>(
         reachable,
         notAssigned,
-        notNullable,
-        notNonNullable,
         newPromoted,
       );
     }
@@ -879,19 +840,13 @@ class _State<Element, Type> {
   }
 
   _State<Element, Type> removePromotedAll(Set<Element> variables) {
-    var newNotNullable = notNullable.addAll(variables);
-    var newNotNonNullable = notNonNullable.addAll(variables);
     var newPromoted = _removePromotedAll(promoted, variables);
 
-    if (identical(newNotNullable, notNullable) &&
-        identical(newNotNonNullable, notNonNullable) &&
-        identical(newPromoted, promoted)) return this;
+    if (identical(newPromoted, promoted)) return this;
 
     return _State<Element, Type>(
       reachable,
       notAssigned,
-      newNotNullable,
-      newNotNonNullable,
       newPromoted,
     );
   }
@@ -907,21 +862,6 @@ class _State<Element, Type> {
       empty: emptySet,
       other: other.notAssigned,
     );
-
-    var newNotNullable = emptySet;
-    for (var variable in notNullable.elements) {
-      if (unsafe.contains(variable) || other.notNullable.contains(variable)) {
-        newNotNullable = newNotNullable.add(variable);
-      }
-    }
-
-    var newNotNonNullable = emptySet;
-    for (var variable in notNonNullable.elements) {
-      if (unsafe.contains(variable) ||
-          other.notNonNullable.contains(variable)) {
-        newNotNonNullable = newNotNonNullable.add(variable);
-      }
-    }
 
     var newPromoted = <Element, Type>{};
     for (var variable in promoted.keys) {
@@ -942,8 +882,6 @@ class _State<Element, Type> {
       other,
       newReachable,
       newNotAssigned,
-      newNotNullable,
-      newNotNonNullable,
       newPromoted,
     );
   }
@@ -954,8 +892,6 @@ class _State<Element, Type> {
     return _State<Element, Type>(
       reachable,
       notAssigned,
-      notNullable,
-      notNonNullable,
       promoted,
     );
   }
@@ -971,19 +907,9 @@ class _State<Element, Type> {
         ? notAssigned.remove(emptySet, variable)
         : notAssigned;
 
-    var newNotNullable = isNull
-        ? notNullable.remove(emptySet, variable)
-        : notNullable.add(variable);
-
-    var newNotNonNullable = isNonNull
-        ? notNonNullable.remove(emptySet, variable)
-        : notNonNullable.add(variable);
-
     var newPromoted = _removePromoted(promoted, variable);
 
     if (identical(newNotAssigned, notAssigned) &&
-        identical(newNotNullable, notNullable) &&
-        identical(newNotNonNullable, notNonNullable) &&
         identical(newPromoted, promoted)) {
       return this;
     }
@@ -991,8 +917,6 @@ class _State<Element, Type> {
     return _State<Element, Type>(
       reachable,
       newNotAssigned,
-      newNotNullable,
-      newNotNonNullable,
       newPromoted,
     );
   }
@@ -1038,21 +962,15 @@ class _State<Element, Type> {
     _State<Element, Type> second,
     bool newReachable,
     _ElementSet<Element> newNotAssigned,
-    _ElementSet<Element> newNotNullable,
-    _ElementSet<Element> newNotNonNullable,
     Map<Element, Type> newPromoted,
   ) {
     if (first.reachable == newReachable &&
         identical(first.notAssigned, newNotAssigned) &&
-        identical(first.notNullable, newNotNullable) &&
-        identical(first.notNonNullable, newNotNonNullable) &&
         identical(first.promoted, newPromoted)) {
       return first;
     }
     if (second.reachable == newReachable &&
         identical(second.notAssigned, newNotAssigned) &&
-        identical(second.notNullable, newNotNullable) &&
-        identical(second.notNonNullable, newNotNonNullable) &&
         identical(second.promoted, newPromoted)) {
       return second;
     }
@@ -1060,8 +978,6 @@ class _State<Element, Type> {
     return _State<Element, Type>(
       newReachable,
       newNotAssigned,
-      newNotNullable,
-      newNotNonNullable,
       newPromoted,
     );
   }

@@ -4,6 +4,8 @@
 
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/type_system.dart';
 import 'package:analyzer/src/dart/analysis/experiments.dart';
 import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
 import 'package:analyzer/src/generated/engine.dart';
@@ -708,6 +710,8 @@ class _FlowAnalysisDataComputer extends DataComputer<Set<_FlowAssertion>> {
 class _FlowAnalysisDataExtractor extends AstDataExtractor<Set<_FlowAssertion>> {
   FlowAnalysisResult _flowResult;
 
+  TypeSystem _typeSystem;
+
   _FlowAnalysisDataExtractor(Uri uri,
       Map<Id, ActualData<Set<_FlowAssertion>>> actualMap, this._flowResult)
       : super(uri, actualMap);
@@ -715,18 +719,16 @@ class _FlowAnalysisDataExtractor extends AstDataExtractor<Set<_FlowAssertion>> {
   @override
   Set<_FlowAssertion> computeNodeValue(Id id, AstNode node) {
     Set<_FlowAssertion> result = {};
-    if (_flowResult.nullableNodes.contains(node)) {
-      // We sometimes erroneously annotate a node as both nullable and
-      // non-nullable.  Ignore for now.  TODO(paulberry): fix this.
-      if (!_flowResult.nonNullableNodes.contains(node)) {
-        result.add(_FlowAssertion.nullable);
-      }
-    }
-    if (_flowResult.nonNullableNodes.contains(node)) {
-      // We sometimes erroneously annotate a node as both nullable and
-      // non-nullable.  Ignore for now.  TODO(paulberry): fix this.
-      if (!_flowResult.nullableNodes.contains(node)) {
-        result.add(_FlowAssertion.nonNullable);
+    if (node is SimpleIdentifier && node.inGetterContext()) {
+      var element = node.staticElement;
+      if (element is LocalVariableElement || element is ParameterElement) {
+        var promotedType = node.staticType;
+        var declaredType = (element as VariableElement).type;
+        if (promotedType != declaredType &&
+            _typeSystem.isNullable(declaredType) &&
+            !_typeSystem.isNullable(promotedType)) {
+          result.add(_FlowAssertion.nonNullable);
+        }
       }
     }
     if (_flowResult.unreachableNodes.contains(node)) {
