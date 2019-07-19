@@ -25,9 +25,9 @@ main() {
       var nodeOperations = _NodeOperations();
       var typeOperations = _TypeOperations();
       var functionBodyAccess = _FunctionBodyAccess();
-      var flow = FlowAnalysis<_Statement, _Expression, _Element, _Type>(
+      var flow = FlowAnalysis<_Statement, _Expression, _Variable, _Type>(
           nodeOperations, typeOperations, functionBodyAccess);
-      var x = _Element();
+      var x = _Variable();
       flow.add(x, assigned: true);
       var xNotEqNull = _Expression();
       flow.conditionNotEqNull(xNotEqNull, x);
@@ -41,19 +41,19 @@ main() {
   });
 }
 
-class _Element {}
+class _Variable {}
 
 class _Expression {}
 
-class _FunctionBodyAccess implements FunctionBodyAccess<_Element> {
+class _FunctionBodyAccess implements FunctionBodyAccess<_Variable> {
   @override
-  bool isPotentiallyMutatedInClosure(_Element variable) {
+  bool isPotentiallyMutatedInClosure(_Variable variable) {
     // TODO(paulberry): make tests where this returns true
     return false;
   }
 
   @override
-  bool isPotentiallyMutatedInScope(_Element variable) {
+  bool isPotentiallyMutatedInScope(_Variable variable) {
     throw UnimplementedError('TODO(paulberry)');
   }
 }
@@ -69,14 +69,14 @@ class _Statement {}
 
 class _Type {}
 
-class _TypeOperations implements TypeOperations<_Element, _Type> {
+class _TypeOperations implements TypeOperations<_Variable, _Type> {
   @override
-  _Type elementType(_Element element) {
+  _Type variableType(_Variable variable) {
     throw UnimplementedError('TODO(paulberry)');
   }
 
   @override
-  bool isLocalVariable(_Element element) {
+  bool isLocalVariable(_Variable variable) {
     throw UnimplementedError('TODO(paulberry)');
   }
 

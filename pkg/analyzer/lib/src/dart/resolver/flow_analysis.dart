@@ -661,6 +661,14 @@ abstract class TypeOperations<Variable, Type> {
 
   /// Return the static type of the given [variable].
   Type variableType(Variable variable);
+
+  /// Returns the non-null promoted version of [type].  For example, given
+  /// `int?`, returns `int`.
+  ///
+  /// Note that some types don't have a non-nullable version (e.g.
+  /// `FutureOr<int?>`), so [type] may be returned unchanged even if it is
+  /// nullable.
+  Type promoteToNonNull(Type type);
 }
 
 class _State<Variable, Type> {
