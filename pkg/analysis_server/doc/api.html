@@ -3901,6 +3901,21 @@ a:focus, a:hover {
           The string literal value of the attribute.
           This field is absent if the value is not a string literal.
         </p>
+      </dd><dt class="field"><b>nameLocation: <a href="#type_Location">Location</a><span style="color:#999999"> (optional)</span></b></dt><dd>
+        
+        <p>
+          If the attribute is a named argument, the location of the name,
+          without the colon.
+        </p>
+      </dd><dt class="field"><b>valueLocation: <a href="#type_Location">Location</a><span style="color:#999999"> (optional)</span></b></dt><dd>
+        
+        <p>
+          The location of the value.
+        </p>
+        <p>
+          This field is always available, but marked optional for backward
+          compatibility between new clients with older servers.
+        </p>
       </dd></dl></dd><dt class="typeDefinition"><a name="type_FlutterOutlineKind">FlutterOutlineKind: String</a></dt><dd>
     <p>
       An enumeration of the kinds of FlutterOutline elements. The list of kinds
@@ -3939,17 +3954,7 @@ a:focus, a:hover {
       A property of a Flutter widget.
     </p>
     
-  <dl><dt class="field"><b>id: int</b></dt><dd>
-        
-        <p>
-          The unique identifier of the property, must be passed back to the
-          server when updating the property value. Identifiers become invalid
-          on any source code change.
-        </p>
-      </dd><dt class="field"><b>name: String</b></dt><dd>
-        
-        <p>The name of the property to display to the user.</p>
-      </dd><dt class="field"><b>documentation: String<span style="color:#999999"> (optional)</span></b></dt><dd>
+  <dl><dt class="field"><b>documentation: String<span style="color:#999999"> (optional)</span></b></dt><dd>
         
         <p>
           The documentation of the property to show to the user. Omitted if
@@ -3961,6 +3966,13 @@ a:focus, a:hover {
         <p>
           If the value of this property is set, the Dart code of the expression
           of this property.
+        </p>
+      </dd><dt class="field"><b>id: int</b></dt><dd>
+        
+        <p>
+          The unique identifier of the property, must be passed back to the
+          server when updating the property value. Identifiers become invalid
+          on any source code change.
         </p>
       </dd><dt class="field"><b>isRequired: bool</b></dt><dd>
         
@@ -3977,19 +3989,22 @@ a:focus, a:hover {
           for example when the expression is a reference to a field, so that
           its value is provided from outside, this field is false.
         </p>
-      </dd><dt class="field"><b>editor: <a href="#type_FlutterWidgetPropertyEditor">FlutterWidgetPropertyEditor</a><span style="color:#999999"> (optional)</span></b></dt><dd>
+      </dd><dt class="field"><b>name: String</b></dt><dd>
         
-        <p>
-          The editor that should be used by the client. This field is omitted
-          if the server does not know the editor for this property, for example
-          because it does not have one of the supported types.
-        </p>
+        <p>The name of the property to display to the user.</p>
       </dd><dt class="field"><b>children: List&lt;<a href="#type_FlutterWidgetProperty">FlutterWidgetProperty</a>&gt;<span style="color:#999999"> (optional)</span></b></dt><dd>
         
         <p>
           The list of children properties, if any. For example any property of
           type <tt>EdgeInsets</tt> will have four children properties of type
           <tt>double</tt> - left / top / right / bottom.
+        </p>
+      </dd><dt class="field"><b>editor: <a href="#type_FlutterWidgetPropertyEditor">FlutterWidgetPropertyEditor</a><span style="color:#999999"> (optional)</span></b></dt><dd>
+        
+        <p>
+          The editor that should be used by the client. This field is omitted
+          if the server does not know the editor for this property, for example
+          because it does not have one of the supported types.
         </p>
       </dd><dt class="field"><b>value: <a href="#type_FlutterWidgetPropertyValue">FlutterWidgetPropertyValue</a><span style="color:#999999"> (optional)</span></b></dt><dd>
         
@@ -5068,6 +5083,11 @@ a:focus, a:hover {
           A request specified a FilePath which does not match a file in
           an analysis root, or the requested operation is not available
           for the file.
+        </p>
+      </dd><dt class="value">FLUTTER_GET_WIDGET_DESCRIPTION_NO_WIDGET</dt><dd>
+        
+        <p>
+          The given location does not have a supported widget.
         </p>
       </dd><dt class="value">FLUTTER_SET_WIDGET_PROPERTY_VALUE_INVALID_ID</dt><dd>
         

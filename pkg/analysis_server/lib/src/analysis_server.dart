@@ -43,6 +43,7 @@ import 'package:analysis_server/src/search/search_domain.dart';
 import 'package:analysis_server/src/server/detachable_filesystem_manager.dart';
 import 'package:analysis_server/src/server/diagnostic_server.dart';
 import 'package:analysis_server/src/server/features.dart';
+import 'package:analysis_server/src/services/flutter/widget_descriptions.dart';
 import 'package:analysis_server/src/services/search/search_engine.dart';
 import 'package:analysis_server/src/services/search/search_engine_internal.dart';
 import 'package:analysis_server/src/utilities/null_string_sink.dart';
@@ -119,6 +120,9 @@ class AnalysisServer extends AbstractAnalysisServer {
   /// A table mapping [FlutterService]s to the file paths for which these
   /// notifications should be sent.
   Map<FlutterService, Set<String>> flutterServices = {};
+
+  /// The support for Flutter properties.
+  WidgetDescriptions flutterWidgetDescriptions = WidgetDescriptions();
 
   /// The [Completer] that completes when analysis is complete.
   Completer _onAnalysisCompleteCompleter;
@@ -770,13 +774,8 @@ class ServerContextManagerCallbacks extends ContextManagerCallbacks {
       String path = result.path;
       if (analysisServer.shouldSendErrorsNotificationFor(path)) {
         if (notificationManager != null) {
-          notificationManager.recordAnalysisErrors(
-              NotificationManager.serverId,
-              path,
-              server.doAnalysisError_listFromEngine(
-                  result.session.analysisContext.analysisOptions,
-                  result.lineInfo,
-                  result.errors));
+          notificationManager.recordAnalysisErrors(NotificationManager.serverId,
+              path, server.doAnalysisError_listFromEngine(result));
         } else {
           new_sendErrorNotification(analysisServer, result);
         }

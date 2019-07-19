@@ -143,6 +143,24 @@ class CompileTimeErrorCode extends ErrorCode {
               "explicitly hiding the name in one of the export directives.");
 
   /**
+   * It is a compile time error if there are two applicable extensions defining
+   * the same member and neither is more specific than the other.
+   *
+   * Parameters:
+   * 0: the name of the member
+   * 1: the name of the first declaring extension
+   * 2: the name of the second declaring extension
+   */
+  static const CompileTimeErrorCode AMBIGUOUS_EXTENSION_METHOD_ACCESS =
+      const CompileTimeErrorCode(
+          'AMBIGUOUS_EXTENSION_METHOD_ACCESS',
+          "A member named '{0}' is defined in extensions '{1}' and '{2}' and "
+              "neither is more specific.",
+          correction:
+              "Try using an extension override to specify the extension "
+              "you want to to be chosen.");
+
+  /**
    * No parameters.
    */
   // #### Description
@@ -185,7 +203,7 @@ class CompileTimeErrorCode extends ErrorCode {
   // ```
   //
   // The second fix is to change the elements of one kind into elements that are
-  // consistent with the other elements. For example, you could add the elements
+  // consistent with the other elements. For example, you can add the elements
   // of the list as keys that map to themselves:
   //
   // ```dart
@@ -241,8 +259,8 @@ class CompileTimeErrorCode extends ErrorCode {
   // ```
   //
   // The second fix is to add type information so that the expressions have
-  // either the type `Iterable` or the type `Map`. You could add an explicit
-  // cast or, in this case, add types to the declarations of the two parameters:
+  // either the type `Iterable` or the type `Map`. You can add an explicit cast
+  // or, in this case, add types to the declarations of the two parameters:
   //
   // ```dart
   // union(List<int> a, List<int> b) => {...a, ...b};
@@ -1200,6 +1218,25 @@ class CompileTimeErrorCode extends ErrorCode {
               "Try removing the field declaration or making it a static field.");
 
   /**
+   * No parameters.
+   */
+  static const CompileTimeErrorCode EXTENSION_OVERRIDE_ACCESS_TO_STATIC_MEMBER =
+      const CompileTimeErrorCode(
+          'EXTENSION_OVERRIDE_ACCESS_TO_STATIC_MEMBER',
+          "An extension override can't be used to access a static member from an "
+              "extension.",
+          correction: "Try using just the name of the extension.");
+
+  /**
+   * No parameters.
+   */
+  static const CompileTimeErrorCode EXTENSION_OVERRIDE_ARGUMENT_NOT_ASSIGNABLE =
+      const CompileTimeErrorCode(
+          'EXTENSION_OVERRIDE_ARGUMENT_NOT_ASSIGNABLE',
+          "The argument to the extension override is not assignable to the "
+              "extended type.");
+
+  /**
    * 12.14.2 Binding Actuals to Formals: It is a static warning if <i>m &lt;
    * h</i> or if <i>m &gt; n</i>.
    *
@@ -1695,6 +1732,16 @@ class CompileTimeErrorCode extends ErrorCode {
   static const CompileTimeErrorCode INVALID_CONSTRUCTOR_NAME =
       const CompileTimeErrorCode(
           'INVALID_CONSTRUCTOR_NAME', "Invalid constructor name.");
+
+  /**
+   * No parameters.
+   */
+  static const CompileTimeErrorCode INVALID_EXTENSION_ARGUMENT_COUNT =
+      const CompileTimeErrorCode(
+          'INVALID_EXTENSION_ARGUMENT_COUNT',
+          "Extension overrides must have exactly one argument: "
+              "the value of 'this' in the extension method.",
+          correction: "Try specifying exactly one argument.");
 
   /**
    * 7.6.2 Factories: It is a compile-time error if <i>M</i> is not the name of
@@ -3102,6 +3149,42 @@ class CompileTimeErrorCode extends ErrorCode {
           "The class '{0}' doesn't have an unnamed constructor.",
           correction: "Try defining an unnamed constructor in '{0}', or "
               "invoking a different constructor.");
+
+  /**
+   * Parameters:
+   * 0: the name of the getter that is undefined
+   * 1: the name of the extension that was explicitly specified
+   */
+  static const CompileTimeErrorCode UNDEFINED_EXTENSION_GETTER =
+      const CompileTimeErrorCode('UNDEFINED_EXTENSION_GETTER',
+          "The getter '{0}' isn't defined for the extension '{1}'.",
+          correction:
+              "Try correcting the name to the name of an existing getter, or "
+              "defining a getter named '{0}'.");
+
+  /**
+   * Parameters:
+   * 0: the name of the method that is undefined
+   * 1: the name of the extension that was explicitly specified
+   */
+  static const CompileTimeErrorCode UNDEFINED_EXTENSION_METHOD =
+      const CompileTimeErrorCode('UNDEFINED_EXTENSION_METHOD',
+          "The method '{0}' isn't defined for the extension '{1}'.",
+          correction:
+              "Try correcting the name to the name of an existing method, or "
+              "defining a method named '{0}'.");
+
+  /**
+   * Parameters:
+   * 0: the name of the setter that is undefined
+   * 1: the name of the extension that was explicitly specified
+   */
+  static const CompileTimeErrorCode UNDEFINED_EXTENSION_SETTER =
+      const CompileTimeErrorCode('UNDEFINED_EXTENSION_SETTER',
+          "The setter '{0}' isn't defined for the extension '{1}'.",
+          correction:
+              "Try correcting the name to the name of an existing setter, or "
+              "defining a setter named '{0}'.");
 
   /**
    * 12.14.2 Binding Actuals to Formals: Furthermore, each <i>q<sub>i</sub></i>,

@@ -645,6 +645,8 @@ final Matcher isFlutterOutline =
  *   "literalValueBoolean": optional bool
  *   "literalValueInteger": optional int
  *   "literalValueString": optional String
+ *   "nameLocation": optional Location
+ *   "valueLocation": optional Location
  * }
  */
 final Matcher isFlutterOutlineAttribute =
@@ -654,7 +656,9 @@ final Matcher isFlutterOutlineAttribute =
         }, optionalFields: {
           "literalValueBoolean": isBool,
           "literalValueInteger": isInt,
-          "literalValueString": isString
+          "literalValueString": isString,
+          "nameLocation": isLocation,
+          "valueLocation": isLocation
         }));
 
 /**
@@ -691,28 +695,28 @@ final Matcher isFlutterService = new MatchesEnum("FlutterService", ["OUTLINE"]);
  * FlutterWidgetProperty
  *
  * {
- *   "id": int
- *   "name": String
  *   "documentation": optional String
  *   "expression": optional String
+ *   "id": int
  *   "isRequired": bool
  *   "isSafeToUpdate": bool
- *   "editor": optional FlutterWidgetPropertyEditor
+ *   "name": String
  *   "children": optional List<FlutterWidgetProperty>
+ *   "editor": optional FlutterWidgetPropertyEditor
  *   "value": optional FlutterWidgetPropertyValue
  * }
  */
 final Matcher isFlutterWidgetProperty =
     new LazyMatcher(() => new MatchesJsonObject("FlutterWidgetProperty", {
           "id": isInt,
-          "name": isString,
           "isRequired": isBool,
-          "isSafeToUpdate": isBool
+          "isSafeToUpdate": isBool,
+          "name": isString
         }, optionalFields: {
           "documentation": isString,
           "expression": isString,
-          "editor": isFlutterWidgetPropertyEditor,
           "children": isListOf(isFlutterWidgetProperty),
+          "editor": isFlutterWidgetPropertyEditor,
           "value": isFlutterWidgetPropertyValue
         }));
 
@@ -1520,6 +1524,7 @@ final Matcher isRequestError = new LazyMatcher(() => new MatchesJsonObject(
  *   CONTENT_MODIFIED
  *   DEBUG_PORT_COULD_NOT_BE_OPENED
  *   FILE_NOT_ANALYZED
+ *   FLUTTER_GET_WIDGET_DESCRIPTION_NO_WIDGET
  *   FLUTTER_SET_WIDGET_PROPERTY_VALUE_INVALID_ID
  *   FLUTTER_SET_WIDGET_PROPERTY_VALUE_IS_REQUIRED
  *   FORMAT_INVALID_FILE
@@ -1554,6 +1559,7 @@ final Matcher isRequestErrorCode = new MatchesEnum("RequestErrorCode", [
   "CONTENT_MODIFIED",
   "DEBUG_PORT_COULD_NOT_BE_OPENED",
   "FILE_NOT_ANALYZED",
+  "FLUTTER_GET_WIDGET_DESCRIPTION_NO_WIDGET",
   "FLUTTER_SET_WIDGET_PROPERTY_VALUE_INVALID_ID",
   "FLUTTER_SET_WIDGET_PROPERTY_VALUE_IS_REQUIRED",
   "FORMAT_INVALID_FILE",

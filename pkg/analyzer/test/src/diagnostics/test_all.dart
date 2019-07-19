@@ -59,6 +59,10 @@ import 'extension_declares_abstract_method_test.dart'
 import 'extension_declares_constructor_test.dart'
     as extension_declares_constructor;
 import 'extension_declares_field_test.dart' as extension_declares_field;
+import 'extension_override_access_to_static_member_test.dart'
+    as extension_override_access_to_static_member;
+import 'extension_override_argument_not_assignable_test.dart'
+    as extension_override_argument_not_assignable;
 import 'final_not_initialized_test.dart' as final_not_initialized;
 import 'implements_non_class_test.dart' as implements_non_class;
 import 'implicit_this_reference_in_initializer_test.dart'
@@ -67,6 +71,8 @@ import 'import_deferred_library_with_load_function_test.dart'
     as import_deferred_library_with_load_function;
 import 'invalid_assignment_test.dart' as invalid_assignment;
 import 'invalid_cast_new_expr_test.dart' as invalid_cast_new_expr;
+import 'invalid_extension_argument_count_test.dart'
+    as invalid_extension_argument_count;
 import 'invalid_factory_annotation_test.dart' as invalid_factory_annotation;
 import 'invalid_factory_method_impl_test.dart' as invalid_factory_method_impl;
 import 'invalid_immutable_annotation_test.dart' as invalid_immutable_annotation;
@@ -183,6 +189,9 @@ import 'type_check_is_not_null_test.dart' as type_check_is_not_null;
 import 'type_check_is_null_test.dart' as type_check_is_null;
 import 'unchecked_use_of_nullable_value_test.dart'
     as unchecked_use_of_nullable_value;
+import 'undefined_extension_getter_test.dart' as undefined_extension_getter;
+import 'undefined_extension_method_test.dart' as undefined_extension_method;
+import 'undefined_extension_setter_test.dart' as undefined_extension_setter;
 import 'undefined_getter_test.dart' as undefined_getter;
 import 'undefined_hidden_name_test.dart' as undefined_hidden_name;
 import 'undefined_identifier_test.dart' as undefined_identifier;
@@ -215,7 +224,6 @@ main() {
     ambiguous_import.main();
     ambiguous_set_or_map_literal.main();
     argument_type_not_assignable.main();
-
     assignment_to_const.main();
     assignment_to_final_local.main();
     assignment_to_final_no_setter.main();
@@ -255,12 +263,15 @@ main() {
     extension_declares_abstract_method.main();
     extension_declares_constructor.main();
     extension_declares_field.main();
+    extension_override_access_to_static_member.main();
+    extension_override_argument_not_assignable.main();
     final_not_initialized.main();
     implements_non_class.main();
     implicit_this_reference_in_initializer.main();
     import_deferred_library_with_load_function.main();
     invalid_assignment.main();
     invalid_cast_new_expr.main();
+    invalid_extension_argument_count.main();
     invalid_factory_annotation.main();
     invalid_factory_method_impl.main();
     invalid_immutable_annotation.main();
@@ -342,6 +353,9 @@ main() {
     type_check_is_not_null.main();
     type_check_is_null.main();
     unchecked_use_of_nullable_value.main();
+    undefined_extension_getter.main();
+    undefined_extension_method.main();
+    undefined_extension_setter.main();
     undefined_getter.main();
     undefined_identifier.main();
     undefined_hidden_name.main();

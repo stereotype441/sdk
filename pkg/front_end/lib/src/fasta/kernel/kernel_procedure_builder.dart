@@ -60,7 +60,7 @@ import '../source/source_library_builder.dart' show SourceLibraryBuilder;
 import '../source/source_loader.dart' show SourceLoader;
 
 import '../type_inference/type_inference_engine.dart'
-    show IncludesTypeParametersCovariantly;
+    show IncludesTypeParametersNonCovariantly, Variance;
 
 import 'kernel_body_builder.dart' show KernelBodyBuilder;
 
@@ -73,7 +73,7 @@ import 'kernel_builder.dart'
         KernelFormalParameterBuilder,
         KernelLibraryBuilder,
         KernelMetadataBuilder,
-        KernelTypeBuilder,
+        TypeBuilder,
         KernelTypeVariableBuilder,
         LibraryBuilder,
         MetadataBuilder,
@@ -87,8 +87,7 @@ import 'redirecting_factory_body.dart' show RedirectingFactoryBody;
 
 import 'expression_generator_helper.dart' show ExpressionGeneratorHelper;
 
-abstract class KernelFunctionBuilder
-    extends ProcedureBuilder<KernelTypeBuilder> {
+abstract class KernelFunctionBuilder extends ProcedureBuilder<TypeBuilder> {
   final String nativeMethodName;
 
   FunctionNode function;
@@ -98,7 +97,7 @@ abstract class KernelFunctionBuilder
   KernelFunctionBuilder(
       List<MetadataBuilder> metadata,
       int modifiers,
-      KernelTypeBuilder returnType,
+      TypeBuilder returnType,
       String name,
       List<TypeVariableBuilder> typeVariables,
       List<FormalParameterBuilder> formals,
@@ -159,12 +158,14 @@ abstract class KernelFunctionBuilder
   FunctionNode buildFunction(LibraryBuilder library) {
     assert(function == null);
     FunctionNode result = new FunctionNode(body, asyncMarker: asyncModifier);
-    IncludesTypeParametersCovariantly needsCheckVisitor;
+    IncludesTypeParametersNonCovariantly needsCheckVisitor;
     if (!isConstructor && !isFactory && parent is ClassBuilder) {
       Class enclosingClass = parent.target;
       if (enclosingClass.typeParameters.isNotEmpty) {
-        needsCheckVisitor = new IncludesTypeParametersCovariantly(
-            enclosingClass.typeParameters);
+        needsCheckVisitor = new IncludesTypeParametersNonCovariantly(
+            enclosingClass.typeParameters,
+            // We are checking the parameter types which are in a contravariant position.
+            initialVariance: Variance.contravariant);
       }
     }
     if (typeVariables != null) {
@@ -260,7 +261,7 @@ abstract class KernelFunctionBuilder
       // into the outline. For all other formals we need to call
       // buildOutlineExpressions to clear initializerToken to prevent
       // consuming too much memory.
-      for (FormalParameterBuilder<KernelTypeBuilder> formal in formals) {
+      for (FormalParameterBuilder<TypeBuilder> formal in formals) {
         formal.buildOutlineExpressions(library);
       }
     }
@@ -316,7 +317,7 @@ class KernelProcedureBuilder extends KernelFunctionBuilder {
   KernelProcedureBuilder(
       List<MetadataBuilder> metadata,
       int modifiers,
-      KernelTypeBuilder returnType,
+      TypeBuilder returnType,
       String name,
       List<TypeVariableBuilder> typeVariables,
       List<FormalParameterBuilder> formals,
@@ -447,7 +448,7 @@ class KernelConstructorBuilder extends KernelFunctionBuilder {
   KernelConstructorBuilder(
       List<MetadataBuilder> metadata,
       int modifiers,
-      KernelTypeBuilder returnType,
+      TypeBuilder returnType,
       String name,
       List<TypeVariableBuilder> typeVariables,
       List<FormalParameterBuilder> formals,
@@ -663,7 +664,7 @@ class KernelRedirectingFactoryBuilder extends KernelProcedureBuilder {
   KernelRedirectingFactoryBuilder(
       List<MetadataBuilder> metadata,
       int modifiers,
-      KernelTypeBuilder returnType,
+      TypeBuilder returnType,
       String name,
       List<TypeVariableBuilder> typeVariables,
       List<FormalParameterBuilder> formals,

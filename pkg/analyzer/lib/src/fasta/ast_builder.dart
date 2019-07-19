@@ -215,6 +215,7 @@ class AstBuilder extends StackListener {
     extensionDeclaration = ast.extensionDeclaration(
       comment: comment,
       metadata: metadata,
+      extensionKeyword: extensionKeyword,
       name: name,
       typeParameters: typeParameters,
       extendedType: null, // extendedType is set in [endExtensionDeclaration]
@@ -271,7 +272,9 @@ class AstBuilder extends StackListener {
       assert(staticToken.isModifier);
       String className = classDeclaration != null
           ? classDeclaration.name.name
-          : mixinDeclaration.name.name;
+          : (mixinDeclaration != null
+              ? mixinDeclaration.name.name
+              : extensionDeclaration.name?.name);
       if (name?.lexeme == className && getOrSet == null) {
         // This error is also reported in OutlineBuilder.beginMethod
         handleRecoverableError(

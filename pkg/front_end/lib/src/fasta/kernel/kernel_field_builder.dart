@@ -23,7 +23,7 @@ import '../scope.dart' show Scope;
 import '../source/source_loader.dart' show SourceLoader;
 
 import '../type_inference/type_inference_engine.dart'
-    show IncludesTypeParametersCovariantly;
+    show IncludesTypeParametersNonCovariantly, Variance;
 
 import '../type_inference/type_inferrer.dart' show TypeInferrerImpl;
 
@@ -39,14 +39,14 @@ import 'kernel_builder.dart'
         ImplicitFieldType,
         KernelLibraryBuilder,
         KernelMetadataBuilder,
-        KernelTypeBuilder,
+        TypeBuilder,
         LibraryBuilder,
         MetadataBuilder;
 
 class KernelFieldBuilder extends FieldBuilder<Expression> {
   final Field field;
   final List<MetadataBuilder> metadata;
-  final KernelTypeBuilder type;
+  final TypeBuilder type;
   Token constInitializerToken;
 
   bool hadTypesInferred = false;
@@ -78,12 +78,16 @@ class KernelFieldBuilder extends FieldBuilder<Expression> {
       field.type = type.build(library);
 
       if (!isFinal && !isConst) {
-        IncludesTypeParametersCovariantly needsCheckVisitor;
+        IncludesTypeParametersNonCovariantly needsCheckVisitor;
         if (parent is ClassBuilder) {
           Class enclosingClass = parent.target;
           if (enclosingClass.typeParameters.isNotEmpty) {
-            needsCheckVisitor = new IncludesTypeParametersCovariantly(
-                enclosingClass.typeParameters);
+            needsCheckVisitor = new IncludesTypeParametersNonCovariantly(
+                enclosingClass.typeParameters,
+                // We are checking the field type as if it is the type of the
+                // parameter of the implicit setter and this is a contravariant
+                // position.
+                initialVariance: Variance.contravariant);
           }
         }
         if (needsCheckVisitor != null) {
@@ -184,12 +188,16 @@ class KernelFieldBuilder extends FieldBuilder<Expression> {
       // [inferredType] was computed.
       field.type = inferredType;
 
-      IncludesTypeParametersCovariantly needsCheckVisitor;
+      IncludesTypeParametersNonCovariantly needsCheckVisitor;
       if (parent is ClassBuilder) {
         Class enclosingClass = parent.target;
         if (enclosingClass.typeParameters.isNotEmpty) {
-          needsCheckVisitor = new IncludesTypeParametersCovariantly(
-              enclosingClass.typeParameters);
+          needsCheckVisitor = new IncludesTypeParametersNonCovariantly(
+              enclosingClass.typeParameters,
+              // We are checking the field type as if it is the type of the
+              // parameter of the implicit setter and this is a contravariant
+              // position.
+              initialVariance: Variance.contravariant);
         }
       }
       if (needsCheckVisitor != null) {

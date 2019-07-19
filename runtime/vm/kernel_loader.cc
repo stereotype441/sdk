@@ -209,7 +209,6 @@ KernelLoader::KernelLoader(Program* program,
       bytecode_metadata_helper_(&helper_, &active_class_),
       external_name_class_(Class::Handle(Z)),
       external_name_field_(Field::Handle(Z)),
-      evaluating_(GrowableObjectArray::Handle(Z)),
       potential_natives_(GrowableObjectArray::Handle(Z)),
       potential_pragma_functions_(GrowableObjectArray::Handle(Z)),
       pragma_class_(Class::Handle(Z)),
@@ -456,7 +455,6 @@ KernelLoader::KernelLoader(const Script& script,
       bytecode_metadata_helper_(&helper_, &active_class_),
       external_name_class_(Class::Handle(Z)),
       external_name_field_(Field::Handle(Z)),
-      evaluating_(GrowableObjectArray::Handle(Z)),
       potential_natives_(GrowableObjectArray::Handle(Z)),
       potential_pragma_functions_(GrowableObjectArray::Handle(Z)),
       pragma_class_(Class::Handle(Z)),
@@ -531,16 +529,18 @@ void KernelLoader::AnnotateNativeProcedures() {
       if (tag == kConstantExpression || tag == kDeprecated_ConstantExpression) {
         helper_.ReadByte();  // Skip the tag.
 
-        // We have a candidate.  Let's look if it's an instance of the
+        // We have a candidate. Let's look if it's an instance of the
         // ExternalName class.
         if (tag == kConstantExpression) {
           helper_.ReadPosition();  // Skip fileOffset.
           helper_.SkipDartType();  // Skip type.
         }
         const intptr_t constant_table_offset = helper_.ReadUInt();
-        constant = constant_evaluator.EvaluateConstantExpression(
-            constant_table_offset);
-        if (constant.clazz() == external_name_class_.raw()) {
+        if (constant_evaluator.IsInstanceConstant(constant_table_offset,
+                                                  external_name_class_)) {
+          constant = constant_evaluator.EvaluateConstantExpression(
+              constant_table_offset);
+          ASSERT(constant.clazz() == external_name_class_.raw());
           // We found the annotation, let's flag the function as native and
           // set the native name!
           native_name ^= constant.GetField(external_name_field_);
@@ -665,14 +665,18 @@ void KernelLoader::LoadNativeExtensionLibraries() {
             tag == kDeprecated_ConstantExpression) {
           helper_.ReadByte();  // Skip the tag.
 
+          // We have a candidate. Let's look if it's an instance of the
+          // ExternalName class.
           if (tag == kConstantExpression) {
             helper_.ReadPosition();  // Skip fileOffset.
             helper_.SkipDartType();  // Skip type.
           }
           const intptr_t constant_table_offset = helper_.ReadUInt();
-          constant = constant_evaluator.EvaluateConstantExpression(
-              constant_table_offset);
-          if (constant.clazz() == external_name_class_.raw()) {
+          if (constant_evaluator.IsInstanceConstant(constant_table_offset,
+                                                    external_name_class_)) {
+            constant = constant_evaluator.EvaluateConstantExpression(
+                constant_table_offset);
+            ASSERT(constant.clazz() == external_name_class_.raw());
             uri_path ^= constant.GetField(external_name_field_);
           }
         } else if (tag == kConstructorInvocation ||
@@ -1575,6 +1579,13 @@ void KernelLoader::FinishClassLoading(const Class& klass,
           TokenPosition::kNoSource, TokenPosition::kNoSource);
       fields_.Add(&deleted_enum_sentinel);
     }
+
+    // Due to ReadVMAnnotations(), the klass may have been loaded at this point
+    // (loading the class while evaluating annotations).
+    if (klass.is_loaded()) {
+      return;
+    }
+
     klass.SetFields(Array::Handle(Z, MakeFieldsArray()));
   }
 
@@ -1826,25 +1837,17 @@ void KernelLoader::ReadVMAnnotations(const Library& library,
           helper_.SkipDartType();  // Skip type.
         }
         const intptr_t constant_table_offset = helper_.ReadUInt();
-        // A cycle in evaluating the same library instance occurs when we are
-        // trying to finalize a class while evaluation the constant. We break
-        // this cycle by ignoring the second evaluation, since the first
-        // evaluation will take care of inspecting the result.
-        // TODO(ajcbik): avoid cycle detection completely by peeking
-        //               into the constants and proceed only for @pragma
-        //               or @ExternalName
-        if (EnqueueLibraryForEvaluation(library)) {
+        // We have a candidate. Let's look if it's an instance of the
+        // ExternalName or Pragma class.
+        if (constant_evaluator.IsInstanceConstant(constant_table_offset,
+                                                  external_name_class_)) {
           constant = constant_evaluator.EvaluateConstantExpression(
               constant_table_offset);
-          DequeueLibraryForEvaluation(library);
-          if (constant.clazz() == external_name_class_.raw()) {
-            const Instance& instance =
-                Instance::Handle(Instance::RawCast(constant.raw()));
-            *native_name =
-                String::RawCast(instance.GetField(external_name_field_));
-          } else if (constant.clazz() == pragma_class_.raw()) {
-            *has_pragma_annotation = true;
-          }
+          ASSERT(constant.clazz() == external_name_class_.raw());
+          *native_name ^= constant.GetField(external_name_field_);
+        } else if (constant_evaluator.IsInstanceConstant(constant_table_offset,
+                                                         pragma_class_)) {
+          *has_pragma_annotation = true;
         }
       }
     } else {
@@ -2290,13 +2293,23 @@ RawFunction* CreateFieldInitializerFunction(Thread* thread,
 
   // Create a static initializer.
   const Function& initializer_fun = Function::Handle(
-      zone, Function::New(init_name, RawFunction::kStaticFieldInitializer,
-                          true,   // is_static
-                          false,  // is_const
-                          false,  // is_abstract
-                          false,  // is_external
-                          false,  // is_native
+      zone, Function::New(init_name, RawFunction::kFieldInitializer,
+                          field.is_static(),  // is_static
+                          false,              // is_const
+                          false,              // is_abstract
+                          false,              // is_external
+                          false,              // is_native
                           initializer_owner, TokenPosition::kNoSource));
+  if (!field.is_static()) {
+    initializer_fun.set_num_fixed_parameters(1);
+    initializer_fun.set_parameter_types(
+        Array::Handle(zone, Array::New(1, Heap::kOld)));
+    initializer_fun.set_parameter_names(
+        Array::Handle(zone, Array::New(1, Heap::kOld)));
+    initializer_fun.SetParameterTypeAt(
+        0, AbstractType::Handle(zone, field_owner.DeclarationType()));
+    initializer_fun.SetParameterNameAt(0, Symbols::This());
+  }
   initializer_fun.set_result_type(AbstractType::Handle(zone, field.type()));
   initializer_fun.set_is_reflectable(false);
   initializer_fun.set_is_inlinable(false);

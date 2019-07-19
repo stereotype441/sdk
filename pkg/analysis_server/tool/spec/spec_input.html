@@ -3149,6 +3149,10 @@
     <p>
       Return the description of the widget instance at the given location.
     </p>
+    <p>
+      If the location does not have a support widget, an error of type
+      <tt>FLUTTER_GET_WIDGET_DESCRIPTION_NO_WIDGET</tt> will be generated.
+    </p>
     <params>
       <field name="file">
         <ref>FilePath</ref>
@@ -4125,18 +4129,6 @@
       A property of a Flutter widget.
     </p>
     <object>
-      <field name="id">
-        <ref>int</ref>
-        <p>
-          The unique identifier of the property, must be passed back to the
-          server when updating the property value. Identifiers become invalid
-          on any source code change.
-        </p>
-      </field>
-      <field name="name">
-        <ref>String</ref>
-        <p>The name of the property to display to the user.</p>
-      </field>
       <field name="documentation" optional="true">
         <ref>String</ref>
         <p>
@@ -4150,6 +4142,14 @@
         <p>
           If the value of this property is set, the Dart code of the expression
           of this property.
+        </p>
+      </field>
+      <field name="id">
+        <ref>int</ref>
+        <p>
+          The unique identifier of the property, must be passed back to the
+          server when updating the property value. Identifiers become invalid
+          on any source code change.
         </p>
       </field>
       <field name="isRequired">
@@ -4169,13 +4169,9 @@
           its value is provided from outside, this field is false.
         </p>
       </field>
-      <field name="editor" optional="true">
-        <ref>FlutterWidgetPropertyEditor</ref>
-        <p>
-          The editor that should be used by the client. This field is omitted
-          if the server does not know the editor for this property, for example
-          because it does not have one of the supported types.
-        </p>
+      <field name="name">
+        <ref>String</ref>
+        <p>The name of the property to display to the user.</p>
       </field>
       <field name="children" optional="true">
         <list>
@@ -4185,6 +4181,14 @@
           The list of children properties, if any. For example any property of
           type <tt>EdgeInsets</tt> will have four children properties of type
           <tt>double</tt> - left / top / right / bottom.
+        </p>
+      </field>
+      <field name="editor" optional="true">
+        <ref>FlutterWidgetPropertyEditor</ref>
+        <p>
+          The editor that should be used by the client. This field is omitted
+          if the server does not know the editor for this property, for example
+          because it does not have one of the supported types.
         </p>
       </field>
       <field name="value" optional="true">
@@ -4447,6 +4451,23 @@
         <p>
           The string literal value of the attribute.
           This field is absent if the value is not a string literal.
+        </p>
+      </field>
+      <field name="nameLocation" optional="true">
+        <ref>Location</ref>
+        <p>
+          If the attribute is a named argument, the location of the name,
+          without the colon.
+        </p>
+      </field>
+      <field name="valueLocation" optional="true">
+        <ref>Location</ref>
+        <p>
+          The location of the value.
+        </p>
+        <p>
+          This field is always available, but marked optional for backward
+          compatibility between new clients with older servers.
         </p>
       </field>
     </object>
@@ -4835,6 +4856,12 @@
           A request specified a FilePath which does not match a file in
           an analysis root, or the requested operation is not available
           for the file.
+        </p>
+      </value>
+      <value>
+        <code>FLUTTER_GET_WIDGET_DESCRIPTION_NO_WIDGET</code>
+        <p>
+          The given location does not have a supported widget.
         </p>
       </value>
       <value>

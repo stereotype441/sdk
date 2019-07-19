@@ -3555,7 +3555,9 @@ void Class::EnsureDeclarationLoaded() const {
 #else
     // Loading of class declaration can be postponed until needed
     // if class comes from bytecode.
-    ASSERT(is_declared_in_bytecode());
+    if (!is_declared_in_bytecode()) {
+      FATAL1("Unable to use class %s which is not loaded yet.", ToCString());
+    }
     kernel::BytecodeReader::LoadClassDeclaration(*this);
     ASSERT(is_declaration_loaded());
     ASSERT(is_type_finalized());
@@ -3565,6 +3567,7 @@ void Class::EnsureDeclarationLoaded() const {
 
 // Ensure that top level parsing of the class has been done.
 RawError* Class::EnsureIsFinalized(Thread* thread) const {
+  ASSERT(!IsNull());
   // Finalized classes have already been parsed.
   if (is_finalized()) {
     return Error::null();
@@ -4463,6 +4466,7 @@ RawFunction* Class::CheckFunctionType(const Function& func, MemberKind kind) {
 }
 
 RawFunction* Class::LookupFunction(const String& name, MemberKind kind) const {
+  ASSERT(!IsNull());
   Thread* thread = Thread::Current();
   if (EnsureIsFinalized(thread) != Error::null()) {
     return Function::null();
@@ -4514,6 +4518,7 @@ RawFunction* Class::LookupFunction(const String& name, MemberKind kind) const {
 
 RawFunction* Class::LookupFunctionAllowPrivate(const String& name,
                                                MemberKind kind) const {
+  ASSERT(!IsNull());
   Thread* thread = Thread::Current();
   if (EnsureIsFinalized(thread) != Error::null()) {
     return Function::null();
@@ -4549,6 +4554,7 @@ RawFunction* Class::LookupSetterFunction(const String& name) const {
 RawFunction* Class::LookupAccessorFunction(const char* prefix,
                                            intptr_t prefix_length,
                                            const String& name) const {
+  ASSERT(!IsNull());
   Thread* thread = Thread::Current();
   if (EnsureIsFinalized(thread) != Error::null()) {
     return Function::null();
@@ -4586,6 +4592,7 @@ RawField* Class::LookupField(const String& name) const {
 }
 
 RawField* Class::LookupField(const String& name, MemberKind kind) const {
+  ASSERT(!IsNull());
   Thread* thread = Thread::Current();
   if (EnsureIsFinalized(thread) != Error::null()) {
     return Field::null();
@@ -4633,6 +4640,7 @@ RawField* Class::LookupField(const String& name, MemberKind kind) const {
 
 RawField* Class::LookupFieldAllowPrivate(const String& name,
                                          bool instance_only) const {
+  ASSERT(!IsNull());
   // Use slow string compare, ignoring privacy name mangling.
   Thread* thread = Thread::Current();
   if (EnsureIsFinalized(thread) != Error::null()) {
@@ -5905,7 +5913,7 @@ RawField* Function::accessor_field() const {
   ASSERT(kind() == RawFunction::kImplicitGetter ||
          kind() == RawFunction::kImplicitSetter ||
          kind() == RawFunction::kImplicitStaticGetter ||
-         kind() == RawFunction::kStaticFieldInitializer);
+         kind() == RawFunction::kFieldInitializer);
   return Field::RawCast(raw_ptr()->data_);
 }
 
@@ -5913,7 +5921,7 @@ void Function::set_accessor_field(const Field& value) const {
   ASSERT(kind() == RawFunction::kImplicitGetter ||
          kind() == RawFunction::kImplicitSetter ||
          kind() == RawFunction::kImplicitStaticGetter ||
-         kind() == RawFunction::kStaticFieldInitializer);
+         kind() == RawFunction::kFieldInitializer);
   // Top level classes may be finalized multiple times.
   ASSERT(raw_ptr()->data_ == Object::null() || raw_ptr()->data_ == value.raw());
   set_data(value);
@@ -5975,7 +5983,7 @@ bool Function::HasGenericParent() const {
 
 RawFunction* Function::implicit_closure_function() const {
   if (IsClosureFunction() || IsSignatureFunction() || IsFactory() ||
-      IsDispatcherOrImplicitAccessor() || IsImplicitStaticFieldInitializer()) {
+      IsDispatcherOrImplicitAccessor() || IsFieldInitializer()) {
     return Function::null();
   }
   const Object& obj = Object::Handle(raw_ptr()->data_);
@@ -6183,8 +6191,8 @@ const char* Function::KindToCString(RawFunction::Kind kind) {
     case RawFunction::kImplicitStaticGetter:
       return "ImplicitStaticGetter";
       break;
-    case RawFunction::kStaticFieldInitializer:
-      return "StaticFieldInitializer";
+    case RawFunction::kFieldInitializer:
+      return "FieldInitializer";
       break;
     case RawFunction::kMethodExtractor:
       return "MethodExtractor";
@@ -8065,8 +8073,9 @@ void Function::SetDeoptReasonForAll(intptr_t deopt_id,
 }
 
 bool Function::CheckSourceFingerprint(const char* prefix, int32_t fp) const {
-  // TODO(alexmarkov): '(kernel_offset() <= 0)' looks like an impossible
-  // condition, fix this and re-enable fingerprints checking.
+  // TODO(36376): Restore checking fingerprints of recognized methods.
+  // '(kernel_offset() <= 0)' looks like an impossible condition, fix this and
+  //  re-enable fingerprints checking.
   if (!Isolate::Current()->obfuscate() && !is_declared_in_bytecode() &&
       (kernel_offset() <= 0) && (SourceFingerprint() != fp)) {
     const bool recalculatingFingerprints = false;
@@ -8149,8 +8158,8 @@ const char* Function::ToCString() const {
     case RawFunction::kImplicitStaticGetter:
       kind_str = " static-getter";
       break;
-    case RawFunction::kStaticFieldInitializer:
-      kind_str = " static-field-initializer";
+    case RawFunction::kFieldInitializer:
+      kind_str = " field-initializer";
       break;
     case RawFunction::kMethodExtractor:
       kind_str = " method-extractor";
@@ -10449,6 +10458,7 @@ RawObject* Library::LookupReExport(const String& name,
 }
 
 RawObject* Library::LookupEntry(const String& name, intptr_t* index) const {
+  ASSERT(!IsNull());
   Thread* thread = Thread::Current();
   REUSABLE_ARRAY_HANDLESCOPE(thread);
   REUSABLE_OBJECT_HANDLESCOPE(thread);
@@ -12165,11 +12175,6 @@ void KernelProgramInfo::set_constants_table(
   StorePointer(&raw_ptr()->constants_table_, value.raw());
 }
 
-void KernelProgramInfo::set_evaluating(
-    const GrowableObjectArray& evaluating) const {
-  StorePointer(&raw_ptr()->evaluating_, evaluating.raw());
-}
-
 void KernelProgramInfo::set_potential_natives(
     const GrowableObjectArray& candidates) const {
   StorePointer(&raw_ptr()->potential_natives_, candidates.raw());
@@ -12494,6 +12499,7 @@ void Library::CheckFunctionFingerprints() {
   all_libs.Add(&Library::ZoneHandle(Library::TypedDataLibrary()));
   all_libs.Add(&Library::ZoneHandle(Library::CollectionLibrary()));
   all_libs.Add(&Library::ZoneHandle(Library::InternalLibrary()));
+  all_libs.Add(&Library::ZoneHandle(Library::FfiLibrary()));
   OTHER_RECOGNIZED_LIST(CHECK_FINGERPRINTS2);
   INLINE_WHITE_LIST(CHECK_FINGERPRINTS);
   INLINE_BLACK_LIST(CHECK_FINGERPRINTS);

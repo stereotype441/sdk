@@ -14,10 +14,11 @@ import 'dart:_foreign_helper'
         JS_EMBEDDED_GLOBAL,
         JS_GET_NAME,
         RAW_DART_FUNCTION_REF;
+
 import 'dart:_interceptors' show JSArray, JSUnmodifiableArray;
 
 import 'dart:_js_embedded_names'
-    show JsBuiltin, JsGetName, RtiUniverseFieldNames, RTI_UNIVERSE;
+    show JsBuiltin, JsGetName, RtiUniverseFieldNames, RTI_UNIVERSE, TYPES;
 
 import 'dart:_recipe_syntax';
 
@@ -125,12 +126,18 @@ class Rti {
   static const kindGenericFunction = 11;
   static const kindGenericFunctionParameter = 12;
 
+  static bool _isFunctionType(Rti rti) {
+    int kind = Rti._getKind(rti);
+    return kind == kindFunction || kind == kindGenericFunction;
+  }
+
   /// Primary data associated with type.
   ///
   /// - Minified name of interface for interface types.
   /// - Underlying type for unary terms.
   /// - Class part of a type environment inside a generic class, or `null` for
   ///   type tuple.
+  /// - Return type of a function type.
   dynamic _primary;
 
   static Object _getPrimary(Rti rti) => rti._primary;
@@ -143,7 +150,8 @@ class Rti {
   /// - The type arguments of an interface type.
   /// - The type arguments from enclosing functions and closures for a
   ///   kindBinding.
-  /// - TBD for kindFunction and kindGenericFunction.
+  /// - The [_FunctionParameters] of a function type.
+  /// - TBD for kindGenericFunction.
   dynamic _rest;
 
   static Object _getRest(Rti rti) => rti._rest;
@@ -176,6 +184,16 @@ class Rti {
   static Rti _getFutureOrArgument(Rti rti) {
     assert(_getKind(rti) == kindFutureOr);
     return _castToRti(_getPrimary(rti));
+  }
+
+  static Rti _getReturnType(Rti rti) {
+    assert(_getKind(rti) == kindFunction);
+    return _castToRti(_getPrimary(rti));
+  }
+
+  static _FunctionParameters _getFunctionParameters(Rti rti) {
+    assert(_getKind(rti) == kindFunction);
+    return JS('_FunctionParameters', '#', _getRest(rti));
   }
 
   /// On [Rti]s that are type environments*, derived types are cached on the
@@ -227,6 +245,28 @@ class Rti {
   }
 }
 
+class _FunctionParameters {
+  // TODO(fishythefish): Support named parameters.
+
+  static _FunctionParameters allocate() => _FunctionParameters();
+
+  Object _requiredPositional;
+  static JSArray _getRequiredPositional(_FunctionParameters parameters) =>
+      JS('JSArray', '#', parameters._requiredPositional);
+  static void _setRequiredPositional(
+      _FunctionParameters parameters, Object requiredPositional) {
+    parameters._requiredPositional = requiredPositional;
+  }
+
+  Object _optionalPositional;
+  static JSArray _getOptionalPositional(_FunctionParameters parameters) =>
+      JS('JSArray', '#', parameters._optionalPositional);
+  static void _setOptionalPositional(
+      _FunctionParameters parameters, Object optionalPositional) {
+    parameters._optionalPositional = optionalPositional;
+  }
+}
+
 Object _theUniverse() => JS_EMBEDDED_GLOBAL('', RTI_UNIVERSE);
 
 Rti _rtiEval(Rti environment, String recipe) {
@@ -245,6 +285,19 @@ Rti _rtiBind(Rti environment, Rti types) {
 /// Called from generated code.
 Rti findType(String recipe) {
   return _Universe.eval(_theUniverse(), recipe);
+}
+
+/// Returns the Rti type of [object]. Closures have both an interface type
+/// (Closures implement `Function`) and a structural function type. Uses
+/// [testRti] to choose the appropriate type.
+///
+/// Called from generated code.
+Rti instanceOrFunctionType(object, Rti testRti) {
+  if (Rti._isFunctionType(testRti)) {
+    Rti rti = _instanceFunctionType(object);
+    if (rti != null) return rti;
+  }
+  return instanceType(object);
 }
 
 /// Returns the Rti type of [object].
@@ -282,6 +335,39 @@ Rti instanceType(object) {
 Rti _instanceTypeFromConstructor(constructor) {
   // TODO(sra): Cache Rti on constructor.
   return findType(JS('String', '#.name', constructor));
+}
+
+/// Returns the structural function type of [object], or `null` if the object is
+/// not a closure.
+Rti _instanceFunctionType(object) {
+  if (_Utils.instanceOf(
+      object,
+      JS_BUILTIN(
+          'depends:none;effects:none;', JsBuiltin.dartClosureConstructor))) {
+    var signatureName = JS_GET_NAME(JsGetName.SIGNATURE_NAME);
+    var signature = JS('', '#[#]', object, signatureName);
+    if (signature != null) {
+      if (JS('bool', 'typeof # == "number"', signature)) {
+        return getTypeFromTypesTable(_Utils.asInt(signature));
+      }
+      return _castToRti(JS('', '#[#]()', object, signatureName));
+    }
+  }
+  return null;
+}
+
+/// Returns Rti from types table. The types table is initialized with recipe
+/// strings.
+Rti getTypeFromTypesTable(/*int*/ _index) {
+  int index = _Utils.asInt(_index);
+  var table = JS_EMBEDDED_GLOBAL('', TYPES);
+  var type = _Utils.arrayAt(table, index);
+  if (_Utils.isString(type)) {
+    Rti rti = findType(_Utils.asString(type));
+    _Utils.arraySetAt(table, index, rti);
+    return rti;
+  }
+  return _castToRti(type);
 }
 
 Type getRuntimeType(object) {
@@ -329,7 +415,7 @@ bool _generalIsTestImplementation(object) {
   // This static method is installed on an Rti object as a JavaScript instance
   // method. The Rti object is 'this'.
   Rti testRti = _castToRti(JS('', 'this'));
-  Rti objectRti = instanceType(object);
+  Rti objectRti = instanceOrFunctionType(object, testRti);
   return isSubtype(_theUniverse(), objectRti, testRti);
 }
 
@@ -339,7 +425,7 @@ _generalAsCheckImplementation(object) {
   // This static method is installed on an Rti object as a JavaScript instance
   // method. The Rti object is 'this'.
   Rti testRti = _castToRti(JS('', 'this'));
-  Rti objectRti = instanceType(object);
+  Rti objectRti = instanceOrFunctionType(object, testRti);
   if (isSubtype(_theUniverse(), objectRti, testRti)) return object;
   var message = "${Error.safeToString(object)}:"
       " type '${_rtiToString(objectRti, null)}'"
@@ -353,7 +439,7 @@ _generalTypeCheckImplementation(object) {
   // This static method is installed on an Rti object as a JavaScript instance
   // method. The Rti object is 'this'.
   Rti testRti = _castToRti(JS('', 'this'));
-  Rti objectRti = instanceType(object);
+  Rti objectRti = instanceOrFunctionType(object, testRti);
   if (isSubtype(_theUniverse(), objectRti, testRti)) return object;
   var message = "${Error.safeToString(object)}:"
       " type '${_rtiToString(objectRti, null)}'"
@@ -408,6 +494,42 @@ String _rtiToString(Rti rti, List<String> genericContext) {
     return name;
   }
 
+  if (kind == Rti.kindFunction) {
+    // TODO(fishythefish): Support named parameters.
+    Rti returnType = Rti._getReturnType(rti);
+    var parameters = Rti._getFunctionParameters(rti);
+    var requiredPositional =
+        _FunctionParameters._getRequiredPositional(parameters);
+    var requiredPositionalLength = _Utils.arrayLength(requiredPositional);
+    var optionalPositional =
+        _FunctionParameters._getOptionalPositional(parameters);
+    var optionalPositionalLength = _Utils.arrayLength(optionalPositional);
+
+    String s = _rtiToString(returnType, genericContext) + '(';
+    String sep = '';
+    for (int i = 0; i < requiredPositionalLength; i++) {
+      s += sep +
+          _rtiToString(_castToRti(_Utils.arrayAt(requiredPositional, i)),
+              genericContext);
+      sep = ', ';
+    }
+
+    if (optionalPositionalLength > 0) {
+      s += sep + '[';
+      sep = '';
+      for (int i = 0; i < optionalPositionalLength; i++) {
+        s += sep +
+            _rtiToString(_castToRti(_Utils.arrayAt(optionalPositional, i)),
+                genericContext);
+        sep = ', ';
+      }
+      s += ']';
+    }
+
+    s += ')';
+    return s;
+  }
+
   return '?';
 }
 
@@ -419,6 +541,35 @@ String _rtiToDebugString(Rti rti) {
       sep = ', ';
     }
     return s + ']';
+  }
+
+  String functionParametersToString(_FunctionParameters parameters) {
+    // TODO(fishythefish): Support named parameters.
+    String s = '(', sep = '';
+    var requiredPositional =
+        _FunctionParameters._getRequiredPositional(parameters);
+    var requiredPositionalLength = _Utils.arrayLength(requiredPositional);
+    var optionalPositional =
+        _FunctionParameters._getOptionalPositional(parameters);
+    var optionalPositionalLength = _Utils.arrayLength(optionalPositional);
+    for (int i = 0; i < requiredPositionalLength; i++) {
+      s += sep +
+          _rtiToDebugString(_castToRti(_Utils.arrayAt(requiredPositional, i)));
+      sep = ', ';
+    }
+
+    if (optionalPositionalLength > 0) {
+      s += sep + '[';
+      sep = '';
+      for (int i = 0; i < optionalPositionalLength; i++) {
+        s += sep +
+            _rtiToDebugString(
+                _castToRti(_Utils.arrayAt(optionalPositional, i)));
+        sep = ', ';
+      }
+      s += ']';
+    }
+    return s + ')';
   }
 
   int kind = Rti._getKind(rti);
@@ -442,6 +593,12 @@ String _rtiToDebugString(Rti rti) {
     var base = Rti._getBindingBase(rti);
     var arguments = Rti._getBindingArguments(rti);
     return 'binding(${_rtiToDebugString(base)}, ${arrayToString(arguments)})';
+  }
+
+  if (kind == Rti.kindFunction) {
+    var returnType = Rti._getReturnType(rti);
+    var parameters = Rti._getFunctionParameters(rti);
+    return 'function(${_rtiToDebugString(returnType)}, ${functionParametersToString(parameters)})';
   }
 
   return 'other(kind=$kind)';
@@ -486,7 +643,14 @@ class _Universe {
       JS('', '#.#', typeRules(universe), targetType);
 
   static void addRules(universe, rules) {
-    JS('', 'Object.assign(#, #)', typeRules(universe), rules);
+    // TODO(fishythefish): Use `Object.assign()` when IE11 is deprecated.
+    var keys = JS('JSArray', 'Object.keys(#)', rules);
+    var length = _Utils.arrayLength(keys);
+    var ruleset = typeRules(universe);
+    for (int i = 0; i < length; i++) {
+      var targetType = _Utils.arrayAt(keys, i);
+      JS('', '#[#] = #[#]', ruleset, targetType, rules, targetType);
+    }
   }
 
   static Object sharedEmptyArray(universe) =>
@@ -718,6 +882,52 @@ class _Universe {
     Rti._setCanonicalRecipe(rti, key);
     return _finishRti(universe, rti);
   }
+
+  static String _canonicalRecipeOfFunction(
+          Rti returnType, _FunctionParameters parameters) =>
+      Rti._getCanonicalRecipe(returnType) +
+      _canonicalRecipeOfFunctionParameters(parameters);
+
+  // TODO(fishythefish): Support named parameters.
+  static String _canonicalRecipeOfFunctionParameters(
+      _FunctionParameters parameters) {
+    var requiredPositional =
+        _FunctionParameters._getRequiredPositional(parameters);
+    var optionalPositional =
+        _FunctionParameters._getOptionalPositional(parameters);
+    var optionalPositionalLength = _Utils.arrayLength(optionalPositional);
+
+    String recipe = Recipe.startFunctionArgumentsString +
+        _canonicalRecipeJoin(requiredPositional);
+    if (optionalPositionalLength > 0) {
+      var requiredPositionalLength = _Utils.arrayLength(requiredPositional);
+      String sep = requiredPositionalLength > 0 ? Recipe.separatorString : '';
+      recipe += sep +
+          Recipe.startOptionalGroupString +
+          _canonicalRecipeJoin(optionalPositional) +
+          Recipe.endOptionalGroupString;
+    }
+    return recipe + Recipe.endFunctionArgumentsString;
+  }
+
+  static Rti _lookupFunctionRti(
+      Object universe, Rti returnType, _FunctionParameters parameters) {
+    String key = _canonicalRecipeOfFunction(returnType, parameters);
+    var cache = evalCache(universe);
+    var probe = _cacheGet(cache, key);
+    if (probe != null) return _castToRti(probe);
+    return _createFunctionRti(universe, returnType, parameters, key);
+  }
+
+  static Rti _createFunctionRti(Object universe, Rti returnType,
+      _FunctionParameters parameters, String canonicalRecipe) {
+    var rti = Rti.allocate();
+    Rti._setKind(rti, Rti.kindFunction);
+    Rti._setPrimary(rti, returnType);
+    Rti._setRest(rti, parameters);
+    Rti._setCanonicalRecipe(rti, canonicalRecipe);
+    return _finishRti(universe, rti);
+  }
 }
 
 /// Class of static methods implementing recipe parser.
@@ -890,6 +1100,9 @@ class _Parser {
           case Recipe.separator:
             break;
 
+          case Recipe.nameSeparator:
+            break;
+
           case Recipe.toType:
             push(stack,
                 toType(universe(parser), environment(parser), pop(stack)));
@@ -904,8 +1117,7 @@ class _Parser {
             break;
 
           case Recipe.startTypeArguments:
-            push(stack, position(parser));
-            setPosition(parser, _Utils.arrayLength(stack));
+            pushStackFrame(parser, stack);
             break;
 
           case Recipe.endTypeArguments:
@@ -924,6 +1136,30 @@ class _Parser {
                     u, toType(u, environment(parser), pop(stack))));
             break;
 
+          case Recipe.startFunctionArguments:
+            pushStackFrame(parser, stack);
+            break;
+
+          case Recipe.endFunctionArguments:
+            handleFunctionArguments(parser, stack);
+            break;
+
+          case Recipe.startOptionalGroup:
+            pushStackFrame(parser, stack);
+            break;
+
+          case Recipe.endOptionalGroup:
+            handleOptionalGroup(parser, stack);
+            break;
+
+          case Recipe.startNamedGroup:
+            pushStackFrame(parser, stack);
+            break;
+
+          case Recipe.endNamedGroup:
+            handleNamedGroup(parser, stack);
+            break;
+
           default:
             JS('', 'throw "Bad character " + #', ch);
         }
@@ -931,6 +1167,11 @@ class _Parser {
     }
     Object item = pop(stack);
     return toType(universe(parser), environment(parser), item);
+  }
+
+  static void pushStackFrame(Object parser, Object stack) {
+    push(stack, position(parser));
+    setPosition(parser, _Utils.arrayLength(stack));
   }
 
   static int handleDigit(int i, int digit, String source, Object stack) {
@@ -981,6 +1222,47 @@ class _Parser {
       Rti base = toType(universe, environment(parser), head);
       push(stack, _Universe._lookupBindingRti(universe, base, arguments));
     }
+  }
+
+  static const int optionalSentinel = -1;
+
+  static void handleFunctionArguments(Object parser, Object stack) {
+    var universe = _Parser.universe(parser);
+    var parameters = _FunctionParameters.allocate();
+    var optionalPositional = _Universe.sharedEmptyArray(universe);
+
+    var head = pop(stack);
+    if (_Utils.isNum(head)) {
+      int sentinel = _Utils.asInt(head);
+      switch (sentinel) {
+        case optionalSentinel:
+          optionalPositional = pop(stack);
+          break;
+
+        default:
+          push(stack, head);
+          break;
+      }
+    } else {
+      push(stack, head);
+    }
+
+    _FunctionParameters._setRequiredPositional(
+        parameters, collectArray(parser, stack));
+    _FunctionParameters._setOptionalPositional(parameters, optionalPositional);
+    Rti returnType = toType(universe, environment(parser), pop(stack));
+    push(stack, _Universe._lookupFunctionRti(universe, returnType, parameters));
+  }
+
+  static void handleOptionalGroup(Object parser, Object stack) {
+    var parameters = collectArray(parser, stack);
+    push(stack, parameters);
+    push(stack, optionalSentinel);
+  }
+
+  static void handleNamedGroup(Object parser, Object stack) {
+    // TODO(fishythefish)
+    throw UnimplementedError('handleNamedGroup');
   }
 
   static void handleExtendedOperations(Object parser, Object stack) {
@@ -1122,8 +1404,7 @@ bool _isSubtype(universe, Rti s, sEnv, Rti t, tEnv) {
   if (isNullType(s)) return true;
 
   if (isFunctionKind(t)) {
-    // TODO(fishythefish): Check if s is a function subtype of t.
-    throw UnimplementedError("isFunctionKind(t)");
+    return _isFunctionSubtype(universe, s, sEnv, t, tEnv);
   }
 
   if (isFunctionKind(s)) {
@@ -1154,6 +1435,60 @@ bool _isSubtype(universe, Rti s, sEnv, Rti t, tEnv) {
   var tArgs = Rti._getInterfaceTypeArguments(t);
 
   return _isSubtypeOfInterface(universe, s, sEnv, tName, tArgs, tEnv);
+}
+
+// TODO(fishythefish): Support named parameters.
+bool _isFunctionSubtype(universe, Rti s, sEnv, Rti t, tEnv) {
+  assert(isFunctionKind(t));
+  if (!isFunctionKind(s)) return false;
+
+  var sReturnType = Rti._getReturnType(s);
+  var tReturnType = Rti._getReturnType(t);
+  if (!_isSubtype(universe, sReturnType, sEnv, tReturnType, tEnv)) return false;
+
+  var sParameters = Rti._getFunctionParameters(s);
+  var tParameters = Rti._getFunctionParameters(t);
+
+  var sRequiredPositional =
+      _FunctionParameters._getRequiredPositional(sParameters);
+  var tRequiredPositional =
+      _FunctionParameters._getRequiredPositional(tParameters);
+  var sRequiredPositionalLength = _Utils.arrayLength(sRequiredPositional);
+  var tRequiredPositionalLength = _Utils.arrayLength(tRequiredPositional);
+  if (sRequiredPositionalLength > tRequiredPositionalLength) return false;
+  var requiredPositionalDelta =
+      tRequiredPositionalLength - sRequiredPositionalLength;
+
+  var sOptionalPositional =
+      _FunctionParameters._getOptionalPositional(sParameters);
+  var tOptionalPositional =
+      _FunctionParameters._getOptionalPositional(tParameters);
+  var sOptionalPositionalLength = _Utils.arrayLength(sOptionalPositional);
+  var tOptionalPositionalLength = _Utils.arrayLength(tOptionalPositional);
+  if (sRequiredPositionalLength + sOptionalPositionalLength <
+      tRequiredPositionalLength + tOptionalPositionalLength) return false;
+
+  for (int i = 0; i < sRequiredPositionalLength; i++) {
+    var sParameter = _Utils.arrayAt(sRequiredPositional, i);
+    var tParameter = _Utils.arrayAt(tRequiredPositional, i);
+    if (!_isSubtype(universe, tParameter, tEnv, sParameter, sEnv)) return false;
+  }
+
+  for (int i = 0; i < requiredPositionalDelta; i++) {
+    var sParameter = _Utils.arrayAt(sOptionalPositional, i);
+    var tParameter =
+        _Utils.arrayAt(tRequiredPositional, sRequiredPositionalLength + i);
+    if (!_isSubtype(universe, tParameter, tEnv, sParameter, sEnv)) return false;
+  }
+
+  for (int i = 0; i < tOptionalPositionalLength; i++) {
+    var sParameter =
+        _Utils.arrayAt(sOptionalPositional, requiredPositionalDelta + i);
+    var tParameter = _Utils.arrayAt(tOptionalPositional, i);
+    if (!_isSubtype(universe, tParameter, tEnv, sParameter, sEnv)) return false;
+  }
+
+  return true;
 }
 
 bool _isSubtypeOfInterface(

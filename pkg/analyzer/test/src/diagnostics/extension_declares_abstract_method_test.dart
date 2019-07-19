@@ -22,8 +22,8 @@ class ExtensionDeclaresAbstractMethodTest extends DriverResolutionTest {
     ..contextFeatures = new FeatureSet.forTesting(
         sdkVersion: '2.3.0', additionalFeatures: [Feature.extension_methods]);
 
-  test_getter() {
-    assertErrorsInCode('''
+  test_getter() async {
+    await assertErrorsInCode('''
 extension E on String {
   bool get isPalindrome;
 }
@@ -32,8 +32,8 @@ extension E on String {
     ]);
   }
 
-  test_method() {
-    assertErrorsInCode('''
+  test_method() async {
+    await assertErrorsInCode('''
 extension E on String {
   String reversed();
 }
@@ -42,14 +42,14 @@ extension E on String {
     ]);
   }
 
-  test_none() {
-    assertNoErrorsInCode('''
+  test_none() async {
+    await assertNoErrorsInCode('''
 extension E on String {}
 ''');
   }
 
-  test_operator() {
-    assertErrorsInCode('''
+  test_operator() async {
+    await assertErrorsInCode('''
 extension E on String {
   String operator -(String otherString);
 }
@@ -58,8 +58,8 @@ extension E on String {
     ]);
   }
 
-  test_setter() {
-    assertErrorsInCode('''
+  test_setter() async {
+    await assertErrorsInCode('''
 extension E on String {
   set length(int newLength);
 }

@@ -674,6 +674,48 @@ class ElementResolver extends SimpleAstVisitor<void> {
     Expression target = node.realTarget;
     if (target is SuperExpression && !_isSuperInValidContext(target)) {
       return;
+    } else if (target is ExtensionOverride) {
+      if (node.isCascaded) {
+        // TODO(brianwilkerson) Report this error and decide how to recover.
+        throw new UnsupportedError('cascaded extension override');
+      }
+      ExtensionElement element = target.extensionName.staticElement;
+      SimpleIdentifier propertyName = node.propertyName;
+      PropertyAccessorElement member;
+      if (propertyName.inSetterContext()) {
+        member = element.getSetter(propertyName.name);
+        if (member == null) {
+          _resolver.errorReporter.reportErrorForNode(
+              CompileTimeErrorCode.UNDEFINED_EXTENSION_SETTER,
+              propertyName,
+              [propertyName.name, element.name]);
+        }
+        if (propertyName.inGetterContext()) {
+          PropertyAccessorElement getter = element.getGetter(propertyName.name);
+          if (getter == null) {
+            _resolver.errorReporter.reportErrorForNode(
+                CompileTimeErrorCode.UNDEFINED_EXTENSION_GETTER,
+                propertyName,
+                [propertyName.name, element.name]);
+          }
+          propertyName.auxiliaryElements = AuxiliaryElements(getter, null);
+        }
+      } else if (propertyName.inGetterContext()) {
+        member = element.getGetter(propertyName.name);
+        if (member == null) {
+          _resolver.errorReporter.reportErrorForNode(
+              CompileTimeErrorCode.UNDEFINED_EXTENSION_GETTER,
+              propertyName,
+              [propertyName.name, element.name]);
+        }
+      }
+      if (member != null && member.isStatic) {
+        _resolver.errorReporter.reportErrorForNode(
+            CompileTimeErrorCode.EXTENSION_OVERRIDE_ACCESS_TO_STATIC_MEMBER,
+            propertyName);
+      }
+      propertyName.staticElement = member;
+      return;
     }
     SimpleIdentifier propertyName = node.propertyName;
     _resolvePropertyAccess(target, propertyName, node.isCascaded);
@@ -1447,6 +1489,18 @@ class ElementResolver extends SimpleAstVisitor<void> {
   void _resolveBinaryExpression(BinaryExpression node, String methodName) {
     Expression leftOperand = node.leftOperand;
     if (leftOperand != null) {
+      if (leftOperand is ExtensionOverride) {
+        ExtensionElement element = leftOperand.extensionName.staticElement;
+        MethodElement member = element.getMethod(methodName);
+        if (member == null) {
+          _resolver.errorReporter.reportErrorForToken(
+              CompileTimeErrorCode.UNDEFINED_EXTENSION_METHOD,
+              node.operator,
+              [methodName, element.name]);
+        }
+        node.staticElement = member;
+        return;
+      }
       DartType leftType = _getStaticType(leftOperand);
       var isSuper = leftOperand is SuperExpression;
       var invokeType = _lookUpGetterType(leftType, methodName,
