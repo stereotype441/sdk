@@ -559,12 +559,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   /// Register write of the given [variable] in the current state.
   void write(
-    Variable variable, {
-    bool isNull = false,
-    bool isNonNull = false,
-  }) {
-    _current = _current.write(typeOperations, _emptySet, variable,
-        isNull: isNull, isNonNull: isNonNull);
+    Variable variable) {
+    _current = _current.write(typeOperations, _emptySet, variable);
   }
 
   void _conditionalEnd(Expression condition) {
@@ -808,10 +804,7 @@ class _State<Variable, Type> {
   _State<Variable, Type> write(
     TypeOperations<Variable, Type> typeOperations,
     _VariableSet<Variable> emptySet,
-    Variable variable, {
-    bool isNull = false,
-    bool isNonNull = false,
-  }) {
+    Variable variable) {
     var newNotAssigned = typeOperations.isLocalVariable(variable)
         ? notAssigned.remove(emptySet, variable)
         : notAssigned;

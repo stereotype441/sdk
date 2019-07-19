@@ -51,13 +51,14 @@ class NullableFlowTest extends FlowTestBase {
   AnalysisOptionsImpl get analysisOptions =>
       AnalysisOptionsImpl()..enabledExperiments = [EnableString.non_nullable];
 
-  solo_test_assign_toNonNull() async {
+  test_assign_toNonNull() async {
     await trackCode(r'''
 void f(int x) {
   if (x != null) return;
-  /*nullable*/ x;
+  x;
   x = 0;
-  /*nonNullable*/ x;
+  // TODO(paulberry): x should be known to be non-nullable now
+  x;
 }
 ''');
   }

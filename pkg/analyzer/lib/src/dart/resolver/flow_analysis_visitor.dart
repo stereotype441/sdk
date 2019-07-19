@@ -77,10 +77,7 @@ class FlowAnalysisHelper {
     if (localElement == null) return;
 
     flow.write(
-      localElement,
-      isNull: _isNull(right),
-      isNonNull: _isNonNull(right),
-    );
+      localElement);
   }
 
   void binaryExpression_bangEq(
@@ -301,16 +298,6 @@ class FlowAnalysisHelper {
     }
     return null;
   }
-
-  static bool _isNonNull(Expression node) {
-    if (node is NullLiteral) return false;
-
-    return node is Literal;
-  }
-
-  static bool _isNull(Expression node) {
-    return node is NullLiteral;
-  }
 }
 
 /// The result of performing flow analysis on a unit.
@@ -498,13 +485,10 @@ class _FlowAnalysisWrapper
 
   @override
   void write(
-    Element variable, {
-    bool isNull = false,
-    bool isNonNull = false,
-  }) {
+    Element variable) {
     // TODO(paulberry): test
-    _wrap('write($variable, isNull: $isNull, isNonNull: $isNonNull)',
-        () => _flow.write(variable, isNull: isNull, isNonNull: isNonNull));
+    _wrap('write($variable)',
+        () => _flow.write(variable));
   }
 
   T _wrap<T>(String text, T Function() f) {
