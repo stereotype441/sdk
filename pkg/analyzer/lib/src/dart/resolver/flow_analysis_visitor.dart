@@ -471,10 +471,10 @@ class _FlowAnalysisWrapper
   }
 
   @override
-  void ifStatement_thenBegin(Statement ifStatement, Expression condition) {
+  void ifStatement_thenBegin(Expression condition) {
     // TODO(paulberry): test
-    _wrap('ifStatement_thenBegin($ifStatement, $condition)',
-        () => _flow.ifStatement_thenBegin(ifStatement, condition));
+    _wrap('ifStatement_thenBegin($condition)',
+        () => _flow.ifStatement_thenBegin(condition));
   }
 
   @override
