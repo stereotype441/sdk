@@ -53,7 +53,7 @@ class NullableFlowTest extends FlowTestBase {
 
   test_assign_toNonNull() async {
     await trackCode(r'''
-void f(int x) {
+void f(int? x) {
   if (x != null) return;
   x;
   x = 0;
@@ -63,13 +63,13 @@ void f(int x) {
 ''');
   }
 
-  test_assign_toNull() async {
+  solo_test_assign_toNull() async {
     await trackCode(r'''
-void f(int x) {
+void f(int? x) {
   if (x == null) return;
   /*nonNullable*/ x;
   x = null;
-  /*nullable*/ x;
+  x;
 }
 ''');
   }
