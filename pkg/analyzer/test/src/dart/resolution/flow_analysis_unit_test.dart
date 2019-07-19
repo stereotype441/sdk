@@ -19,13 +19,44 @@ import 'package:test_reflective_loader/test_reflective_loader.dart';
 import '../../../util/id_testing_helper.dart';
 import 'driver_resolution.dart';
 
-class _Statement {}
-
-class _Expression {}
+main() {
+  group('Flow analysis unit tests', () {
+    test('foo', () {
+      var nodeOperations = _NodeOperations();
+      var typeOperations = _TypeOperations();
+      var functionBodyAccess = _FunctionBodyAccess();
+      var flow = FlowAnalysis<_Statement, _Expression, _Element, _Type>(
+          nodeOperations, typeOperations, functionBodyAccess);
+      var x = _Element();
+      flow.add(x, assigned: true);
+      var xNotEqNull = _Expression();
+      flow.conditionNotEqNull(xNotEqNull, x);
+      flow.ifStatement_thenBegin(xNotEqNull);
+      flow.handleExit();
+      flow.ifStatement_end(false);
+      var xPromotedType = flow.promotedType(x);
+      fail('$xPromotedType');
+      flow.verifyStackEmpty();
+    });
+  });
+}
 
 class _Element {}
 
-class _Type {}
+class _Expression {}
+
+class _FunctionBodyAccess implements FunctionBodyAccess<_Element> {
+  @override
+  bool isPotentiallyMutatedInClosure(_Element variable) {
+    // TODO(paulberry): make tests where this returns true
+    return false;
+  }
+
+  @override
+  bool isPotentiallyMutatedInScope(_Element variable) {
+    throw UnimplementedError('TODO(paulberry)');
+  }
+}
 
 class _NodeOperations implements NodeOperations<_Expression> {
   @override
@@ -33,6 +64,10 @@ class _NodeOperations implements NodeOperations<_Expression> {
     throw UnimplementedError('TODO(paulberry)');
   }
 }
+
+class _Statement {}
+
+class _Type {}
 
 class _TypeOperations implements TypeOperations<_Element, _Type> {
   @override
@@ -54,37 +89,4 @@ class _TypeOperations implements TypeOperations<_Element, _Type> {
   _Type promoteToNonNull(_Type type) {
     throw UnimplementedError('TODO(paulberry)');
   }
-}
-
-class _FunctionBodyAccess implements FunctionBodyAccess<_Expression> {
-  @override
-  bool isPotentiallyMutatedInClosure(_Expression variable) {
-    throw UnimplementedError('TODO(paulberry)');
-  }
-
-  @override
-  bool isPotentiallyMutatedInScope(_Expression variable) {
-    throw UnimplementedError('TODO(paulberry)');
-  }
-}
-
-main() {
-  group('Flow analysis unit tests', () {
-    test('foo', () {
-      var nodeOperations = _NodeOperations();
-      var typeOperations = _TypeOperations();
-      var functionBodyAccess = _FunctionBodyAccess();
-      var flow = FlowAnalysis<_Statement, _Expression, _Element, _Type>(nodeOperations, typeOperations, functionBodyAccess);
-      var x = _Element();
-      flow.add(x, assigned: true);
-      var xNotEqNull = _Expression();
-      flow.conditionNotEqNull(xNotEqNull, x);
-      flow.ifStatement_thenBegin(xNotEqNull);
-      flow.handleExit();
-      flow.ifStatement_end(false);
-      var xPromotedType = flow.promotedType(x);
-      fail('$xPromotedType');
-      flow.verifyStackEmpty();
-    });
-  });
 }
