@@ -50,7 +50,7 @@ class FlowAnalysis<Statement, Expression, Element, Type> {
   final TypeOperations<Element, Type> typeOperations;
 
   /// The enclosing function body, used to check for potential mutations.
-  final FunctionBodyAccess functionBody;
+  final FunctionBodyAccess<Element> functionBody;
 
   /// The stack of states of variables that are not definitely assigned.
   final List<_State<Element, Type>> _stack = [];
@@ -78,7 +78,7 @@ class FlowAnalysis<Statement, Expression, Element, Type> {
   factory FlowAnalysis(
     NodeOperations<Expression> nodeOperations,
     TypeOperations<Element, Type> typeOperations,
-    FunctionBodyAccess functionBody,
+    FunctionBodyAccess<Element> functionBody,
   ) {
     var emptySet = _ElementSet<Element>._(
       List<Element>(0),
