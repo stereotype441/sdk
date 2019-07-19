@@ -51,7 +51,7 @@ class NullableFlowTest extends FlowTestBase {
   AnalysisOptionsImpl get analysisOptions =>
       AnalysisOptionsImpl()..enabledExperiments = [EnableString.non_nullable];
 
-  test_assign_toNonNull() async {
+  solo_test_assign_toNonNull() async {
     await trackCode(r'''
 void f(int x) {
   if (x != null) return;
