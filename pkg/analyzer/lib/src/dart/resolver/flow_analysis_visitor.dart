@@ -558,11 +558,6 @@ class _TypeSystemTypeOperations
   _TypeSystemTypeOperations(this.typeSystem);
 
   @override
-  DartType elementType(VariableElement element) {
-    return element.type;
-  }
-
-  @override
   bool isLocalVariable(VariableElement element) {
     return element is LocalVariableElement;
   }
@@ -574,4 +569,9 @@ class _TypeSystemTypeOperations
 
   @override
   DartType promoteToNonNull(DartType type) => typeSystem.promoteToNonNull(type);
+
+  @override
+  DartType variableType(VariableElement variable) {
+    return variable.type;
+  }
 }

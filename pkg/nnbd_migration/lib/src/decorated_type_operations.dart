@@ -17,11 +17,6 @@ class DecoratedTypeOperations
   DecoratedTypeOperations(this._typeSystem, this._variableRepository);
 
   @override
-  DecoratedType elementType(VariableElement element) {
-    return _variableRepository.decoratedElementType(element);
-  }
-
-  @override
   bool isLocalVariable(VariableElement element) {
     return element is LocalVariableElement;
   }
@@ -34,5 +29,10 @@ class DecoratedTypeOperations
   @override
   DecoratedType promoteToNonNull(DecoratedType type) {
     throw new UnimplementedError('TODO(paulberry)');
+  }
+
+  @override
+  DecoratedType variableType(VariableElement variable) {
+    return _variableRepository.decoratedElementType(variable);
   }
 }
