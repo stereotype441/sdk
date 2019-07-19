@@ -139,11 +139,12 @@ class FlowAnalysisHelper {
       return;
     }
 
-    flow = FlowAnalysis<Statement, Expression, VariableElement, DartType>(
+    flow = _FlowAnalysisWrapper(
+        FlowAnalysis<Statement, Expression, VariableElement, DartType>(
       _nodeOperations,
       _typeOperations,
       _FunctionBodyAccess(node),
-    );
+    ));
 
     var parameters = _enclosingExecutableParameters(node);
     if (parameters != null) {
@@ -425,6 +426,91 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
     assignedVariables.beginStatement();
     super.visitWhileStatement(node);
     assignedVariables.endStatement(node);
+  }
+}
+
+class _FlowAnalysisWrapper
+    implements FlowAnalysis<Statement, Expression, VariableElement, DartType> {
+  final FlowAnalysis<Statement, Expression, VariableElement, DartType> _flow;
+
+  _FlowAnalysisWrapper(this._flow);
+
+  @override
+  bool get isReachable => _wrap('isReachable', () => _flow.isReachable);
+
+  @override
+  void add(Element variable, {bool assigned: false}) {
+    // TODO(paulberry): test
+    _wrap('add($variable, assigned: $assigned)',
+        () => _flow.add(variable, assigned: assigned));
+  }
+
+  @override
+  void conditionNotEqNull(Expression binaryExpression, Element variable) {
+    // TODO(paulberry): test
+    _wrap('conditionNotEqNull($binaryExpression, $variable)',
+        () => _flow.conditionNotEqNull(binaryExpression, variable));
+  }
+
+  @override
+  void functionExpression_end() {
+    // TODO(paulberry): test
+    _wrap('functionExpression_end()', () => _flow.functionExpression_end());
+  }
+
+  @override
+  void handleExit() {
+    // TODO(paulberry): test
+    _wrap('handleExit()', () => _flow.handleExit());
+  }
+
+  @override
+  void ifStatement_end(bool hasElse) {
+    // TODO(paulberry): test
+    _wrap('handleEnd($hasElse)', () => _flow.ifStatement_end(hasElse));
+  }
+
+  @override
+  void ifStatement_thenBegin(Statement ifStatement, Expression condition) {
+    // TODO(paulberry): test
+    _wrap('ifStatement_thenBegin($ifStatement, $condition)',
+        () => _flow.ifStatement_thenBegin(ifStatement, condition));
+  }
+
+  @override
+  noSuchMethod(Invocation invocation) {
+    var name = invocation.memberName.toString();
+    print('Unimplemented: $name');
+    throw UnimplementedError('TODO(paulberry)');
+  }
+
+  @override
+  DartType promotedType(Element variable) {
+    // TODO(paulberry): test
+    return _wrap('promotedType($variable)', () => _flow.promotedType(variable));
+  }
+
+  @override
+  void verifyStackEmpty() {
+    // TODO(paulberry): test
+    return _wrap('verifyStackEmpty()', () => _flow.verifyStackEmpty());
+  }
+
+  @override
+  void write(
+    Element variable, {
+    bool isNull = false,
+    bool isNonNull = false,
+  }) {
+    // TODO(paulberry): test
+    _wrap('write($variable, isNull: $isNull, isNonNull: $isNonNull)',
+        () => _flow.write(variable, isNull: isNull, isNonNull: isNonNull));
+  }
+
+  T _wrap<T>(String text, T Function() f) {
+    T value = f();
+    print('$text => $value');
+    return value;
   }
 }
 
