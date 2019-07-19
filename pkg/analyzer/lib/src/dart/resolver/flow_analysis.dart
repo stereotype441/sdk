@@ -50,7 +50,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   final TypeOperations<Variable, Type> typeOperations;
 
   /// The enclosing function body, used to check for potential mutations.
-  final FunctionBodyAccess<Element> functionBody;
+  final FunctionBodyAccess<Variable> functionBody;
 
   /// The stack of states of variables that are not definitely assigned.
   final List<_State<Variable, Type>> _stack = [];
