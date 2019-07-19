@@ -244,18 +244,6 @@ class FlowAnalysisHelper {
     return false;
   }
 
-  void simpleIdentifier(SimpleIdentifier node) {
-    if (flow == null) return;
-
-    var element = node.staticElement;
-    var isLocalVariable = element is LocalVariableElement;
-    if (isLocalVariable || element is ParameterElement) {
-      if (node.inGetterContext() && !node.inDeclarationContext()) {
-        throw UnimplementedError('TODO(paulberry): what to do here?');
-      }
-    }
-  }
-
   void variableDeclarationStatement(VariableDeclarationStatement node) {
     var variables = node.variables.variables;
     for (var i = 0; i < variables.length; ++i) {
