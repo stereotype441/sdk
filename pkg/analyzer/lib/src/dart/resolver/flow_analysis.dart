@@ -345,7 +345,7 @@ class FlowAnalysis<Statement, Expression, Element, Type> {
     _current = _join(afterThen, afterElse);
   }
 
-  void ifStatement_thenBegin(Statement ifStatement, Expression condition) {
+  void ifStatement_thenBegin(Expression condition) {
     _conditionalEnd(condition);
     // Tail of the stack:  falseCondition, trueCondition
 
