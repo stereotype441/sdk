@@ -42,7 +42,6 @@ class AssignedVariables<Statement, Variable> {
 }
 
 class FlowAnalysis<Statement, Expression, Variable, Type> {
-  final _VariableSet<Variable> _emptySet;
   final _State<Variable, Type> _identity;
 
   /// The [NodeOperations], used to manipulate expressions.
@@ -82,19 +81,14 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     TypeOperations<Variable, Type> typeOperations,
     FunctionBodyAccess<Variable> functionBody,
   ) {
-    var emptySet = _VariableSet<Variable>._(
-      List<Variable>(0),
-    );
     var identifyState = _State<Variable, Type>(
       false,
-      emptySet,
       const {},
     );
     return FlowAnalysis._(
       nodeOperations,
       typeOperations,
       functionBody,
-      emptySet,
       identifyState,
     );
   }
@@ -103,12 +97,10 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     this.nodeOperations,
     this.typeOperations,
     this.functionBody,
-    this._emptySet,
     this._identity,
   ) {
     _current = _State<Variable, Type>(
       true,
-      _emptySet,
       const {},
     );
   }
@@ -190,8 +182,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
     _condition = binaryExpression;
     _conditionTrue = _current;
-    _conditionFalse =
-        _current.markNonNullable(typeOperations, _emptySet, variable);
+    _conditionFalse = _current.markNonNullable(typeOperations, variable);
   }
 
   /// The [binaryExpression] checks that the [variable] is not equal to `null`.
@@ -201,8 +192,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     }
 
     _condition = binaryExpression;
-    _conditionTrue =
-        _current.markNonNullable(typeOperations, _emptySet, variable);
+    _conditionTrue = _current.markNonNullable(typeOperations, variable);
     _conditionFalse = _current;
   }
 
@@ -280,7 +270,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _stack.add(_current);
 
     Set<Variable> notPromoted = null;
-    for (var variable in _current.promoted.keys) {
+    for (var variable in _current.variables.keys) {
       if (functionBody.isPotentiallyMutatedInScope(variable)) {
         notPromoted ??= Set<Variable>.identity();
         notPromoted.add(variable);
@@ -358,7 +348,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   /// Return whether the [variable] is definitely assigned in the current state.
   bool isAssigned(Variable variable) {
-    return !_current.notAssigned.contains(variable);
+    return !_current.variables[variable].definitelyAssigned;
   }
 
   void isExpression_end(
@@ -378,35 +368,28 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   }
 
   @visibleForTesting
-  Map<Variable, Type> joinPromoted(
-    Map<Variable, Type> first,
-    Map<Variable, Type> second,
+  Map<Variable, VariableState<Type>> joinVariables(
+    Map<Variable, VariableState<Type>> first,
+    Map<Variable, VariableState<Type>> second,
   ) {
     if (identical(first, second)) return first;
     if (first.isEmpty || second.isEmpty) return const {};
 
-    var result = <Variable, Type>{};
+    var result = <Variable, VariableState<Type>>{};
     var alwaysFirst = true;
     var alwaysSecond = true;
     for (var variable in first.keys) {
-      var firstType = first[variable];
-      var secondType = second[variable];
-      if (secondType != null) {
-        if (identical(firstType, secondType)) {
-          result[variable] = firstType;
-        } else if (typeOperations.isSubtypeOf(firstType, secondType)) {
-          result[variable] = secondType;
-          alwaysFirst = false;
-        } else if (typeOperations.isSubtypeOf(secondType, firstType)) {
-          result[variable] = firstType;
-          alwaysSecond = false;
-        } else {
-          alwaysFirst = false;
-          alwaysSecond = false;
-        }
-      } else {
+      var firstVariableState = first[variable];
+      var secondVariableState = second[variable];
+      var newVariableState = VariableState.join(
+          typeOperations, firstVariableState, secondVariableState);
+      if (!identical(firstVariableState, newVariableState)) {
         alwaysFirst = false;
       }
+      if (!identical(secondVariableState, newVariableState)) {
+        alwaysSecond = false;
+      }
+      result[variable] = newVariableState;
     }
 
     if (alwaysFirst) return first;
@@ -486,7 +469,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// Retrieves the type that the [variable] is promoted to, if the [variable]
   /// is currently promoted.  Otherwise returns `null`.
   Type promotedType(Variable variable) {
-    return _current.promoted[variable];
+    return _current.variables[variable].promotedType;
   }
 
   /// The [notPromoted] set contains all variables that are potentially
@@ -554,7 +537,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     var afterBody = _stack.removeLast();
     _current = _current.restrict(
       typeOperations,
-      _emptySet,
       afterBody,
       assignedInFinally,
     );
@@ -599,7 +581,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   /// Register write of the given [variable] in the current state.
   void write(Variable variable) {
-    _current = _current.write(typeOperations, _emptySet, variable);
+    _current = _current.write(typeOperations, variable);
   }
 
   void _conditionalEnd(Expression condition) {
@@ -624,16 +606,9 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     if (!first.reachable && second.reachable) return second;
 
     var newReachable = first.reachable || second.reachable;
-    var newNotAssigned = first.notAssigned.union(second.notAssigned);
-    var newPromoted = joinPromoted(first.promoted, second.promoted);
+    var newVariables = joinVariables(first.variables, second.variables);
 
-    return _State._identicalOrNew(
-      first,
-      second,
-      newReachable,
-      newNotAssigned,
-      newPromoted,
-    );
+    return _State._identicalOrNew(first, second, newReachable, newVariables);
   }
 }
 
@@ -670,56 +645,85 @@ abstract class TypeOperations<Variable, Type> {
   Type variableType(Variable variable);
 }
 
+@visibleForTesting
+class VariableState<Type> {
+  final bool definitelyAssigned;
+  final Type promotedType;
+
+  VariableState(this.definitelyAssigned, this.promotedType);
+
+  VariableState setDefinitelyAssigned(bool newDefinitelyAssigned) =>
+      VariableState<Type>(newDefinitelyAssigned, promotedType);
+
+  VariableState setPromotedType(Type newPromotedType) =>
+      VariableState<Type>(definitelyAssigned, newPromotedType);
+
+  @override
+  String toString() => '($definitelyAssigned, $promotedType)';
+
+  static VariableState<Type> join<Type>(
+      TypeOperations<Object, Type> typeOperations,
+      VariableState<Type> first,
+      VariableState<Type> second) {
+    if (identical(first, second)) return first;
+    if (first == null || second == null) return null;
+    var newDefinitelyAssigned =
+        first.definitelyAssigned && second.definitelyAssigned;
+    var firstType = first.promotedType;
+    var secondType = second.promotedType;
+    Type newPromotedType;
+    if (identical(firstType, secondType)) {
+      newPromotedType = firstType;
+    } else if (typeOperations.isSubtypeOf(firstType, secondType)) {
+      newPromotedType = secondType;
+    } else if (typeOperations.isSubtypeOf(secondType, firstType)) {
+      newPromotedType = firstType;
+    } else {
+      newPromotedType = null;
+    }
+    if (first.definitelyAssigned == newDefinitelyAssigned &&
+        identical(first.promotedType, newPromotedType)) {
+      return first;
+    } else if (second.definitelyAssigned == newDefinitelyAssigned &&
+        identical(second.promotedType, newPromotedType)) {
+      return second;
+    } else {
+      return VariableState<Type>(newDefinitelyAssigned, newPromotedType);
+    }
+  }
+}
+
 class _State<Variable, Type> {
   final bool reachable;
-  final _VariableSet<Variable> notAssigned;
-  final Map<Variable, Type> promoted;
+  final Map<Variable, VariableState<Type>> variables;
 
   _State(
     this.reachable,
-    this.notAssigned,
-    this.promoted,
+    this.variables,
   );
 
   /// Add a new [variable] to track definite assignment.
   _State<Variable, Type> add(Variable variable, {bool assigned: false}) {
-    var newNotAssigned = assigned ? notAssigned : notAssigned.add(variable);
-
-    if (identical(newNotAssigned, notAssigned)) {
-      return this;
-    }
-
-    return _State<Variable, Type>(
-      reachable,
-      newNotAssigned,
-      promoted,
-    );
+    var newVariables = Map<Variable, VariableState<Type>>.from(variables);
+    newVariables[variable] = VariableState(assigned, null);
+    return _State<Variable, Type>(reachable, newVariables);
   }
 
   _State<Variable, Type> exit() {
-    return _State<Variable, Type>(
-      false,
-      notAssigned,
-      promoted,
-    );
+    return _State<Variable, Type>(false, variables);
   }
 
   _State<Variable, Type> markNonNullable(
-      TypeOperations<Variable, Type> typeOperations,
-      _VariableSet<Variable> emptySet,
-      Variable variable) {
-    var previousType = promoted[variable];
+      TypeOperations<Variable, Type> typeOperations, Variable variable) {
+    var previousVariableState = variables[variable];
+    var previousType = previousVariableState.promotedType;
     previousType ??= typeOperations.variableType(variable);
     var type = typeOperations.tryPromoteToNonNull(previousType);
 
     if (type != null) {
-      var newPromoted = <Variable, Type>{}..addAll(promoted);
-      newPromoted[variable] = type;
-      return _State<Variable, Type>(
-        reachable,
-        notAssigned,
-        newPromoted,
-      );
+      var newVariables = _cloneVariables();
+      newVariables[variable] = previousVariableState.setPromotedType(type);
+      return _State<Variable, Type>(reachable, newVariables);
     }
 
     return this;
@@ -730,133 +734,116 @@ class _State<Variable, Type> {
     Variable variable,
     Type type,
   ) {
-    var previousType = promoted[variable];
+    var previousVariableState = variables[variable];
+    var previousType = previousVariableState.promotedType;
     previousType ??= typeOperations.variableType(variable);
 
     if (typeOperations.isSubtypeOf(type, previousType) &&
         type != previousType) {
-      var newPromoted = <Variable, Type>{}..addAll(promoted);
-      newPromoted[variable] = type;
-      return _State<Variable, Type>(
-        reachable,
-        notAssigned,
-        newPromoted,
-      );
+      var newVariables = _cloneVariables();
+      newVariables[variable] = previousVariableState.setPromotedType(type);
+      return _State<Variable, Type>(reachable, newVariables);
     }
 
     return this;
   }
 
-  _State<Variable, Type> removePromotedAll(Set<Variable> variables) {
-    var newPromoted = _removePromotedAll(promoted, variables);
+  _State<Variable, Type> removePromotedAll(Set<Variable> toRemove) {
+    var newVariables = _removePromotedAll(variables, toRemove);
 
-    if (identical(newPromoted, promoted)) return this;
+    if (identical(newVariables, variables)) return this;
 
-    return _State<Variable, Type>(
-      reachable,
-      notAssigned,
-      newPromoted,
-    );
+    return _State<Variable, Type>(reachable, newVariables);
   }
 
   _State<Variable, Type> restrict(
     TypeOperations<Variable, Type> typeOperations,
-    _VariableSet<Variable> emptySet,
     _State<Variable, Type> other,
     Set<Variable> unsafe,
   ) {
     var newReachable = reachable && other.reachable;
-    var newNotAssigned = notAssigned.intersect(
-      empty: emptySet,
-      other: other.notAssigned,
-    );
+    bool isDifferent = newReachable != reachable;
 
-    var newPromoted = <Variable, Type>{};
-    for (var variable in promoted.keys) {
-      var thisType = promoted[variable];
-      if (!unsafe.contains(variable)) {
-        var otherType = other.promoted[variable];
+    var newVariables = <Variable, VariableState>{};
+    for (var entry in variables.entries) {
+      var variable = entry.key;
+      var variableState = entry.value;
+      if (unsafe.contains(variable)) {
+        var otherVariableState = other.variables[variable];
+        var otherType = otherVariableState.promotedType;
+        var thisType = variableState.promotedType;
         if (otherType != null &&
+            !identical(otherType, thisType) &&
             typeOperations.isSubtypeOf(otherType, thisType)) {
-          newPromoted[variable] = otherType;
-          continue;
+          variableState = variableState.setPromotedType(otherType);
+          isDifferent = true;
+        }
+        if (!variableState.definitelyAssigned &&
+            otherVariableState.definitelyAssigned) {
+          variableState = variableState.setDefinitelyAssigned(true);
+          isDifferent = true;
         }
       }
-      newPromoted[variable] = thisType;
+      newVariables[variable] = variableState;
     }
 
-    return _identicalOrNew(
-      this,
-      other,
-      newReachable,
-      newNotAssigned,
-      newPromoted,
-    );
+    return isDifferent
+        ? _State<Variable, Type>(newReachable, newVariables)
+        : this;
   }
 
   _State<Variable, Type> setReachable(bool reachable) {
     if (this.reachable == reachable) return this;
 
-    return _State<Variable, Type>(
-      reachable,
-      notAssigned,
-      promoted,
-    );
+    return _State<Variable, Type>(reachable, variables);
   }
 
-  _State<Variable, Type> write(TypeOperations<Variable, Type> typeOperations,
-      _VariableSet<Variable> emptySet, Variable variable) {
-    var newNotAssigned = typeOperations.isLocalVariable(variable)
-        ? notAssigned.remove(emptySet, variable)
-        : notAssigned;
+  _State<Variable, Type> write(
+      TypeOperations<Variable, Type> typeOperations, Variable variable) {
+    var oldVariableState = variables[variable];
+    var newVariableState = oldVariableState;
+    if (typeOperations.isLocalVariable(variable) &&
+        !newVariableState.definitelyAssigned) {
+      newVariableState = newVariableState.setDefinitelyAssigned(true);
+    }
+    if (newVariableState.promotedType != null) {
+      newVariableState = newVariableState.setPromotedType(null);
+    }
 
-    var newPromoted = _removePromoted(promoted, variable);
-
-    if (identical(newNotAssigned, notAssigned) &&
-        identical(newPromoted, promoted)) {
+    if (identical(oldVariableState, newVariableState)) {
       return this;
     }
 
-    return _State<Variable, Type>(
-      reachable,
-      newNotAssigned,
-      newPromoted,
-    );
+    var newVariables = _cloneVariables();
+    newVariables[variable] = newVariableState;
+    return _State<Variable, Type>(reachable, newVariables);
   }
 
-  Map<Variable, Type> _removePromoted(
-      Map<Variable, Type> map, Variable variable) {
-    if (map.isEmpty) return const {};
+  Map<Variable, VariableState> _cloneVariables() =>
+      Map<Variable, VariableState>.from(variables);
 
-    var result = <Variable, Type>{};
-    for (var key in map.keys) {
-      if (!identical(key, variable)) {
-        result[key] = map[key];
-      }
-    }
-
-    if (result.isEmpty) return const {};
-    return result;
-  }
-
-  Map<Variable, Type> _removePromotedAll(
-    Map<Variable, Type> map,
-    Set<Variable> variables,
+  Map<Variable, VariableState<Type>> _removePromotedAll(
+    Map<Variable, VariableState<Type>> variables,
+    Set<Variable> toRemove,
   ) {
-    if (map.isEmpty) return const {};
-    if (variables.isEmpty) return map;
+    if (variables.isEmpty) return const {};
+    if (toRemove.isEmpty) return variables;
 
-    var result = <Variable, Type>{};
+    var result = <Variable, VariableState<Type>>{};
     var noChanges = true;
-    for (var key in map.keys) {
-      if (variables.contains(key)) {
-        noChanges = false;
-      } else {
-        result[key] = map[key];
+    for (var entry in variables.entries) {
+      var newVariableState = entry.value;
+      var variable = entry.key;
+      if (toRemove.contains(variable)) {
+        if (newVariableState.promotedType != null) {
+          noChanges = false;
+          newVariableState = newVariableState.setPromotedType(null);
+        }
       }
+      result[variable] = newVariableState;
     }
 
-    if (noChanges) return map;
+    if (noChanges) return variables;
     if (result.isEmpty) return const {};
     return result;
   }
@@ -865,116 +852,17 @@ class _State<Variable, Type> {
     _State<Variable, Type> first,
     _State<Variable, Type> second,
     bool newReachable,
-    _VariableSet<Variable> newNotAssigned,
-    Map<Variable, Type> newPromoted,
+    Map<Variable, VariableState> newVariables,
   ) {
     if (first.reachable == newReachable &&
-        identical(first.notAssigned, newNotAssigned) &&
-        identical(first.promoted, newPromoted)) {
+        identical(first.variables, newVariables)) {
       return first;
     }
     if (second.reachable == newReachable &&
-        identical(second.notAssigned, newNotAssigned) &&
-        identical(second.promoted, newPromoted)) {
+        identical(second.variables, newVariables)) {
       return second;
     }
 
-    return _State<Variable, Type>(
-      newReachable,
-      newNotAssigned,
-      newPromoted,
-    );
-  }
-}
-
-/// List based immutable set of variables.
-class _VariableSet<Variable> {
-  final List<Variable> variables;
-
-  _VariableSet._(this.variables);
-
-  _VariableSet<Variable> add(Variable addedVariable) {
-    if (contains(addedVariable)) {
-      return this;
-    }
-
-    var length = variables.length;
-    var newVariables = List<Variable>(length + 1);
-    for (var i = 0; i < length; ++i) {
-      newVariables[i] = variables[i];
-    }
-    newVariables[length] = addedVariable;
-    return _VariableSet._(newVariables);
-  }
-
-  _VariableSet<Variable> addAll(Iterable<Variable> variables) {
-    var result = this;
-    for (var variable in variables) {
-      result = result.add(variable);
-    }
-    return result;
-  }
-
-  bool contains(Variable variable) {
-    var length = variables.length;
-    for (var i = 0; i < length; ++i) {
-      if (identical(variables[i], variable)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  _VariableSet<Variable> intersect({
-    _VariableSet<Variable> empty,
-    _VariableSet<Variable> other,
-  }) {
-    if (identical(other, empty)) return empty;
-
-    // TODO(scheglov) optimize
-    var newVariables =
-        variables.toSet().intersection(other.variables.toSet()).toList();
-
-    if (newVariables.isEmpty) return empty;
-    return _VariableSet._(newVariables);
-  }
-
-  _VariableSet<Variable> remove(
-    _VariableSet<Variable> empty,
-    Variable removedVariable,
-  ) {
-    if (!contains(removedVariable)) {
-      return this;
-    }
-
-    var length = variables.length;
-    if (length == 1) {
-      return empty;
-    }
-
-    var newVariables = List<Variable>(length - 1);
-    var newIndex = 0;
-    for (var i = 0; i < length; ++i) {
-      var variable = variables[i];
-      if (!identical(variable, removedVariable)) {
-        newVariables[newIndex++] = variable;
-      }
-    }
-
-    return _VariableSet._(newVariables);
-  }
-
-  _VariableSet<Variable> union(_VariableSet<Variable> other) {
-    if (other.variables.isEmpty) {
-      return this;
-    }
-
-    var result = this;
-    var otherVariables = other.variables;
-    for (var i = 0; i < otherVariables.length; ++i) {
-      var otherVariable = otherVariables[i];
-      result = result.add(otherVariable);
-    }
-    return result;
+    return _State<Variable, Type>(newReachable, newVariables);
   }
 }
