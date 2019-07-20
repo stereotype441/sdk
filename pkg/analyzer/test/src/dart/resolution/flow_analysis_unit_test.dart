@@ -118,14 +118,6 @@ class _Harness
   }
 
   @override
-  _Type tryPromoteToNonNull(_Type type) {
-    if (type.type.endsWith('?')) {
-      return _Type(type.type.substring(0, type.type.length - 1));
-    }
-    return null;
-  }
-
-  @override
   _Expression unwrapParenthesized(_Expression node) {
     // TODO(paulberry): test cases where this matters
     return node;
