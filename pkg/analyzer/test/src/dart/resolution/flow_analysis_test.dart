@@ -127,7 +127,7 @@ class C {
 ''');
   }
 
-  solo_test_if_joinThenElse_ifNull() async {
+  test_if_joinThenElse_ifNull() async {
     await trackCode(r'''
 void f(int? a, int? b) {
   if (a == null) {
