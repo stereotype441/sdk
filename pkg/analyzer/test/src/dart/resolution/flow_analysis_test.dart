@@ -7,6 +7,7 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type_system.dart';
 import 'package:analyzer/src/dart/analysis/experiments.dart';
+import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
 import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/util/ast_data_extractor.dart';
@@ -51,6 +52,17 @@ class NullableFlowTest extends FlowTestBase {
   AnalysisOptionsImpl get analysisOptions =>
       AnalysisOptionsImpl()..enabledExperiments = [EnableString.non_nullable];
 
+  solo_test_assign_toNull() async {
+    await trackCode(r'''
+void f(int? x) {
+  if (x == null) return;
+  /*nonNullable*/ x;
+  x = null;
+  x;
+}
+''');
+  }
+
   test_assign_toNonNull() async {
     await trackCode(r'''
 void f(int? x) {
@@ -58,17 +70,6 @@ void f(int? x) {
   x;
   x = 0;
   // TODO(paulberry): x should be known to be non-nullable now
-  x;
-}
-''');
-  }
-
-  solo_test_assign_toNull() async {
-    await trackCode(r'''
-void f(int? x) {
-  if (x == null) return;
-  /*nonNullable*/ x;
-  x = null;
   x;
 }
 ''');
@@ -708,8 +709,8 @@ class _FlowAnalysisDataComputer extends DataComputer<Set<_FlowAssertion>> {
   void computeUnitData(CompilationUnit unit,
       Map<Id, ActualData<Set<_FlowAssertion>>> actualMap) {
     var flowResult = FlowAnalysisResult.getFromNode(unit);
-    _FlowAnalysisDataExtractor(
-            unit.declaredElement.source.uri, actualMap, flowResult)
+    _FlowAnalysisDataExtractor(unit.declaredElement.source.uri, actualMap,
+            flowResult, unit.declaredElement.context.typeSystem)
         .run(unit);
   }
 }
@@ -717,10 +718,13 @@ class _FlowAnalysisDataComputer extends DataComputer<Set<_FlowAssertion>> {
 class _FlowAnalysisDataExtractor extends AstDataExtractor<Set<_FlowAssertion>> {
   FlowAnalysisResult _flowResult;
 
-  TypeSystem _typeSystem;
+  final TypeSystem _typeSystem;
 
-  _FlowAnalysisDataExtractor(Uri uri,
-      Map<Id, ActualData<Set<_FlowAssertion>>> actualMap, this._flowResult)
+  _FlowAnalysisDataExtractor(
+      Uri uri,
+      Map<Id, ActualData<Set<_FlowAssertion>>> actualMap,
+      this._flowResult,
+      this._typeSystem)
       : super(uri, actualMap);
 
   @override
@@ -729,9 +733,14 @@ class _FlowAnalysisDataExtractor extends AstDataExtractor<Set<_FlowAssertion>> {
     if (node is SimpleIdentifier && node.inGetterContext()) {
       var element = node.staticElement;
       if (element is LocalVariableElement || element is ParameterElement) {
-        var promotedType = node.staticType;
-        var declaredType = (element as VariableElement).type;
-        if (promotedType != declaredType &&
+        TypeImpl promotedType = node.staticType;
+        TypeImpl declaredType = (element as VariableElement).type;
+        // TODO(paulberry): once type equality has been updated to account for
+        // nullability, isPromoted should just be
+        // `promotedType != declaredType`.  See dartbug.com/37587.
+        var isPromoted = promotedType != declaredType ||
+            promotedType.nullabilitySuffix != declaredType.nullabilitySuffix;
+        if (isPromoted &&
             _typeSystem.isNullable(declaredType) &&
             !_typeSystem.isNullable(promotedType)) {
           result.add(_FlowAssertion.nonNullable);

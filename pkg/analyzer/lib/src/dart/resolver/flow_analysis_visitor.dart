@@ -561,7 +561,7 @@ class _TypeSystemTypeOperations
     TypeImpl promotedType = typeSystem.promoteToNonNull(type);
     if (promotedType.nullabilitySuffix != type.nullabilitySuffix) {
       // TODO(paulberry): after DartType.operator== has been updated to compare
-      // nullabilities, this if test can be dropped.
+      // nullabilities, this if test can be dropped.  See dartbug.com/37587.
       return promotedType;
     }
     if (promotedType != type.nullabilitySuffix) {
