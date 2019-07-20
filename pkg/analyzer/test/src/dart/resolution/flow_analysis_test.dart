@@ -52,17 +52,6 @@ class NullableFlowTest extends FlowTestBase {
   AnalysisOptionsImpl get analysisOptions =>
       AnalysisOptionsImpl()..enabledExperiments = [EnableString.non_nullable];
 
-  solo_test_assign_toNull() async {
-    await trackCode(r'''
-void f(int? x) {
-  if (x == null) return;
-  /*nonNullable*/ x;
-  x = null;
-  x;
-}
-''');
-  }
-
   test_assign_toNonNull() async {
     await trackCode(r'''
 void f(int? x) {
@@ -70,6 +59,17 @@ void f(int? x) {
   x;
   x = 0;
   // TODO(paulberry): x should be known to be non-nullable now
+  x;
+}
+''');
+  }
+
+  test_assign_toNull() async {
+    await trackCode(r'''
+void f(int? x) {
+  if (x == null) return;
+  /*nonNullable*/ x;
+  x = null;
   x;
 }
 ''');
@@ -90,7 +90,7 @@ void f(int? a, int? b) {
     await trackCode(r'''
 void f(int? a, int? b) {
   if (a != null) return;
-  /*nullable*/ a;
+  a;
   a = b;
   a;
 }
@@ -100,7 +100,7 @@ void f(int? a, int? b) {
   test_binaryExpression_logicalAnd() async {
     await trackCode(r'''
 void f(int? x) {
-  x == null && /*nullable*/ x.isEven;
+  x == null && x.isEven;
 }
 ''');
   }
@@ -118,7 +118,7 @@ void f(int? x) {
 class C {
   C(int? x) {
     if (x == null) {
-      /*nullable*/ x;
+      x;
     } else {
       /*nonNullable*/ x;
     }
@@ -131,7 +131,7 @@ class C {
     await trackCode(r'''
 void f(int? a, int? b) {
   if (a == null) {
-    /*nullable*/ a;
+    a;
     if (b == null) return;
     /*nonNullable*/ b;
   } else {
@@ -149,7 +149,7 @@ void f(int? a, int? b) {
     await trackCode(r'''
 void f(int? x) {
   if (null != x) return;
-  /*nullable*/ x;
+  x;
 }
 ''');
   }
@@ -158,7 +158,7 @@ void f(int? x) {
     await trackCode(r'''
 void f(int? x) {
   if (x != null) return;
-  /*nullable*/ x;
+  x;
 }
 ''');
   }
@@ -185,7 +185,7 @@ void f(int? x) {
     await trackCode(r'''
 void f(int? x) {
   if (x == null) {
-    /*nullable*/ x;
+    x;
   } else {
     /*nonNullable*/ x;
   }
@@ -198,7 +198,7 @@ void f(int? x) {
 class C {
   void f(int? x) {
     if (x == null) {
-      /*nullable*/ x;
+      x;
     } else {
       /*nonNullable*/ x;
     }
@@ -256,7 +256,7 @@ void f(int? x) {
 void f(int? a, int? b) {
   if (a != null) return;
   try {
-    /*nullable*/ a;
+    a;
     a = b;
     a;
   } finally {
@@ -303,7 +303,7 @@ void f(int? a, int? b) {
     await trackCode(r'''
 void f(int? x) {
   while (x == null) {
-    /*nullable*/ x;
+    x;
   }
   /*nonNullable*/ x;
 }
@@ -316,7 +316,7 @@ void f(int? x) {
   while (x != null) {
     /*nonNullable*/ x;
   }
-  /*nullable*/ x;
+  x;
 }
 ''');
   }
