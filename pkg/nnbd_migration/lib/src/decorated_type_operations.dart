@@ -27,7 +27,7 @@ class DecoratedTypeOperations
   }
 
   @override
-  DecoratedType promoteToNonNull(DecoratedType type) {
+  DecoratedType tryPromoteToNonNull(DecoratedType type) {
     throw new UnimplementedError('TODO(paulberry)');
   }
 

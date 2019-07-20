@@ -8,6 +8,7 @@ import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/dart/element/type_system.dart';
+import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/resolver/flow_analysis.dart';
 import 'package:analyzer/src/generated/variable_type_provider.dart';
 
@@ -556,7 +557,18 @@ class _TypeSystemTypeOperations
   }
 
   @override
-  DartType promoteToNonNull(DartType type) => typeSystem.promoteToNonNull(type);
+  DartType tryPromoteToNonNull(covariant TypeImpl type) {
+    TypeImpl promotedType = typeSystem.promoteToNonNull(type);
+    if (promotedType.nullabilitySuffix != type.nullabilitySuffix) {
+      // TODO(paulberry): after DartType.operator== has been updated to compare
+      // nullabilities, this if test can be dropped.
+      return promotedType;
+    }
+    if (promotedType != type.nullabilitySuffix) {
+      return promotedType;
+    }
+    return null;
+  }
 
   @override
   DartType variableType(VariableElement variable) {

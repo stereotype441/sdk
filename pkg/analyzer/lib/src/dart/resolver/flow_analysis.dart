@@ -654,16 +654,16 @@ abstract class TypeOperations<Variable, Type> {
   /// Return `true` if the [leftType] is a subtype of the [rightType].
   bool isSubtypeOf(Type leftType, Type rightType);
 
-  /// Return the static type of the given [variable].
-  Type variableType(Variable variable);
-
-  /// Returns the non-null promoted version of [type].  For example, given
-  /// `int?`, returns `int`.
+  /// Returns the non-null promoted version of [type], if it is different,
+  /// otherwise `null`.  For example, given `int?`, returns `int`.
   ///
   /// Note that some types don't have a non-nullable version (e.g.
-  /// `FutureOr<int?>`), so [type] may be returned unchanged even if it is
+  /// `FutureOr<int?>`), so `null` may be returned unchanged even if the type is
   /// nullable.
-  Type promoteToNonNull(Type type);
+  Type tryPromoteToNonNull(Type type);
+
+  /// Return the static type of the given [variable].
+  Type variableType(Variable variable);
 }
 
 class _State<Variable, Type> {
@@ -706,9 +706,9 @@ class _State<Variable, Type> {
       Variable variable) {
     var previousType = promoted[variable];
     previousType ??= typeOperations.variableType(variable);
-    var type = typeOperations.promoteToNonNull(previousType);
+    var type = typeOperations.tryPromoteToNonNull(previousType);
 
-    if (type != previousType) {
+    if (type != null) {
       var newPromoted = <Variable, Type>{}..addAll(promoted);
       newPromoted[variable] = type;
       return _State<Variable, Type>(
