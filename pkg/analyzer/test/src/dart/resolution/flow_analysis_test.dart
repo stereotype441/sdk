@@ -232,7 +232,8 @@ void f(int? x) {
   } finally {
     x;
   }
-  /*nonNullable*/ x;
+  // TODO(paulberry): x should be known to be non-nullable now
+  x;
 }
 ''');
   }
@@ -375,13 +376,10 @@ void f(bool b, int i) {
   /*stmt: unreachable*/ do {} while (b);
   /*stmt: unreachable*/ for (;;) {}
   /*stmt: unreachable*/ for (var _ in []) {}
-  // TODO(paulberry): b shouldn't be considered both nullable and non-nullable.
-  /*stmt: unreachable*/ if (/*nonNullable,nullable*/b) {}
-  // TODO(paulberry): i shouldn't be considered both nullable and non-nullable.
-  /*stmt: unreachable*/ switch (/*nonNullable,nullable*/i) {}
+  /*stmt: unreachable*/ if (b) {}
+  /*stmt: unreachable*/ switch (i) {}
   /*stmt: unreachable*/ try {} finally {}
-  // TODO(paulberry): b shouldn't be considered both nullable and non-nullable.
-  /*stmt: unreachable*/ while (/*nonNullable,nullable*/b) {}
+  /*stmt: unreachable*/ while (b) {}
 }
 ''');
   }
@@ -492,8 +490,7 @@ void f() {
   test_logicalAnd_leftFalse() async {
     await trackCode(r'''
 void f(int x) {
-  // TODO(paulberry): x shouldn't be considered both nullable and non-nullable.
-  false && /*unreachable*/ (/*nonNullable,nullable*/x == 1);
+  false && /*unreachable*/ (x == 1);
 }
 ''');
   }
@@ -501,8 +498,7 @@ void f(int x) {
   test_logicalOr_leftTrue() async {
     await trackCode(r'''
 void f(int x) {
-  // TODO(paulberry): x shouldn't be considered both nullable and non-nullable.
-  true || /*unreachable*/ (/*nonNullable,nullable*/x == 1);
+  true || /*unreachable*/ (x == 1);
 }
 ''');
   }
