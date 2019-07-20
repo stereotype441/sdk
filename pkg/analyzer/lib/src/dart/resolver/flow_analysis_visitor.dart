@@ -459,6 +459,12 @@ class _FlowAnalysisWrapper
   }
 
   @override
+  void ifStatement_elseBegin() {
+    // TODO(paulberry): test
+    _wrap('ifStatement_elseBegin()', () => _flow.ifStatement_elseBegin());
+  }
+
+  @override
   void ifStatement_end(bool hasElse) {
     // TODO(paulberry): test
     _wrap('ifStatement_end($hasElse)', () => _flow.ifStatement_end(hasElse));
