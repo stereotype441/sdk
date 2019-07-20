@@ -325,6 +325,10 @@ class BytecodeAssembler {
     _emitJumpInstruction(Opcode.kJumpIfNotNull, label);
   }
 
+  void emitJumpIfUnchecked(Label label) {
+    _emitJumpInstruction(Opcode.kJumpIfUnchecked, label);
+  }
+
   void emitReturnTOS() {
     emitSourcePosition();
     _emitInstruction0(Opcode.kReturnTOS);
@@ -435,6 +439,7 @@ class BytecodeAssembler {
   }
 
   void emitStoreContextVar(int ra, int re) {
+    emitSourcePosition();
     _emitInstructionAE(Opcode.kStoreContextVar, ra, re);
   }
 

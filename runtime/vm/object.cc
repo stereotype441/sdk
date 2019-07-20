@@ -2086,14 +2086,21 @@ RawString* Object::DictionaryName() const {
 }
 
 void Object::InitializeObject(uword address, intptr_t class_id, intptr_t size) {
-  uword initial_value = (class_id == kInstructionsCid)
-                            ? compiler::Assembler::GetBreakInstructionFiller()
-                            : reinterpret_cast<uword>(null_);
   uword cur = address;
   uword end = address + size;
-  while (cur < end) {
-    *reinterpret_cast<uword*>(cur) = initial_value;
-    cur += kWordSize;
+  if (class_id == kInstructionsCid) {
+    compiler::target::uword initial_value =
+        compiler::Assembler::GetBreakInstructionFiller();
+    while (cur < end) {
+      *reinterpret_cast<compiler::target::uword*>(cur) = initial_value;
+      cur += compiler::target::kWordSize;
+    }
+  } else {
+    uword initial_value = reinterpret_cast<uword>(null_);
+    while (cur < end) {
+      *reinterpret_cast<uword*>(cur) = initial_value;
+      cur += kWordSize;
+    }
   }
   uint32_t tags = 0;
   ASSERT(class_id != kIllegalCid);
@@ -15399,13 +15406,30 @@ intptr_t Bytecode::GetTryIndexAtPc(uword return_address) const {
 #endif
 }
 
-uword Bytecode::GetDebugCheckedOpcodePc(uword from_offset,
-                                        uword to_offset) const {
+uword Bytecode::GetFirstDebugCheckOpcodePc() const {
+#if defined(DART_PRECOMPILED_RUNTIME)
+  UNREACHABLE();
+#else
+  uword pc = PayloadStart();
+  const uword end_pc = pc + Size();
+  while (pc < end_pc) {
+    if (KernelBytecode::IsDebugCheckOpcode(
+            reinterpret_cast<const KBCInstr*>(pc))) {
+      return pc;
+    }
+    pc = KernelBytecode::Next(pc);
+  }
+  return 0;
+#endif
+}
+
+uword Bytecode::GetDebugCheckedOpcodeReturnAddress(uword from_offset,
+                                                   uword to_offset) const {
 #if defined(DART_PRECOMPILED_RUNTIME)
   UNREACHABLE();
 #else
   uword pc = PayloadStart() + from_offset;
-  uword end_pc = pc + (to_offset - from_offset);
+  const uword end_pc = pc + (to_offset - from_offset);
   while (pc < end_pc) {
     uword next_pc = KernelBytecode::Next(pc);
     if (KernelBytecode::IsDebugCheckedOpcode(

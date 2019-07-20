@@ -23,7 +23,7 @@ class ExtensionMethodTest extends DriverResolutionTest {
     ..contextFeatures = new FeatureSet.forTesting(
         sdkVersion: '2.3.0', additionalFeatures: [Feature.extension_methods]);
 
-  test_more_specific_than_platform() async {
+  test_method_moreSpecificThanPlatform() async {
     //
     // An extension with on type clause T1 is more specific than another
     // extension with on type clause T2 iff
@@ -60,15 +60,7 @@ f() {
     expect(invocation.methodName.staticElement.library.isDartCore, isFalse);
   }
 
-  test_multipleExtensions() async {
-    await assertNoErrorsInCode('''
-class A {}
-extension E1 on A {}
-extension E2 on A {}
-''');
-  }
-
-  test_no_match() async {
+  test_method_noMatch() async {
     await assertErrorCodesInCode(r'''
 class B { }
 
@@ -83,7 +75,7 @@ f() {
 ''', [StaticTypeWarningCode.UNDEFINED_METHOD]);
   }
 
-  test_noMostSpecificExtension() async {
+  test_method_noMostSpecificExtension() async {
     await assertErrorsInCode('''
 class A { }
 
@@ -104,7 +96,7 @@ f() {
     ]);
   }
 
-  test_one_match() async {
+  test_method_oneMatch() async {
     await assertNoErrorsInCode('''
 class B { }
 
@@ -123,7 +115,96 @@ f() {
     expect(invocation.methodName.staticElement, declaration.declaredElement);
   }
 
-  test_specific_subtype_match_platform() async {
+  test_method_privateExtension() async {
+    newFile('/test/lib/lib.dart', content: '''
+class B { }
+
+extension _ on B {
+  void a() { }
+}
+''');
+    await assertErrorCodesInCode(r'''
+import 'lib.dart';
+
+f() {
+  B b = B();
+  b.a();
+}
+''', [StaticTypeWarningCode.UNDEFINED_METHOD]);
+  }
+
+  test_method_resolvesToStatic() async {
+    await assertErrorsInCode('''
+class A { }
+
+extension A1_Ext on A {
+  static void a() { }
+}
+
+f() {
+  A a = A();
+  a.a();
+}
+''', [
+      error(CompileTimeErrorCode.ACCESS_STATIC_EXTENSION_MEMBER, 85, 1),
+    ]);
+  }
+
+  test_method_specificSubtypeMatchLocal() async {
+    await assertNoErrorsInCode('''
+class A { }
+
+class B extends A { }
+
+extension A_Ext on A {
+  void a() { }
+}
+
+extension B_Ext on B {
+  void /*2*/ a() { }
+}
+
+f() {
+  B b = B();
+  b.a();
+}
+''');
+
+    var invocation = findNode.methodInvocation('b.a()');
+    var declaration = findNode.methodDeclaration('void /*2*/ a()');
+    expect(invocation.methodName.staticElement, declaration.declaredElement);
+  }
+
+  @failingTest
+  test_method_specificSubtypeMatchLocalGenerics() async {
+    await assertNoErrorsInCode('''
+class A<T> { }
+
+class B<T> extends A<T> { }
+
+class O { }
+
+extension A_Ext<T> on A<T> {
+  void f(T x) { }
+}
+
+extension B_Ext<T> on B<T> {
+  void /*2*/ f(T x) { }
+}
+
+main() {
+  B<O> x = B<O>();
+  O o = O();
+  x.f(o);
+}
+''');
+
+    var invocation = findNode.methodInvocation('x.f(o)');
+    var declaration = findNode.methodDeclaration('void /*2*/ f(T x)');
+    expect(invocation.methodName.staticElement, declaration.declaredElement);
+  }
+
+  test_method_specificSubtypeMatchPlatform() async {
     newFile('/test/lib/core.dart', content: '''
 library dart.core;
 
@@ -154,57 +235,38 @@ f() {
     expect(invocation.methodName.staticElement, declaration.declaredElement);
   }
 
-  test_specificSubtype_match_local() async {
-    await assertNoErrorsInCode('''
-class A { }
+  test_method_unnamedExtension() async {
+    newFile('/test/lib/lib.dart', content: '''
+class B { }
 
-class B extends A { }
-
-extension A_Ext on A {
+extension on B {
   void a() { }
 }
-
-extension B_Ext on B {
-  void /*2*/ a() { }
-}
+''');
+    await assertErrorCodesInCode(r'''
+import 'lib.dart';
 
 f() {
   B b = B();
   b.a();
 }
-''');
-
-    var invocation = findNode.methodInvocation('b.a()');
-    var declaration = findNode.methodDeclaration('void /*2*/ a()');
-    expect(invocation.methodName.staticElement, declaration.declaredElement);
+''', [StaticTypeWarningCode.UNDEFINED_METHOD]);
   }
 
-  @failingTest
-  test_specificSubtype_match_local_generics() async {
+  test_multipleExtensions() async {
     await assertNoErrorsInCode('''
-class A<T> { }
+class A {}
+extension E1 on A {}
+extension E2 on A {}
+''');
+  }
 
-class B<T> extends A<T> { }
-
-class O { }
-
-extension A_Ext<T> on A<T> {
-  void f(T x) { }
-}
-
-extension B_Ext<T> on B<T> {
-  void /*2*/ f(T x) { }
-}
-
-main() {
-  B<O> x = B<O>();
-  O o = O();
-  x.f(o);
+  test_unnamedExtension() async {
+    await assertNoErrorsInCode('''
+class A {}
+extension on A {
+  void a() { }
 }
 ''');
-
-    var invocation = findNode.methodInvocation('x.f(o)');
-    var declaration = findNode.methodDeclaration('void /*2*/ f(T x)');
-    expect(invocation.methodName.staticElement, declaration.declaredElement);
   }
 }
