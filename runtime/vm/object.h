@@ -5733,8 +5733,14 @@ class Bytecode : public Object {
   TokenPosition GetTokenIndexOfPC(uword return_address) const;
   intptr_t GetTryIndexAtPc(uword return_address) const;
 
+  // Return the pc of the first 'DebugCheck' opcode of the bytecode.
+  // Return 0 if none is found.
+  uword GetFirstDebugCheckOpcodePc() const;
+
   // Return the pc after the first 'debug checked' opcode in the range.
-  uword GetDebugCheckedOpcodePc(uword from_offset, uword to_offset) const;
+  // Return 0 if none is found.
+  uword GetDebugCheckedOpcodeReturnAddress(uword from_offset,
+                                           uword to_offset) const;
 
   intptr_t instructions_binary_offset() const {
     return raw_ptr()->instructions_binary_offset_;
@@ -9114,7 +9120,9 @@ class Pointer : public Instance {
   }
 
   void SetNativeAddress(size_t address) const {
-    StorePointer(&raw_ptr()->c_memory_address_, Integer::New(address));
+    const auto& address_boxed = Integer::Handle(Integer::New(address));
+    NoSafepointScope no_safepoint_scope;
+    StorePointer(&raw_ptr()->c_memory_address_, address_boxed.raw());
   }
 
   static intptr_t type_arguments_offset() {

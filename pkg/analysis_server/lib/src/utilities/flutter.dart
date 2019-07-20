@@ -12,6 +12,7 @@ import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer_plugin/utilities/change_builder/change_builder_dart.dart';
 
 class Flutter {
+  static const _nameAlign = 'Align';
   static const _nameCenter = 'Center';
   static const _nameContainer = 'Container';
   static const _namePadding = 'Padding';
@@ -33,6 +34,7 @@ class Flutter {
   final String packageName;
   final String widgetsUri;
 
+  final Uri _uriAlignment;
   final Uri _uriAsync;
   final Uri _uriBasic;
   final Uri _uriContainer;
@@ -65,6 +67,7 @@ class Flutter {
 
   Flutter._(this.packageName, String uriPrefix)
       : widgetsUri = '$uriPrefix/widgets.dart',
+        _uriAlignment = Uri.parse('$uriPrefix/src/painting/alignment.dart'),
         _uriAsync = Uri.parse('$uriPrefix/src/widgets/async.dart'),
         _uriBasic = Uri.parse('$uriPrefix/src/widgets/basic.dart'),
         _uriContainer = Uri.parse('$uriPrefix/src/widgets/container.dart'),
@@ -181,6 +184,21 @@ class Flutter {
       InstanceCreationExpression newExpr) {
     NamedExpression child = findChildArgument(newExpr);
     return getChildWidget(child);
+  }
+
+  /**
+   * Return the named expression with the given [name], or `null` if none.
+   */
+  NamedExpression findNamedArgument(
+    InstanceCreationExpression creation,
+    String name,
+  ) {
+    var arguments = creation.argumentList.arguments;
+    return arguments.firstWhere(
+      (argument) =>
+          argument is NamedExpression && argument.name.label.name == name,
+      orElse: () => null,
+    );
   }
 
   /**
@@ -321,11 +339,34 @@ class Flutter {
   bool isChildrenArgument(Expression argument) =>
       argument is NamedExpression && argument.name.label.name == 'children';
 
+  /// Return `true` if the [element] is the Flutter class `Alignment`.
+  bool isExactAlignment(ClassElement element) {
+    return _isExactWidget(element, 'Alignment', _uriAlignment);
+  }
+
+  /// Return `true` if the [element] is the Flutter class `AlignmentDirectional`.
+  bool isExactAlignmentDirectional(ClassElement element) {
+    return _isExactWidget(element, 'AlignmentDirectional', _uriAlignment);
+  }
+
+  /// Return `true` if the [element] is the Flutter class `AlignmentGeometry`.
+  bool isExactAlignmentGeometry(ClassElement element) {
+    return _isExactWidget(element, 'AlignmentGeometry', _uriAlignment);
+  }
+
+  /**
+   * Return `true` if the [node] is creation of `Align`.
+   */
+  bool isExactlyAlignCreation(InstanceCreationExpression node) {
+    var type = node?.staticType;
+    return isExactWidgetTypeAlign(type);
+  }
+
   /**
    * Return `true` if the [node] is creation of `Container`.
    */
   bool isExactlyContainerCreation(InstanceCreationExpression node) {
-    var type = node.staticType;
+    var type = node?.staticType;
     return isExactWidgetTypeContainer(type);
   }
 
@@ -348,6 +389,14 @@ class Flutter {
   /// Return `true` if the given [element] is the Flutter class `State`.
   bool isExactState(ClassElement element) {
     return _isExactWidget(element, _nameState, _uriFramework);
+  }
+
+  /**
+   * Return `true` if the given [type] is the Flutter class `Align`.
+   */
+  bool isExactWidgetTypeAlign(DartType type) {
+    return type is InterfaceType &&
+        _isExactWidget(type.element, _nameAlign, _uriBasic);
   }
 
   /**
