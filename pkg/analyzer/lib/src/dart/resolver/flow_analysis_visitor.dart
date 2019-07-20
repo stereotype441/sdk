@@ -76,8 +76,7 @@ class FlowAnalysisHelper {
       VariableElement localElement, Expression right) {
     if (localElement == null) return;
 
-    flow.write(
-      localElement);
+    flow.write(localElement);
   }
 
   void binaryExpression_bangEq(
@@ -433,6 +432,13 @@ class _FlowAnalysisWrapper
   }
 
   @override
+  void conditionEqNull(Expression binaryExpression, VariableElement variable) {
+    // TODO(paulberry): test
+    _wrap('conditionEqNull($binaryExpression, $variable)',
+        () => _flow.conditionEqNull(binaryExpression, variable));
+  }
+
+  @override
   void conditionNotEqNull(Expression binaryExpression, Element variable) {
     // TODO(paulberry): test
     _wrap('conditionNotEqNull($binaryExpression, $variable)',
@@ -484,11 +490,9 @@ class _FlowAnalysisWrapper
   }
 
   @override
-  void write(
-    Element variable) {
+  void write(Element variable) {
     // TODO(paulberry): test
-    _wrap('write($variable)',
-        () => _flow.write(variable));
+    _wrap('write($variable)', () => _flow.write(variable));
   }
 
   T _wrap<T>(String text, T Function() f) {
