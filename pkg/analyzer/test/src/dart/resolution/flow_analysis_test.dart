@@ -381,16 +381,8 @@ void f() {
 
   solo_test_exit_beforeSplitStatement() async {
     await trackCode(r'''
-/*member: f:doesNotComplete*/
-void f(bool b, int i) {
-  return;
-  /*stmt: unreachable*/ do {} while (b);
-  /*stmt: unreachable*/ for (;;) {}
-  /*stmt: unreachable*/ for (var _ in []) {}
-  /*stmt: unreachable*/ if (b) {}
-  /*stmt: unreachable*/ switch (i) {}
-  /*stmt: unreachable*/ try {} finally {}
-  /*stmt: unreachable*/ while (b) {}
+void f() {
+  for (var _ in []) {}
 }
 ''');
   }
