@@ -789,9 +789,9 @@ class State<Variable, Type> {
       }
     }
     assert(promotedMatchesThis ==
-        promotionsEqual(typeOperations, newPromoted, promoted));
+        _promotionsEqual(typeOperations, newPromoted, promoted));
     assert(promotedMatchesOther ==
-        promotionsEqual(typeOperations, newPromoted, other.promoted));
+        _promotionsEqual(typeOperations, newPromoted, other.promoted));
     if (promotedMatchesThis) {
       newPromoted = promoted;
     } else if (promotedMatchesOther) {
@@ -877,36 +877,6 @@ class State<Variable, Type> {
     return result;
   }
 
-  @visibleForTesting
-  static bool promotionsEqual<Variable, Type>(
-      TypeOperations<Variable, Type> typeOperations,
-      Map<Variable, Type> p1,
-      Map<Variable, Type> p2) {
-    if (p1.length != p2.length) return false;
-    if (!p1.keys.toSet().containsAll(p2.keys)) return false;
-    for (var entry in p1.entries) {
-      var p1Value = entry.value;
-      var p2Value = p2[entry.key];
-      if (!typeOperations.isSameType(p1Value, p2Value)) return false;
-    }
-    return true;
-  }
-
-  @visibleForTesting
-  static bool statesEqual<Variable, Type>(
-      TypeOperations<Variable, Type> typeOperations,
-      State<Variable, Type> s1,
-      State<Variable, Type> s2) {
-    if (s1.reachable != s2.reachable) return false;
-    if (s1.notAssigned.variables.length != s2.notAssigned.variables.length) {
-      return false;
-    }
-    for (var v in s1.notAssigned.variables) {
-      if (!s2.notAssigned.contains(v)) return false;
-    }
-    return promotionsEqual(typeOperations, s1.promoted, s2.promoted);
-  }
-
   static State<Variable, Type> _identicalOrNew<Variable, Type>(
     State<Variable, Type> first,
     State<Variable, Type> second,
@@ -930,6 +900,20 @@ class State<Variable, Type> {
       newNotAssigned,
       newPromoted,
     );
+  }
+
+  static bool _promotionsEqual<Variable, Type>(
+      TypeOperations<Variable, Type> typeOperations,
+      Map<Variable, Type> p1,
+      Map<Variable, Type> p2) {
+    if (p1.length != p2.length) return false;
+    if (!p1.keys.toSet().containsAll(p2.keys)) return false;
+    for (var entry in p1.entries) {
+      var p1Value = entry.value;
+      var p2Value = p2[entry.key];
+      if (!typeOperations.isSameType(p1Value, p2Value)) return false;
+    }
+    return true;
   }
 }
 
