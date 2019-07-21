@@ -4,6 +4,13 @@
 
 import 'package:meta/meta.dart';
 
+bool _isSameNullableType<Type>(
+    TypeOperations<Object, Type> typeOperations, Type type1, Type type2) {
+  if (identical(type1, type2)) return true;
+  if (type1 == null || type2 == null) return false;
+  return typeOperations.isSameType(type1, type2);
+}
+
 /// Sets of local variables that are potentially assigned in a statement.
 ///
 /// These statements are loops, `switch`, and `try` statements.
@@ -707,9 +714,9 @@ class State<Variable, Type> {
       var variable = entry.key;
       var variableState = entry.value;
       var otherVariableState = other.variables[variable];
+      var otherType = otherVariableState.promotedType;
+      var thisType = variableState.promotedType;
       if (!unsafe.contains(variable)) {
-        var otherType = otherVariableState.promotedType;
-        var thisType = variableState.promotedType;
         if (identical(otherType, thisType)) {
           // No need to update the promoted type; it's the same.
         } else if (otherType != null &&
@@ -717,7 +724,7 @@ class State<Variable, Type> {
                 typeOperations.isSubtypeOf(otherType, thisType))) {
           variableState = variableState.setPromotedType(otherType);
           if (variablesMatchesThis &&
-              !typeOperations.isSameType(thisType, otherType)) {
+              !_isSameNullableType(typeOperations, thisType, otherType)) {
             variablesMatchesThis = false;
           }
         } else {
@@ -731,6 +738,10 @@ class State<Variable, Type> {
             !otherVariableState.definitelyAssigned) {
           variablesMatchesOther = false;
         }
+      } else if (!_isSameNullableType(typeOperations, thisType, otherType) ||
+          variableState.definitelyAssigned !=
+              otherVariableState.definitelyAssigned) {
+        variablesMatchesOther = false;
       }
       newVariables[variable] = variableState;
     }
@@ -877,9 +888,8 @@ class VariableState<Type> {
   bool isSameAs(
       TypeOperations<Object, Type> typeOperations, VariableState<Type> other) {
     if (definitelyAssigned != other.definitelyAssigned) return false;
-    if (identical(promotedType, other.promotedType)) return true;
-    if (promotedType == null || other.promotedType == null) return false;
-    return typeOperations.isSameType(promotedType, other.promotedType);
+    return _isSameNullableType(
+        typeOperations, promotedType, other.promotedType);
   }
 
   VariableState<Type> setDefinitelyAssigned(bool newDefinitelyAssigned) =>
