@@ -65,12 +65,9 @@ main() {
         expect(flow.joinVariables(p, p), same(p));
       });
 
-      test('one input empty', () {
+      test('two empty inputs', () {
         var flow = _Harness().flow;
-        var p1 = {x: intState, y: stringState};
-        var p2 = emptyMap;
-        expect(flow.joinVariables(p1, p2), same(emptyMap));
-        expect(flow.joinVariables(p2, p1), same(emptyMap));
+        expect(flow.joinVariables({}, {}), same(emptyMap));
       });
 
       test('related types', () {
@@ -87,32 +84,6 @@ main() {
         var p2 = {x: stringState};
         expect(flow.joinVariables(p1, p2), {x: unpromotedState});
         expect(flow.joinVariables(p2, p1), {x: unpromotedState});
-      });
-
-      test('sub-map', () {
-        var flow = _Harness().flow;
-        var p1 = {x: intState, y: stringState};
-        var p2 = {x: intState};
-        expect(flow.joinVariables(p1, p2), same(p2));
-        expect(flow.joinVariables(p2, p1), same(p2));
-      });
-
-      test('sub-map with matched subtype', () {
-        var flow = _Harness().flow;
-        var p1 = {x: intState, y: stringState};
-        var p2 = {x: intQState};
-        expect(flow.joinVariables(p1, p2), same(p2));
-        expect(flow.joinVariables(p2, p1), same(p2));
-      });
-
-      test('sub-map with mismatched subtype', () {
-        var flow = _Harness().flow;
-        var p1 = {x: intQState, y: stringState};
-        var p2 = {x: intState};
-        var join12 = flow.joinVariables(p1, p2);
-        _Type.allowComparisons(() => expect(join12, {x: intQState}));
-        var join21 = flow.joinVariables(p2, p1);
-        _Type.allowComparisons(() => expect(join21, {x: intQState}));
       });
     });
   });

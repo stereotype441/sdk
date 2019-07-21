@@ -372,6 +372,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     Map<Variable, VariableState<Type>> first,
     Map<Variable, VariableState<Type>> second,
   ) {
+    assert(first.length == second.length &&
+        first.keys.toSet().containsAll(second.keys));
     if (identical(first, second)) return first;
     if (first.isEmpty || second.isEmpty) return const {};
 
