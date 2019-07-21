@@ -54,6 +54,37 @@ main() {
         expect(h.flow.promotedType(x), null);
       });
     });
+
+    void _checkIs(String declaredType, String tryPromoteType,
+        String expectedPromotedType) {
+      var flow = _Harness().flow;
+      var x = _Var('x', _Type(declaredType));
+      flow.add(x, assigned: true);
+      var expr = _Expression();
+      flow.isExpression_end(expr, x, false, _Type(tryPromoteType));
+      flow.ifStatement_thenBegin(expr);
+      if (expectedPromotedType == null) {
+        expect(flow.promotedType(x), isNull);
+      } else {
+        expect(flow.promotedType(x).type, 'int');
+      }
+      flow.ifStatement_elseBegin();
+      expect(flow.promotedType(x), isNull);
+      flow.ifStatement_end(true);
+      flow.verifyStackEmpty();
+    }
+
+    test('isExpression_end promotes to a subtype', () {
+      _checkIs('int?', 'int', 'int');
+    });
+
+    test('isExpression_end does not promote to a supertype', () {
+      _checkIs('int', 'int?', null);
+    });
+
+    test('isExpression_end does not promote to an unrelated type', () {
+      _checkIs('int', 'String', null);
+    });
   });
 
   group('join variables', () {
@@ -123,6 +154,11 @@ class _Harness
   @override
   bool isPotentiallyMutatedInScope(_Var variable) {
     throw UnimplementedError('TODO(paulberry)');
+  }
+
+  @override
+  bool isSameType(_Type type1, _Type type2) {
+    return type1.type == type2.type;
   }
 
   @override
