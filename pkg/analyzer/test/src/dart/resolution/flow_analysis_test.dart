@@ -379,7 +379,7 @@ void f() {
 ''');
   }
 
-  test_exit_beforeSplitStatement() async {
+  solo_test_exit_beforeSplitStatement() async {
     await trackCode(r'''
 /*member: f:doesNotComplete*/
 void f(bool b, int i) {
