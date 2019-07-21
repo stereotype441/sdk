@@ -624,67 +624,6 @@ abstract class NodeOperations<Expression> {
 }
 
 @visibleForTesting
-class VariableState<Type> {
-  final bool definitelyAssigned;
-  final Type promotedType;
-
-  VariableState(this.definitelyAssigned, this.promotedType);
-
-  @override
-  bool operator ==(Object other) =>
-      other is VariableState<Type> &&
-      this.definitelyAssigned == other.definitelyAssigned &&
-      this.promotedType == other.promotedType;
-
-  VariableState<Type> setDefinitelyAssigned(bool newDefinitelyAssigned) =>
-      VariableState<Type>(newDefinitelyAssigned, promotedType);
-
-  VariableState<Type> setPromotedType(Type newPromotedType) =>
-      VariableState<Type>(definitelyAssigned, newPromotedType);
-
-  @override
-  String toString() => '($definitelyAssigned, $promotedType)';
-
-  static VariableState<Type> join<Type>(
-      TypeOperations<Object, Type> typeOperations,
-      VariableState<Type> first,
-      VariableState<Type> second) {
-    if (identical(first, second)) return first;
-    if (first == null || second == null) return null;
-    var newDefinitelyAssigned =
-        first.definitelyAssigned && second.definitelyAssigned;
-    var firstType = first.promotedType;
-    var secondType = second.promotedType;
-    Type newPromotedType;
-    if (identical(firstType, secondType)) {
-      newPromotedType = firstType;
-    } else if (firstType == null || secondType == null) {
-      newPromotedType = null;
-    } else if (typeOperations.isSubtypeOf(firstType, secondType)) {
-      newPromotedType = secondType;
-    } else if (typeOperations.isSubtypeOf(secondType, firstType)) {
-      newPromotedType = firstType;
-    } else {
-      newPromotedType = null;
-    }
-    if (first.definitelyAssigned == newDefinitelyAssigned &&
-        identical(first.promotedType, newPromotedType)) {
-      return first;
-    } else if (second.definitelyAssigned == newDefinitelyAssigned &&
-        identical(second.promotedType, newPromotedType)) {
-      return second;
-    } else {
-      return VariableState<Type>(newDefinitelyAssigned, newPromotedType);
-    }
-  }
-
-  bool isSameAs(TypeOperations<Object, Type> typeOperations, VariableState<Type> other) {
-    if (definitelyAssigned != other.definitelyAssigned) return false;
-    return typeOperations.isSameType(promotedType, other.promotedType);
-  }
-}
-
-@visibleForTesting
 class State<Variable, Type> {
   final bool reachable;
   final Map<Variable, VariableState<Type>> variables;
@@ -773,22 +712,23 @@ class State<Variable, Type> {
         var thisType = variableState.promotedType;
         if (identical(otherType, thisType)) {
           // No need to update the promoted type; it's the same.
-        } else
-        if (otherType != null &&
-            (thisType == null || typeOperations.isSubtypeOf(otherType, thisType))) {
+        } else if (otherType != null &&
+            (thisType == null ||
+                typeOperations.isSubtypeOf(otherType, thisType))) {
           variableState = variableState.setPromotedType(otherType);
-          if (variablesMatchesThis && !typeOperations.isSameType(thisType, otherType)) {
+          if (variablesMatchesThis &&
+              !typeOperations.isSameType(thisType, otherType)) {
             variablesMatchesThis = false;
           }
-        } else
-          {
-            variablesMatchesOther = false;
+        } else {
+          variablesMatchesOther = false;
         }
         if (!variableState.definitelyAssigned &&
             otherVariableState.definitelyAssigned) {
           variableState = variableState.setDefinitelyAssigned(true);
           variablesMatchesThis = false;
-        } else if (variableState.definitelyAssigned && !otherVariableState.definitelyAssigned) {
+        } else if (variableState.definitelyAssigned &&
+            !otherVariableState.definitelyAssigned) {
           variablesMatchesOther = false;
         }
       }
@@ -919,4 +859,68 @@ abstract class TypeOperations<Variable, Type> {
 
   /// Return the static type of the given [variable].
   Type variableType(Variable variable);
+}
+
+@visibleForTesting
+class VariableState<Type> {
+  final bool definitelyAssigned;
+  final Type promotedType;
+
+  VariableState(this.definitelyAssigned, this.promotedType);
+
+  @override
+  bool operator ==(Object other) =>
+      other is VariableState<Type> &&
+      this.definitelyAssigned == other.definitelyAssigned &&
+      this.promotedType == other.promotedType;
+
+  bool isSameAs(
+      TypeOperations<Object, Type> typeOperations, VariableState<Type> other) {
+    if (definitelyAssigned != other.definitelyAssigned) return false;
+    if (identical(promotedType, other.promotedType)) return true;
+    if (promotedType == null || other.promotedType == null) return false;
+    return typeOperations.isSameType(promotedType, other.promotedType);
+  }
+
+  VariableState<Type> setDefinitelyAssigned(bool newDefinitelyAssigned) =>
+      VariableState<Type>(newDefinitelyAssigned, promotedType);
+
+  VariableState<Type> setPromotedType(Type newPromotedType) =>
+      VariableState<Type>(definitelyAssigned, newPromotedType);
+
+  @override
+  String toString() => '($definitelyAssigned, $promotedType)';
+
+  static VariableState<Type> join<Type>(
+      TypeOperations<Object, Type> typeOperations,
+      VariableState<Type> first,
+      VariableState<Type> second) {
+    if (identical(first, second)) return first;
+    if (first == null || second == null) return null;
+    var newDefinitelyAssigned =
+        first.definitelyAssigned && second.definitelyAssigned;
+    var firstType = first.promotedType;
+    var secondType = second.promotedType;
+    Type newPromotedType;
+    if (identical(firstType, secondType)) {
+      newPromotedType = firstType;
+    } else if (firstType == null || secondType == null) {
+      newPromotedType = null;
+    } else if (typeOperations.isSubtypeOf(firstType, secondType)) {
+      newPromotedType = secondType;
+    } else if (typeOperations.isSubtypeOf(secondType, firstType)) {
+      newPromotedType = firstType;
+    } else {
+      newPromotedType = null;
+    }
+    if (first.definitelyAssigned == newDefinitelyAssigned &&
+        identical(first.promotedType, newPromotedType)) {
+      return first;
+    } else if (second.definitelyAssigned == newDefinitelyAssigned &&
+        identical(second.promotedType, newPromotedType)) {
+      return second;
+    } else {
+      return VariableState<Type>(newDefinitelyAssigned, newPromotedType);
+    }
+  }
 }

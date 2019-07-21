@@ -361,7 +361,7 @@ main() {
         expect(s1.variables[objectQVar].promotedType, isNotNull);
         var s2 = s1.write(h, objectQVar);
         expect(s2.reachable, true);
-        expect(s1.variables[objectQVar].promotedType, isNull);
+        expect(s2.variables[objectQVar].promotedType, isNull);
       });
     });
 
@@ -425,8 +425,8 @@ main() {
         var s2 = s1.removePromotedAll({intQVar});
         expect(s2.reachable, true);
         _Type.allowComparisons(() {
-          expect(s2.variables,
-              {objectQVar: VariableState<_Type>(false, _Type('int'))});
+          expect(s2.variables[objectQVar],
+              VariableState<_Type>(false, _Type('int')));
         });
       });
     });
