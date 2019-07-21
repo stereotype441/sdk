@@ -606,7 +606,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     var newReachable = first.reachable || second.reachable;
     var newVariables = joinVariables(first.variables, second.variables);
 
-    return _State._identicalOrNew(first, second, newReachable, newVariables);
+    return State._identicalOrNew(first, second, newReachable, newVariables);
   }
 }
 
@@ -677,6 +677,11 @@ class VariableState<Type> {
       return VariableState<Type>(newDefinitelyAssigned, newPromotedType);
     }
   }
+
+  bool isSameAs(TypeOperations<Object, Type> typeOperations, VariableState<Type> other) {
+    if (definitelyAssigned != other.definitelyAssigned) return false;
+    return typeOperations.isSameType(promotedType, other.promotedType);
+  }
 }
 
 @visibleForTesting
@@ -687,7 +692,6 @@ class State<Variable, Type> {
   State(bool reachable)
       : this._(
           reachable,
-          _VariableSet<Variable>._(const []),
           const {},
         );
 
@@ -764,36 +768,43 @@ class State<Variable, Type> {
       var variable = entry.key;
       var variableState = entry.value;
       var otherVariableState = other.variables[variable];
-      if (unsafe.contains(variable)) {
+      if (!unsafe.contains(variable)) {
         var otherType = otherVariableState.promotedType;
         var thisType = variableState.promotedType;
+        if (identical(otherType, thisType)) {
+          // No need to update the promoted type; it's the same.
+        } else
         if (otherType != null &&
-            !identical(otherType, thisType) &&
             (thisType == null || typeOperations.isSubtypeOf(otherType, thisType))) {
           variableState = variableState.setPromotedType(otherType);
-          isDifferent = true;
+          if (variablesMatchesThis && !typeOperations.isSameType(thisType, otherType)) {
+            variablesMatchesThis = false;
+          }
+        } else
+          {
+            variablesMatchesOther = false;
         }
         if (!variableState.definitelyAssigned &&
             otherVariableState.definitelyAssigned) {
           variableState = variableState.setDefinitelyAssigned(true);
-          isDifferent = true;
+          variablesMatchesThis = false;
+        } else if (variableState.definitelyAssigned && !otherVariableState.definitelyAssigned) {
+          variablesMatchesOther = false;
         }
       }
       newVariables[variable] = variableState;
     }
-    assert(promotedMatchesThis ==
-        _promotionsEqual(typeOperations, newPromoted, promoted));
-    assert(promotedMatchesOther ==
-        _promotionsEqual(typeOperations, newPromoted, other.promoted));
-    if (promotedMatchesThis) {
-      newPromoted = promoted;
-    } else if (promotedMatchesOther) {
-      newPromoted = other.promoted;
+    assert(variablesMatchesThis ==
+        _variablesEqual(typeOperations, newVariables, variables));
+    assert(variablesMatchesOther ==
+        _variablesEqual(typeOperations, newVariables, other.variables));
+    if (variablesMatchesThis) {
+      newVariables = variables;
+    } else if (variablesMatchesOther) {
+      newVariables = other.variables;
     }
 
-    return isDifferent
-        ? State<Variable, Type>(newReachable, newVariables)
-        : this;
+    return _identicalOrNew(this, other, newReachable, newVariables);
   }
 
   State<Variable, Type> setReachable(bool reachable) {
@@ -803,7 +814,7 @@ class State<Variable, Type> {
   }
 
   @override
-  String toString() => '($reachable, $notAssigned, $promoted)';
+  String toString() => '($reachable, $variables)';
 
   State<Variable, Type> write(
       TypeOperations<Variable, Type> typeOperations, Variable variable) {
@@ -873,16 +884,16 @@ class State<Variable, Type> {
     return State<Variable, Type>._(newReachable, newVariables);
   }
 
-  static bool _promotionsEqual<Variable, Type>(
+  static bool _variablesEqual<Variable, Type>(
       TypeOperations<Variable, Type> typeOperations,
-      Map<Variable, Type> p1,
-      Map<Variable, Type> p2) {
+      Map<Variable, VariableState<Type>> p1,
+      Map<Variable, VariableState<Type>> p2) {
     if (p1.length != p2.length) return false;
     if (!p1.keys.toSet().containsAll(p2.keys)) return false;
     for (var entry in p1.entries) {
       var p1Value = entry.value;
       var p2Value = p2[entry.key];
-      if (!typeOperations.isSameType(p1Value, p2Value)) return false;
+      if (!p1Value.isSameAs(typeOperations, p2Value)) return false;
     }
     return true;
   }

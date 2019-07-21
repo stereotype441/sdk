@@ -205,7 +205,6 @@ main() {
   });
 
   group('State', () {
-    var emptySet = State<_Var, _Type>(true).notAssigned;
     var intVar = _Var('x', _Type('int'));
     var intQVar = _Var('x', _Type('int?'));
     var objectQVar = _Var('x', _Type('Object?'));
@@ -222,8 +221,7 @@ main() {
           var s = initial.setReachable(newReachability);
           expect(s, isNot(same(initial)));
           expect(s.reachable, newReachability);
-          expect(s.notAssigned, same(initial.notAssigned));
-          expect(s.promoted, same(initial.promoted));
+          expect(s.variables, same(initial.variables));
         }
 
         _check(unreachable, true);
@@ -236,26 +234,22 @@ main() {
         // By default, added variables are considered unassigned.
         var s1 = State<_Var, _Type>(true);
         var s2 = s1.add(intVar);
-        expect(s2.notAssigned.contains(intVar), true);
         expect(s2.reachable, true);
-        expect(s2.promoted, same(s1.promoted));
+        expect(s2.variables, {intVar: VariableState<_Type>(false, null)});
       });
 
       test('unassigned', () {
-        // By default, added variables are considered unassigned.
         var s1 = State<_Var, _Type>(true);
         var s2 = s1.add(intVar, assigned: false);
-        expect(s2.notAssigned.contains(intVar), true);
         expect(s2.reachable, true);
-        expect(s2.promoted, same(s1.promoted));
+        expect(s2.variables, {intVar: VariableState<_Type>(false, null)});
       });
 
       test('assigned', () {
-        // By default, added variables are considered unassigned.
         var s1 = State<_Var, _Type>(true);
         var s2 = s1.add(intVar, assigned: true);
-        expect(s2.notAssigned.contains(intVar), false);
-        expect(s2, same(s1));
+        expect(s2.reachable, true);
+        expect(s2.variables, {intVar: VariableState<_Type>(true, null)});
       });
     });
 
@@ -263,8 +257,7 @@ main() {
       var s1 = State<_Var, _Type>(true);
       var s2 = s1.exit();
       expect(s2.reachable, false);
-      expect(s2.notAssigned, same(s1.notAssigned));
-      expect(s2.promoted, same(s1.promoted));
+      expect(s2.variables, same(s1.variables));
     });
 
     group('promote', () {
@@ -294,9 +287,9 @@ main() {
         var s1 = State<_Var, _Type>(true).add(intQVar);
         var s2 = s1.promote(h, intQVar, _Type('int'));
         expect(s2.reachable, true);
-        expect(s2.notAssigned, same(s1.notAssigned));
         _Type.allowComparisons(() {
-          expect(s2.promoted, {intQVar: _Type('int')});
+          expect(s2.variables,
+              {intQVar: VariableState<_Type>(false, _Type('int'))});
         });
       });
 
@@ -334,9 +327,9 @@ main() {
             .promote(h, objectQVar, _Type('int?'));
         var s2 = s1.promote(h, objectQVar, _Type('int'));
         expect(s2.reachable, true);
-        expect(s2.notAssigned, same(s1.notAssigned));
         _Type.allowComparisons(() {
-          expect(s2.promoted, {objectQVar: _Type('int')});
+          expect(s2.variables,
+              {objectQVar: VariableState<_Type>(false, _Type('int'))});
         });
       });
     });
@@ -346,17 +339,18 @@ main() {
       test('unchanged', () {
         var h = _Harness();
         var s1 = State<_Var, _Type>(true).add(objectQVar, assigned: true);
-        var s2 = s1.write(h, emptySet, objectQVar);
+        var s2 = s1.write(h, objectQVar);
         expect(s2, same(s1));
       });
 
       test('marks as assigned', () {
         var h = _Harness();
         var s1 = State<_Var, _Type>(true).add(objectQVar, assigned: false);
-        var s2 = s1.write(h, emptySet, objectQVar);
+        var s2 = s1.write(h, objectQVar);
         expect(s2.reachable, true);
-        expect(s2.notAssigned.contains(objectQVar), false);
-        expect(s2.promoted, same(s1.promoted));
+        _Type.allowComparisons(() {
+          expect(s2.variables, {objectQVar: VariableState<_Type>(true, null)});
+        });
       });
 
       test('un-promotes', () {
@@ -364,11 +358,10 @@ main() {
         var s1 = State<_Var, _Type>(true)
             .add(objectQVar, assigned: true)
             .promote(h, objectQVar, _Type('int'));
-        expect(s1.promoted, contains(objectQVar));
-        var s2 = s1.write(h, emptySet, objectQVar);
+        expect(s1.variables[objectQVar].promotedType, isNotNull);
+        var s2 = s1.write(h, objectQVar);
         expect(s2.reachable, true);
-        expect(s2.notAssigned, same(s1.notAssigned));
-        expect(s2.promoted, isEmpty);
+        expect(s1.variables[objectQVar].promotedType, isNull);
       });
     });
 
@@ -376,17 +369,16 @@ main() {
       test('unpromoted -> unchanged', () {
         var h = _Harness();
         var s1 = State<_Var, _Type>(true).add(intVar);
-        var s2 = s1.markNonNullable(h, emptySet, intVar);
+        var s2 = s1.markNonNullable(h, intVar);
         expect(s2, same(s1));
       });
 
       test('unpromoted -> promoted', () {
         var h = _Harness();
         var s1 = State<_Var, _Type>(true).add(intQVar);
-        var s2 = s1.markNonNullable(h, emptySet, intQVar);
+        var s2 = s1.markNonNullable(h, intQVar);
         expect(s2.reachable, true);
-        expect(s2.notAssigned, same(s1.notAssigned));
-        expect(s2.promoted[intQVar].type, 'int');
+        expect(s2.variables[intQVar].promotedType.type, 'int');
       });
 
       test('promoted -> unchanged', () {
@@ -394,7 +386,7 @@ main() {
         var s1 = State<_Var, _Type>(true)
             .add(objectQVar)
             .promote(h, objectQVar, _Type('int'));
-        var s2 = s1.markNonNullable(h, emptySet, objectQVar);
+        var s2 = s1.markNonNullable(h, objectQVar);
         expect(s2, same(s1));
       });
 
@@ -403,11 +395,11 @@ main() {
         var s1 = State<_Var, _Type>(true)
             .add(objectQVar)
             .promote(h, objectQVar, _Type('int?'));
-        var s2 = s1.markNonNullable(h, emptySet, objectQVar);
+        var s2 = s1.markNonNullable(h, objectQVar);
         expect(s2.reachable, true);
-        expect(s2.notAssigned, same(s1.notAssigned));
         _Type.allowComparisons(() {
-          expect(s2.promoted, {objectQVar: _Type('int')});
+          expect(s2.variables,
+              {objectQVar: VariableState<_Type>(false, _Type('int'))});
         });
       });
     });
@@ -432,9 +424,9 @@ main() {
             .promote(h, intQVar, _Type('int'));
         var s2 = s1.removePromotedAll({intQVar});
         expect(s2.reachable, true);
-        expect(s2.notAssigned, same(s1.notAssigned));
         _Type.allowComparisons(() {
-          expect(s2.promoted, {objectQVar: _Type('int')});
+          expect(s2.variables,
+              {objectQVar: VariableState<_Type>(false, _Type('int'))});
         });
       });
     });
@@ -444,13 +436,10 @@ main() {
         var h = _Harness();
         var reachable = State<_Var, _Type>(true);
         var unreachable = reachable.exit();
-        expect(reachable.restrict(h, emptySet, reachable, {}), same(reachable));
-        expect(reachable.restrict(h, emptySet, unreachable, {}),
-            same(unreachable));
-        expect(unreachable.restrict(h, emptySet, unreachable, {}),
-            same(unreachable));
-        expect(unreachable.restrict(h, emptySet, unreachable, {}),
-            same(unreachable));
+        expect(reachable.restrict(h, reachable, {}), same(reachable));
+        expect(reachable.restrict(h, unreachable, {}), same(unreachable));
+        expect(unreachable.restrict(h, unreachable, {}), same(unreachable));
+        expect(unreachable.restrict(h, unreachable, {}), same(unreachable));
       });
 
       test('assignments', () {
@@ -460,13 +449,13 @@ main() {
         var c = _Var('c', _Type('int'));
         var d = _Var('d', _Type('int'));
         var s0 = State<_Var, _Type>(true).add(a).add(b).add(c).add(d);
-        var s1 = s0.write(h, emptySet, a).write(h, emptySet, b);
-        var s2 = s0.write(h, emptySet, a).write(h, emptySet, c);
-        var result = s1.restrict(h, emptySet, s2, {});
-        expect(result.notAssigned.contains(a), false);
-        expect(result.notAssigned.contains(b), false);
-        expect(result.notAssigned.contains(c), false);
-        expect(result.notAssigned.contains(d), true);
+        var s1 = s0.write(h, a).write(h, b);
+        var s2 = s0.write(h, a).write(h, c);
+        var result = s1.restrict(h, s2, {});
+        expect(result.variables[a].definitelyAssigned, true);
+        expect(result.variables[b].definitelyAssigned, true);
+        expect(result.variables[c].definitelyAssigned, true);
+        expect(result.variables[d].definitelyAssigned, false);
       });
 
       test('promotion', () {
@@ -477,11 +466,11 @@ main() {
           var s0 = State<_Var, _Type>(true).add(x, assigned: true);
           var s1 = thisType == null ? s0 : s0.promote(h, x, _Type(thisType));
           var s2 = otherType == null ? s0 : s0.promote(h, x, _Type(otherType));
-          var result = s1.restrict(h, emptySet, s2, unsafe ? {x} : {});
+          var result = s1.restrict(h, s2, unsafe ? {x} : {});
           if (expectedType == null) {
-            expect(result.promoted, isNot(contains(x)));
+            expect(result.variables[x].promotedType, isNull);
           } else {
-            expect(result.promoted[x].type, expectedType);
+            expect(result.variables[x].promotedType.type, expectedType);
           }
         }
 
