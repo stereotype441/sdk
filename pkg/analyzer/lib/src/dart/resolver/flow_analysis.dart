@@ -391,7 +391,9 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
       if (!identical(secondVariableState, newVariableState)) {
         alwaysSecond = false;
       }
-      result[variable] = newVariableState;
+      if (newVariableState != null) {
+        result[variable] = newVariableState;
+      }
     }
 
     if (alwaysFirst) return first;

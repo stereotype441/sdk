@@ -88,10 +88,80 @@ main() {
 
   group('VariableState', () {
     test('operator==', () {
-      expect(VariableState(true, 'Object') == VariableState(true, 'Object'), isTrue);
-      expect(VariableState(true, 'Object') == VariableState(false, 'Object'), isFalse);
-      expect(VariableState(true, 'Object') == VariableState(true, 'int'), isFalse);
+      expect(VariableState(true, 'Object') == VariableState(true, 'Object'),
+          isTrue);
+      expect(VariableState(true, 'Object') == VariableState(false, 'Object'),
+          isFalse);
+      expect(
+          VariableState(true, 'Object') == VariableState(true, 'int'), isFalse);
       expect(VariableState(true, 'Object') == 'Object', isFalse);
+    });
+
+    test('setDefinitelyAssigned', () {
+      expect(VariableState(true, 'Object').setDefinitelyAssigned(false),
+          VariableState(false, 'Object'));
+    });
+
+    test('setPromotedType', () {
+      expect(VariableState(true, 'Object').setPromotedType('int'),
+          VariableState(true, 'int'));
+    });
+
+    group('join', () {
+      var assignedState = VariableState<_Type>(true, null);
+      var unassignedState = VariableState<_Type>(false, null);
+      var intState = VariableState<_Type>(true, _Type('int'));
+      var intQState = VariableState<_Type>(true, _Type('int?'));
+      var stringState = VariableState<_Type>(true, _Type('String'));
+
+      test('identical inputs', () {
+        var h = _Harness();
+        expect(VariableState.join(h, intState, intState), same(intState));
+      });
+
+      test('null handling', () {
+        var h = _Harness();
+        expect(VariableState.join(h, intState, null), isNull);
+        expect(VariableState.join(h, null, intState), isNull);
+      });
+
+      test('assigned vs unassigned', () {
+        var h = _Harness();
+        expect(VariableState.join(h, unassignedState, assignedState),
+            same(unassignedState));
+        expect(VariableState.join(h, assignedState, unassignedState),
+            same(unassignedState));
+      });
+
+      test('unpromoted vs promoted', () {
+        var h = _Harness();
+        expect(VariableState.join(h, intState, assignedState),
+            same(assignedState));
+        expect(VariableState.join(h, assignedState, intState),
+            same(assignedState));
+      });
+
+      test('related types', () {
+        var h = _Harness();
+        expect(VariableState.join(h, intState, intQState), same(intQState));
+        expect(VariableState.join(h, intQState, intState), same(intQState));
+      });
+
+      test('unrelated types', () {
+        var h = _Harness();
+        expect(VariableState.join(h, intState, stringState), assignedState);
+        expect(VariableState.join(h, stringState, intState), assignedState);
+      });
+
+      test('mixed assignment and promotion', () {
+        var h = _Harness();
+        _Type.allowComparisons(() {
+          expect(
+              VariableState.join(h, VariableState<_Type>(true, _Type('int?')),
+                  VariableState<_Type>(false, _Type('int'))),
+              VariableState<_Type>(false, _Type('int?')));
+        });
+      });
     });
   });
 
