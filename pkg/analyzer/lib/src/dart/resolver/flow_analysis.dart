@@ -673,6 +673,8 @@ class VariableState<Type> {
     Type newPromotedType;
     if (identical(firstType, secondType)) {
       newPromotedType = firstType;
+    } else if (firstType == null || secondType == null) {
+      newPromotedType = null;
     } else if (typeOperations.isSubtypeOf(firstType, secondType)) {
       newPromotedType = secondType;
     } else if (typeOperations.isSubtypeOf(secondType, firstType)) {
