@@ -56,7 +56,7 @@ main() {
       var intState = VariableState<_Type>(true, _Type('int'));
       var intQState = VariableState<_Type>(true, _Type('int?'));
       var stringState = VariableState<_Type>(true, _Type('String'));
-      const emptyMap = <Null, Null>{};
+      const emptyMap = <Null, VariableState<Null>>{};
 
       test('identical inputs', () {
         var flow = _Harness().flow;
@@ -67,7 +67,7 @@ main() {
       test('one input empty', () {
         var flow = _Harness().flow;
         var p1 = {x: intState, y: stringState};
-        var p2 = <_Var, VariableState<_Type>>{};
+        var p2 = emptyMap;
         expect(flow.joinVariables(p1, p2), same(emptyMap));
         expect(flow.joinVariables(p2, p1), same(emptyMap));
       });
