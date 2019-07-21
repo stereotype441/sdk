@@ -42,7 +42,7 @@ class AssignedVariables<Statement, Variable> {
 }
 
 class FlowAnalysis<Statement, Expression, Variable, Type> {
-  final _State<Variable, Type> _identity;
+  final State<Variable, Type> _identity;
 
   /// The [NodeOperations], used to manipulate expressions.
   final NodeOperations<Expression> nodeOperations;
@@ -54,7 +54,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   final FunctionBodyAccess<Variable> functionBody;
 
   /// The stack of states of variables that are not definitely assigned.
-  final List<_State<Variable, Type>> _stack = [];
+  final List<State<Variable, Type>> _stack = [];
 
   /// The mapping from labeled [Statement]s to the index in the [_stack]
   /// where the first related element is located.  The number of elements
@@ -65,31 +65,28 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// The list of all variables.
   final List<Variable> _variables = [];
 
-  _State<Variable, Type> _current;
+  State<Variable, Type> _current;
 
   /// The last boolean condition, for [_conditionTrue] and [_conditionFalse].
   Expression _condition;
 
   /// The state when [_condition] evaluates to `true`.
-  _State<Variable, Type> _conditionTrue;
+  State<Variable, Type> _conditionTrue;
 
   /// The state when [_condition] evaluates to `false`.
-  _State<Variable, Type> _conditionFalse;
+  State<Variable, Type> _conditionFalse;
 
   factory FlowAnalysis(
     NodeOperations<Expression> nodeOperations,
     TypeOperations<Variable, Type> typeOperations,
     FunctionBodyAccess<Variable> functionBody,
   ) {
-    var identifyState = _State<Variable, Type>(
-      false,
-      const {},
-    );
+    var identityState = State<Variable, Type>(false);
     return FlowAnalysis._(
       nodeOperations,
       typeOperations,
       functionBody,
-      identifyState,
+      identityState,
     );
   }
 
@@ -99,10 +96,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     this.functionBody,
     this._identity,
   ) {
-    _current = _State<Variable, Type>(
-      true,
-      const {},
-    );
+    _current = State<Variable, Type>(true);
   }
 
   /// Return `true` if the current state is reachable.
@@ -326,8 +320,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   }
 
   void ifStatement_end(bool hasElse) {
-    _State<Variable, Type> afterThen;
-    _State<Variable, Type> afterElse;
+    State<Variable, Type> afterThen;
+    State<Variable, Type> afterElse;
     if (hasElse) {
       afterThen = _stack.removeLast();
       afterElse = _current;
@@ -599,9 +593,9 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     }
   }
 
-  _State<Variable, Type> _join(
-    _State<Variable, Type> first,
-    _State<Variable, Type> second,
+  State<Variable, Type> _join(
+    State<Variable, Type> first,
+    State<Variable, Type> second,
   ) {
     if (identical(first, _identity)) return second;
     if (identical(second, _identity)) return first;
@@ -627,28 +621,6 @@ abstract class FunctionBodyAccess<Variable> {
 abstract class NodeOperations<Expression> {
   /// If the [node] is a parenthesized expression, recursively unwrap it.
   Expression unwrapParenthesized(Expression node);
-}
-
-/// Operations on types, abstracted from concrete type interfaces.
-abstract class TypeOperations<Variable, Type> {
-  /// Return `true` if the [variable] is a local variable, not a parameter.
-  bool isLocalVariable(Variable variable);
-
-  /// Returns `true` if [type1] and [type2] are the same type.
-  bool isSameType(Type type1, Type type2);
-
-  /// Return `true` if the [leftType] is a subtype of the [rightType].
-  bool isSubtypeOf(Type leftType, Type rightType);
-
-  /// Returns the non-null promoted version of [type], if it is different,
-  /// otherwise `null`.  For example, given `int?`, returns `int`.
-  ///
-  /// Note that some types don't have a non-nullable version (e.g.
-  /// `FutureOr<int?>`), so `null` may be returned even if the type is nullable.
-  Type tryPromoteToNonNull(Type type);
-
-  /// Return the static type of the given [variable].
-  Type variableType(Variable variable);
 }
 
 @visibleForTesting
@@ -707,27 +679,35 @@ class VariableState<Type> {
   }
 }
 
-class _State<Variable, Type> {
+@visibleForTesting
+class State<Variable, Type> {
   final bool reachable;
   final Map<Variable, VariableState<Type>> variables;
 
-  _State(
+  State(bool reachable)
+      : this._(
+          reachable,
+          _VariableSet<Variable>._(const []),
+          const {},
+        );
+
+  State._(
     this.reachable,
     this.variables,
   );
 
   /// Add a new [variable] to track definite assignment.
-  _State<Variable, Type> add(Variable variable, {bool assigned: false}) {
+  State<Variable, Type> add(Variable variable, {bool assigned: false}) {
     var newVariables = Map<Variable, VariableState<Type>>.from(variables);
     newVariables[variable] = VariableState<Type>(assigned, null);
-    return _State<Variable, Type>(reachable, newVariables);
+    return State<Variable, Type>._(reachable, newVariables);
   }
 
-  _State<Variable, Type> exit() {
-    return _State<Variable, Type>(false, variables);
+  State<Variable, Type> exit() {
+    return State<Variable, Type>._(false, variables);
   }
 
-  _State<Variable, Type> markNonNullable(
+  State<Variable, Type> markNonNullable(
       TypeOperations<Variable, Type> typeOperations, Variable variable) {
     var previousVariableState = variables[variable];
     var previousType = previousVariableState.promotedType;
@@ -737,13 +717,13 @@ class _State<Variable, Type> {
     if (type != null) {
       var newVariables = _cloneVariables();
       newVariables[variable] = previousVariableState.setPromotedType(type);
-      return _State<Variable, Type>(reachable, newVariables);
+      return State<Variable, Type>._(reachable, newVariables);
     }
 
     return this;
   }
 
-  _State<Variable, Type> promote(
+  State<Variable, Type> promote(
     TypeOperations<Variable, Type> typeOperations,
     Variable variable,
     Type type,
@@ -756,39 +736,40 @@ class _State<Variable, Type> {
         !typeOperations.isSameType(type, previousType)) {
       var newVariables = _cloneVariables();
       newVariables[variable] = previousVariableState.setPromotedType(type);
-      return _State<Variable, Type>(reachable, newVariables);
+      return State<Variable, Type>._(reachable, newVariables);
     }
 
     return this;
   }
 
-  _State<Variable, Type> removePromotedAll(Set<Variable> toRemove) {
+  State<Variable, Type> removePromotedAll(Set<Variable> toRemove) {
     var newVariables = _removePromotedAll(variables, toRemove);
 
     if (identical(newVariables, variables)) return this;
 
-    return _State<Variable, Type>(reachable, newVariables);
+    return State<Variable, Type>._(reachable, newVariables);
   }
 
-  _State<Variable, Type> restrict(
+  State<Variable, Type> restrict(
     TypeOperations<Variable, Type> typeOperations,
-    _State<Variable, Type> other,
+    State<Variable, Type> other,
     Set<Variable> unsafe,
   ) {
     var newReachable = reachable && other.reachable;
-    bool isDifferent = newReachable != reachable;
 
     var newVariables = <Variable, VariableState<Type>>{};
+    bool variablesMatchesThis = true;
+    bool variablesMatchesOther = true;
     for (var entry in variables.entries) {
       var variable = entry.key;
       var variableState = entry.value;
+      var otherVariableState = other.variables[variable];
       if (unsafe.contains(variable)) {
-        var otherVariableState = other.variables[variable];
         var otherType = otherVariableState.promotedType;
         var thisType = variableState.promotedType;
         if (otherType != null &&
             !identical(otherType, thisType) &&
-            typeOperations.isSubtypeOf(otherType, thisType)) {
+            (thisType == null || typeOperations.isSubtypeOf(otherType, thisType))) {
           variableState = variableState.setPromotedType(otherType);
           isDifferent = true;
         }
@@ -800,19 +781,31 @@ class _State<Variable, Type> {
       }
       newVariables[variable] = variableState;
     }
+    assert(promotedMatchesThis ==
+        _promotionsEqual(typeOperations, newPromoted, promoted));
+    assert(promotedMatchesOther ==
+        _promotionsEqual(typeOperations, newPromoted, other.promoted));
+    if (promotedMatchesThis) {
+      newPromoted = promoted;
+    } else if (promotedMatchesOther) {
+      newPromoted = other.promoted;
+    }
 
     return isDifferent
-        ? _State<Variable, Type>(newReachable, newVariables)
+        ? State<Variable, Type>(newReachable, newVariables)
         : this;
   }
 
-  _State<Variable, Type> setReachable(bool reachable) {
+  State<Variable, Type> setReachable(bool reachable) {
     if (this.reachable == reachable) return this;
 
-    return _State<Variable, Type>(reachable, variables);
+    return State<Variable, Type>._(reachable, variables);
   }
 
-  _State<Variable, Type> write(
+  @override
+  String toString() => '($reachable, $notAssigned, $promoted)';
+
+  State<Variable, Type> write(
       TypeOperations<Variable, Type> typeOperations, Variable variable) {
     var oldVariableState = variables[variable];
     var newVariableState = oldVariableState;
@@ -830,7 +823,7 @@ class _State<Variable, Type> {
 
     var newVariables = _cloneVariables();
     newVariables[variable] = newVariableState;
-    return _State<Variable, Type>(reachable, newVariables);
+    return State<Variable, Type>._(reachable, newVariables);
   }
 
   Map<Variable, VariableState<Type>> _cloneVariables() =>
@@ -862,9 +855,9 @@ class _State<Variable, Type> {
     return result;
   }
 
-  static _State<Variable, Type> _identicalOrNew<Variable, Type>(
-    _State<Variable, Type> first,
-    _State<Variable, Type> second,
+  static State<Variable, Type> _identicalOrNew<Variable, Type>(
+    State<Variable, Type> first,
+    State<Variable, Type> second,
     bool newReachable,
     Map<Variable, VariableState<Type>> newVariables,
   ) {
@@ -877,6 +870,42 @@ class _State<Variable, Type> {
       return second;
     }
 
-    return _State<Variable, Type>(newReachable, newVariables);
+    return State<Variable, Type>._(newReachable, newVariables);
   }
+
+  static bool _promotionsEqual<Variable, Type>(
+      TypeOperations<Variable, Type> typeOperations,
+      Map<Variable, Type> p1,
+      Map<Variable, Type> p2) {
+    if (p1.length != p2.length) return false;
+    if (!p1.keys.toSet().containsAll(p2.keys)) return false;
+    for (var entry in p1.entries) {
+      var p1Value = entry.value;
+      var p2Value = p2[entry.key];
+      if (!typeOperations.isSameType(p1Value, p2Value)) return false;
+    }
+    return true;
+  }
+}
+
+/// Operations on types, abstracted from concrete type interfaces.
+abstract class TypeOperations<Variable, Type> {
+  /// Return `true` if the [variable] is a local variable, not a parameter.
+  bool isLocalVariable(Variable variable);
+
+  /// Returns `true` if [type1] and [type2] are the same type.
+  bool isSameType(Type type1, Type type2);
+
+  /// Return `true` if the [leftType] is a subtype of the [rightType].
+  bool isSubtypeOf(Type leftType, Type rightType);
+
+  /// Returns the non-null promoted version of [type], if it is different,
+  /// otherwise `null`.  For example, given `int?`, returns `int`.
+  ///
+  /// Note that some types don't have a non-nullable version (e.g.
+  /// `FutureOr<int?>`), so `null` may be returned even if the type is nullable.
+  Type tryPromoteToNonNull(Type type);
+
+  /// Return the static type of the given [variable].
+  Type variableType(Variable variable);
 }
