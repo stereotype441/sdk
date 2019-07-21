@@ -748,19 +748,54 @@ class State<Variable, Type> {
       empty: emptySet,
       other: other.notAssigned,
     );
+    if (newNotAssigned.variables.length == notAssigned.variables.length) {
+      newNotAssigned = notAssigned;
+    } else if (newNotAssigned.variables.length ==
+        other.notAssigned.variables.length) {
+      newNotAssigned = other.notAssigned;
+    }
 
     var newPromoted = <Variable, Type>{};
-    for (var variable in promoted.keys) {
+    bool promotedMatchesThis = true;
+    bool promotedMatchesOther = true;
+    for (var variable in Set<Variable>.from(promoted.keys)
+      ..addAll(other.promoted.keys)) {
       var thisType = promoted[variable];
+      var otherType = other.promoted[variable];
       if (!unsafe.contains(variable)) {
-        var otherType = other.promoted[variable];
         if (otherType != null &&
-            typeOperations.isSubtypeOf(otherType, thisType)) {
+            (thisType == null ||
+                typeOperations.isSubtypeOf(otherType, thisType))) {
           newPromoted[variable] = otherType;
+          if (promotedMatchesThis &&
+              (thisType == null ||
+                  !typeOperations.isSameType(thisType, otherType))) {
+            promotedMatchesThis = false;
+          }
           continue;
         }
       }
-      newPromoted[variable] = thisType;
+      if (thisType != null) {
+        newPromoted[variable] = thisType;
+        if (promotedMatchesOther &&
+            (otherType == null ||
+                !typeOperations.isSameType(thisType, otherType))) {
+          promotedMatchesOther = false;
+        }
+      } else {
+        if (promotedMatchesOther && otherType != null) {
+          promotedMatchesOther = false;
+        }
+      }
+    }
+    assert(promotedMatchesThis ==
+        promotionsEqual(typeOperations, newPromoted, promoted));
+    assert(promotedMatchesOther ==
+        promotionsEqual(typeOperations, newPromoted, other.promoted));
+    if (promotedMatchesThis) {
+      newPromoted = promoted;
+    } else if (promotedMatchesOther) {
+      newPromoted = other.promoted;
     }
 
     return _identicalOrNew(
@@ -781,6 +816,9 @@ class State<Variable, Type> {
       promoted,
     );
   }
+
+  @override
+  String toString() => '($reachable, $notAssigned, $promoted)';
 
   State<Variable, Type> write(TypeOperations<Variable, Type> typeOperations,
       _VariableSet<Variable> emptySet, Variable variable) {
@@ -837,6 +875,36 @@ class State<Variable, Type> {
     if (noChanges) return map;
     if (result.isEmpty) return const {};
     return result;
+  }
+
+  @visibleForTesting
+  static bool promotionsEqual<Variable, Type>(
+      TypeOperations<Variable, Type> typeOperations,
+      Map<Variable, Type> p1,
+      Map<Variable, Type> p2) {
+    if (p1.length != p2.length) return false;
+    if (!p1.keys.toSet().containsAll(p2.keys)) return false;
+    for (var entry in p1.entries) {
+      var p1Value = entry.value;
+      var p2Value = p2[entry.key];
+      if (!typeOperations.isSameType(p1Value, p2Value)) return false;
+    }
+    return true;
+  }
+
+  @visibleForTesting
+  static bool statesEqual<Variable, Type>(
+      TypeOperations<Variable, Type> typeOperations,
+      State<Variable, Type> s1,
+      State<Variable, Type> s2) {
+    if (s1.reachable != s2.reachable) return false;
+    if (s1.notAssigned.variables.length != s2.notAssigned.variables.length) {
+      return false;
+    }
+    for (var v in s1.notAssigned.variables) {
+      if (!s2.notAssigned.contains(v)) return false;
+    }
+    return promotionsEqual(typeOperations, s1.promoted, s2.promoted);
   }
 
   static State<Variable, Type> _identicalOrNew<Variable, Type>(
@@ -930,6 +998,7 @@ class _VariableSet<Variable> {
     _VariableSet<Variable> other,
   }) {
     if (identical(other, empty)) return empty;
+    if (identical(this, other)) return this;
 
     // TODO(scheglov) optimize
     var newVariables =
@@ -963,6 +1032,9 @@ class _VariableSet<Variable> {
 
     return _VariableSet._(newVariables);
   }
+
+  @override
+  String toString() => variables.isEmpty ? '{}' : '{ ${variables.join(', ')} }';
 
   _VariableSet<Variable> union(_VariableSet<Variable> other) {
     if (other.variables.isEmpty) {
