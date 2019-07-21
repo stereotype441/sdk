@@ -651,6 +651,12 @@ class VariableState<Type> {
 
   VariableState(this.definitelyAssigned, this.promotedType);
 
+  @override
+  bool operator ==(Object other) =>
+      other is VariableState<Type> &&
+      this.definitelyAssigned == other.definitelyAssigned &&
+      this.promotedType == other.promotedType;
+
   VariableState<Type> setDefinitelyAssigned(bool newDefinitelyAssigned) =>
       VariableState<Type>(newDefinitelyAssigned, promotedType);
 

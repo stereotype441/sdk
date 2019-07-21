@@ -56,6 +56,7 @@ main() {
       var intState = VariableState<_Type>(true, _Type('int'));
       var intQState = VariableState<_Type>(true, _Type('int?'));
       var stringState = VariableState<_Type>(true, _Type('String'));
+      var unpromotedState = VariableState<_Type>(true, null);
       const emptyMap = <Null, VariableState<Null>>{};
 
       test('identical inputs', () {
@@ -84,8 +85,8 @@ main() {
         var flow = _Harness().flow;
         var p1 = {x: intState};
         var p2 = {x: stringState};
-        expect(flow.joinVariables(p1, p2), same(emptyMap));
-        expect(flow.joinVariables(p2, p1), same(emptyMap));
+        expect(flow.joinVariables(p1, p2), {x: unpromotedState});
+        expect(flow.joinVariables(p2, p1), {x: unpromotedState});
       });
 
       test('sub-map', () {
