@@ -81,6 +81,28 @@ main() {
     var intVar = _Var('x', _Type('int'));
     var intQVar = _Var('x', _Type('int?'));
     var objectQVar = _Var('x', _Type('Object?'));
+    group('setReachable', () {
+      var unreachable = State<_Var, _Type>(false);
+      var reachable = State<_Var, _Type>(true);
+      test('unchanged', () {
+        expect(unreachable.setReachable(false), same(unreachable));
+        expect(reachable.setReachable(true), same(reachable));
+      });
+
+      test('changed', () {
+        void _check(State<_Var, _Type> initial, bool newReachability) {
+          var s = initial.setReachable(newReachability);
+          expect(s, isNot(same(initial)));
+          expect(s.reachable, newReachability);
+          expect(s.notAssigned, same(initial.notAssigned));
+          expect(s.promoted, same(initial.promoted));
+        }
+
+        _check(unreachable, true);
+        _check(reachable, false);
+      });
+    });
+
     group('add', () {
       test('default', () {
         // By default, added variables are considered unassigned.
@@ -188,6 +210,37 @@ main() {
         _Type.allowComparisons(() {
           expect(s2.promoted, {objectQVar: _Type('int')});
         });
+      });
+    });
+
+    group('write', () {
+      var objectQVar = _Var('x', _Type('Object?'));
+      test('unchanged', () {
+        var h = _Harness();
+        var s1 = State<_Var, _Type>(true).add(objectQVar, assigned: true);
+        var s2 = s1.write(h, emptySet, objectQVar);
+        expect(s2, same(s1));
+      });
+
+      test('marks as assigned', () {
+        var h = _Harness();
+        var s1 = State<_Var, _Type>(true).add(objectQVar, assigned: false);
+        var s2 = s1.write(h, emptySet, objectQVar);
+        expect(s2.reachable, true);
+        expect(s2.notAssigned.contains(objectQVar), false);
+        expect(s2.promoted, same(s1.promoted));
+      });
+
+      test('un-promotes', () {
+        var h = _Harness();
+        var s1 = State<_Var, _Type>(true)
+            .add(objectQVar, assigned: true)
+            .promote(h, objectQVar, _Type('int'));
+        expect(s1.promoted, contains(objectQVar));
+        var s2 = s1.write(h, emptySet, objectQVar);
+        expect(s2.reachable, true);
+        expect(s2.notAssigned, same(s1.notAssigned));
+        expect(s2.promoted, isEmpty);
       });
     });
 
