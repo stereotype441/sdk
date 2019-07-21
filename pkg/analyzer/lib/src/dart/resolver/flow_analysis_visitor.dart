@@ -476,7 +476,7 @@ class _TypeSystemTypeOperations
       // nullabilities, this if test can be dropped.  See dartbug.com/37587.
       return promotedType;
     }
-    if (promotedType != type.nullabilitySuffix) {
+    if (promotedType != type) {
       return promotedType;
     }
     return null;

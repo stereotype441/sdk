@@ -637,8 +637,7 @@ abstract class TypeOperations<Variable, Type> {
   /// otherwise `null`.  For example, given `int?`, returns `int`.
   ///
   /// Note that some types don't have a non-nullable version (e.g.
-  /// `FutureOr<int?>`), so `null` may be returned unchanged even if the type is
-  /// nullable.
+  /// `FutureOr<int?>`), so `null` may be returned even if the type is nullable.
   Type tryPromoteToNonNull(Type type);
 
   /// Return the static type of the given [variable].
