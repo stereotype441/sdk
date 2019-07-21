@@ -191,6 +191,7 @@ class _Harness
       'int <: String': false,
       'int? <: int': false,
       'String <: int': false,
+      'String <: int?': false,
     };
 
     if (leftType.type == rightType.type) return true;
