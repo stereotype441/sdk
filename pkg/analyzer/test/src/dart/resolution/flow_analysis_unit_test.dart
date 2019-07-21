@@ -76,6 +76,181 @@ main() {
     });
   });
 
+  group('State', () {
+    var emptySet = State<_Var, _Type>(true).notAssigned;
+    var intVar = _Var('x', _Type('int'));
+    var intQVar = _Var('x', _Type('int?'));
+    var objectQVar = _Var('x', _Type('Object?'));
+    test('add default', () {
+      // By default, added variables are considered unassigned.
+      var s1 = State<_Var, _Type>(true);
+      var s2 = s1.add(intVar);
+      expect(s2.notAssigned.contains(intVar), true);
+      expect(s2.reachable, true);
+      expect(s2.promoted, same(s1.promoted));
+    });
+
+    test('add unassigned', () {
+      // By default, added variables are considered unassigned.
+      var s1 = State<_Var, _Type>(true);
+      var s2 = s1.add(intVar, assigned: false);
+      expect(s2.notAssigned.contains(intVar), true);
+      expect(s2.reachable, true);
+      expect(s2.promoted, same(s1.promoted));
+    });
+
+    test('add assigned', () {
+      // By default, added variables are considered unassigned.
+      var s1 = State<_Var, _Type>(true);
+      var s2 = s1.add(intVar, assigned: true);
+      expect(s2.notAssigned.contains(intVar), false);
+      expect(s2, same(s1));
+    });
+
+    test('exit', () {
+      var s1 = State<_Var, _Type>(true);
+      var s2 = s1.exit();
+      expect(s2.reachable, false);
+      expect(s2.notAssigned, same(s1.notAssigned));
+      expect(s2.promoted, same(s1.promoted));
+    });
+
+    test('promote unpromoted -> unchanged (same)', () {
+      var h = _Harness();
+      var s1 = State<_Var, _Type>(true).add(intVar);
+      var s2 = s1.promote(h, intVar, _Type('int'));
+      expect(s2, same(s1));
+    });
+
+    test('promote unpromoted -> unchanged (supertype)', () {
+      var h = _Harness();
+      var s1 = State<_Var, _Type>(true).add(intVar);
+      var s2 = s1.promote(h, intVar, _Type('Object'));
+      expect(s2, same(s1));
+    });
+
+    test('promote unpromoted -> unchanged (unrelated)', () {
+      var h = _Harness();
+      var s1 = State<_Var, _Type>(true).add(intVar);
+      var s2 = s1.promote(h, intVar, _Type('String'));
+      expect(s2, same(s1));
+    });
+
+    test('promote unpromoted -> subtype', () {
+      var h = _Harness();
+      var s1 = State<_Var, _Type>(true).add(intQVar);
+      var s2 = s1.promote(h, intQVar, _Type('int'));
+      expect(s2.reachable, true);
+      expect(s2.notAssigned, same(s1.notAssigned));
+      _Type.allowComparisons(() {
+        expect(s2.promoted, {intQVar: _Type('int')});
+      });
+    });
+
+    test('promote promoted -> unchanged (same)', () {
+      var h = _Harness();
+      var s1 = State<_Var, _Type>(true)
+          .add(objectQVar)
+          .promote(h, objectQVar, _Type('int'));
+      var s2 = s1.promote(h, objectQVar, _Type('int'));
+      expect(s2, same(s1));
+    });
+
+    test('promote promoted -> unchanged (supertype)', () {
+      var h = _Harness();
+      var s1 = State<_Var, _Type>(true)
+          .add(objectQVar)
+          .promote(h, objectQVar, _Type('int'));
+      var s2 = s1.promote(h, objectQVar, _Type('Object'));
+      expect(s2, same(s1));
+    });
+
+    test('promote promoted -> unchanged (unrelated)', () {
+      var h = _Harness();
+      var s1 = State<_Var, _Type>(true)
+          .add(objectQVar)
+          .promote(h, objectQVar, _Type('int'));
+      var s2 = s1.promote(h, objectQVar, _Type('String'));
+      expect(s2, same(s1));
+    });
+
+    test('promote promoted -> subtype', () {
+      var h = _Harness();
+      var s1 = State<_Var, _Type>(true)
+          .add(objectQVar)
+          .promote(h, objectQVar, _Type('int?'));
+      var s2 = s1.promote(h, objectQVar, _Type('int'));
+      expect(s2.reachable, true);
+      expect(s2.notAssigned, same(s1.notAssigned));
+      _Type.allowComparisons(() {
+        expect(s2.promoted, {objectQVar: _Type('int')});
+      });
+    });
+
+    test('markNonNullable unpromoted -> unchanged', () {
+      var h = _Harness();
+      var s1 = State<_Var, _Type>(true).add(intVar);
+      var s2 = s1.markNonNullable(h, emptySet, intVar);
+      expect(s2, same(s1));
+    });
+
+    test('markNonNullable unpromoted -> promoted', () {
+      var h = _Harness();
+      var s1 = State<_Var, _Type>(true).add(intQVar);
+      var s2 = s1.markNonNullable(h, emptySet, intQVar);
+      expect(s2.reachable, true);
+      expect(s2.notAssigned, same(s1.notAssigned));
+      expect(s2.promoted[intQVar].type, 'int');
+    });
+
+    test('markNonNullable promoted -> unchanged', () {
+      var h = _Harness();
+      var s1 = State<_Var, _Type>(true)
+          .add(objectQVar)
+          .promote(h, objectQVar, _Type('int'));
+      var s2 = s1.markNonNullable(h, emptySet, objectQVar);
+      expect(s2, same(s1));
+    });
+
+    test('markNonNullable promoted -> re-promoted', () {
+      var h = _Harness();
+      var s1 = State<_Var, _Type>(true)
+          .add(objectQVar)
+          .promote(h, objectQVar, _Type('int?'));
+      var s2 = s1.markNonNullable(h, emptySet, objectQVar);
+      expect(s2.reachable, true);
+      expect(s2.notAssigned, same(s1.notAssigned));
+      _Type.allowComparisons(() {
+        expect(s2.promoted, {objectQVar: _Type('int')});
+      });
+    });
+
+    test('removePromotedAll unchanged', () {
+      var h = _Harness();
+      var s1 = State<_Var, _Type>(true)
+          .add(objectQVar)
+          .add(intQVar)
+          .promote(h, objectQVar, _Type('int'));
+      var s2 = s1.removePromotedAll({intQVar});
+      expect(s2, same(s1));
+    });
+
+    test('removePromotedAll changed', () {
+      var h = _Harness();
+      var s1 = State<_Var, _Type>(true)
+          .add(objectQVar)
+          .add(intQVar)
+          .promote(h, objectQVar, _Type('int'))
+          .promote(h, intQVar, _Type('int'));
+      var s2 = s1.removePromotedAll({intQVar});
+      expect(s2.reachable, true);
+      expect(s2.notAssigned, same(s1.notAssigned));
+      _Type.allowComparisons(() {
+        expect(s2.promoted, {objectQVar: _Type('int')});
+      });
+    });
+  });
+
   group('join', () {
     group('should re-use an input if possible', () {
       var x = _Var('x', null);
@@ -188,9 +363,13 @@ class _Harness
   bool isSubtypeOf(_Type leftType, _Type rightType) {
     const Map<String, bool> _subtypes = const {
       'int <: int?': true,
+      'int <: Object?': true,
       'int <: String': false,
       'int? <: int': false,
+      'int? <: Object?': true,
+      'Object <: int': false,
       'String <: int': false,
+      'String <: int?': false,
     };
 
     if (leftType.type == rightType.type) return true;

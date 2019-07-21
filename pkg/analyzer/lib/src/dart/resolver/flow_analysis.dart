@@ -82,20 +82,14 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     TypeOperations<Variable, Type> typeOperations,
     FunctionBodyAccess<Variable> functionBody,
   ) {
-    var emptySet = _VariableSet<Variable>._(
-      List<Variable>(0),
-    );
-    var identifyState = State<Variable, Type>(
-      false,
-      emptySet,
-      const {},
-    );
+    var identityState = State<Variable, Type>(false);
+    var emptySet = identityState.notAssigned;
     return FlowAnalysis._(
       nodeOperations,
       typeOperations,
       functionBody,
       emptySet,
-      identifyState,
+      identityState,
     );
   }
 
@@ -106,11 +100,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     this._emptySet,
     this._identity,
   ) {
-    _current = State<Variable, Type>(
-      true,
-      _emptySet,
-      const {},
-    );
+    _current = State<Variable, Type>(true);
   }
 
   /// Return `true` if the current state is reachable.
@@ -656,7 +646,14 @@ class State<Variable, Type> {
   final _VariableSet<Variable> notAssigned;
   final Map<Variable, Type> promoted;
 
-  State(
+  State(bool reachable)
+      : this._(
+          reachable,
+          _VariableSet<Variable>._(const []),
+          const {},
+        );
+
+  State._(
     this.reachable,
     this.notAssigned,
     this.promoted,
@@ -670,7 +667,7 @@ class State<Variable, Type> {
       return this;
     }
 
-    return State<Variable, Type>(
+    return State<Variable, Type>._(
       reachable,
       newNotAssigned,
       promoted,
@@ -678,7 +675,7 @@ class State<Variable, Type> {
   }
 
   State<Variable, Type> exit() {
-    return State<Variable, Type>(
+    return State<Variable, Type>._(
       false,
       notAssigned,
       promoted,
@@ -696,7 +693,7 @@ class State<Variable, Type> {
     if (type != null) {
       var newPromoted = <Variable, Type>{}..addAll(promoted);
       newPromoted[variable] = type;
-      return State<Variable, Type>(
+      return State<Variable, Type>._(
         reachable,
         notAssigned,
         newPromoted,
@@ -718,7 +715,7 @@ class State<Variable, Type> {
         !typeOperations.isSameType(type, previousType)) {
       var newPromoted = <Variable, Type>{}..addAll(promoted);
       newPromoted[variable] = type;
-      return State<Variable, Type>(
+      return State<Variable, Type>._(
         reachable,
         notAssigned,
         newPromoted,
@@ -733,7 +730,7 @@ class State<Variable, Type> {
 
     if (identical(newPromoted, promoted)) return this;
 
-    return State<Variable, Type>(
+    return State<Variable, Type>._(
       reachable,
       notAssigned,
       newPromoted,
@@ -778,7 +775,7 @@ class State<Variable, Type> {
   State<Variable, Type> setReachable(bool reachable) {
     if (this.reachable == reachable) return this;
 
-    return State<Variable, Type>(
+    return State<Variable, Type>._(
       reachable,
       notAssigned,
       promoted,
@@ -798,7 +795,7 @@ class State<Variable, Type> {
       return this;
     }
 
-    return State<Variable, Type>(
+    return State<Variable, Type>._(
       reachable,
       newNotAssigned,
       newPromoted,
@@ -860,7 +857,7 @@ class State<Variable, Type> {
       return second;
     }
 
-    return State<Variable, Type>(
+    return State<Variable, Type>._(
       newReachable,
       newNotAssigned,
       newPromoted,
