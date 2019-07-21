@@ -447,6 +447,27 @@ class _FlowAnalysisWrapper
   }
 
   @override
+  void doStatement_bodyBegin(Statement doStatement, Set<Element> loopAssigned) {
+    // TODO(paulberry): test
+    _wrap('doStatement_bodyBegin($doStatement, $loopAssigned)',
+        () => _flow.doStatement_bodyBegin(doStatement, loopAssigned));
+  }
+
+  @override
+  void doStatement_conditionBegin() {
+    // TODO(paulberry): test
+    _wrap('doStatement_conditionBegin()',
+        () => _flow.doStatement_conditionBegin());
+  }
+
+  @override
+  void doStatement_end(Statement doStatement, Expression condition) {
+    // TODO(paulberry): test
+    _wrap('doStatement_end($doStatement, $condition)',
+        () => _flow.doStatement_end(doStatement, condition));
+  }
+
+  @override
   void functionExpression_end() {
     // TODO(paulberry): test
     _wrap('functionExpression_end()', () => _flow.functionExpression_end());
