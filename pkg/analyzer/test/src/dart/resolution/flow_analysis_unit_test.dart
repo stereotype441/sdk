@@ -86,6 +86,15 @@ main() {
     });
   });
 
+  group('VariableState', () {
+    test('operator==', () {
+      expect(VariableState(true, 'Object') == VariableState(true, 'Object'), isTrue);
+      expect(VariableState(true, 'Object') == VariableState(false, 'Object'), isFalse);
+      expect(VariableState(true, 'Object') == VariableState(true, 'int'), isFalse);
+      expect(VariableState(true, 'Object') == 'Object', isFalse);
+    });
+  });
+
   group('join variables', () {
     group('should re-use an input if possible', () {
       var x = _Var('x', null);
