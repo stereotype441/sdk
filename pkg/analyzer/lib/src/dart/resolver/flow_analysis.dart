@@ -651,10 +651,10 @@ class VariableState<Type> {
 
   VariableState(this.definitelyAssigned, this.promotedType);
 
-  VariableState setDefinitelyAssigned(bool newDefinitelyAssigned) =>
+  VariableState<Type> setDefinitelyAssigned(bool newDefinitelyAssigned) =>
       VariableState<Type>(newDefinitelyAssigned, promotedType);
 
-  VariableState setPromotedType(Type newPromotedType) =>
+  VariableState<Type> setPromotedType(Type newPromotedType) =>
       VariableState<Type>(definitelyAssigned, newPromotedType);
 
   @override
@@ -704,7 +704,7 @@ class _State<Variable, Type> {
   /// Add a new [variable] to track definite assignment.
   _State<Variable, Type> add(Variable variable, {bool assigned: false}) {
     var newVariables = Map<Variable, VariableState<Type>>.from(variables);
-    newVariables[variable] = VariableState(assigned, null);
+    newVariables[variable] = VariableState<Type>(assigned, null);
     return _State<Variable, Type>(reachable, newVariables);
   }
 
@@ -763,7 +763,7 @@ class _State<Variable, Type> {
     var newReachable = reachable && other.reachable;
     bool isDifferent = newReachable != reachable;
 
-    var newVariables = <Variable, VariableState>{};
+    var newVariables = <Variable, VariableState<Type>>{};
     for (var entry in variables.entries) {
       var variable = entry.key;
       var variableState = entry.value;
@@ -818,8 +818,8 @@ class _State<Variable, Type> {
     return _State<Variable, Type>(reachable, newVariables);
   }
 
-  Map<Variable, VariableState> _cloneVariables() =>
-      Map<Variable, VariableState>.from(variables);
+  Map<Variable, VariableState<Type>> _cloneVariables() =>
+      Map<Variable, VariableState<Type>>.from(variables);
 
   Map<Variable, VariableState<Type>> _removePromotedAll(
     Map<Variable, VariableState<Type>> variables,
@@ -851,7 +851,7 @@ class _State<Variable, Type> {
     _State<Variable, Type> first,
     _State<Variable, Type> second,
     bool newReachable,
-    Map<Variable, VariableState> newVariables,
+    Map<Variable, VariableState<Type>> newVariables,
   ) {
     if (first.reachable == newReachable &&
         identical(first.variables, newVariables)) {
