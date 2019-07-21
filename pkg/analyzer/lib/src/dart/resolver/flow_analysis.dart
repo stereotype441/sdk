@@ -814,8 +814,8 @@ class _State<Variable, Type> {
       TypeOperations<Variable, Type> typeOperations, Variable variable) {
     var oldVariableState = variables[variable];
     var newVariableState = oldVariableState;
-    if (typeOperations.isLocalVariable(variable) &&
-        !newVariableState.definitelyAssigned) {
+    if (!newVariableState.definitelyAssigned &&
+        typeOperations.isLocalVariable(variable)) {
       newVariableState = newVariableState.setDefinitelyAssigned(true);
     }
     if (newVariableState.promotedType != null) {

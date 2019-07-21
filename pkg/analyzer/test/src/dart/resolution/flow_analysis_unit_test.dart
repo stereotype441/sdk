@@ -57,21 +57,20 @@ main() {
 
     void _checkIs(String declaredType, String tryPromoteType,
         String expectedPromotedType) {
-      var flow = _Harness().flow;
-      var x = _Var('x', _Type(declaredType));
-      flow.add(x, assigned: true);
+      var h = _Harness();
+      var x = h.addAssignedVar('x', declaredType);
       var expr = _Expression();
-      flow.isExpression_end(expr, x, false, _Type(tryPromoteType));
-      flow.ifStatement_thenBegin(expr);
+      h.flow.isExpression_end(expr, x, false, _Type(tryPromoteType));
+      h.flow.ifStatement_thenBegin(expr);
       if (expectedPromotedType == null) {
-        expect(flow.promotedType(x), isNull);
+        expect(h.flow.promotedType(x), isNull);
       } else {
-        expect(flow.promotedType(x).type, 'int');
+        expect(h.flow.promotedType(x).type, 'int');
       }
-      flow.ifStatement_elseBegin();
-      expect(flow.promotedType(x), isNull);
-      flow.ifStatement_end(true);
-      flow.verifyStackEmpty();
+      h.flow.ifStatement_elseBegin();
+      expect(h.flow.promotedType(x), isNull);
+      h.flow.ifStatement_end(true);
+      h.flow.verifyStackEmpty();
     }
 
     test('isExpression_end promotes to a subtype', () {
@@ -140,6 +139,12 @@ class _Harness
     flow = FlowAnalysis<_Statement, _Expression, _Var, _Type>(this, this, this);
   }
 
+  addAssignedVar(String name, String type) {
+    var v = _Var(name, _Type(type));
+    flow.add(v, assigned: true);
+    return v;
+  }
+
   @override
   bool isLocalVariable(_Var variable) {
     throw UnimplementedError('TODO(paulberry)');
@@ -176,6 +181,14 @@ class _Harness
     return _subtypes[query] ?? fail('Unknown subtype query: $query');
   }
 
+  void promote(_Var variable, String type, void Function() callback) {
+    var expr = _Expression();
+    flow.isExpression_end(expr, variable, false, _Type(type));
+    flow.ifStatement_thenBegin(expr);
+    callback();
+    flow.ifStatement_end(false);
+  }
+
   @override
   _Type tryPromoteToNonNull(_Type type) {
     if (type.type.endsWith('?')) {
@@ -193,20 +206,6 @@ class _Harness
   @override
   _Type variableType(_Var variable) {
     return variable.type;
-  }
-
-  addAssignedVar(String name, String type) {
-    var v = _Var(name, _Type(type));
-    flow.add(v, assigned: true);
-    return v;
-  }
-
-  void promote(_Var variable, String type, void Function() callback) {
-    var expr = _Expression();
-    flow.isExpression_end(expr, variable, false, _Type(type));
-    flow.ifStatement_thenBegin(expr);
-    callback();
-    flow.ifStatement_end(false);
   }
 }
 
