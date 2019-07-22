@@ -157,12 +157,17 @@ class FlowAnalysisHelper {
       return;
     }
 
+    // Set this.flow to null before doing any clean-up so that if an exception
+    // is raised, the state is already updated correctly, and we don't have
+    // cascading failures.
+    var flow = this.flow;
+    this.flow = null;
+
     if (!flow.isReachable) {
       result.functionBodiesThatDontComplete.add(node);
     }
 
-    flow.verifyStackEmpty();
-    flow = null;
+    flow.finish();
   }
 
   void breakStatement(BreakStatement node) {
