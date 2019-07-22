@@ -133,14 +133,13 @@ class FlowAnalysisHelper {
 
     if (_blockFunctionBodyLevel > 1) {
       assert(flow != null);
-      return;
+    } else {
+      flow = FlowAnalysis<Statement, Expression, VariableElement, DartType>(
+        _nodeOperations,
+        _typeOperations,
+        _FunctionBodyAccess(node),
+      );
     }
-
-    flow = FlowAnalysis<Statement, Expression, VariableElement, DartType>(
-      _nodeOperations,
-      _typeOperations,
-      _FunctionBodyAccess(node),
-    );
 
     var parameters = _enclosingExecutableParameters(node);
     if (parameters != null) {
