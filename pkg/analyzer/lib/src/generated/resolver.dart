@@ -5118,6 +5118,12 @@ class ResolverVisitor extends ScopedVisitor {
     for (var i = 0; i < catchLength; ++i) {
       var catchClause = catchClauses[i];
       flow.tryCatchStatement_catchBegin();
+      if (catchClause.exceptionParameter != null) {
+        flow.add(catchClause.exceptionParameter.staticElement, assigned: true);
+      }
+      if (catchClause.stackTraceParameter != null) {
+        flow.add(catchClause.stackTraceParameter.staticElement, assigned: true);
+      }
       catchClause.accept(this);
       flow.tryCatchStatement_catchEnd();
     }
