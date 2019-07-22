@@ -24,11 +24,20 @@ import '../fasta_codes.dart'
 
 abstract class ClassBuilder<T extends TypeBuilder, R>
     extends TypeDeclarationBuilder<T, R> {
+  /// The type variables declared on a class, extension or mixin declaration.
   List<TypeVariableBuilder> typeVariables;
 
+  /// The type in the `extends` clause of a class declaration.
+  ///
+  /// Currently this also holds the synthesized super class for a mixin
+  /// declaration.
   T supertype;
 
+  /// The type in the `implements` clause of a class or mixin declaration.
   List<T> interfaces;
+
+  /// The types in the `on` clause of an extension or mixin declaration.
+  List<T> onTypes;
 
   final Scope scope;
 
@@ -47,6 +56,7 @@ abstract class ClassBuilder<T extends TypeBuilder, R>
       this.typeVariables,
       this.supertype,
       this.interfaces,
+      this.onTypes,
       this.scope,
       this.constructors,
       LibraryBuilder parent,
@@ -132,8 +142,7 @@ abstract class ClassBuilder<T extends TypeBuilder, R>
 
   /// Don't use for scope lookup. Only use when an element is known to exist
   /// (and isn't a setter).
-  MemberBuilder operator [](String name) {
-    // TODO(ahe): Rename this to getLocalMember.
+  MemberBuilder getLocalMember(String name) {
     return scope.local[name] ??
         internalProblem(
             templateInternalProblemNotFoundIn.withArguments(
@@ -157,7 +166,7 @@ abstract class ClassBuilder<T extends TypeBuilder, R>
   /// For example, this method is convenient for use when building synthetic
   /// members, such as those of an enum.
   MemberBuilder firstMemberNamed(String name) {
-    Declaration declaration = this[name];
+    Declaration declaration = getLocalMember(name);
     while (declaration.next != null) {
       declaration = declaration.next;
     }

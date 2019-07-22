@@ -202,7 +202,9 @@ class SourceLoader extends Loader<Library> {
     ScannerResult result = scan(bytes,
         includeComments: includeComments,
         configuration: new ScannerConfiguration(
-            enableTripleShift: target.enableTripleShift));
+            enableTripleShift: target.enableTripleShift,
+            enableExtensionMethods: target.enableExtensionMethods,
+            enableNonNullable: target.enableNonNullable));
     Token token = result.tokens;
     if (!suppressLexicalErrors) {
       List<int> source = getSource(bytes);
@@ -583,7 +585,8 @@ class SourceLoader extends Loader<Library> {
 
     Set<ClassBuilder> blackListedClasses = new Set<ClassBuilder>();
     for (int i = 0; i < blacklistedCoreClasses.length; i++) {
-      blackListedClasses.add(coreLibrary[blacklistedCoreClasses[i]]);
+      blackListedClasses
+          .add(coreLibrary.getLocalMember(blacklistedCoreClasses[i]));
     }
 
     // Sort the classes topologically.
@@ -1098,7 +1101,7 @@ class SourceLoader extends Loader<Library> {
     if (library == null) {
       return target.dillTarget.loader.computeClassBuilderFromTargetClass(cls);
     }
-    return library[cls.name];
+    return library.getLocalMember(cls.name);
   }
 
   @override

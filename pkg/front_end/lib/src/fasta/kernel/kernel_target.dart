@@ -245,11 +245,11 @@ class KernelTarget extends TargetImplementation {
       loader.createTypeInferenceEngine();
       await loader.buildOutlines();
       loader.coreLibrary.becomeCoreLibrary();
-      dynamicType.bind(loader.coreLibrary["dynamic"]);
+      dynamicType.bind(loader.coreLibrary.getLocalMember("dynamic"));
       loader.resolveParts();
       loader.computeLibraryScopes();
-      objectType.bind(loader.coreLibrary["Object"]);
-      bottomType.bind(loader.coreLibrary["Null"]);
+      objectType.bind(loader.coreLibrary.getLocalMember("Object"));
+      bottomType.bind(loader.coreLibrary.getLocalMember("Null"));
       loader.resolveTypes();
       loader.computeDefaultTypes(dynamicType, bottomType, objectClassBuilder);
       List<SourceClassBuilder> myClasses =
@@ -392,7 +392,11 @@ class KernelTarget extends TargetImplementation {
     Class objectClass = this.objectClass;
     for (SourceClassBuilder builder in builders) {
       if (builder.target != objectClass && !builder.isPatch) {
-        if (builder.isPatch || builder.isMixinDeclaration) continue;
+        if (builder.isPatch ||
+            builder.isMixinDeclaration ||
+            builder.isExtension) {
+          continue;
+        }
         if (builder.isMixinApplication) {
           installForwardingConstructors(builder);
         } else {
@@ -410,6 +414,7 @@ class KernelTarget extends TargetImplementation {
   /// If [builder] doesn't have a constructors, install the defaults.
   void installDefaultConstructor(SourceClassBuilder builder) {
     assert(!builder.isMixinApplication);
+    assert(!builder.isExtension);
     // TODO(askesc): Make this check light-weight in the absence of patches.
     if (builder.target.constructors.isNotEmpty) return;
     if (builder.target.redirectingFactoryConstructors.isNotEmpty) return;

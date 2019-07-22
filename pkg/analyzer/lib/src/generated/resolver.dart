@@ -8550,8 +8550,8 @@ class UnusedLocalElementsVerifier extends RecursiveAstVisitor {
 
   _visitClassElement(ClassElement element) {
     if (!_isUsedElement(element)) {
-      _reportErrorForElement(HintCode.UNUSED_ELEMENT, element,
-          [element.kind.displayName, element.displayName]);
+      _reportErrorForElement(
+          HintCode.UNUSED_ELEMENT, element, [element.displayName]);
     }
   }
 
@@ -8564,15 +8564,15 @@ class UnusedLocalElementsVerifier extends RecursiveAstVisitor {
 
   _visitFunctionElement(FunctionElement element) {
     if (!_isUsedElement(element)) {
-      _reportErrorForElement(HintCode.UNUSED_ELEMENT, element,
-          [element.kind.displayName, element.displayName]);
+      _reportErrorForElement(
+          HintCode.UNUSED_ELEMENT, element, [element.displayName]);
     }
   }
 
   _visitFunctionTypeAliasElement(FunctionTypeAliasElement element) {
     if (!_isUsedElement(element)) {
-      _reportErrorForElement(HintCode.UNUSED_ELEMENT, element,
-          [element.kind.displayName, element.displayName]);
+      _reportErrorForElement(
+          HintCode.UNUSED_ELEMENT, element, [element.displayName]);
     }
   }
 
@@ -8592,22 +8592,22 @@ class UnusedLocalElementsVerifier extends RecursiveAstVisitor {
 
   _visitMethodElement(MethodElement element) {
     if (!_isUsedMember(element)) {
-      _reportErrorForElement(HintCode.UNUSED_ELEMENT, element,
-          [element.kind.displayName, element.displayName]);
+      _reportErrorForElement(
+          HintCode.UNUSED_ELEMENT, element, [element.displayName]);
     }
   }
 
   _visitPropertyAccessorElement(PropertyAccessorElement element) {
     if (!_isUsedMember(element)) {
-      _reportErrorForElement(HintCode.UNUSED_ELEMENT, element,
-          [element.kind.displayName, element.displayName]);
+      _reportErrorForElement(
+          HintCode.UNUSED_ELEMENT, element, [element.displayName]);
     }
   }
 
   _visitTopLevelVariableElement(TopLevelVariableElement element) {
     if (!_isUsedElement(element)) {
-      _reportErrorForElement(HintCode.UNUSED_ELEMENT, element,
-          [element.kind.displayName, element.displayName]);
+      _reportErrorForElement(
+          HintCode.UNUSED_ELEMENT, element, [element.displayName]);
     }
   }
 }

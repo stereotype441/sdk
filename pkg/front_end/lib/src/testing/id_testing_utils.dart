@@ -2,9 +2,14 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-/// Helper methods to use on annotated tests.
-
+import 'package:front_end/src/fasta/builder/builder.dart';
+import 'package:front_end/src/fasta/kernel/kernel_builder.dart';
+import 'package:front_end/src/fasta/source/source_library_builder.dart';
+import 'package:front_end/src/fasta/source/source_loader.dart';
+import 'package:front_end/src/kernel_generator_impl.dart';
 import 'package:kernel/ast.dart';
+
+/// Helper methods to use in annotated tests.
 
 /// Returns a canonical simple name for [member].
 String getMemberName(Member member) {
@@ -73,6 +78,61 @@ Member lookupClassMember(Class cls, String memberName, {bool required: true}) {
     }
     return null;
   });
+}
+
+DeclarationBuilder<TypeBuilder> lookupLibraryDeclarationBuilder(
+    CompilerResult compilerResult, Library library,
+    {bool required: true}) {
+  SourceLoader loader = compilerResult.kernelTargetForTesting.loader;
+  KernelLibraryBuilder builder = loader.builders[library.importUri];
+  if (builder == null && required) {
+    throw new ArgumentError("DeclarationBuilder for $library not found.");
+  }
+  return builder.libraryDeclaration;
+}
+
+ClassBuilder lookupClassBuilder(CompilerResult compilerResult, Class cls,
+    {bool required: true}) {
+  DeclarationBuilder<TypeBuilder> libraryBuilder =
+      lookupLibraryDeclarationBuilder(compilerResult, cls.enclosingLibrary,
+          required: required);
+  ClassBuilder clsBuilder = libraryBuilder.members[cls.name];
+  if (clsBuilder == null && required) {
+    throw new ArgumentError("ClassBuilder for $cls not found.");
+  }
+  return clsBuilder;
+}
+
+MemberBuilder lookupMemberBuilder(CompilerResult compilerResult, Member member,
+    {bool required: true}) {
+  MemberBuilder memberBuilder;
+  if (member.enclosingClass != null) {
+    ClassBuilder classBuilder = lookupClassBuilder(
+        compilerResult, member.enclosingClass,
+        required: required);
+    if (classBuilder != null) {
+      if (member is Constructor) {
+        memberBuilder = classBuilder.constructors.local[member.name.name];
+      } else if (member is Procedure && member.isSetter) {
+        memberBuilder = classBuilder.scope.setters[member.name.name];
+      } else {
+        memberBuilder = classBuilder.scope.local[member.name.name];
+      }
+    }
+  } else {
+    DeclarationBuilder<TypeBuilder> libraryBuilder =
+        lookupLibraryDeclarationBuilder(
+            compilerResult, member.enclosingLibrary);
+    if (member is Procedure && member.isSetter) {
+      memberBuilder = libraryBuilder.members[member.name.name];
+    } else {
+      memberBuilder = libraryBuilder.setters[member.name.name];
+    }
+  }
+  if (memberBuilder == null && required) {
+    throw new ArgumentError("MemberBuilder for $member not found.");
+  }
+  return memberBuilder;
 }
 
 /// Returns a textual representation of the constant [node] to be used in
@@ -307,4 +367,60 @@ class DartTypeToTextVisitor implements DartTypeVisitor<void> {
       sb.write('>');
     }
   }
+}
+
+/// Returns `true` if [type] is `Object` from `dart:core`.
+bool isObject(DartType type) {
+  return type is InterfaceType &&
+      type.classNode.name == 'Object' &&
+      '${type.classNode.enclosingLibrary.importUri}' == 'dart:core';
+}
+
+/// Returns a textual representation of the [typeParameter] to be used in
+/// testing.
+String typeParameterToText(TypeParameter typeParameter) {
+  String name = typeParameter.name;
+  if (!isObject(typeParameter.bound)) {
+    return '$name extends ${typeToText(typeParameter.bound)}';
+  }
+  return name;
+}
+
+/// Returns a textual representation of the [type] to be used in testing.
+String typeBuilderToText(TypeBuilder type) {
+  StringBuffer sb = new StringBuffer();
+  _typeBuilderToText(type, sb);
+  return sb.toString();
+}
+
+void _typeBuilderToText(TypeBuilder type, StringBuffer sb) {
+  if (type is NamedTypeBuilder) {
+    sb.write(type.name);
+    if (type.arguments != null && type.arguments.isNotEmpty) {
+      sb.write('<');
+      _typeBuildersToText(type.arguments, sb);
+      sb.write('>');
+    }
+  } else {
+    throw 'Unhandled type builder $type (${type.runtimeType})';
+  }
+}
+
+void _typeBuildersToText(Iterable<TypeBuilder> types, StringBuffer sb) {
+  String comma = '';
+  for (TypeBuilder type in types) {
+    sb.write(comma);
+    _typeBuilderToText(type, sb);
+    comma = ',';
+  }
+}
+
+/// Returns a textual representation of the [typeVariable] to be used in
+/// testing.
+String typeVariableBuilderToText(TypeVariableBuilder typeVariable) {
+  String name = typeVariable.name;
+  if (typeVariable.bound != null) {
+    return '$name extends ${typeBuilderToText(typeVariable.bound)}';
+  }
+  return name;
 }
