@@ -63,9 +63,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// states.
   final Map<Statement, int> _statementToStackIndex = {};
 
-  /// The list of all variables.
-  final List<Variable> _variables = [];
-
   State<Variable, Type> _current;
 
   /// The last boolean condition, for [_conditionTrue] and [_conditionFalse].
@@ -105,12 +102,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   /// Return `true` if the current state is reachable.
   bool get isReachable => _current.reachable;
-
-  /// Add a new [variable], which might be already [assigned].
-  void add(Variable variable, {bool assigned: false}) {
-    _variables.add(variable);
-    _current = _current.add(variable, assigned: assigned);
-  }
 
   void booleanLiteral(Expression expression, bool value) {
     _condition = expression;

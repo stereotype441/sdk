@@ -454,7 +454,7 @@ class _Harness
 
   _Var addAssignedVar(String name, String type) {
     var v = _Var(name, _Type(type));
-    flow.add(v, assigned: true);
+    flow.write(v);
     return v;
   }
 
