@@ -42,7 +42,14 @@ class AssignedVariables<Statement, Variable> {
 }
 
 class FlowAnalysis<Statement, Expression, Variable, Type> {
+  static bool get _assertionsEnabled {
+    bool result = false;
+    assert(result = true);
+    return result;
+  }
+
   final _VariableSet<Variable> _emptySet;
+
   final State<Variable, Type> _identity;
 
   /// The [NodeOperations], used to manipulate expressions.
@@ -77,6 +84,19 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// The state when [_condition] evaluates to `false`.
   State<Variable, Type> _conditionFalse;
 
+  /// If assertions are enabled, keeps track of all variables that have been
+  /// passed into the API (other than through a call to [add]).  The [finish]
+  /// method uses this to verify that the caller doesn't forget to pass a
+  /// variable to [add].
+  ///
+  /// Note: the reason we have to keep track of this set (rather than simply
+  /// checking each variable at the time it is passed into the API) is because
+  /// the client doesn't call `add` until a variable is declared, and in
+  /// erroneous code, it's possible that a variable might be used before its
+  /// declaration.
+  final Set<Variable> _referencedVariables =
+      _assertionsEnabled ? <Variable>{} : null;
+
   factory FlowAnalysis(
     NodeOperations<Expression> nodeOperations,
     TypeOperations<Variable, Type> typeOperations,
@@ -105,12 +125,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   /// Return `true` if the current state is reachable.
   bool get isReachable => _current.reachable;
-
-  static bool get _assertionsEnabled {
-    bool result = false;
-    assert(result = true);
-    return result;
-  }
 
   /// Add a new [variable], which might be already [assigned].
   void add(Variable variable, {bool assigned: false}) {
@@ -230,6 +244,19 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     var breakState = _stack.removeLast();
 
     _current = _join(falseCondition, breakState);
+  }
+
+  /// This method should be called at the conclusion of flow analysis for a top
+  /// level function or method.  Performs assertion checks.
+  void finish() {
+    assert(_stack.isEmpty);
+    assert(() {
+      var variablesNotAdded =
+          _referencedVariables.difference(Set<Variable>.from(_addedVariables));
+      assert(variablesNotAdded.isEmpty,
+          'Variables not passed to add: $variablesNotAdded');
+      return true;
+    }());
   }
 
   void forEachStatement_bodyBegin(Set<Variable> loopAssigned) {
@@ -573,30 +600,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     var afterBody = _current;
     _stack.add(afterBody);
     _current = _join(afterBody, beforeTry.removePromotedAll(assignedInBody));
-  }
-
-  /// If assertions are enabled, keeps track of all variables that have been
-  /// passed into the API (other than through a call to [add]).  The [finish]
-  /// method uses this to verify that the caller doesn't forget to pass a
-  /// variable to [add].
-  ///
-  /// Note: the reason we have to keep track of this set (rather than simply
-  /// checking each variable at the time it is passed into the API) is because
-  /// the client doesn't call `add` until a variable is declared, and in
-  /// erroneous code, it's possible that a variable might be used before its
-  /// declaration.
-  final Set<Variable> _referencedVariables = _assertionsEnabled ? <Variable>{} : null;
-
-  /// This method should be called at the conclusion of flow analysis for a top
-  /// level function or method.  Performs assertion checks.
-  void finish() {
-    assert(_stack.isEmpty);
-    assert(() {
-      var variablesNotAdded =
-      _referencedVariables.difference(Set<Variable>.from(_addedVariables));
-      assert(variablesNotAdded.isEmpty, 'Variables not passed to add: $variablesNotAdded');
-      return true;
-    }());
   }
 
   void whileStatement_bodyBegin(
