@@ -365,44 +365,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     }
   }
 
-  @visibleForTesting
-  Map<Variable, Type> joinPromoted(
-    Map<Variable, Type> first,
-    Map<Variable, Type> second,
-  ) {
-    if (identical(first, second)) return first;
-    if (first.isEmpty || second.isEmpty) return const {};
-
-    var result = <Variable, Type>{};
-    var alwaysFirst = true;
-    var alwaysSecond = true;
-    for (var variable in first.keys) {
-      var firstType = first[variable];
-      var secondType = second[variable];
-      if (secondType != null) {
-        if (identical(firstType, secondType)) {
-          result[variable] = firstType;
-        } else if (typeOperations.isSubtypeOf(firstType, secondType)) {
-          result[variable] = secondType;
-          alwaysFirst = false;
-        } else if (typeOperations.isSubtypeOf(secondType, firstType)) {
-          result[variable] = firstType;
-          alwaysSecond = false;
-        } else {
-          alwaysFirst = false;
-          alwaysSecond = false;
-        }
-      } else {
-        alwaysFirst = false;
-      }
-    }
-
-    if (alwaysFirst) return first;
-    if (alwaysSecond && result.length == second.length) return second;
-    if (result.isEmpty) return const {};
-    return result;
-  }
-
   void logicalAnd_end(Expression andExpression, Expression rightOperand) {
     _conditionalEnd(rightOperand);
     // Tail of the stack: falseLeft, trueLeft, falseRight, trueRight
@@ -613,7 +575,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
     var newReachable = first.reachable || second.reachable;
     var newNotAssigned = first.notAssigned.union(second.notAssigned);
-    var newPromoted = joinPromoted(first.promoted, second.promoted);
+    var newPromoted = State.joinPromoted(typeOperations, first.promoted, second.promoted);
 
     return State._identicalOrNew(
       first,
@@ -648,6 +610,45 @@ abstract class NodeOperations<Expression> {
 class State<Variable, Type> {
   /// Indicates whether this point in the control flow is reachable.
   final bool reachable;
+
+  /// TODO(paulberry): document
+  static Map<Variable, Type> joinPromoted<Variable, Type>(
+      TypeOperations typeOperations,
+      Map<Variable, Type> first,
+      Map<Variable, Type> second,
+      ) {
+    if (identical(first, second)) return first;
+    if (first.isEmpty || second.isEmpty) return const {};
+
+    var result = <Variable, Type>{};
+    var alwaysFirst = true;
+    var alwaysSecond = true;
+    for (var variable in first.keys) {
+      var firstType = first[variable];
+      var secondType = second[variable];
+      if (secondType != null) {
+        if (identical(firstType, secondType)) {
+          result[variable] = firstType;
+        } else if (typeOperations.isSubtypeOf(firstType, secondType)) {
+          result[variable] = secondType;
+          alwaysFirst = false;
+        } else if (typeOperations.isSubtypeOf(secondType, firstType)) {
+          result[variable] = firstType;
+          alwaysSecond = false;
+        } else {
+          alwaysFirst = false;
+          alwaysSecond = false;
+        }
+      } else {
+        alwaysFirst = false;
+      }
+    }
+
+    if (alwaysFirst) return first;
+    if (alwaysSecond && result.length == second.length) return second;
+    if (result.isEmpty) return const {};
+    return result;
+  }
 
   /// The set of variables that are not yet definitely assigned at this point in
   /// the control flow.
