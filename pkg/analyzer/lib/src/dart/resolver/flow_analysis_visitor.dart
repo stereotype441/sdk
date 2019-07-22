@@ -243,7 +243,7 @@ class FlowAnalysisHelper {
 
   void loopVariable(DeclaredIdentifier loopVariable) {
     if (loopVariable != null) {
-      flow.add(loopVariable.declaredElement, assigned: true);
+      flow.write(loopVariable.declaredElement);
     }
   }
 
