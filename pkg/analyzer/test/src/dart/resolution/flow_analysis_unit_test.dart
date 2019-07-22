@@ -114,7 +114,6 @@ main() {
       });
 
       test('unassigned', () {
-        // By default, added variables are considered unassigned.
         var s1 = State<_Var, _Type>(true);
         var s2 = s1.add(intVar, assigned: false);
         expect(s2.notAssigned.contains(intVar), true);
@@ -123,7 +122,6 @@ main() {
       });
 
       test('assigned', () {
-        // By default, added variables are considered unassigned.
         var s1 = State<_Var, _Type>(true);
         var s2 = s1.add(intVar, assigned: true);
         expect(s2.notAssigned.contains(intVar), false);
