@@ -289,7 +289,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     if (breakIndex != null) {
       _stack[breakIndex] = _join(_stack[breakIndex], _current);
     }
-    _current = _current.exit();
+    _current = _current.setReachable(false);
   }
 
   void handleContinue(Statement target) {
@@ -298,13 +298,13 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
       var continueIndex = breakIndex + 1;
       _stack[continueIndex] = _join(_stack[continueIndex], _current);
     }
-    _current = _current.exit();
+    _current = _current.setReachable(false);
   }
 
   /// Register the fact that the current state definitely exists, e.g. returns
   /// from the body, throws an exception, etc.
   void handleExit() {
-    _current = _current.exit();
+    _current = _current.setReachable(false);
   }
 
   void ifNullExpression_end() {
@@ -689,15 +689,6 @@ class State<Variable, Type> {
     return State<Variable, Type>._(
       reachable,
       newNotAssigned,
-      promoted,
-    );
-  }
-
-  /// Updates the state to indicate that the control flow path is unreachable.
-  State<Variable, Type> exit() {
-    return State<Variable, Type>._(
-      false,
-      notAssigned,
       promoted,
     );
   }
