@@ -8,7 +8,6 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
-import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/util/ast_data_extractor.dart';
 import 'package:front_end/src/testing/id.dart' show ActualData, Id;
 import 'package:front_end/src/testing/id_testing.dart';
@@ -77,9 +76,18 @@ class ConstantsDataExtractor extends AstDataExtractor<String> {
         var elements = value.toListValue().map(_stringify).join(',');
         return 'List<${type.typeArguments[0]}>($elements)';
       }
+      if (type.isDartCoreMap) {
+        var typeArguments = type.typeArguments.join(',');
+        var elements = value.toMapValue().entries.map((entry) {
+          var key = _stringify(entry.key);
+          var value = _stringify(entry.value);
+          return '$key:$value';
+        }).join(',');
+        return 'Map<$typeArguments>($elements)';
+      }
     } else if (type is FunctionType) {
       var element = value.toFunctionValue();
-      return 'Function(${element.name})${element.type}';
+      return 'Function(${element.name})';
     }
     return '???($type)';
   }
