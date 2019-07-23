@@ -15,6 +15,6 @@ const Map<String, int> Function(String, int) instantiation1 =
 
 main() {
   print(/*Function(method1)*/ function0);
-  print(/*Instantiation(method1<int>)*/ instantiation0);
-  print(/*Instantiation(method2<String,int>)*/ instantiation1);
+  print(/*Function(method1)*/ instantiation0);
+  print(/*Function(method2)*/ instantiation1);
 }
