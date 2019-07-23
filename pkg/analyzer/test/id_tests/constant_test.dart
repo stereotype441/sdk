@@ -3,17 +3,21 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'dart:io';
+
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
+import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/util/ast_data_extractor.dart';
-import 'package:front_end/src/testing/id_testing.dart';
 import 'package:front_end/src/testing/id.dart' show ActualData, Id;
+import 'package:front_end/src/testing/id_testing.dart';
+
 import '../util/id_testing_helper.dart';
 
 main(List<String> args) async {
-  Directory dataDir = new Directory.fromUri(Platform.script.resolve('../../../front_end/test/constants/data'));
+  Directory dataDir = new Directory.fromUri(
+      Platform.script.resolve('../../../front_end/test/constants/data'));
   await runTests(dataDir,
       args: args,
       supportedMarkers: sharedMarkers,
@@ -27,19 +31,18 @@ class ConstantsDataComputer extends DataComputer<String> {
   const ConstantsDataComputer();
 
   @override
-  void computeUnitData(CompilationUnit unit,
-      Map<Id, ActualData<String>> actualMap) {
+  DataInterpreter<String> get dataValidator => const StringDataInterpreter();
+
+  @override
+  void computeUnitData(
+      CompilationUnit unit, Map<Id, ActualData<String>> actualMap) {
     ConstantsDataExtractor(unit.declaredElement.source.uri, actualMap)
         .run(unit);
   }
-
-  @override
-  DataInterpreter<String> get dataValidator => const StringDataInterpreter();
 }
 
 class ConstantsDataExtractor extends AstDataExtractor<String> {
-  ConstantsDataExtractor(
-      Uri uri, Map<Id, ActualData<String>> actualMap)
+  ConstantsDataExtractor(Uri uri, Map<Id, ActualData<String>> actualMap)
       : super(uri, actualMap);
 
   @override
@@ -66,8 +69,17 @@ class ConstantsDataExtractor extends AstDataExtractor<String> {
       if (type.isDartCoreInt) return 'Int(${value.toIntValue()})';
       if (type.isDartCoreDouble) return 'Double(${value.toDoubleValue()})';
       if (type.isDartCoreSymbol) return 'Symbol(${value.toSymbolValue()})';
-      if (type.isDartCoreSet) return 'Set<${type.typeArguments[0]}>(${value.toSetValue().map(_stringify).join(',')})';
-      if (type.isDartCoreList) return 'Set<${type.typeArguments[0]}>(${value.toListValue().map(_stringify).join(',')})';
+      if (type.isDartCoreSet) {
+        var elements = value.toSetValue().map(_stringify).join(',');
+        return 'Set<${type.typeArguments[0]}>($elements)';
+      }
+      if (type.isDartCoreList) {
+        var elements = value.toListValue().map(_stringify).join(',');
+        return 'List<${type.typeArguments[0]}>($elements)';
+      }
+    } else if (type is FunctionType) {
+      var element = value.toFunctionValue();
+      return 'Function(${element.name})${element.type}';
     }
     return '???($type)';
   }
