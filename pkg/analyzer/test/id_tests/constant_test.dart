@@ -6,6 +6,7 @@ import 'dart:io';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/util/ast_data_extractor.dart';
 import 'package:front_end/src/testing/id_testing.dart';
 import 'package:front_end/src/testing/id.dart' show ActualData, Id;
@@ -58,12 +59,15 @@ class ConstantsDataExtractor extends AstDataExtractor<String> {
 
   String _stringify(DartObject value) {
     var type = value.type;
-    if (type.isDartCoreNull) return 'Null()';
-    if (type.isDartCoreBool) return 'Bool(${value.toBoolValue()})';
-    if (type.isDartCoreString) return 'String(${value.toStringValue()})';
-    if (type.isDartCoreInt) return 'Int(${value.toIntValue()})';
-    if (type.isDartCoreDouble) return 'Double(${value.toDoubleValue()})';
-    if (type.isDartCoreSymbol) return 'Symbol(${value.toSymbolValue()})';
+    if (type is InterfaceType) {
+      if (type.isDartCoreNull) return 'Null()';
+      if (type.isDartCoreBool) return 'Bool(${value.toBoolValue()})';
+      if (type.isDartCoreString) return 'String(${value.toStringValue()})';
+      if (type.isDartCoreInt) return 'Int(${value.toIntValue()})';
+      if (type.isDartCoreDouble) return 'Double(${value.toDoubleValue()})';
+      if (type.isDartCoreSymbol) return 'Symbol(${value.toSymbolValue()})';
+      if (type.isDartCoreSet) return 'Set<${type.typeArguments[0]}>(${value.toSetValue().map(_stringify).join(',')})';
+    }
     return '???($type)';
   }
 }
