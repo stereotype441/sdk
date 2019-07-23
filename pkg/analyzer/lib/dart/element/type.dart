@@ -71,6 +71,10 @@ abstract class DartType {
   /// dart:core library.
   bool get isDartCoreList;
 
+  /// Returns `true` if this type represents the type 'Map' defined in the
+  /// dart:core library.
+  bool get isDartCoreMap;
+
   /// Return `true` if this type represents the type 'Null' defined in the
   /// dart:core library.
   bool get isDartCoreNull;
