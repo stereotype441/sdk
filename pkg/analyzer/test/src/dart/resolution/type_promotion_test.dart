@@ -33,7 +33,7 @@ class TypePromotionTest extends DriverResolutionTest {
 
   Future<void> resolveCode(String code) async {
     if (await checkTests(
-        code, _computeResult, const _TypePromotionDataComputer(), FeatureSet.forTesting(sdkVersion: '2.2.2', additionalFeatures: [Feature.non_nullable]))) {
+        code, const _TypePromotionDataComputer(), FeatureSet.forTesting(sdkVersion: '2.2.2', additionalFeatures: [Feature.non_nullable]))) {
       fail('Failure(s)');
     }
   }
@@ -730,12 +730,6 @@ void f(bool b, Object x) {
   }
 }
 ''');
-  }
-
-  Future<ResolvedUnitResult> _computeResult(String code) async {
-    addTestFile(code);
-    await resolveTestFile();
-    return result;
   }
 }
 

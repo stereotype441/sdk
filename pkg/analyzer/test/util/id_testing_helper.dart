@@ -113,28 +113,7 @@ Future<bool> runTest<T>(TestData testData, DataComputer<T> dataComputer,
 
 Future<bool> checkTests<T>(
     String rawCode,
-    Future<ResolvedUnitResult> resultComputer(String rawCode),
     DataComputer<T> dataComputer, FeatureSet featureSet) async {
-  if (false) { // TODO(paulberry): old
-    AnnotatedCode code =
-    new AnnotatedCode.fromText(rawCode, commentStart, commentEnd);
-    var result = await resultComputer(code.sourceCode);
-    var uri = result.libraryElement.source.uri;
-    var marker = 'normal';
-    Map<String, MemberAnnotations<IdValue>> expectedMaps = {
-      marker: new MemberAnnotations<IdValue>(),
-    };
-    computeExpectedMap(uri, code, expectedMaps, onFailure: onFailure);
-    MemberAnnotations<IdValue> annotations = expectedMaps[marker];
-    Map<Id, ActualData<T>> actualMap = {};
-    dataComputer.computeUnitData(result.unit, actualMap);
-    Map<Uri, AnnotatedCode> codeMap = {uri: code};
-    var compiledData =
-    AnalyzerCompiledData<T>(codeMap, uri, {uri: actualMap}, {});
-    return await checkCode(marker, uri, codeMap, annotations, compiledData,
-        dataComputer.dataValidator,
-        onFailure: onFailure);
-  } else {
     AnnotatedCode code =
     new AnnotatedCode.fromText(rawCode, commentStart, commentEnd);
     String testFileName = 'test.dart';
@@ -150,7 +129,6 @@ Future<bool> checkTests<T>(
     var testData = TestData(testFileUri, testFileUri, memorySourceFiles, codeMap, expectedMaps, libFileNames);
     var config = TestConfig(marker, 'provisional test config', featureSet: featureSet);
     return runTestForConfig<T>(testData, dataComputer, config);
-  }
 }
 
 /// Runs [dataComputer] on [testData] for [config].

@@ -27,23 +27,15 @@ main() {
   });
 }
 
-class FlowTestBase extends DriverResolutionTest {
+class FlowTestBase {
   FlowAnalysisResult flowResult;
 
   /// Resolve the given [code] and track nullability in the unit.
   Future<void> trackCode(String code) async {
     if (await checkTests(
-        code, _computeResult, const _FlowAnalysisDataComputer(), FeatureSet.forTesting(sdkVersion: '2.2.2', additionalFeatures: [Feature.non_nullable]))) {
+        code, const _FlowAnalysisDataComputer(), FeatureSet.forTesting(sdkVersion: '2.2.2', additionalFeatures: [Feature.non_nullable]))) {
       fail('Failure(s)');
     }
-  }
-
-  Future<ResolvedUnitResult> _computeResult(String code) async {
-    addTestFile(code);
-    await resolveTestFile();
-    var unit = result.unit;
-    flowResult = FlowAnalysisResult.getFromNode(unit);
-    return result;
   }
 }
 
