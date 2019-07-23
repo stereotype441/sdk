@@ -2,6 +2,7 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
@@ -32,7 +33,7 @@ class FlowTestBase extends DriverResolutionTest {
   /// Resolve the given [code] and track nullability in the unit.
   Future<void> trackCode(String code) async {
     if (await checkTests(
-        code, _computeResult, const _FlowAnalysisDataComputer())) {
+        code, _computeResult, const _FlowAnalysisDataComputer(), FeatureSet.forTesting(sdkVersion: '2.2.2', additionalFeatures: [Feature.non_nullable]))) {
       fail('Failure(s)');
     }
   }

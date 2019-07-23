@@ -11,7 +11,7 @@ import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/dart/ast/ast.dart' hide Annotation;
 import 'package:analyzer/file_system/file_system.dart';
 import 'package:analyzer/file_system/memory_file_system.dart';
-import 'package:analyzer/source/package_map_resolver.dart';
+import 'package:analyzer/src/source/package_map_resolver.dart';
 import 'package:analyzer/src/dart/analysis/byte_store.dart';
 import 'package:analyzer/src/dart/analysis/driver.dart';
 import 'package:analyzer/src/dart/analysis/file_state.dart';
@@ -114,7 +114,7 @@ Future<bool> runTest<T>(TestData testData, DataComputer<T> dataComputer,
 Future<bool> checkTests<T>(
     String rawCode,
     Future<ResolvedUnitResult> resultComputer(String rawCode),
-    DataComputer<T> dataComputer) async {
+    DataComputer<T> dataComputer, FeatureSet featureSet) async {
   if (false) { // TODO(paulberry): old
     AnnotatedCode code =
     new AnnotatedCode.fromText(rawCode, commentStart, commentEnd);
@@ -148,7 +148,7 @@ Future<bool> checkTests<T>(
     Map<Uri, AnnotatedCode> codeMap = {testFileUri: code};
     var libFileNames = <String>[];
     var testData = TestData(testFileUri, testFileUri, memorySourceFiles, codeMap, expectedMaps, libFileNames);
-    var config = TestConfig(marker, 'provisional test config');
+    var config = TestConfig(marker, 'provisional test config', featureSet: featureSet);
     return runTestForConfig<T>(testData, dataComputer, config);
   }
 }
