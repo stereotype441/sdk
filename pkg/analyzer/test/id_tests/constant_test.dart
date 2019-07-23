@@ -4,13 +4,14 @@
 
 import 'dart:io';
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/src/util/ast_data_extractor.dart';
 import 'package:front_end/src/testing/id_testing.dart';
 import 'package:front_end/src/testing/id.dart' show ActualData, Id;
 import '../util/id_testing_helper.dart';
 
 main(List<String> args) async {
-  Directory dataDir = new Directory.fromUri(Platform.script.resolve('data'));
+  Directory dataDir = new Directory.fromUri(Platform.script.resolve('../../../front_end/test/constants/data'));
   await runTests(dataDir,
       args: args,
       supportedMarkers: sharedMarkers,
@@ -41,6 +42,17 @@ class ConstantsDataExtractor extends AstDataExtractor<String> {
 
   @override
   String computeNodeValue(Id id, AstNode node) {
+    print('Examining node $node');
+    if (node is Identifier) {
+      var element = node.staticElement;
+      if (element is PropertyAccessorElement && element.isSynthetic) {
+        var variable = element.variable;
+        if (!variable.isSynthetic && variable.isConst) {
+          var value = variable.constantValue;
+          throw '$value';
+        }
+      }
+    }
     // TODO(paulberry): figure out what to do here.
     return null;
   }

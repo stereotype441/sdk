@@ -9,10 +9,21 @@ import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/dart/ast/ast.dart' hide Annotation;
+import 'package:analyzer/file_system/file_system.dart';
+import 'package:analyzer/file_system/memory_file_system.dart';
+import 'package:analyzer/source/package_map_resolver.dart';
+import 'package:analyzer/src/dart/analysis/byte_store.dart';
+import 'package:analyzer/src/dart/analysis/driver.dart';
+import 'package:analyzer/src/dart/analysis/file_state.dart';
+import 'package:analyzer/src/dart/analysis/performance_logger.dart';
+import 'package:analyzer/src/generated/engine.dart';
+import 'package:analyzer/src/generated/source.dart';
+import 'package:analyzer/src/test_utilities/mock_sdk.dart';
 import 'package:front_end/src/testing/annotated_code_helper.dart';
 import 'package:front_end/src/testing/id.dart'
     show ActualData, Id, IdValue, MemberId, NodeId;
 import 'package:front_end/src/testing/id_testing.dart';
+import '../src/dart/resolution/driver_resolution.dart';
 
 class AnalyzerCompiledData<T> extends CompiledData<T> {
   // TODO(johnniwinther,paulberry): Maybe this should have access to the
@@ -76,8 +87,6 @@ RunTestFunction runTestFor<T>(
       {bool testAfterFailures, bool verbose, bool printCode}) {
     return runTest(testData, dataComputer, testedConfigs,
         testAfterFailures: testAfterFailures,
-        verbose: verbose,
-        printCode: printCode,
         onFailure: onFailure);
   };
 }
@@ -88,8 +97,6 @@ RunTestFunction runTestFor<T>(
 Future<bool> runTest<T>(TestData testData, DataComputer<T> dataComputer,
     List<TestConfig> testedConfigs,
     {bool testAfterFailures,
-      bool verbose,
-      bool printCode,
       bool forUserLibrariesOnly: true,
       Iterable<Id> globalIds: const <Id>[],
       void onFailure(String message)}) async {
@@ -97,9 +104,7 @@ Future<bool> runTest<T>(TestData testData, DataComputer<T> dataComputer,
   for (TestConfig config in testedConfigs) {
     if (await runTestForConfig(testData, dataComputer, config,
         fatalErrors: !testAfterFailures,
-        onFailure: onFailure,
-        verbose: verbose,
-        printCode: printCode)) {
+        onFailure: onFailure)) {
       hasFailures = true;
     }
   }
@@ -107,7 +112,6 @@ Future<bool> runTest<T>(TestData testData, DataComputer<T> dataComputer,
 }
 
 Future<bool> checkTests<T>(
-    Uri testFileUri,
     String rawCode,
     Future<ResolvedUnitResult> resultComputer(String rawCode),
     DataComputer<T> dataComputer) async {
@@ -131,7 +135,21 @@ Future<bool> checkTests<T>(
         dataComputer.dataValidator,
         onFailure: onFailure);
   } else {
-    var testData = TestData(testFileUri, testFileUri, memorySourceFiles, code, expectedMaps, libFileNames)
+    AnnotatedCode code =
+    new AnnotatedCode.fromText(rawCode, commentStart, commentEnd);
+    String testFileName = 'test.dart';
+    var testFileUri = _toTestUri(testFileName);
+    var memorySourceFiles = {testFileName: code.sourceCode};
+    var marker = 'analyzer';
+    Map<String, MemberAnnotations<IdValue>> expectedMaps = {
+      marker: new MemberAnnotations<IdValue>(),
+    };
+    computeExpectedMap(testFileUri, code, expectedMaps, onFailure: onFailure);
+    Map<Uri, AnnotatedCode> codeMap = {testFileUri: code};
+    var libFileNames = <String>[];
+    var testData = TestData(testFileUri, testFileUri, memorySourceFiles, codeMap, expectedMaps, libFileNames);
+    var config = TestConfig(marker, 'provisional test config');
+    return runTestForConfig<T>(testData, dataComputer, config);
   }
 }
 
@@ -141,133 +159,48 @@ Future<bool> checkTests<T>(
 Future<bool> runTestForConfig<T>(
     TestData testData, DataComputer<T> dataComputer, TestConfig config,
     {bool fatalErrors,
-      bool verbose,
-      bool printCode,
-      bool forUserLibrariesOnly: true,
-      Iterable<Id> globalIds: const <Id>[],
       void onFailure(String message)}) async {
   MemberAnnotations<IdValue> memberAnnotations =
   testData.expectedMaps[config.marker];
   Iterable<Id> globalIds = memberAnnotations.globalData.keys;
-  CompilerOptions options = new CompilerOptions();
-  options.debugDump = printCode;
-  options.experimentalFlags.addAll(config.experimentalFlags);
-  CompilerResult compilerResult = await compileScript(
-      testData.memorySourceFiles,
-      options: options,
-      retainDataForTesting: true);
-  Component component = compilerResult.component;
+  DriverResolutionTest resolutionTest = DriverResolutionTest(); // TODO(paulberry): remove.
+  var resourceProvider = new MemoryResourceProvider();
+  for (var entry in testData.memorySourceFiles.entries) {
+    resourceProvider.newFile(resourceProvider.convertPath(_toTestUri(entry.key).path), entry.value);
+  }
+  var sdk = new MockSdk(resourceProvider: resourceProvider);
+  var logBuffer = new StringBuffer();
+  var logger = new PerformanceLog(logBuffer);
+  var scheduler = new AnalysisDriverScheduler(logger);
+  // TODO(paulberry): Do we need a non-empty package map for any of these tests?
+  var packageMap = <String, List<Folder>>{};
+  var byteStore = new MemoryByteStore();
+  var analysisOptions = AnalysisOptionsImpl()..contextFeatures = config.featureSet;
+  var driver = new AnalysisDriver(
+      scheduler,
+      logger,
+      resourceProvider,
+      byteStore,
+      new FileContentOverlay(),
+      null,
+      new SourceFactory([
+        new DartUriResolver(sdk),
+        new PackageMapUriResolver(resourceProvider, packageMap),
+        new ResourceUriResolver(resourceProvider)
+      ], null, resourceProvider),
+      analysisOptions);
+  scheduler.start();
+  var result = await driver.getResult(resourceProvider.convertPath(testData.entryPoint.path));
   Map<Uri, Map<Id, ActualData<T>>> actualMaps = <Uri, Map<Id, ActualData<T>>>{};
   Map<Id, ActualData<T>> globalData = <Id, ActualData<T>>{};
 
-  Map<Id, ActualData<T>> actualMapFor(TreeNode node) {
-    Uri uri = node is Library ? node.fileUri : node.location.file;
+  Map<Id, ActualData<T>> actualMapFor(Uri uri) {
     return actualMaps.putIfAbsent(uri, () => <Id, ActualData<T>>{});
   }
 
-  void processMember(Member member, Map<Id, ActualData<T>> actualMap) {
-    if (member.enclosingClass != null) {
-      if (member.enclosingClass.isEnum) {
-        if (member is Constructor ||
-            member.isInstanceMember ||
-            member.name == 'values') {
-          return;
-        }
-      }
-      if (member is Constructor && member.enclosingClass.isMixinApplication) {
-        return;
-      }
-    }
-    dataComputer.computeMemberData(compilerResult, member, actualMap,
-        verbose: verbose);
-  }
-
-  void processClass(Class cls, Map<Id, ActualData<T>> actualMap) {
-    dataComputer.computeClassData(compilerResult, cls, actualMap,
-        verbose: verbose);
-  }
-
-  bool excludeLibrary(Library library) {
-    return forUserLibrariesOnly &&
-        (library.importUri.scheme == 'dart' ||
-            library.importUri.scheme == 'package');
-  }
-
-  for (Library library in component.libraries) {
-    if (excludeLibrary(library)) continue;
-    dataComputer.computeLibraryData(
-        compilerResult, library, actualMapFor(library));
-    for (Class cls in library.classes) {
-      processClass(cls, actualMapFor(cls));
-      for (Member member in cls.members) {
-        processMember(member, actualMapFor(member));
-      }
-    }
-    for (Member member in library.members) {
-      processMember(member, actualMapFor(member));
-    }
-  }
-
-  List<Uri> globalLibraries = <Uri>[
-    Uri.parse('dart:core'),
-    Uri.parse('dart:collection'),
-    Uri.parse('dart:async'),
-  ];
-
-  Class getGlobalClass(String className) {
-    Class cls;
-    for (Uri uri in globalLibraries) {
-      Library library = lookupLibrary(component, uri);
-      if (library != null) {
-        cls ??= lookupClass(library, className);
-      }
-    }
-    if (cls == null) {
-      throw "Global class '$className' not found in the global "
-          "libraries: ${globalLibraries.join(', ')}";
-    }
-    return cls;
-  }
-
-  Member getGlobalMember(String memberName) {
-    Member member;
-    for (Uri uri in globalLibraries) {
-      Library library = lookupLibrary(component, uri);
-      if (library != null) {
-        member ??= lookupLibraryMember(library, memberName);
-      }
-    }
-    if (member == null) {
-      throw "Global member '$memberName' not found in the global "
-          "libraries: ${globalLibraries.join(', ')}";
-    }
-    return member;
-  }
-
-  for (Id id in globalIds) {
-    if (id is MemberId) {
-      Member member;
-      if (id.className != null) {
-        Class cls = getGlobalClass(id.className);
-        member = lookupClassMember(cls, id.memberName);
-        if (member == null) {
-          throw "Global member '${id.memberName}' not found in class $cls.";
-        }
-      } else {
-        member = getGlobalMember(id.memberName);
-      }
-      processMember(member, globalData);
-    } else if (id is ClassId) {
-      Class cls = getGlobalClass(id.className);
-      processClass(cls, globalData);
-    } else {
-      throw new UnsupportedError("Unexpected global id: $id");
-    }
-  }
-
-  CfeCompiledData compiledData = new CfeCompiledData<T>(
-      compilerResult, testData.testFileUri, actualMaps, globalData);
-
+  dataComputer.computeUnitData(result.unit, actualMapFor(testData.entryPoint));
+  var compiledData =
+  AnalyzerCompiledData<T>(testData.code, testData.entryPoint, actualMaps, globalData);
   return checkCode(config.name, testData.testFileUri, testData.code,
       memberAnnotations, compiledData, dataComputer.dataValidator,
       fatalErrors: fatalErrors, onFailure: onFailure);
