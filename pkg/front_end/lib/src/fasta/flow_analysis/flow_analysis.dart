@@ -131,9 +131,9 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _condition = expression;
     if (value) {
       _conditionTrue = _current;
-      _conditionFalse = _identity;
+      _conditionFalse = _current.setReachable(false);
     } else {
-      _conditionTrue = _identity;
+      _conditionTrue = _current.setReachable(false);
       _conditionFalse = _current;
     }
   }
@@ -529,6 +529,9 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     var breakState = _stack.removeLast();
 
     if (hasDefault) {
+      // breakState should not be null because we should have joined it with
+      // something non-null when handling the default case.
+      assert(breakState != null);
       _current = breakState;
     } else {
       _current = _join(breakState, afterExpression);
