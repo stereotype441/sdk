@@ -26,7 +26,7 @@ main() {
 }
 
 @reflectiveTest
-class TypePromotionTest extends DriverResolutionTest {
+class TypePromotionTest {
   @override
   AnalysisOptionsImpl get analysisOptions =>
       AnalysisOptionsImpl()..enabledExperiments = [EnableString.non_nullable];
