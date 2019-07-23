@@ -67,6 +67,7 @@ class ConstantsDataExtractor extends AstDataExtractor<String> {
       if (type.isDartCoreDouble) return 'Double(${value.toDoubleValue()})';
       if (type.isDartCoreSymbol) return 'Symbol(${value.toSymbolValue()})';
       if (type.isDartCoreSet) return 'Set<${type.typeArguments[0]}>(${value.toSetValue().map(_stringify).join(',')})';
+      if (type.isDartCoreList) return 'Set<${type.typeArguments[0]}>(${value.toListValue().map(_stringify).join(',')})';
     }
     return '???($type)';
   }
