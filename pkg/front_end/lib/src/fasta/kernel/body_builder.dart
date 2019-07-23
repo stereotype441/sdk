@@ -104,6 +104,8 @@ import 'expression_generator.dart'
 
 import 'expression_generator_helper.dart' show ExpressionGeneratorHelper;
 
+import 'fangorn.dart' show Fangorn;
+
 import 'forest.dart' show Forest;
 
 import 'implicit_type_argument.dart' show ImplicitTypeArgument;
@@ -134,8 +136,10 @@ const noLocation = null;
 // has been enabled by default.
 const invalidCollectionElement = const Object();
 
-abstract class BodyBuilder extends ScopeListener<JumpTarget>
+class BodyBuilder extends ScopeListener<JumpTarget>
     implements ExpressionGeneratorHelper, EnsureLoaded {
+  final Forest forest;
+
   // TODO(ahe): Rename [library] to 'part'.
   @override
   final KernelLibraryBuilder library;
@@ -208,6 +212,18 @@ abstract class BodyBuilder extends ScopeListener<JumpTarget>
   /// second in the formal parameter scope.
   bool inInitializer = false;
 
+  /// Set to `true` when we are parsing a field initializer either directly
+  /// or within an initializer list.
+  ///
+  /// For instance in `<init>` in
+  ///
+  ///    var foo = <init>;
+  ///    class Class {
+  ///      var bar = <init>;
+  ///      Class() : <init>;
+  ///    }
+  ///
+  /// This is used to determine whether instance properties are available.
   bool inFieldInitializer = false;
 
   bool inCatchClause = false;
@@ -265,7 +281,8 @@ abstract class BodyBuilder extends ScopeListener<JumpTarget>
       this.isInstanceMember,
       this.uri,
       this.typeInferrer)
-      : enableNative =
+      : forest = const Fangorn(),
+        enableNative =
             library.loader.target.backendTarget.enableNative(library.uri),
         stringExpectedAfterNative =
             library.loader.target.backendTarget.nativeExtensionExpectsString,
@@ -299,6 +316,25 @@ abstract class BodyBuilder extends ScopeListener<JumpTarget>
                 : field.parent,
             field.parent is KernelClassBuilder ? field.parent : null,
             typeInferrer);
+
+  BodyBuilder.forOutlineExpression(
+      KernelLibraryBuilder library,
+      KernelClassBuilder classBuilder,
+      ModifierBuilder member,
+      Scope scope,
+      Uri fileUri)
+      : this(
+            library,
+            member,
+            scope,
+            null,
+            library.loader.hierarchy,
+            library.loader.coreTypes,
+            classBuilder,
+            member?.isInstanceMember ?? false,
+            fileUri,
+            library.loader.typeInferenceEngine?.createLocalTypeInferrer(
+                fileUri, classBuilder?.target?.thisType, library));
 
   bool get inConstructor {
     return functionNestingLevel == 0 && member is KernelConstructorBuilder;
@@ -1709,7 +1745,7 @@ abstract class BodyBuilder extends ScopeListener<JumpTarget>
         // This way of computing the superclass is slower than using the kernel
         // objects directly.
         Object supertype = builder.supertype;
-        if (supertype is NamedTypeBuilder<TypeBuilder, Object>) {
+        if (supertype is NamedTypeBuilder) {
           Object builder = supertype.declaration;
           if (builder is ClassBuilder<TypeBuilder, Object>) return builder;
         }
@@ -2757,7 +2793,7 @@ abstract class BodyBuilder extends ScopeListener<JumpTarget>
         library.addProblem(
             message, offset, lengthOfSpan(beginToken, suffix), uri);
         push(new UnresolvedType<TypeBuilder>(
-            new KernelNamedTypeBuilder(name, null)
+            new NamedTypeBuilder(name, null)
               ..bind(new KernelInvalidTypeBuilder(
                   name,
                   message.withLocation(
@@ -2777,7 +2813,7 @@ abstract class BodyBuilder extends ScopeListener<JumpTarget>
       // TODO(ahe): Arguments could be passed here.
       library.addProblem(
           name.message, name.charOffset, name.name.length, name.fileUri);
-      result = new KernelNamedTypeBuilder(name.name, null)
+      result = new NamedTypeBuilder(name.name, null)
         ..bind(new KernelInvalidTypeBuilder(
             name.name,
             name.message.withLocation(
@@ -2830,7 +2866,7 @@ abstract class BodyBuilder extends ScopeListener<JumpTarget>
     debugEvent("VoidKeyword");
     int offset = offsetForToken(token);
     push(new UnresolvedType<TypeBuilder>(
-        new KernelNamedTypeBuilder("void", null)
+        new NamedTypeBuilder("void", null)
           ..bind(new VoidTypeBuilder<TypeBuilder, VoidType>(
               const VoidType(), library, offset)),
         offset,
@@ -5171,8 +5207,7 @@ abstract class BodyBuilder extends ScopeListener<JumpTarget>
   UnresolvedType<TypeBuilder> validateTypeUse(
       UnresolvedType<TypeBuilder> unresolved, bool nonInstanceAccessIsError) {
     TypeBuilder builder = unresolved.builder;
-    if (builder is KernelNamedTypeBuilder &&
-        builder.declaration.isTypeVariable) {
+    if (builder is NamedTypeBuilder && builder.declaration.isTypeVariable) {
       TypeParameter typeParameter = builder.declaration.target;
       LocatedMessage message;
       if (!isInstanceContext && typeParameter.parent is Class) {
@@ -5190,7 +5225,7 @@ abstract class BodyBuilder extends ScopeListener<JumpTarget>
       }
       addProblem(message.messageObject, message.charOffset, message.length);
       return new UnresolvedType<TypeBuilder>(
-          new KernelNamedTypeBuilder(typeParameter.name, null)
+          new NamedTypeBuilder(typeParameter.name, null)
             ..bind(new KernelInvalidTypeBuilder(typeParameter.name, message)),
           unresolved.charOffset,
           unresolved.fileUri);
@@ -5346,9 +5381,11 @@ abstract class BodyBuilder extends ScopeListener<JumpTarget>
     return new DeferredCheckJudgment(check, expression);
   }
 
-  /// TODO(ahe): This method is temporarily implemented by subclasses. Once type
-  /// promotion is independent of shadow nodes, remove this method.
-  void enterThenForTypePromotion(Expression condition);
+  /// TODO(ahe): This method is temporarily implemented. Once type promotion is
+  /// independent of shadow nodes, remove this method.
+  void enterThenForTypePromotion(Expression condition) {
+    typePromoter?.enterThen(condition);
+  }
 
   bool isErroneousNode(TreeNode node) {
     return library.loader.handledErrors.isNotEmpty &&

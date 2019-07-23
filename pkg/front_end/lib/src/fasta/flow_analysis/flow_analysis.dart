@@ -683,7 +683,7 @@ class State<Variable, Type> {
   );
 
   /// Updates the state to track a newly declared local [variable].  The
-  /// optional [assigned] boolean indicates whether the boolean is assigned at
+  /// optional [assigned] boolean indicates whether the variable is assigned at
   /// the point of declaration.
   State<Variable, Type> add(Variable variable, {bool assigned: false}) {
     var newNotAssigned = assigned ? notAssigned : notAssigned.add(variable);
