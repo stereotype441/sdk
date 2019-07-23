@@ -1539,6 +1539,15 @@ class InterfaceTypeImpl extends TypeImpl implements InterfaceType {
   }
 
   @override
+  bool get isDartCoreSymbol {
+    ClassElement element = this.element;
+    if (element == null) {
+      return false;
+    }
+    return element.name == "Symbol" && element.library.isDartCore;
+  }
+
+  @override
   bool get isObject => element.supertype == null && !element.isMixin;
 
   @override
@@ -2836,6 +2845,9 @@ abstract class TypeImpl implements DartType {
 
   @override
   bool get isDartCoreString => false;
+
+  @override
+  bool get isDartCoreSymbol => false;
 
   @override
   bool get isDynamic => false;
