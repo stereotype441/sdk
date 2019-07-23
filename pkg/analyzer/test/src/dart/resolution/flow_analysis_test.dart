@@ -3,14 +3,11 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'package:analyzer/dart/analysis/features.dart';
-import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type_system.dart';
-import 'package:analyzer/src/dart/analysis/experiments.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
-import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/util/ast_data_extractor.dart';
 import 'package:front_end/src/testing/id.dart' show ActualData, Id;
 import 'package:front_end/src/testing/id_testing.dart' show DataInterpreter;
@@ -18,7 +15,6 @@ import 'package:test/test.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
 
 import '../../../util/id_testing_helper.dart';
-import 'driver_resolution.dart';
 
 main() {
   defineReflectiveSuite(() {
@@ -33,7 +29,10 @@ class FlowTestBase {
   /// Resolve the given [code] and track nullability in the unit.
   Future<void> trackCode(String code) async {
     if (await checkTests(
-        code, const _FlowAnalysisDataComputer(), FeatureSet.forTesting(sdkVersion: '2.2.2', additionalFeatures: [Feature.non_nullable]))) {
+        code,
+        const _FlowAnalysisDataComputer(),
+        FeatureSet.forTesting(
+            sdkVersion: '2.2.2', additionalFeatures: [Feature.non_nullable]))) {
       fail('Failure(s)');
     }
   }
@@ -41,10 +40,6 @@ class FlowTestBase {
 
 @reflectiveTest
 class NullableFlowTest extends FlowTestBase {
-  @override
-  AnalysisOptionsImpl get analysisOptions =>
-      AnalysisOptionsImpl()..enabledExperiments = [EnableString.non_nullable];
-
   test_assign_toNonNull() async {
     await trackCode(r'''
 void f(int? x) {
@@ -329,10 +324,6 @@ void f(int? x) {
 
 @reflectiveTest
 class ReachableFlowTest extends FlowTestBase {
-  @override
-  AnalysisOptionsImpl get analysisOptions =>
-      AnalysisOptionsImpl()..enabledExperiments = [EnableString.non_nullable];
-
   test_conditional_false() async {
     await trackCode(r'''
 void f() {
