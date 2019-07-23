@@ -39,10 +39,9 @@ Token scannerRecovery(List<int> bytes, Token tokens, List<int> lineStarts) {
   // example of how these events are used.
   //
   // In addition, the scanner will attempt a bit of recovery when braces don't
-  // match up during brace grouping. See
-  // [ArrayBasedScanner.discardBeginGroupUntil](array_based_scanner.dart). For
-  // more details on brace grouping see
-  // [AbstractScanner.unmatchedBeginGroup](abstract_scanner.dart).
+  // match up during brace grouping. For more details on brace grouping see
+  // [AbstractScanner.discardBeginGroupUntil] and
+  // [AbstractScanner.unmatchedBeginGroup].
 
   /// Tokens with errors.
   ErrorToken error;
@@ -135,8 +134,7 @@ Token scannerRecovery(List<int> bytes, Token tokens, List<int> lineStarts) {
   }
 
   recoverHexDigit() {
-    return synthesizeToken(errorTail.charOffset, "0", TokenType.INT)
-      ..setNext(errorTail.next);
+    throw "Internal error: Hex digit error token should have been prepended";
   }
 
   recoverStringInterpolation() {
@@ -151,10 +149,22 @@ Token scannerRecovery(List<int> bytes, Token tokens, List<int> lineStarts) {
   recoverUnmatched() {
     // TODO(ahe): Try to use top-level keywords (such as `class`, `typedef`,
     // and `enum`) and indentation to recover.
-    return errorTail.next;
+    throw "Internal error: Unmatched error token should have been prepended";
   }
 
-  for (Token current = tokens; !current.isEof; current = current.next) {
+  // All unmatched error tokens should have been prepended
+  Token current = tokens;
+  while (current is ErrorToken &&
+      (current.errorCode == codeUnmatchedToken ||
+          current.errorCode == codeExpectedHexDigit)) {
+    if (errorTail == null) {
+      error = current;
+    }
+    errorTail = current;
+    current = current.next;
+  }
+
+  for (; !current.isEof; current = current.next) {
     while (current is ErrorToken) {
       ErrorToken first = current;
       Token next = current;

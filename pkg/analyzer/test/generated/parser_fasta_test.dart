@@ -1018,6 +1018,17 @@ main() { // missing async
     ]);
   }
 
+  void test_constructor_super_cascade_synthetic() {
+    // https://github.com/dart-lang/sdk/issues/37110
+    parseCompilationUnit('class B extends A { B(): super.. {} }', errors: [
+      expectedError(ParserErrorCode.INVALID_SUPER_IN_INITIALIZER, 25, 5),
+      expectedError(ParserErrorCode.EXPECTED_TOKEN, 30, 2),
+      expectedError(ParserErrorCode.MISSING_IDENTIFIER, 33, 1),
+      expectedError(ParserErrorCode.MISSING_FUNCTION_BODY, 34, 1),
+      expectedError(ParserErrorCode.EXPECTED_EXECUTABLE, 36, 1),
+    ]);
+  }
+
   void test_constructor_super_field() {
     // https://github.com/dart-lang/sdk/issues/36262
     // https://github.com/dart-lang/sdk/issues/31198
@@ -1035,6 +1046,33 @@ main() { // missing async
         ]);
   }
 
+  void test_constructor_super_named_method() {
+    // https://github.com/dart-lang/sdk/issues/37600
+    parseCompilationUnit('class B extends A { B(): super.c().create() {} }',
+        errors: [
+          expectedError(ParserErrorCode.INVALID_SUPER_IN_INITIALIZER, 25, 5),
+        ]);
+  }
+
+  void test_constructor_super_named_method_method() {
+    // https://github.com/dart-lang/sdk/issues/37600
+    parseCompilationUnit('class B extends A { B(): super.c().create().x() {} }',
+        errors: [
+          expectedError(ParserErrorCode.INVALID_SUPER_IN_INITIALIZER, 25, 5),
+        ]);
+  }
+
+  void test_constructor_this_cascade_synthetic() {
+    // https://github.com/dart-lang/sdk/issues/37110
+    parseCompilationUnit('class B extends A { B(): this.. {} }', errors: [
+      expectedError(ParserErrorCode.MISSING_ASSIGNMENT_IN_INITIALIZER, 25, 4),
+      expectedError(ParserErrorCode.EXPECTED_TOKEN, 29, 2),
+      expectedError(ParserErrorCode.MISSING_IDENTIFIER, 32, 1),
+      expectedError(ParserErrorCode.MISSING_FUNCTION_BODY, 33, 1),
+      expectedError(ParserErrorCode.EXPECTED_EXECUTABLE, 35, 1),
+    ]);
+  }
+
   void test_constructor_this_field() {
     // https://github.com/dart-lang/sdk/issues/36262
     // https://github.com/dart-lang/sdk/issues/31198
@@ -1049,6 +1087,22 @@ main() { // missing async
     parseCompilationUnit('class B extends A { B(): this().foo(); }', errors: [
       expectedError(ParserErrorCode.INVALID_THIS_IN_INITIALIZER, 25, 4),
     ]);
+  }
+
+  void test_constructor_this_named_method() {
+    // https://github.com/dart-lang/sdk/issues/37600
+    parseCompilationUnit('class B extends A { B(): super.c().create() {} }',
+        errors: [
+          expectedError(ParserErrorCode.INVALID_SUPER_IN_INITIALIZER, 25, 5),
+        ]);
+  }
+
+  void test_constructor_this_named_method_field() {
+    // https://github.com/dart-lang/sdk/issues/37600
+    parseCompilationUnit('class B extends A { B(): super.c().create().x {} }',
+        errors: [
+          expectedError(ParserErrorCode.INVALID_SUPER_IN_INITIALIZER, 25, 5),
+        ]);
   }
 
   @override
