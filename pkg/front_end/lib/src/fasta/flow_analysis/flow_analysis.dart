@@ -50,8 +50,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   final _VariableSet<Variable> _emptySet;
 
-  final State<Variable, Type> _identity;
-
   /// The [NodeOperations], used to manipulate expressions.
   final NodeOperations<Expression> nodeOperations;
 
@@ -102,14 +100,12 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     TypeOperations<Variable, Type> typeOperations,
     FunctionBodyAccess<Variable> functionBody,
   ) {
-    var identityState = State<Variable, Type>(false);
-    var emptySet = identityState.notAssigned;
+    var emptySet = State<Variable, Type>(false).notAssigned;
     return FlowAnalysis._(
       nodeOperations,
       typeOperations,
       functionBody,
       emptySet,
-      identityState,
     );
   }
 
@@ -118,7 +114,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     this.typeOperations,
     this.functionBody,
     this._emptySet,
-    this._identity,
   ) {
     _current = State<Variable, Type>(true);
   }
@@ -222,8 +217,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _current = _current.removePromotedAll(loopAssigned);
 
     _statementToStackIndex[doStatement] = _stack.length;
-    _stack.add(_identity); // break
-    _stack.add(_identity); // continue
+    _stack.add(null); // break
+    _stack.add(null); // continue
   }
 
   void doStatement_conditionBegin() {
@@ -275,8 +270,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     var trueCondition = _stack.removeLast();
 
     _statementToStackIndex[node] = _stack.length;
-    _stack.add(_identity); // break
-    _stack.add(_identity); // continue
+    _stack.add(null); // break
+    _stack.add(null); // continue
 
     _current = trueCondition;
   }
@@ -542,8 +537,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   void switchStatement_expressionEnd(Statement switchStatement) {
     _statementToStackIndex[switchStatement] = _stack.length;
-    _stack.add(_identity); // break
-    _stack.add(_identity); // continue
+    _stack.add(null); // break
+    _stack.add(null); // continue
     _stack.add(_current); // afterExpression
   }
 
@@ -608,8 +603,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     var trueCondition = _stack.removeLast();
 
     _statementToStackIndex[whileStatement] = _stack.length;
-    _stack.add(_identity); // break
-    _stack.add(_identity); // continue
+    _stack.add(null); // break
+    _stack.add(null); // continue
 
     _current = trueCondition;
   }
@@ -648,8 +643,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     State<Variable, Type> first,
     State<Variable, Type> second,
   ) {
-    if (identical(first, _identity)) return second;
-    if (identical(second, _identity)) return first;
+    if (first == null) return second;
+    if (second == null) return first;
 
     if (first.reachable && !second.reachable) return first;
     if (!first.reachable && second.reachable) return second;
