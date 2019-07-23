@@ -93,7 +93,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// erroneous code, it's possible that a variable might be used before its
   /// declaration.
   final Set<Variable> _referencedVariables =
-      _assertionsEnabled ? <Variable>{} : null;
+      _assertionsEnabled ? Set<Variable>() : null;
 
   factory FlowAnalysis(
     NodeOperations<Expression> nodeOperations,
@@ -738,7 +738,7 @@ class State<Variable, Type> {
   );
 
   /// Updates the state to track a newly declared local [variable].  The
-  /// optional [assigned] boolean indicates whether the boolean is assigned at
+  /// optional [assigned] boolean indicates whether the variable is assigned at
   /// the point of declaration.
   State<Variable, Type> add(Variable variable, {bool assigned: false}) {
     var newNotAssigned = assigned ? notAssigned : notAssigned.add(variable);
