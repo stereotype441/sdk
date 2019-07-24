@@ -26,8 +26,8 @@ main(List<String> args) async {
       supportedMarkers: sharedMarkers,
       createUriForFileName: createUriForFileName,
       onFailure: onFailure,
-      runTest: runTestFor(
-          const _FlowAnalysisDataComputer(), [analyzerConstantUpdate2018Config]));
+      runTest:
+          runTestFor(const _FlowAnalysisDataComputer(), [analyzerNnbdConfig]));
 }
 
 class FlowTestBase {
@@ -63,7 +63,7 @@ class _FlowAnalysisDataComputer extends DataComputer<Set<_FlowAssertion>> {
 }
 
 class _FlowAnalysisDataExtractor extends AstDataExtractor<Set<_FlowAssertion>> {
-  FlowAnalysisResult _flowResult;
+  final FlowAnalysisResult _flowResult;
 
   final TypeSystem _typeSystem;
 
