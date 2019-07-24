@@ -36,575 +36,282 @@ class DefiniteAssignmentTrackerTest extends DriverResolutionTest
     expect(tracker.readBeforeWritten, unorderedEquals(expected));
   }
 
+// ===========================================
+  
   test_assert() async {
     await trackCode(r'''
-main() {
-  int v;
-  assert((v = 0) >= 0, v);
-  /*unassigned*/ v;
-}
 ''');
     assertReadBeforeWritten('v');
   }
 
+// ===========================================
+  
   test_assignment_leftExpression() async {
     await trackCode(r'''
-main() {
-  List<int> v;
-  /*unassigned*/ v[0] = (v = [1, 2])[1];
-  v;
-}
 ''');
     assertReadBeforeWritten('v');
   }
 
   test_assignment_leftLocal_compound() async {
     await trackCode(r'''
-main() {
-  int v;
-  /*unassigned*/ v += 1;
-}
 ''');
     assertReadBeforeWritten('v');
   }
 
   test_assignment_leftLocal_compound_assignInRight() async {
     await trackCode(r'''
-main() {
-  int v;
-  /*unassigned*/ v += (v = /*unassigned*/ v);
-}
 ''');
     assertReadBeforeWritten('v');
   }
 
   test_assignment_leftLocal_pure_eq() async {
     await trackCode(r'''
-main() {
-  int v;
-  v = 0;
-}
 ''');
     assertReadBeforeWritten();
   }
 
   test_assignment_leftLocal_pure_eq_self() async {
     await trackCode(r'''
-main() {
-  int v;
-  v = /*unassigned*/ v;
-}
 ''');
     assertReadBeforeWritten('v');
   }
 
   test_assignment_leftLocal_pure_questionEq() async {
     await trackCode(r'''
-main() {
-  int v;
-  /*unassigned*/ v ??= 0;
-}
 ''');
     assertReadBeforeWritten('v');
   }
 
   test_assignment_leftLocal_pure_questionEq_self() async {
     await trackCode(r'''
-main() {
-  int v;
-  /*unassigned*/ v ??= v;
-}
 ''');
     assertReadBeforeWritten('v');
   }
 
+// ===========================================
+  
   test_binaryExpression_ifNull_left() async {
     await trackCode(r'''
-main() {
-  int v;
-  (v = 0) ?? 0;
-  v;
-}
 ''');
     assertReadBeforeWritten();
   }
 
   test_binaryExpression_ifNull_right() async {
     await trackCode(r'''
-main(int a) {
-  int v;
-  a ?? (v = 0);
-  /*unassigned*/ v;
-}
 ''');
     assertReadBeforeWritten('v');
   }
 
   test_binaryExpression_logicalAnd_left() async {
     await trackCode(r'''
-main(bool c) {
-  int v;
-  ((v = 0) >= 0) && c;
-  v;
-}
 ''');
     assertReadBeforeWritten();
   }
 
   test_binaryExpression_logicalAnd_right() async {
     await trackCode(r'''
-main(bool c) {
-  int v;
-  c && ((v = 0) >= 0);
-  /*unassigned*/ v;
-}
 ''');
     assertReadBeforeWritten('v');
   }
 
   test_binaryExpression_logicalOr_left() async {
     await trackCode(r'''
-main(bool c) {
-  int v;
-  ((v = 0) >= 0) || c;
-  v;
-}
 ''');
     assertReadBeforeWritten();
   }
 
   test_binaryExpression_logicalOr_right() async {
     await trackCode(r'''
-main(bool c) {
-  int v;
-  c || ((v = 0) >= 0);
-  /*unassigned*/ v;
-}
 ''');
     assertReadBeforeWritten('v');
   }
 
   test_binaryExpression_plus_left() async {
     await trackCode(r'''
-main() {
-  int v;
-  (v = 0) + 1;
-  v;
-}
 ''');
     assertReadBeforeWritten();
   }
 
   test_binaryExpression_plus_right() async {
     await trackCode(r'''
-main() {
-  int v;
-  1 + (v = 0);
-  v;
-}
 ''');
     assertReadBeforeWritten();
   }
 
+// ===========================================
+  
   test_conditionalExpression_both() async {
     await trackCode(r'''
-main(bool c) {
-  int v;
-  c ? (v = 0) : (v = 0);
-  v;
-}
 ''');
     assertReadBeforeWritten();
   }
 
   test_conditionalExpression_condition() async {
     await trackCode(r'''
-main() {
-  int v;
-  (v = 0) >= 0 ? 1 : 2;
-  v;
-}
 ''');
     assertReadBeforeWritten();
   }
 
   test_conditionalExpression_else() async {
     await trackCode(r'''
-main(bool c) {
-  int v;
-  c ? (v = 0) : 2;
-  /*unassigned*/ v;
-}
 ''');
     assertReadBeforeWritten('v');
   }
 
   test_conditionalExpression_then() async {
     await trackCode(r'''
-main(bool c) {
-  int v;
-  c ? (v = 0) : 2;
-  /*unassigned*/ v;
-}
 ''');
     assertReadBeforeWritten('v');
   }
 
+// ===========================================
+  
   test_doWhile_break_afterAssignment() async {
     await trackCode(r'''
-main(bool c) {
-  int v;
-  do {
-    v = 0;
-    v;
-    if (c) break;
-  } while (c);
-  v;
-}
 ''');
     assertReadBeforeWritten();
   }
 
   test_doWhile_break_beforeAssignment() async {
     await trackCode(r'''
-main(bool c) {
-  int v;
-  do {
-    if (c) break;
-    v = 0;
-  } while (c);
-  /*unassigned*/ v;
-}
 ''');
     assertReadBeforeWritten('v');
   }
 
   test_doWhile_breakOuterFromInner() async {
     await trackCode(r'''
-main(bool c) {
-  int v1, v2, v3;
-  L1: do {
-    do {
-      v1 = 0;
-      if (c) break L1;
-      v2 = 0;
-      v3 = 0;
-    } while (c);
-    v2;
-  } while (c);
-  v1;
-  /*unassigned*/ v3;
-}
 ''');
     assertReadBeforeWritten('v3');
   }
 
   test_doWhile_condition() async {
     await trackCode(r'''
-main() {
-  int v1, v2;
-  do {
-    /*unassigned*/ v1; // assigned in the condition, but not yet
-  } while ((v1 = 0) + (v2 = 0) >= 0);
-  v2;
-}
 ''');
     assertReadBeforeWritten('v1');
   }
 
   test_doWhile_condition_break() async {
     await trackCode(r'''
-main(bool c) {
-  int v;
-  do {
-    if (c) break;
-  } while ((v = 0) >= 0);
-  /*unassigned*/ v;
-}
 ''');
     assertReadBeforeWritten('v');
   }
 
   test_doWhile_condition_break_continue() async {
     await trackCode(r'''
-main(bool c1, bool c2) {
-  int v1, v2, v3, v4, v5, v6;
-  do {
-    v1 = 0; // visible outside, visible to the condition
-    if (c1) break;
-    v2 = 0; // not visible outside, visible to the condition
-    v3 = 0; // not visible outside, visible to the condition
-    if (c2) continue;
-    v4 = 0; // not visible
-    v5 = 0; // not visible
-  } while ((v6 = v1 + v2 + /*unassigned*/ v4) == 0); // has break => v6 is not visible outside
-  v1;
-  /*unassigned*/ v3;
-  /*unassigned*/ v5;
-  /*unassigned*/ v6;
-}
 ''');
     assertReadBeforeWritten('v3', 'v4', 'v5', 'v6');
   }
 
   test_doWhile_condition_continue() async {
     await trackCode(r'''
-main(bool c) {
-  int v1, v2, v3, v4;
-  do {
-    v1 = 0; // visible outside, visible to the condition
-    if (c) continue;
-    v2 = 0; // not visible
-    v3 = 0; // not visible
-  } while ((v4 = v1 + /*unassigned*/ v2) == 0); // no break => v4 visible outside
-  v1;
-  /*unassigned*/ v3;
-  v4;
-}
 ''');
     assertReadBeforeWritten('v2', 'v3');
   }
 
   test_doWhile_continue_beforeAssignment() async {
     await trackCode(r'''
-main(bool c) {
-  int v;
-  do {
-    if (c) continue;
-    v = 0;
-  } while (c);
-  /*unassigned*/ v;
-}
 ''');
     assertReadBeforeWritten('v');
   }
 
+// ===========================================
+  
   test_for_body() async {
     await trackCode(r'''
-main(bool c) {
-  int v;
-  for (; c;) {
-    v = 0;
-  }
-  /*unassigned*/ v;
-}
 ''');
     assertReadBeforeWritten('v');
   }
 
   test_for_break() async {
     await trackCode(r'''
-main(bool c) {
-  int v1, v2;
-  for (; c;) {
-    v1 = 0;
-    if (c) break;
-    v2 = 0;
-  }
-  /*unassigned*/ v1;
-  /*unassigned*/ v2;
-}
 ''');
     assertReadBeforeWritten('v1', 'v2');
   }
 
   test_for_break_updaters() async {
     await trackCode(r'''
-main(bool c) {
-  int v1, v2;
-  for (; c; v1 + v2) {
-    v1 = 0;
-    if (c) break;
-    v2 = 0;
-  }
-}
 ''');
     assertReadBeforeWritten();
   }
 
   test_for_condition() async {
     await trackCode(r'''
-main() {
-  int v;
-  for (; (v = 0) >= 0;) {
-    v;
-  }
-  v;
-}
 ''');
     assertReadBeforeWritten();
   }
 
   test_for_continue() async {
     await trackCode(r'''
-main(bool c) {
-  int v1, v2;
-  for (; c;) {
-    v1 = 0;
-    if (c) continue;
-    v2 = 0;
-  }
-  /*unassigned*/ v1;
-  /*unassigned*/ v2;
-}
 ''');
     assertReadBeforeWritten('v1', 'v2');
   }
 
   test_for_continue_updaters() async {
     await trackCode(r'''
-main(bool c) {
-  int v1, v2;
-  for (; c; v1 + /*unassigned*/ v2) {
-    v1 = 0;
-    if (c) continue;
-    v2 = 0;
-  }
-}
 ''');
     assertReadBeforeWritten('v2');
   }
 
   test_for_initializer_expression() async {
     await trackCode(r'''
-main() {
-  int v;
-  for (v = 0;;) {
-    v;
-  }
-  v;
-}
 ''');
     assertReadBeforeWritten();
   }
 
   test_for_initializer_variable() async {
     await trackCode(r'''
-main() {
-  int v;
-  for (var t = (v = 0);;) {
-    v;
-  }
-  v;
-}
 ''');
     assertReadBeforeWritten();
   }
 
   test_for_updaters() async {
     await trackCode(r'''
-main(bool c) {
-  int v1, v2, v3, v4;
-  for (; c; v1 = 0, v2 = 0, v3 = 0, /*unassigned*/ v4) {
-    /*unassigned*/ v1;
-  }
-  /*unassigned*/ v2;
-}
 ''');
     assertReadBeforeWritten('v1', 'v2', 'v4');
   }
 
   test_for_updaters_afterBody() async {
     await trackCode(r'''
-main(bool c) {
-  int v;
-  for (; c; v) {
-    v = 0;
-  }
-}
 ''');
     assertReadBeforeWritten();
   }
 
+// ===========================================
+  
   test_forEach() async {
     await trackCode(r'''
-main() {
-  int v1, v2;
-  for (var _ in (v1 = [0, 1, 2])) {
-    v2 = 0;
-  }
-  v1;
-  /*unassigned*/ v2;
-}
 ''');
     assertReadBeforeWritten('v2');
   }
 
   test_forEach_break() async {
     await trackCode(r'''
-main(bool c) {
-  int v1, v2;
-  for (var _ in [0, 1, 2]) {
-    v1 = 0;
-    if (c) break;
-    v2 = 0;
-  }
-  /*unassigned*/ v1;
-  /*unassigned*/ v2;
-}
 ''');
     assertReadBeforeWritten('v1', 'v2');
   }
 
   test_forEach_continue() async {
     await trackCode(r'''
-main(bool c) {
-  int v1, v2;
-  for (var _ in [0, 1, 2]) {
-    v1 = 0;
-    if (c) continue;
-    v2 = 0;
-  }
-  /*unassigned*/ v1;
-  /*unassigned*/ v2;
-}
 ''');
     assertReadBeforeWritten('v1', 'v2');
   }
 
+// ===========================================
+  
   test_functionExpression_closure_read() async {
     await trackCode(r'''
-main() {
-  int v1, v2;
-  
-  v1 = 0;
-  
-  [0, 1, 2].forEach((t) {
-    v1;
-    /*unassigned*/ v2;
-  });
-}
 ''');
     assertReadBeforeWritten('v2');
   }
 
   test_functionExpression_closure_write() async {
     await trackCode(r'''
-main() {
-  int v;
-  
-  [0, 1, 2].forEach((t) {
-    v = t;
-  });
-
-  /*unassigned*/ v;
-}
 ''');
     assertReadBeforeWritten('v');
   }
 
   test_functionExpression_localFunction_local() async {
     await trackCode(r'''
-main() {
-  int v;
-
-  v = 0;
-
-  void f() {
-    int v; // 1
-    /*unassigned*/ v;
-  }
-}
 ''');
     var localV = findNode.simple('v; // 1').staticElement;
     expect(tracker.readBeforeWritten, unorderedEquals([localV]));
@@ -612,127 +319,50 @@ main() {
 
   test_functionExpression_localFunction_local2() async {
     await trackCode(r'''
-main() {
-  int v1;
-
-  v1 = 0;
-
-  void f() {
-    int v2, v3;
-    v2 = 0;
-    v1;
-    v2;
-    /*unassigned*/ v3;
-  }
-}
 ''');
     assertReadBeforeWritten('v3');
   }
 
   test_functionExpression_localFunction_read() async {
     await trackCode(r'''
-main() {
-  int v1, v2, v3;
-
-  v1 = 0;
-
-  void f() {
-    v1;
-    /*unassigned*/ v2;
-  }
-
-  v2 = 0;
-}
 ''');
     assertReadBeforeWritten('v2');
   }
 
   test_functionExpression_localFunction_write() async {
     await trackCode(r'''
-main() {
-  int v;
-
-  void f() {
-    v = 0;
-  }
-
-  /*unassigned*/ v;
-}
 ''');
     assertReadBeforeWritten('v');
   }
 
+// ===========================================
+  
   test_if_condition() async {
     await trackCode(r'''
-main() {
-  int v;
-  if ((v = 0) >= 0) {
-    v;
-  } else {
-    v;
-  }
-  v;
-}
 ''');
     assertReadBeforeWritten();
   }
 
   test_if_then() async {
     await trackCode(r'''
-main(bool c) {
-  int v;
-  if (c) {
-    v = 0;
-  }
-  /*unassigned*/ v;
-}
 ''');
     assertReadBeforeWritten('v');
   }
 
   test_if_thenElse_all() async {
     await trackCode(r'''
-main(bool c) {
-  int v;
-  if (c) {
-    v = 0;
-    v;
-  } else {
-    v = 0;
-    v;
-  }
-  v;
-}
 ''');
     assertReadBeforeWritten();
   }
 
   test_if_thenElse_else() async {
     await trackCode(r'''
-main(bool c) {
-  int v;
-  if (c) {
-    // not assigned
-  } else {
-    v = 0;
-  }
-  /*unassigned*/ v;
-}
 ''');
     assertReadBeforeWritten('v');
   }
 
   test_if_thenElse_then() async {
     await trackCode(r'''
-main(bool c) {
-  int v;
-  if (c) {
-    v = 0;
-  } else {
-    // not assigned
-  }
-  /*unassigned*/ v;
-}
 ''');
     assertReadBeforeWritten('v');
   }
@@ -740,132 +370,44 @@ main(bool c) {
   test_if_thenElse_then_exit_alwaysThrows() async {
     addMetaPackage();
     await trackCode(r'''
-import 'package:meta/meta.dart';
-
-main(bool c) {
-  int v;
-  if (c) {
-    v = 0;
-  } else {
-    foo();
-  }
-  v;
-}
-
-@alwaysThrows
-void foo() {}
 ''');
     assertReadBeforeWritten();
   }
 
   test_if_thenElse_then_exit_return() async {
     await trackCode(r'''
-main(bool c) {
-  int v;
-  if (c) {
-    v = 0;
-  } else {
-    return;
-  }
-  v;
-}
 ''');
     assertReadBeforeWritten();
   }
 
   test_if_thenElse_then_exit_throw() async {
     await trackCode(r'''
-main(bool c) {
-  int v;
-  if (c) {
-    v = 0;
-  } else {
-    throw 42;
-  }
-  v;
-}
 ''');
     assertReadBeforeWritten();
   }
 
+// ===========================================
+  
   test_switch_case1_default() async {
     await trackCode(r'''
-main(int e) {
-  int v;
-  switch (e) {
-    case 1:
-      v = 0;
-      break;
-    case 2:
-      // not assigned
-      break;
-    default:
-      v = 0;
-  }
-  /*unassigned*/ v;
-}
 ''');
     assertReadBeforeWritten('v');
   }
 
   test_switch_case2_default() async {
     await trackCode(r'''
-main(int e) {
-  int v1, v2;
-  switch (e) {
-    case 1:
-      v1 = 0;
-      v2 = 0;
-      v1;
-      break;
-    default:
-      v1 = 0;
-      v1;
-  }
-  v1;
-  /*unassigned*/ v2;
-}
 ''');
     assertReadBeforeWritten('v2');
   }
 
   test_switch_case_default_break() async {
     await trackCode(r'''
-main(int e, bool c) {
-  int v1, v2;
-  switch (e) {
-    case 1:
-      v1 = 0;
-      if (c) break;
-      v2 = 0;
-      break;
-    default:
-      v1 = 0;
-      if (c) break;
-      v2 = 0;
-  }
-  v1;
-  /*unassigned*/ v2;
-}
 ''');
     assertReadBeforeWritten('v2');
   }
 
   test_switch_case_default_continue() async {
     await trackCode(r'''
-main(int e) {
-  int v;
-  switch (e) {
-    L: case 1:
-      v = 0;
-      break;
-    case 2:
-      continue L;
-    default:
-      v = 0;
-  }
-  v;
-}
 ''');
     // We don't analyze to which `case` we go from `continue L`,
     // but we don't have to. If all cases assign, then the variable is
@@ -876,326 +418,124 @@ main(int e) {
 
   test_switch_case_noDefault() async {
     await trackCode(r'''
-main(int e) {
-  int v;
-  switch (e) {
-    case 1:
-      v = 0;
-      break;
-  }
-  /*unassigned*/ v;
-}
 ''');
     assertReadBeforeWritten('v');
   }
 
   test_switch_condition() async {
     await trackCode(r'''
-main() {
-  int v;
-  switch (v = 0) {}
-  v;
-}
 ''');
     assertReadBeforeWritten();
   }
 
+// ===========================================
+  
   test_tryCatch_all() async {
     await trackCode(r'''
-main() {
-  int v;
-  try {
-    f();
-    v = 0;
-  } catch (_) {
-    v = 0;
-  }
-  v;
-}
-
-void f() {}
 ''');
     assertReadBeforeWritten();
   }
 
   test_tryCatch_catch() async {
     await trackCode(r'''
-main() {
-  int v;
-  try {
-    // not assigned
-  } catch (_) {
-    v = 0;
-  }
-  /*unassigned*/ v;
-}
 ''');
     assertReadBeforeWritten('v');
   }
 
   test_tryCatch_try() async {
     await trackCode(r'''
-main() {
-  int v;
-  try {
-    v = 0;
-  } catch (_) {
-    // not assigned
-  }
-  /*unassigned*/ v;
-}
 ''');
     assertReadBeforeWritten('v');
   }
 
   test_tryCatchFinally_catch() async {
     await trackCode(r'''
-main() {
-  int v;
-  try {
-    // not assigned
-  } catch (_) {
-    v = 0;
-  } finally {
-    // not assigned
-  }
-  /*unassigned*/ v;
-}
 ''');
     assertReadBeforeWritten('v');
   }
 
   test_tryCatchFinally_finally() async {
     await trackCode(r'''
-main() {
-  int v;
-  try {
-    // not assigned
-  } catch (_) {
-    // not assigned
-  } finally {
-    v = 0;
-  }
-  v;
-}
 ''');
     assertReadBeforeWritten();
   }
 
   test_tryCatchFinally_try() async {
     await trackCode(r'''
-main() {
-  int v;
-  try {
-    v = 0;
-  } catch (_) {
-    // not assigned
-  } finally {
-    // not assigned
-  }
-  /*unassigned*/ v;
-}
 ''');
     assertReadBeforeWritten('v');
   }
 
   test_tryFinally_finally() async {
     await trackCode(r'''
-main() {
-  int v;
-  try {
-    // not assigned
-  } finally {
-    v = 0;
-  }
-  v;
-}
 ''');
     assertReadBeforeWritten();
   }
 
   test_tryFinally_try() async {
     await trackCode(r'''
-main() {
-  int v;
-  try {
-    v = 0;
-  } finally {
-    // not assigned
-  }
-  v;
-}
 ''');
     assertReadBeforeWritten();
   }
 
+// ===========================================
+  
   test_while_condition() async {
     await trackCode(r'''
-main() {
-  int v;
-  while ((v = 0) >= 0) {
-    v;
-  }
-  v;
-}
 ''');
     assertReadBeforeWritten();
   }
 
   test_while_condition_notTrue() async {
     await trackCode(r'''
-main(bool c) {
-  int v1, v2;
-  while (c) {
-    v1 = 0;
-    v2 = 0;
-    v1;
-  }
-  /*unassigned*/ v2;
-}
 ''');
     assertReadBeforeWritten('v2');
   }
 
   test_while_true_break_afterAssignment() async {
     await trackCode(r'''
-main(bool c) {
-  int v1, v2;
-  while (true) {
-    v1 = 0;
-    v1;
-    if (c) break;
-    v1;
-    v2 = 0;
-    v2;
-  }
-  v1;
-}
 ''');
     assertReadBeforeWritten();
   }
 
   test_while_true_break_beforeAssignment() async {
     await trackCode(r'''
-main(bool c) {
-  int v1, v2;
-  while (true) {
-    if (c) break;
-    v1 = 0;
-    v2 = 0;
-    v2;
-  }
-  /*unassigned*/ v1;
-}
 ''');
     assertReadBeforeWritten('v1');
   }
 
   test_while_true_break_if() async {
     await trackCode(r'''
-main(bool c) {
-  int v;
-  while (true) {
-    if (c) {
-      v = 0;
-      break;
-    } else {
-      v = 0;
-      break;
-    }
-    v;
-  }
-  v;
-}
 ''');
     assertReadBeforeWritten();
   }
 
   test_while_true_break_if2() async {
     await trackCode(r'''
-main(bool c) {
-  var v;
-  while (true) {
-    if (c) {
-      break;
-    } else {
-      v = 0;
-    }
-    v;
-  }
-}
 ''');
     assertReadBeforeWritten();
   }
 
   test_while_true_break_if3() async {
     await trackCode(r'''
-main(bool c) {
-  int v1, v2;
-  while (true) {
-    if (c) {
-      v1 = 0;
-      v2 = 0;
-      if (c) break;
-    } else {
-      if (c) break;
-      v1 = 0;
-      v2 = 0;
-    }
-    v1;
-  }
-  /*unassigned*/ v2;
-}
 ''');
     assertReadBeforeWritten('v2');
   }
 
   test_while_true_breakOuterFromInner() async {
     await trackCode(r'''
-main(bool c) {
-  int v1, v2, v3;
-  L1: while (true) {
-    L2: while (true) {
-      v1 = 0;
-      if (c) break L1;
-      v2 = 0;
-      v3 = 0;
-      if (c) break L2;
-    }
-    v2;
-  }
-  v1;
-  /*unassigned*/ v3;
-}
 ''');
     assertReadBeforeWritten('v3');
   }
 
   test_while_true_continue() async {
     await trackCode(r'''
-main(bool c) {
-  int v;
-  while (true) {
-    if (c) continue;
-    v = 0;
-  }
-  v;
-}
 ''');
     assertReadBeforeWritten();
   }
 
   test_while_true_noBreak() async {
     await trackCode(r'''
-main(bool c) {
-  int v;
-  while (true) {
-    // No assignment, but not break.
-    // So, we don't exit the loop.
-    // So, all variables are assigned.
-  }
-  v;
-}
 ''');
     assertReadBeforeWritten();
   }
