@@ -16,7 +16,7 @@ void isType_mutatedInclosure2() {
     if (x is String) {
       x;
     }
-    
+
     void h() {
       x = 42;
     }
@@ -25,7 +25,7 @@ void isType_mutatedInclosure2() {
 
 void outerIsType_assignedOutside(Object x) {
   void Function() g;
-  
+
   if (x is String) {
     /*String*/ x;
 
