@@ -29,7 +29,7 @@ void outerIsType_loopAssigned_body(bool b, Object x) {
   if (x is String) {
     while (b) {
       x;
-      x = x.length;
+      x = (x as String).length;
     }
     x;
   }
@@ -39,7 +39,7 @@ void outerIsType_loopAssigned_condition(bool b, Object x) {
   if (x is String) {
     while (x != 0) {
       x;
-      x = x.length;
+      x = (x as String).length;
     }
     x;
   }
