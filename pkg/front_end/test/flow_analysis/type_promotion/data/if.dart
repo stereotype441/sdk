@@ -72,7 +72,7 @@ logicalNot_isType(v) {
   v;
 }
 
-void isNotType_return(bool b, Object x) {
+void isNotType_return2(bool b, Object x) {
   if (b) {
     if (x is! String) return;
   }
