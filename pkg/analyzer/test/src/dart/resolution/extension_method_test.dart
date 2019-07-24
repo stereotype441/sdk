@@ -23,6 +23,73 @@ class ExtensionMethodTest extends DriverResolutionTest {
     ..contextFeatures = new FeatureSet.forTesting(
         sdkVersion: '2.3.0', additionalFeatures: [Feature.extension_methods]);
 
+  test_getter_noMatch() async {
+    await assertErrorCodesInCode(r'''
+class B { }
+
+extension A on B { }
+
+f() {
+  B b = B();
+  int x = b.a;
+}
+''', [StaticTypeWarningCode.UNDEFINED_GETTER]);
+  }
+
+  test_getter_oneMatch() async {
+    await assertNoErrorsInCode('''
+class B { }
+
+extension A on B {
+  int get a => 1;
+}
+
+f() {
+  B b = B();
+  int x = b.a;
+}
+''');
+  }
+
+  test_getter_specificSubtypeMatchLocal() async {
+    await assertNoErrorsInCode('''
+class A { }
+
+class B extends A { 
+  int get b => 1;
+}
+
+extension A_Ext on A {
+  int get a => 1;
+}
+
+extension B_Ext on B {
+  int /*2*/ get a => 2;
+}
+
+f() {
+  B b = B();
+  int x = b.a;
+}
+''');
+
+    var invocation = findNode.prefixed('b.a');
+    var declaration = findNode.methodDeclaration('int /*2*/ get a');
+    expect(invocation.identifier.staticElement, declaration.declaredElement);
+  }
+
+  test_accessStaticWithinInstance() async {
+    await assertNoErrorsInCode('''
+class A {}
+extension E on A {
+  static void a() {}
+  void b() { a(); }
+}
+''');
+    var invocation = findNode.methodInvocation('a();');
+    assertElement(invocation, findElement.method('a'));
+  }
+
   test_method_moreSpecificThanPlatform() async {
     //
     // An extension with on type clause T1 is more specific than another
@@ -57,11 +124,11 @@ f() {
 ''');
 
     var invocation = findNode.methodInvocation('c.a()');
-    expect(invocation.methodName.staticElement.library.isDartCore, isFalse);
+    assertElement(invocation, findElement.method('a', of: 'Core2_Ext'));
   }
 
   test_method_noMatch() async {
-    await assertErrorCodesInCode(r'''
+    await assertErrorsInCode(r'''
 class B { }
 
 extension A on B {
@@ -72,7 +139,9 @@ f() {
   B b = B();
   b.c();
 }
-''', [StaticTypeWarningCode.UNDEFINED_METHOD]);
+''', [
+      error(StaticTypeWarningCode.UNDEFINED_METHOD, 73, 1),
+    ]);
   }
 
   test_method_noMostSpecificExtension() async {
@@ -111,8 +180,7 @@ f() {
 ''');
 
     var invocation = findNode.methodInvocation('b.a()');
-    var declaration = findNode.methodDeclaration('void a()');
-    expect(invocation.methodName.staticElement, declaration.declaredElement);
+    assertElement(invocation, findElement.method('a'));
   }
 
   test_method_privateExtension() async {
@@ -123,14 +191,16 @@ extension _ on B {
   void a() { }
 }
 ''');
-    await assertErrorCodesInCode(r'''
+    await assertErrorsInCode(r'''
 import 'lib.dart';
 
 f() {
   B b = B();
   b.a();
 }
-''', [StaticTypeWarningCode.UNDEFINED_METHOD]);
+''', [
+      error(StaticTypeWarningCode.UNDEFINED_METHOD, 43, 1),
+    ]);
   }
 
   test_method_resolvesToStatic() async {
@@ -161,7 +231,7 @@ extension A_Ext on A {
 }
 
 extension B_Ext on B {
-  void /*2*/ a() { }
+  void a() { }
 }
 
 f() {
@@ -171,8 +241,7 @@ f() {
 ''');
 
     var invocation = findNode.methodInvocation('b.a()');
-    var declaration = findNode.methodDeclaration('void /*2*/ a()');
-    expect(invocation.methodName.staticElement, declaration.declaredElement);
+    assertElement(invocation, findElement.method('a', of: 'B_Ext'));
   }
 
   @failingTest
@@ -189,7 +258,7 @@ extension A_Ext<T> on A<T> {
 }
 
 extension B_Ext<T> on B<T> {
-  void /*2*/ f(T x) { }
+  void f(T x) { }
 }
 
 main() {
@@ -200,8 +269,7 @@ main() {
 ''');
 
     var invocation = findNode.methodInvocation('x.f(o)');
-    var declaration = findNode.methodDeclaration('void /*2*/ f(T x)');
-    expect(invocation.methodName.staticElement, declaration.declaredElement);
+    assertElement(invocation, findElement.method('f', of: 'B_Ext'));
   }
 
   test_method_specificSubtypeMatchPlatform() async {
@@ -221,7 +289,7 @@ extension Core_Ext on Core {
 }
 
 extension Core2_Ext on Core2 {
-  void /*2*/ a() => 0;
+  void a() => 0;
 }
 
 f() {
@@ -231,8 +299,7 @@ f() {
 ''');
 
     var invocation = findNode.methodInvocation('c.a()');
-    var declaration = findNode.methodDeclaration('void /*2*/ a()');
-    expect(invocation.methodName.staticElement, declaration.declaredElement);
+    assertElement(invocation, findElement.method('a', of: 'Core2_Ext'));
   }
 
   test_method_unnamedExtension() async {
@@ -243,14 +310,16 @@ extension on B {
   void a() { }
 }
 ''');
-    await assertErrorCodesInCode(r'''
+    await assertErrorsInCode(r'''
 import 'lib.dart';
 
 f() {
   B b = B();
   b.a();
 }
-''', [StaticTypeWarningCode.UNDEFINED_METHOD]);
+''', [
+      error(StaticTypeWarningCode.UNDEFINED_METHOD, 43, 1),
+    ]);
   }
 
   test_multipleExtensions() async {
@@ -258,6 +327,35 @@ f() {
 class A {}
 extension E1 on A {}
 extension E2 on A {}
+''');
+  }
+
+  test_setter_noMatch() async {
+    await assertErrorCodesInCode(r'''
+class B { }
+
+extension A on B {
+}
+
+f() {
+  B b = B();
+  b.a = 1;
+}
+''', [StaticTypeWarningCode.UNDEFINED_SETTER]);
+  }
+
+  test_setter_oneMatch() async {
+    await assertNoErrorsInCode('''
+class B { }
+
+extension A on B {
+  set a(int x) { }
+}
+
+f() {
+  B b = B();
+  b.a = 1;
+}
 ''');
   }
 
