@@ -34,8 +34,7 @@ final TestConfig analyzerConstantUpdate2018Config = TestConfig(
 final TestConfig analyzerNnbdConfig = TestConfig(
     analyzerMarker, 'analyzer with NNBD',
     featureSet: FeatureSet.forTesting(
-        sdkVersion: '2.2.2',
-        additionalFeatures: [Feature.non_nullable]));
+        sdkVersion: '2.2.2', additionalFeatures: [Feature.non_nullable]));
 
 /// A fake absolute directory used as the root of a memory-file system in ID
 /// tests.
