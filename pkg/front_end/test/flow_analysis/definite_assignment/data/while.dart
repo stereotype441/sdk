@@ -60,7 +60,7 @@ true_break_if(bool c) {
 }
 
 true_break_if2(bool c) {
-  late var v;
+  late Object v;
   while (true) {
     if (c) {
       break;

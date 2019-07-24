@@ -3,7 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 forEach() {
-  late int v1, v2;
+  late Object v1, v2;
   for (var _ in (v1 = [0, 1, 2])) {
     v2 = 0;
   }
