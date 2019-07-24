@@ -15,7 +15,6 @@ import '../../scanner/token.dart' as analyzer show StringToken;
 
 import '../fasta_codes.dart'
     show
-        Message,
         messageExpectedHexDigit,
         messageMissingExponent,
         messageUnexpectedDollarInString,
@@ -28,6 +27,7 @@ import '../util/link.dart' show Link;
 
 import 'error_token.dart'
     show
+        NonAsciiIdentifierToken,
         UnmatchedToken,
         UnsupportedOperator,
         UnterminatedString,
@@ -36,7 +36,7 @@ import 'error_token.dart'
 import 'keyword_state.dart' show KeywordState;
 
 import 'token.dart'
-    show CommentToken, DartDocToken, LanguageVersionToken, SyntheticStringToken;
+    show CommentToken, DartDocToken, LanguageVersionToken, StringToken;
 
 import 'token_constants.dart';
 
@@ -422,7 +422,10 @@ abstract class AbstractScanner implements Scanner {
   }
 
   /// Append [token] to the token stream.
+  /// DEPRECATED: Use prependErrorToken instead.
   void appendErrorToken(ErrorToken token) {
+    // TODO(danrubel): Update scanner to use prependErrorToken everywhere
+    // then remove this method
     hasErrors = true;
     appendToken(token);
   }
@@ -1117,8 +1120,8 @@ abstract class AbstractScanner implements Scanner {
           prependErrorToken(new UnterminatedToken(
               messageExpectedHexDigit, start, stringOffset));
           // Recovery
-          // TODO(danrubel): append actual characters not "0"
-          appendToken(SyntheticStringToken(TokenType.INT, "0", tokenStart));
+          appendSyntheticSubstringToken(
+              TokenType.HEXADECIMAL, start, true, "0");
           return next;
         }
         appendSubstringToken(TokenType.HEXADECIMAL, start, true);
@@ -1173,7 +1176,7 @@ abstract class AbstractScanner implements Scanner {
           } else {
             if (!hasExponentDigits) {
               appendSyntheticSubstringToken(TokenType.DOUBLE, start, true, '0');
-              appendErrorToken(new UnterminatedToken(
+              prependErrorToken(new UnterminatedToken(
                   messageMissingExponent, tokenStart, stringOffset));
               return next;
             }
@@ -1354,7 +1357,9 @@ abstract class AbstractScanner implements Scanner {
     while (true) {
       if (identical($EOF, next)) {
         if (!asciiOnlyLines) handleUnicode(unicodeStart);
-        unterminated(messageUnterminatedComment);
+        prependErrorToken(UnterminatedToken(
+            messageUnterminatedComment, tokenStart, stringOffset));
+        advanceAfterError(true);
         break;
       } else if (identical($STAR, next)) {
         next = advance();
@@ -1496,11 +1501,7 @@ abstract class AbstractScanner implements Scanner {
    */
   int tokenizeIdentifier(int next, int start, bool allowDollar) {
     while (true) {
-      if (($a <= next && next <= $z) ||
-          ($A <= next && next <= $Z) ||
-          ($0 <= next && next <= $9) ||
-          identical(next, $_) ||
-          (identical(next, $$) && allowDollar)) {
+      if (_isIdentifierChar(next, allowDollar)) {
         next = advance();
       } else {
         // Identifier ends here.
@@ -1624,7 +1625,8 @@ abstract class AbstractScanner implements Scanner {
     } else {
       beginToken(); // The synthetic identifier starts here.
       appendSyntheticSubstringToken(TokenType.IDENTIFIER, scanOffset, true, '');
-      unterminated(messageUnexpectedDollarInString, shouldAdvance: false);
+      prependErrorToken(UnterminatedToken(
+          messageUnexpectedDollarInString, tokenStart, stringOffset));
     }
     beginToken(); // The string interpolation suffix starts here.
     return next;
@@ -1749,13 +1751,31 @@ abstract class AbstractScanner implements Scanner {
   }
 
   int unexpected(int character) {
-    appendErrorToken(buildUnexpectedCharacterToken(character, tokenStart));
-    return advanceAfterError(true);
-  }
-
-  int unterminated(Message message, {bool shouldAdvance: true}) {
-    appendErrorToken(new UnterminatedToken(message, tokenStart, stringOffset));
-    return advanceAfterError(shouldAdvance);
+    var errorToken = buildUnexpectedCharacterToken(character, tokenStart);
+    if (errorToken is NonAsciiIdentifierToken) {
+      int charOffset;
+      List<int> codeUnits = <int>[];
+      if (tail.type == TokenType.IDENTIFIER && tail.charEnd == tokenStart) {
+        charOffset = tail.charOffset;
+        codeUnits.addAll(tail.lexeme.codeUnits);
+        tail = tail.previous;
+      } else {
+        charOffset = errorToken.charOffset;
+      }
+      codeUnits.add(errorToken.character);
+      prependErrorToken(errorToken);
+      int next = advanceAfterError(true);
+      while (_isIdentifierChar(next, true)) {
+        codeUnits.add(next);
+        next = advance();
+      }
+      appendToken(StringToken.fromString(TokenType.IDENTIFIER,
+          new String.fromCharCodes(codeUnits), charOffset));
+      return next;
+    } else {
+      prependErrorToken(errorToken);
+      return advanceAfterError(true);
+    }
   }
 
   void unterminatedString(int quoteChar, int quoteStart, int start,
@@ -1767,7 +1787,7 @@ abstract class AbstractScanner implements Scanner {
     appendSyntheticSubstringToken(TokenType.STRING, start, asciiOnly, suffix);
     // Ensure that the error is reported on a visible token
     int errorStart = tokenStart < stringOffset ? tokenStart : quoteStart;
-    appendErrorToken(new UnterminatedString(prefix, errorStart, stringOffset));
+    prependErrorToken(new UnterminatedString(prefix, errorStart, stringOffset));
   }
 
   int advanceAfterError(bool shouldAdvance) {
@@ -1893,4 +1913,12 @@ class ScannerConfiguration {
   })  : this.enableExtensionMethods = enableExtensionMethods ?? false,
         this.enableNonNullable = enableNonNullable ?? false,
         this.enableTripleShift = enableTripleShift ?? false;
+}
+
+bool _isIdentifierChar(int next, bool allowDollar) {
+  return ($a <= next && next <= $z) ||
+      ($A <= next && next <= $Z) ||
+      ($0 <= next && next <= $9) ||
+      identical(next, $_) ||
+      (identical(next, $$) && allowDollar);
 }
