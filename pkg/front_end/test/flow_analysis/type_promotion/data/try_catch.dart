@@ -47,8 +47,7 @@ void isNotType_exit_body_catchRethrow(Object x) {
 }
 
 void isNotType_exit_catch(Object x) {
-  try {
-  } catch (_) {
+  try {} catch (_) {
     if (x is! String) return;
     /*String*/ x;
   }

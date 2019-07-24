@@ -53,4 +53,3 @@ void outerIsType_loopAssigned_condition2(bool b, Object x) {
     x;
   }
 }
-

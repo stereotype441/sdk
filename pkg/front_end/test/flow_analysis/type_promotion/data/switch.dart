@@ -5,7 +5,8 @@
 void outerIsType_assignedInCase(int e, Object x) {
   if (x is String) {
     switch (e) {
-      L: case 1:
+      L:
+      case 1:
         x;
         break;
       case 2: // no label
