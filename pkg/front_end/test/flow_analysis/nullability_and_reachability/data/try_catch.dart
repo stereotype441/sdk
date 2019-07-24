@@ -71,7 +71,6 @@ void return_catch() {
   4;
 }
 
-/*member: return_body:doesNotComplete*/
 void return_body() {
   try {
     1;
