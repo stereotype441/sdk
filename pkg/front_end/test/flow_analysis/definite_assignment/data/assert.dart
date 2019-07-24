@@ -5,5 +5,7 @@
 f() {
   late int v;
   assert((v = 0) >= 0, v);
-  /*unassigned*/ v;
+  // TODO(paulberry): `v` should be considered unassigned here, because the
+  // assert statement doesn't execute in release mode.
+  v;
 }

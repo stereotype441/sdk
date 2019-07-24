@@ -59,7 +59,9 @@ if_thenElse_then_exit_alwaysThrows(bool c) {
   } else {
     foo();
   }
-  v;
+  // TODO(paulberry): flow analysis should understand that foo never returns, so
+  // `v` is definitely assigned here.
+  /*unassigned*/ v;
 }
 
 Never foo() {
