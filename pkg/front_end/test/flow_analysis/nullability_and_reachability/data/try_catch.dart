@@ -33,7 +33,7 @@ void return_catch() {
   4;
 }
 
-void return_body() {
+void return_body2() {
   try {
     1;
     return;
@@ -59,7 +59,7 @@ void return_bodyCatch() {
   /*stmt: unreachable*/ 4;
 }
 
-void return_catch() {
+void return_catch2() {
   try {
     1;
   } catch (_) {
@@ -71,7 +71,8 @@ void return_catch() {
   4;
 }
 
-void return_body() {
+/*member: return_body3:doesNotComplete*/
+void return_body3() {
   try {
     1;
     return;
