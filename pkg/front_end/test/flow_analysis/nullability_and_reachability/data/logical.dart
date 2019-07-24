@@ -3,7 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 void logicalAnd(int? x) {
-  x == null && x?.isEven;
+  x == null && x!.isEven;
 }
 
 void logicalOr(int? x) {
