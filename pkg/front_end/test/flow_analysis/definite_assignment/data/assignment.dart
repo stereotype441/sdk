@@ -35,5 +35,5 @@ leftLocal_pure_questionEq() {
 
 leftLocal_pure_questionEq_self() {
   late int v;
-  /*unassigned*/ v ??= v;
+  /*unassigned*/ v ??= /*unassigned*/ v;
 }
