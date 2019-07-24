@@ -14,15 +14,15 @@ import 'package:front_end/src/testing/id_testing.dart';
 import '../util/id_testing_helper.dart';
 
 main(List<String> args) async {
-  Directory dataDir = new Directory.fromUri(Platform.script
-      .resolve('../../../front_end/test/flow_analysis/definite_assignment/data'));
+  Directory dataDir = new Directory.fromUri(Platform.script.resolve(
+      '../../../front_end/test/flow_analysis/definite_assignment/data'));
   await runTests(dataDir,
       args: args,
       supportedMarkers: sharedMarkers,
       createUriForFileName: createUriForFileName,
       onFailure: onFailure,
-      runTest:
-      runTestFor(const _DefiniteAssignmentDataComputer(), [analyzerNnbdConfig]));
+      runTest: runTestFor(
+          const _DefiniteAssignmentDataComputer(), [analyzerNnbdConfig]));
 }
 
 class _DefiniteAssignmentDataComputer extends DataComputer<String> {
@@ -36,7 +36,8 @@ class _DefiniteAssignmentDataComputer extends DataComputer<String> {
   void computeUnitData(
       CompilationUnit unit, Map<Id, ActualData<String>> actualMap) {
     var flowResult = FlowAnalysisResult.getFromNode(unit);
-    _DefiniteAssignmentDataExtractor(unit.declaredElement.source.uri, actualMap, flowResult)
+    _DefiniteAssignmentDataExtractor(
+            unit.declaredElement.source.uri, actualMap, flowResult)
         .run(unit);
   }
 }
@@ -44,7 +45,8 @@ class _DefiniteAssignmentDataComputer extends DataComputer<String> {
 class _DefiniteAssignmentDataExtractor extends AstDataExtractor<String> {
   final FlowAnalysisResult _flowResult;
 
-  _DefiniteAssignmentDataExtractor(Uri uri, Map<Id, ActualData<String>> actualMap, this._flowResult)
+  _DefiniteAssignmentDataExtractor(
+      Uri uri, Map<Id, ActualData<String>> actualMap, this._flowResult)
       : super(uri, actualMap);
 
   @override
