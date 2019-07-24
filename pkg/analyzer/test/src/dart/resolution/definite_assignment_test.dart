@@ -41,7 +41,7 @@ class DefiniteAssignmentTrackerTest extends DriverResolutionTest
 main() {
   int v;
   assert((v = 0) >= 0, v);
-  v;
+  /*unassigned*/ v;
 }
 ''');
     assertReadBeforeWritten('v');
@@ -51,7 +51,7 @@ main() {
     await trackCode(r'''
 main() {
   List<int> v;
-  v[0] = (v = [1, 2])[1];
+  /*unassigned*/ v[0] = (v = [1, 2])[1];
   v;
 }
 ''');
@@ -62,7 +62,7 @@ main() {
     await trackCode(r'''
 main() {
   int v;
-  v += 1;
+  /*unassigned*/ v += 1;
 }
 ''');
     assertReadBeforeWritten('v');
@@ -72,7 +72,7 @@ main() {
     await trackCode(r'''
 main() {
   int v;
-  v += (v = v);
+  /*unassigned*/ v += (v = /*unassigned*/ v);
 }
 ''');
     assertReadBeforeWritten('v');
@@ -92,7 +92,7 @@ main() {
     await trackCode(r'''
 main() {
   int v;
-  v = v;
+  v = /*unassigned*/ v;
 }
 ''');
     assertReadBeforeWritten('v');
@@ -102,7 +102,7 @@ main() {
     await trackCode(r'''
 main() {
   int v;
-  v ??= 0;
+  /*unassigned*/ v ??= 0;
 }
 ''');
     assertReadBeforeWritten('v');
@@ -112,7 +112,7 @@ main() {
     await trackCode(r'''
 main() {
   int v;
-  v ??= v;
+  /*unassigned*/ v ??= v;
 }
 ''');
     assertReadBeforeWritten('v');
@@ -134,7 +134,7 @@ main() {
 main(int a) {
   int v;
   a ?? (v = 0);
-  v;
+  /*unassigned*/ v;
 }
 ''');
     assertReadBeforeWritten('v');
@@ -156,7 +156,7 @@ main(bool c) {
 main(bool c) {
   int v;
   c && ((v = 0) >= 0);
-  v;
+  /*unassigned*/ v;
 }
 ''');
     assertReadBeforeWritten('v');
@@ -178,7 +178,7 @@ main(bool c) {
 main(bool c) {
   int v;
   c || ((v = 0) >= 0);
-  v;
+  /*unassigned*/ v;
 }
 ''');
     assertReadBeforeWritten('v');
@@ -233,7 +233,7 @@ main() {
 main(bool c) {
   int v;
   c ? (v = 0) : 2;
-  v;
+  /*unassigned*/ v;
 }
 ''');
     assertReadBeforeWritten('v');
@@ -244,7 +244,7 @@ main(bool c) {
 main(bool c) {
   int v;
   c ? (v = 0) : 2;
-  v;
+  /*unassigned*/ v;
 }
 ''');
     assertReadBeforeWritten('v');
@@ -273,7 +273,7 @@ main(bool c) {
     if (c) break;
     v = 0;
   } while (c);
-  v;
+  /*unassigned*/ v;
 }
 ''');
     assertReadBeforeWritten('v');
@@ -293,7 +293,7 @@ main(bool c) {
     v2;
   } while (c);
   v1;
-  v3;
+  /*unassigned*/ v3;
 }
 ''');
     assertReadBeforeWritten('v3');
@@ -304,7 +304,7 @@ main(bool c) {
 main() {
   int v1, v2;
   do {
-    v1; // assigned in the condition, but not yet
+    /*unassigned*/ v1; // assigned in the condition, but not yet
   } while ((v1 = 0) + (v2 = 0) >= 0);
   v2;
 }
@@ -319,7 +319,7 @@ main(bool c) {
   do {
     if (c) break;
   } while ((v = 0) >= 0);
-  v;
+  /*unassigned*/ v;
 }
 ''');
     assertReadBeforeWritten('v');
@@ -337,11 +337,11 @@ main(bool c1, bool c2) {
     if (c2) continue;
     v4 = 0; // not visible
     v5 = 0; // not visible
-  } while ((v6 = v1 + v2 + v4) == 0); // has break => v6 is not visible outside
+  } while ((v6 = v1 + v2 + /*unassigned*/ v4) == 0); // has break => v6 is not visible outside
   v1;
-  v3;
-  v5;
-  v6;
+  /*unassigned*/ v3;
+  /*unassigned*/ v5;
+  /*unassigned*/ v6;
 }
 ''');
     assertReadBeforeWritten('v3', 'v4', 'v5', 'v6');
@@ -356,9 +356,9 @@ main(bool c) {
     if (c) continue;
     v2 = 0; // not visible
     v3 = 0; // not visible
-  } while ((v4 = v1 + v2) == 0); // no break => v4 visible outside
+  } while ((v4 = v1 + /*unassigned*/ v2) == 0); // no break => v4 visible outside
   v1;
-  v3;
+  /*unassigned*/ v3;
   v4;
 }
 ''');
@@ -373,7 +373,7 @@ main(bool c) {
     if (c) continue;
     v = 0;
   } while (c);
-  v;
+  /*unassigned*/ v;
 }
 ''');
     assertReadBeforeWritten('v');
@@ -386,7 +386,7 @@ main(bool c) {
   for (; c;) {
     v = 0;
   }
-  v;
+  /*unassigned*/ v;
 }
 ''');
     assertReadBeforeWritten('v');
@@ -401,8 +401,8 @@ main(bool c) {
     if (c) break;
     v2 = 0;
   }
-  v1;
-  v2;
+  /*unassigned*/ v1;
+  /*unassigned*/ v2;
 }
 ''');
     assertReadBeforeWritten('v1', 'v2');
@@ -444,8 +444,8 @@ main(bool c) {
     if (c) continue;
     v2 = 0;
   }
-  v1;
-  v2;
+  /*unassigned*/ v1;
+  /*unassigned*/ v2;
 }
 ''');
     assertReadBeforeWritten('v1', 'v2');
@@ -455,7 +455,7 @@ main(bool c) {
     await trackCode(r'''
 main(bool c) {
   int v1, v2;
-  for (; c; v1 + v2) {
+  for (; c; v1 + /*unassigned*/ v2) {
     v1 = 0;
     if (c) continue;
     v2 = 0;
@@ -495,10 +495,10 @@ main() {
     await trackCode(r'''
 main(bool c) {
   int v1, v2, v3, v4;
-  for (; c; v1 = 0, v2 = 0, v3 = 0, v4) {
-    v1;
+  for (; c; v1 = 0, v2 = 0, v3 = 0, /*unassigned*/ v4) {
+    /*unassigned*/ v1;
   }
-  v2;
+  /*unassigned*/ v2;
 }
 ''');
     assertReadBeforeWritten('v1', 'v2', 'v4');
@@ -524,7 +524,7 @@ main() {
     v2 = 0;
   }
   v1;
-  v2;
+  /*unassigned*/ v2;
 }
 ''');
     assertReadBeforeWritten('v2');
@@ -539,8 +539,8 @@ main(bool c) {
     if (c) break;
     v2 = 0;
   }
-  v1;
-  v2;
+  /*unassigned*/ v1;
+  /*unassigned*/ v2;
 }
 ''');
     assertReadBeforeWritten('v1', 'v2');
@@ -555,8 +555,8 @@ main(bool c) {
     if (c) continue;
     v2 = 0;
   }
-  v1;
-  v2;
+  /*unassigned*/ v1;
+  /*unassigned*/ v2;
 }
 ''');
     assertReadBeforeWritten('v1', 'v2');
@@ -571,7 +571,7 @@ main() {
   
   [0, 1, 2].forEach((t) {
     v1;
-    v2;
+    /*unassigned*/ v2;
   });
 }
 ''');
@@ -587,7 +587,7 @@ main() {
     v = t;
   });
 
-  v;
+  /*unassigned*/ v;
 }
 ''');
     assertReadBeforeWritten('v');
@@ -602,7 +602,7 @@ main() {
 
   void f() {
     int v; // 1
-    v;
+    /*unassigned*/ v;
   }
 }
 ''');
@@ -622,7 +622,7 @@ main() {
     v2 = 0;
     v1;
     v2;
-    v3;
+    /*unassigned*/ v3;
   }
 }
 ''');
@@ -638,7 +638,7 @@ main() {
 
   void f() {
     v1;
-    v2;
+    /*unassigned*/ v2;
   }
 
   v2 = 0;
@@ -656,7 +656,7 @@ main() {
     v = 0;
   }
 
-  v;
+  /*unassigned*/ v;
 }
 ''');
     assertReadBeforeWritten('v');
@@ -684,7 +684,7 @@ main(bool c) {
   if (c) {
     v = 0;
   }
-  v;
+  /*unassigned*/ v;
 }
 ''');
     assertReadBeforeWritten('v');
@@ -716,7 +716,7 @@ main(bool c) {
   } else {
     v = 0;
   }
-  v;
+  /*unassigned*/ v;
 }
 ''');
     assertReadBeforeWritten('v');
@@ -731,7 +731,7 @@ main(bool c) {
   } else {
     // not assigned
   }
-  v;
+  /*unassigned*/ v;
 }
 ''');
     assertReadBeforeWritten('v');
@@ -802,7 +802,7 @@ main(int e) {
     default:
       v = 0;
   }
-  v;
+  /*unassigned*/ v;
 }
 ''');
     assertReadBeforeWritten('v');
@@ -823,7 +823,7 @@ main(int e) {
       v1;
   }
   v1;
-  v2;
+  /*unassigned*/ v2;
 }
 ''');
     assertReadBeforeWritten('v2');
@@ -845,7 +845,7 @@ main(int e, bool c) {
       v2 = 0;
   }
   v1;
-  v2;
+  /*unassigned*/ v2;
 }
 ''');
     assertReadBeforeWritten('v2');
@@ -883,7 +883,7 @@ main(int e) {
       v = 0;
       break;
   }
-  v;
+  /*unassigned*/ v;
 }
 ''');
     assertReadBeforeWritten('v');
@@ -927,7 +927,7 @@ main() {
   } catch (_) {
     v = 0;
   }
-  v;
+  /*unassigned*/ v;
 }
 ''');
     assertReadBeforeWritten('v');
@@ -942,7 +942,7 @@ main() {
   } catch (_) {
     // not assigned
   }
-  v;
+  /*unassigned*/ v;
 }
 ''');
     assertReadBeforeWritten('v');
@@ -959,7 +959,7 @@ main() {
   } finally {
     // not assigned
   }
-  v;
+  /*unassigned*/ v;
 }
 ''');
     assertReadBeforeWritten('v');
@@ -993,7 +993,7 @@ main() {
   } finally {
     // not assigned
   }
-  v;
+  /*unassigned*/ v;
 }
 ''');
     assertReadBeforeWritten('v');
@@ -1051,7 +1051,7 @@ main(bool c) {
     v2 = 0;
     v1;
   }
-  v2;
+  /*unassigned*/ v2;
 }
 ''');
     assertReadBeforeWritten('v2');
@@ -1085,7 +1085,7 @@ main(bool c) {
     v2 = 0;
     v2;
   }
-  v1;
+  /*unassigned*/ v1;
 }
 ''');
     assertReadBeforeWritten('v1');
@@ -1144,7 +1144,7 @@ main(bool c) {
     }
     v1;
   }
-  v2;
+  /*unassigned*/ v2;
 }
 ''');
     assertReadBeforeWritten('v2');
@@ -1165,7 +1165,7 @@ main(bool c) {
     v2;
   }
   v1;
-  v3;
+  /*unassigned*/ v3;
 }
 ''');
     assertReadBeforeWritten('v3');
