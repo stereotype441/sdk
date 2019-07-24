@@ -3,7 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 for_body(bool c) {
-  int v;
+  late int v;
   for (; c;) {
     v = 0;
   }
@@ -11,7 +11,7 @@ for_body(bool c) {
 }
 
 for_break(bool c) {
-  int v1, v2;
+  late int v1, v2;
   for (; c;) {
     v1 = 0;
     if (c) break;
@@ -22,7 +22,7 @@ for_break(bool c) {
 }
 
 for_break_updaters(bool c) {
-  int v1, v2;
+  late int v1, v2;
   for (; c; v1 + v2) {
     v1 = 0;
     if (c) break;
@@ -31,7 +31,7 @@ for_break_updaters(bool c) {
 }
 
 for_condition() {
-  int v;
+  late int v;
   for (; (v = 0) >= 0;) {
     v;
   }
@@ -39,7 +39,7 @@ for_condition() {
 }
 
 for_continue(bool c) {
-  int v1, v2;
+  late int v1, v2;
   for (; c;) {
     v1 = 0;
     if (c) continue;
@@ -50,7 +50,7 @@ for_continue(bool c) {
 }
 
 for_continue_updaters(bool c) {
-  int v1, v2;
+  late int v1, v2;
   for (; c; v1 + /*unassigned*/ v2) {
     v1 = 0;
     if (c) continue;
@@ -59,7 +59,7 @@ for_continue_updaters(bool c) {
 }
 
 for_initializer_expression() {
-  int v;
+  late int v;
   for (v = 0;;) {
     v;
   }
@@ -67,7 +67,7 @@ for_initializer_expression() {
 }
 
 for_initializer_variable() {
-  int v;
+  late int v;
   for (var t = (v = 0);;) {
     v;
   }
@@ -75,7 +75,7 @@ for_initializer_variable() {
 }
 
 for_updaters(bool c) {
-  int v1, v2, v3, v4;
+  late int v1, v2, v3, v4;
   for (; c; v1 = 0, v2 = 0, v3 = 0, /*unassigned*/ v4) {
     /*unassigned*/ v1;
   }
@@ -83,7 +83,7 @@ for_updaters(bool c) {
 }
 
 for_updaters_afterBody(bool c) {
-  int v;
+  late int v;
   for (; c; v) {
     v = 0;
   }

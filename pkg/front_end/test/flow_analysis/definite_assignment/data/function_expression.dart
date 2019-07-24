@@ -3,7 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 closure_read() {
-  int v1, v2;
+  late int v1, v2;
   
   v1 = 0;
   
@@ -14,7 +14,7 @@ closure_read() {
 }
 
 closure_write() {
-  int v;
+  late int v;
   
   [0, 1, 2].forEach((t) {
     v = t;
@@ -24,23 +24,23 @@ closure_write() {
 }
 
 localFunction_local() {
-  int v;
+  late int v;
 
   v = 0;
 
   void f() {
-    int v; // 1
+    late int v;
     /*unassigned*/ v;
   }
 }
 
 localFunction_local2() {
-  int v1;
+  late int v1;
 
   v1 = 0;
 
   void f() {
-    int v2, v3;
+    late int v2, v3;
     v2 = 0;
     v1;
     v2;
@@ -49,7 +49,7 @@ localFunction_local2() {
 }
 
 localFunction_read() {
-  int v1, v2, v3;
+  late int v1, v2, v3;
 
   v1 = 0;
 
@@ -62,7 +62,7 @@ localFunction_read() {
 }
 
 localFunction_write() {
-  int v;
+  late int v;
 
   void f() {
     v = 0;

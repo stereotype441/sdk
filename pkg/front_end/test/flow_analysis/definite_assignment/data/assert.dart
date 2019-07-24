@@ -3,7 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 f() {
-  int v;
+  late int v;
   assert((v = 0) >= 0, v);
   /*unassigned*/ v;
 }

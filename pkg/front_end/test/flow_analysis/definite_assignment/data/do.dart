@@ -3,7 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 break_afterAssignment(bool c) {
-  int v;
+  late int v;
   do {
     v = 0;
     v;
@@ -13,7 +13,7 @@ break_afterAssignment(bool c) {
 }
 
 break_beforeAssignment(bool c) {
-  int v;
+  late int v;
   do {
     if (c) break;
     v = 0;
@@ -22,7 +22,7 @@ break_beforeAssignment(bool c) {
 }
 
 breakOuterFromInner(bool c) {
-  int v1, v2, v3;
+  late int v1, v2, v3;
   L1: do {
     do {
       v1 = 0;
@@ -37,7 +37,7 @@ breakOuterFromInner(bool c) {
 }
 
 condition() {
-  int v1, v2;
+  late int v1, v2;
   do {
     /*unassigned*/ v1; // assigned in the condition, but not yet
   } while ((v1 = 0) + (v2 = 0) >= 0);
@@ -45,7 +45,7 @@ condition() {
 }
 
 condition_break(bool c) {
-  int v;
+  late int v;
   do {
     if (c) break;
   } while ((v = 0) >= 0);
@@ -53,7 +53,7 @@ condition_break(bool c) {
 }
 
 condition_break_continue(bool c1, bool c2) {
-  int v1, v2, v3, v4, v5, v6;
+  late int v1, v2, v3, v4, v5, v6;
   do {
     v1 = 0; // visible outside, visible to the condition
     if (c1) break;
@@ -70,7 +70,7 @@ condition_break_continue(bool c1, bool c2) {
 }
 
 condition_continue(bool c) {
-  int v1, v2, v3, v4;
+  late int v1, v2, v3, v4;
   do {
     v1 = 0; // visible outside, visible to the condition
     if (c) continue;
@@ -83,7 +83,7 @@ condition_continue(bool c) {
 }
 
 continue_beforeAssignment(bool c) {
-  int v;
+  late int v;
   do {
     if (c) continue;
     v = 0;

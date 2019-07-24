@@ -3,7 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 if_condition() {
-  int v;
+  late int v;
   if ((v = 0) >= 0) {
     v;
   } else {
@@ -13,7 +13,7 @@ if_condition() {
 }
 
 if_then(bool c) {
-  int v;
+  late int v;
   if (c) {
     v = 0;
   }
@@ -21,7 +21,7 @@ if_then(bool c) {
 }
 
 if_thenElse_all(bool c) {
-  int v;
+  late int v;
   if (c) {
     v = 0;
     v;
@@ -33,7 +33,7 @@ if_thenElse_all(bool c) {
 }
 
 if_thenElse_else(bool c) {
-  int v;
+  late int v;
   if (c) {
     // not assigned
   } else {
@@ -43,7 +43,7 @@ if_thenElse_else(bool c) {
 }
 
 if_thenElse_then(bool c) {
-  int v;
+  late int v;
   if (c) {
     v = 0;
   } else {
@@ -53,7 +53,7 @@ if_thenElse_then(bool c) {
 }
 
 if_thenElse_then_exit_alwaysThrows(bool c) {
-  int v;
+  late int v;
   if (c) {
     v = 0;
   } else {
@@ -67,7 +67,7 @@ Never foo() {
 }
 
 if_thenElse_then_exit_return(bool c) {
-  int v;
+  late int v;
   if (c) {
     v = 0;
   } else {
@@ -77,7 +77,7 @@ if_thenElse_then_exit_return(bool c) {
 }
 
 if_thenElse_then_exit_throw(bool c) {
-  int v;
+  late int v;
   if (c) {
     v = 0;
   } else {

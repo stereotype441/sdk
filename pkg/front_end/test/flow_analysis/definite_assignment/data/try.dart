@@ -5,7 +5,7 @@
 void f() {}
 
 tryCatch_all() {
-  int v;
+  late int v;
   try {
     f();
     v = 0;
@@ -16,7 +16,7 @@ tryCatch_all() {
 }
 
 tryCatch_catch() {
-  int v;
+  late int v;
   try {
     // not assigned
   } catch (_) {
@@ -26,7 +26,7 @@ tryCatch_catch() {
 }
 
 tryCatch_try() {
-  int v;
+  late int v;
   try {
     v = 0;
   } catch (_) {
@@ -36,7 +36,7 @@ tryCatch_try() {
 }
 
 tryCatchFinally_catch() {
-  int v;
+  late int v;
   try {
     // not assigned
   } catch (_) {
@@ -48,7 +48,7 @@ tryCatchFinally_catch() {
 }
 
 tryCatchFinally_finally() {
-  int v;
+  late int v;
   try {
     // not assigned
   } catch (_) {
@@ -60,7 +60,7 @@ tryCatchFinally_finally() {
 }
 
 tryCatchFinally_try() {
-  int v;
+  late int v;
   try {
     v = 0;
   } catch (_) {
@@ -72,7 +72,7 @@ tryCatchFinally_try() {
 }
 
 tryFinally_finally() {
-  int v;
+  late int v;
   try {
     // not assigned
   } finally {
@@ -82,7 +82,7 @@ tryFinally_finally() {
 }
 
 tryFinally_try() {
-  int v;
+  late int v;
   try {
     v = 0;
   } finally {

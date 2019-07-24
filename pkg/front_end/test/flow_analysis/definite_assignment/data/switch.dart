@@ -3,7 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 case1_default(int e) {
-  int v;
+  late int v;
   switch (e) {
     case 1:
       v = 0;
@@ -18,7 +18,7 @@ case1_default(int e) {
 }
 
 case2_default(int e) {
-  int v1, v2;
+  late int v1, v2;
   switch (e) {
     case 1:
       v1 = 0;
@@ -34,7 +34,7 @@ case2_default(int e) {
 }
 
 case_default_break(int e, bool c) {
-  int v1, v2;
+  late int v1, v2;
   switch (e) {
     case 1:
       v1 = 0;
@@ -51,7 +51,7 @@ case_default_break(int e, bool c) {
 }
 
 case_default_continue(int e) {
-  int v;
+  late int v;
   switch (e) {
     L: case 1:
       v = 0;
@@ -65,7 +65,7 @@ case_default_continue(int e) {
 }
 
 case_noDefault(int e) {
-  int v;
+  late int v;
   switch (e) {
     case 1:
       v = 0;
@@ -75,7 +75,7 @@ case_noDefault(int e) {
 }
 
 condition() {
-  int v;
+  late int v;
   switch (v = 0) {}
   v;
 }

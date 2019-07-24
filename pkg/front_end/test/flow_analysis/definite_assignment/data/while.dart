@@ -3,7 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 condition() {
-  int v;
+  late int v;
   while ((v = 0) >= 0) {
     v;
   }
@@ -11,7 +11,7 @@ condition() {
 }
 
 condition_notTrue(bool c) {
-  int v1, v2;
+  late int v1, v2;
   while (c) {
     v1 = 0;
     v2 = 0;
@@ -21,7 +21,7 @@ condition_notTrue(bool c) {
 }
 
 true_break_afterAssignment(bool c) {
-  int v1, v2;
+  late int v1, v2;
   while (true) {
     v1 = 0;
     v1;
@@ -34,7 +34,7 @@ true_break_afterAssignment(bool c) {
 }
 
 true_break_beforeAssignment(bool c) {
-  int v1, v2;
+  late int v1, v2;
   while (true) {
     if (c) break;
     v1 = 0;
@@ -45,7 +45,7 @@ true_break_beforeAssignment(bool c) {
 }
 
 true_break_if(bool c) {
-  int v;
+  late int v;
   while (true) {
     if (c) {
       v = 0;
@@ -60,7 +60,7 @@ true_break_if(bool c) {
 }
 
 true_break_if2(bool c) {
-  var v;
+  late var v;
   while (true) {
     if (c) {
       break;
@@ -72,7 +72,7 @@ true_break_if2(bool c) {
 }
 
 true_break_if3(bool c) {
-  int v1, v2;
+  late int v1, v2;
   while (true) {
     if (c) {
       v1 = 0;
@@ -89,7 +89,7 @@ true_break_if3(bool c) {
 }
 
 true_breakOuterFromInner(bool c) {
-  int v1, v2, v3;
+  late int v1, v2, v3;
   L1: while (true) {
     L2: while (true) {
       v1 = 0;
@@ -105,7 +105,7 @@ true_breakOuterFromInner(bool c) {
 }
 
 true_continue(bool c) {
-  int v;
+  late int v;
   while (true) {
     if (c) continue;
     v = 0;
@@ -114,7 +114,7 @@ true_continue(bool c) {
 }
 
 true_noBreak(bool c) {
-  int v;
+  late int v;
   while (true) {
     // No assignment, but not break.
     // So, we don't exit the loop.

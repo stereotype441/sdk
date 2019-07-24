@@ -3,25 +3,25 @@
 // BSD-style license that can be found in the LICENSE file.
 
 in_both(bool c) {
-  int v;
+  late int v;
   c ? (v = 0) : (v = 0);
   v;
 }
 
 in_condition() {
-  int v;
+  late int v;
   (v = 0) >= 0 ? 1 : 2;
   v;
 }
 
 in_else(bool c) {
-  int v;
+  late int v;
   c ? (v = 0) : 2;
   /*unassigned*/ v;
 }
 
 in_then(bool c) {
-  int v;
+  late int v;
   c ? (v = 0) : 2;
   /*unassigned*/ v;
 }

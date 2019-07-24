@@ -3,7 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 forEach() {
-  int v1, v2;
+  late int v1, v2;
   for (var _ in (v1 = [0, 1, 2])) {
     v2 = 0;
   }
@@ -12,7 +12,7 @@ forEach() {
 }
 
 forEach_break(bool c) {
-  int v1, v2;
+  late int v1, v2;
   for (var _ in [0, 1, 2]) {
     v1 = 0;
     if (c) break;
@@ -23,7 +23,7 @@ forEach_break(bool c) {
 }
 
 forEach_continue(bool c) {
-  int v1, v2;
+  late int v1, v2;
   for (var _ in [0, 1, 2]) {
     v1 = 0;
     if (c) continue;
