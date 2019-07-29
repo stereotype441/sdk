@@ -8,7 +8,7 @@ import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/handle.dart';
-import 'package:analyzer/src/dart/element/inheritance_manager2.dart';
+import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
 import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/generated/resolver.dart';
@@ -31,7 +31,7 @@ import 'package:nnbd_migration/src/nullability_node.dart';
 /// variables that will determine its nullability.  For `visit...` methods that
 /// don't visit expressions, `null` will be returned.
 class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
-  final InheritanceManager2 _inheritanceManager;
+  final InheritanceManager3 _inheritanceManager;
 
   /// The repository of constraint variables and decorated types (from a
   /// previous pass over the source code).
@@ -88,7 +88,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
   EdgeBuilder(TypeProvider typeProvider, TypeSystem typeSystem, this._variables,
       this._graph, this._source, this.listener)
       : _decoratedClassHierarchy = DecoratedClassHierarchy(_variables, _graph),
-        _inheritanceManager = InheritanceManager2(typeSystem),
+        _inheritanceManager = InheritanceManager3(typeSystem),
         _notNullType = DecoratedType(typeProvider.objectType, _graph.never),
         _nonNullableBoolType =
             DecoratedType(typeProvider.boolType, _graph.never),
@@ -342,6 +342,14 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
         node.initializers,
         node.body,
         node.redirectedConstructor);
+    return null;
+  }
+
+  @override
+  DecoratedType visitConstructorFieldInitializer(
+      ConstructorFieldInitializer node) {
+    _handleAssignment(
+        node.expression, getOrComputeElementType(node.fieldName.staticElement));
     return null;
   }
 
@@ -1128,12 +1136,14 @@ $stackTrace''');
       if (declaredElement is! ConstructorElement) {
         var classElement = declaredElement.enclosingElement as ClassElement;
         var origin = InheritanceOrigin(_source, node.offset);
-        for (var overridden in _inheritanceManager.getOverridden(
+        for (var overriddenElement in _inheritanceManager.getOverridden(
                 classElement.type,
                 Name(classElement.library.source.uri, declaredElement.name)) ??
-            const []) {
-          var overriddenElement = overridden.element as ExecutableElement;
-          assert(overriddenElement is! ExecutableMember);
+            const <ExecutableElement>[]) {
+          if (overriddenElement is ExecutableMember) {
+            var member = overriddenElement as ExecutableMember;
+            overriddenElement = member.baseElement;
+          }
           var overriddenClass =
               overriddenElement.enclosingElement as ClassElement;
           var decoratedOverriddenFunctionType =
