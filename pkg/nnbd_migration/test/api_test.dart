@@ -1837,7 +1837,7 @@ main() {
     await _checkSingleFileChanges(content, expected);
   }
 
-  solo_test_redirecting_constructor_ordinary_to_unnamed() async {
+  test_redirecting_constructor_ordinary_to_unnamed() async {
     var content = '''
 class C {
   C.named(int i, int j) : this(j, i);
