@@ -191,6 +191,21 @@ class C {
     expect(decoratedType.node, same(never));
   }
 
+  test_constructor_metadata() async {
+    await analyze('''
+class A {
+  final Object x;
+  const A(this.x);
+}
+class C {
+  @A(<int>[])
+  C();
+}
+''');
+    var node = decoratedTypeAnnotation('int').node;
+    expect(node, TypeMatcher<NullabilityNodeMutable>());
+  }
+
   test_constructor_returnType_implicit_dynamic() async {
     await analyze('''
 class C {
@@ -556,6 +571,19 @@ class C {
     // field.
   }
 
+  test_function_metadata() async {
+    await analyze('''
+class A {
+  final Object x;
+  const A(this.x);
+}
+@A(<int>[])
+f() {}
+''');
+    var node = decoratedTypeAnnotation('int').node;
+    expect(node, TypeMatcher<NullabilityNodeMutable>());
+  }
+
   test_functionTypedFormalParameter_namedParameter_typed() async {
     await analyze('''
 void f(void g({int i})) {}
@@ -856,6 +884,21 @@ main() {
     var decoratedType =
         variables.decoratedElementType(findNode.simple('x').staticElement);
     expect(decoratedType.node, same(always));
+  }
+
+  test_method_metadata() async {
+    await analyze('''
+class A {
+  final Object x;
+  const A(this.x);
+}
+class C {
+  @A(<int>[])
+  f() {}
+}
+''');
+    var node = decoratedTypeAnnotation('int').node;
+    expect(node, TypeMatcher<NullabilityNodeMutable>());
   }
 
   test_method_parameterType_implicit_dynamic() async {
