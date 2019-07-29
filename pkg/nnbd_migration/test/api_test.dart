@@ -889,7 +889,7 @@ main() {
     await _checkSingleFileChanges(content, expected);
   }
 
-  solo_test_field_initializer_simple() async {
+  test_field_initializer_simple() async {
     var content = '''
 class C {
   int f;
