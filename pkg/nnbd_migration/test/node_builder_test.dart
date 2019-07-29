@@ -201,6 +201,17 @@ class C {
     expect(decoratedType.node, same(never));
   }
 
+  test_constructorFieldInitializer_visit_expression() async {
+    await analyze('''
+class C {
+  C() : f = <int>[];
+  Object f;
+}
+''');
+    var node = decoratedTypeAnnotation('int').node;
+    expect(node, TypeMatcher<NullabilityNodeMutable>());
+  }
+
   test_directSupertypes_class_extends() async {
     await analyze('''
 class C<T, U> {}

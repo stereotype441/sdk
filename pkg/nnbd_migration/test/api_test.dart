@@ -911,7 +911,7 @@ main() {
     await _checkSingleFileChanges(content, expected);
   }
 
-  solo_test_field_initializer_typed_list_literal() async {
+  test_field_initializer_typed_list_literal() async {
     var content = '''
 class C {
   List<int> f;
