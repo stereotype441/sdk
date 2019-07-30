@@ -266,8 +266,8 @@ class NullabilityNodeTest {
     connect(n4, n3);
     propagate();
     expect(n1.isNullable, true);
-    expect(n2.isExactNullable, true);
-    expect(n2.isNullable, true);
+    expect(n1.isExactNullable, true);
+    expect(n2.isNullable, false);
     expect(n3.isNullable, true);
     expect(n3.isExactNullable, true);
     expect(n4.isNullable, true);
@@ -282,6 +282,7 @@ class NullabilityNodeTest {
     var n2 = newNode(2);
     var n3 = newNode(3);
     connect(n1, never, hard: true);
+    connect(always, subst(n1, n2));
     connect(n3, n2);
     propagate();
     expect(n1.isNullable, false);
