@@ -348,6 +348,35 @@ class NullabilityNodeTest {
     assertUnsatisfied([]);
   }
 
+  test_propagation_downstream_reverse_substitution_unsatisfiable() {
+    // 1 -> never (hard)
+    // 2 -> never (hard)
+    // always -> subst(1, 2)
+    var n1 = newNode(1);
+    var n2 = newNode(2);
+    connect(n1, never, hard: true);
+    connect(n2, never, hard: true);
+    connect(always, subst(n1, n2));
+    propagate();
+    expect(n1.isNullable, false);
+    expect(n2.isNullable, false);
+  }
+
+  test_propagation_downstream_reverse_substitution_outer_already_nullable() {
+    // 1 -> never (hard)
+    // always -> 2
+    // always -> subst(1, 2)
+    var n1 = newNode(1);
+    var n2 = newNode(2);
+    connect(n1, never, hard: true);
+    connect(always, n2);
+    connect(always, subst(n1, n2));
+    propagate();
+    expect(n1.isNullable, false);
+    expect(n2.isNullable, true);
+    expect(n2.isExactNullable, false);
+  }
+
   test_propagation_downstream_through_substitution_inner() {
     // always -> 1
     // subst(1, 2) -> 3
