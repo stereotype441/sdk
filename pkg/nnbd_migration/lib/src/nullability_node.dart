@@ -112,6 +112,10 @@ class NullabilityGraph {
   /// couldn't be satisfied.
   final List<NullabilityEdge> _unsatisfiedEdges = [];
 
+  /// During execution of [_propagateDownstream], a list of all the substitution
+  /// nodes that have not yet been resolved.
+  final List<NullabilityNodeForSubstitution> _pendingSubstitutions = [];
+
   /// Records that [sourceNode] is immediately upstream from [destinationNode].
   ///
   /// Returns the edge created by the connection.
@@ -220,7 +224,6 @@ class NullabilityGraph {
     for (var node in _unionedWithAlways) {
       _pendingEdges.addAll(node._downstreamEdges);
     }
-    var pendingSubstitutions = <NullabilityNodeForSubstitution>[];
     while (true) {
       while (_pendingEdges.isNotEmpty) {
         var edge = _pendingEdges.removeLast();
@@ -237,12 +240,12 @@ class NullabilityGraph {
           // Was not previously nullable, so we need to propagate.
           _pendingEdges.addAll(node._downstreamEdges);
           if (node is NullabilityNodeForSubstitution) {
-            pendingSubstitutions.add(node);
+            _pendingSubstitutions.add(node);
           }
         }
       }
-      if (pendingSubstitutions.isEmpty) break;
-      var node = pendingSubstitutions.removeLast();
+      if (_pendingSubstitutions.isEmpty) break;
+      var node = _pendingSubstitutions.removeLast();
       if (node.innerNode.isNullable || node.outerNode.isNullable) {
         // No further propagation is needed, since some other connection already
         // propagated nullability to either the inner or outer node.
