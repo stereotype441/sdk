@@ -1073,6 +1073,40 @@ void g(C<int?> y) {
     await _checkSingleFileChanges(content, expected);
   }
 
+  solo_test_generic_exact_propagation_with_lub() async {
+    var content = '''
+class C<T> {
+  List<T> values;
+  C() : values = <T>[];
+  void add(T t) => values.add(t);
+  T operator[](int i) => values[i];
+}
+void f() {
+  C<int> x = new C<int>();
+  g(null, x);
+}
+void g(C<int> y, C<int> z) {
+  (y ?? z).add(null);
+}
+    ''';
+    var expected = '''
+class C<T> {
+  List<T> values;
+  C() : values = <T>[];
+  void add(T t) => values.add(t);
+  T operator[](int i) => values[i];
+}
+void f() {
+  C<int?> x = new C<int?>();
+  g(null, x);
+}
+void g(C<int?>? y, C<int?> z) {
+  (y ?? z).add(null);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_generic_function_type_syntax_inferred_dynamic_return() async {
     var content = '''
 abstract class C {
