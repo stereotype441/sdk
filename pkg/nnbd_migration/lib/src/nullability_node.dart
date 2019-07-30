@@ -425,6 +425,11 @@ abstract class NullabilityNode {
   String get debugSuffix => '?($this)';
 
   /// After nullability propagation, this getter can be used to query whether
+  /// the type associated with this node should be considered "exact nullable".
+  @visibleForTesting
+  bool get isExactNullable;
+
+  /// After nullability propagation, this getter can be used to query whether
   /// the type associated with this node should be considered nullable.
   bool get isNullable;
 
@@ -435,11 +440,6 @@ abstract class NullabilityNode {
   String get _debugPrefix;
 
   _NullabilityState get _state;
-
-  /// After nullability propagation, this getter can be used to query whether
-  /// the type associated with this node should be considered "exact nullable".
-  @visibleForTesting
-  bool get isExactNullable;
 
   /// Records the fact that an invocation was made to a function with named
   /// parameters, and the named parameter associated with this node was not
@@ -537,6 +537,9 @@ abstract class NullabilityNodeMutable extends NullabilityNode {
         super._();
 
   @override
+  bool get isExactNullable => _state == _NullabilityState.exactNullable;
+
+  @override
   bool get isNullable => _state.isNullable;
 }
 
@@ -558,6 +561,9 @@ abstract class _NullabilityNodeCompound extends NullabilityNodeMutable {
   _NullabilityNodeCompound() : super._();
 
   @override
+  bool get isExactNullable => _components.any((c) => c.isExactNullable);
+
+  @override
   bool get isNullable => _components.any((c) => c.isNullable);
 
   Iterable<NullabilityNode> get _components;
@@ -576,8 +582,11 @@ class _NullabilityNodeImmutable extends NullabilityNode {
   String get debugSuffix => isNullable ? '?' : '';
 
   @override
+  bool get isExactNullable => isNullable;
+
+  @override
   _NullabilityState get _state => isNullable
-      ? _NullabilityState.ordinaryNullable
+      ? _NullabilityState.exactNullable
       : _NullabilityState.nonNullable;
 }
 
