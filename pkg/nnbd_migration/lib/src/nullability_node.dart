@@ -631,5 +631,3 @@ class _NullabilityState {
   @override
   String toString() => name;
 }
-
-class _SubstitutionHeuristicOrigin extends EdgeOrigin {}
