@@ -275,21 +275,18 @@ class NullabilityGraph {
     if (substitutionNode.innerNode._state == _NullabilityState.nonNullable &&
         substitutionNode.outerNode._state == _NullabilityState.nonNullable) {
       // TODO(paulberry): should we report an error?
-      // TODO(paulberry): test this case
       return;
     }
 
     // Otherwise, if the outer node is in a nullable state, then no resolution
     // is needed because the substitution node is already satisfied.
     if (substitutionNode.outerNode.isNullable) {
-      // TODO(paulberry): test this case
       return;
     }
 
     // Otherwise, if the inner node is in the non-nullable state, then we set
     // the outer node to the ordinary nullable state.
     if (substitutionNode.innerNode._state == _NullabilityState.nonNullable) {
-      // TODO(paulberry): test this case
       _setNullable(substitutionNode.outerNode as NullabilityNodeMutable);
       return;
     }
@@ -299,7 +296,6 @@ class NullabilityGraph {
     // rule: if there is an edge A → B, where A is in the undetermined or
     // ordinary nullable state, and B is in the exact nullable state, then A’s
     // state is changed to exact nullable.
-    // TODO(paulberry): test this case
     var pendingNodes = [substitutionNode.innerNode];
     while (pendingNodes.isNotEmpty) {
       var node = pendingNodes.removeLast();
