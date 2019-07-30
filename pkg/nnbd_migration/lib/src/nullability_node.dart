@@ -100,10 +100,9 @@ class NullabilityGraph {
   /// Set containing all sources being migrated.
   final _sourcesBeingMigrated = <Source>{};
 
-  /// During and after nullability propagation, a list of all nodes that have
-  /// been placed in either the [_NullabilityState.ordinaryNullable] or
-  /// [_NullabilityState.exactNullable] state.
-  final List<NullabilityNode> _nullableNodes = [];
+  /// After execution of [_propagateAlways], a list of all nodes reachable from
+  /// [always] via zero or more edges of kind [_NullabilityEdgeKind.union].
+  final List<NullabilityNode> _unionedWithAlways = [];
 
   /// During any given stage of nullability propagation, a list of all the edges
   /// that need to be examined before the stage is complete.
@@ -145,8 +144,6 @@ class NullabilityGraph {
     _propagateDownstream();
     return _unsatisfiedEdges;
   }
-
-  void run() {}
 
   /// Records that nodes [x] and [y] should have exactly the same nullability.
   void union(NullabilityNode x, NullabilityNode y, EdgeOrigin origin) {
@@ -199,7 +196,7 @@ class NullabilityGraph {
 
   /// Propagates nullability downstream along union edges from "always".
   void _propagateAlways() {
-    _nullableNodes.add(always);
+    _unionedWithAlways.add(always);
     _pendingEdges.addAll(always._downstreamEdges);
     while (_pendingEdges.isNotEmpty) {
       var edge = _pendingEdges.removeLast();
@@ -209,7 +206,7 @@ class NullabilityGraph {
       assert(edge.sources.length == 1);
       var node = edge.destinationNode;
       if (node is NullabilityNodeMutable && !node.isNullable) {
-        _nullableNodes.add(node);
+        _unionedWithAlways.add(node);
         node._state = _NullabilityState.ordinaryNullable;
         // Was not previously nullable, so we need to propagate.
         _pendingEdges.addAll(node._downstreamEdges);
@@ -220,7 +217,7 @@ class NullabilityGraph {
   /// Propagates nullability downstream.
   void _propagateDownstream() {
     assert(_pendingEdges.isEmpty);
-    for (var node in _nullableNodes) {
+    for (var node in _unionedWithAlways) {
       _pendingEdges.addAll(node._downstreamEdges);
     }
     var pendingSubstitutions = <NullabilityNodeForSubstitution>[];
