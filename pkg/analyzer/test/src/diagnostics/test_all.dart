@@ -4,6 +4,7 @@
 
 import 'package:test_reflective_loader/test_reflective_loader.dart';
 
+import 'ambiguous_export_test.dart' as ambiguous_export;
 import 'ambiguous_import_test.dart' as ambiguous_import;
 import 'ambiguous_set_or_map_literal_test.dart' as ambiguous_set_or_map_literal;
 import 'argument_type_not_assignable_test.dart' as argument_type_not_assignable;
@@ -61,6 +62,8 @@ import 'extension_declares_abstract_method_test.dart'
 import 'extension_declares_constructor_test.dart'
     as extension_declares_constructor;
 import 'extension_declares_field_test.dart' as extension_declares_field;
+import 'extension_declares_member_of_object_test.dart'
+    as extension_declares_member_of_object;
 import 'extension_override_access_to_static_member_test.dart'
     as extension_override_access_to_static_member;
 import 'extension_override_argument_not_assignable_test.dart'
@@ -206,6 +209,8 @@ import 'sdk_version_set_literal_test.dart' as sdk_version_set_literal;
 import 'sdk_version_ui_as_code_test.dart' as sdk_version_ui_as_code;
 import 'set_element_type_not_assignable_test.dart'
     as set_element_type_not_assignable;
+import 'static_access_to_instance_member_test.dart'
+    as static_access_to_instance_member;
 import 'subtype_of_sealed_class_test.dart' as subtype_of_sealed_class;
 import 'top_level_instance_getter_test.dart' as top_level_instance_getter;
 import 'top_level_instance_method_test.dart' as top_level_instance_method;
@@ -247,6 +252,7 @@ import 'wrong_type_parameter_variance_in_superinterface_test.dart'
 
 main() {
   defineReflectiveSuite(() {
+    ambiguous_export.main();
     ambiguous_import.main();
     ambiguous_set_or_map_literal.main();
     argument_type_not_assignable.main();
@@ -290,6 +296,7 @@ main() {
     extension_declares_abstract_method.main();
     extension_declares_constructor.main();
     extension_declares_field.main();
+    extension_declares_member_of_object.main();
     extension_override_access_to_static_member.main();
     extension_override_argument_not_assignable.main();
     extra_positional_arguments.main();
@@ -388,6 +395,7 @@ main() {
     sdk_version_set_literal.main();
     sdk_version_ui_as_code.main();
     set_element_type_not_assignable.main();
+    static_access_to_instance_member.main();
     subtype_of_sealed_class.main();
     top_level_instance_getter.main();
     top_level_instance_method.main();

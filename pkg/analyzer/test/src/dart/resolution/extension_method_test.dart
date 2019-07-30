@@ -187,6 +187,27 @@ f(C c) {
     assertInvokeType(invocation, 'int Function(int)');
   }
 
+  test_instance_getter_methodInvocation() async {
+    await assertNoErrorsInCode('''
+class C {}
+
+extension E on C {
+  double Function(int) get a => (b) => 2.0;
+}
+
+f(C c) {
+  c.a(0);
+}
+''');
+    var invocation = findNode.methodInvocation('a(0);');
+    assertMethodInvocation(
+      invocation,
+      findElement.getter('a'),
+      'double Function(int)',
+      expectedMethodNameType: 'double Function(int) Function()',
+    );
+  }
+
   test_instance_getter_noMatch() async {
     await assertErrorsInCode(r'''
 class C {}
@@ -516,8 +537,66 @@ f(C c) {
     assertElement(access, findElement.setter('a'));
   }
 
-  @failingTest
-  test_static_getter() async {
+  test_static_field_importedWithPrefix() async {
+    newFile('/test/lib/lib.dart', content: '''
+class C {}
+
+extension E on C {
+  static int a = 1;
+}
+''');
+    await assertNoErrorsInCode('''
+import 'lib.dart' as p;
+
+f() {
+  p.E.a;
+}
+''');
+    var identifier = findNode.simple('a;');
+    var import = findElement.importFind('package:test/lib.dart');
+    assertElement(identifier, import.extension_('E').getGetter('a'));
+    assertType(identifier, 'int');
+  }
+
+  test_static_field_local() async {
+    await assertNoErrorsInCode('''
+class C {}
+
+extension E on C {
+  static int a = 1;
+}
+
+f() {
+  E.a;
+}
+''');
+    var identifier = findNode.simple('a;');
+    assertElement(identifier, findElement.getter('a'));
+    assertType(identifier, 'int');
+  }
+
+  test_static_getter_importedWithPrefix() async {
+    newFile('/test/lib/lib.dart', content: '''
+class C {}
+
+extension E on C {
+  static int get a => 1;
+}
+''');
+    await assertNoErrorsInCode('''
+import 'lib.dart' as p;
+
+f() {
+  p.E.a;
+}
+''');
+    var identifier = findNode.simple('a;');
+    var import = findElement.importFind('package:test/lib.dart');
+    assertElement(identifier, import.extension_('E').getGetter('a'));
+    assertType(identifier, 'int');
+  }
+
+  test_static_getter_local() async {
     await assertNoErrorsInCode('''
 class C {}
 
@@ -534,10 +613,31 @@ f() {
     assertType(identifier, 'int');
   }
 
-  @failingTest
-  test_static_method() async {
+  test_static_method_importedWithPrefix() async {
+    newFile('/test/lib/lib.dart', content: '''
+class C {}
+
+extension E on C {
+  static void a() {}
+}
+''');
+    await assertNoErrorsInCode('''
+import 'lib.dart' as p;
+
+f() {
+  p.E.a();
+}
+''');
+    var invocation = findNode.methodInvocation('E.a()');
+    var import = findElement.importFind('package:test/lib.dart');
+    assertElement(invocation, import.extension_('E').getMethod('a'));
+    assertInvokeType(invocation, 'void Function()');
+  }
+
+  test_static_method_local() async {
     await assertNoErrorsInCode('''
 class C {}
+
 extension E on C {
   static void a() {}
 }
@@ -546,13 +646,32 @@ f() {
   E.a();
 }
 ''');
-    var invocation = findNode.methodInvocation('a();');
+    var invocation = findNode.methodInvocation('E.a()');
     assertElement(invocation, findElement.method('a'));
     assertInvokeType(invocation, 'void Function()');
   }
 
-  @failingTest
-  test_static_setter() async {
+  test_static_setter_importedWithPrefix() async {
+    newFile('/test/lib/lib.dart', content: '''
+class C {}
+
+extension E on C {
+  static set a(int x) {}
+}
+''');
+    await assertNoErrorsInCode('''
+import 'lib.dart' as p;
+
+f() {
+  p.E.a = 3;
+}
+''');
+    var identifier = findNode.simple('a =');
+    var import = findElement.importFind('package:test/lib.dart');
+    assertElement(identifier, import.extension_('E').getSetter('a'));
+  }
+
+  test_static_setter_local() async {
     await assertNoErrorsInCode('''
 class C {}
 
@@ -774,6 +893,34 @@ extension E on C {
 ''');
     var access = findNode.propertyAccess('this.a');
     assertElement(access, findElement.setter('a', of: 'E'));
+  }
+
+  test_static_field_fromInstance() async {
+    await assertNoErrorsInCode('''
+class C {}
+
+extension E on C {
+  static int a = 1;
+  int m() => a;
+}
+''');
+    var identifier = findNode.simple('a;');
+    assertElement(identifier, findElement.getter('a'));
+    assertType(identifier, 'int');
+  }
+
+  test_static_field_fromStatic() async {
+    await assertNoErrorsInCode('''
+class C {}
+
+extension E on C {
+  static int a = 1;
+  static int m() => a;
+}
+''');
+    var identifier = findNode.simple('a;');
+    assertElement(identifier, findElement.getter('a'));
+    assertType(identifier, 'int');
   }
 
   test_static_getter_fromInstance() async {
