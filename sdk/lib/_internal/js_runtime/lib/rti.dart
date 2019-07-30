@@ -332,6 +332,18 @@ Rti instanceType(object) {
           'depends:none;effects:none;', JsBuiltin.dartObjectConstructor))) {
     var rti = JS('', r'#[#]', object, JS_GET_NAME(JsGetName.RTI_NAME));
     if (rti != null) return _castToRti(rti);
+
+    // Subclasses of Closure are synthetic classes, so make them appear to be
+    // the 'Closure' class.
+    // TODO(sra): Can this be done less expensively, e.g. by putting $ti on the
+    // prototype of Closure class?
+    var closureClassConstructor = JS_BUILTIN(
+        'depends:none;effects:none;', JsBuiltin.dartClosureConstructor);
+    if (closureClassConstructor != null &&
+        _Utils.instanceOf(object, closureClassConstructor)) {
+      return _instanceTypeFromConstructor(closureClassConstructor);
+    }
+
     return _instanceTypeFromConstructor(JS('', '#.constructor', object));
   }
 
@@ -1472,8 +1484,6 @@ class TypeRule {
 bool isSubtype(universe, Rti s, Rti t) {
   return _isSubtype(universe, s, null, t, null);
 }
-
-int _ticks = 0;
 
 bool _isSubtype(universe, Rti s, sEnv, Rti t, tEnv) {
   // TODO(fishythefish): Update for NNBD. See
