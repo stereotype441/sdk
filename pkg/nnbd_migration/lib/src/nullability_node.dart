@@ -436,6 +436,11 @@ abstract class NullabilityNode {
 
   _NullabilityState get _state;
 
+  /// After nullability propagation, this getter can be used to query whether
+  /// the type associated with this node should be considered "exact nullable".
+  @visibleForTesting
+  bool get isExactNullable;
+
   /// Records the fact that an invocation was made to a function with named
   /// parameters, and the named parameter associated with this node was not
   /// supplied.
