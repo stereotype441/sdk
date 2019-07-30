@@ -100,40 +100,6 @@ class D = C with M;
     await _checkSingleFileChanges(content, expected);
   }
 
-  solo_test_foo() async {
-    var content = '''
-class C<T> {
-  List<T> values;
-  C() : values = <T>[];
-  void add(T t) => values.add(t);
-  T operator[](int i) => values[i];
-}
-void f() {
-  C<int> x = new C<int>();
-  g(x);
-}
-void g(C<int> y) {
-  y.add(null);
-}
-''';
-  var expected = '''
-class C<T> {
-  List<T> values;
-  C() : values = <T>[];
-  void add(T t) => values.add(t);
-  T operator[](int i) => values[i];
-}
-void f() {
-  C<int?> x = new C<int?>();
-  g(x);
-}
-void g(C<int?> y) {
-  y.add(null);
-}
-''';
-    await _checkSingleFileChanges(content, expected);
-  }
-
   test_class_with_default_constructor() async {
     var content = '''
 void main() => f(Foo());
@@ -1075,6 +1041,40 @@ int? g(int? i) => i;
 int? test(int? i) => f(g, i);
 main() {
   test(null);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_generic_exact_propagation() async {
+    var content = '''
+class C<T> {
+  List<T> values;
+  C() : values = <T>[];
+  void add(T t) => values.add(t);
+  T operator[](int i) => values[i];
+}
+void f() {
+  C<int> x = new C<int>();
+  g(x);
+}
+void g(C<int> y) {
+  y.add(null);
+}
+''';
+    var expected = '''
+class C<T> {
+  List<T> values;
+  C() : values = <T>[];
+  void add(T t) => values.add(t);
+  T operator[](int i) => values[i];
+}
+void f() {
+  C<int?> x = new C<int?>();
+  g(x);
+}
+void g(C<int?> y) {
+  y.add(null);
 }
 ''';
     await _checkSingleFileChanges(content, expected);
