@@ -357,6 +357,8 @@ class AnalysisDriver implements AnalysisDriverGeneric {
    */
   void Function(String) onCurrentSessionAboutToBeDiscarded;
 
+  /// If testing data is being retained, a pointer to the object that is
+  /// retaining the testing data.  Otherwise `null`.
   final TestingData testingData;
 
   /**
