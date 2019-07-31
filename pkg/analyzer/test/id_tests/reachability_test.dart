@@ -6,10 +6,7 @@ import 'dart:io';
 
 import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/dart/ast/ast.dart';
-import 'package:analyzer/dart/element/element.dart';
-import 'package:analyzer/dart/element/type_system.dart';
 import 'package:analyzer/src/dart/analysis/testing_data.dart';
-import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
 import 'package:analyzer/src/util/ast_data_extractor.dart';
 import 'package:front_end/src/testing/id.dart' show ActualData, Id;
@@ -58,7 +55,7 @@ class _ReachabilityDataComputer extends DataComputer<Set<_ReachabilityAssertion>
     var flowResult =
     testingData.uriToFlowAnalysisResult[unit.declaredElement.source.uri];
     _ReachabilityDataExtractor(unit.declaredElement.source.uri, actualMap,
-        flowResult, unit.declaredElement.context.typeSystem)
+        flowResult)
         .run(unit);
   }
 }
@@ -66,31 +63,15 @@ class _ReachabilityDataComputer extends DataComputer<Set<_ReachabilityAssertion>
 class _ReachabilityDataExtractor extends AstDataExtractor<Set<_ReachabilityAssertion>> {
   final FlowAnalysisResult _flowResult;
 
-  final TypeSystem _typeSystem;
-
   _ReachabilityDataExtractor(
       Uri uri,
       Map<Id, ActualData<Set<_ReachabilityAssertion>>> actualMap,
-      this._flowResult,
-      this._typeSystem)
+      this._flowResult)
       : super(uri, actualMap);
 
   @override
   Set<_ReachabilityAssertion> computeNodeValue(Id id, AstNode node) {
     Set<_ReachabilityAssertion> result = {};
-    if (node is SimpleIdentifier && node.inGetterContext()) {
-      var element = node.staticElement;
-      if (element is LocalVariableElement || element is ParameterElement) {
-        TypeImpl promotedType = node.staticType;
-        TypeImpl declaredType = (element as VariableElement).type;
-        var isPromoted = promotedType != declaredType;
-        if (isPromoted &&
-            _typeSystem.isNullable(declaredType) &&
-            !_typeSystem.isNullable(promotedType)) {
-          result.add(_ReachabilityAssertion.nonNullable);
-        }
-      }
-    }
     if (_flowResult.unreachableNodes.contains(node)) {
       result.add(_ReachabilityAssertion.unreachable);
     }

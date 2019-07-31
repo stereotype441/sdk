@@ -55,23 +55,18 @@ class _NullabilityDataComputer extends DataComputer<String> {
   @override
   void computeUnitData(TestingData testingData, CompilationUnit unit,
       Map<Id, ActualData<String>> actualMap) {
-    var flowResult =
-    testingData.uriToFlowAnalysisResult[unit.declaredElement.source.uri];
     _NullabilityDataExtractor(unit.declaredElement.source.uri, actualMap,
-        flowResult, unit.declaredElement.context.typeSystem)
+        unit.declaredElement.context.typeSystem)
         .run(unit);
   }
 }
 
 class _NullabilityDataExtractor extends AstDataExtractor<String> {
-  final FlowAnalysisResult _flowResult;
-
   final TypeSystem _typeSystem;
 
   _NullabilityDataExtractor(
       Uri uri,
       Map<Id, ActualData<String>> actualMap,
-      this._flowResult,
       this._typeSystem)
       : super(uri, actualMap);
 
