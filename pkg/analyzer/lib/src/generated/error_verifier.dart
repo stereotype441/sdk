@@ -906,6 +906,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
     if (!_checkForNullableDereference(functionExpression) &&
         !_checkForUseOfVoidResult(functionExpression) &&
         !_checkForUseOfNever(functionExpression) &&
+        node.staticElement == null &&
         !_isFunctionType(expressionType)) {
       _errorReporter.reportErrorForNode(
           StaticTypeWarningCode.INVOCATION_OF_NON_FUNCTION_EXPRESSION,
@@ -1076,7 +1077,6 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
       _checkTypeArgumentCount(typeArguments, 1,
           StaticTypeWarningCode.EXPECTED_ONE_LIST_TYPE_ARGUMENTS);
     }
-    _checkForInferenceFailureOnCollectionLiteral(node);
     _checkForImplicitDynamicTypedLiteral(node);
     _checkForListElementTypeNotAssignable(node);
 
@@ -1298,7 +1298,6 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
         _checkTypeArgumentCount(typeArguments, 2,
             StaticTypeWarningCode.EXPECTED_TWO_MAP_TYPE_ARGUMENTS);
       }
-      _checkForInferenceFailureOnCollectionLiteral(node);
       _checkForImplicitDynamicTypedLiteral(node);
       _checkForMapTypeNotAssignable(node);
       _checkForNonConstMapAsExpressionStatement3(node);
@@ -1314,7 +1313,6 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
         _checkTypeArgumentCount(typeArguments, 1,
             StaticTypeWarningCode.EXPECTED_ONE_SET_TYPE_ARGUMENTS);
       }
-      _checkForInferenceFailureOnCollectionLiteral(node);
       _checkForImplicitDynamicTypedLiteral(node);
       _checkForSetElementTypeNotAssignable3(node);
     }
@@ -3826,25 +3824,6 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
         CompileTimeErrorCode.IMPORT_INTERNAL_LIBRARY,
         directive.uri,
         [directive.uri.stringValue]);
-  }
-
-  /// Checks a collection literal for an inference failure, and reports the
-  /// appropriate error if [AnalysisOptionsImpl.strictInference] is set.
-  ///
-  /// This checks if [node] does not have explicit or inferred type arguments.
-  /// When that happens, it reports a
-  /// HintCode.INFERENCE_FAILURE_ON_COLLECTION_LITERAL error.
-  void _checkForInferenceFailureOnCollectionLiteral(TypedLiteral node) {
-    if (!_options.strictInference || node == null) return;
-    if (node.typeArguments != null) {
-      // Type has explicit type arguments.
-      return;
-    }
-    var type = node.staticType;
-    if (_isMissingTypeArguments(node, type, type.element, node)) {
-      _errorReporter.reportErrorForNode(
-          HintCode.INFERENCE_FAILURE_ON_COLLECTION_LITERAL, node, [type.name]);
-    }
   }
 
   /// Checks a type on an instance creation expression for an inference
@@ -6440,8 +6419,10 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
 
     Queue<ClassElement> superclasses =
         Queue.of(classElement.mixins.map((i) => i.element))
-          ..addAll(classElement.superclassConstraints.map((i) => i.element))
-          ..add(classElement.supertype?.element);
+          ..addAll(classElement.superclassConstraints.map((i) => i.element));
+    if (classElement.supertype != null) {
+      superclasses.add(classElement.supertype.element);
+    }
     return superclasses.any(
         (parent) => parent.lookUpConcreteMethod(name, parent.library) != null);
   }
