@@ -105,7 +105,8 @@ class LibraryAnalyzer {
       this._library,
       this._resourceProvider,
       {TestingData testingData})
-      : _typeSystem = _context.typeSystem, _testingData = testingData;
+      : _typeSystem = _context.typeSystem,
+        _testingData = testingData;
 
   /**
    * Compute analysis results for all units of the library.
