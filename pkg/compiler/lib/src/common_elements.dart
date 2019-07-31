@@ -490,6 +490,11 @@ abstract class CommonElements {
   FieldEntity get rtiIsField;
   FunctionEntity get rtiEvalMethod;
   FunctionEntity get rtiBindMethod;
+  FunctionEntity get rtiAddRulesMethod;
+
+  FunctionEntity get generalIsTestImplementation;
+  FunctionEntity get generalAsCheckImplementation;
+  FunctionEntity get generalTypeCheckImplementation;
 
   // From dart:_internal
 
@@ -1837,6 +1842,7 @@ class CommonElementsImpl
       _checkTypeBound ??= _findRtiFunction('checkTypeBound');
 
   ClassEntity get _rtiImplClass => _findClass(rtiLibrary, 'Rti');
+  ClassEntity get _rtiUniverseClass => _findClass(rtiLibrary, '_Universe');
   FieldEntity _findRtiClassField(String name) =>
       _findClassMember(_rtiImplClass, name);
 
@@ -1862,6 +1868,29 @@ class CommonElementsImpl
   @override
   FunctionEntity get rtiBindMethod =>
       _rtiBindMethod ??= _findClassMember(_rtiImplClass, '_bind');
+
+  FunctionEntity _rtiAddRulesMethod;
+  @override
+  FunctionEntity get rtiAddRulesMethod =>
+      _rtiAddRulesMethod ??= _findClassMember(_rtiUniverseClass, 'addRules');
+
+  FunctionEntity _generalIsTestImplementation;
+  @override
+  FunctionEntity get generalIsTestImplementation =>
+      _generalIsTestImplementation ??=
+          _findRtiFunction('_generalIsTestImplementation');
+
+  FunctionEntity _generalAsCheckImplementation;
+  @override
+  FunctionEntity get generalAsCheckImplementation =>
+      _generalAsCheckImplementation ??=
+          _findRtiFunction('_generalAsCheckImplementation');
+
+  FunctionEntity _generalTypeCheckImplementation;
+  @override
+  FunctionEntity get generalTypeCheckImplementation =>
+      _generalTypeCheckImplementation ??=
+          _findRtiFunction('_generalTypeCheckImplementation');
 
   // From dart:_internal
 

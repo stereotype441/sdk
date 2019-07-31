@@ -7,8 +7,7 @@ import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/ast/ast.dart';
-import 'package:analyzer/src/dart/element/inheritance_manager2.dart';
-import 'package:analyzer/src/dart/element/member.dart';
+import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/resolver/extension_member_resolver.dart';
 import 'package:analyzer/src/dart/resolver/scope.dart';
@@ -29,7 +28,7 @@ class MethodInvocationResolver {
   final InterfaceType _typeType;
 
   /// The manager for the inheritance mappings.
-  final InheritanceManager2 _inheritance;
+  final InheritanceManager3 _inheritance;
 
   /// The element for the library containing the compilation unit being visited.
   final LibraryElement _definingLibrary;
@@ -95,6 +94,15 @@ class MethodInvocationResolver {
       }
     }
 
+    if (receiver is Identifier) {
+      var receiverElement = receiver.staticElement;
+      if (receiverElement is ExtensionElement) {
+        _resolveExtensionMember(
+            node, receiver, receiverElement, nameNode, name);
+        return;
+      }
+    }
+
     if (receiver is SuperExpression) {
       _resolveReceiverSuper(node, receiver, nameNode, name);
       return;
@@ -134,6 +142,11 @@ class MethodInvocationResolver {
       _reportUseOfVoidType(node, receiver);
       return;
     }
+
+    if (receiverType == BottomTypeImpl.instance) {
+      _reportUseOfNeverType(node, receiver);
+      return;
+    }
   }
 
   /// Given an [argumentList] and the executable [element] that  will be invoked
@@ -155,18 +168,17 @@ class MethodInvocationResolver {
     return null;
   }
 
-  /// If the element of the invoked [targetType] is a getter, then actually
-  /// the return type of the [targetType] is invoked.  So, remember the
-  /// [targetType] into [MethodInvocationImpl.methodNameType] and return the
-  /// actual invoked type.
-  DartType _getCalleeType(MethodInvocation node, FunctionType targetType) {
-    if (targetType.element.kind == ElementKind.GETTER) {
-      (node as MethodInvocationImpl).methodNameType = targetType;
-      var calleeType = targetType.returnType;
+  /// If the invoked [target] is a getter, then actually the return type of
+  /// the [target] is invoked.  So, remember the [target] into
+  /// [MethodInvocationImpl.methodNameType] and return the actual invoked type.
+  DartType _getCalleeType(MethodInvocation node, ExecutableElement target) {
+    if (target.kind == ElementKind.GETTER) {
+      (node as MethodInvocationImpl).methodNameType = target.type;
+      var calleeType = target.returnType;
       calleeType = _resolveTypeParameter(calleeType);
       return calleeType;
     }
-    return targetType;
+    return target.type;
   }
 
   /// Check for a generic type, and apply type arguments.
@@ -253,6 +265,14 @@ class MethodInvocationResolver {
     );
   }
 
+  void _reportUseOfNeverType(MethodInvocation node, AstNode errorNode) {
+    _setDynamicResolution(node);
+    _resolver.errorReporter.reportErrorForNode(
+      StaticWarningCode.INVALID_USE_OF_NEVER_VALUE,
+      errorNode,
+    );
+  }
+
   void _reportUseOfVoidType(MethodInvocation node, AstNode errorNode) {
     _setDynamicResolution(node);
     _resolver.errorReporter.reportErrorForNode(
@@ -328,31 +348,60 @@ class MethodInvocationResolver {
       return;
     }
     nameNode.staticElement = member;
+    var calleeType = _getCalleeType(node, member);
+    _setResolution(node, calleeType);
     return;
+  }
+
+  void _resolveExtensionMember(MethodInvocation node, Identifier receiver,
+      ExtensionElement extension, SimpleIdentifier nameNode, String name) {
+    ExecutableElement element =
+        extension.getMethod(name) ?? extension.getGetter(name);
+    if (element is ExecutableElement) {
+      if (!element.isStatic) {
+        _resolver.errorReporter.reportErrorForNode(
+            StaticWarningCode.STATIC_ACCESS_TO_INSTANCE_MEMBER,
+            nameNode,
+            [name]);
+      }
+      nameNode.staticElement = element;
+      _setResolution(node, _getCalleeType(node, element));
+    } else {
+      _reportUndefinedFunction(node, receiver);
+    }
   }
 
   void _resolveExtensionOverride(MethodInvocation node,
       ExtensionOverride override, SimpleIdentifier nameNode, String name) {
     ExtensionElement element = override.extensionName.staticElement;
-    Element member = element.getMethod(name) ?? element.getGetter(name);
+    ExecutableElement member =
+        element.getMethod(name) ?? element.getGetter(name);
+
     if (member == null) {
+      _setDynamicResolution(node);
       _resolver.errorReporter.reportErrorForNode(
-          CompileTimeErrorCode.UNDEFINED_EXTENSION_METHOD,
-          nameNode,
-          [name, element.name]);
-    } else if (member is ExecutableElement && member.isStatic) {
-      _resolver.errorReporter.reportErrorForNode(
-          CompileTimeErrorCode.EXTENSION_OVERRIDE_ACCESS_TO_STATIC_MEMBER,
-          nameNode);
+        CompileTimeErrorCode.UNDEFINED_EXTENSION_METHOD,
+        nameNode,
+        [name, element.name],
+      );
+      return;
     }
+
+    if (member is ExecutableElement && member.isStatic) {
+      _resolver.errorReporter.reportErrorForNode(
+        CompileTimeErrorCode.EXTENSION_OVERRIDE_ACCESS_TO_STATIC_MEMBER,
+        nameNode,
+      );
+    }
+
     if (node.isCascaded) {
       // TODO(brianwilkerson) Report this error and decide how to recover.
       throw new UnsupportedError('cascaded extension override');
     }
-    // TODO(brianwilkerson) Handle the case where the name resolved to a getter.
-    //  It might be that the getter returns a function that is being invoked, or
-    //  it might be an error to have an argument list.
+
     nameNode.staticElement = member;
+    var calleeType = _getCalleeType(node, member);
+    _setResolution(node, calleeType);
   }
 
   void _resolveReceiverDynamic(MethodInvocation node, String name) {
@@ -371,13 +420,13 @@ class MethodInvocationResolver {
     }
 
     // We can invoke Object methods on Function.
-    var type = _inheritance.getMember(
+    var member = _inheritance.getMember(
       _resolver.typeProvider.objectType,
       new Name(null, name),
     );
-    if (type != null) {
-      nameNode.staticElement = type.element;
-      return _setResolution(node, type);
+    if (member != null) {
+      nameNode.staticElement = member;
+      return _setResolution(node, member.type);
     }
 
     _reportUndefinedMethod(
@@ -395,21 +444,10 @@ class MethodInvocationResolver {
       return;
     }
 
-    var targetType = _inheritance.getMember(receiverType, _currentName);
-    if (targetType != null) {
-      var calleeType = _getCalleeType(node, targetType);
-
-      // TODO(scheglov) This is bad, we have to create members here.
-      // Find a way to avoid this.
-      Element element;
-      var baseElement = targetType.element;
-      if (baseElement is MethodElement) {
-        element = MethodMember.from(baseElement, receiverType);
-      } else if (baseElement is PropertyAccessorElement) {
-        element = PropertyAccessorMember.from(baseElement, receiverType);
-      }
-      nameNode.staticElement = element;
-
+    var target = _inheritance.getMember(receiverType, _currentName);
+    if (target != null) {
+      nameNode.staticElement = target;
+      var calleeType = _getCalleeType(node, target);
       return _setResolution(node, calleeType);
     }
 
@@ -475,7 +513,7 @@ class MethodInvocationResolver {
         element = multiply.conflictingElements[0];
       }
       if (element is ExecutableElement) {
-        var calleeType = _getCalleeType(node, element.type);
+        var calleeType = _getCalleeType(node, element);
         return _setResolution(node, calleeType);
       }
       if (element is VariableElement) {
@@ -496,11 +534,11 @@ class MethodInvocationResolver {
     }
 
     var receiverType = enclosingClass.type;
-    var targetType = _inheritance.getMember(receiverType, _currentName);
+    var target = _inheritance.getMember(receiverType, _currentName);
 
-    if (targetType != null) {
-      nameNode.staticElement = targetType.element;
-      var calleeType = _getCalleeType(node, targetType);
+    if (target != null) {
+      nameNode.staticElement = target;
+      var calleeType = _getCalleeType(node, target);
       return _setResolution(node, calleeType);
     }
 
@@ -550,7 +588,7 @@ class MethodInvocationResolver {
     }
 
     if (element is ExecutableElement) {
-      var calleeType = _getCalleeType(node, element.type);
+      var calleeType = _getCalleeType(node, element);
       return _setResolution(node, calleeType);
     }
 
@@ -564,16 +602,16 @@ class MethodInvocationResolver {
     }
 
     var receiverType = _resolver.enclosingClass.type;
-    var targetType = _inheritance.getMember(
+    var target = _inheritance.getMember(
       receiverType,
       _currentName,
       forSuper: true,
     );
 
     // If there is that concrete dispatch target, then we are done.
-    if (targetType != null) {
-      nameNode.staticElement = targetType.element;
-      var calleeType = _getCalleeType(node, targetType);
+    if (target != null) {
+      nameNode.staticElement = target;
+      var calleeType = _getCalleeType(node, target);
       _setResolution(node, calleeType);
       return;
     }
@@ -581,16 +619,16 @@ class MethodInvocationResolver {
     // Otherwise, this is an error.
     // But we would like to give the user at least some resolution.
     // So, we try to find the interface target.
-    targetType = _inheritance.getInherited(receiverType, _currentName);
-    if (targetType != null) {
-      nameNode.staticElement = targetType.element;
-      var calleeType = _getCalleeType(node, targetType);
+    target = _inheritance.getInherited(receiverType, _currentName);
+    if (target != null) {
+      nameNode.staticElement = target;
+      var calleeType = _getCalleeType(node, target);
       _setResolution(node, calleeType);
 
       _resolver.errorReporter.reportErrorForNode(
           CompileTimeErrorCode.ABSTRACT_SUPER_MEMBER_REFERENCE,
           nameNode,
-          [targetType.element.kind.displayName, name]);
+          [target.kind.displayName, name]);
       return;
     }
 
@@ -612,7 +650,7 @@ class MethodInvocationResolver {
     if (element != null) {
       if (element is ExecutableElement) {
         nameNode.staticElement = element;
-        var calleeType = _getCalleeType(node, element.type);
+        var calleeType = _getCalleeType(node, element);
         _setResolution(node, calleeType);
       } else {
         _reportInvocationOfNonFunction(node);
@@ -667,8 +705,8 @@ class MethodInvocationResolver {
 
     if (type is InterfaceType) {
       var call = _inheritance.getMember(type, _nameCall);
-      if (call != null && call.element.kind == ElementKind.METHOD) {
-        type = call;
+      if (call != null && call.kind == ElementKind.METHOD) {
+        type = call.type;
       }
     }
 
@@ -693,6 +731,10 @@ class MethodInvocationResolver {
 
     if (type is VoidType) {
       return _reportUseOfVoidType(node, node.methodName);
+    }
+
+    if (type == BottomTypeImpl.instance) {
+      return _reportUseOfNeverType(node, node.methodName);
     }
 
     _reportInvocationOfNonFunction(node);

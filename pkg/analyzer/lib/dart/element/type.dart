@@ -79,6 +79,10 @@ abstract class DartType {
   /// dart:core library.
   bool get isDartCoreNull;
 
+  /// Return `true` if this type represents the type 'num' defined in the
+  /// dart:core library.
+  bool get isDartCoreNum;
+
   /// Returns `true` if this type represents the type 'Set' defined in the
   /// dart:core library.
   bool get isDartCoreSet;
@@ -128,9 +132,11 @@ abstract class DartType {
   ///
   /// `operator==` would consider F<int> and F<bool> to be different types;
   /// `isEquivalentTo` considers them to be equivalent.
+  @Deprecated('operator== was fixed. Use it instead.')
   bool isEquivalentTo(DartType dest);
 
   /// Return `true` if this type is more specific than the given [type].
+  @Deprecated('Use TypeSystem.isSubtypeOf() instead.')
   bool isMoreSpecificThan(DartType type);
 
   /// Return `true` if this type is a subtype of the given [type].
@@ -373,25 +379,8 @@ abstract class InterfaceType implements ParameterizedType {
   /// * <i>I</i> is listed in the implements clause of <i>J</i>.
   /// * <i>I</i> is listed in the with clause of <i>J</i>.
   /// * <i>J</i> is a mixin application of the mixin of <i>I</i>.
+  @Deprecated('This method was used internally, and is not used anymore.')
   bool isDirectSupertypeOf(InterfaceType type);
-
-  /// Return `true` if this type is more specific than the given [type]. An
-  /// interface type <i>T</i> is more specific than an interface type <i>S</i>,
-  /// written <i>T &laquo; S</i>, if one of the following conditions is met:
-  ///
-  /// * Reflexivity: <i>T</i> is <i>S</i>.
-  /// * <i>T</i> is bottom.
-  /// * <i>S</i> is dynamic.
-  /// * Direct supertype: <i>S</i> is a direct supertype of <i>T</i>.
-  /// * <i>T</i> is a type parameter and <i>S</i> is the upper bound of
-  /// <i>T</i>.
-  /// * Covariance: <i>T</i> is of the form <i>I&lt;T<sub>1</sub>, &hellip;,
-  ///   T<sub>n</sub>&gt;</i> and S</i> is of the form <i>I&lt;S<sub>1</sub>,
-  ///   &hellip;, S<sub>n</sub>&gt;</i> and <i>T<sub>i</sub> &laquo;
-  ///   S<sub>i</sub></i>, <i>1 <= i <= n</i>.
-  /// * Transitivity: <i>T &laquo; U</i> and <i>U &laquo; S</i>.
-  @override
-  bool isMoreSpecificThan(DartType type);
 
   /// Return `true` if this type is a subtype of the given [type]. An interface
   /// type <i>T</i> is a subtype of an interface type <i>S</i>, written <i>T</i>

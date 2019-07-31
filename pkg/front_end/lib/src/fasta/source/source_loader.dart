@@ -79,8 +79,7 @@ import '../kernel/kernel_builder.dart'
         DelayedOverrideCheck,
         EnumBuilder,
         FieldBuilder,
-        KernelClassBuilder,
-        KernelProcedureBuilder,
+        ProcedureBuilder,
         LibraryBuilder,
         MemberBuilder,
         NamedTypeBuilder,
@@ -117,7 +116,7 @@ import 'source_class_builder.dart' show SourceClassBuilder;
 
 import 'source_library_builder.dart' show SourceLibraryBuilder;
 
-class SourceLoader extends Loader<Library> {
+class SourceLoader extends Loader {
   /// The [FileSystem] which should be used to access files.
   final FileSystem fileSystem;
 
@@ -317,8 +316,8 @@ class SourceLoader extends Loader<Library> {
               "debugExpression in $enclosingClass");
       }
     }
-    KernelProcedureBuilder builder = new KernelProcedureBuilder(null, 0, null,
-        "debugExpr", null, null, ProcedureKind.Method, library, 0, 0, -1, -1)
+    ProcedureBuilder builder = new ProcedureBuilder(null, 0, null, "debugExpr",
+        null, null, ProcedureKind.Method, library, 0, 0, -1, -1)
       ..parent = parent;
     BodyBuilder listener = dietListener.createListener(
         builder, dietListener.memberScope, isInstanceMember);
@@ -670,7 +669,7 @@ class SourceLoader extends Loader<Library> {
       bool isClassBuilder = false;
       if (mixedInType is NamedTypeBuilder) {
         var builder = mixedInType.declaration;
-        if (builder is ClassBuilder<TypeBuilder, DartType>) {
+        if (builder is ClassBuilder) {
           isClassBuilder = true;
           for (Declaration constructory in builder.constructors.local.values) {
             if (constructory.isConstructor && !constructory.isSynthetic) {
@@ -818,11 +817,11 @@ class SourceLoader extends Loader<Library> {
   }
 
   void computeHierarchy() {
-    List<List> ambiguousTypesRecords = [];
+    List<AmbiguousTypesRecord> ambiguousTypesRecords = [];
     HandleAmbiguousSupertypes onAmbiguousSupertypes =
         (Class cls, Supertype a, Supertype b) {
       if (ambiguousTypesRecords != null) {
-        ambiguousTypesRecords.add([cls, a, b]);
+        ambiguousTypesRecords.add(new AmbiguousTypesRecord(cls, a, b));
       }
     };
     if (hierarchy == null) {
@@ -834,8 +833,8 @@ class SourceLoader extends Loader<Library> {
       hierarchy.applyTreeChanges(const [], component.libraries,
           reissueAmbiguousSupertypesFor: component);
     }
-    for (List record in ambiguousTypesRecords) {
-      handleAmbiguousSupertypes(record[0], record[1], record[2]);
+    for (AmbiguousTypesRecord record in ambiguousTypesRecords) {
+      handleAmbiguousSupertypes(record.cls, record.a, record.b);
     }
     ambiguousTypesRecords = null;
     ticker.logMs("Computed class hierarchy");
@@ -1095,7 +1094,7 @@ class SourceLoader extends Loader<Library> {
   }
 
   @override
-  KernelClassBuilder computeClassBuilderFromTargetClass(Class cls) {
+  ClassBuilder computeClassBuilderFromTargetClass(Class cls) {
     Library kernelLibrary = cls.enclosingLibrary;
     LibraryBuilder library = builders[kernelLibrary.importUri];
     if (library == null) {
@@ -1250,3 +1249,11 @@ class Symbol {
   const Symbol(String name);
 }
 """;
+
+class AmbiguousTypesRecord {
+  final Class cls;
+  final Supertype a;
+  final Supertype b;
+
+  const AmbiguousTypesRecord(this.cls, this.a, this.b);
+}

@@ -2021,6 +2021,68 @@ class C/*codeOffset=0, codeLength=462*/ {
         withConstElements: false);
   }
 
+  test_codeRange_extensions() async {
+    featureSet = enableExtensionMethods;
+    var library = await checkLibrary('''
+class A {}
+
+extension Raw on A {}
+
+/// Comment 1.
+/// Comment 2.
+extension HasDocComment on A {}
+
+@Object()
+extension HasAnnotation on A {}
+
+@Object()
+/// Comment 1.
+/// Comment 2.
+extension AnnotationThenComment on A {}
+
+/// Comment 1.
+/// Comment 2.
+@Object()
+extension CommentThenAnnotation on A {}
+
+/// Comment 1.
+@Object()
+/// Comment 2.
+extension CommentAroundAnnotation on A {}
+''');
+    checkElementText(
+        library,
+        r'''
+class A/*codeOffset=0, codeLength=10*/ {
+}
+extension Raw/*codeOffset=12, codeLength=21*/ on A {
+}
+/// Comment 1.
+/// Comment 2.
+extension HasDocComment/*codeOffset=35, codeLength=61*/ on A {
+}
+@Object()
+extension HasAnnotation/*codeOffset=98, codeLength=41*/ on A {
+}
+/// Comment 1.
+/// Comment 2.
+@Object()
+extension AnnotationThenComment/*codeOffset=141, codeLength=79*/ on A {
+}
+/// Comment 1.
+/// Comment 2.
+@Object()
+extension CommentThenAnnotation/*codeOffset=222, codeLength=79*/ on A {
+}
+/// Comment 2.
+@Object()
+extension CommentAroundAnnotation/*codeOffset=318, codeLength=66*/ on A {
+}
+''',
+        withCodeRanges: true,
+        withConstElements: false);
+  }
+
   test_codeRange_field() async {
     var library = await checkLibrary('''
 class C {
@@ -3608,6 +3670,27 @@ const int Function(int, String) V =
 ''');
   }
 
+  test_const_reference_staticMethod_ofExtension() async {
+    featureSet = enableExtensionMethods;
+    var library = await checkLibrary('''
+class A {}
+extension E on A {
+  static void f() {}
+}
+const x = E.f;
+''');
+    checkElementText(library, r'''
+class A {
+}
+extension E on A {
+  static void f() {}
+}
+const void Function() x =
+        E/*location: test.dart;E*/.
+        f/*location: test.dart;E;f*/;
+''');
+  }
+
   test_const_reference_topLevelFunction() async {
     var library = await checkLibrary(r'''
 foo() {}
@@ -5121,6 +5204,26 @@ class X {
         defaultF/*location: test.dart;defaultF*/});
 }
 void defaultF<T>(T v) {}
+''');
+  }
+
+  test_defaultValue_refersToExtension_method_inside() async {
+    featureSet = enableExtensionMethods;
+    var library = await checkLibrary('''
+class A {}
+extension E on A {
+  static void f() {}
+  static void g([Object p = f]) {}
+}
+''');
+    checkElementText(library, r'''
+class A {
+}
+extension E on A {
+  static void f() {}
+  static void g([Object p =
+        f/*location: test.dart;E;f*/]) {}
+}
 ''');
   }
 
@@ -8220,6 +8323,27 @@ const dynamic a = null;
 ''');
   }
 
+  test_metadata_extensionDeclaration() async {
+    featureSet = enableExtensionMethods;
+    var library = await checkLibrary(r'''
+const a = null;
+class A {}
+@a
+@Object()
+extension E on A {}''');
+    checkElementText(library, r'''
+class A {
+}
+@
+        a/*location: test.dart;a?*/
+@
+        Object/*location: dart:core;Object*/()
+extension E on A {
+}
+const dynamic a = null;
+''');
+  }
+
   test_metadata_fieldDeclaration() async {
     var library = await checkLibrary('const a = null; class C { @a int x; }');
     checkElementText(library, r'''
@@ -10819,6 +10943,25 @@ final int v;
     var library = await checkLibrary('final v = 0;');
     checkElementText(library, r'''
 final int v;
+''');
+  }
+
+  test_variable_initializer_staticMethod_ofExtension() async {
+    featureSet = enableExtensionMethods;
+    var library = await checkLibrary('''
+class A {}
+extension E on A {
+  static int f() => 0;
+}
+var x = E.f();
+''');
+    checkElementText(library, r'''
+class A {
+}
+extension E on A {
+  static int f() {}
+}
+int x;
 ''');
   }
 

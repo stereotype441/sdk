@@ -6,7 +6,8 @@ library js_backend.runtime_types_new;
 
 import 'package:js_runtime/shared/recipe_syntax.dart';
 
-import '../common_elements.dart' show JCommonElements, JElementEnvironment;
+import '../common_elements.dart'
+    show CommonElements, JCommonElements, JElementEnvironment;
 import '../elements/entities.dart';
 import '../elements/types.dart';
 import '../js/js.dart' as jsAst;
@@ -21,13 +22,12 @@ import 'runtime_types_codegen.dart' show RuntimeTypesSubstitutions;
 import 'runtime_types_resolution.dart' show RuntimeTypesNeed;
 
 abstract class RecipeEncoder {
-  /// Returns a [jsAst.Expression] representing the given [recipe] to be
+  /// Returns a [jsAst.Literal] representing the given [recipe] to be
   /// evaluated against a type environment with shape [structure].
-  jsAst.Expression encodeRecipe(ModularEmitter emitter,
+  jsAst.Literal encodeRecipe(ModularEmitter emitter,
       TypeEnvironmentStructure environmentStructure, TypeRecipe recipe);
 
-  jsAst.Expression encodeGroundRecipe(
-      ModularEmitter emitter, TypeRecipe recipe);
+  jsAst.Literal encodeGroundRecipe(ModularEmitter emitter, TypeRecipe recipe);
 
   // TODO(sra): Still need a $signature function when the function type is a
   // function of closed type variables. See if the $signature method can always
@@ -48,14 +48,13 @@ class RecipeEncoderImpl implements RecipeEncoder {
       this._elementEnvironment, this.commonElements, this._rtiNeed);
 
   @override
-  jsAst.Expression encodeRecipe(ModularEmitter emitter,
+  jsAst.Literal encodeRecipe(ModularEmitter emitter,
       TypeEnvironmentStructure environmentStructure, TypeRecipe recipe) {
     return _RecipeGenerator(this, emitter, environmentStructure, recipe).run();
   }
 
   @override
-  jsAst.Expression encodeGroundRecipe(
-      ModularEmitter emitter, TypeRecipe recipe) {
+  jsAst.Literal encodeGroundRecipe(ModularEmitter emitter, TypeRecipe recipe) {
     return _RecipeGenerator(this, emitter, null, recipe).run();
   }
 
@@ -90,7 +89,7 @@ class _RecipeGenerator implements DartTypeVisitor<void, void> {
   NativeBasicData get _nativeData => _encoder._nativeData;
   RuntimeTypesSubstitutions get _rtiSubstitutions => _encoder._rtiSubstitutions;
 
-  jsAst.Expression run() {
+  jsAst.Literal run() {
     _start(_recipe);
     assert(functionTypeVariables.isEmpty);
     if (_fragments.isEmpty) {
@@ -379,5 +378,115 @@ class _RecipeGenerator implements DartTypeVisitor<void, void> {
   void visitFutureOrType(FutureOrType type, _) {
     visit(type.typeArgument, _);
     _emitCode(Recipe.wrapFutureOr);
+  }
+}
+
+class RulesetEncoder {
+  final DartTypes _dartTypes;
+  final ModularEmitter _emitter;
+  final RecipeEncoder _recipeEncoder;
+
+  RulesetEncoder(this._dartTypes, this._emitter, this._recipeEncoder);
+
+  CommonElements get _commonElements => _dartTypes.commonElements;
+  ClassEntity get _objectClass => _commonElements.objectClass;
+
+  final _leftBrace = js.stringPart('{');
+  final _rightBrace = js.stringPart('}');
+  final _leftBracket = js.stringPart('[');
+  final _rightBracket = js.stringPart(']');
+  final _colon = js.stringPart(':');
+  final _comma = js.stringPart(',');
+  final _quote = js.stringPart("'");
+
+  bool _isObject(InterfaceType type) => identical(type.element, _objectClass);
+
+  // TODO(fishythefish): Common substring elimination.
+
+  /// Produces a string readable by `JSON.parse()`.
+  jsAst.StringConcatenation encodeRuleset(
+          Map<InterfaceType, Iterable<InterfaceType>> ruleset) =>
+      js.concatenateStrings([
+        _quote,
+        _leftBrace,
+        ...js.joinLiterals(
+            ruleset.entries
+                .where((entry) => !_isObject(entry.key))
+                .map((entry) => _encodeRule(entry.key, entry.value)),
+            _comma),
+        _rightBrace,
+        _quote,
+      ]);
+
+  jsAst.StringConcatenation _encodeRule(
+          InterfaceType targetType, Iterable<InterfaceType> supertypes) =>
+      js.concatenateStrings([
+        js.quoteName(_emitter.typeAccessNewRti(targetType.element)),
+        _colon,
+        _leftBrace,
+        ...js.joinLiterals(
+            supertypes
+                .where((InterfaceType supertype) => !_isObject(supertype))
+                .map((InterfaceType supertype) =>
+                    _encodeSupertype(targetType, supertype)),
+            _comma),
+        _rightBrace,
+      ]);
+
+  jsAst.StringConcatenation _encodeSupertype(
+          InterfaceType targetType, InterfaceType supertype) =>
+      js.concatenateStrings(js.joinLiterals([
+        _encodeSupertypeInterface(targetType, supertype),
+        ..._encodeSupertypeTypeVariables(targetType, supertype),
+      ], _comma));
+
+  jsAst.StringConcatenation _encodeSupertypeInterface(
+          InterfaceType targetType, InterfaceType supertype) =>
+      js.concatenateStrings([
+        js.quoteName(_emitter.typeAccessNewRti(supertype.element)),
+        _colon,
+        _leftBracket,
+        ...js.joinLiterals(
+            supertype.typeArguments.map((DartType supertypeArgument) =>
+                _encodeSupertypeArgument(targetType, supertypeArgument)),
+            _comma),
+        _rightBracket,
+      ]);
+
+  List<jsAst.StringConcatenation> _encodeSupertypeTypeVariables(
+      InterfaceType targetType, InterfaceType supertype) {
+    InterfaceType thisSupertype = _dartTypes.getThisType(supertype.element);
+    List<DartType> typeVariables = thisSupertype.typeArguments;
+    List<DartType> supertypeArguments = supertype.typeArguments;
+    int length = typeVariables.length;
+    assert(supertypeArguments.length == length);
+    List<jsAst.StringConcatenation> result = List(length);
+    for (int i = 0; i < length; i++) {
+      DartType typeVariable = typeVariables[i];
+      assert(typeVariable.isTypeVariable);
+      typeVariable.forEachTypeVariable((TypeVariableType typeVariable) {
+        result[i] = _encodeSupertypeTypeVariable(
+            targetType, typeVariable, supertypeArguments[i]);
+      });
+    }
+    return result;
+  }
+
+  jsAst.StringConcatenation _encodeSupertypeTypeVariable(
+          InterfaceType targetType,
+          TypeVariableType typeVariable,
+          DartType supertypeArgument) =>
+      js.concatenateStrings([
+        js.quoteName(_emitter.typeVariableAccessNewRti(typeVariable.element)),
+        _colon,
+        _encodeSupertypeArgument(targetType, supertypeArgument),
+      ]);
+
+  jsAst.Literal _encodeSupertypeArgument(
+      InterfaceType targetType, DartType supertypeArgument) {
+    TypeEnvironmentStructure environment =
+        FullTypeEnvironmentStructure(classType: targetType);
+    TypeRecipe recipe = TypeExpressionRecipe(supertypeArgument);
+    return _recipeEncoder.encodeRecipe(_emitter, environment, recipe);
   }
 }
