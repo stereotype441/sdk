@@ -8,4 +8,8 @@ import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
 class TestingData {
   final Map<Uri, FlowAnalysisResult> uriToFlowAnalysisResult = {};
 
+  void recordFlowAnalysisResult(Uri uri, FlowAnalysisResult result) {
+    uriToFlowAnalysisResult[uri] = result;
+  }
+
 }
