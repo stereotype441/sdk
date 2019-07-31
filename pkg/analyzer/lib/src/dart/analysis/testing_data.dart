@@ -11,5 +11,4 @@ class TestingData {
   void recordFlowAnalysisResult(Uri uri, FlowAnalysisResult result) {
     uriToFlowAnalysisResult[uri] = result;
   }
-
 }

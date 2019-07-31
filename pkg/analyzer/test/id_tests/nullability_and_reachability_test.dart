@@ -55,7 +55,8 @@ class _FlowAnalysisDataComputer extends DataComputer<Set<_FlowAssertion>> {
   @override
   void computeUnitData(TestingData testingData, CompilationUnit unit,
       Map<Id, ActualData<Set<_FlowAssertion>>> actualMap) {
-    var flowResult = testingData.uriToFlowAnalysisResult[unit.declaredElement.source.uri];
+    var flowResult =
+        testingData.uriToFlowAnalysisResult[unit.declaredElement.source.uri];
     _FlowAnalysisDataExtractor(unit.declaredElement.source.uri, actualMap,
             flowResult, unit.declaredElement.context.typeSystem)
         .run(unit);

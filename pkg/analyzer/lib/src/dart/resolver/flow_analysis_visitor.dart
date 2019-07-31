@@ -37,22 +37,20 @@ class FlowAnalysisHelper {
 
   int _blockFunctionBodyLevel = 0;
 
-  factory FlowAnalysisHelper(TypeSystem typeSystem, AstNode node, bool retainDataForTesting) {
+  factory FlowAnalysisHelper(
+      TypeSystem typeSystem, AstNode node, bool retainDataForTesting) {
     var assignedVariables = AssignedVariables<Statement, VariableElement>();
     node.accept(_AssignedVariablesVisitor(assignedVariables));
 
     return FlowAnalysisHelper._(
-      _NodeOperations(),
-      _TypeSystemTypeOperations(typeSystem),
-      assignedVariables, retainDataForTesting ? FlowAnalysisResult() : null
-    );
+        _NodeOperations(),
+        _TypeSystemTypeOperations(typeSystem),
+        assignedVariables,
+        retainDataForTesting ? FlowAnalysisResult() : null);
   }
 
-  FlowAnalysisHelper._(
-    this._nodeOperations,
-    this._typeOperations,
-    this.assignedVariables, this.result
-  );
+  FlowAnalysisHelper._(this._nodeOperations, this._typeOperations,
+      this.assignedVariables, this.result);
 
   LocalVariableTypeProvider get localVariableTypeProvider {
     return _LocalVariableTypeProvider(this);

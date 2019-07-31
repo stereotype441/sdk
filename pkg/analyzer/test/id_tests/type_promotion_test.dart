@@ -35,8 +35,8 @@ class _TypePromotionDataComputer extends DataComputer<DartType> {
       const _TypePromotionDataInterpreter();
 
   @override
-  void computeUnitData(TestingData testingData,
-      CompilationUnit unit, Map<Id, ActualData<DartType>> actualMap) {
+  void computeUnitData(TestingData testingData, CompilationUnit unit,
+      Map<Id, ActualData<DartType>> actualMap) {
     _TypePromotionDataExtractor(unit.declaredElement.source.uri, actualMap)
         .run(unit);
   }

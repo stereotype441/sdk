@@ -103,7 +103,8 @@ class LibraryAnalyzer {
       this._elementFactory,
       this._inheritance,
       this._library,
-      this._resourceProvider, this._testingData)
+      this._resourceProvider,
+      this._testingData)
       : _typeSystem = _context.typeSystem;
 
   /**
@@ -705,8 +706,10 @@ class LibraryAnalyzer {
 
     FlowAnalysisHelper flowAnalysisHelper;
     if (unit.featureSet.isEnabled(Feature.non_nullable)) {
-      flowAnalysisHelper = FlowAnalysisHelper(_context.typeSystem, unit, _testingData != null);
-      _testingData?.recordFlowAnalysisResult(file.uri, flowAnalysisHelper.result);
+      flowAnalysisHelper =
+          FlowAnalysisHelper(_context.typeSystem, unit, _testingData != null);
+      _testingData?.recordFlowAnalysisResult(
+          file.uri, flowAnalysisHelper.result);
     }
 
     unit.accept(new ResolverVisitor(

@@ -357,6 +357,8 @@ class AnalysisDriver implements AnalysisDriverGeneric {
    */
   void Function(String) onCurrentSessionAboutToBeDiscarded;
 
+  final TestingData testingData;
+
   /**
    * Create a new instance of [AnalysisDriver].
    *
@@ -374,10 +376,12 @@ class AnalysisDriver implements AnalysisDriverGeneric {
       this._analysisOptions,
       {this.disableChangesAndCacheAllResults: false,
       this.enableIndex: false,
-      SummaryDataStore externalSummaries, bool retainDataForTesting: false})
+      SummaryDataStore externalSummaries,
+      bool retainDataForTesting: false})
       : _logger = logger,
         _sourceFactory = sourceFactory.clone(),
-        _externalSummaries = externalSummaries, testingData = retainDataForTesting ? TestingData() : null {
+        _externalSummaries = externalSummaries,
+        testingData = retainDataForTesting ? TestingData() : null {
     _createNewSession(null);
     _onResults = _resultController.stream.asBroadcastStream();
     _testView = new AnalysisDriverTestView(this);
@@ -1448,7 +1452,8 @@ class AnalysisDriver implements AnalysisDriverGeneric {
             libraryContext.elementFactory,
             libraryContext.inheritanceManager,
             library,
-            _resourceProvider, testingData);
+            _resourceProvider,
+            testingData);
         Map<FileState, UnitAnalysisResult> results = analyzer.analyze();
 
         List<int> bytes;
@@ -1496,8 +1501,6 @@ class AnalysisDriver implements AnalysisDriverGeneric {
     return analysisResult._index;
   }
 
-  final TestingData testingData;
-
   /**
    * Return the newly computed resolution result of the library with the
    * given [path].
@@ -1519,7 +1522,8 @@ class AnalysisDriver implements AnalysisDriverGeneric {
           libraryContext.elementFactory,
           libraryContext.inheritanceManager,
           library,
-          _resourceProvider, testingData);
+          _resourceProvider,
+          testingData);
       Map<FileState, UnitAnalysisResult> unitResults = analyzer.analyze();
       var resolvedUnits = <ResolvedUnitResult>[];
 
@@ -2242,6 +2246,7 @@ class AnalysisDriverTestView {
 class AnalysisResult extends ResolvedUnitResultImpl {
   static final _UNCHANGED = new AnalysisResult(
       null, null, null, null, null, null, null, null, null, null, null, null);
+
   /**
    * The [SourceFactory] with which the file was analyzed.
    */

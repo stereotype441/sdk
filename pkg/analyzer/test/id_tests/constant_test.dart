@@ -34,8 +34,8 @@ class ConstantsDataComputer extends DataComputer<String> {
   DataInterpreter<String> get dataValidator => const StringDataInterpreter();
 
   @override
-  void computeUnitData(TestingData testingData,
-      CompilationUnit unit, Map<Id, ActualData<String>> actualMap) {
+  void computeUnitData(TestingData testingData, CompilationUnit unit,
+      Map<Id, ActualData<String>> actualMap) {
     ConstantsDataExtractor(unit.declaredElement.source.uri, actualMap)
         .run(unit);
   }
