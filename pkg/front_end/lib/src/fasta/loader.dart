@@ -8,6 +8,8 @@ import 'dart:async' show Future;
 
 import 'dart:collection' show Queue;
 
+import 'package:kernel/ast.dart' show Library;
+
 import 'builder/builder.dart'
     show ClassBuilder, Declaration, LibraryBuilder, TypeBuilder;
 
@@ -35,12 +37,12 @@ import 'ticker.dart' show Ticker;
 
 const String untranslatableUriScheme = "org-dartlang-untranslatable-uri";
 
-abstract class Loader<L> {
+abstract class Loader {
   final Map<Uri, LibraryBuilder> builders = <Uri, LibraryBuilder>{};
 
   final Queue<LibraryBuilder> unparsedLibraries = new Queue<LibraryBuilder>();
 
-  final List<L> libraries = <L>[];
+  final List<Library> libraries = <Library>[];
 
   final TargetImplementation target;
 
@@ -303,8 +305,7 @@ fileUri: ${contextMessage.uri}
 
   Declaration getNativeAnnotation() => target.getNativeAnnotation(this);
 
-  ClassBuilder<TypeBuilder, Object> computeClassBuilderFromTargetClass(
-      covariant Object cls);
+  ClassBuilder computeClassBuilderFromTargetClass(covariant Object cls);
 
   TypeBuilder computeTypeBuilder(covariant Object type);
 }

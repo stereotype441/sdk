@@ -41,8 +41,8 @@ import 'builder.dart'
 
 import '../kernel/kernel_builder.dart'
     show
-        KernelClassBuilder,
-        KernelInvalidTypeBuilder,
+        ClassBuilder,
+        InvalidTypeBuilder,
         LibraryBuilder,
         TypeBuilder,
         TypeDeclarationBuilder,
@@ -55,7 +55,7 @@ class NamedTypeBuilder extends TypeBuilder {
   List<TypeBuilder> arguments;
 
   @override
-  TypeDeclarationBuilder<TypeBuilder, DartType> declaration;
+  TypeDeclarationBuilder declaration;
 
   NamedTypeBuilder(this.name, this.arguments);
 
@@ -103,24 +103,26 @@ class NamedTypeBuilder extends TypeBuilder {
       return;
     } else if (member is TypeDeclarationBuilder) {
       declaration = member.origin;
-      if (arguments == null && declaration.typeVariablesCount != 0) {
-        String typeName;
-        int typeNameOffset;
-        if (name is Identifier) {
-          typeName = name.name;
-          typeNameOffset = name.charOffset;
-        } else {
-          typeName = name;
-          typeNameOffset = charOffset;
+      if (!declaration.isExtension) {
+        if (arguments == null && declaration.typeVariablesCount != 0) {
+          String typeName;
+          int typeNameOffset;
+          if (name is Identifier) {
+            typeName = name.name;
+            typeNameOffset = name.charOffset;
+          } else {
+            typeName = name;
+            typeNameOffset = charOffset;
+          }
+          library.addProblem(
+              templateMissingExplicitTypeArguments
+                  .withArguments(declaration.typeVariablesCount),
+              typeNameOffset,
+              typeName.length,
+              fileUri);
         }
-        library.addProblem(
-            templateMissingExplicitTypeArguments
-                .withArguments(declaration.typeVariablesCount),
-            typeNameOffset,
-            typeName.length,
-            fileUri);
+        return;
       }
-      return;
     }
     Template<Message Function(String name)> template =
         member == null ? templateTypeNotFound : templateNotAType;
@@ -178,11 +180,11 @@ class NamedTypeBuilder extends TypeBuilder {
     return buffer;
   }
 
-  KernelInvalidTypeBuilder buildInvalidType(LocatedMessage message,
+  InvalidTypeBuilder buildInvalidType(LocatedMessage message,
       {List<LocatedMessage> context}) {
     // TODO(ahe): Consider if it makes sense to pass a QualifiedName to
-    // KernelInvalidTypeBuilder?
-    return new KernelInvalidTypeBuilder(
+    // InvalidTypeBuilder?
+    return new InvalidTypeBuilder(
         flattenName(name, message.charOffset, message.uri), message,
         context: context);
   }
@@ -207,9 +209,9 @@ class NamedTypeBuilder extends TypeBuilder {
   Supertype buildSupertype(
       LibraryBuilder library, int charOffset, Uri fileUri) {
     TypeDeclarationBuilder declaration = this.declaration;
-    if (declaration is KernelClassBuilder) {
+    if (declaration is ClassBuilder) {
       return declaration.buildSupertype(library, arguments);
-    } else if (declaration is KernelInvalidTypeBuilder) {
+    } else if (declaration is InvalidTypeBuilder) {
       library.addProblem(
           declaration.message.messageObject,
           declaration.message.charOffset,
@@ -225,9 +227,9 @@ class NamedTypeBuilder extends TypeBuilder {
   Supertype buildMixedInType(
       LibraryBuilder library, int charOffset, Uri fileUri) {
     TypeDeclarationBuilder declaration = this.declaration;
-    if (declaration is KernelClassBuilder) {
+    if (declaration is ClassBuilder) {
       return declaration.buildMixedInType(library, arguments);
-    } else if (declaration is KernelInvalidTypeBuilder) {
+    } else if (declaration is InvalidTypeBuilder) {
       library.addProblem(
           declaration.message.messageObject,
           declaration.message.charOffset,

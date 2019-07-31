@@ -12,7 +12,7 @@ import '../fasta_codes.dart'
     show SummaryTemplate, Template, templateDillOutlineSummary;
 
 import '../kernel/kernel_builder.dart'
-    show KernelClassBuilder, TypeBuilder, LibraryBuilder;
+    show ClassBuilder, TypeBuilder, LibraryBuilder;
 
 import '../kernel/type_builder_computer.dart' show TypeBuilderComputer;
 
@@ -26,7 +26,7 @@ import 'dill_library_builder.dart' show DillLibraryBuilder;
 
 import 'dill_target.dart' show DillTarget;
 
-class DillLoader extends Loader<Library> {
+class DillLoader extends Loader {
   DillLoader(TargetImplementation target) : super(target);
 
   Template<SummaryTemplate> get outlineSummaryTemplate =>
@@ -76,7 +76,7 @@ class DillLoader extends Loader<Library> {
   }
 
   @override
-  KernelClassBuilder computeClassBuilderFromTargetClass(Class cls) {
+  ClassBuilder computeClassBuilderFromTargetClass(Class cls) {
     Library kernelLibrary = cls.enclosingLibrary;
     LibraryBuilder library = builders[kernelLibrary.importUri];
     return library.getLocalMember(cls.name);

@@ -4378,12 +4378,19 @@ class HIsTest extends HInstruction {
 
 /// Type cast or type check using Rti form of type expression.
 class HAsCheck extends HCheck {
+  final AbstractValueWithPrecision checkedType;
+  final DartType checkedTypeExpression;
   final bool isTypeError;
 
-  HAsCheck(HInstruction checked, HInstruction rti, this.isTypeError,
-      AbstractValue type)
+  HAsCheck(
+      HInstruction checked,
+      HInstruction rti,
+      this.checkedType,
+      this.checkedTypeExpression,
+      this.isTypeError,
+      AbstractValue instructionType)
       : assert(isTypeError != null),
-        super([rti, checked], type);
+        super([rti, checked], instructionType);
 
   // The type input is first to facilitate the `type.as(value)` codegen pattern.
   HInstruction get typeInput => inputs[0];
@@ -4405,6 +4412,15 @@ class HAsCheck extends HCheck {
   @override
   bool dataEquals(HAsCheck other) {
     return isTypeError == other.isTypeError;
+  }
+
+  bool isRedundant(JClosedWorld closedWorld) {
+    if (!checkedType.isPrecise) return false;
+    AbstractValueDomain abstractValueDomain = closedWorld.abstractValueDomain;
+    AbstractValue inputType = checkedInput.instructionType;
+    return abstractValueDomain
+        .isIn(inputType, checkedType.abstractValue)
+        .isDefinitelyTrue;
   }
 
   @override

@@ -422,10 +422,6 @@ class Isolate : public BaseIsolate, public IntrusiveDListEntry<Isolate> {
 
   void ScheduleInterrupts(uword interrupt_bits);
 
-  // Marks all libraries as loaded.
-  void DoneLoading();
-  void DoneFinalizing();
-
 #if !defined(PRODUCT) && !defined(DART_PRECOMPILED_RUNTIME)
   // By default the reload context is deleted. This parameter allows
   // the caller to delete is separately if it is still needed.
@@ -929,6 +925,10 @@ class Isolate : public BaseIsolate, public IntrusiveDListEntry<Isolate> {
   // Lookup an isolate by its main port. Returns nullptr if no matching isolate
   // is found.
   static Isolate* LookupIsolateByPort(Dart_Port port);
+
+  // Lookup an isolate by its main port and return a copy of its name. Returns
+  // nullptr if not matching isolate is found.
+  static std::unique_ptr<char[]> LookupIsolateNameByPort(Dart_Port port);
 
   static void DisableIsolateCreation();
   static void EnableIsolateCreation();

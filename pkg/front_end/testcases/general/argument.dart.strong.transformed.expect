@@ -3,22 +3,22 @@ import self as self;
 import "dart:core" as core;
 
 abstract class Base extends core::Object {
-  synthetic constructor •() → self::Base
+  synthetic constructor •() → self::Base*
     : super core::Object::•()
     ;
 }
 class Foo extends self::Base {
-  synthetic constructor •() → self::Foo
+  synthetic constructor •() → self::Foo*
     : super self::Base::•()
     ;
 }
 class Bar extends self::Base {
-  synthetic constructor •() → self::Bar
+  synthetic constructor •() → self::Bar*
     : super self::Base::•()
     ;
 }
 class Baz extends self::Base {
-  synthetic constructor •() → self::Baz
+  synthetic constructor •() → self::Baz*
     : super self::Base::•()
     ;
 }
@@ -32,6 +32,11 @@ static method escape(dynamic fn) → void {
 static method main() → dynamic {
   self::foo(new self::Foo::•());
   self::bar(new self::Bar::•());
-  self::escape(self::foo_escaped);
-  self::escape(self::bar_escaped);
+  self::escape(#C1);
+  self::escape(#C2);
+}
+
+constants  {
+  #C1 = tearoff self::foo_escaped
+  #C2 = tearoff self::bar_escaped
 }

@@ -89,12 +89,11 @@ import 'kernel_builder.dart'
         ClassBuilder,
         Declaration,
         InvalidTypeBuilder,
-        KernelClassBuilder,
         KernelFieldBuilder,
         KernelLibraryBuilder,
-        KernelProcedureBuilder,
-        LibraryBuilder,
         NamedTypeBuilder,
+        ProcedureBuilder,
+        LibraryBuilder,
         TypeBuilder,
         TypeDeclarationBuilder;
 
@@ -343,7 +342,7 @@ class KernelTarget extends TargetImplementation {
         AmbiguousBuilder problem = declaration;
         declaration = problem.getFirstDeclaration();
       }
-      if (declaration is KernelProcedureBuilder) {
+      if (declaration is ProcedureBuilder) {
         component.mainMethod = declaration.procedure;
       } else if (declaration is DillMemberBuilder) {
         if (declaration.member is Procedure) {
@@ -404,7 +403,7 @@ class KernelTarget extends TargetImplementation {
     ticker.logMs("Installed synthetic constructors");
   }
 
-  KernelClassBuilder get objectClassBuilder => objectType.declaration;
+  ClassBuilder get objectClassBuilder => objectType.declaration;
 
   Class get objectClass => objectClassBuilder.cls;
 
@@ -457,7 +456,7 @@ class KernelTarget extends TargetImplementation {
     if (supertype.isMixinApplication) {
       installForwardingConstructors(supertype);
     }
-    if (supertype is KernelClassBuilder) {
+    if (supertype is ClassBuilder) {
       if (supertype.cls.constructors.isEmpty) {
         builder.addSyntheticConstructor(makeDefaultConstructor(builder.target));
       } else {
@@ -860,7 +859,7 @@ Constructor defaultSuperConstructor(Class cls) {
 
 class KernelDiagnosticReporter
     extends DiagnosticReporter<Message, LocatedMessage> {
-  final Loader<Library> loader;
+  final Loader loader;
 
   KernelDiagnosticReporter(this.loader);
 

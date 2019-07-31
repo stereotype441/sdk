@@ -122,6 +122,13 @@ class FindElement {
       findIn(mixin.fields);
     }
 
+    for (var extension in unitElement.extensions) {
+      if (of != null && extension.name != of) {
+        continue;
+      }
+      findIn(extension.fields);
+    }
+
     if (result != null) {
       return result;
     }
@@ -342,6 +349,15 @@ class FindElement {
 
     for (var function in unitElement.functionTypeAliases) {
       findIn(function.parameters);
+    }
+
+    for (var extension_ in unitElement.extensions) {
+      for (var method in extension_.methods) {
+        findIn(method.parameters);
+      }
+      for (var accessor in extension_.accessors) {
+        findIn(accessor.parameters);
+      }
     }
 
     for (var class_ in unitElement.types) {

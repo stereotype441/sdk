@@ -1364,8 +1364,10 @@ class Class : public Object {
   bool TraceAllocation(Isolate* isolate) const;
   void SetTraceAllocation(bool trace_allocation) const;
 
-  void ReplaceEnum(const Class& old_enum) const;
-  void CopyStaticFieldValues(const Class& old_cls) const;
+  void ReplaceEnum(IsolateReloadContext* reload_context,
+                   const Class& old_enum) const;
+  void CopyStaticFieldValues(IsolateReloadContext* reload_context,
+                             const Class& old_cls) const;
   void PatchFieldsAndFunctions() const;
   void MigrateImplicitStaticClosures(IsolateReloadContext* context,
                                      const Class& new_cls) const;
@@ -2648,7 +2650,7 @@ class Function : public Object {
 
   void SetKernelDataAndScript(const Script& script,
                               const ExternalTypedData& data,
-                              intptr_t offset);
+                              intptr_t offset) const;
 
   intptr_t KernelDataProgramOffset() const;
 
@@ -3028,7 +3030,6 @@ class Function : public Object {
   // external: Just a declaration that expects to be defined in another patch
   //           file.
   // generated_body: Has a generated body.
-  // always_inline: Should always be inlined.
   // polymorphic_target: A polymorphic method.
   // has_pragma: Has a @pragma decoration.
   // no_such_method_forwarder: A stub method that just calls noSuchMethod.
@@ -3046,7 +3047,6 @@ class Function : public Object {
   V(Redirecting, is_redirecting)                                               \
   V(External, is_external)                                                     \
   V(GeneratedBody, is_generated_body)                                          \
-  V(AlwaysInline, always_inline)                                               \
   V(PolymorphicTarget, is_polymorphic_target)                                  \
   V(HasPragma, has_pragma)                                                     \
   V(IsNoSuchMethodForwarder, is_no_such_method_forwarder)
@@ -4064,6 +4064,7 @@ class Library : public Object {
                          const Function& from_fun,
                          const Function& to_fun) const;
   RawObject* GetMetadata(const Object& obj) const;
+  RawArray* GetExtendedMetadata(const Object& obj, intptr_t count) const;
 
   // Tries to finds a @pragma annotation on [object].
   //
@@ -5851,6 +5852,8 @@ class Context : public Object {
     return *ObjectAddr(context_index);
   }
   inline void SetAt(intptr_t context_index, const Object& value) const;
+
+  intptr_t GetLevel() const;
 
   void Dump(int indent = 0) const;
 

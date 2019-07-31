@@ -776,7 +776,16 @@ class BackendImpacts {
         _commonElements.instanceType,
         _commonElements.rtiEvalMethod,
         _commonElements.rtiBindMethod,
-      ])
+        _commonElements.generalIsTestImplementation,
+        _commonElements.generalAsCheckImplementation,
+        _commonElements.generalTypeCheckImplementation,
+      ], globalUses: [])
     ];
   }
+
+  BackendImpact _rtiAddRules;
+
+  BackendImpact get rtiAddRules => _rtiAddRules ??= BackendImpact(
+      globalUses: [_commonElements.rtiAddRulesMethod],
+      otherImpacts: [_needsString('Needed to encode the new RTI ruleset.')]);
 }

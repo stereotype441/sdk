@@ -18,7 +18,7 @@ import 'package:analyzer/src/dart/ast/ast.dart'
         SimpleIdentifierImpl;
 import 'package:analyzer/src/dart/ast/token.dart';
 import 'package:analyzer/src/dart/element/element.dart';
-import 'package:analyzer/src/dart/element/inheritance_manager2.dart';
+import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/resolver/extension_member_resolver.dart';
 import 'package:analyzer/src/dart/resolver/method_invocation_resolver.dart';
@@ -89,7 +89,7 @@ class ElementResolver extends SimpleAstVisitor<void> {
   /**
    * The manager for the inheritance mappings.
    */
-  final InheritanceManager2 _inheritance;
+  final InheritanceManager3 _inheritance;
 
   /**
    * The resolver driving this participant.
@@ -669,6 +669,13 @@ class ElementResolver extends SimpleAstVisitor<void> {
       DartType staticType = _getStaticType(operand, read: true);
       MethodElement staticMethod =
           _lookUpMethod(operand, staticType, methodName);
+      if (staticMethod == null && staticType is InterfaceType) {
+        ExtensionElement extension = _extensionMemberResolver.findExtension(
+            staticType, methodName, node);
+        if (extension != null) {
+          staticMethod = extension.getMethod(methodName);
+        }
+      }
       node.staticElement = staticMethod;
       if (_shouldReportInvalidMember(staticType, staticMethod)) {
         if (operand is SuperExpression) {
@@ -1242,25 +1249,6 @@ class ElementResolver extends SimpleAstVisitor<void> {
   }
 
   /**
-   * Look up the [FunctionType] of a getter or a method with the given [name]
-   * in the given [targetType].
-   */
-  FunctionType _lookUpGetterType(DartType targetType, String name,
-      {bool concrete: false, bool forSuper: false}) {
-    targetType = _resolveTypeParameter(targetType);
-    if (targetType is InterfaceType) {
-      var nameObject = new Name(_definingLibrary.source.uri, name);
-      return _inheritance.getMember(
-        targetType,
-        nameObject,
-        concrete: concrete,
-        forSuper: forSuper,
-      );
-    }
-    return null;
-  }
-
-  /**
    * Look up the method with the given [methodName] in the given [type]. Return
    * the element representing the method that was found, or `null` if there is
    * no method with the given name. The [target] is the target of the
@@ -1540,11 +1528,26 @@ class ElementResolver extends SimpleAstVisitor<void> {
       }
       DartType leftType = _getStaticType(leftOperand);
       var isSuper = leftOperand is SuperExpression;
-      var invokeType = _lookUpGetterType(leftType, methodName,
-          concrete: isSuper, forSuper: isSuper);
-      var invokeElement = invokeType?.element;
+
+      ExecutableElement invokeElement;
+      if (leftType is InterfaceType) {
+        invokeElement = _inheritance.getMember(
+          leftType,
+          new Name(_definingLibrary.source.uri, methodName),
+          forSuper: isSuper,
+        );
+      }
+
+      if (invokeElement == null && leftType is InterfaceType) {
+        ExtensionElement extension =
+            _extensionMemberResolver.findExtension(leftType, methodName, node);
+        if (extension != null) {
+          invokeElement = extension.getMethod(methodName);
+        }
+      }
+
       node.staticElement = invokeElement;
-      node.staticInvokeType = invokeType;
+      node.staticInvokeType = invokeElement?.type;
       if (_shouldReportInvalidMember(leftType, invokeElement)) {
         if (isSuper) {
           _recordUndefinedToken(
@@ -1655,50 +1658,67 @@ class ElementResolver extends SimpleAstVisitor<void> {
   void _resolvePropertyAccess(
       Expression target, SimpleIdentifier propertyName, bool isCascaded) {
     DartType staticType = _getStaticType(target);
-    Element staticElement = null;
+    Element staticElement;
+    if (target is Identifier && target.staticElement is ExtensionElement) {
+      ExtensionElement extension = target.staticElement;
+      String memberName = propertyName.name;
+      if (propertyName.inSetterContext()) {
+        staticElement = extension.getSetter(memberName);
+      }
+      staticElement ??= extension.getGetter(memberName);
+      staticElement ??= extension.getMethod(memberName);
+      if (staticElement is ExecutableElement && !staticElement.isStatic) {
+        _resolver.errorReporter.reportErrorForNode(
+            StaticWarningCode.STATIC_ACCESS_TO_INSTANCE_MEMBER,
+            propertyName,
+            [memberName]);
+      }
+    }
     //
     // If this property access is of the form 'C.m' where 'C' is a class,
     // then we don't call resolveProperty(...) which walks up the class
     // hierarchy, instead we just look for the member in the type only.  This
     // does not apply to conditional property accesses (i.e. 'C?.m').
     //
-    ClassElement typeReference = getTypeReference(target);
-    if (typeReference != null) {
-      if (isCascaded) {
-        typeReference = _typeType.element;
-      }
-      staticElement = _resolveElement(typeReference, propertyName);
-    } else {
-      if (target is SuperExpression) {
-        if (staticType is InterfaceTypeImpl) {
-          staticElement = staticType.lookUpInheritedMember(
-              propertyName.name, _definingLibrary,
-              setter: propertyName.inSetterContext(),
-              concrete: true,
-              forSuperInvocation: true);
-          // We were not able to find the concrete dispatch target.
-          // But we would like to give the user at least some resolution.
-          // So, we retry without the "concrete" requirement.
-          if (staticElement == null) {
+    if (staticElement == null) {
+      ClassElement typeReference = getTypeReference(target);
+      if (typeReference != null) {
+        if (isCascaded) {
+          typeReference = _typeType.element;
+        }
+        staticElement = _resolveElement(typeReference, propertyName);
+      } else {
+        if (target is SuperExpression) {
+          if (staticType is InterfaceTypeImpl) {
             staticElement = staticType.lookUpInheritedMember(
                 propertyName.name, _definingLibrary,
-                setter: propertyName.inSetterContext(), concrete: false);
-            if (staticElement != null) {
-              ClassElementImpl receiverSuperClass =
-                  AbstractClassElementImpl.getImpl(
-                staticType.element.supertype.element,
-              );
-              if (!receiverSuperClass.hasNoSuchMethod) {
-                _resolver.errorReporter.reportErrorForNode(
-                    CompileTimeErrorCode.ABSTRACT_SUPER_MEMBER_REFERENCE,
-                    propertyName,
-                    [staticElement.kind.displayName, propertyName.name]);
+                setter: propertyName.inSetterContext(),
+                concrete: true,
+                forSuperInvocation: true);
+            // We were not able to find the concrete dispatch target.
+            // But we would like to give the user at least some resolution.
+            // So, we retry without the "concrete" requirement.
+            if (staticElement == null) {
+              staticElement = staticType.lookUpInheritedMember(
+                  propertyName.name, _definingLibrary,
+                  setter: propertyName.inSetterContext(), concrete: false);
+              if (staticElement != null) {
+                ClassElementImpl receiverSuperClass =
+                    AbstractClassElementImpl.getImpl(
+                  staticType.element.supertype.element,
+                );
+                if (!receiverSuperClass.hasNoSuchMethod) {
+                  _resolver.errorReporter.reportErrorForNode(
+                      CompileTimeErrorCode.ABSTRACT_SUPER_MEMBER_REFERENCE,
+                      propertyName,
+                      [staticElement.kind.displayName, propertyName.name]);
+                }
               }
             }
           }
+        } else {
+          staticElement = _resolveProperty(target, staticType, propertyName);
         }
-      } else {
-        staticElement = _resolveProperty(target, staticType, propertyName);
       }
     }
     // May be part of annotation, record property element only if exists.
