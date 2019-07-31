@@ -133,7 +133,8 @@ Future<bool> runTestForConfig<T>(
         new PackageMapUriResolver(resourceProvider, packageMap),
         new ResourceUriResolver(resourceProvider)
       ], null, resourceProvider),
-      analysisOptions, retainDataForTesting: true);
+      analysisOptions,
+      retainDataForTesting: true);
   scheduler.start();
   var result = await driver
       .getResult(resourceProvider.convertPath(testData.entryPoint.path));
@@ -150,7 +151,8 @@ Future<bool> runTestForConfig<T>(
     return actualMaps.putIfAbsent(uri, () => <Id, ActualData<T>>{});
   }
 
-  dataComputer.computeUnitData(driver.testingData, result.unit, actualMapFor(testData.entryPoint));
+  dataComputer.computeUnitData(
+      driver.testingData, result.unit, actualMapFor(testData.entryPoint));
   var compiledData = AnalyzerCompiledData<T>(
       testData.code, testData.entryPoint, actualMaps, globalData);
   return checkCode(config.name, testData.testFileUri, testData.code,
@@ -214,7 +216,8 @@ abstract class DataComputer<T> {
   ///
   /// Fills [actualMap] with the data and [sourceSpanMap] with the source spans
   /// for the data origin.
-  void computeUnitData(TestingData testingData, CompilationUnit unit, Map<Id, ActualData<T>> actualMap);
+  void computeUnitData(TestingData testingData, CompilationUnit unit,
+      Map<Id, ActualData<T>> actualMap);
 }
 
 class TestConfig {

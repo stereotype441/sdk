@@ -34,10 +34,10 @@ class _DefiniteAssignmentDataComputer extends DataComputer<String> {
       const _DefiniteAssignmentDataInterpreter();
 
   @override
-  void computeUnitData(TestingData testingData,
-      CompilationUnit unit, Map<Id, ActualData<String>> actualMap) {
-    var flowResult = testingData.uriToFlowAnalysisResult[unit.declaredElement
-        .source.uri];
+  void computeUnitData(TestingData testingData, CompilationUnit unit,
+      Map<Id, ActualData<String>> actualMap) {
+    var flowResult =
+        testingData.uriToFlowAnalysisResult[unit.declaredElement.source.uri];
     _DefiniteAssignmentDataExtractor(
             unit.declaredElement.source.uri, actualMap, flowResult)
         .run(unit);
