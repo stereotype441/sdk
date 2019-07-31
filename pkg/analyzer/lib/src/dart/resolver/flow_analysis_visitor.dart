@@ -240,9 +240,11 @@ class FlowAnalysisHelper {
         if (isUnassigned) {
           result.unassignedNodes.add(node);
         }
-        // TODO(paulberry): in principle we could make this slightly more
-        // performant by checking element.isLate earlier, but we would lose the
-        // ability to test the flow analysis mechanism using late variables.
+        // Note: in principle we could make this slightly more performant by
+        // checking element.isLate earlier, but we would lose the ability to
+        // test the flow analysis mechanism using late variables.  And it seems
+        // unlikely that the `late` modifier will be used often enough for it to
+        // make a significant difference.
         if (element.isLate) return false;
         return isUnassigned;
       }
