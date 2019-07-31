@@ -12,6 +12,7 @@ import 'package:analyzer/error/listener.dart';
 import 'package:analyzer/file_system/file_system.dart';
 import 'package:analyzer/src/dart/analysis/driver.dart';
 import 'package:analyzer/src/dart/analysis/file_state.dart';
+import 'package:analyzer/src/dart/analysis/testing_data.dart';
 import 'package:analyzer/src/dart/ast/ast.dart';
 import 'package:analyzer/src/dart/ast/utilities.dart';
 import 'package:analyzer/src/dart/constant/compute.dart';
@@ -78,7 +79,7 @@ class LibraryAnalyzer {
   final Map<FileState, IgnoreInfo> _fileToIgnoreInfo = {};
   final Map<FileState, RecordingErrorListener> _errorListeners = {};
   final Map<FileState, ErrorReporter> _errorReporters = {};
-  final Map<FileState, FlowAnalysisResult> _fileToFlowAnalysisResult = {};
+  final TestingData _testingData;
   final List<UsedImportedElements> _usedImportedElementsList = [];
   final List<UsedLocalElements> _usedLocalElementsList = [];
   final Map<FileState, List<PendingError>> _fileToPendingErrors = {};
@@ -102,7 +103,7 @@ class LibraryAnalyzer {
       this._elementFactory,
       this._inheritance,
       this._library,
-      this._resourceProvider)
+      this._resourceProvider, this._testingData)
       : _typeSystem = _context.typeSystem;
 
   /**
@@ -415,8 +416,7 @@ class LibraryAnalyzer {
     // Use the ErrorVerifier to compute errors.
     //
     ErrorVerifier errorVerifier = new ErrorVerifier(
-        errorReporter, _libraryElement, _typeProvider, _inheritance, false,
-        flowAnalysisResult: _fileToFlowAnalysisResult[file]);
+        errorReporter, _libraryElement, _typeProvider, _inheritance, false);
     unit.accept(errorVerifier);
   }
 
@@ -705,9 +705,8 @@ class LibraryAnalyzer {
 
     FlowAnalysisHelper flowAnalysisHelper;
     if (unit.featureSet.isEnabled(Feature.non_nullable)) {
-      flowAnalysisHelper = FlowAnalysisHelper(_context.typeSystem, unit);
-      _fileToFlowAnalysisResult[file] = flowAnalysisHelper.result;
-      flowAnalysisHelper.result.putIntoNode(unit);
+      flowAnalysisHelper = FlowAnalysisHelper(_context.typeSystem, unit, _testingData != null);
+      _testingData?.recordFlowAnalysisResult(file.uri, flowAnalysisHelper.result);
     }
 
     unit.accept(new ResolverVisitor(

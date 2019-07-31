@@ -30,7 +30,7 @@ class FlowAnalysisHelper {
   final AssignedVariables<Statement, VariableElement> assignedVariables;
 
   /// The result for post-resolution stages of analysis.
-  final FlowAnalysisResult result = FlowAnalysisResult();
+  final FlowAnalysisResult result;
 
   /// The current flow, when resolving a function body, or `null` otherwise.
   FlowAnalysis<Statement, Expression, VariableElement, DartType> flow;
@@ -321,8 +321,6 @@ class FlowAnalysisHelper {
 
 /// The result of performing flow analysis on a unit.
 class FlowAnalysisResult {
-  static const _astKey = 'FlowAnalysisResult';
-
   /// The list of nodes, [Expression]s or [Statement]s, that cannot be reached,
   /// for example because a previous statement always exits.
   final List<AstNode> unreachableNodes = [];
@@ -334,14 +332,6 @@ class FlowAnalysisResult {
   /// The list of [Expression]s representing variable accesses that occur before
   /// the corresponding variable has been definitely assigned.
   final List<AstNode> unassignedNodes = [];
-
-  void putIntoNode(AstNode node) {
-    node.setProperty(_astKey, this);
-  }
-
-  static FlowAnalysisResult getFromNode(AstNode node) {
-    return node.getProperty(_astKey);
-  }
 }
 
 /// The visitor that gathers local variables that are potentially assigned

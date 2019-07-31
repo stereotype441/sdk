@@ -132,7 +132,7 @@ Future<bool> runTestForConfig<T>(
         new PackageMapUriResolver(resourceProvider, packageMap),
         new ResourceUriResolver(resourceProvider)
       ], null, resourceProvider),
-      analysisOptions);
+      analysisOptions, retainDataForTesting: true);
   scheduler.start();
   var result = await driver
       .getResult(resourceProvider.convertPath(testData.entryPoint.path));
