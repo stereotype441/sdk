@@ -163,7 +163,7 @@ class FlowAnalysisHelper {
     this.flow = null;
 
     if (!flow.isReachable) {
-      result.functionBodiesThatDontComplete.add(node);
+      result?.functionBodiesThatDontComplete.add(node);
     }
 
     flow.finish();
@@ -180,13 +180,15 @@ class FlowAnalysisHelper {
     if (flow == null) return;
     if (flow.isReachable) return;
 
-    // Ignore the [node] if it is fully covered by the last unreachable.
-    if (result.unreachableNodes.isNotEmpty) {
-      var last = result.unreachableNodes.last;
-      if (node.offset >= last.offset && node.end <= last.end) return;
-    }
+    if (result != null) {
+      // Ignore the [node] if it is fully covered by the last unreachable.
+      if (result.unreachableNodes.isNotEmpty) {
+        var last = result.unreachableNodes.last;
+        if (node.offset >= last.offset && node.end <= last.end) return;
+      }
 
-    result.unreachableNodes.add(node);
+      result.unreachableNodes.add(node);
+    }
   }
 
   void continueStatement(ContinueStatement node) {
@@ -238,7 +240,7 @@ class FlowAnalysisHelper {
       if (typeSystem.isPotentiallyNonNullable(element.type)) {
         var isUnassigned = !flow.isAssigned(element);
         if (isUnassigned) {
-          result.unassignedNodes.add(node);
+          result?.unassignedNodes.add(node);
         }
         // Note: in principle we could make this slightly more performant by
         // checking element.isLate earlier, but we would lose the ability to
