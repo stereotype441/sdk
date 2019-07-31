@@ -161,7 +161,7 @@ class FlowAnalysisHelper {
     this.flow = null;
 
     if (!flow.isReachable) {
-      result?.functionBodiesThatDontComplete.add(node);
+      result?.functionBodiesThatDontComplete?.add(node);
     }
 
     flow.finish();
@@ -238,7 +238,7 @@ class FlowAnalysisHelper {
       if (typeSystem.isPotentiallyNonNullable(element.type)) {
         var isUnassigned = !flow.isAssigned(element);
         if (isUnassigned) {
-          result?.unassignedNodes.add(node);
+          result?.unassignedNodes?.add(node);
         }
         // Note: in principle we could make this slightly more performant by
         // checking element.isLate earlier, but we would lose the ability to
