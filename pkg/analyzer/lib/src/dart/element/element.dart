@@ -2182,6 +2182,7 @@ class CompilationUnitElementImpl extends UriReferencedElementImpl
     super.visitChildren(visitor);
     safelyVisitChildren(accessors, visitor);
     safelyVisitChildren(enums, visitor);
+    safelyVisitChildren(extensions, visitor);
     safelyVisitChildren(functions, visitor);
     safelyVisitChildren(functionTypeAliases, visitor);
     safelyVisitChildren(mixins, visitor);
@@ -5014,6 +5015,28 @@ class ExtensionElementImpl extends ElementImpl
   }
 
   @override
+  int get codeLength {
+    if (linkedNode != null) {
+      return linkedContext.getCodeLength(linkedNode);
+    }
+    if (_unlinkedExtension != null) {
+      return _unlinkedExtension.codeRange?.length;
+    }
+    return super.codeLength;
+  }
+
+  @override
+  int get codeOffset {
+    if (linkedNode != null) {
+      return linkedContext.getCodeOffset(linkedNode);
+    }
+    if (_unlinkedExtension != null) {
+      return _unlinkedExtension.codeRange?.offset;
+    }
+    return super.codeOffset;
+  }
+
+  @override
   String get displayName => name;
 
   @override
@@ -5254,6 +5277,15 @@ class ExtensionElementImpl extends ElementImpl
   PropertyAccessorElement getSetter(String setterName) {
     return AbstractClassElementImpl.getSetterFromAccessors(
         setterName, accessors);
+  }
+
+  @override
+  void visitChildren(ElementVisitor visitor) {
+    super.visitChildren(visitor);
+    safelyVisitChildren(accessors, visitor);
+    safelyVisitChildren(fields, visitor);
+    safelyVisitChildren(methods, visitor);
+    safelyVisitChildren(typeParameters, visitor);
   }
 
   /// Create the accessors and fields when [linkedNode] is not `null`.
@@ -6644,6 +6676,10 @@ class ImportElementImpl extends UriReferencedElementImpl
 
   @override
   int get prefixOffset {
+    if (linkedNode != null) {
+      ImportDirective node = linkedNode;
+      return node.prefix?.offset ?? -1;
+    }
     if (_unlinkedImport != null) {
       return _unlinkedImport.prefixOffset;
     }
@@ -9180,7 +9216,7 @@ class ParameterElementImpl extends VariableElementImpl
         NormalFormalParameter parameterNode = node.parameter;
         var name = parameterNode.identifier?.name ?? '';
         var reference = containerRef.getChild(name);
-        reference.node2 = node;
+        reference.node = node;
         if (parameterNode is FieldFormalParameter) {
           return DefaultFieldFormalParameterElementImpl.forLinkedNode(
             enclosing,

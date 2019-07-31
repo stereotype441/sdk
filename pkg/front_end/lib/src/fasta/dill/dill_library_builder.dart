@@ -36,8 +36,6 @@ import '../kernel/kernel_builder.dart'
         Declaration,
         DynamicTypeBuilder,
         InvalidTypeBuilder,
-        KernelInvalidTypeBuilder,
-        TypeBuilder,
         LibraryBuilder,
         Scope;
 
@@ -76,7 +74,7 @@ class LazyLibraryScope extends Scope {
   }
 }
 
-class DillLibraryBuilder extends LibraryBuilder<TypeBuilder, Library> {
+class DillLibraryBuilder extends LibraryBuilder {
   final Library library;
 
   DillLoader loader;
@@ -137,10 +135,7 @@ class DillLibraryBuilder extends LibraryBuilder<TypeBuilder, Library> {
 
   void addSyntheticDeclarationOfDynamic() {
     addBuilder(
-        "dynamic",
-        new DynamicTypeBuilder<TypeBuilder, DartType>(
-            const DynamicType(), this, -1),
-        -1);
+        "dynamic", new DynamicTypeBuilder(const DynamicType(), this, -1), -1);
   }
 
   void addClass(Class cls) {
@@ -220,7 +215,7 @@ class DillLibraryBuilder extends LibraryBuilder<TypeBuilder, Library> {
     if (builder.parent == this) return builder;
     Message message = templateDuplicatedDeclaration.withArguments(name);
     addProblem(message, charOffset, name.length, fileUri);
-    return new KernelInvalidTypeBuilder(
+    return new InvalidTypeBuilder(
         name, message.withLocation(fileUri, charOffset, name.length));
   }
 
@@ -255,8 +250,7 @@ class DillLibraryBuilder extends LibraryBuilder<TypeBuilder, Library> {
               ? templateTypeNotFound.withArguments(name)
               : templateUnspecified.withArguments(messageText);
           addProblem(message, -1, noLength, null);
-          declaration =
-              new KernelInvalidTypeBuilder(name, message.withoutLocation());
+          declaration = new InvalidTypeBuilder(name, message.withoutLocation());
       }
       exportScopeBuilder.addMember(name, declaration);
     });

@@ -48,9 +48,8 @@ void for_outerIsType_loopAssigned_updaters(bool b, Object x) {
 }
 
 void forEach_outerIsType_loopAssigned(Object x) {
-  Object v1;
   if (x is String) {
-    for (var _ in (v1 = [0, 1, 2])) {
+    for (var _ in [0, 1, 2]) {
       x;
       x = 42;
     }

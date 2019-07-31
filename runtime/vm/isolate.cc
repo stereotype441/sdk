@@ -1404,21 +1404,6 @@ void Isolate::BuildName(const char* name_prefix) {
   }
 }
 
-void Isolate::DoneLoading() {
-  GrowableObjectArray& libs =
-      GrowableObjectArray::Handle(current_zone(), object_store()->libraries());
-  Library& lib = Library::Handle(current_zone());
-  intptr_t num_libs = libs.Length();
-  for (intptr_t i = 0; i < num_libs; i++) {
-    lib ^= libs.At(i);
-    // If this library was loaded with Dart_LoadLibrary, it was marked
-    // as 'load in progres'. Set the status to 'loaded'.
-    if (lib.LoadInProgress()) {
-      lib.SetLoaded();
-    }
-  }
-}
-
 #if !defined(PRODUCT) && !defined(DART_PRECOMPILED_RUNTIME)
 bool Isolate::CanReload() const {
   return !Isolate::IsVMInternalIsolate(this) && is_runnable() &&
@@ -1474,14 +1459,6 @@ void Isolate::DeleteReloadContext() {
   reload_context_ = nullptr;
 }
 #endif  // !defined(PRODUCT) && !defined(DART_PRECOMPILED_RUNTIME)
-
-void Isolate::DoneFinalizing() {
-#if !defined(PRODUCT) && !defined(DART_PRECOMPILED_RUNTIME)
-  if (IsReloading()) {
-    reload_context_->FinalizeLoading();
-  }
-#endif  // !defined(PRODUCT) && !defined(DART_PRECOMPILED_RUNTIME)
-}
 
 const char* Isolate::MakeRunnable() {
   ASSERT(Isolate::Current() == nullptr);
@@ -2129,14 +2106,12 @@ void Isolate::VisitObjectPointers(ObjectPointerVisitor* visitor,
   // Visit objects in the class table.
   class_table()->VisitObjectPointers(visitor);
 
-  // Visit objects in per isolate stubs.
-  StubCode::VisitObjectPointers(visitor);
-
   // Visit the dart api state for all local and persistent handles.
   if (api_state() != nullptr) {
     api_state()->VisitObjectPointers(visitor);
   }
 
+  visitor->clear_gc_root_type();
   // Visit the objects directly referenced from the isolate structure.
   visitor->VisitPointer(reinterpret_cast<RawObject**>(&current_tag_));
   visitor->VisitPointer(reinterpret_cast<RawObject**>(&default_tag_));
@@ -2197,6 +2172,7 @@ void Isolate::VisitObjectPointers(ObjectPointerVisitor* visitor,
 
 void Isolate::VisitStackPointers(ObjectPointerVisitor* visitor,
                                  ValidationPolicy validate_frames) {
+  visitor->set_gc_root_type("stack");
   // Visit objects in all threads (e.g., Dart stack, handles in zones).
   thread_registry()->VisitObjectPointers(this, visitor, validate_frames);
 
@@ -2205,6 +2181,7 @@ void Isolate::VisitStackPointers(ObjectPointerVisitor* visitor,
   if (mutator_thread_ != nullptr) {
     mutator_thread_->VisitObjectPointers(visitor, validate_frames);
   }
+  visitor->clear_gc_root_type();
 }
 
 void Isolate::VisitWeakPersistentHandles(HandleVisitor* visitor) {
@@ -2850,6 +2827,21 @@ Isolate* Isolate::LookupIsolateByPort(Dart_Port port) {
     current = current->next_;
   }
   return nullptr;
+}
+
+std::unique_ptr<char[]> Isolate::LookupIsolateNameByPort(Dart_Port port) {
+  MonitorLocker ml(isolates_list_monitor_);
+  Isolate* current = isolates_list_head_;
+  while (current != nullptr) {
+    if (current->main_port() == port) {
+      const size_t len = strlen(current->name()) + 1;
+      auto result = std::unique_ptr<char[]>(new char[len]);
+      strncpy(result.get(), current->name(), len);
+      return result;
+    }
+    current = current->next_;
+  }
+  return std::unique_ptr<char[]>();
 }
 
 bool Isolate::AddIsolateToList(Isolate* isolate) {

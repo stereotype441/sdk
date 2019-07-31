@@ -181,8 +181,7 @@ class ReferenceResolver extends ThrowingAstVisitor<void> {
     node.typeParameters?.accept(this);
     node.extendedType.accept(this);
 
-    // TODO(scheglov) do we need a scope?
-//    scope = new ClassScope(scope, element);
+    scope = new ExtensionScope(scope, element);
     LinkingNodeContext(node, scope);
 
     node.members.accept(this);
@@ -280,7 +279,7 @@ class ReferenceResolver extends ThrowingAstVisitor<void> {
 
     var name = node.identifier.name;
     reference = reference.getChild('@parameter').getChild(name);
-    reference.node2 = node;
+    reference.node = node;
 
     var element = ParameterElementImpl.forLinkedNode(
       outerReference.element,
@@ -512,7 +511,7 @@ class ReferenceResolver extends ThrowingAstVisitor<void> {
     var outerReference = this.reference;
     var containerRef = outerReference.getChild('@typeParameter');
     var reference = containerRef.getChild(node.name.name);
-    reference.node2 = node;
+    reference.node = node;
 
     var element = TypeParameterElementImpl.forLinkedNode(
       outerReference.element,

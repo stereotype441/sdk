@@ -4,11 +4,11 @@
 
 library fasta.dill_typedef_builder;
 
-import 'package:kernel/ast.dart' show DartType, Library, Typedef;
+import 'package:kernel/ast.dart' show DartType, Typedef;
 
 import '../kernel/kernel_builder.dart'
     show
-        KernelTypeAliasBuilder,
+        TypeAliasBuilder,
         FunctionTypeBuilder,
         TypeBuilder,
         LibraryBuilder,
@@ -18,7 +18,7 @@ import '../problems.dart' show unimplemented;
 
 import 'dill_library_builder.dart' show DillLibraryBuilder;
 
-class DillTypeAliasBuilder extends KernelTypeAliasBuilder {
+class DillTypeAliasBuilder extends TypeAliasBuilder {
   DillTypeAliasBuilder(Typedef typedef, DillLibraryBuilder parent)
       : super(null, typedef.name, null, null, parent, typedef.fileOffset,
             typedef);
@@ -36,14 +36,13 @@ class DillTypeAliasBuilder extends KernelTypeAliasBuilder {
   }
 
   @override
-  DartType buildThisType(LibraryBuilder<TypeBuilder, Library> library) {
+  DartType buildThisType(LibraryBuilder library) {
     return thisType ??= target.type;
   }
 
   @override
   List<DartType> buildTypeArguments(
-      LibraryBuilder<TypeBuilder, Library> library,
-      List<TypeBuilder> arguments) {
+      LibraryBuilder library, List<TypeBuilder> arguments) {
     // For performance reasons, [typeVariables] aren't restored from [target].
     // So, if [arguments] is null, the default types should be retrieved from
     // [cls.typeParameters].

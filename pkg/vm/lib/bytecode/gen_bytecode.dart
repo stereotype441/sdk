@@ -41,6 +41,7 @@ import 'generics.dart'
         getInstantiatorTypeArguments,
         hasFreeTypeParameters,
         hasInstantiatorTypeArguments,
+        isAllDynamic,
         isUncheckedCall,
         isUncheckedClosureCall;
 import 'local_variable_table.dart' show LocalVariableTable;
@@ -383,8 +384,52 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
     }
     final object =
         objectTable.getHandle(new ListConstant(const DynamicType(), constants));
-    bytecodeComponent.annotations.add(object);
-    return new Annotations(object, hasPragma);
+    final decl = new AnnotationsDeclaration(object);
+    bytecodeComponent.annotations.add(decl);
+    return new Annotations(decl, hasPragma);
+  }
+
+  // Insert annotations for the function and its parameters into the annotations
+  // section. Return the annotations for the function only. The bytecode reader
+  // will implicitly find the parameter annotations by reading N packed objects
+  // after reading the function's annotations, one for each parameter.
+  Annotations getFunctionAnnotations(Member member) {
+    final functionNodes = member.annotations;
+    final parameterNodeLists = new List<List<Expression>>();
+    for (VariableDeclaration variable in member.function.positionalParameters) {
+      parameterNodeLists.add(variable.annotations);
+    }
+    for (VariableDeclaration variable in member.function.namedParameters) {
+      parameterNodeLists.add(variable.annotations);
+    }
+
+    if (functionNodes.isEmpty &&
+        parameterNodeLists.every((nodes) => nodes.isEmpty)) {
+      return const Annotations(null, false);
+    }
+
+    List<Constant> functionConstants = constantEvaluator.withNewEnvironment(
+        () => functionNodes.map(_evaluateConstantExpression).toList());
+    bool hasPragma = functionConstants.any(_isPragma);
+    if (!options.emitAnnotations && !hasPragma) {
+      return const Annotations(null, false);
+    }
+
+    final functionObject = objectTable
+        .getHandle(new ListConstant(const DynamicType(), functionConstants));
+    final functionDecl = new AnnotationsDeclaration(functionObject);
+    bytecodeComponent.annotations.add(functionDecl);
+
+    for (final parameterNodes in parameterNodeLists) {
+      List<Constant> parameterConstants = constantEvaluator.withNewEnvironment(
+          () => parameterNodes.map(_evaluateConstantExpression).toList());
+      final parameterObject = objectTable
+          .getHandle(new ListConstant(const DynamicType(), parameterConstants));
+      final parameterDecl = new AnnotationsDeclaration(parameterObject);
+      bytecodeComponent.annotations.add(parameterDecl);
+    }
+
+    return new Annotations(functionDecl, hasPragma);
   }
 
   FieldDeclaration getFieldDeclaration(Field field, Code initializer) {
@@ -548,7 +593,7 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       position = (member as dynamic).startFileOffset;
       endPosition = member.fileEndOffset;
     }
-    Annotations annotations = getAnnotations(member.annotations);
+    Annotations annotations = getFunctionAnnotations(member);
     if (annotations.object != null) {
       flags |= FunctionDeclaration.hasAnnotationsFlag;
       if (annotations.hasPragma) {
@@ -640,6 +685,9 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       }
       if (variable.isGenericCovariantImpl) {
         flags |= ParameterDeclaration.isGenericCovariantImplFlag;
+      }
+      if (variable.isFinal) {
+        flags |= ParameterDeclaration.isFinalFlag;
       }
       return flags;
     }
@@ -1273,8 +1321,8 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       return;
     }
 
-    if (type is InterfaceType && type.typeArguments.isEmpty) {
-      assert(type.classNode.typeParameters.isEmpty);
+    if (type is InterfaceType &&
+        (type.typeArguments.isEmpty || isAllDynamic(type.typeArguments))) {
       asm.emitPushConstant(cp.addType(type));
       final argDesc = objectTable.getArgDescHandle(2);
       final cpIndex = cp.addInterfaceCall(
@@ -1408,7 +1456,9 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
         int forwardingStubTargetCpIndex = null;
         int defaultFunctionTypeArgsCpIndex = null;
 
-        if (node is Procedure) {
+        if (node is Constructor) {
+          parameterFlags = getParameterFlags(node.function);
+        } else if (node is Procedure) {
           parameterFlags = getParameterFlags(node.function);
 
           if (node.isForwardingStub) {
@@ -3905,7 +3955,7 @@ class FinallyBlock {
 }
 
 class Annotations {
-  final ObjectHandle object;
+  final AnnotationsDeclaration object;
   final bool hasPragma;
 
   const Annotations(this.object, this.hasPragma);
