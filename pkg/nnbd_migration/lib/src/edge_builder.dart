@@ -928,12 +928,13 @@ $stackTrace''');
       origin.edges.add(edge);
     }
     // TODO(paulberry): generalize this.
-    if ((_isSimple(source) || destination.type.isObject) &&
-        (_isSimple(destination) || source.type.isDartCoreNull)) {
-      // Ok; nothing further to do.
-    } else if (source.type is InterfaceType &&
-        destination.type is InterfaceType &&
-        source.type.element == destination.type.element) {
+    if (source.type is InterfaceType &&
+        destination.type is InterfaceType) {
+      if (_typeProvider)
+      this._decoratedClassHierarchy.getDecoratedSupertype(class_, superclass);
+      if (source.typeArguments.isNotEmpty || destination.typeArguments.isNotEmpty) {
+        if (source.typeArguments.)
+      }
       assert(source.typeArguments.length == destination.typeArguments.length);
       for (int i = 0; i < source.typeArguments.length; i++) {
         _checkAssignment(origin,
@@ -1339,20 +1340,6 @@ $stackTrace''');
         _unimplemented(
             expression, 'Conditional expression with operator ${token.lexeme}');
     }
-  }
-
-  /// Double checks that [type] is sufficiently simple for this naive prototype
-  /// implementation.
-  ///
-  /// TODO(paulberry): get rid of this method and put the correct logic into the
-  /// call sites.
-  bool _isSimple(DecoratedType type) {
-    if (type.type.isBottom) return true;
-    if (type.type.isVoid) return true;
-    if (type.type is TypeParameterType) return true;
-    if (type.type is! InterfaceType) return false;
-    if ((type.type as InterfaceType).typeParameters.isNotEmpty) return false;
-    return true;
   }
 
   bool _isUntypedParameter(NormalFormalParameter parameter) {
