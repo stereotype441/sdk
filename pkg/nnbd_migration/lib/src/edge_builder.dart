@@ -260,14 +260,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
       // TODO(paulberry): substitute if necessary
       assert(calleeType.positionalParameters.length > 0); // TODO(paulberry)
       _handleAssignment(node.rightOperand, calleeType.positionalParameters[0]);
-      var returnType = calleeType.returnType;
-      if (returnType.type.isDartCoreNum && node.staticType.isDartCoreInt) {
-        // In a few cases the type computed by normal method lookup is `num`,
-        // but special rules kick in to cause the type to be `int` instead.  If
-        // that is the case, we need to fix up the decorated type.
-        returnType = DecoratedType(node.staticType, returnType.node);
-      }
-      return returnType;
+      return _fixNumericTypes(calleeType.returnType, node.staticType);
     } else {
       // TODO(paulberry)
       node.leftOperand.accept(this);
@@ -678,7 +671,7 @@ $stackTrace''');
       }
       var calleeType = getOrComputeElementType(callee);
       // TODO(paulberry): substitute if necessary
-      return calleeType.returnType;
+      return _fixNumericTypes(calleeType.returnType, node.staticType);
     }
     _unimplemented(
         node, 'Postfix expression with operator ${node.operator.lexeme}');
@@ -1096,6 +1089,18 @@ $stackTrace''');
       _unimplemented(astNode, 'LUB/GLB with type parameter types');
     }
     _unimplemented(astNode, '_decorateUpperOrLowerBound');
+  }
+
+  DecoratedType _fixNumericTypes(
+      DecoratedType decoratedType, DartType undecoratedType) {
+    if (decoratedType.type.isDartCoreNum && undecoratedType.isDartCoreInt) {
+      // In a few cases the type computed by normal method lookup is `num`,
+      // but special rules kick in to cause the type to be `int` instead.  If
+      // that is the case, we need to fix up the decorated type.
+      return DecoratedType(undecoratedType, decoratedType.node);
+    } else {
+      return decoratedType;
+    }
   }
 
   /// Creates the necessary constraint(s) for an assignment of the given
