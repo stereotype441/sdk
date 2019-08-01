@@ -76,6 +76,20 @@ abstract class _ProvisionalApiTestBase extends AbstractContextTest {
 
 /// Mixin containing test cases for the provisional API.
 mixin _ProvisionalApiTestCases on _ProvisionalApiTestBase {
+  test_assign_null_to_generic_type() async {
+    var content = '''
+main() {
+  List<int> x = null;
+}
+''';
+    var expected = '''
+main() {
+  List<int>? x = null;
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_class_alias_synthetic_constructor_with_parameters() async {
     var content = '''
 void main() {
@@ -1068,20 +1082,6 @@ void f() {
 }
 void g(C<int?> y) {
   y.add(null);
-}
-''';
-    await _checkSingleFileChanges(content, expected);
-  }
-
-  solo_test_assign_null_to_generic_type() async {
-    var content = '''
-main() {
-  List<int> x = null;
-}
-''';
-    var expected = '''
-main() {
-  List<int>? x = null;
 }
 ''';
     await _checkSingleFileChanges(content, expected);
