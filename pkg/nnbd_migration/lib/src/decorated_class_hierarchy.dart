@@ -36,6 +36,7 @@ class DecoratedClassHierarchy {
   /// nullable.
   DecoratedType getDecoratedSupertype(
       ClassElement class_, ClassElement superclass) {
+    assert(!(class_.library.isDartCore && class_.name == 'Null'));
     assert(class_ is! ClassElementHandle);
     assert(superclass is! ClassElementHandle);
     if (superclass.typeParameters.isEmpty) {
