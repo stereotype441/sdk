@@ -24,12 +24,12 @@ group("default") {
 }
 
 group("most") {
+  import("runtime/runtime_args.gni")
   if (targetting_fuchsia) {
     # Fuchsia has run_vm_tests marked testonly.
     testonly = true
   }
   deps = [
-    ":analysis_server",
     ":create_sdk",
     ":dart2js",
     ":dartanalyzer",
@@ -37,6 +37,9 @@ group("most") {
     ":runtime",
     ":samples",
   ]
+  if (dart_target_arch != "arm") {
+    deps += [ ":analysis_server" ]
+  }
 }
 
 group("runtime") {
@@ -123,16 +126,20 @@ group("analysis_server") {
 }
 
 group("check_llvm") {
-  deps = [
-    "runtime/llvm_codegen/test",
-  ]
+  if (checkout_llvm) {
+    deps = [
+      "runtime/llvm_codegen/test",
+    ]
+  }
 }
 
 group("llvm_codegen") {
-  deps = [
-    "runtime/llvm_codegen/codegen",
-    "runtime/llvm_codegen/bit",
-  ]
+  if (checkout_llvm) {
+    deps = [
+      "runtime/llvm_codegen/codegen",
+      "runtime/llvm_codegen/bit",
+    ]
+  }
 }
 
 # This is the target that is built on the dart2js build bots.

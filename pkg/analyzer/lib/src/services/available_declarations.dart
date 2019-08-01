@@ -13,6 +13,7 @@ import 'package:analyzer/error/listener.dart';
 import 'package:analyzer/file_system/file_system.dart';
 import 'package:analyzer/source/line_info.dart';
 import 'package:analyzer/src/dart/analysis/byte_store.dart';
+import 'package:analyzer/src/dart/analysis/session.dart';
 import 'package:analyzer/src/dart/ast/ast.dart';
 import 'package:analyzer/src/dart/ast/token.dart';
 import 'package:analyzer/src/dart/scanner/reader.dart';
@@ -102,6 +103,7 @@ enum DeclarationKind {
   CONSTRUCTOR,
   ENUM,
   ENUM_CONSTANT,
+  EXTENSION,
   FUNCTION,
   FUNCTION_TYPE_ALIAS,
   GETTER,
@@ -140,11 +142,28 @@ class DeclarationsContext {
   /// The path prefix keys are sorted so that the longest keys are first.
   final Map<String, List<String>> _pathPrefixToDependencyPathList = {};
 
+  /// The set of paths of already checked known files, some of which were
+  /// added to [_knownPathList]. For example we skip non-API files.
+  final Set<String> _knownPathSet = Set<String>();
+
+  /// The list of paths of files known to this context - from the context
+  /// itself, from direct dependencies, from indirect dependencies.
+  ///
+  /// We include libraries from this list only when actual context dependencies
+  /// are not known. Dependencies are always know for Pub packages, but are
+  /// currently never known for Bazel packages.
+  final List<String> _knownPathList = [];
+
   DeclarationsContext(this._tracker, this._analysisContext);
 
   /// Return the combined information about all of the dartdoc directives in
   /// this context.
   DartdocDirectiveInfo get dartdocDirectiveInfo => _dartdocDirectiveInfo;
+
+  /// The set of features that are globally enabled for this context.
+  FeatureSet get featureSet {
+    return _analysisContext.analysisOptions.contextFeatures;
+  }
 
   /// Return libraries that are available to the file with the given [path].
   ///
@@ -165,6 +184,10 @@ class DeclarationsContext {
         _addLibrariesWithPaths(dependencyLibraries, pathList);
         break;
       }
+    }
+
+    if (_pathPrefixToDependencyPathList.isEmpty) {
+      _addLibrariesWithPaths(dependencyLibraries, _knownPathList);
     }
 
     _Package package;
@@ -376,6 +399,21 @@ class DeclarationsContext {
     }
   }
 
+  void _scheduleKnownFiles() {
+    var session = _analysisContext.currentSession as AnalysisSessionImpl;
+    // ignore: deprecated_member_use_from_same_package
+    var analysisDriver = session.getDriver();
+
+    for (var path in analysisDriver.knownFiles) {
+      if (_knownPathSet.add(path)) {
+        if (!path.contains(r'/lib/src/')) {
+          _knownPathList.add(path);
+          _tracker._addFile(this, path);
+        }
+      }
+    }
+  }
+
   void _scheduleSdkLibraries() {
     // ignore: deprecated_member_use_from_same_package
     var sdk = _analysisContext.currentSession.sourceFactory.dartSdk;
@@ -435,6 +473,9 @@ class DeclarationsTracker {
   /// libraries, but parts are ignored when we detect them.
   final List<_ScheduledFile> _scheduledFiles = [];
 
+  /// The time when known files were last pulled.
+  DateTime _whenKnownFilesPulled = DateTime.fromMillisecondsSinceEpoch(0);
+
   DeclarationsTracker(this._byteStore, this._resourceProvider);
 
   /// The stream of changes to the set of libraries used by the added contexts.
@@ -443,6 +484,11 @@ class DeclarationsTracker {
   /// Return `true` if there is scheduled work to do, as a result of adding
   /// new contexts, or changes to files.
   bool get hasWork {
+    var now = DateTime.now();
+    if (now.difference(_whenKnownFilesPulled).inSeconds > 1) {
+      _whenKnownFilesPulled = now;
+      _pullKnownFiles();
+    }
     return _changedPaths.isNotEmpty || _scheduledFiles.isNotEmpty;
   }
 
@@ -693,6 +739,16 @@ class DeclarationsTracker {
       LibraryChange._(changedLibraries, removedLibraries),
     );
   }
+
+  /// Pull known files into [DeclarationsContext]s.
+  ///
+  /// This is a temporary support for Bazel repositories, because IDEA
+  /// does not yet give us dependencies for them.
+  void _pullKnownFiles() {
+    for (var context in _contexts.values) {
+      context._scheduleKnownFiles();
+    }
+  }
 }
 
 class Libraries {
@@ -858,6 +914,8 @@ class _DeclarationStorage {
         return DeclarationKind.ENUM;
       case idl.AvailableDeclarationKind.ENUM_CONSTANT:
         return DeclarationKind.ENUM_CONSTANT;
+      case idl.AvailableDeclarationKind.EXTENSION:
+        return DeclarationKind.EXTENSION;
       case idl.AvailableDeclarationKind.FUNCTION:
         return DeclarationKind.FUNCTION;
       case idl.AvailableDeclarationKind.FUNCTION_TYPE_ALIAS:
@@ -887,6 +945,8 @@ class _DeclarationStorage {
         return idl.AvailableDeclarationKind.ENUM;
       case DeclarationKind.ENUM_CONSTANT:
         return idl.AvailableDeclarationKind.ENUM_CONSTANT;
+      case DeclarationKind.EXTENSION:
+        return idl.AvailableDeclarationKind.EXTENSION;
       case DeclarationKind.FUNCTION:
         return idl.AvailableDeclarationKind.FUNCTION;
       case DeclarationKind.FUNCTION_TYPE_ALIAS:
@@ -987,7 +1047,7 @@ class _ExportCombinator {
 
 class _File {
   /// The version of data format, should be incremented on every format change.
-  static const int DATA_VERSION = 11;
+  static const int DATA_VERSION = 12;
 
   /// The next value for [id].
   static int _nextId = 0;
@@ -1071,7 +1131,7 @@ class _File {
     if (bytes == null) {
       content ??= _readContent(resource);
 
-      CompilationUnit unit = _parse(content);
+      CompilationUnit unit = _parse(context.featureSet, content);
       _buildFileDeclarations(unit);
       _extractDartdocInfoFromUnit(unit);
       _putFileDeclarationsToByteStore(contentKey);
@@ -1331,6 +1391,14 @@ class _File {
             kind: DeclarationKind.ENUM_CONSTANT,
             name: constant.name,
             parent: enumDeclaration,
+          );
+        }
+      } else if (node is ExtensionDeclaration) {
+        if (node.name != null) {
+          addDeclaration(
+            isDeprecated: isDeprecated,
+            kind: DeclarationKind.EXTENSION,
+            name: node.name,
           );
         }
       } else if (node is FunctionDeclaration) {
@@ -1640,13 +1708,11 @@ class _File {
     return false;
   }
 
-  static CompilationUnit _parse(String content) {
+  static CompilationUnit _parse(FeatureSet featureSet, String content) {
     var errorListener = AnalysisErrorListener.NULL_LISTENER;
     var source = StringSource(content, '');
 
     var reader = new CharSequenceReader(content);
-    // TODO(paulberry): figure out the appropriate FeatureSet to use here
-    var featureSet = FeatureSet.fromEnableFlags([]);
     var scanner = new Scanner(null, reader, errorListener)
       ..configureFeatures(featureSet);
     var token = scanner.tokenize();

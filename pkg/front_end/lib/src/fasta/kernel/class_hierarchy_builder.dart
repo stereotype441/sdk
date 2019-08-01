@@ -12,7 +12,6 @@ import 'package:kernel/ast.dart'
         FunctionNode,
         InterfaceType,
         InvalidType,
-        Library,
         Member,
         Name,
         Procedure,
@@ -83,7 +82,6 @@ import 'kernel_builder.dart'
         KernelLibraryBuilder,
         NamedTypeBuilder,
         ProcedureBuilder,
-        KernelTypeVariableBuilder,
         LibraryBuilder,
         MemberBuilder,
         TypeBuilder,
@@ -199,7 +197,7 @@ class ClassHierarchyBuilder {
 
   final ClassBuilder objectClass;
 
-  final Loader<Library> loader;
+  final Loader loader;
 
   final Class objectKernelClass;
 
@@ -1393,7 +1391,7 @@ class ClassHierarchyNodeBuilder {
     ClassBuilder cls = type.declaration;
     List<TypeBuilder> result = new List<TypeBuilder>(cls.typeVariables.length);
     for (int i = 0; i < result.length; ++i) {
-      KernelTypeVariableBuilder tv = cls.typeVariables[i];
+      TypeVariableBuilder tv = cls.typeVariables[i];
       result[i] = tv.defaultType ??
           cls.library.loader.computeTypeBuilder(tv.target.defaultType);
     }

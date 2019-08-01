@@ -113,7 +113,7 @@ import 'kernel_builder.dart'
         AccessErrorBuilder,
         Declaration,
         ClassBuilder,
-        KernelInvalidTypeBuilder,
+        InvalidTypeBuilder,
         NamedTypeBuilder,
         TypeBuilder,
         UnresolvedType;
@@ -445,8 +445,7 @@ abstract class Generator {
   ///
   /// The type arguments have not been resolved and should be resolved to
   /// create a [TypeBuilder] for a valid type.
-  TypeBuilder buildTypeWithResolvedArguments(
-      List<UnresolvedType<TypeBuilder>> arguments) {
+  TypeBuilder buildTypeWithResolvedArguments(List<UnresolvedType> arguments) {
     NamedTypeBuilder result = new NamedTypeBuilder(token.lexeme, null);
     Message message = templateNotAType.withArguments(token.lexeme);
     _helper.library.addProblem(
@@ -461,7 +460,7 @@ abstract class Generator {
   }
 
   Expression invokeConstructor(
-      List<UnresolvedType<TypeBuilder>> typeArguments,
+      List<UnresolvedType> typeArguments,
       String name,
       Arguments arguments,
       Token nameToken,
@@ -1650,23 +1649,20 @@ class DeferredAccessGenerator extends Generator {
   String get _debugName => "DeferredAccessGenerator";
 
   @override
-  TypeBuilder buildTypeWithResolvedArguments(
-      List<UnresolvedType<TypeBuilder>> arguments) {
+  TypeBuilder buildTypeWithResolvedArguments(List<UnresolvedType> arguments) {
     String name = "${prefixGenerator._plainNameForRead}."
         "${suffixGenerator._plainNameForRead}";
     TypeBuilder type =
         suffixGenerator.buildTypeWithResolvedArguments(arguments);
     LocatedMessage message;
-    if (type is NamedTypeBuilder &&
-        type.declaration is KernelInvalidTypeBuilder) {
-      KernelInvalidTypeBuilder declaration = type.declaration;
+    if (type is NamedTypeBuilder && type.declaration is InvalidTypeBuilder) {
+      InvalidTypeBuilder declaration = type.declaration;
       message = declaration.message;
     } else {
       int charOffset = offsetForToken(prefixGenerator.token);
       message = templateDeferredTypeAnnotation
           .withArguments(
-              _helper.buildDartType(
-                  new UnresolvedType<TypeBuilder>(type, charOffset, _uri)),
+              _helper.buildDartType(new UnresolvedType(type, charOffset, _uri)),
               prefixGenerator._plainNameForRead)
           .withLocation(
               _uri, charOffset, lengthOfSpan(prefixGenerator.token, token));
@@ -1688,7 +1684,7 @@ class DeferredAccessGenerator extends Generator {
 
   @override
   Expression invokeConstructor(
-      List<UnresolvedType<TypeBuilder>> typeArguments,
+      List<UnresolvedType> typeArguments,
       String name,
       Arguments arguments,
       Token nameToken,
@@ -1740,8 +1736,7 @@ class TypeUseGenerator extends ReadOnlyAccessGenerator {
   String get _debugName => "TypeUseGenerator";
 
   @override
-  TypeBuilder buildTypeWithResolvedArguments(
-      List<UnresolvedType<TypeBuilder>> arguments) {
+  TypeBuilder buildTypeWithResolvedArguments(List<UnresolvedType> arguments) {
     if (declaration.isExtension) {
       // Extension declarations cannot be used as types.
       return super.buildTypeWithResolvedArguments(arguments);
@@ -1781,7 +1776,7 @@ class TypeUseGenerator extends ReadOnlyAccessGenerator {
 
   @override
   Expression invokeConstructor(
-      List<UnresolvedType<TypeBuilder>> typeArguments,
+      List<UnresolvedType> typeArguments,
       String name,
       Arguments arguments,
       Token nameToken,
@@ -1810,8 +1805,8 @@ class TypeUseGenerator extends ReadOnlyAccessGenerator {
   Expression get expression {
     if (super.expression == null) {
       int offset = offsetForToken(token);
-      if (declaration is KernelInvalidTypeBuilder) {
-        KernelInvalidTypeBuilder declaration = this.declaration;
+      if (declaration is InvalidTypeBuilder) {
+        InvalidTypeBuilder declaration = this.declaration;
         _helper.addProblemErrorIfConst(
             declaration.message.messageObject, offset, token.length);
         super.expression = _helper.wrapSyntheticExpression(
@@ -1822,7 +1817,7 @@ class TypeUseGenerator extends ReadOnlyAccessGenerator {
       } else {
         super.expression = _forest.literalType(
             _helper.buildDartType(
-                new UnresolvedType<TypeBuilder>(
+                new UnresolvedType(
                     buildTypeWithResolvedArguments(null), offset, _uri),
                 nonInstanceAccessIsError: true),
             token);
@@ -1914,6 +1909,33 @@ class TypeUseGenerator extends ReadOnlyAccessGenerator {
   }
 }
 
+/// [ReadOnlyAccessGenerator] represents the subexpression whose prefix is the
+/// name of final local variable, final parameter, or catch clause variable or
+/// `this` in an instance method in an extension declaration.
+///
+/// For instance:
+///
+///   method(final a) {
+///     final b = null;
+///     a;         // a ReadOnlyAccessGenerator is created for `a`.
+///     a[];       // a ReadOnlyAccessGenerator is created for `a`.
+///     b();       // a ReadOnlyAccessGenerator is created for `b`.
+///     b.c = a.d; // a ReadOnlyAccessGenerator is created for `a` and `b`.
+///
+///     try {
+///     } catch (a) {
+///       a;       // a ReadOnlyAccessGenerator is created for `a`.
+///     }
+///   }
+///
+///   extension on Foo {
+///     method() {
+///       this;         // a ReadOnlyAccessGenerator is created for `this`.
+///       this.a;       // a ReadOnlyAccessGenerator is created for `this`.
+///       this.b();     // a ReadOnlyAccessGenerator is created for `this`.
+///     }
+///   }
+///
 class ReadOnlyAccessGenerator extends Generator {
   @override
   final String _plainNameForRead;
@@ -2062,7 +2084,7 @@ abstract class ErroneousExpressionGenerator extends Generator {
 
   @override
   Expression invokeConstructor(
-      List<UnresolvedType<TypeBuilder>> typeArguments,
+      List<UnresolvedType> typeArguments,
       String name,
       Arguments arguments,
       Token nameToken,
@@ -2526,8 +2548,7 @@ class UnexpectedQualifiedUseGenerator extends Generator {
   }
 
   @override
-  TypeBuilder buildTypeWithResolvedArguments(
-      List<UnresolvedType<TypeBuilder>> arguments) {
+  TypeBuilder buildTypeWithResolvedArguments(List<UnresolvedType> arguments) {
     Template<Message Function(String, String)> template = isUnresolved
         ? templateUnresolvedPrefixInTypeAnnotation
         : templateNotAPrefixInTypeAnnotation;
@@ -2624,8 +2645,7 @@ class ParserErrorGenerator extends Generator {
     return buildProblem();
   }
 
-  TypeBuilder buildTypeWithResolvedArguments(
-      List<UnresolvedType<TypeBuilder>> arguments) {
+  TypeBuilder buildTypeWithResolvedArguments(List<UnresolvedType> arguments) {
     NamedTypeBuilder result = new NamedTypeBuilder(token.lexeme, null);
     _helper.library.addProblem(message, offsetForToken(token), noLength, _uri);
     result.bind(result.buildInvalidType(
@@ -2638,7 +2658,7 @@ class ParserErrorGenerator extends Generator {
   }
 
   Expression invokeConstructor(
-      List<UnresolvedType<TypeBuilder>> typeArguments,
+      List<UnresolvedType> typeArguments,
       String name,
       Arguments arguments,
       Token nameToken,
@@ -2665,6 +2685,9 @@ class ParserErrorGenerator extends Generator {
 ///       this.b += c;  // a ThisAccessGenerator is created for `this`.
 ///     }
 ///   }
+///
+/// If this `this` occurs in an instance member on an extension declaration,
+/// a [ReadOnlyAccessGenerator] is created instead.
 ///
 class ThisAccessGenerator extends Generator {
   /// `true` if this access is in an initializer list.
@@ -2693,12 +2716,8 @@ class ThisAccessGenerator extends Generator {
   /// `true` if this subexpression represents a `super` prefix.
   final bool isSuper;
 
-  /// If non-null, this subexpression represents a `this` prefix in an
-  /// extension declaration member.
-  final VariableDeclaration extensionThis;
-
   ThisAccessGenerator(ExpressionGeneratorHelper helper, Token token,
-      this.isInitializer, this.inFieldInitializer, this.extensionThis,
+      this.isInitializer, this.inFieldInitializer,
       {this.isSuper: false})
       : super(helper, token);
 
@@ -2713,12 +2732,6 @@ class ThisAccessGenerator extends Generator {
     if (!isSuper) {
       if (inFieldInitializer) {
         return buildFieldInitializerError(null);
-      } else if (extensionThis != null) {
-        var fact = _helper.typePromoter
-            ?.getFactForAccess(extensionThis, _helper.functionNestingLevel);
-        var scope = _helper.typePromoter?.currentScope;
-        return new VariableGetJudgment(extensionThis, fact, scope)
-          ..fileOffset = offsetForToken(token);
       } else {
         return _forest.thisExpression(token);
       }
@@ -2888,8 +2901,6 @@ class ThisAccessGenerator extends Generator {
     sink.write(inFieldInitializer);
     sink.write(", isSuper: ");
     sink.write(isSuper);
-    sink.write(", extensionThis: ");
-    sink.write(extensionThis);
   }
 }
 

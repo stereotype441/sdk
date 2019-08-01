@@ -40,7 +40,7 @@ import '../ignored_parser_errors.dart' show isIgnoredParserError;
 import '../kernel/body_builder.dart' show BodyBuilder;
 
 import '../kernel/kernel_builder.dart'
-    show FormalParameterBuilder, KernelTypeAliasBuilder, TypeBuilder;
+    show FormalParameterBuilder, TypeAliasBuilder, TypeBuilder;
 
 import '../parser.dart' show Assert, MemberKind, Parser, optional;
 
@@ -104,7 +104,7 @@ class DietListener extends StackListener {
 
   @override
   void endMetadataStar(int count) {
-    assert(checkState(valueKinds(ValueKind.Token, count)));
+    assert(checkState(null, valueKinds(ValueKind.Token, count)));
     debugEvent("MetadataStar");
     if (count > 0) {
       discard(count - 1);
@@ -249,7 +249,7 @@ class DietListener extends StackListener {
 
     Declaration typedefBuilder = lookupBuilder(typedefKeyword, null, name);
     parseMetadata(typedefBuilder, metadata, typedefBuilder.target);
-    if (typedefBuilder is KernelTypeAliasBuilder) {
+    if (typedefBuilder is TypeAliasBuilder) {
       TypeBuilder type = typedefBuilder.type;
       if (type is FunctionTypeBuilder) {
         List<FormalParameterBuilder> formals = type.formals;
@@ -708,7 +708,7 @@ class DietListener extends StackListener {
 
   @override
   void beginClassOrMixinBody(Token token) {
-    assert(checkState([
+    assert(checkState(token, [
       ValueKind.Token,
       ValueKind.NameOrParserRecovery,
       ValueKind.TokenOrNull
@@ -1006,7 +1006,7 @@ class DietListener extends StackListener {
   }
 
   @override
-  bool isIgnoredError(Code code, Token token) {
+  bool isIgnoredError(Code<dynamic> code, Token token) {
     return isIgnoredParserError(code, token) ||
         super.isIgnoredError(code, token);
   }
