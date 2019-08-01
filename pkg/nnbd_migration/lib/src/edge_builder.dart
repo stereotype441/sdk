@@ -953,22 +953,13 @@ $stackTrace''');
         destinationType is InterfaceType) {
       if (_typeSystem.isSubtypeOf(sourceType, destinationType)) {
         // Ordinary (upcast) assignment.  No cast necessary.
-        DecoratedType substitutedSource;
-        if (sourceType.element == destinationType.element) {
-          substitutedSource = source;
-        } else {
-          // TODO(paulberry): test.
-          var substitution = _decoratedClassHierarchy
-              .getDecoratedSupertype(
-                  sourceType.element, destinationType.element)
-              .asSubstitution;
-          substitutedSource = source.substitute(substitution);
-        }
-        assert(substitutedSource.typeArguments.length ==
+        var rewrittenSource = _decoratedClassHierarchy.asInstanceOf(
+            source, destinationType.element);
+        assert(rewrittenSource.typeArguments.length ==
             destination.typeArguments.length);
-        for (int i = 0; i < substitutedSource.typeArguments.length; i++) {
+        for (int i = 0; i < rewrittenSource.typeArguments.length; i++) {
           _checkAssignment(origin,
-              source: substitutedSource.typeArguments[i],
+              source: rewrittenSource.typeArguments[i],
               destination: destination.typeArguments[i],
               hard: false);
         }

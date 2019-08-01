@@ -46,6 +46,20 @@ class DecoratedClassHierarchy {
         (throw StateError('Unrelated types'));
   }
 
+  /// Retrieves a [DecoratedType] describing how [type] implements [superclass].
+  ///
+  /// If [type] is not an interface type, or it does not implement [superclass],
+  /// raises an exception.
+  DecoratedType asInstanceOf(DecoratedType type, ClassElement superclass) {
+    var typeType = type.type as InterfaceType;
+    var result = getDecoratedSupertype(typeType.element, superclass);
+    if (result.typeArguments.isNotEmpty && type.typeArguments.isNotEmpty) {
+      // TODO(paulberry): test
+      result = result.substitute(type.asSubstitution);
+    }
+    return result;
+  }
+
   /// Computes a map whose keys are all the superclasses of [class_], and whose
   /// values indicate how [class_] implements each superclass.
   Map<ClassElement, DecoratedType> _getGenericSupertypeDecorations(
