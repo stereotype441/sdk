@@ -708,7 +708,7 @@ $stackTrace''');
       }
       var calleeType = getOrComputeElementType(callee);
       // TODO(paulberry): substitute if necessary
-      return calleeType.returnType;
+      return _fixNumericTypes(calleeType.returnType, node.staticType);
     } else {
       var callee = node.staticElement;
       var calleeType = getOrComputeElementType(callee, targetType: targetType);
