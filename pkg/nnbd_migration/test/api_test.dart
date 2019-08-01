@@ -1073,7 +1073,7 @@ void g(C<int?> y) {
     await _checkSingleFileChanges(content, expected);
   }
 
-  solo_test_assign_null_to_complex_type() async {
+  solo_test_assign_null_to_generic_type() async {
     var content = '''
 main() {
   List<int> x = null;
