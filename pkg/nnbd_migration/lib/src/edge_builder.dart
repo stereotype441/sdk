@@ -31,6 +31,8 @@ import 'package:nnbd_migration/src/nullability_node.dart';
 /// variables that will determine its nullability.  For `visit...` methods that
 /// don't visit expressions, `null` will be returned.
 class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
+  final TypeSystem _typeSystem;
+
   final InheritanceManager3 _inheritanceManager;
 
   /// The repository of constraint variables and decorated types (from a
@@ -85,10 +87,10 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
 
   NullabilityNode _lastConditionalNode;
 
-  EdgeBuilder(TypeProvider typeProvider, TypeSystem typeSystem, this._variables,
+  EdgeBuilder(TypeProvider typeProvider, this._typeSystem, this._variables,
       this._graph, this._source, this.listener)
       : _decoratedClassHierarchy = DecoratedClassHierarchy(_variables, _graph),
-        _inheritanceManager = InheritanceManager3(typeSystem),
+        _inheritanceManager = InheritanceManager3(_typeSystem),
         _notNullType = DecoratedType(typeProvider.objectType, _graph.never),
         _nonNullableBoolType =
             DecoratedType(typeProvider.boolType, _graph.never),
@@ -927,23 +929,35 @@ $stackTrace''');
     if (origin is ExpressionChecks) {
       origin.edges.add(edge);
     }
-    // TODO(paulberry): generalize this.
-    if (source.type is InterfaceType &&
-        destination.type is InterfaceType) {
-      if (_typeProvider)
-      this._decoratedClassHierarchy.getDecoratedSupertype(class_, superclass);
-      if (source.typeArguments.isNotEmpty || destination.typeArguments.isNotEmpty) {
-        if (source.typeArguments.)
+    var sourceType = source.type;
+    var destinationType = destination.type;
+    if (sourceType is InterfaceType && destinationType is InterfaceType) {
+      if (_typeSystem.isSubtypeOf(sourceType, destinationType)) {
+        // Ordinary (upcast) assignment.  No cast necessary.
+        DecoratedType substitutedSource;
+        if (sourceType.element == destinationType.element) {
+          substitutedSource = source;
+        } else {
+          // TODO(paulberry): test.
+          var substitution = _decoratedClassHierarchy
+              .getDecoratedSupertype(
+                  sourceType.element, destinationType.element)
+              .asSubstitution;
+          substitutedSource = source.substitute(substitution);
+        }
+        assert(substitutedSource.typeArguments.length ==
+            destination.typeArguments.length);
+        for (int i = 0; i < substitutedSource.typeArguments.length; i++) {
+          _checkAssignment(origin,
+              source: substitutedSource.typeArguments[i],
+              destination: destination.typeArguments[i],
+              hard: false);
+        }
+      } else if (_typeSystem.isSubtypeOf(destinationType, sourceType)) {
+        // Implicit downcast assignment.
+        throw UnimplementedError('Implicit downcast');
       }
-      assert(source.typeArguments.length == destination.typeArguments.length);
-      for (int i = 0; i < source.typeArguments.length; i++) {
-        _checkAssignment(origin,
-            source: source.typeArguments[i],
-            destination: destination.typeArguments[i],
-            hard: false);
-      }
-    } else if (source.type is FunctionType &&
-        destination.type is FunctionType) {
+    } else if (sourceType is FunctionType && destinationType is FunctionType) {
       _checkAssignment(origin,
           source: source.returnType,
           destination: destination.returnType,
@@ -969,7 +983,7 @@ $stackTrace''');
             destination: source.namedParameters[entry.key],
             hard: hard);
       }
-    } else if (destination.type.isDynamic || source.type.isDynamic) {
+    } else if (destinationType.isDynamic || sourceType.isDynamic) {
       // ok; nothing further to do.
     } else {
       throw '$destination <= $source'; // TODO(paulberry)
