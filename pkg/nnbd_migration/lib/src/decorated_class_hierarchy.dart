@@ -52,7 +52,9 @@ class DecoratedClassHierarchy {
   /// raises an exception.
   DecoratedType asInstanceOf(DecoratedType type, ClassElement superclass) {
     var typeType = type.type as InterfaceType;
-    var result = getDecoratedSupertype(typeType.element, superclass);
+    var class_ = typeType.element;
+    if (class_ == superclass) return type;
+    var result = getDecoratedSupertype(class_, superclass);
     if (result.typeArguments.isNotEmpty && type.typeArguments.isNotEmpty) {
       // TODO(paulberry): test
       result = result.substitute(type.asSubstitution);
