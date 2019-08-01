@@ -942,6 +942,10 @@ $stackTrace''');
       // No further edges need to be created, since all interface types are
       // trivially supertypes of bottom (and of Null, in the pre-migration
       // world).
+    } else if (sourceType is TypeParameterType &&
+        destinationType is TypeParameterType) {
+      // No further edges need to be created, since type parameter types aren't
+      // made up of other types.
     } else if (sourceType is InterfaceType &&
         destinationType is InterfaceType) {
       if (_typeSystem.isSubtypeOf(sourceType, destinationType)) {
