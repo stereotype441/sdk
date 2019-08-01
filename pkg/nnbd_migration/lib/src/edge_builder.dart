@@ -931,7 +931,12 @@ $stackTrace''');
     }
     var sourceType = source.type;
     var destinationType = destination.type;
-    if (sourceType is InterfaceType && destinationType is InterfaceType) {
+    if (sourceType.isBottom || sourceType.isDartCoreNull) {
+      // No further edges need to be created, since all interface types are
+      // trivially supertypes of bottom (and of Null, in the pre-migration
+      // world).
+    } else if (sourceType is InterfaceType &&
+        destinationType is InterfaceType) {
       if (_typeSystem.isSubtypeOf(sourceType, destinationType)) {
         // Ordinary (upcast) assignment.  No cast necessary.
         DecoratedType substitutedSource;
