@@ -260,7 +260,14 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
       // TODO(paulberry): substitute if necessary
       assert(calleeType.positionalParameters.length > 0); // TODO(paulberry)
       _handleAssignment(node.rightOperand, calleeType.positionalParameters[0]);
-      return calleeType.returnType;
+      var returnType = calleeType.returnType;
+      if (returnType.type.isDartCoreNum && node.staticType.isDartCoreInt) {
+        // In a few cases the type computed by normal method lookup is `num`,
+        // but special rules kick in to cause the type to be `int` instead.  If
+        // that is the case, we need to fix up the decorated type.
+        returnType = DecoratedType(node.staticType, returnType.node);
+      }
+      return returnType;
     } else {
       // TODO(paulberry)
       node.leftOperand.accept(this);
