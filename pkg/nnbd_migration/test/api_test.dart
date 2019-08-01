@@ -1073,6 +1073,20 @@ void g(C<int?> y) {
     await _checkSingleFileChanges(content, expected);
   }
 
+  solo_test_assign_null_to_complex_type() async {
+    var content = '''
+main() {
+  List<int> x = null;
+}
+''';
+    var expected = '''
+main() {
+  List<int>? x = null;
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_generic_function_type_syntax_inferred_dynamic_return() async {
     var content = '''
 abstract class C {
