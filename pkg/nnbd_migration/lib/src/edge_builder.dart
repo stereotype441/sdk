@@ -1290,20 +1290,6 @@ $stackTrace''');
     }
   }
 
-  /// Double checks that [type] is sufficiently simple for this naive prototype
-  /// implementation.
-  ///
-  /// TODO(paulberry): get rid of this method and put the correct logic into the
-  /// call sites.
-  bool _isSimple(DecoratedType type) {
-    if (type.type.isBottom) return true;
-    if (type.type.isVoid) return true;
-    if (type.type is TypeParameterType) return true;
-    if (type.type is! InterfaceType) return false;
-    if ((type.type as InterfaceType).typeParameters.isNotEmpty) return false;
-    return true;
-  }
-
   bool _isUntypedParameter(NormalFormalParameter parameter) {
     if (parameter is SimpleFormalParameter) {
       return parameter.type == null;
@@ -1442,6 +1428,20 @@ mixin _AssignmentChecker {
   void _connect(
       NullabilityNode source, NullabilityNode destination, EdgeOrigin origin,
       {bool hard = false});
+
+  /// Double checks that [type] is sufficiently simple for this naive prototype
+  /// implementation.
+  ///
+  /// TODO(paulberry): get rid of this method and put the correct logic into the
+  /// call sites.
+  bool _isSimple(DecoratedType type) {
+    if (type.type.isBottom) return true;
+    if (type.type.isVoid) return true;
+    if (type.type is TypeParameterType) return true;
+    if (type.type is! InterfaceType) return false;
+    if ((type.type as InterfaceType).typeParameters.isNotEmpty) return false;
+    return true;
+  }
 }
 
 /// Information about a binary expression whose boolean value could possibly
