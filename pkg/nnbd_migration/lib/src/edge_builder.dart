@@ -30,7 +30,8 @@ import 'package:nnbd_migration/src/nullability_node.dart';
 /// the static type of the visited expression, along with the constraint
 /// variables that will determine its nullability.  For `visit...` methods that
 /// don't visit expressions, `null` will be returned.
-class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
+class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
+    with _AssignmentChecker {
   final InheritanceManager3 _inheritanceManager;
 
   /// The repository of constraint variables and decorated types (from a
@@ -913,62 +914,6 @@ $stackTrace''');
     return null;
   }
 
-  /// Creates the necessary constraint(s) for an assignment from [source] to
-  /// [destination].  [origin] should be used as the origin for any edges
-  /// created.  [hard] indicates whether a hard edge should be created.
-  void _checkAssignment(EdgeOrigin origin,
-      {@required DecoratedType source,
-      @required DecoratedType destination,
-      @required bool hard}) {
-    _connect(source.node, destination.node, origin, hard: hard);
-    // TODO(paulberry): generalize this.
-    if ((_isSimple(source) || destination.type.isObject) &&
-        (_isSimple(destination) || source.type.isDartCoreNull)) {
-      // Ok; nothing further to do.
-    } else if (source.type is InterfaceType &&
-        destination.type is InterfaceType &&
-        source.type.element == destination.type.element) {
-      assert(source.typeArguments.length == destination.typeArguments.length);
-      for (int i = 0; i < source.typeArguments.length; i++) {
-        _checkAssignment(origin,
-            source: source.typeArguments[i],
-            destination: destination.typeArguments[i],
-            hard: false);
-      }
-    } else if (source.type is FunctionType &&
-        destination.type is FunctionType) {
-      _checkAssignment(origin,
-          source: source.returnType,
-          destination: destination.returnType,
-          hard: hard);
-      if (source.typeArguments.isNotEmpty ||
-          destination.typeArguments.isNotEmpty) {
-        throw UnimplementedError('TODO(paulberry)');
-      }
-      for (int i = 0;
-          i < source.positionalParameters.length &&
-              i < destination.positionalParameters.length;
-          i++) {
-        // Note: source and destination are swapped due to contravariance.
-        _checkAssignment(origin,
-            source: destination.positionalParameters[i],
-            destination: source.positionalParameters[i],
-            hard: hard);
-      }
-      for (var entry in destination.namedParameters.entries) {
-        // Note: source and destination are swapped due to contravariance.
-        _checkAssignment(origin,
-            source: entry.value,
-            destination: source.namedParameters[entry.key],
-            hard: hard);
-      }
-    } else if (destination.type.isDynamic || source.type.isDynamic) {
-      // ok; nothing further to do.
-    } else {
-      throw '$destination <= $source'; // TODO(paulberry)
-    }
-  }
-
   /// Double checks that [name] is not the name of a method or getter declared
   /// on [Object].
   ///
@@ -1433,6 +1378,70 @@ $stackTrace''');
       _unionDecoratedTypes(x.returnType, y.returnType, origin);
     }
   }
+}
+
+mixin _AssignmentChecker {
+  DecoratedClassHierarchy get _decoratedClassHierarchy;
+
+  /// Creates the necessary constraint(s) for an assignment from [source] to
+  /// [destination].  [origin] should be used as the origin for any edges
+  /// created.  [hard] indicates whether a hard edge should be created.
+  void _checkAssignment(EdgeOrigin origin,
+      {@required DecoratedType source,
+      @required DecoratedType destination,
+      @required bool hard}) {
+    _connect(source.node, destination.node, origin, hard: hard);
+    // TODO(paulberry): generalize this.
+    if ((_isSimple(source) || destination.type.isObject) &&
+        (_isSimple(destination) || source.type.isDartCoreNull)) {
+      // Ok; nothing further to do.
+    } else if (source.type is InterfaceType &&
+        destination.type is InterfaceType &&
+        source.type.element == destination.type.element) {
+      assert(source.typeArguments.length == destination.typeArguments.length);
+      for (int i = 0; i < source.typeArguments.length; i++) {
+        _checkAssignment(origin,
+            source: source.typeArguments[i],
+            destination: destination.typeArguments[i],
+            hard: false);
+      }
+    } else if (source.type is FunctionType &&
+        destination.type is FunctionType) {
+      _checkAssignment(origin,
+          source: source.returnType,
+          destination: destination.returnType,
+          hard: hard);
+      if (source.typeArguments.isNotEmpty ||
+          destination.typeArguments.isNotEmpty) {
+        throw UnimplementedError('TODO(paulberry)');
+      }
+      for (int i = 0;
+          i < source.positionalParameters.length &&
+              i < destination.positionalParameters.length;
+          i++) {
+        // Note: source and destination are swapped due to contravariance.
+        _checkAssignment(origin,
+            source: destination.positionalParameters[i],
+            destination: source.positionalParameters[i],
+            hard: hard);
+      }
+      for (var entry in destination.namedParameters.entries) {
+        // Note: source and destination are swapped due to contravariance.
+        _checkAssignment(origin,
+            source: entry.value,
+            destination: source.namedParameters[entry.key],
+            hard: hard);
+      }
+    } else if (destination.type.isDynamic || source.type.isDynamic) {
+      // ok; nothing further to do.
+    } else {
+      throw '$destination <= $source'; // TODO(paulberry)
+    }
+  }
+
+  void _connect(
+      NullabilityNode source, NullabilityNode destination, EdgeOrigin origin,
+      {bool hard = false});
 }
 
 /// Information about a binary expression whose boolean value could possibly
