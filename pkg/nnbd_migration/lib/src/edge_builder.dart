@@ -25,12 +25,16 @@ import 'package:nnbd_migration/src/nullability_node.dart';
 
 @visibleForTesting
 class AssignmentCheckerForTesting extends Object with _AssignmentChecker {
+  @override
+  final TypeSystem _typeSystem;
+
   final NullabilityGraph _graph;
 
   @override
   final DecoratedClassHierarchy _decoratedClassHierarchy;
 
-  AssignmentCheckerForTesting(this._graph, this._decoratedClassHierarchy);
+  AssignmentCheckerForTesting(
+      this._typeSystem, this._graph, this._decoratedClassHierarchy);
 
   void checkAssignment(EdgeOrigin origin,
       {@required DecoratedType source,
