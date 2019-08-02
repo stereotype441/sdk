@@ -30,7 +30,8 @@ import 'package:nnbd_migration/src/nullability_node.dart';
 /// the static type of the visited expression, along with the constraint
 /// variables that will determine its nullability.  For `visit...` methods that
 /// don't visit expressions, `null` will be returned.
-class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
+class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
+    with _AssignmentChecker {
   final TypeSystem _typeSystem;
 
   final InheritanceManager3 _inheritanceManager;
@@ -915,92 +916,6 @@ $stackTrace''');
     return null;
   }
 
-  /// Creates the necessary constraint(s) for an assignment from [source] to
-  /// [destination].  [origin] should be used as the origin for any edges
-  /// created.  [hard] indicates whether a hard edge should be created.
-  void _checkAssignment(EdgeOrigin origin,
-      {@required DecoratedType source,
-      @required DecoratedType destination,
-      @required bool hard}) {
-    _connect(source.node, destination.node, origin, hard: hard);
-    var sourceType = source.type;
-    var destinationType = destination.type;
-    if (sourceType.isBottom || sourceType.isDartCoreNull) {
-      // No further edges need to be created, since all types are trivially
-      // supertypes of bottom (and of Null, in the pre-migration world).
-    } else if (destinationType.isDynamic || destinationType.isVoid) {
-      // No further edges need to be created, since all types are trivially
-      // subtypes of dynamic (and of void, since void is treated as equivalent
-      // to dynamic for subtyping purposes).
-    } else if (sourceType is TypeParameterType) {
-      if (destinationType is TypeParameterType) {
-        // No further edges need to be created, since type parameter types
-        // aren't made up of other types.
-      } else {
-        // TODO(paulberry): the correct behavior here would be to do a
-        // substitution so that replace sourceType with the type parameter's
-        // bound and then continue with the comparison.  But most of the time
-        // that will result in a no-op, because the destination type is an
-        // interface type with no type parameters, so no edges need to be
-        // generated.  So for now we just verify that we're in the easy case.
-        if (!(destinationType is InterfaceType &&
-            destinationType.typeArguments.isEmpty)) {
-          throw UnimplementedError(
-              'Handle assignment from type parameter to complex type '
-              '$destinationType');
-        }
-      }
-    } else if (sourceType is InterfaceType &&
-        destinationType is InterfaceType) {
-      if (_typeSystem.isSubtypeOf(sourceType, destinationType)) {
-        // Ordinary (upcast) assignment.  No cast necessary.
-        var rewrittenSource = _decoratedClassHierarchy.asInstanceOf(
-            source, destinationType.element);
-        assert(rewrittenSource.typeArguments.length ==
-            destination.typeArguments.length);
-        for (int i = 0; i < rewrittenSource.typeArguments.length; i++) {
-          _checkAssignment(origin,
-              source: rewrittenSource.typeArguments[i],
-              destination: destination.typeArguments[i],
-              hard: false);
-        }
-      } else if (_typeSystem.isSubtypeOf(destinationType, sourceType)) {
-        // Implicit downcast assignment.
-        throw UnimplementedError('Implicit downcast');
-      }
-    } else if (sourceType is FunctionType && destinationType is FunctionType) {
-      _checkAssignment(origin,
-          source: source.returnType,
-          destination: destination.returnType,
-          hard: hard);
-      if (source.typeArguments.isNotEmpty ||
-          destination.typeArguments.isNotEmpty) {
-        throw UnimplementedError('TODO(paulberry)');
-      }
-      for (int i = 0;
-          i < source.positionalParameters.length &&
-              i < destination.positionalParameters.length;
-          i++) {
-        // Note: source and destination are swapped due to contravariance.
-        _checkAssignment(origin,
-            source: destination.positionalParameters[i],
-            destination: source.positionalParameters[i],
-            hard: hard);
-      }
-      for (var entry in destination.namedParameters.entries) {
-        // Note: source and destination are swapped due to contravariance.
-        _checkAssignment(origin,
-            source: entry.value,
-            destination: source.namedParameters[entry.key],
-            hard: hard);
-      }
-    } else if (destinationType.isDynamic || sourceType.isDynamic) {
-      // ok; nothing further to do.
-    } else {
-      throw '$destination <= $source'; // TODO(paulberry)
-    }
-  }
-
   /// Double checks that [name] is not the name of a method or getter declared
   /// on [Object].
   ///
@@ -1463,6 +1378,102 @@ $stackTrace''');
       _unionDecoratedTypes(x.returnType, y.returnType, origin);
     }
   }
+}
+
+mixin _AssignmentChecker {
+  DecoratedClassHierarchy get _decoratedClassHierarchy;
+
+  TypeSystem get _typeSystem;
+
+  /// Creates the necessary constraint(s) for an assignment from [source] to
+  /// [destination].  [origin] should be used as the origin for any edges
+  /// created.  [hard] indicates whether a hard edge should be created.
+  void _checkAssignment(EdgeOrigin origin,
+      {@required DecoratedType source,
+      @required DecoratedType destination,
+      @required bool hard}) {
+    _connect(source.node, destination.node, origin, hard: hard);
+    var sourceType = source.type;
+    var destinationType = destination.type;
+    if (sourceType.isBottom || sourceType.isDartCoreNull) {
+      // No further edges need to be created, since all types are trivially
+      // supertypes of bottom (and of Null, in the pre-migration world).
+    } else if (destinationType.isDynamic || destinationType.isVoid) {
+      // No further edges need to be created, since all types are trivially
+      // subtypes of dynamic (and of void, since void is treated as equivalent
+      // to dynamic for subtyping purposes).
+    } else if (sourceType is TypeParameterType) {
+      if (destinationType is TypeParameterType) {
+        // No further edges need to be created, since type parameter types
+        // aren't made up of other types.
+      } else {
+        // TODO(paulberry): the correct behavior here would be to do a
+        // substitution so that replace sourceType with the type parameter's
+        // bound and then continue with the comparison.  But most of the time
+        // that will result in a no-op, because the destination type is an
+        // interface type with no type parameters, so no edges need to be
+        // generated.  So for now we just verify that we're in the easy case.
+        if (!(destinationType is InterfaceType &&
+            destinationType.typeArguments.isEmpty)) {
+          throw UnimplementedError(
+              'Handle assignment from type parameter to complex type '
+              '$destinationType');
+        }
+      }
+    } else if (sourceType is InterfaceType &&
+        destinationType is InterfaceType) {
+      if (_typeSystem.isSubtypeOf(sourceType, destinationType)) {
+        // Ordinary (upcast) assignment.  No cast necessary.
+        var rewrittenSource = _decoratedClassHierarchy.asInstanceOf(
+            source, destinationType.element);
+        assert(rewrittenSource.typeArguments.length ==
+            destination.typeArguments.length);
+        for (int i = 0; i < rewrittenSource.typeArguments.length; i++) {
+          _checkAssignment(origin,
+              source: rewrittenSource.typeArguments[i],
+              destination: destination.typeArguments[i],
+              hard: false);
+        }
+      } else if (_typeSystem.isSubtypeOf(destinationType, sourceType)) {
+        // Implicit downcast assignment.
+        throw UnimplementedError('Implicit downcast');
+      }
+    } else if (sourceType is FunctionType && destinationType is FunctionType) {
+      _checkAssignment(origin,
+          source: source.returnType,
+          destination: destination.returnType,
+          hard: hard);
+      if (source.typeArguments.isNotEmpty ||
+          destination.typeArguments.isNotEmpty) {
+        throw UnimplementedError('TODO(paulberry)');
+      }
+      for (int i = 0;
+          i < source.positionalParameters.length &&
+              i < destination.positionalParameters.length;
+          i++) {
+        // Note: source and destination are swapped due to contravariance.
+        _checkAssignment(origin,
+            source: destination.positionalParameters[i],
+            destination: source.positionalParameters[i],
+            hard: hard);
+      }
+      for (var entry in destination.namedParameters.entries) {
+        // Note: source and destination are swapped due to contravariance.
+        _checkAssignment(origin,
+            source: entry.value,
+            destination: source.namedParameters[entry.key],
+            hard: hard);
+      }
+    } else if (destinationType.isDynamic || sourceType.isDynamic) {
+      // ok; nothing further to do.
+    } else {
+      throw '$destination <= $source'; // TODO(paulberry)
+    }
+  }
+
+  void _connect(
+      NullabilityNode source, NullabilityNode destination, EdgeOrigin origin,
+      {bool hard = false});
 }
 
 /// Information about a binary expression whose boolean value could possibly
