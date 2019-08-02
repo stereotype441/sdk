@@ -938,10 +938,24 @@ $stackTrace''');
       // No further edges need to be created, since all types are trivially
       // subtypes of dynamic (and of void, since void is treated as equivalent
       // to dynamic for subtyping purposes).
-    } else if (sourceType is TypeParameterType &&
-        destinationType is TypeParameterType) {
-      // No further edges need to be created, since type parameter types aren't
-      // made up of other types.
+    } else if (sourceType is TypeParameterType) {
+      if (destinationType is TypeParameterType) {
+        // No further edges need to be created, since type parameter types
+        // aren't made up of other types.
+      } else {
+        // TODO(paulberry): the correct behavior here would be to do a
+        // substitution so that replace sourceType with the type parameter's
+        // bound and then continue with the comparison.  But most of the time
+        // that will result in a no-op, because the destination type is an
+        // interface type with no type parameters, so no edges need to be
+        // generated.  So for now we just verify that we're in the easy case.
+        if (!(destinationType is InterfaceType &&
+            destinationType.typeArguments.isEmpty)) {
+          throw UnimplementedError(
+              'Handle assignment from type parameter to complex type '
+              '$destinationType');
+        }
+      }
     } else if (sourceType is InterfaceType &&
         destinationType is InterfaceType) {
       if (_typeSystem.isSubtypeOf(sourceType, destinationType)) {
