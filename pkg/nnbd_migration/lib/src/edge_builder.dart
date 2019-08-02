@@ -168,8 +168,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
     if (identical(_conditionInfo?.condition, node.condition)) {
       if (!_inConditionalControlFlow &&
           _conditionInfo.trueDemonstratesNonNullIntent != null) {
-        _graph.connect(_conditionInfo.trueDemonstratesNonNullIntent,
-            _graph.never, NonNullAssertionOrigin(_source, node.offset),
+        _connect(_conditionInfo.trueDemonstratesNonNullIntent, _graph.never,
+            NonNullAssertionOrigin(_source, node.offset),
             hard: true);
       }
     }
@@ -240,9 +240,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
         var rightType = node.rightOperand.accept(this);
         var ifNullNode = NullabilityNode.forIfNotNull();
         expressionType = DecoratedType(node.staticType, ifNullNode);
-        _graph.connect(rightType.node, expressionType.node,
-            IfNullOrigin(_source, node.offset),
-            guards: _guards);
+        _connect(rightType.node, expressionType.node,
+            IfNullOrigin(_source, node.offset));
       } finally {
         _guards.removeLast();
       }
@@ -364,11 +363,10 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType> {
         // Nothing to do; the implicit default value of `null` will never be
         // reached.
       } else {
-        _graph.connect(
+        _connect(
             _graph.always,
             getOrComputeElementType(node.declaredElement).node,
-            OptionalFormalParameterOrigin(_source, node.offset),
-            guards: _guards);
+            OptionalFormalParameterOrigin(_source, node.offset));
       }
     } else {
       _handleAssignment(
@@ -924,11 +922,7 @@ $stackTrace''');
       {@required DecoratedType source,
       @required DecoratedType destination,
       @required bool hard}) {
-    var edge = _graph.connect(source.node, destination.node, origin,
-        guards: _guards, hard: hard);
-    if (origin is ExpressionChecks) {
-      origin.edges.add(edge);
-    }
+    _connect(source.node, destination.node, origin, hard: hard);
     var sourceType = source.type;
     var destinationType = destination.type;
     if (sourceType.isBottom || sourceType.isDartCoreNull) {
@@ -1017,6 +1011,16 @@ $stackTrace''');
     assert(name != 'hashCode');
     assert(name != 'noSuchMethod');
     assert(name != 'runtimeType');
+  }
+
+  void _connect(
+      NullabilityNode source, NullabilityNode destination, EdgeOrigin origin,
+      {bool hard = false}) {
+    var edge = _graph.connect(source, destination, origin,
+        hard: hard, guards: _guards);
+    if (origin is ExpressionChecks) {
+      origin.edges.add(edge);
+    }
   }
 
   DecoratedType _decorateUpperOrLowerBound(AstNode astNode, DartType type,
