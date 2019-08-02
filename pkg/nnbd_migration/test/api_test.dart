@@ -1584,7 +1584,7 @@ main() {
     await _checkSingleFileChanges(content, expected);
   }
 
-  solo_test_null_aware_method_invocation() async {
+  test_null_aware_method_invocation() async {
     var content = '''
 int f(int i) => i?.abs();
 main() {
