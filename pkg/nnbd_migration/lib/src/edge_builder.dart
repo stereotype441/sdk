@@ -23,6 +23,31 @@ import 'package:nnbd_migration/src/expression_checks.dart';
 import 'package:nnbd_migration/src/node_builder.dart';
 import 'package:nnbd_migration/src/nullability_node.dart';
 
+@visibleForTesting
+class AssignmentCheckerForTesting extends Object with _AssignmentChecker {
+  final NullabilityGraph _graph;
+
+  @override
+  final DecoratedClassHierarchy _decoratedClassHierarchy;
+
+  AssignmentCheckerForTesting(this._graph, this._decoratedClassHierarchy);
+
+  void checkAssignment(EdgeOrigin origin,
+      {@required DecoratedType source,
+      @required DecoratedType destination,
+      @required bool hard}) {
+    super._checkAssignment(origin,
+        source: source, destination: destination, hard: hard);
+  }
+
+  @override
+  void _connect(
+      NullabilityNode source, NullabilityNode destination, EdgeOrigin origin,
+      {bool hard = false}) {
+    _graph.connect(source, destination, origin);
+  }
+}
+
 /// Visitor that builds nullability graph edges by examining code to be
 /// migrated.
 ///
@@ -47,6 +72,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   /// The file being analyzed.
   final Source _source;
 
+  @override
   final DecoratedClassHierarchy _decoratedClassHierarchy;
 
   /// For convenience, a [DecoratedType] representing non-nullable `Object`.
@@ -928,6 +954,7 @@ $stackTrace''');
     assert(name != 'runtimeType');
   }
 
+  @override
   void _connect(
       NullabilityNode source, NullabilityNode destination, EdgeOrigin origin,
       {bool hard = false}) {

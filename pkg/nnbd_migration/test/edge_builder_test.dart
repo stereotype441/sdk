@@ -16,8 +16,14 @@ import 'migration_visitor_test_base.dart';
 
 main() {
   defineReflectiveSuite(() {
+    defineReflectiveTests(AssignmentCheckerTest);
     defineReflectiveTests(EdgeBuilderTest);
   });
+}
+
+@reflectiveTest
+class AssignmentCheckerTest {
+  final AssignmentCheckerForTesting _checker;
 }
 
 @reflectiveTest
