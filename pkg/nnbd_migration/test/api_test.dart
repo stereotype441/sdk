@@ -1824,7 +1824,7 @@ D? test(C c) => -c;
     await _checkSingleFileChanges(content, expected);
   }
 
-  solo_test_prefix_minus_substitute() async {
+  test_prefix_minus_substitute() async {
     var content = '''
 abstract class C<T> {
   D<T> operator-();
