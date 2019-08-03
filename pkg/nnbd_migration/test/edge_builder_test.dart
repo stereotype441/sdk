@@ -45,9 +45,17 @@ class AssignmentCheckerTest extends Object with EdgeTester {
 
   AssignmentCheckerTest._(this.typeProvider, this.graph, this.checker);
 
+  NullabilityNode get always => graph.always;
+
   DecoratedType get bottom => DecoratedType(typeProvider.bottomType, never);
 
+  DecoratedType get dynamic_ => DecoratedType(typeProvider.dynamicType, always);
+
   NullabilityNode get never => graph.never;
+
+  DecoratedType get null_ => DecoratedType(typeProvider.nullType, always);
+
+  DecoratedType get void_ => DecoratedType(typeProvider.voidType, always);
 
   void assign(DecoratedType source, DecoratedType destination,
       {bool hard = false}) {
@@ -56,13 +64,64 @@ class AssignmentCheckerTest extends Object with EdgeTester {
         source: source, destination: destination, hard: hard);
   }
 
-  DecoratedType object(int offset) => DecoratedType(
-      typeProvider.objectType, NullabilityNode.forTypeAnnotation(0));
+  DecoratedType list(DecoratedType elementType, int offset) => DecoratedType(
+      typeProvider.listType.instantiate([elementType.type]),
+      NullabilityNode.forTypeAnnotation(offset),
+      typeArguments: [elementType]);
 
-  void test_bottom_to_object() {
+  DecoratedType object(int offset) => DecoratedType(
+      typeProvider.objectType, NullabilityNode.forTypeAnnotation(offset));
+
+  void test_bottom_to_complex() {
+    var t = list(object(0), 1);
+    assign(bottom, t);
+    assertEdge(never, t.node, hard: false);
+    expect(graph.getUpstreamEdges(t.typeArguments[0].node), isEmpty);
+  }
+
+  void test_bottom_to_simple() {
     var t = object(0);
     assign(bottom, t);
     assertEdge(never, t.node, hard: false);
+  }
+
+  test_complex_to_dynamic() {
+    var t = list(object(0), 1);
+    assign(t, dynamic_);
+    assertEdge(t.node, always, hard: false);
+    expect(graph.getDownstreamEdges(t.typeArguments[0].node), isEmpty);
+  }
+
+  test_complex_to_void() {
+    var t = list(object(0), 1);
+    assign(t, void_);
+    assertEdge(t.node, always, hard: false);
+    expect(graph.getDownstreamEdges(t.typeArguments[0].node), isEmpty);
+  }
+
+  void test_null_to_complex() {
+    var t = list(object(0), 1);
+    assign(null_, t);
+    assertEdge(always, t.node, hard: false);
+    expect(graph.getUpstreamEdges(t.typeArguments[0].node), isEmpty);
+  }
+
+  void test_null_to_simple() {
+    var t = object(0);
+    assign(null_, t);
+    assertEdge(always, t.node, hard: false);
+  }
+
+  test_simple_to_dynamic() {
+    var t = object(0);
+    assign(t, dynamic_);
+    assertEdge(t.node, always, hard: false);
+  }
+
+  test_simple_to_void() {
+    var t = object(0);
+    assign(t, void_);
+    assertEdge(t.node, always, hard: false);
   }
 }
 
