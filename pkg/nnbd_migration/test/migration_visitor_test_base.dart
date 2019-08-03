@@ -81,30 +81,8 @@ class InstrumentedVariables extends Variables {
   }
 }
 
-class MigrationVisitorTestBase extends AbstractSingleUnitTest {
-  final InstrumentedVariables variables;
-
-  final NullabilityGraphForTesting graph;
-
-  MigrationVisitorTestBase() : this._(NullabilityGraphForTesting());
-
-  MigrationVisitorTestBase._(this.graph)
-      : variables = InstrumentedVariables(graph);
-
-  NullabilityNode get always => graph.always;
-
-  NullabilityNode get never => graph.never;
-
-  TypeProvider get typeProvider => testAnalysisResult.typeProvider;
-
-  TypeSystem get typeSystem => testAnalysisResult.typeSystem;
-
-  Future<CompilationUnit> analyze(String code) async {
-    await resolveTestUnit(code);
-    testUnit
-        .accept(NodeBuilder(variables, testSource, null, graph, typeProvider));
-    return testUnit;
-  }
+mixin EdgeTester {
+  NullabilityGraphForTesting get graph;
 
   NullabilityEdge assertEdge(
       NullabilityNode source, NullabilityNode destination,
@@ -140,6 +118,39 @@ class MigrationVisitorTestBase extends AbstractSingleUnitTest {
     fail('Expected union between $x and $y, not found');
   }
 
+  List<NullabilityEdge> getEdges(
+      NullabilityNode source, NullabilityNode destination) =>
+      graph
+          .getUpstreamEdges(destination)
+          .where((e) => e.primarySource == source)
+          .toList();
+}
+
+class MigrationVisitorTestBase extends AbstractSingleUnitTest with EdgeTester {
+  final InstrumentedVariables variables;
+
+  final NullabilityGraphForTesting graph;
+
+  MigrationVisitorTestBase() : this._(NullabilityGraphForTesting());
+
+  MigrationVisitorTestBase._(this.graph)
+      : variables = InstrumentedVariables(graph);
+
+  NullabilityNode get always => graph.always;
+
+  NullabilityNode get never => graph.never;
+
+  TypeProvider get typeProvider => testAnalysisResult.typeProvider;
+
+  TypeSystem get typeSystem => testAnalysisResult.typeSystem;
+
+  Future<CompilationUnit> analyze(String code) async {
+    await resolveTestUnit(code);
+    testUnit
+        .accept(NodeBuilder(variables, testSource, null, graph, typeProvider));
+    return testUnit;
+  }
+
   /// Gets the [DecoratedType] associated with the constructor declaration whose
   /// name matches [search].
   DecoratedType decoratedConstructorDeclaration(String search) => variables
@@ -167,13 +178,6 @@ class MigrationVisitorTestBase extends AbstractSingleUnitTest {
     return variables.decoratedTypeAnnotation(
         testSource, findNode.typeAnnotation(text));
   }
-
-  List<NullabilityEdge> getEdges(
-          NullabilityNode source, NullabilityNode destination) =>
-      graph
-          .getUpstreamEdges(destination)
-          .where((e) => e.primarySource == source)
-          .toList();
 
   NullabilityNode possiblyOptionalParameter(String text) {
     return variables.possiblyOptionalParameter(findNode.defaultParameter(text));

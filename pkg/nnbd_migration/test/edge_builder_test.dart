@@ -5,8 +5,12 @@
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/member.dart';
+import 'package:analyzer/src/generated/resolver.dart';
+import 'package:analyzer/src/generated/testing/test_type_provider.dart';
+import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
 import 'package:nnbd_migration/src/decorated_type.dart';
 import 'package:nnbd_migration/src/edge_builder.dart';
+import 'package:nnbd_migration/src/edge_origin.dart';
 import 'package:nnbd_migration/src/expression_checks.dart';
 import 'package:nnbd_migration/src/nullability_node.dart';
 import 'package:test/test.dart';
@@ -22,8 +26,44 @@ main() {
 }
 
 @reflectiveTest
-class AssignmentCheckerTest {
-  final AssignmentCheckerForTesting _checker;
+class AssignmentCheckerTest extends Object with EdgeTester {
+  static const EdgeOrigin origin = const _TestEdgeOrigin();
+
+  final TypeProvider typeProvider;
+
+  final NullabilityGraphForTesting graph;
+
+  final AssignmentCheckerForTesting checker;
+
+  factory AssignmentCheckerTest() {
+    var typeProvider = TestTypeProvider();
+    var graph = NullabilityGraphForTesting();
+    var checker = AssignmentCheckerForTesting(Dart2TypeSystem(typeProvider),
+        graph, _DecoratedClassHierarchyForTesting());
+    return AssignmentCheckerTest._(typeProvider, graph, checker);
+  }
+
+  AssignmentCheckerTest._(this.typeProvider, this.graph, this.checker);
+
+  DecoratedType get bottom => DecoratedType(typeProvider.bottomType, never);
+
+  NullabilityNode get never => graph.never;
+
+  void assign(DecoratedType source, DecoratedType destination,
+      {bool hard = false}) {
+    // TODO(paulberry): test hardness
+    checker.checkAssignment(origin,
+        source: source, destination: destination, hard: hard);
+  }
+
+  DecoratedType object(int offset) => DecoratedType(
+      typeProvider.objectType, NullabilityNode.forTypeAnnotation(0));
+
+  void test_bottom_to_object() {
+    var t = object(0);
+    assign(bottom, t);
+    assertEdge(never, t.node, hard: false);
+  }
 }
 
 @reflectiveTest
@@ -2869,4 +2909,21 @@ void f(int i) {
         decoratedTypeAnnotation('int j').node,
         hard: true);
   }
+}
+
+class _DecoratedClassHierarchyForTesting implements DecoratedClassHierarchy {
+  @override
+  DecoratedType asInstanceOf(DecoratedType type, ClassElement superclass) {
+    throw UnimplementedError('TODO(paulberry)');
+  }
+
+  @override
+  DecoratedType getDecoratedSupertype(
+      ClassElement class_, ClassElement superclass) {
+    throw UnimplementedError('TODO(paulberry)');
+  }
+}
+
+class _TestEdgeOrigin extends EdgeOrigin {
+  const _TestEdgeOrigin();
 }
