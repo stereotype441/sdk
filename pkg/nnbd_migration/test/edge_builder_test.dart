@@ -31,18 +31,28 @@ main() {
 class AssignmentCheckerTest extends Object with EdgeTester {
   static const EdgeOrigin origin = const _TestEdgeOrigin();
 
+  ClassElement _myListOfListClass;
+
+  DecoratedType _myListOfListSupertype;
+
   final TypeProvider typeProvider;
 
   final NullabilityGraphForTesting graph;
 
   final AssignmentCheckerForTesting checker;
 
+  int offset = 0;
+
   factory AssignmentCheckerTest() {
     var typeProvider = TestTypeProvider();
     var graph = NullabilityGraphForTesting();
-    var checker = AssignmentCheckerForTesting(
-        graph, _DecoratedClassHierarchyForTesting());
-    return AssignmentCheckerTest._(typeProvider, graph, checker);
+    var decoratedClassHierarchy = _DecoratedClassHierarchyForTesting();
+    var checker = AssignmentCheckerForTesting(Dart2TypeSystem(typeProvider),
+        Dart2TypeSystem(typeProvider), graph, decoratedClassHierarchy);
+    var assignmentCheckerTest =
+        AssignmentCheckerTest._(typeProvider, graph, checker);
+    decoratedClassHierarchy.assignmentCheckerTest = assignmentCheckerTest;
+    return assignmentCheckerTest;
   }
 
   AssignmentCheckerTest._(this.typeProvider, this.graph, this.checker);
@@ -66,109 +76,141 @@ class AssignmentCheckerTest extends Object with EdgeTester {
         source: source, destination: destination, hard: hard);
   }
 
-  DecoratedType list(DecoratedType elementType, int offset) => DecoratedType(
+  DecoratedType list(DecoratedType elementType) => DecoratedType(
       typeProvider.listType.instantiate([elementType.type]),
-      NullabilityNode.forTypeAnnotation(offset),
+      NullabilityNode.forTypeAnnotation(offset++),
       typeArguments: [elementType]);
 
-  DecoratedType object(int offset) => DecoratedType(
-      typeProvider.objectType, NullabilityNode.forTypeAnnotation(offset));
+  DecoratedType myListOfList(DecoratedType elementType) {
+    if (_myListOfListClass == null) {
+      var t = _MockTypeParameter('T', object().type);
+      _myListOfListSupertype = list(list(typeParameterType(t)));
+      _myListOfListClass = _MockClass(
+          'MyListOfList', _myListOfListSupertype.type as InterfaceType, [t]);
+    }
+    return DecoratedType(
+        InterfaceTypeImpl(_myListOfListClass)
+          ..typeArguments = [elementType.type],
+        NullabilityNode.forTypeAnnotation(offset++),
+        typeArguments: [elementType]);
+  }
+
+  DecoratedType object() => DecoratedType(
+      typeProvider.objectType, NullabilityNode.forTypeAnnotation(offset++));
 
   void test_bottom_to_generic() {
-    var t = list(object(0), 1);
+    var t = list(object());
     assign(bottom, t);
     assertEdge(never, t.node, hard: false);
     expect(graph.getUpstreamEdges(t.typeArguments[0].node), isEmpty);
   }
 
   void test_bottom_to_simple() {
-    var t = object(0);
+    var t = object();
     assign(bottom, t);
     assertEdge(never, t.node, hard: false);
   }
 
   test_generic_to_dynamic() {
-    var t = list(object(0), 1);
+    var t = list(object());
     assign(t, dynamic_);
     assertEdge(t.node, always, hard: false);
     expect(graph.getDownstreamEdges(t.typeArguments[0].node), isEmpty);
   }
 
   test_generic_to_generic_same_element() {
-    var t1 = list(object(0), 1);
-    var t2 = list(object(2), 3);
+    var t1 = list(object());
+    var t2 = list(object());
     assign(t1, t2);
     assertEdge(t1.node, t2.node, hard: false);
     assertEdge(t1.typeArguments[0].node, t2.typeArguments[0].node, hard: false);
   }
 
+  test_generic_to_generic_upcast() {
+    var t1 = myListOfList(object());
+    var t2 = list(list(object()));
+    assign(t1, t2);
+    assertEdge(t1.node, t2.node, hard: false);
+    // Let A, B, and C be nullability nodes such that:
+    // - t1 is MyListOfList<Object?A>
+    var a = t1.typeArguments[0].node;
+    // - t2 is List<List<Object?B>>
+    var b = t2.typeArguments[0].typeArguments[0].node;
+    // - the supertype of MyListOfList<T> is List<List<T?C>>
+    var c = _myListOfListSupertype.typeArguments[0].typeArguments[0].node;
+    // Then there should be an edge from substitute(a, c) to b.
+    var substitutionNode = graph.getUpstreamEdges(b).single.primarySource
+        as NullabilityNodeForSubstitution;
+    expect(substitutionNode.innerNode, same(a));
+    expect(substitutionNode.outerNode, same(c));
+  }
+
   test_generic_to_object() {
-    var t1 = list(object(0), 1);
-    var t2 = object(2);
+    var t1 = list(object());
+    var t2 = object();
     assign(t1, t2);
     assertEdge(t1.node, t2.node, hard: false);
     expect(graph.getDownstreamEdges(t1.typeArguments[0].node), isEmpty);
   }
 
   test_generic_to_void() {
-    var t = list(object(0), 1);
+    var t = list(object());
     assign(t, void_);
     assertEdge(t.node, always, hard: false);
     expect(graph.getDownstreamEdges(t.typeArguments[0].node), isEmpty);
   }
 
   void test_null_to_generic() {
-    var t = list(object(0), 1);
+    var t = list(object());
     assign(null_, t);
     assertEdge(always, t.node, hard: false);
     expect(graph.getUpstreamEdges(t.typeArguments[0].node), isEmpty);
   }
 
   void test_null_to_simple() {
-    var t = object(0);
+    var t = object();
     assign(null_, t);
     assertEdge(always, t.node, hard: false);
   }
 
   test_simple_to_dynamic() {
-    var t = object(0);
+    var t = object();
     assign(t, dynamic_);
     assertEdge(t.node, always, hard: false);
   }
 
   test_simple_to_simple() {
-    var t1 = object(0);
-    var t2 = object(1);
+    var t1 = object();
+    var t2 = object();
     assign(t1, t2);
     assertEdge(t1.node, t2.node, hard: false);
   }
 
   test_simple_to_void() {
-    var t = object(0);
+    var t = object();
     assign(t, void_);
     assertEdge(t.node, always, hard: false);
   }
 
   void test_typeParam_to_object() {
-    var t = _MockTypeParameter('T');
-    var t1 = typeParameterType(t, 0);
-    var t2 = object(1);
+    var t = _MockTypeParameter('T', object().type);
+    var t1 = typeParameterType(t);
+    var t2 = object();
     assign(t1, t2);
     assertEdge(t1.node, t2.node, hard: false);
   }
 
   void test_typeParam_to_typeParam() {
-    var t = _MockTypeParameter('T');
-    var t1 = typeParameterType(t, 0);
-    var t2 = typeParameterType(t, 1);
+    var t = _MockTypeParameter('T', object().type);
+    var t1 = typeParameterType(t);
+    var t2 = typeParameterType(t);
     assign(t1, t2);
     assertEdge(t1.node, t2.node, hard: false);
   }
 
-  DecoratedType typeParameterType(
-          TypeParameterElement typeParameter, int offset) =>
-      DecoratedType(TypeParameterTypeImpl(typeParameter),
-          NullabilityNode.forTypeAnnotation(offset));
+  DecoratedType typeParameterType(TypeParameterElement typeParameter) =>
+      DecoratedType(
+          typeParameter.type, NullabilityNode.forTypeAnnotation(offset++));
 }
 
 @reflectiveTest
@@ -3017,13 +3059,21 @@ void f(int i) {
 }
 
 class _DecoratedClassHierarchyForTesting implements DecoratedClassHierarchy {
+  AssignmentCheckerTest assignmentCheckerTest;
+
   @override
   DecoratedType asInstanceOf(DecoratedType type, ClassElement superclass) {
-    if ((type.type as InterfaceType).element == superclass) return type;
+    var class_ = (type.type as InterfaceType).element;
+    if (class_ == superclass) return type;
     if (superclass.name == 'Object') {
       return DecoratedType(superclass.type, type.node);
     }
-    throw UnimplementedError('TODO(paulberry)');
+    if (class_.name == 'MyListOfList' && superclass.name == 'List') {
+      return assignmentCheckerTest._myListOfListSupertype
+          .substitute({class_.typeParameters[0]: type.typeArguments[0]});
+    }
+    throw UnimplementedError(
+        'TODO(paulberry): asInstanceOf($type, $superclass)');
   }
 
   @override
@@ -3033,11 +3083,44 @@ class _DecoratedClassHierarchyForTesting implements DecoratedClassHierarchy {
   }
 }
 
+class _MockClass implements ClassElement {
+  @override
+  final String name;
+
+  @override
+  final InterfaceType supertype;
+
+  InterfaceType _type;
+
+  @override
+  final List<TypeParameterElement> typeParameters;
+
+  _MockClass(this.name, this.supertype, this.typeParameters);
+
+  @override
+  String get displayName => name;
+
+  @override
+  InterfaceType get type => _type ??= InterfaceTypeImpl(this)
+    ..typeArguments =
+        typeParameters.map((t) => TypeParameterTypeImpl(t)).toList();
+
+  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 class _MockTypeParameter implements TypeParameterElement {
   @override
   final String name;
 
-  _MockTypeParameter(this.name);
+  @override
+  final DartType bound;
+
+  @override
+  TypeParameterType type;
+
+  _MockTypeParameter(this.name, this.bound) {
+    type = TypeParameterTypeImpl(this);
+  }
 
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
