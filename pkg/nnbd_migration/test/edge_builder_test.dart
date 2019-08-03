@@ -4,7 +4,9 @@
 
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/member.dart';
+import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/testing/test_type_provider.dart';
 import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
@@ -72,7 +74,7 @@ class AssignmentCheckerTest extends Object with EdgeTester {
   DecoratedType object(int offset) => DecoratedType(
       typeProvider.objectType, NullabilityNode.forTypeAnnotation(offset));
 
-  void test_bottom_to_complex() {
+  void test_bottom_to_generic() {
     var t = list(object(0), 1);
     assign(bottom, t);
     assertEdge(never, t.node, hard: false);
@@ -85,21 +87,37 @@ class AssignmentCheckerTest extends Object with EdgeTester {
     assertEdge(never, t.node, hard: false);
   }
 
-  test_complex_to_dynamic() {
+  test_generic_to_dynamic() {
     var t = list(object(0), 1);
     assign(t, dynamic_);
     assertEdge(t.node, always, hard: false);
     expect(graph.getDownstreamEdges(t.typeArguments[0].node), isEmpty);
   }
 
-  test_complex_to_void() {
+  test_generic_to_generic_same_element() {
+    var t1 = list(object(0), 1);
+    var t2 = list(object(2), 3);
+    assign(t1, t2);
+    assertEdge(t1.node, t2.node, hard: false);
+    assertEdge(t1.typeArguments[0].node, t2.typeArguments[0].node, hard: false);
+  }
+
+  test_generic_to_object() {
+    var t1 = list(object(0), 1);
+    var t2 = object(2);
+    assign(t1, t2);
+    assertEdge(t1.node, t2.node, hard: false);
+    expect(graph.getDownstreamEdges(t1.typeArguments[0].node), isEmpty);
+  }
+
+  test_generic_to_void() {
     var t = list(object(0), 1);
     assign(t, void_);
     assertEdge(t.node, always, hard: false);
     expect(graph.getDownstreamEdges(t.typeArguments[0].node), isEmpty);
   }
 
-  void test_null_to_complex() {
+  void test_null_to_generic() {
     var t = list(object(0), 1);
     assign(null_, t);
     assertEdge(always, t.node, hard: false);
@@ -118,11 +136,39 @@ class AssignmentCheckerTest extends Object with EdgeTester {
     assertEdge(t.node, always, hard: false);
   }
 
+  test_simple_to_simple() {
+    var t1 = object(0);
+    var t2 = object(1);
+    assign(t1, t2);
+    assertEdge(t1.node, t2.node, hard: false);
+  }
+
   test_simple_to_void() {
     var t = object(0);
     assign(t, void_);
     assertEdge(t.node, always, hard: false);
   }
+
+  void test_typeParam_to_object() {
+    var t = _MockTypeParameter('T');
+    var t1 = typeParameterType(t, 0);
+    var t2 = object(1);
+    assign(t1, t2);
+    assertEdge(t1.node, t2.node, hard: false);
+  }
+
+  void test_typeParam_to_typeParam() {
+    var t = _MockTypeParameter('T');
+    var t1 = typeParameterType(t, 0);
+    var t2 = typeParameterType(t, 1);
+    assign(t1, t2);
+    assertEdge(t1.node, t2.node, hard: false);
+  }
+
+  DecoratedType typeParameterType(
+          TypeParameterElement typeParameter, int offset) =>
+      DecoratedType(TypeParameterTypeImpl(typeParameter),
+          NullabilityNode.forTypeAnnotation(offset));
 }
 
 @reflectiveTest
@@ -2973,6 +3019,10 @@ void f(int i) {
 class _DecoratedClassHierarchyForTesting implements DecoratedClassHierarchy {
   @override
   DecoratedType asInstanceOf(DecoratedType type, ClassElement superclass) {
+    if ((type.type as InterfaceType).element == superclass) return type;
+    if (superclass.name == 'Object') {
+      return DecoratedType(superclass.type, type.node);
+    }
     throw UnimplementedError('TODO(paulberry)');
   }
 
@@ -2981,6 +3031,15 @@ class _DecoratedClassHierarchyForTesting implements DecoratedClassHierarchy {
       ClassElement class_, ClassElement superclass) {
     throw UnimplementedError('TODO(paulberry)');
   }
+}
+
+class _MockTypeParameter implements TypeParameterElement {
+  @override
+  final String name;
+
+  _MockTypeParameter(this.name);
+
+  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _TestEdgeOrigin extends EdgeOrigin {
