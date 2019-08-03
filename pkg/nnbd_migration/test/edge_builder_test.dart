@@ -38,7 +38,7 @@ class AssignmentCheckerTest extends Object with EdgeTester {
   factory AssignmentCheckerTest() {
     var typeProvider = TestTypeProvider();
     var graph = NullabilityGraphForTesting();
-    var checker = AssignmentCheckerForTesting(Dart2TypeSystem(typeProvider),
+    var checker = AssignmentCheckerForTesting(
         graph, _DecoratedClassHierarchyForTesting());
     return AssignmentCheckerTest._(typeProvider, graph, checker);
   }
