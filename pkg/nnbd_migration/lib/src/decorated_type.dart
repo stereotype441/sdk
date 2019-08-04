@@ -269,13 +269,13 @@ class DecoratedType {
       var name = type.element.name;
       var args = '';
       if (type.typeArguments.isNotEmpty) {
-        args = '<${type.typeArguments.join(', ')}>';
+        args = '<${typeArguments.join(', ')}>';
       }
       return '$name$args$trailing';
     } else if (type is FunctionType) {
       String formals = '';
       if (type.typeFormals.isNotEmpty) {
-        formals = '<${type.typeFormals.join(', ')}>';
+        formals = '<${typeFormals.join(', ')}>';
       }
       List<String> paramStrings = [];
       for (int i = 0; i < positionalParameters.length; i++) {
