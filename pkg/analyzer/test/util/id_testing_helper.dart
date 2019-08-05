@@ -53,7 +53,8 @@ Future<bool> checkTests<T>(
   Map<String, MemberAnnotations<IdValue>> expectedMaps = {
     marker: new MemberAnnotations<IdValue>(),
   };
-  computeExpectedMap(testFileUri, code, expectedMaps, onFailure: onFailure);
+  computeExpectedMap(testFileUri, testFileName, code, expectedMaps,
+      onFailure: onFailure);
   Map<Uri, AnnotatedCode> codeMap = {testFileUri: code};
   var libFileNames = <String>[];
   var testData = TestData(testFileUri, testFileUri, memorySourceFiles, codeMap,
@@ -93,7 +94,7 @@ Future<bool> runTest<T>(TestData testData, DataComputer<T> dataComputer,
 RunTestFunction runTestFor<T>(
     DataComputer<T> dataComputer, List<TestConfig> testedConfigs) {
   return (TestData testData,
-      {bool testAfterFailures, bool verbose, bool printCode}) {
+      {bool testAfterFailures, bool verbose, bool succinct, bool printCode}) {
     return runTest(testData, dataComputer, testedConfigs,
         testAfterFailures: testAfterFailures, onFailure: onFailure);
   };
@@ -202,7 +203,8 @@ class AnalyzerCompiledData<T> extends CompiledData<T> {
   }
 
   @override
-  void reportError(Uri uri, int offset, String message) {
+  void reportError(Uri uri, int offset, String message,
+      {bool succinct: false}) {
     print('$offset: $message');
   }
 }

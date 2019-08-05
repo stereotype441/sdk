@@ -150,7 +150,7 @@ class MemberAnnotations<DataType> {
 /// corresponding test configuration. Otherwise it is expected for all
 /// configurations.
 // TODO(johnniwinther): Support an empty marker set.
-void computeExpectedMap(Uri sourceUri, AnnotatedCode code,
+void computeExpectedMap(Uri sourceUri, String filename, AnnotatedCode code,
     Map<String, MemberAnnotations<IdValue>> maps,
     {void onFailure(String message)}) {
   List<String> mapKeys = maps.keys.toList();
@@ -165,13 +165,15 @@ void computeExpectedMap(Uri sourceUri, AnnotatedCode code,
       IdValue idValue = IdValue.decode(sourceUri, annotation.offset, text);
       if (idValue.id.isGlobal) {
         if (fileAnnotations.globalData.containsKey(idValue.id)) {
-          onFailure("Duplicate annotations for ${idValue.id} in $marker: "
+          onFailure("Error in test '$filename': "
+              "Duplicate annotations for ${idValue.id} in $marker: "
               "${idValue} and ${fileAnnotations.globalData[idValue.id]}.");
         }
         fileAnnotations.globalData[idValue.id] = idValue;
       } else {
         if (expectedValues.containsKey(idValue.id)) {
-          onFailure("Duplicate annotations for ${idValue.id} in $marker: "
+          onFailure("Error in test '$filename': "
+              "Duplicate annotations for ${idValue.id} in $marker: "
               "${idValue} and ${expectedValues[idValue.id]}.");
         }
         expectedValues[idValue.id] = idValue;
@@ -182,14 +184,35 @@ void computeExpectedMap(Uri sourceUri, AnnotatedCode code,
 
 /// Creates a [TestData] object for the annotated test in [testFile].
 ///
+/// If [testFile] is a file, use that directly. If it's a directory include
+/// everything in that directory.
+///
 /// If [testLibDirectory] is not `null`, files in [testLibDirectory] with the
 /// [testFile] name as a prefix are included.
-TestData computeTestData(File testFile, Directory testLibDirectory,
+TestData computeTestData(FileSystemEntity testFile, Directory testLibDirectory,
     {Iterable<String> supportedMarkers,
     Uri createUriForFileName(String fileName, {bool isLib}),
     void onFailure(String message)}) {
   Uri entryPoint = createUriForFileName('main.dart', isLib: false);
-  String annotatedCode = new File.fromUri(testFile.uri).readAsStringSync();
+
+  File mainTestFile;
+  Map<String, File> additionalFiles;
+  if (testFile is File) {
+    mainTestFile = testFile;
+  } else if (testFile is Directory) {
+    additionalFiles = new Map<String, File>();
+    for (FileSystemEntity entry in testFile.listSync(recursive: true)) {
+      if (entry is! File) continue;
+      if (entry.uri.pathSegments.last == "main.dart") {
+        mainTestFile = entry;
+      } else {
+        additionalFiles[entry.uri.path.substring(testFile.uri.path.length)] =
+            entry;
+      }
+    }
+  }
+
+  String annotatedCode = new File.fromUri(mainTestFile.uri).readAsStringSync();
   Map<Uri, AnnotatedCode> code = {
     entryPoint:
         new AnnotatedCode.fromText(annotatedCode, commentStart, commentEnd)
@@ -198,30 +221,42 @@ TestData computeTestData(File testFile, Directory testLibDirectory,
   for (String testMarker in supportedMarkers) {
     expectedMaps[testMarker] = new MemberAnnotations<IdValue>();
   }
-  computeExpectedMap(entryPoint, code[entryPoint], expectedMaps,
+  computeExpectedMap(entryPoint, testFile.uri.pathSegments.last,
+      code[entryPoint], expectedMaps,
       onFailure: onFailure);
   Map<String, String> memorySourceFiles = {
     entryPoint.path: code[entryPoint].sourceCode
   };
 
   List<String> libFileNames;
+
+  addSupportingFile(String libFileName, File libEntity, bool isLib) {
+    libFileNames ??= [];
+    libFileNames.add(libFileName);
+    Uri libFileUri = createUriForFileName(libFileName, isLib: isLib);
+    String libCode = libEntity.readAsStringSync();
+    AnnotatedCode annotatedLibCode =
+        new AnnotatedCode.fromText(libCode, commentStart, commentEnd);
+    memorySourceFiles[libFileUri.path] = annotatedLibCode.sourceCode;
+    code[libFileUri] = annotatedLibCode;
+    computeExpectedMap(libFileUri, libFileName, annotatedLibCode, expectedMaps,
+        onFailure: onFailure);
+  }
+
   if (testLibDirectory != null) {
     String name = testFile.uri.pathSegments.last;
     String filePrefix = name.substring(0, name.lastIndexOf('.'));
     for (FileSystemEntity libEntity in testLibDirectory.listSync()) {
       String libFileName = libEntity.uri.pathSegments.last;
       if (libFileName.startsWith(filePrefix)) {
-        libFileNames ??= [];
-        libFileNames.add(libFileName);
-        Uri libFileUri = createUriForFileName(libFileName, isLib: true);
-        String libCode = new File.fromUri(libEntity.uri).readAsStringSync();
-        AnnotatedCode annotatedLibCode =
-            new AnnotatedCode.fromText(libCode, commentStart, commentEnd);
-        memorySourceFiles[libFileUri.path] = annotatedLibCode.sourceCode;
-        code[libFileUri] = annotatedLibCode;
-        computeExpectedMap(libFileUri, annotatedLibCode, expectedMaps,
-            onFailure: onFailure);
+        addSupportingFile(libFileName, libEntity, true);
       }
+    }
+  }
+  if (additionalFiles != null) {
+    for (MapEntry<String, File> additionalFileData in additionalFiles.entries) {
+      addSupportingFile(
+          additionalFileData.key, additionalFileData.value, false);
     }
   }
 
@@ -303,7 +338,7 @@ abstract class CompiledData<T> {
 
   int getOffsetFromId(Id id, Uri uri);
 
-  void reportError(Uri uri, int offset, String message);
+  void reportError(Uri uri, int offset, String message, {bool succinct: false});
 }
 
 /// Interface used for interpreting annotations.
@@ -444,6 +479,7 @@ Future<bool> checkCode<T>(
     DataInterpreter<T> dataValidator,
     {bool filterActualData(IdValue expected, ActualData<T> actualData),
     bool fatalErrors: true,
+    bool succinct: false,
     void onFailure(String message)}) async {
   IdData<T> data = new IdData<T>(code, expectedMaps, compiledData);
   bool hasFailure = false;
@@ -463,10 +499,13 @@ Future<bool> checkCode<T>(
           compiledData.reportError(
               actualData.uri,
               actualData.offset,
-              'EXTRA $modeName DATA for ${id.descriptor}:\n '
-              'object   : ${actualData.objectText}\n '
-              'actual   : ${colorizeActual(actualValueText)}\n '
-              'Data was expected for these ids: ${expectedMap.keys}');
+              succinct
+                  ? 'EXTRA $modeName DATA for ${id.descriptor}'
+                  : 'EXTRA $modeName DATA for ${id.descriptor}:\n '
+                      'object   : ${actualData.objectText}\n '
+                      'actual   : ${colorizeActual(actualValueText)}\n '
+                      'Data was expected for these ids: ${expectedMap.keys}',
+              succinct: succinct);
           if (filterActualData == null || filterActualData(null, actualData)) {
             hasLocalFailure = true;
           }
@@ -480,11 +519,14 @@ Future<bool> checkCode<T>(
           compiledData.reportError(
               actualData.uri,
               actualData.offset,
-              'UNEXPECTED $modeName DATA for ${id.descriptor}:\n '
-              'detail  : ${colorizeMessage(unexpectedMessage)}\n '
-              'object  : ${actualData.objectText}\n '
-              'expected: ${colorizeExpected('$expected')}\n '
-              'actual  : ${colorizeActual(actualValueText)}');
+              succinct
+                  ? 'UNEXPECTED $modeName DATA for ${id.descriptor}'
+                  : 'UNEXPECTED $modeName DATA for ${id.descriptor}:\n '
+                      'detail  : ${colorizeMessage(unexpectedMessage)}\n '
+                      'object  : ${actualData.objectText}\n '
+                      'expected: ${colorizeExpected('$expected')}\n '
+                      'actual  : ${colorizeActual(actualValueText)}',
+              succinct: succinct);
           if (filterActualData == null ||
               filterActualData(expected, actualData)) {
             hasLocalFailure = true;
@@ -516,7 +558,8 @@ Future<bool> checkCode<T>(
             'Expected ${colorizeExpected('$expected')}';
         if (uri != null) {
           compiledData.reportError(
-              uri, compiledData.getOffsetFromId(id, uri), message);
+              uri, compiledData.getOffsetFromId(id, uri), message,
+              succinct: succinct);
         } else {
           print(message);
         }
@@ -531,10 +574,12 @@ Future<bool> checkCode<T>(
     checkMissing(expectedMap, data.actualMaps[uri], uri);
   });
   checkMissing(data.expectedMaps.globalData, data.actualMaps.globalData);
-  for (Uri uri in neededDiffs) {
-    print('--annotations diff [${uri.pathSegments.last}]-------------');
-    print(data.diffCode(uri, dataValidator));
-    print('----------------------------------------------------------');
+  if (!succinct) {
+    for (Uri uri in neededDiffs) {
+      print('--annotations diff [${uri.pathSegments.last}]-------------');
+      print(data.diffCode(uri, dataValidator));
+      print('----------------------------------------------------------');
+    }
   }
   if (missingIds.isNotEmpty) {
     print("MISSING ids: ${missingIds}.");
@@ -547,7 +592,7 @@ Future<bool> checkCode<T>(
 }
 
 typedef Future<bool> RunTestFunction(TestData testData,
-    {bool testAfterFailures, bool verbose, bool printCode});
+    {bool testAfterFailures, bool verbose, bool succinct, bool printCode});
 
 /// Check code for all test files int [data] using [computeFromAst] and
 /// [computeFromKernel] from the respective front ends. If [skipForKernel]
@@ -572,6 +617,7 @@ Future runTests(Directory dataDir,
   // TODO(johnniwinther): Support --show to show actual data for an input.
   args = args.toList();
   bool verbose = args.remove('-v');
+  bool succinct = args.remove('-s');
   bool shouldContinue = args.remove('-c');
   bool testAfterFailures = args.remove('-a');
   bool printCode = args.remove('-p');
@@ -598,12 +644,13 @@ Future runTests(Directory dataDir,
     }
     print('----------------------------------------------------------------');
 
-    TestData testData = computeTestData(entity, libDirectory,
+    TestData testData = computeTestData(
+        entity, entity is File ? libDirectory : null,
         supportedMarkers: supportedMarkers,
         createUriForFileName: createUriForFileName,
         onFailure: onFailure);
     print('Test file: ${testData.testFileUri}');
-    if (testData.libFileNames != null) {
+    if (!succinct && testData.libFileNames != null) {
       print('Supporting libraries:');
       for (String libFileName in testData.libFileNames) {
         print('    - libs/$libFileName');
@@ -613,6 +660,7 @@ Future runTests(Directory dataDir,
     if (await runTest(testData,
         testAfterFailures: testAfterFailures,
         verbose: verbose,
+        succinct: succinct,
         printCode: printCode)) {
       hasFailures = true;
     }

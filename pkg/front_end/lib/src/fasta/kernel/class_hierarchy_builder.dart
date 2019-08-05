@@ -57,6 +57,8 @@ import '../problems.dart' show unhandled;
 
 import '../scope.dart' show Scope;
 
+import '../source/source_library_builder.dart' show SourceLibraryBuilder;
+
 import '../source/source_loader.dart' show SourceLoader;
 
 import '../type_inference/standard_bounds.dart' show StandardBounds;
@@ -78,8 +80,7 @@ import 'kernel_builder.dart'
         FormalParameterBuilder,
         ImplicitFieldType,
         ClassBuilder,
-        KernelFieldBuilder,
-        KernelLibraryBuilder,
+        FieldBuilder,
         NamedTypeBuilder,
         ProcedureBuilder,
         LibraryBuilder,
@@ -339,7 +340,7 @@ class ClassHierarchyBuilder {
   }
 
   Member getCombinedMemberSignatureKernel(Class cls, Name name, bool isSetter,
-      int charOffset, KernelLibraryBuilder library) {
+      int charOffset, SourceLibraryBuilder library) {
     Declaration declaration =
         getNodeFromKernelClass(cls).getInterfaceMember(name, isSetter);
     if (declaration?.isStatic ?? true) return null;
@@ -466,7 +467,7 @@ class ClassHierarchyNodeBuilder {
       case MergeKind.membersWithSetters:
       case MergeKind.settersWithMembers:
         if (a.parent == cls && b.parent != cls) {
-          if (a is KernelFieldBuilder) {
+          if (a is FieldBuilder) {
             if (a.isFinal && b.isSetter) {
               hierarchy.overrideChecks.add(new DelayedOverrideCheck(cls, a, b));
             } else {
@@ -925,7 +926,7 @@ class ClassHierarchyNodeBuilder {
     if (declaredType == inheritedType) return true;
 
     bool result = false;
-    if (a is KernelFieldBuilder) {
+    if (a is FieldBuilder) {
       if (a.parent == cls && a.type == null) {
         if (a.hadTypesInferred) {
           reportCantInferFieldType(cls, a);
@@ -935,8 +936,8 @@ class ClassHierarchyNodeBuilder {
           a.hadTypesInferred = true;
         }
         if (inheritedType is ImplicitFieldType) {
-          KernelLibraryBuilder library = cls.library;
-          (library.implicitlyTypedFields ??= <KernelFieldBuilder>[]).add(a);
+          SourceLibraryBuilder library = cls.library;
+          (library.implicitlyTypedFields ??= <FieldBuilder>[]).add(a);
         }
         a.target.type = inheritedType;
       }
@@ -2039,7 +2040,7 @@ class DelayedOverrideCheck {
           }
         }
         a.hadTypesInferred = true;
-      } else if (a is KernelFieldBuilder && a.type == null) {
+      } else if (a is FieldBuilder && a.type == null) {
         DartType type;
         if (b.isGetter) {
           Procedure bTarget = b.target;
@@ -2243,7 +2244,7 @@ class InterfaceConflict extends DelayedMember {
     if (combinedMemberSignatureResult != null) {
       return combinedMemberSignatureResult;
     }
-    if (parent.library is! KernelLibraryBuilder) {
+    if (parent.library is! SourceLibraryBuilder) {
       return combinedMemberSignatureResult = declarations.first.target;
     }
     DartType thisType = parent.cls.thisType;
@@ -2328,7 +2329,7 @@ class InterfaceConflict extends DelayedMember {
               .finalize();
       if (parent.cls == stub.enclosingClass) {
         parent.cls.addMember(stub);
-        KernelLibraryBuilder library = parent.library;
+        SourceLibraryBuilder library = parent.library;
         if (bestSoFar.target is Procedure) {
           library.forwardersOrigins..add(stub)..add(bestSoFar.target);
         }
@@ -2576,7 +2577,7 @@ void reportCantInferReturnType(
       context: context);
 }
 
-void reportCantInferFieldType(ClassBuilder cls, KernelFieldBuilder member) {
+void reportCantInferFieldType(ClassBuilder cls, FieldBuilder member) {
   String name = member.fullNameForErrors;
   cls.addProblem(
       templateCantInferTypeDueToInconsistentOverrides.withArguments(name),

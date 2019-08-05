@@ -11,6 +11,7 @@ import 'package:kernel/ast.dart'
     show AsyncMarker, ProcedureKind, VariableDeclaration;
 
 import 'package:kernel/type_algebra.dart' show containsTypeVariable, substitute;
+import 'package:kernel/type_algebra.dart';
 
 import 'builder.dart'
     show
@@ -66,8 +67,6 @@ import '../kernel/kernel_builder.dart'
         ConstructorReferenceBuilder,
         Declaration,
         FormalParameterBuilder,
-        KernelLibraryBuilder,
-        KernelMetadataBuilder,
         LibraryBuilder,
         MetadataBuilder,
         TypeBuilder,
@@ -115,6 +114,11 @@ abstract class FunctionBuilder extends MemberBuilder {
   final List<TypeVariableBuilder> typeVariables;
 
   final List<FormalParameterBuilder> formals;
+
+  /// If this procedure is an instance member declared in an extension
+  /// declaration, [extensionThis] holds the synthetically added `this`
+  /// parameter.
+  VariableDeclaration extensionThis;
 
   FunctionBuilder(
       this.metadata,
@@ -217,11 +221,6 @@ abstract class FunctionBuilder extends MemberBuilder {
 
   FunctionNode function;
 
-  /// If this procedure is an instance member declared in an extension
-  /// declaration, [extensionThis] holds the synthetically added `this`
-  /// parameter.
-  VariableDeclaration extensionThis;
-
   Statement actualBody;
 
   FunctionBuilder get actualOrigin;
@@ -291,19 +290,6 @@ abstract class FunctionBuilder extends MemberBuilder {
       }
       setParents(result.typeParameters, result);
     }
-
-    if (parent is ClassBuilder) {
-      ClassBuilder cls = parent;
-      if (cls.isExtension && isInstanceMember) {
-        DartType thisType = cls.onTypes.first.build(library);
-        extensionThis = new VariableDeclarationJudgment("this", 0,
-            type: thisType, isFinal: true)
-          ..fileOffset = charOffset
-          ..parent = result;
-        result.positionalParameters.add(extensionThis);
-        result.requiredParameterCount++;
-      }
-    }
     if (formals != null) {
       for (FormalParameterBuilder formal in formals) {
         VariableDeclaration parameter = formal.build(library, 0);
@@ -370,6 +356,12 @@ abstract class FunctionBuilder extends MemberBuilder {
         }
       }
     }
+    if (parent is ClassBuilder) {
+      ClassBuilder cls = parent;
+      if (cls.isExtension && isInstanceMember) {
+        extensionThis = result.positionalParameters.first;
+      }
+    }
     return function = result;
   }
 
@@ -377,7 +369,7 @@ abstract class FunctionBuilder extends MemberBuilder {
 
   @override
   void buildOutlineExpressions(LibraryBuilder library) {
-    KernelMetadataBuilder.buildAnnotations(
+    MetadataBuilder.buildAnnotations(
         target, metadata, library, isClassMember ? parent : null, this);
 
     if (formals != null) {
@@ -446,7 +438,7 @@ class ProcedureBuilder extends FunctionBuilder {
       List<TypeVariableBuilder> typeVariables,
       List<FormalParameterBuilder> formals,
       ProcedureKind kind,
-      KernelLibraryBuilder compilationUnit,
+      SourceLibraryBuilder compilationUnit,
       int startCharOffset,
       int charOffset,
       this.charOpenParenOffset,
@@ -576,7 +568,7 @@ class ConstructorBuilder extends FunctionBuilder {
       String name,
       List<TypeVariableBuilder> typeVariables,
       List<FormalParameterBuilder> formals,
-      KernelLibraryBuilder compilationUnit,
+      SourceLibraryBuilder compilationUnit,
       int startCharOffset,
       int charOffset,
       this.charOpenParenOffset,
@@ -791,7 +783,7 @@ class RedirectingFactoryBuilder extends ProcedureBuilder {
       String name,
       List<TypeVariableBuilder> typeVariables,
       List<FormalParameterBuilder> formals,
-      KernelLibraryBuilder compilationUnit,
+      SourceLibraryBuilder compilationUnit,
       int startCharOffset,
       int charOffset,
       int charOpenParenOffset,

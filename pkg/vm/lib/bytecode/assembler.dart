@@ -288,7 +288,6 @@ class BytecodeAssembler {
   }
 
   void emitJump(Label label) {
-    emitSourcePosition();
     _emitJumpInstruction(Opcode.kJump, label);
     isUnreachable = true;
   }
@@ -364,12 +363,10 @@ class BytecodeAssembler {
   }
 
   void emitStoreLocal(int rx) {
-    emitSourcePosition();
     _emitInstructionX(Opcode.kStoreLocal, rx);
   }
 
   void emitPopLocal(int rx) {
-    emitSourcePosition();
     _emitInstructionX(Opcode.kPopLocal, rx);
   }
 
@@ -381,6 +378,11 @@ class BytecodeAssembler {
   void emitInterfaceCall(int rd, int rf) {
     emitSourcePosition();
     _emitInstructionDF(Opcode.kInterfaceCall, rd, rf);
+  }
+
+  void emitInstantiatedInterfaceCall(int rd, int rf) {
+    emitSourcePosition();
+    _emitInstructionDF(Opcode.kInstantiatedInterfaceCall, rd, rf);
   }
 
   void emitUncheckedClosureCall(int rd, int rf) {
@@ -439,7 +441,6 @@ class BytecodeAssembler {
   }
 
   void emitStoreContextVar(int ra, int re) {
-    emitSourcePosition();
     _emitInstructionAE(Opcode.kStoreContextVar, ra, re);
   }
 

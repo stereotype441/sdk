@@ -744,13 +744,14 @@ final Matcher isFlutterWidgetPropertyEditor = new LazyMatcher(() =>
  *   BOOL
  *   DOUBLE
  *   ENUM
+ *   ENUM_LIKE
  *   INT
  *   STRING
  * }
  */
 final Matcher isFlutterWidgetPropertyEditorKind = new MatchesEnum(
     "FlutterWidgetPropertyEditorKind",
-    ["BOOL", "DOUBLE", "ENUM", "INT", "STRING"]);
+    ["BOOL", "DOUBLE", "ENUM", "ENUM_LIKE", "INT", "STRING"]);
 
 /**
  * FlutterWidgetPropertyValue
@@ -761,6 +762,7 @@ final Matcher isFlutterWidgetPropertyEditorKind = new MatchesEnum(
  *   "intValue": optional int
  *   "stringValue": optional String
  *   "enumValue": optional FlutterWidgetPropertyValueEnumItem
+ *   "expression": optional String
  * }
  */
 final Matcher isFlutterWidgetPropertyValue = new LazyMatcher(() =>
@@ -769,7 +771,8 @@ final Matcher isFlutterWidgetPropertyValue = new LazyMatcher(() =>
       "doubleValue": isDouble,
       "intValue": isInt,
       "stringValue": isString,
-      "enumValue": isFlutterWidgetPropertyValueEnumItem
+      "enumValue": isFlutterWidgetPropertyValueEnumItem,
+      "expression": isString
     }));
 
 /**
@@ -2529,6 +2532,7 @@ final Matcher isDiagnosticGetServerPortResult = new LazyMatcher(() =>
  * {
  *   "included": List<FilePath>
  *   "includedFixes": optional List<String>
+ *   "includePedanticFixes": optional bool
  *   "includeRequiredFixes": optional bool
  *   "excludedFixes": optional List<String>
  * }
@@ -2538,6 +2542,7 @@ final Matcher isEditDartfixParams =
           "included": isListOf(isFilePath)
         }, optionalFields: {
           "includedFixes": isListOf(isString),
+          "includePedanticFixes": isBool,
           "includeRequiredFixes": isBool,
           "excludedFixes": isListOf(isString)
         }));

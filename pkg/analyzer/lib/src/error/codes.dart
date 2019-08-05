@@ -341,10 +341,8 @@ class CompileTimeErrorCode extends ErrorCode {
    * for-in statement appears inside a synchronous function.
    */
   static const CompileTimeErrorCode ASYNC_FOR_IN_WRONG_CONTEXT =
-      const CompileTimeErrorCode(
-          'ASYNC_FOR_IN_WRONG_CONTEXT',
-          "The asynchronous for-in can only be used in an asynchronous "
-              "function.",
+      const CompileTimeErrorCode('ASYNC_FOR_IN_WRONG_CONTEXT',
+          "The async for-in can only be used in an async function.",
           correction:
               "Try marking the function body with either 'async' or 'async*', "
               "or removing the 'await' before the for loop.");
@@ -356,7 +354,7 @@ class CompileTimeErrorCode extends ErrorCode {
    */
   static const CompileTimeErrorCode AWAIT_IN_WRONG_CONTEXT =
       const CompileTimeErrorCode('AWAIT_IN_WRONG_CONTEXT',
-          "The await expression can only be used in an asynchronous function.",
+          "The await expression can only be used in an async function.",
           correction:
               "Try marking the function body with either 'async' or 'async*'.");
 
@@ -1326,6 +1324,14 @@ class CompileTimeErrorCode extends ErrorCode {
           'EXTENSION_OVERRIDE_ARGUMENT_NOT_ASSIGNABLE',
           "The type of the argument to the extension override '{0}' "
               "isn't assignable to the extended type '{1}'.");
+
+  /**
+   * No parameters.
+   */
+  static const CompileTimeErrorCode EXTENSION_OVERRIDE_WITHOUT_ACCESS =
+      const CompileTimeErrorCode('EXTENSION_OVERRIDE_WITHOUT_ACCESS',
+          "An extension override can only be used to access instance members.",
+          correction: 'Consider adding an access to an instance member.');
 
   /**
    * 12.14.2 Binding Actuals to Formals: It is a static warning if <i>m &lt;
@@ -3203,6 +3209,15 @@ class CompileTimeErrorCode extends ErrorCode {
           "The prefix of a deferred import can't be used in other import "
               "directives.",
           correction: "Try renaming one of the prefixes.");
+
+  /**
+   * No parameters.
+   */
+  static const CompileTimeErrorCode SUPER_IN_EXTENSION =
+      const CompileTimeErrorCode(
+          'SUPER_IN_EXTENSION',
+          "You can't reference 'super' in an extension because extensions do "
+              "not have a superclass.");
 
   /**
    * 12.15.4 Super Invocation: A super method invocation <i>i</i> has the form
