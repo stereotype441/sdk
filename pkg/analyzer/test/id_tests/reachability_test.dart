@@ -16,15 +16,15 @@ import 'package:test/test.dart';
 import '../util/id_testing_helper.dart';
 
 main(List<String> args) async {
-  Directory dataDir = new Directory.fromUri(Platform.script.resolve(
-      '../../../front_end/test/flow_analysis/reachability/data'));
+  Directory dataDir = new Directory.fromUri(Platform.script
+      .resolve('../../../front_end/test/flow_analysis/reachability/data'));
   await runTests(dataDir,
       args: args,
       supportedMarkers: sharedMarkers,
       createUriForFileName: createUriForFileName,
       onFailure: onFailure,
       runTest:
-      runTestFor(const _ReachabilityDataComputer(), [analyzerNnbdConfig]));
+          runTestFor(const _ReachabilityDataComputer(), [analyzerNnbdConfig]));
 }
 
 class FlowTestBase {
@@ -42,7 +42,13 @@ class FlowTestBase {
   }
 }
 
-class _ReachabilityDataComputer extends DataComputer<Set<_ReachabilityAssertion>> {
+enum _ReachabilityAssertion {
+  doesNotComplete,
+  unreachable,
+}
+
+class _ReachabilityDataComputer
+    extends DataComputer<Set<_ReachabilityAssertion>> {
   const _ReachabilityDataComputer();
 
   @override
@@ -53,14 +59,15 @@ class _ReachabilityDataComputer extends DataComputer<Set<_ReachabilityAssertion>
   void computeUnitData(TestingData testingData, CompilationUnit unit,
       Map<Id, ActualData<Set<_ReachabilityAssertion>>> actualMap) {
     var flowResult =
-    testingData.uriToFlowAnalysisResult[unit.declaredElement.source.uri];
-    _ReachabilityDataExtractor(unit.declaredElement.source.uri, actualMap,
-        flowResult)
+        testingData.uriToFlowAnalysisResult[unit.declaredElement.source.uri];
+    _ReachabilityDataExtractor(
+            unit.declaredElement.source.uri, actualMap, flowResult)
         .run(unit);
   }
 }
 
-class _ReachabilityDataExtractor extends AstDataExtractor<Set<_ReachabilityAssertion>> {
+class _ReachabilityDataExtractor
+    extends AstDataExtractor<Set<_ReachabilityAssertion>> {
   final FlowAnalysisResult _flowResult;
 
   _ReachabilityDataExtractor(
@@ -95,7 +102,8 @@ class _ReachabilityDataInterpreter
       _sortedRepresentation(_toStrings(actualData));
 
   @override
-  String isAsExpected(Set<_ReachabilityAssertion> actualData, String expectedData) {
+  String isAsExpected(
+      Set<_ReachabilityAssertion> actualData, String expectedData) {
     var actualStrings = _toStrings(actualData);
     var actualSorted = _sortedRepresentation(actualStrings);
     var expectedSorted = _sortedRepresentation(expectedData?.split(','));
@@ -118,9 +126,4 @@ class _ReachabilityDataInterpreter
   List<String> _toStrings(Set<_ReachabilityAssertion> actualData) => actualData
       .map((flowAssertion) => flowAssertion.toString().split('.')[1])
       .toList();
-}
-
-enum _ReachabilityAssertion {
-  doesNotComplete,
-  unreachable,
 }

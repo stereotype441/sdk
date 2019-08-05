@@ -19,15 +19,15 @@ import 'package:test/test.dart';
 import '../util/id_testing_helper.dart';
 
 main(List<String> args) async {
-  Directory dataDir = new Directory.fromUri(Platform.script.resolve(
-      '../../../front_end/test/flow_analysis/nullability/data'));
+  Directory dataDir = new Directory.fromUri(Platform.script
+      .resolve('../../../front_end/test/flow_analysis/nullability/data'));
   await runTests(dataDir,
       args: args,
       supportedMarkers: sharedMarkers,
       createUriForFileName: createUriForFileName,
       onFailure: onFailure,
       runTest:
-      runTestFor(const _NullabilityDataComputer(), [analyzerNnbdConfig]));
+          runTestFor(const _NullabilityDataComputer(), [analyzerNnbdConfig]));
 }
 
 class FlowTestBase {
@@ -56,7 +56,7 @@ class _NullabilityDataComputer extends DataComputer<String> {
   void computeUnitData(TestingData testingData, CompilationUnit unit,
       Map<Id, ActualData<String>> actualMap) {
     _NullabilityDataExtractor(unit.declaredElement.source.uri, actualMap,
-        unit.declaredElement.context.typeSystem)
+            unit.declaredElement.context.typeSystem)
         .run(unit);
   }
 }
@@ -65,9 +65,7 @@ class _NullabilityDataExtractor extends AstDataExtractor<String> {
   final TypeSystem _typeSystem;
 
   _NullabilityDataExtractor(
-      Uri uri,
-      Map<Id, ActualData<String>> actualMap,
-      this._typeSystem)
+      Uri uri, Map<Id, ActualData<String>> actualMap, this._typeSystem)
       : super(uri, actualMap);
 
   @override
@@ -89,8 +87,7 @@ class _NullabilityDataExtractor extends AstDataExtractor<String> {
   }
 }
 
-class _NullabilityDataInterpreter
-    implements DataInterpreter<String> {
+class _NullabilityDataInterpreter implements DataInterpreter<String> {
   const _NullabilityDataInterpreter();
 
   @override
