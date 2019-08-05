@@ -606,7 +606,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   State<Variable, Type> _join(
           State<Variable, Type> first, State<Variable, Type> second) =>
-      first.join(typeOperations, second);
+      State.join(typeOperations, first, second);
 
   /// If assertions are enabled, records that the given variable has been
   /// referenced.  The [finish] method will verify that all referenced variables
@@ -702,40 +702,6 @@ class State<Variable, Type> {
       reachable,
       newNotAssigned,
       promoted,
-    );
-  }
-
-  /// Forms a new state to reflect a control flow path that might have come from
-  /// either `this` or the [other] state.
-  ///
-  /// The control flow path is considered reachable if either of the input
-  /// states is reachable.  Variables are considered definitely assigned if they
-  /// were definitely assigned in both of the input states.  Variable promotions
-  /// are kept only if they are common to both input states; if a variable is
-  /// promoted to one type in one state and a subtype in the other state, the
-  /// less specific type promotion is kept.
-  State<Variable, Type> join<Variable, Type>(
-    TypeOperations typeOperations,
-    State<Variable, Type> first,
-    State<Variable, Type> second,
-  ) {
-    if (first == null) return second;
-    if (second == null) return first;
-
-    if (first.reachable && !second.reachable) return first;
-    if (!first.reachable && second.reachable) return second;
-
-    var newReachable = first.reachable || second.reachable;
-    var newNotAssigned = first.notAssigned.union(second.notAssigned);
-    var newPromoted =
-        State.joinPromoted(typeOperations, first.promoted, second.promoted);
-
-    return State._identicalOrNew(
-      first,
-      second,
-      newReachable,
-      newNotAssigned,
-      newPromoted,
     );
   }
 
@@ -994,6 +960,40 @@ class State<Variable, Type> {
     if (noChanges) return map;
     if (result.isEmpty) return const {};
     return result;
+  }
+
+  /// Forms a new state to reflect a control flow path that might have come from
+  /// either `this` or the [other] state.
+  ///
+  /// The control flow path is considered reachable if either of the input
+  /// states is reachable.  Variables are considered definitely assigned if they
+  /// were definitely assigned in both of the input states.  Variable promotions
+  /// are kept only if they are common to both input states; if a variable is
+  /// promoted to one type in one state and a subtype in the other state, the
+  /// less specific type promotion is kept.
+  static State<Variable, Type> join<Variable, Type>(
+    TypeOperations typeOperations,
+    State<Variable, Type> first,
+    State<Variable, Type> second,
+  ) {
+    if (first == null) return second;
+    if (second == null) return first;
+
+    if (first.reachable && !second.reachable) return first;
+    if (!first.reachable && second.reachable) return second;
+
+    var newReachable = first.reachable || second.reachable;
+    var newNotAssigned = first.notAssigned.union(second.notAssigned);
+    var newPromoted =
+        State.joinPromoted(typeOperations, first.promoted, second.promoted);
+
+    return State._identicalOrNew(
+      first,
+      second,
+      newReachable,
+      newNotAssigned,
+      newPromoted,
+    );
   }
 
   /// Joins two "promoted" maps.  See [join] for details.
