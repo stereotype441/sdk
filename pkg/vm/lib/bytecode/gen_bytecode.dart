@@ -39,8 +39,11 @@ import 'generics.dart'
         flattenInstantiatorTypeArguments,
         getDefaultFunctionTypeArguments,
         getInstantiatorTypeArguments,
+        getStaticType,
         hasFreeTypeParameters,
         hasInstantiatorTypeArguments,
+        isAllDynamic,
+        isInstantiatedInterfaceCall,
         isUncheckedCall,
         isUncheckedClosureCall;
 import 'local_variable_table.dart' show LocalVariableTable;
@@ -383,8 +386,52 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
     }
     final object =
         objectTable.getHandle(new ListConstant(const DynamicType(), constants));
-    bytecodeComponent.annotations.add(object);
-    return new Annotations(object, hasPragma);
+    final decl = new AnnotationsDeclaration(object);
+    bytecodeComponent.annotations.add(decl);
+    return new Annotations(decl, hasPragma);
+  }
+
+  // Insert annotations for the function and its parameters into the annotations
+  // section. Return the annotations for the function only. The bytecode reader
+  // will implicitly find the parameter annotations by reading N packed objects
+  // after reading the function's annotations, one for each parameter.
+  Annotations getFunctionAnnotations(Member member) {
+    final functionNodes = member.annotations;
+    final parameterNodeLists = new List<List<Expression>>();
+    for (VariableDeclaration variable in member.function.positionalParameters) {
+      parameterNodeLists.add(variable.annotations);
+    }
+    for (VariableDeclaration variable in member.function.namedParameters) {
+      parameterNodeLists.add(variable.annotations);
+    }
+
+    if (functionNodes.isEmpty &&
+        parameterNodeLists.every((nodes) => nodes.isEmpty)) {
+      return const Annotations(null, false);
+    }
+
+    List<Constant> functionConstants = constantEvaluator.withNewEnvironment(
+        () => functionNodes.map(_evaluateConstantExpression).toList());
+    bool hasPragma = functionConstants.any(_isPragma);
+    if (!options.emitAnnotations && !hasPragma) {
+      return const Annotations(null, false);
+    }
+
+    final functionObject = objectTable
+        .getHandle(new ListConstant(const DynamicType(), functionConstants));
+    final functionDecl = new AnnotationsDeclaration(functionObject);
+    bytecodeComponent.annotations.add(functionDecl);
+
+    for (final parameterNodes in parameterNodeLists) {
+      List<Constant> parameterConstants = constantEvaluator.withNewEnvironment(
+          () => parameterNodes.map(_evaluateConstantExpression).toList());
+      final parameterObject = objectTable
+          .getHandle(new ListConstant(const DynamicType(), parameterConstants));
+      final parameterDecl = new AnnotationsDeclaration(parameterObject);
+      bytecodeComponent.annotations.add(parameterDecl);
+    }
+
+    return new Annotations(functionDecl, hasPragma);
   }
 
   FieldDeclaration getFieldDeclaration(Field field, Code initializer) {
@@ -548,7 +595,7 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       position = (member as dynamic).startFileOffset;
       endPosition = member.fileEndOffset;
     }
-    Annotations annotations = getAnnotations(member.annotations);
+    Annotations annotations = getFunctionAnnotations(member);
     if (annotations.object != null) {
       flags |= FunctionDeclaration.hasAnnotationsFlag;
       if (annotations.hasPragma) {
@@ -640,6 +687,9 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       }
       if (variable.isGenericCovariantImpl) {
         flags |= ParameterDeclaration.isGenericCovariantImplFlag;
+      }
+      if (variable.isFinal) {
+        flags |= ParameterDeclaration.isFinalFlag;
       }
       return flags;
     }
@@ -1273,8 +1323,8 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       return;
     }
 
-    if (type is InterfaceType && type.typeArguments.isEmpty) {
-      assert(type.classNode.typeParameters.isEmpty);
+    if (type is InterfaceType &&
+        (type.typeArguments.isEmpty || isAllDynamic(type.typeArguments))) {
       asm.emitPushConstant(cp.addType(type));
       final argDesc = objectTable.getArgDescHandle(2);
       final cpIndex = cp.addInterfaceCall(
@@ -1369,6 +1419,7 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
     _recordSourcePosition(position);
     _genPrologue(node, node.function);
     _setupInitialContext(node.function);
+    _emitFirstDebugCheck(node.function);
     if (node is Procedure && node.isInstanceMember) {
       _checkArguments(node.function);
     }
@@ -1408,7 +1459,9 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
         int forwardingStubTargetCpIndex = null;
         int defaultFunctionTypeArgsCpIndex = null;
 
-        if (node is Procedure) {
+        if (node is Constructor) {
+          parameterFlags = getParameterFlags(node.function);
+        } else if (node is Procedure) {
           parameterFlags = getParameterFlags(node.function);
 
           if (node.isForwardingStub) {
@@ -1644,12 +1697,15 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       function.positionalParameters.forEach(_copyParamIfCaptured);
       locals.sortedNamedParameters.forEach(_copyParamIfCaptured);
     }
+  }
 
+  void _emitFirstDebugCheck(FunctionNode function) {
     if (options.emitDebuggerStops) {
       // DebugCheck instruction should be emitted after parameter variables
       // are declared and copied into context.
       // The debugger expects the source position to correspond to the
       // declaration position of the last parameter, if any, or of the function.
+      // The DebugCheck must be encountered each time an async op is reentered.
       if (options.emitSourcePositions && function != null) {
         var pos = TreeNode.noOffset;
         if (function.namedParameters.isNotEmpty) {
@@ -2025,9 +2081,10 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       continuationSwitchVar = locals.scratchVarIndexInFrame;
       _genSyncYieldingPrologue(
           function, continuationSwitchLabel, continuationSwitchVar);
+    } else {
+      _setupInitialContext(function);
+      _emitFirstDebugCheck(function);
     }
-
-    _setupInitialContext(function);
     _checkArguments(function);
 
     _generateNode(function.body);
@@ -2137,13 +2194,37 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
 
   void _genSyncYieldingPrologue(FunctionNode function, Label continuationLabel,
       int switchVarIndexInFrame) {
+    Label debugCheckLabel = new Label();
+
     // switch_var = :await_jump_var
     _genLoadVar(locals.awaitJumpVar);
     asm.emitStoreLocal(switchVarIndexInFrame);
 
-    // if (switch_var != 0) goto continuationLabel
     _genPushInt(0);
-    asm.emitJumpIfNeStrict(continuationLabel);
+
+    if (options.emitDebuggerStops) {
+      // if (switch_var != 0) goto debugCheckLabel
+      asm.emitJumpIfNeStrict(debugCheckLabel);
+
+      _setupInitialContext(function);
+
+      asm.bind(debugCheckLabel);
+      // The debugger may set a breakpoint on this DebugCheck opcode and it
+      // expects to hit it on the first entry to the async op, as well as on
+      // each subsequent reentry.
+      _emitFirstDebugCheck(function);
+
+      _genLoadVar(locals.awaitJumpVar);
+
+      // if (switch_var != 0) goto continuationLabel
+      _genPushInt(0);
+      asm.emitJumpIfNeStrict(continuationLabel);
+    } else {
+      // if (switch_var != 0) goto continuationLabel
+      asm.emitJumpIfNeStrict(continuationLabel);
+
+      _setupInitialContext(function);
+    }
 
     // Proceed to normal entry.
   }
@@ -2329,6 +2410,9 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
   /// the last finally block.
   void _generateNonLocalControlTransfer(
       TreeNode from, TreeNode to, GenerateContinuation continuation) {
+    if (options.emitDebuggerStops) {
+      asm.emitDebugCheck(); // Before context is unwound.
+    }
     List<TryFinally> tryFinallyBlocks = _getEnclosingTryFinallyBlocks(from, to);
     _addFinallyBlocks(tryFinallyBlocks, continuation);
   }
@@ -2746,8 +2830,28 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
   }
 
   void _genInstanceCall(
-      int totalArgCount, int callCpIndex, bool isDynamic, bool isUnchecked,
-      [TreeNode context]) {
+      InvocationKind invocationKind,
+      Member interfaceTarget,
+      Name targetName,
+      Expression receiver,
+      int totalArgCount,
+      ObjectHandle argDesc) {
+    final isDynamic = interfaceTarget == null;
+    final isUnchecked = invocationKind != InvocationKind.getter &&
+        isUncheckedCall(interfaceTarget, receiver, typeEnvironment);
+
+    if (invocationKind != InvocationKind.getter && !isDynamic && !isUnchecked) {
+      final staticReceiverType = getStaticType(receiver, typeEnvironment);
+      if (isInstantiatedInterfaceCall(interfaceTarget, staticReceiverType)) {
+        final callCpIndex = cp.addInstantiatedInterfaceCall(
+            invocationKind, interfaceTarget, argDesc, staticReceiverType);
+        asm.emitInstantiatedInterfaceCall(callCpIndex, totalArgCount);
+        return;
+      }
+    }
+
+    final callCpIndex = cp.addInstanceCall(
+        invocationKind, interfaceTarget, targetName, argDesc);
     if (isDynamic) {
       assert(!isUnchecked);
       asm.emitDynamicCall(callCpIndex, totalArgCount);
@@ -2794,24 +2898,18 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       // interface target doesn't fully represent what is being called.
       interfaceTarget = null;
     }
-    final isDynamic = interfaceTarget == null;
-    final isUnchecked =
-        isUncheckedCall(interfaceTarget, node.receiver, typeEnvironment);
     final argDesc =
         objectTable.getArgDescHandleByArguments(args, hasReceiver: true);
-    final callCpIndex = cp.addInstanceCall(
-        InvocationKind.method, interfaceTarget, node.name, argDesc);
-    _genInstanceCall(totalArgCount, callCpIndex, isDynamic, isUnchecked, node);
+    _genInstanceCall(InvocationKind.method, interfaceTarget, node.name,
+        node.receiver, totalArgCount, argDesc);
   }
 
   @override
   visitPropertyGet(PropertyGet node) {
     _generateNode(node.receiver);
-    final isDynamic = node.interfaceTarget == null;
     final argDesc = objectTable.getArgDescHandle(1);
-    final callCpIndex = cp.addInstanceCall(
-        InvocationKind.getter, node.interfaceTarget, node.name, argDesc);
-    _genInstanceCall(1, callCpIndex, isDynamic, /*isUnchecked=*/ false);
+    _genInstanceCall(InvocationKind.getter, node.interfaceTarget, node.name,
+        node.receiver, 1, argDesc);
   }
 
   @override
@@ -2826,13 +2924,10 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       asm.emitStoreLocal(temp);
     }
 
-    final isDynamic = node.interfaceTarget == null;
-    final isUnchecked =
-        isUncheckedCall(node.interfaceTarget, node.receiver, typeEnvironment);
     final argDesc = objectTable.getArgDescHandle(2);
-    final callCpIndex = cp.addInstanceCall(
-        InvocationKind.setter, node.interfaceTarget, node.name, argDesc);
-    _genInstanceCall(2, callCpIndex, isDynamic, isUnchecked);
+    _genInstanceCall(InvocationKind.setter, node.interfaceTarget, node.name,
+        node.receiver, 2, argDesc);
+
     asm.emitDrop1();
 
     if (hasResult) {
@@ -3108,11 +3203,15 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
     final v = node.variable;
     final bool hasResult = !isExpressionWithoutResult(node);
 
+    _genPushContextIfCaptured(v);
+
+    _generateNode(node.value);
+
+    if (options.emitDebuggerStops && _variableSetNeedsDebugCheck(node.value)) {
+      asm.emitDebugCheck();
+    }
+
     if (locals.isCaptured(v)) {
-      _genPushContextForVariable(v);
-
-      _generateNode(node.value);
-
       final int temp = locals.tempIndexInFrame(node);
       if (hasResult) {
         asm.emitStoreLocal(temp);
@@ -3124,8 +3223,6 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
         asm.emitPush(temp);
       }
     } else {
-      _generateNode(node.value);
-
       final int localIndex = locals.getVarIndexInFrame(v);
       if (hasResult) {
         asm.emitStoreLocal(localIndex);
@@ -3134,6 +3231,13 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       }
     }
   }
+
+  bool _variableSetNeedsDebugCheck(Expression rhs) =>
+      rhs is BasicLiteral ||
+      rhs is ConstantExpression ||
+      rhs is StaticGet ||
+      rhs is FunctionExpression ||
+      rhs is VariableGet;
 
   void _genFutureNull() {
     asm.emitPushNull();
@@ -3747,6 +3851,16 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       } else {
         asm.emitPushNull();
       }
+
+      if (options.emitDebuggerStops) {
+        final savedSourcePosition = asm.currentSourcePosition;
+        if (node.fileEqualsOffset != TreeNode.noOffset) {
+          _recordSourcePosition(node.fileEqualsOffset);
+        }
+        asm.emitDebugCheck();
+        asm.currentSourcePosition = savedSourcePosition;
+      }
+
       if (options.emitLocalVarInfo && !asm.isUnreachable && node.name != null) {
         _declareLocalVariable(node, maxInitializerPosition + 1);
       }
@@ -3905,7 +4019,7 @@ class FinallyBlock {
 }
 
 class Annotations {
-  final ObjectHandle object;
+  final AnnotationsDeclaration object;
   final bool hasPragma;
 
   const Annotations(this.object, this.hasPragma);

@@ -416,7 +416,7 @@ class DartEditBuilderImpl extends EditBuilderImpl implements DartEditBuilder {
 
   @override
   void writeOverride(
-    FunctionType signature, {
+    ExecutableElement element, {
     StringBuffer displayTextBuffer,
     String returnTypeGroupName,
     bool invokeSuper: false,
@@ -430,7 +430,6 @@ class DartEditBuilderImpl extends EditBuilderImpl implements DartEditBuilder {
       }
     }
 
-    ExecutableElement element = signature.element as ExecutableElement;
     String prefix = getIndent(1);
     String prefix2 = getIndent(2);
     ElementKind elementKind = element.kind;
@@ -451,7 +450,7 @@ class DartEditBuilderImpl extends EditBuilderImpl implements DartEditBuilder {
     }
 
     // return type
-    DartType returnType = signature.returnType;
+    DartType returnType = element.returnType;
     bool typeWritten = writeType(returnType,
         groupName: returnTypeGroupName, methodBeingCopied: element);
     if (typeWritten) {
@@ -491,9 +490,10 @@ class DartEditBuilderImpl extends EditBuilderImpl implements DartEditBuilder {
       }
       displayTextBuffer?.write(' => …');
     } else {
-      List<ParameterElement> parameters = signature.parameters;
+      List<ParameterElement> parameters = element.parameters;
       withCarbonCopyBuffer(() {
-        writeTypeParameters(signature.typeFormals, methodBeingCopied: element);
+        writeTypeParameters(element.type.typeFormals,
+            methodBeingCopied: element);
         writeParameters(parameters, methodBeingCopied: element);
       });
       writeln(' {');
@@ -1016,6 +1016,12 @@ class DartEditBuilderImpl extends EditBuilderImpl implements DartEditBuilder {
   void _writeLibraryReference(Element element) {
     // If the element is defined in the library, then no prefix needed.
     if (dartFileEditBuilder._isDefinedLocally(element)) {
+      return;
+    }
+
+    // TODO(scheglov) We should use "methodBeingCopied" to verify that
+    // we really are just copying this type parameter.
+    if (element is TypeParameterElement) {
       return;
     }
 

@@ -3,6 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'dart:io' show Directory, Platform;
+import 'package:front_end/src/fasta/messages.dart' show FormattedMessage;
 import 'package:front_end/src/testing/id.dart' show ActualData, Id;
 import 'package:front_end/src/testing/id_testing.dart'
     show DataInterpreter, StringDataInterpreter, runTests;
@@ -57,7 +58,15 @@ class IdTestingDataComputer extends DataComputer<String> {
       Map<Id, ActualData<String>> actualMap,
       {bool verbose}) {
     new IdTestingDataExtractor(compilerResult, actualMap)
-        .computeForLibrary(library);
+        .computeForLibrary(library, useFileUri: true);
+  }
+
+  @override
+  bool get supportsErrors => true;
+
+  String computeErrorData(
+      CompilerResult compiler, Id id, List<FormattedMessage> errors) {
+    return errorsToText(errors);
   }
 
   @override

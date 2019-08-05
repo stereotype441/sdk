@@ -150,6 +150,8 @@ class LinkedUnitContext {
       return LazyConstructorDeclaration.getCodeLength(this, node);
     } else if (node is EnumDeclaration) {
       return LazyEnumDeclaration.getCodeLength(this, node);
+    } else if (node is ExtensionDeclaration) {
+      return LazyExtensionDeclaration.getCodeLength(this, node);
     } else if (node is FormalParameter) {
       return LazyFormalParameter.getCodeLength(this, node);
     } else if (node is FunctionDeclaration) {
@@ -181,6 +183,8 @@ class LinkedUnitContext {
       return LazyConstructorDeclaration.getCodeOffset(this, node);
     } else if (node is EnumDeclaration) {
       return LazyEnumDeclaration.getCodeOffset(this, node);
+    } else if (node is ExtensionDeclaration) {
+      return LazyExtensionDeclaration.getCodeOffset(this, node);
     } else if (node is FormalParameter) {
       return LazyFormalParameter.getCodeOffset(this, node);
     } else if (node is FunctionDeclaration) {
@@ -256,6 +260,9 @@ class LinkedUnitContext {
     } else if (node is EnumDeclaration) {
       LazyEnumDeclaration.readDocumentationComment(this, node);
       return node.documentationComment;
+    } else if (node is ExtensionDeclaration) {
+      LazyExtensionDeclaration.readDocumentationComment(this, node);
+      return node.documentationComment;
     } else if (node is FunctionDeclaration) {
       LazyFunctionDeclaration.readDocumentationComment(this, node);
       return node.documentationComment;
@@ -295,9 +302,13 @@ class LinkedUnitContext {
     return node.constants;
   }
 
-  TypeName getExtendedType(ExtensionDeclaration node) {
+  TypeAnnotation getExtendedType(ExtensionDeclaration node) {
     LazyExtensionDeclaration.readExtendedType(_astReader, node);
     return node.extendedType;
+  }
+
+  String getExtensionRefName(ExtensionDeclaration node) {
+    return LazyExtensionDeclaration.get(node).refName;
   }
 
   String getFieldFormalParameterName(AstNode node) {
@@ -768,7 +779,7 @@ class LinkedUnitContext {
     } else if (node is FunctionDeclaration) {
       return node.externalKeyword != null;
     } else if (node is MethodDeclaration) {
-      return node.externalKeyword != null;
+      return node.externalKeyword != null || node.body is NativeFunctionBody;
     } else {
       throw UnimplementedError('${node.runtimeType}');
     }
@@ -820,6 +831,14 @@ class LinkedUnitContext {
     throw UnimplementedError('${node.runtimeType}');
   }
 
+  bool isNative(AstNode node) {
+    if (node is MethodDeclaration) {
+      return node.body is NativeFunctionBody;
+    } else {
+      throw UnimplementedError('${node.runtimeType}');
+    }
+  }
+
   bool isSetter(AstNode node) {
     if (node is FunctionDeclaration) {
       return node.isSetter;
@@ -863,7 +882,8 @@ class LinkedUnitContext {
 
     var kind = linkedType.kind;
     if (kind == LinkedNodeTypeKind.bottom) {
-      return BottomTypeImpl.instance;
+      var nullabilitySuffix = _nullabilitySuffix(linkedType.nullabilitySuffix);
+      return BottomTypeImpl.instance.withNullability(nullabilitySuffix);
     } else if (kind == LinkedNodeTypeKind.dynamic_) {
       return DynamicTypeImpl.instance;
     } else if (kind == LinkedNodeTypeKind.function) {

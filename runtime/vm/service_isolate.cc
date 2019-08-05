@@ -143,6 +143,10 @@ Dart_Port ServiceIsolate::Port() {
 
 Dart_Port ServiceIsolate::WaitForLoadPort() {
   VMTagScope tagScope(Thread::Current(), VMTag::kLoadWaitTagId);
+  return WaitForLoadPortInternal();
+}
+
+Dart_Port ServiceIsolate::WaitForLoadPortInternal() {
   MonitorLocker ml(monitor_);
   while (state_ == kStarting && (load_port_ == ILLEGAL_PORT)) {
     ml.Wait();
@@ -185,6 +189,7 @@ bool ServiceIsolate::SendServiceRpc(uint8_t* request_json,
   request.value.as_array.values = request_array;
   request.value.as_array.length = ARRAY_SIZE(request_array);
 
+  ServiceIsolate::WaitForLoadPortInternal();
   return Dart_PostCObject(ServiceIsolate::Port(), &request);
 }
 
@@ -380,7 +385,6 @@ class RunServiceTask : public ThreadPool::Task {
     }
     Isolate* I = reinterpret_cast<Isolate*>(parameter);
     ASSERT(ServiceIsolate::IsServiceIsolate(I));
-    I->WaitForOutstandingSpawns();
     {
       // Print the error if there is one.  This may execute dart code to
       // print the exception object, so we need to use a StartIsolateScope.
@@ -388,6 +392,7 @@ class RunServiceTask : public ThreadPool::Task {
       StartIsolateScope start_scope(I);
       Thread* T = Thread::Current();
       ASSERT(I == T->isolate());
+      I->WaitForOutstandingSpawns();
       StackZone zone(T);
       HandleScope handle_scope(T);
       Error& error = Error::Handle(Z);

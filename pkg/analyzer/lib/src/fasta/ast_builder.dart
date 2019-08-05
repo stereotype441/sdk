@@ -46,6 +46,7 @@ import 'package:front_end/src/fasta/messages.dart'
 import 'package:front_end/src/fasta/parser.dart'
     show
         Assert,
+        ClassKind,
         FormalParameterKind,
         IdentifierContext,
         MemberKind,
@@ -413,33 +414,46 @@ class AstBuilder extends StackListener {
           initializerObject.target, initializerObject);
     }
 
+    if (initializerObject is CascadeExpression) {
+      return buildInitializerTargetExpressionRecovery(
+          initializerObject.target, initializerObject);
+    }
+
     throw new UnsupportedError('unsupported initializer:'
         ' ${initializerObject.runtimeType} :: $initializerObject');
   }
 
   AstNode buildInitializerTargetExpressionRecovery(
       Expression target, Object initializerObject) {
-    if (target is FunctionExpressionInvocation) {
-      Expression targetFunct = target.function;
-      if (targetFunct is SuperExpression) {
-        // TODO(danrubel): Consider generating this error in the parser
-        // This error is also reported in the body builder
-        handleRecoverableError(messageInvalidSuperInInitializer,
-            targetFunct.superKeyword, targetFunct.superKeyword);
-        return ast.superConstructorInvocation(
-            targetFunct.superKeyword, null, null, target.argumentList);
+    ArgumentList argumentList;
+    while (true) {
+      if (target is FunctionExpressionInvocation) {
+        argumentList = (target as FunctionExpressionInvocation).argumentList;
+        target = (target as FunctionExpressionInvocation).function;
+      } else if (target is MethodInvocation) {
+        argumentList = (target as MethodInvocation).argumentList;
+        target = (target as MethodInvocation).target;
+      } else if (target is PropertyAccess) {
+        argumentList = null;
+        target = (target as PropertyAccess).target;
+      } else {
+        break;
       }
-      if (targetFunct is ThisExpression) {
-        // TODO(danrubel): Consider generating this error in the parser
-        // This error is also reported in the body builder
-        handleRecoverableError(messageInvalidThisInInitializer,
-            targetFunct.thisKeyword, targetFunct.thisKeyword);
-        return ast.redirectingConstructorInvocation(
-            targetFunct.thisKeyword, null, null, target.argumentList);
-      }
-      throw new UnsupportedError('unsupported initializer:'
-          ' ${initializerObject.runtimeType} :: $initializerObject'
-          ' %% targetFunct : ${targetFunct.runtimeType} :: $targetFunct');
+    }
+    if (target is SuperExpression) {
+      // TODO(danrubel): Consider generating this error in the parser
+      // This error is also reported in the body builder
+      handleRecoverableError(messageInvalidSuperInInitializer,
+          target.superKeyword, target.superKeyword);
+      return ast.superConstructorInvocation(
+          target.superKeyword, null, null, argumentList);
+    } else if (target is ThisExpression) {
+      // TODO(danrubel): Consider generating this error in the parser
+      // This error is also reported in the body builder
+      handleRecoverableError(messageInvalidThisInInitializer,
+          target.thisKeyword, target.thisKeyword);
+      return ast.redirectingConstructorInvocation(
+          target.thisKeyword, null, null, argumentList);
     }
     throw new UnsupportedError('unsupported initializer:'
         ' ${initializerObject.runtimeType} :: $initializerObject'
@@ -639,7 +653,7 @@ class AstBuilder extends StackListener {
 
   @override
   void endClassOrMixinBody(
-      int memberCount, Token leftBracket, Token rightBracket) {
+      ClassKind kind, int memberCount, Token leftBracket, Token rightBracket) {
     // TODO(danrubel): consider renaming endClassOrMixinBody
     // to endClassOrMixinOrExtensionBody
     assert(optional('{', leftBracket));
@@ -1577,7 +1591,7 @@ class AstBuilder extends StackListener {
       checkFieldFormalParameters(parameters);
       if (extensionDeclaration != null && body is EmptyFunctionBody) {
         errorReporter.errorReporter.reportErrorForNode(
-            CompileTimeErrorCode.EXTENSION_DECLARES_ABSTRACT_METHOD, name);
+            CompileTimeErrorCode.EXTENSION_DECLARES_ABSTRACT_MEMBER, name);
         return;
       }
       currentDeclarationMembers.add(ast.methodDeclaration(

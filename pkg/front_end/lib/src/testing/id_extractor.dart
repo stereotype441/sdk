@@ -56,8 +56,9 @@ abstract class DataExtractor<T> extends Visitor with DataRegistry<T> {
 
   DataExtractor(this.actualMap);
 
-  void computeForLibrary(Library library) {
-    LibraryId id = new LibraryId(library.importUri);
+  void computeForLibrary(Library library, {bool useFileUri: false}) {
+    LibraryId id =
+        new LibraryId(useFileUri ? library.fileUri : library.importUri);
     T value = computeLibraryValue(id, library);
     registerValue(library.fileUri, null, id, value, library);
   }
@@ -87,7 +88,11 @@ abstract class DataExtractor<T> extends Visitor with DataRegistry<T> {
         id, value, node);
   }
 
-  NodeId computeDefaultNodeId(TreeNode node) {
+  NodeId computeDefaultNodeId(TreeNode node,
+      {bool skipNodeWithNoOffset: false}) {
+    if (skipNodeWithNoOffset && node.fileOffset == TreeNode.noOffset) {
+      return null;
+    }
     assert(node.fileOffset != TreeNode.noOffset,
         "No fileOffset on $node (${node.runtimeType})");
     return new NodeId(node.fileOffset, IdKind.node);
@@ -288,13 +293,87 @@ abstract class DataExtractor<T> extends Visitor with DataRegistry<T> {
 
   @override
   visitConstantExpression(ConstantExpression node) {
-    if (node.fileOffset == TreeNode.noOffset) {
-      // Implicit constants (for instance omitted field initializers, implicit
-      // default values) and synthetic constants (for instance in noSuchMethod
-      // forwarders) have no offset.
+    // Implicit constants (for instance omitted field initializers, implicit
+    // default values) and synthetic constants (for instance in noSuchMethod
+    // forwarders) have no offset.
+    computeForNode(
+        node, computeDefaultNodeId(node, skipNodeWithNoOffset: true));
+    super.visitConstantExpression(node);
+  }
+
+  @override
+  visitNullLiteral(NullLiteral node) {
+    // Synthetic null literals, for instance in locals and fields without
+    // initializers, have no offset.
+    computeForNode(
+        node, computeDefaultNodeId(node, skipNodeWithNoOffset: true));
+    super.visitNullLiteral(node);
+  }
+
+  @override
+  visitBoolLiteral(BoolLiteral node) {
+    computeForNode(node, computeDefaultNodeId(node));
+    super.visitBoolLiteral(node);
+  }
+
+  @override
+  visitIntLiteral(IntLiteral node) {
+    // Synthetic ints literals, for instance in enum fields, have no offset.
+    computeForNode(
+        node, computeDefaultNodeId(node, skipNodeWithNoOffset: true));
+    super.visitIntLiteral(node);
+  }
+
+  @override
+  visitDoubleLiteral(DoubleLiteral node) {
+    computeForNode(node, computeDefaultNodeId(node));
+    super.visitDoubleLiteral(node);
+  }
+
+  @override
+  visitStringLiteral(StringLiteral node) {
+    // Synthetic string literals, for instance in enum fields, have no offset.
+    computeForNode(
+        node, computeDefaultNodeId(node, skipNodeWithNoOffset: true));
+    super.visitStringLiteral(node);
+  }
+
+  @override
+  visitListLiteral(ListLiteral node) {
+    // Synthetic list literals,for instance in noSuchMethod forwarders, have no
+    // offset.
+    computeForNode(
+        node, computeDefaultNodeId(node, skipNodeWithNoOffset: true));
+    super.visitListLiteral(node);
+  }
+
+  @override
+  visitMapLiteral(MapLiteral node) {
+    // Synthetic map literals, for instance in noSuchMethod forwarders, have no
+    // offset.
+    computeForNode(
+        node, computeDefaultNodeId(node, skipNodeWithNoOffset: true));
+    super.visitMapLiteral(node);
+  }
+
+  @override
+  visitSetLiteral(SetLiteral node) {
+    computeForNode(node, computeDefaultNodeId(node));
+    super.visitSetLiteral(node);
+  }
+
+  @override
+  visitThisExpression(ThisExpression node) {
+    TreeNode parent = node.parent;
+    if (node.fileOffset == TreeNode.noOffset ||
+        (parent is PropertyGet ||
+                parent is PropertySet ||
+                parent is MethodInvocation) &&
+            parent.fileOffset == node.fileOffset) {
+      // Skip implicit this expressions.
     } else {
       computeForNode(node, computeDefaultNodeId(node));
     }
-    super.visitConstantExpression(node);
+    super.visitThisExpression(node);
   }
 }

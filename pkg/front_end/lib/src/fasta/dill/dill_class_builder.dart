@@ -11,9 +11,8 @@ import '../problems.dart' show unimplemented;
 
 import '../kernel/kernel_builder.dart'
     show
-        KernelClassBuilder,
+        ClassBuilder,
         TypeBuilder,
-        KernelTypeVariableBuilder,
         LibraryBuilder,
         MemberBuilder,
         Scope,
@@ -25,7 +24,7 @@ import 'dill_library_builder.dart' show DillLibraryBuilder;
 
 import 'dill_member_builder.dart' show DillMemberBuilder;
 
-class DillClassBuilder extends KernelClassBuilder {
+class DillClassBuilder extends ClassBuilder {
   final Class cls;
 
   DillClassBuilder(Class cls, DillLibraryBuilder parent)
@@ -153,8 +152,7 @@ List<TypeVariableBuilder> computeTypeVariableBuilders(
   List<TypeVariableBuilder> result =
       new List.filled(typeParameters.length, null);
   for (int i = 0; i < result.length; i++) {
-    result[i] =
-        new KernelTypeVariableBuilder.fromKernel(typeParameters[i], library);
+    result[i] = new TypeVariableBuilder.fromKernel(typeParameters[i], library);
   }
   return result;
 }

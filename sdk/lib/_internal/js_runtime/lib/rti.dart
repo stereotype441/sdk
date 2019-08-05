@@ -12,10 +12,14 @@ import 'dart:_foreign_helper'
         JS,
         JS_BUILTIN,
         JS_EMBEDDED_GLOBAL,
+        JS_GET_FLAG,
         JS_GET_NAME,
+        JS_STRING_CONCAT,
         RAW_DART_FUNCTION_REF;
 
 import 'dart:_interceptors' show JSArray, JSUnmodifiableArray;
+
+import 'dart:_js_names' show unmangleGlobalNameIfPreservedAnyways;
 
 import 'dart:_js_embedded_names'
     show JsBuiltin, JsGetName, RtiUniverseFieldNames, RTI_UNIVERSE, TYPES;
@@ -61,6 +65,12 @@ class Rti {
 
   static void _setIsTestFunction(Rti rti, fn) {
     rti._is = fn;
+  }
+
+  @pragma('dart2js:tryInline')
+  static bool _isCheck(Rti rti, object) {
+    return JS(
+        'bool', '#.#(#)', rti, JS_GET_NAME(JsGetName.RTI_FIELD_IS), object);
   }
 
   /// Method called from generated code to evaluate a type environment recipe in
@@ -246,7 +256,7 @@ class Rti {
 }
 
 class _FunctionParameters {
-  // TODO(fishythefish): Support named parameters.
+  // TODO(fishythefish): Support required named parameters.
 
   static _FunctionParameters allocate() => _FunctionParameters();
 
@@ -264,6 +274,23 @@ class _FunctionParameters {
   static void _setOptionalPositional(
       _FunctionParameters parameters, Object optionalPositional) {
     parameters._optionalPositional = optionalPositional;
+  }
+
+  /// These are alternating name/type pairs; that is, the optional named
+  /// parameters of the function
+  ///
+  ///   void foo({int bar, double baz})
+  ///
+  /// would be encoded as ["bar", int, "baz", double], where the even indices are
+  /// the name [String]s and the odd indices are the type [Rti]s.
+  ///
+  /// Invariant: These pairs are sorted by name in lexicographically ascending order.
+  Object _optionalNamed;
+  static JSArray _getOptionalNamed(_FunctionParameters parameters) =>
+      JS('JSArray', '#', parameters._optionalNamed);
+  static void _setOptionalNamed(
+      _FunctionParameters parameters, Object optionalNamed) {
+    parameters._optionalNamed = optionalNamed;
   }
 }
 
@@ -315,6 +342,18 @@ Rti instanceType(object) {
           'depends:none;effects:none;', JsBuiltin.dartObjectConstructor))) {
     var rti = JS('', r'#[#]', object, JS_GET_NAME(JsGetName.RTI_NAME));
     if (rti != null) return _castToRti(rti);
+
+    // Subclasses of Closure are synthetic classes, so make them appear to be
+    // the 'Closure' class.
+    // TODO(sra): Can this be done less expensively, e.g. by putting $ti on the
+    // prototype of Closure class?
+    var closureClassConstructor = JS_BUILTIN(
+        'depends:none;effects:none;', JsBuiltin.dartClosureConstructor);
+    if (closureClassConstructor != null &&
+        _Utils.instanceOf(object, closureClassConstructor)) {
+      return _instanceTypeFromConstructor(closureClassConstructor);
+    }
+
     return _instanceTypeFromConstructor(JS('', '#.constructor', object));
   }
 
@@ -425,12 +464,11 @@ _generalAsCheckImplementation(object) {
   // This static method is installed on an Rti object as a JavaScript instance
   // method. The Rti object is 'this'.
   Rti testRti = _castToRti(JS('', 'this'));
+  if (Rti._isCheck(testRti, object)) return object;
+
   Rti objectRti = instanceOrFunctionType(object, testRti);
-  if (isSubtype(_theUniverse(), objectRti, testRti)) return object;
-  var message = "${Error.safeToString(object)}:"
-      " type '${_rtiToString(objectRti, null)}'"
-      " is not a subtype of type '${_rtiToString(testRti, null)}'";
-  throw new _CastError.fromMessage('CastError: $message');
+  var message = _Error.compose(object, objectRti, _rtiToString(testRti, null));
+  throw _CastError.fromMessage(message);
 }
 
 /// Called from generated code.
@@ -439,12 +477,11 @@ _generalTypeCheckImplementation(object) {
   // This static method is installed on an Rti object as a JavaScript instance
   // method. The Rti object is 'this'.
   Rti testRti = _castToRti(JS('', 'this'));
+  if (Rti._isCheck(testRti, object)) return object;
+
   Rti objectRti = instanceOrFunctionType(object, testRti);
-  if (isSubtype(_theUniverse(), objectRti, testRti)) return object;
-  var message = "${Error.safeToString(object)}:"
-      " type '${_rtiToString(objectRti, null)}'"
-      " is not a subtype of type '${_rtiToString(testRti, null)}'";
-  throw new _TypeError.fromMessage('TypeError: $message');
+  var message = _Error.compose(object, objectRti, _rtiToString(testRti, null));
+  throw _TypeError.fromMessage(message);
 }
 
 /// Called from generated code.
@@ -453,23 +490,154 @@ checkTypeBound(Rti type, Rti bound, variable) {
   var message = "Type '${_rtiToString(type, null)}'"
       " is not a subtype of type '${_rtiToString(bound, null)}'"
       " of '${_Utils.asString(variable)}'";
-  throw _TypeError.fromMessage('TypeError: $message');
+  throw _TypeError.fromMessage(message);
 }
 
-class _CastError extends Error implements CastError {
-  final String message;
-  _CastError.fromMessage(this.message);
+/// Base class to _CastError and _TypeError.
+class _Error extends Error {
+  final String _message;
+  _Error(this._message);
+
+  static String compose(object, objectRti, checkedTypeDescription) {
+    String objectDescription = Error.safeToString(object);
+    objectRti ??= instanceType(object);
+    String objectTypeDescription = _rtiToString(objectRti, null);
+    return "${objectDescription}:"
+        " type '${objectTypeDescription}'"
+        " is not a subtype of type '${checkedTypeDescription}'";
+  }
 
   @override
-  String toString() => message;
+  String toString() => _message;
 }
 
-class _TypeError extends Error implements TypeError {
-  final String message;
-  _TypeError.fromMessage(this.message);
+class _CastError extends _Error implements CastError {
+  _CastError.fromMessage(String message) : super('CastError: $message');
+
+  factory _CastError.forType(object, String type) {
+    return _CastError.fromMessage(_Error.compose(object, null, type));
+  }
+}
+
+class _TypeError extends _Error implements TypeError {
+  _TypeError.fromMessage(String message) : super('TypeError: $message');
+
+  factory _TypeError.forType(object, String type) {
+    return _TypeError.fromMessage(_Error.compose(object, null, type));
+  }
 
   @override
-  String toString() => message;
+  String get message => _message;
+}
+
+// Specializations.
+//
+// Specializations can be placed on Rti objects as the _as, _check and _is
+// 'methods'. They can also be called directly called from generated code.
+
+/// Specialization for 'is bool'.
+/// Called from generated code.
+bool _isBool(object) {
+  return true == object || false == object;
+}
+
+/// Specialization for 'as bool?'.
+/// Called from generated code.
+bool /*?*/ _asBoolNullable(object) {
+  if (object is bool) return object;
+  if (object == null) return object;
+  throw _CastError.forType(object, 'bool');
+}
+
+/// Specialization for check on 'bool?'.
+/// Called from generated code.
+bool /*?*/ _checkBoolNullable(object) {
+  if (object is bool) return object;
+  if (object == null) return object;
+  throw _TypeError.forType(object, 'bool');
+}
+
+/// Specialization for 'as double?'.
+/// Called from generated code.
+double /*?*/ _asDoubleNullable(object) {
+  if (object is double) return object;
+  if (object == null) return object;
+  throw _CastError.forType(object, 'double');
+}
+
+/// Specialization for check on 'double?'.
+/// Called from generated code.
+double /*?*/ _checkDoubleNullable(object) {
+  if (object is double) return object;
+  if (object == null) return object;
+  throw _TypeError.forType(object, 'double');
+}
+
+/// Specialization for 'is int'.
+/// Called from generated code.
+bool _isInt(object) {
+  return JS('bool', 'typeof # == "number"', object) &&
+      JS('bool', 'Math.floor(#) === #', object, object);
+}
+
+/// Specialization for 'as int?'.
+/// Called from generated code.
+int /*?*/ _asIntNullable(object) {
+  if (object is int) return object;
+  if (object == null) return object;
+  throw _CastError.forType(object, 'int');
+}
+
+/// Specialization for check on 'int?'.
+/// Called from generated code.
+int /*?*/ _checkIntNullable(object) {
+  if (object is int) return object;
+  if (object == null) return object;
+  throw _TypeError.forType(object, 'int');
+}
+
+/// Specialization for 'is num' and 'is double'.
+/// Called from generated code.
+bool _isNum(object) {
+  return JS('bool', 'typeof # == "number"', object);
+}
+
+/// Specialization for 'as num?'.
+/// Called from generated code.
+num /*?*/ _asNumNullable(object) {
+  if (object is num) return object;
+  if (object == null) return object;
+  throw _CastError.forType(object, 'num');
+}
+
+/// Specialization for check on 'num?'.
+/// Called from generated code.
+num /*?*/ _checkNumNullable(object) {
+  if (object is num) return object;
+  if (object == null) return object;
+  throw _TypeError.forType(object, 'num');
+}
+
+/// Specialization for 'is String'.
+/// Called from generated code.
+bool _isString(object) {
+  return JS('bool', 'typeof # == "string"', object);
+}
+
+/// Specialization for 'as String?'.
+/// Called from generated code.
+String /*?*/ _asStringNullable(object) {
+  if (object is String) return object;
+  if (object == null) return object;
+  throw _CastError.forType(object, 'String');
+}
+
+/// Specialization for check on 'String?'.
+/// Called from generated code.
+String /*?*/ _checkStringNullable(object) {
+  if (object is String) return object;
+  if (object == null) return object;
+  throw _TypeError.forType(object, 'String');
 }
 
 String _rtiToString(Rti rti, List<String> genericContext) {
@@ -482,6 +650,7 @@ String _rtiToString(Rti rti, List<String> genericContext) {
 
   if (kind == Rti.kindInterface) {
     String name = Rti._getInterfaceName(rti);
+    name = _unminifyOrTag(name);
     var arguments = Rti._getInterfaceTypeArguments(rti);
     if (arguments.length != 0) {
       name += '<';
@@ -495,7 +664,7 @@ String _rtiToString(Rti rti, List<String> genericContext) {
   }
 
   if (kind == Rti.kindFunction) {
-    // TODO(fishythefish): Support named parameters.
+    // TODO(fishythefish): Support required named parameters.
     Rti returnType = Rti._getReturnType(rti);
     var parameters = Rti._getFunctionParameters(rti);
     var requiredPositional =
@@ -504,6 +673,9 @@ String _rtiToString(Rti rti, List<String> genericContext) {
     var optionalPositional =
         _FunctionParameters._getOptionalPositional(parameters);
     var optionalPositionalLength = _Utils.arrayLength(optionalPositional);
+    var optionalNamed = _FunctionParameters._getOptionalNamed(parameters);
+    var optionalNamedLength = _Utils.arrayLength(optionalNamed);
+    assert(optionalPositionalLength == 0 || optionalNamedLength == 0);
 
     String s = _rtiToString(returnType, genericContext) + '(';
     String sep = '';
@@ -526,11 +698,31 @@ String _rtiToString(Rti rti, List<String> genericContext) {
       s += ']';
     }
 
+    if (optionalNamedLength > 0) {
+      s += sep + '{';
+      sep = '';
+      for (int i = 0; i < optionalNamedLength; i += 2) {
+        s += sep +
+            _Utils.asString(_Utils.arrayAt(optionalNamed, i)) +
+            ': ' +
+            _rtiToString(_castToRti(_Utils.arrayAt(optionalNamed, i + 1)),
+                genericContext);
+        sep = ', ';
+      }
+      s += '}';
+    }
+
     s += ')';
     return s;
   }
 
   return '?';
+}
+
+String _unminifyOrTag(String rawClassName) {
+  String preserved = unmangleGlobalNameIfPreservedAnyways(rawClassName);
+  if (preserved != null) return preserved;
+  return JS_GET_FLAG('MINIFIED') ? 'minified:$rawClassName' : rawClassName;
 }
 
 String _rtiToDebugString(Rti rti) {
@@ -544,7 +736,7 @@ String _rtiToDebugString(Rti rti) {
   }
 
   String functionParametersToString(_FunctionParameters parameters) {
-    // TODO(fishythefish): Support named parameters.
+    // TODO(fishythefish): Support required named parameters.
     String s = '(', sep = '';
     var requiredPositional =
         _FunctionParameters._getRequiredPositional(parameters);
@@ -552,6 +744,10 @@ String _rtiToDebugString(Rti rti) {
     var optionalPositional =
         _FunctionParameters._getOptionalPositional(parameters);
     var optionalPositionalLength = _Utils.arrayLength(optionalPositional);
+    var optionalNamed = _FunctionParameters._getOptionalNamed(parameters);
+    var optionalNamedLength = _Utils.arrayLength(optionalNamed);
+    assert(optionalPositionalLength == 0 || optionalNamedLength == 0);
+
     for (int i = 0; i < requiredPositionalLength; i++) {
       s += sep +
           _rtiToDebugString(_castToRti(_Utils.arrayAt(requiredPositional, i)));
@@ -569,6 +765,20 @@ String _rtiToDebugString(Rti rti) {
       }
       s += ']';
     }
+
+    if (optionalNamedLength > 0) {
+      s += sep + '{';
+      sep = '';
+      for (int i = 0; i < optionalNamedLength; i += 2) {
+        s += sep +
+            _Utils.asString(_Utils.arrayAt(optionalNamed, i)) +
+            ': ' +
+            _rtiToDebugString(_castToRti(_Utils.arrayAt(optionalNamed, i + 1)));
+        sep = ', ';
+      }
+      s += '}';
+    }
+
     return s + ')';
   }
 
@@ -705,7 +915,16 @@ class _Universe {
   }
 
   static Rti evalTypeVariable(Object universe, Rti environment, String name) {
-    throw UnimplementedError('_Universe.evalTypeVariable("$name")');
+    if (Rti._getKind(environment) == Rti.kindBinding) {
+      environment = Rti._getBindingBase(environment);
+    }
+
+    assert(Rti._getKind(environment) == Rti.kindInterface);
+    String interfaceName = Rti._getInterfaceName(environment);
+    var rule = _Universe.findRule(universe, interfaceName);
+    assert(rule != null);
+    String recipe = TypeRule.lookupTypeVariable(rule, name);
+    return _Universe.evalInEnvironment(universe, environment, recipe);
   }
 
   static _cacheGet(cache, key) => JS('', '#.get(#)', cache, key);
@@ -733,7 +952,6 @@ class _Universe {
         rti, RAW_DART_FUNCTION_REF(_generalTypeCheckImplementation));
     Rti._setIsTestFunction(
         rti, RAW_DART_FUNCTION_REF(_generalIsTestImplementation));
-
     return rti;
   }
 
@@ -816,6 +1034,20 @@ class _Universe {
     return s;
   }
 
+  static String _canonicalRecipeJoinNamed(Object arguments) {
+    String s = '', sep = '';
+    int length = _Utils.arrayLength(arguments);
+    assert(length.isEven);
+    for (int i = 0; i < length; i += 2) {
+      String name = _Utils.asString(_Utils.arrayAt(arguments, i));
+      Rti type = _castToRti(_Utils.arrayAt(arguments, i + 1));
+      String subrecipe = Rti._getCanonicalRecipe(type);
+      s += sep + name + Recipe.nameSeparatorString + subrecipe;
+      sep = Recipe.separatorString;
+    }
+    return s;
+  }
+
   static String _canonicalRecipeOfInterface(String name, Object arguments) {
     assert(_Utils.isString(name));
     String s = _Utils.asString(name);
@@ -888,25 +1120,38 @@ class _Universe {
       Rti._getCanonicalRecipe(returnType) +
       _canonicalRecipeOfFunctionParameters(parameters);
 
-  // TODO(fishythefish): Support named parameters.
+  // TODO(fishythefish): Support required named parameters.
   static String _canonicalRecipeOfFunctionParameters(
       _FunctionParameters parameters) {
     var requiredPositional =
         _FunctionParameters._getRequiredPositional(parameters);
+    var requiredPositionalLength = _Utils.arrayLength(requiredPositional);
     var optionalPositional =
         _FunctionParameters._getOptionalPositional(parameters);
     var optionalPositionalLength = _Utils.arrayLength(optionalPositional);
+    var optionalNamed = _FunctionParameters._getOptionalNamed(parameters);
+    var optionalNamedLength = _Utils.arrayLength(optionalNamed);
+    assert(optionalPositionalLength == 0 || optionalNamedLength == 0);
 
     String recipe = Recipe.startFunctionArgumentsString +
         _canonicalRecipeJoin(requiredPositional);
+
     if (optionalPositionalLength > 0) {
-      var requiredPositionalLength = _Utils.arrayLength(requiredPositional);
       String sep = requiredPositionalLength > 0 ? Recipe.separatorString : '';
       recipe += sep +
           Recipe.startOptionalGroupString +
           _canonicalRecipeJoin(optionalPositional) +
           Recipe.endOptionalGroupString;
     }
+
+    if (optionalNamedLength > 0) {
+      String sep = requiredPositionalLength > 0 ? Recipe.separatorString : '';
+      recipe += sep +
+          Recipe.startNamedGroupString +
+          _canonicalRecipeJoinNamed(optionalNamed) +
+          Recipe.endNamedGroupString;
+    }
+
     return recipe + Recipe.endFunctionArgumentsString;
   }
 
@@ -1224,19 +1469,25 @@ class _Parser {
     }
   }
 
-  static const int optionalSentinel = -1;
+  static const int optionalPositionalSentinel = -1;
+  static const int optionalNamedSentinel = -2;
 
   static void handleFunctionArguments(Object parser, Object stack) {
     var universe = _Parser.universe(parser);
     var parameters = _FunctionParameters.allocate();
     var optionalPositional = _Universe.sharedEmptyArray(universe);
+    var optionalNamed = _Universe.sharedEmptyArray(universe);
 
     var head = pop(stack);
     if (_Utils.isNum(head)) {
       int sentinel = _Utils.asInt(head);
       switch (sentinel) {
-        case optionalSentinel:
+        case optionalPositionalSentinel:
           optionalPositional = pop(stack);
+          break;
+
+        case optionalNamedSentinel:
+          optionalNamed = pop(stack);
           break;
 
         default:
@@ -1250,6 +1501,7 @@ class _Parser {
     _FunctionParameters._setRequiredPositional(
         parameters, collectArray(parser, stack));
     _FunctionParameters._setOptionalPositional(parameters, optionalPositional);
+    _FunctionParameters._setOptionalNamed(parameters, optionalNamed);
     Rti returnType = toType(universe, environment(parser), pop(stack));
     push(stack, _Universe._lookupFunctionRti(universe, returnType, parameters));
   }
@@ -1257,12 +1509,13 @@ class _Parser {
   static void handleOptionalGroup(Object parser, Object stack) {
     var parameters = collectArray(parser, stack);
     push(stack, parameters);
-    push(stack, optionalSentinel);
+    push(stack, optionalPositionalSentinel);
   }
 
   static void handleNamedGroup(Object parser, Object stack) {
-    // TODO(fishythefish)
-    throw UnimplementedError('handleNamedGroup');
+    var parameters = collectNamed(parser, stack);
+    push(stack, parameters);
+    push(stack, optionalNamedSentinel);
   }
 
   static void handleExtendedOperations(Object parser, Object stack) {
@@ -1281,6 +1534,13 @@ class _Parser {
   static Object collectArray(Object parser, Object stack) {
     var array = _Utils.arraySplice(stack, position(parser));
     toTypes(_Parser.universe(parser), environment(parser), array);
+    setPosition(parser, _Utils.asInt(pop(stack)));
+    return array;
+  }
+
+  static Object collectNamed(Object parser, Object stack) {
+    var array = _Utils.arraySplice(stack, position(parser));
+    toTypesNamed(_Parser.universe(parser), environment(parser), array);
     setPosition(parser, _Utils.asInt(pop(stack)));
     return array;
   }
@@ -1306,6 +1566,16 @@ class _Parser {
   static void toTypes(Object universe, Rti environment, Object items) {
     int length = _Utils.arrayLength(items);
     for (int i = 0; i < length; i++) {
+      var item = _Utils.arrayAt(items, i);
+      var type = toType(universe, environment, item);
+      _Utils.arraySetAt(items, i, type);
+    }
+  }
+
+  static void toTypesNamed(Object universe, Rti environment, Object items) {
+    int length = _Utils.arrayLength(items);
+    assert(length.isEven);
+    for (int i = 1; i < length; i += 2) {
       var item = _Utils.arrayAt(items, i);
       var type = toType(universe, environment, item);
       _Utils.arraySetAt(items, i, type);
@@ -1358,20 +1628,8 @@ class TypeRule {
 
 // Future entry point from compiled code.
 bool isSubtype(universe, Rti s, Rti t) {
-  // TODO(sra): When more tests are working, remove this rediculous hack.
-  // Temporary 'metering' of isSubtype calls to force tests that endlessly loop
-  // to fail.
-  int next = JS('int', '(#||0) + 1', _ticks);
-  _ticks = next;
-  if (next > 10 * 1000 * 1000) {
-    throw StateError('Too many isSubtype calls'
-        '  ${_rtiToString(s, null)}  <:  ${_rtiToString(t, null)}');
-  }
-
   return _isSubtype(universe, s, null, t, null);
 }
-
-int _ticks = 0;
 
 bool _isSubtype(universe, Rti s, sEnv, Rti t, tEnv) {
   // TODO(fishythefish): Update for NNBD. See
@@ -1437,7 +1695,7 @@ bool _isSubtype(universe, Rti s, sEnv, Rti t, tEnv) {
   return _isSubtypeOfInterface(universe, s, sEnv, tName, tArgs, tEnv);
 }
 
-// TODO(fishythefish): Support named parameters.
+// TODO(fishythefish): Support required named parameters.
 bool _isFunctionSubtype(universe, Rti s, sEnv, Rti t, tEnv) {
   assert(isFunctionKind(t));
   if (!isFunctionKind(s)) return false;
@@ -1488,6 +1746,25 @@ bool _isFunctionSubtype(universe, Rti s, sEnv, Rti t, tEnv) {
     if (!_isSubtype(universe, tParameter, tEnv, sParameter, sEnv)) return false;
   }
 
+  var sOptionalNamed = _FunctionParameters._getOptionalNamed(sParameters);
+  var tOptionalNamed = _FunctionParameters._getOptionalNamed(tParameters);
+  var sOptionalNamedLength = _Utils.arrayLength(sOptionalNamed);
+  var tOptionalNamedLength = _Utils.arrayLength(tOptionalNamed);
+
+  for (int i = 0, j = 0; j < tOptionalNamedLength; j += 2) {
+    String sName;
+    String tName = _Utils.asString(_Utils.arrayAt(tOptionalNamed, j));
+    do {
+      if (i >= sOptionalNamedLength) return false;
+      sName = _Utils.asString(_Utils.arrayAt(sOptionalNamed, i));
+      i += 2;
+    } while (_Utils.stringLessThan(sName, tName));
+    if (_Utils.stringLessThan(tName, sName)) return false;
+    var sType = _Utils.arrayAt(sOptionalNamed, i - 1);
+    var tType = _Utils.arrayAt(tOptionalNamed, j + 1);
+    if (!_isSubtype(universe, tType, tEnv, sType, sEnv)) return false;
+  }
+
   return true;
 }
 
@@ -1508,7 +1785,6 @@ bool _isSubtypeOfInterface(
     return true;
   }
 
-  // TODO(fishythefish): Should we recursively attempt to find supertypes?
   var rule = _Universe.findRule(universe, sName);
   if (rule == null) return false;
   var supertypeArgs = TypeRule.lookupSupertype(rule, tName);
@@ -1572,7 +1848,7 @@ class _Utils {
 
   static Object arrayAt(Object array, int i) => JS('', '#[#]', array, i);
 
-  static Object arraySetAt(Object array, int i, Object value) {
+  static void arraySetAt(Object array, int i, Object value) {
     JS('', '#[#] = #', array, i, value);
   }
 
@@ -1588,6 +1864,9 @@ class _Utils {
 
   static String substring(String s, int start, int end) =>
       JS('String', '#.substring(#, #)', s, start, end);
+
+  static bool stringLessThan(String s1, String s2) =>
+      JS('bool', '# < #', s1, s2);
 
   static mapGet(cache, key) => JS('', '#.get(#)', cache, key);
 

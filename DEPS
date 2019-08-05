@@ -36,7 +36,7 @@ vars = {
   "chromium_git": "https://chromium.googlesource.com",
   "fuchsia_git": "https://fuchsia.googlesource.com",
 
-  "co19_2_rev": "b0220fc898c32d3944cb8c54cf7b78dd8c7cbadb",
+  "co19_2_rev": "796f4de76de460e031bf3b20ce60a52e4ed417d9",
 
   # As Flutter does, we use Fuchsia's GN and Clang toolchain. These revision
   # should be kept up to date with the revisions pulled by the Flutter engine.
@@ -97,7 +97,7 @@ vars = {
   "intl_tag": "0.15.7",
   "jinja2_rev": "2222b31554f03e62600cd7e383376a7c187967a1",
   "json_rpc_2_tag": "2.0.9",
-  "linter_tag": "0.1.94",
+  "linter_tag": "0.1.96",
   "logging_tag": "0.11.3+2",
   "markupsafe_rev": "8f45f5cfa0009d2a70589bcda0349b8cb2b72783",
   "markdown_tag": "2.0.3",
@@ -135,6 +135,7 @@ vars = {
   "term_glyph_tag": "1.0.1",
   "test_reflective_loader_tag": "0.1.8",
   "test_tag": "test-v1.6.4",
+  "tflite_native_rev": "7f3748a2adf0e7c246813d0b206396312cbaa0db",
   "typed_data_tag": "1.1.6",
   "unittest_rev": "2b8375bc98bb9dc81c539c91aaea6adce12e1072",
   "usage_tag": "3.4.0",
@@ -147,7 +148,19 @@ vars = {
   "crashpad_rev": "bf327d8ceb6a669607b0dbab5a83a275d03f99ed",
   "minichromium_rev": "8d641e30a8b12088649606b912c2bc4947419ccc",
   "googletest_rev": "f854f1d27488996dc8a6db3c9453f80b02585e12",
+
+  # An LLVM backend needs LLVM binaries and headers. To avoid build time
+  # increases we can use prebuilts. We don't want to download this on every
+  # CQ/CI bot nor do we want the average Dart developer to incur that cost.
+  # So by default we will not download prebuilts.
+  "checkout_llvm": False,
+  "llvm_revision": "fe8bd96ebd6c490ea0b5c1fb342db2d7c393a109"
 }
+
+gclient_gn_args_file = Var("dart_root") + '/build/config/gclient_args.gni'
+gclient_gn_args = [
+  'checkout_llvm'
+]
 
 deps = {
   # Stuff needed for GN build.
@@ -158,7 +171,7 @@ deps = {
   Var("dart_root") + "/tools/sdks": {
       "packages": [{
           "package": "dart/dart-sdk/${{platform}}",
-          "version": "version:2.4.0",
+          "version": "version:2.5.0-dev.1.0",
       }],
       "dep_type": "cipd",
   },
@@ -360,6 +373,8 @@ deps = {
       Var("dart_git") + "term_glyph.git" + "@" + Var("term_glyph_tag"),
   Var("dart_root") + "/third_party/pkg/test":
       Var("dart_git") + "test.git" + "@" + Var("test_tag"),
+  Var("dart_root") + "/third_party/pkg/tflite_native":
+      Var("dart_git") + "tflite_native.git" + "@" + Var("tflite_native_rev"),
   Var("dart_root") + "/third_party/pkg/test_descriptor":
       Var("dart_git") + "test_descriptor.git" + "@" + Var("test_descriptor_tag"),
   Var("dart_root") + "/third_party/pkg/test_process":
@@ -399,6 +414,16 @@ deps = {
       "dep_type": "cipd",
   },
 
+  Var("dart_root") + "/pkg/analysis_server/language_model": {
+    "packages": [
+      {
+        "package": "dart/language_model",
+        "version": "EFtZ0Z5T822s4EUOOaWeiXUppRGKp5d9Z6jomJIeQYcC",
+      }
+    ],
+    "dep_type": "cipd",
+  },
+
   Var("dart_root") + "/buildtools": {
       "packages": [
           {
@@ -429,6 +454,16 @@ deps = {
       ],
       "dep_type": "cipd",
   },
+  Var("dart_root") + "/third_party/llvm": {
+      "packages": [
+          {
+              "package": "fuchsia/lib/llvm/${{platform}}",
+              "version": "git_revision:" + Var("llvm_revision"),
+          },
+      ],
+      "condition": "checkout_llvm",
+      "dep_type": "cipd",
+  }
 }
 
 deps_os = {

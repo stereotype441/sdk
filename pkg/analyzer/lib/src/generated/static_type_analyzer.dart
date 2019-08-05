@@ -186,6 +186,13 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
               'element', listTypeParam, ParameterKind.POSITIONAL);
       parameters = new List.filled(elementTypes.length, syntheticParamElement);
     }
+    if (_strictInference && parameters.isEmpty && contextType == null) {
+      // We cannot infer the type of a collection literal with no elements, and
+      // no context type. If there are any elements, inference has not failed,
+      // as the types of those elements are considered resolved.
+      _resolver.errorReporter.reportErrorForNode(
+          HintCode.INFERENCE_FAILURE_ON_COLLECTION_LITERAL, node, ['List']);
+    }
     InterfaceType inferred = ts.inferGenericFunctionOrType<InterfaceType>(
         _typeProvider.listType, parameters, elementTypes, contextType,
         downwards: downwards,
@@ -410,12 +417,14 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
       return;
     }
     DartType staticType = node.staticInvokeType?.returnType ?? _dynamicType;
-    staticType = _typeSystem.refineBinaryExpressionType(
-        node.leftOperand.staticType,
-        node.operator.type,
-        node.rightOperand.staticType,
-        staticType,
-        _featureSet);
+    if (node.leftOperand is! ExtensionOverride) {
+      staticType = _typeSystem.refineBinaryExpressionType(
+          node.leftOperand.staticType,
+          node.operator.type,
+          node.rightOperand.staticType,
+          staticType,
+          _featureSet);
+    }
     _recordStaticType(node, staticType);
   }
 
@@ -465,6 +474,43 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
   @override
   void visitDoubleLiteral(DoubleLiteral node) {
     _recordStaticType(node, _nonNullable(_typeProvider.doubleType));
+  }
+
+  @override
+  void visitExtensionOverride(ExtensionOverride node) {
+    var element = node.staticElement;
+    var typeParameters = element.typeParameters;
+
+    List<DartType> typeArgumentTypes;
+    if (node.typeArguments != null) {
+      var arguments = node.typeArguments.arguments;
+      if (arguments.length == typeParameters.length) {
+        typeArgumentTypes = arguments.map((a) => a.type).toList();
+      } else {
+        // TODO(scheglov) Report an error.
+        typeArgumentTypes = List.filled(typeParameters.length, _dynamicType);
+      }
+    } else {
+      var arguments = node.argumentList.arguments;
+      if (arguments.length == 1) {
+        var inferrer =
+            GenericInferrer(_typeProvider, _typeSystem, typeParameters);
+        inferrer.constrainArgument(
+          arguments[0].staticType,
+          element.extendedType,
+          'extendedType',
+        );
+        typeArgumentTypes = inferrer.infer(typeParameters);
+      } else {
+        typeArgumentTypes = List.filled(typeParameters.length, _dynamicType);
+      }
+    }
+
+    var nodeImpl = node as ExtensionOverrideImpl;
+    nodeImpl.typeArgumentTypes = typeArgumentTypes;
+    nodeImpl.extendedType =
+        Substitution.fromPairs(typeParameters, typeArgumentTypes)
+            .substituteType(element.extendedType);
   }
 
   @override
@@ -634,7 +680,7 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
   void visitListLiteral(ListLiteral node) {
     TypeArgumentList typeArguments = node.typeArguments;
 
-    // If we have explicit arguments, use them
+    // If we have explicit arguments, use them.
     if (typeArguments != null) {
       DartType staticType = _dynamicType;
       NodeList<TypeAnnotation> arguments = typeArguments.arguments;
@@ -822,7 +868,7 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
       staticType = staticElement.type;
     }
 
-    staticType = _inferGenericInstantiationFromContext(node, staticType);
+    staticType = _inferTearOff(node, node.identifier, staticType);
     if (!_inferObjectAccess(node, staticType, prefixedIdentifier)) {
       _recordStaticType(prefixedIdentifier, staticType);
       _recordStaticType(node, staticType);
@@ -915,7 +961,7 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
         _nonNullableEnabled) {
       staticType = _typeSystem.makeNullable(staticType);
     }
-    staticType = _inferGenericInstantiationFromContext(node, staticType);
+    staticType = _inferTearOff(node, node.propertyName, staticType);
 
     if (!_inferObjectAccess(node, staticType, propertyName)) {
       _recordStaticType(propertyName, staticType);
@@ -970,6 +1016,17 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
     } else {
       assert(literalType.element == _typeProvider.setType.element);
       (node as SetOrMapLiteralImpl).becomeSet();
+    }
+    if (_strictInference &&
+        node.elements.isEmpty &&
+        InferenceContext.getContext(node) == null) {
+      // We cannot infer the type of a collection literal with no elements, and
+      // no context type. If there are any elements, inference has not failed,
+      // as the types of those elements are considered resolved.
+      _resolver.errorReporter.reportErrorForNode(
+          HintCode.INFERENCE_FAILURE_ON_COLLECTION_LITERAL,
+          node,
+          [node.isMap ? 'Map' : 'Set']);
     }
     // TODO(brianwilkerson) Decide whether the literalType needs to be made
     //  non-nullable here or whether that will have happened in
@@ -1054,7 +1111,7 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
     } else {
       staticType = _dynamicType;
     }
-    staticType = _inferGenericInstantiationFromContext(node, staticType);
+    staticType = _inferTearOff(node, node, staticType);
     _recordStaticType(node, staticType);
   }
 
@@ -1548,23 +1605,6 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
   }
 
   /**
-   * Given an uninstantiated generic function type, try to infer the
-   * instantiated generic function type from the surrounding context.
-   */
-  DartType _inferGenericInstantiationFromContext(AstNode node, DartType type) {
-    TypeSystem ts = _typeSystem;
-    var context = InferenceContext.getContext(node);
-    if (context is FunctionType &&
-        type is FunctionType &&
-        ts is Dart2TypeSystem) {
-      // TODO(scheglov) Also store type arguments for identifiers.
-      return ts.inferFunctionTypeInstantiation(context, type,
-          errorReporter: _resolver.errorReporter, errorNode: node);
-    }
-    return type;
-  }
-
-  /**
    * Given a possibly generic invocation like `o.m(args)` or `(f)(args)` try to
    * infer the instantiated generic function type.
    *
@@ -1907,6 +1947,36 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
       }
       return _typeProvider.dynamicType;
     }
+  }
+
+  /**
+   * Given an uninstantiated generic function type, referenced by the
+   * [identifier] in the tear-off [expression], try to infer the instantiated
+   * generic function type from the surrounding context.
+   */
+  DartType _inferTearOff(
+    Expression expression,
+    SimpleIdentifier identifier,
+    DartType tearOffType,
+  ) {
+    TypeSystem ts = _typeSystem;
+    var context = InferenceContext.getContext(expression);
+    if (context is FunctionType &&
+        tearOffType is FunctionType &&
+        ts is Dart2TypeSystem) {
+      var typeArguments = ts.inferFunctionTypeInstantiation(
+        context,
+        tearOffType,
+        errorReporter: _resolver.errorReporter,
+        errorNode: expression,
+      );
+      (identifier as SimpleIdentifierImpl).tearOffTypeArgumentTypes =
+          typeArguments;
+      if (typeArguments.isNotEmpty) {
+        return tearOffType.instantiate(typeArguments);
+      }
+    }
+    return tearOffType;
   }
 
   /**

@@ -76,6 +76,20 @@ abstract class _ProvisionalApiTestBase extends AbstractContextTest {
 
 /// Mixin containing test cases for the provisional API.
 mixin _ProvisionalApiTestCases on _ProvisionalApiTestBase {
+  test_assign_null_to_generic_type() async {
+    var content = '''
+main() {
+  List<int> x = null;
+}
+''';
+    var expected = '''
+main() {
+  List<int>? x = null;
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_class_alias_synthetic_constructor_with_parameters() async {
     var content = '''
 void main() {
@@ -474,10 +488,6 @@ void test(C<int> c) {
     // propagate to a field in the class, and thence (via return values of other
     // methods) to most users of the class.  Whereas if we add nullability at
     // the call site it's possible that other call sites won't need it.
-    //
-    // TODO(paulberry): possible improvement: detect that since C uses T in a
-    // contravariant way, and deduce that test should change to
-    // `void test(C<int?> c)`
     var expected = '''
 class C<T> {
   void f(T t) {}
@@ -485,7 +495,7 @@ class C<T> {
 void g(C<int?> c, int? i) {
   c.f(i);
 }
-void test(C<int> c) {
+void test(C<int?> c) {
   g(c, null);
 }
 ''';
@@ -524,14 +534,11 @@ void test(List<int> x) {
   f(x, null);
 }
 ''';
-    // TODO(paulberry): possible improvement: detect that since add uses T in
-    // a contravariant way, and deduce that test should change to
-    // `void test(List<int?> x)`
     var expected = '''
 void f(List<int?> x, int? i) {
   x.add(i);
 }
-void test(List<int> x) {
+void test(List<int?> x) {
   f(x, null);
 }
 ''';
@@ -889,6 +896,44 @@ main() {
     await _checkSingleFileChanges(content, expected);
   }
 
+  test_field_initializer_simple() async {
+    var content = '''
+class C {
+  int f;
+  C(int i) : f = i;
+}
+main() {
+  C(null);
+}
+''';
+    var expected = '''
+class C {
+  int? f;
+  C(int? i) : f = i;
+}
+main() {
+  C(null);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_field_initializer_typed_list_literal() async {
+    var content = '''
+class C {
+  List<int> f;
+  C() : f = <int>[null];
+}
+''';
+    var expected = '''
+class C {
+  List<int?> f;
+  C() : f = <int?>[null];
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_field_type_inferred() async {
     var content = '''
 int f() => null;
@@ -1003,6 +1048,40 @@ int? g(int? i) => i;
 int? test(int? i) => f(g, i);
 main() {
   test(null);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_generic_exact_propagation() async {
+    var content = '''
+class C<T> {
+  List<T> values;
+  C() : values = <T>[];
+  void add(T t) => values.add(t);
+  T operator[](int i) => values[i];
+}
+void f() {
+  C<int> x = new C<int>();
+  g(x);
+}
+void g(C<int> y) {
+  y.add(null);
+}
+''';
+    var expected = '''
+class C<T> {
+  List<T> values;
+  C() : values = <T>[];
+  void add(T t) => values.add(t);
+  T operator[](int i) => values[i];
+}
+void f() {
+  C<int?> x = new C<int?>();
+  g(x);
+}
+void g(C<int?> y) {
+  y.add(null);
 }
 ''';
     await _checkSingleFileChanges(content, expected);
@@ -1832,6 +1911,28 @@ class C {
 }
 main() {
   C(null, 1);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_redirecting_constructor_ordinary_to_unnamed() async {
+    var content = '''
+class C {
+  C.named(int i, int j) : this(j, i);
+  C(int j, int i);
+}
+main() {
+  C.named(null, 1);
+}
+''';
+    var expected = '''
+class C {
+  C.named(int? i, int j) : this(j, i);
+  C(int j, int? i);
+}
+main() {
+  C.named(null, 1);
 }
 ''';
     await _checkSingleFileChanges(content, expected);

@@ -61,7 +61,16 @@ class IdTestingDataComputer extends DataComputer<String> {
     KernelToElementMapImpl elementMap = frontendStrategy.elementMap;
     ir.Library node = elementMap.getLibraryNode(library);
     new IdTestingDataExtractor(compiler.reporter, actualMap, elementMap)
-        .computeForLibrary(node);
+        .computeForLibrary(node, useFileUri: true);
+  }
+
+  @override
+  bool get supportsErrors => true;
+
+  @override
+  String computeErrorData(
+      Compiler compiler, Id id, List<CollectedMessage> errors) {
+    return errors.map((c) => c.message.message).join(',');
   }
 
   @override

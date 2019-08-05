@@ -112,8 +112,8 @@ import 'kernel_builder.dart'
     show
         AccessErrorBuilder,
         Declaration,
-        KernelClassBuilder,
-        KernelInvalidTypeBuilder,
+        ClassBuilder,
+        InvalidTypeBuilder,
         NamedTypeBuilder,
         TypeBuilder,
         UnresolvedType;
@@ -169,8 +169,8 @@ abstract class Generator {
 
   /// Builds a [Expression] representing a read from the generator.
   ///
-  /// The read of the this subexpression does _not_ need to support a
-  /// simultaneous write of the same subexpression.
+  /// The read of this subexpression does _not_ need to support a simultaneous
+  /// write of the same subexpression.
   Expression buildSimpleRead() {
     return _finish(_makeSimpleRead(), null);
   }
@@ -181,7 +181,7 @@ abstract class Generator {
   /// simultaneous write of the same subexpression.
   ///
   /// This is in contrast to [_makeRead] which is used for instance in compound
-  /// assignments like `a.b = c` where both a read and a write of the
+  /// assignments like `a.b += c` where both a read and a write of the
   /// subexpression `a.b` occurs.
   ///
   /// Subclasses that can benefit from this distinction should override this
@@ -440,8 +440,12 @@ abstract class Generator {
     }
   }
 
-  TypeBuilder buildTypeWithResolvedArguments(
-      List<UnresolvedType<TypeBuilder>> arguments) {
+  /// Returns a [TypeBuilder] for this subexpression instantiated with the
+  /// type [arguments]. If no type arguments are provided [arguments] is `null`.
+  ///
+  /// The type arguments have not been resolved and should be resolved to
+  /// create a [TypeBuilder] for a valid type.
+  TypeBuilder buildTypeWithResolvedArguments(List<UnresolvedType> arguments) {
     NamedTypeBuilder result = new NamedTypeBuilder(token.lexeme, null);
     Message message = templateNotAType.withArguments(token.lexeme);
     _helper.library.addProblem(
@@ -456,7 +460,7 @@ abstract class Generator {
   }
 
   Expression invokeConstructor(
-      List<UnresolvedType<TypeBuilder>> typeArguments,
+      List<UnresolvedType> typeArguments,
       String name,
       Arguments arguments,
       Token nameToken,
@@ -1645,23 +1649,20 @@ class DeferredAccessGenerator extends Generator {
   String get _debugName => "DeferredAccessGenerator";
 
   @override
-  TypeBuilder buildTypeWithResolvedArguments(
-      List<UnresolvedType<TypeBuilder>> arguments) {
-    String name =
-        "${prefixGenerator._plainNameForRead}.${suffixGenerator._plainNameForRead}";
+  TypeBuilder buildTypeWithResolvedArguments(List<UnresolvedType> arguments) {
+    String name = "${prefixGenerator._plainNameForRead}."
+        "${suffixGenerator._plainNameForRead}";
     TypeBuilder type =
         suffixGenerator.buildTypeWithResolvedArguments(arguments);
     LocatedMessage message;
-    if (type is NamedTypeBuilder &&
-        type.declaration is KernelInvalidTypeBuilder) {
-      KernelInvalidTypeBuilder declaration = type.declaration;
+    if (type is NamedTypeBuilder && type.declaration is InvalidTypeBuilder) {
+      InvalidTypeBuilder declaration = type.declaration;
       message = declaration.message;
     } else {
       int charOffset = offsetForToken(prefixGenerator.token);
       message = templateDeferredTypeAnnotation
           .withArguments(
-              _helper.buildDartType(
-                  new UnresolvedType<TypeBuilder>(type, charOffset, _uri)),
+              _helper.buildDartType(new UnresolvedType(type, charOffset, _uri)),
               prefixGenerator._plainNameForRead)
           .withLocation(
               _uri, charOffset, lengthOfSpan(prefixGenerator.token, token));
@@ -1683,7 +1684,7 @@ class DeferredAccessGenerator extends Generator {
 
   @override
   Expression invokeConstructor(
-      List<UnresolvedType<TypeBuilder>> typeArguments,
+      List<UnresolvedType> typeArguments,
       String name,
       Arguments arguments,
       Token nameToken,
@@ -1705,6 +1706,25 @@ class DeferredAccessGenerator extends Generator {
   }
 }
 
+/// [TypeUseGenerator] represents the subexpression whose prefix is the name of
+/// a class, enum, type variable, typedef, mixin declaration, extension
+/// declaration or built-in type, like dynamic and void.
+///
+/// For instance:
+///
+///   class A<T> {}
+///   typedef B = Function();
+///   mixin C<T> on A<T> {}
+///   extension D<T> on A<T> {}
+///
+///   method<T>() {
+///     C<B>        // a TypeUseGenerator is created for `C` and `B`.
+///     B b;        // a TypeUseGenerator is created for `B`.
+///     D.foo();    // a TypeUseGenerator is created for `D`.
+///     new A<T>(); // a TypeUseGenerator is created for `A` and `T`.
+///     T();        // a TypeUseGenerator is created for `T`.
+///   }
+///
 class TypeUseGenerator extends ReadOnlyAccessGenerator {
   final TypeDeclarationBuilder declaration;
 
@@ -1716,8 +1736,11 @@ class TypeUseGenerator extends ReadOnlyAccessGenerator {
   String get _debugName => "TypeUseGenerator";
 
   @override
-  TypeBuilder buildTypeWithResolvedArguments(
-      List<UnresolvedType<TypeBuilder>> arguments) {
+  TypeBuilder buildTypeWithResolvedArguments(List<UnresolvedType> arguments) {
+    if (declaration.isExtension) {
+      // Extension declarations cannot be used as types.
+      return super.buildTypeWithResolvedArguments(arguments);
+    }
     if (arguments != null) {
       int expected = declaration.typeVariablesCount;
       if (arguments.length != expected) {
@@ -1753,7 +1776,7 @@ class TypeUseGenerator extends ReadOnlyAccessGenerator {
 
   @override
   Expression invokeConstructor(
-      List<UnresolvedType<TypeBuilder>> typeArguments,
+      List<UnresolvedType> typeArguments,
       String name,
       Arguments arguments,
       Token nameToken,
@@ -1782,8 +1805,8 @@ class TypeUseGenerator extends ReadOnlyAccessGenerator {
   Expression get expression {
     if (super.expression == null) {
       int offset = offsetForToken(token);
-      if (declaration is KernelInvalidTypeBuilder) {
-        KernelInvalidTypeBuilder declaration = this.declaration;
+      if (declaration is InvalidTypeBuilder) {
+        InvalidTypeBuilder declaration = this.declaration;
         _helper.addProblemErrorIfConst(
             declaration.message.messageObject, offset, token.length);
         super.expression = _helper.wrapSyntheticExpression(
@@ -1794,7 +1817,7 @@ class TypeUseGenerator extends ReadOnlyAccessGenerator {
       } else {
         super.expression = _forest.literalType(
             _helper.buildDartType(
-                new UnresolvedType<TypeBuilder>(
+                new UnresolvedType(
                     buildTypeWithResolvedArguments(null), offset, _uri),
                 nonInstanceAccessIsError: true),
             token);
@@ -1826,8 +1849,8 @@ class TypeUseGenerator extends ReadOnlyAccessGenerator {
     Name name = send.name;
     Arguments arguments = send.arguments;
 
-    if (declaration is KernelClassBuilder) {
-      KernelClassBuilder declaration = this.declaration;
+    if (declaration is ClassBuilder) {
+      ClassBuilder declaration = this.declaration;
       Declaration member = declaration.findStaticBuilder(
           name.name, offsetForToken(send.token), _uri, _helper.library);
 
@@ -1886,6 +1909,33 @@ class TypeUseGenerator extends ReadOnlyAccessGenerator {
   }
 }
 
+/// [ReadOnlyAccessGenerator] represents the subexpression whose prefix is the
+/// name of final local variable, final parameter, or catch clause variable or
+/// `this` in an instance method in an extension declaration.
+///
+/// For instance:
+///
+///   method(final a) {
+///     final b = null;
+///     a;         // a ReadOnlyAccessGenerator is created for `a`.
+///     a[];       // a ReadOnlyAccessGenerator is created for `a`.
+///     b();       // a ReadOnlyAccessGenerator is created for `b`.
+///     b.c = a.d; // a ReadOnlyAccessGenerator is created for `a` and `b`.
+///
+///     try {
+///     } catch (a) {
+///       a;       // a ReadOnlyAccessGenerator is created for `a`.
+///     }
+///   }
+///
+///   extension on Foo {
+///     method() {
+///       this;         // a ReadOnlyAccessGenerator is created for `this`.
+///       this.a;       // a ReadOnlyAccessGenerator is created for `this`.
+///       this.b();     // a ReadOnlyAccessGenerator is created for `this`.
+///     }
+///   }
+///
 class ReadOnlyAccessGenerator extends Generator {
   @override
   final String _plainNameForRead;
@@ -2034,7 +2084,7 @@ abstract class ErroneousExpressionGenerator extends Generator {
 
   @override
   Expression invokeConstructor(
-      List<UnresolvedType<TypeBuilder>> typeArguments,
+      List<UnresolvedType> typeArguments,
       String name,
       Arguments arguments,
       Token nameToken,
@@ -2498,8 +2548,7 @@ class UnexpectedQualifiedUseGenerator extends Generator {
   }
 
   @override
-  TypeBuilder buildTypeWithResolvedArguments(
-      List<UnresolvedType<TypeBuilder>> arguments) {
+  TypeBuilder buildTypeWithResolvedArguments(List<UnresolvedType> arguments) {
     Template<Message Function(String, String)> template = isUnresolved
         ? templateUnresolvedPrefixInTypeAnnotation
         : templateNotAPrefixInTypeAnnotation;
@@ -2596,8 +2645,7 @@ class ParserErrorGenerator extends Generator {
     return buildProblem();
   }
 
-  TypeBuilder buildTypeWithResolvedArguments(
-      List<UnresolvedType<TypeBuilder>> arguments) {
+  TypeBuilder buildTypeWithResolvedArguments(List<UnresolvedType> arguments) {
     NamedTypeBuilder result = new NamedTypeBuilder(token.lexeme, null);
     _helper.library.addProblem(message, offsetForToken(token), noLength, _uri);
     result.bind(result.buildInvalidType(
@@ -2610,7 +2658,7 @@ class ParserErrorGenerator extends Generator {
   }
 
   Expression invokeConstructor(
-      List<UnresolvedType<TypeBuilder>> typeArguments,
+      List<UnresolvedType> typeArguments,
       String name,
       Arguments arguments,
       Token nameToken,
@@ -2638,6 +2686,9 @@ class ParserErrorGenerator extends Generator {
 ///     }
 ///   }
 ///
+/// If this `this` occurs in an instance member on an extension declaration,
+/// a [ReadOnlyAccessGenerator] is created instead.
+///
 class ThisAccessGenerator extends Generator {
   /// `true` if this access is in an initializer list.
   ///
@@ -2662,7 +2713,7 @@ class ThisAccessGenerator extends Generator {
   ///
   final bool inFieldInitializer;
 
-  // `true` if this subexpression represents a `super` prefix.
+  /// `true` if this subexpression represents a `super` prefix.
   final bool isSuper;
 
   ThisAccessGenerator(ExpressionGeneratorHelper helper, Token token,
@@ -2846,6 +2897,8 @@ class ThisAccessGenerator extends Generator {
   void printOn(StringSink sink) {
     sink.write(", isInitializer: ");
     sink.write(isInitializer);
+    sink.write(", inFieldInitializer: ");
+    sink.write(inFieldInitializer);
     sink.write(", isSuper: ");
     sink.write(isSuper);
   }

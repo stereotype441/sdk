@@ -48,7 +48,7 @@ Future<CompilerResult> compile(List<String> args,
     print('''
 We're sorry, you've found a bug in our compiler.
 You can report this bug at:
-    https://github.com/dart-lang/sdk/issues/labels/area-dev-compiler
+    https://github.com/dart-lang/sdk/issues/labels/web-dev-compiler
 Please include the information below in your report, along with
 any other information that may help us track it down. Thanks!
 -------------------- %< --------------------
@@ -149,8 +149,8 @@ Future<CompilerResult> _compile(List<String> args,
           'then --multi-root-output-path must be explicitly provided.');
       return CompilerResult(64);
     }
-    multiRootOutputPath = _longestPrefixingPath(
-        sourcePathToUri(p.absolute(outPaths.first)), multiRootPaths);
+    var jsOutputUri = sourcePathToUri(p.absolute(outPaths.first));
+    multiRootOutputPath = _longestPrefixingPath(jsOutputUri, multiRootPaths);
   }
 
   var fileSystem = MultiRootFileSystem(

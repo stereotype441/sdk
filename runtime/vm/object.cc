@@ -3074,6 +3074,9 @@ RawFunction* Function::CreateDynamicInvocationForwarder(
   forwarder ^= Object::Clone(*this, Heap::kOld);
 
   forwarder.set_name(mangled_name);
+  forwarder.set_is_native(false);
+  // TODO(dartbug.com/37737): Currently, we intentionally keep the recognized
+  // kind when creating the dynamic invocation forwarder.
   forwarder.set_kind(RawFunction::kDynamicInvocationForwarder);
   forwarder.set_is_debuggable(false);
 
@@ -7293,7 +7296,6 @@ RawFunction* Function::New(const String& name,
   result.set_is_redirecting(false);
   result.set_is_generated_body(false);
   result.set_has_pragma(false);
-  result.set_always_inline(false);
   result.set_is_polymorphic_target(false);
   result.set_is_no_such_method_forwarder(false);
   NOT_IN_PRECOMPILED(result.set_state_bits(0));
@@ -7754,7 +7756,7 @@ void Function::InheritBinaryDeclarationFrom(const Field& src) const {
 
 void Function::SetKernelDataAndScript(const Script& script,
                                       const ExternalTypedData& data,
-                                      intptr_t offset) {
+                                      intptr_t offset) const {
   Array& data_field = Array::Handle(Array::New(3));
   data_field.SetAt(0, script);
   data_field.SetAt(1, data);
@@ -8083,9 +8085,8 @@ void Function::SetDeoptReasonForAll(intptr_t deopt_id,
 }
 
 bool Function::CheckSourceFingerprint(const char* prefix, int32_t fp) const {
-  // TODO(36376): Restore checking fingerprints of recognized methods.
-  // '(kernel_offset() <= 0)' looks like an impossible condition, fix this and
-  //  re-enable fingerprints checking.
+  // TODO(alexmarkov): '(kernel_offset() <= 0)' looks like an impossible
+  // condition, fix this and re-enable fingerprints checking.
   if (!Isolate::Current()->obfuscate() && !is_declared_in_bytecode() &&
       (kernel_offset() <= 0) && (SourceFingerprint() != fp)) {
     const bool recalculatingFingerprints = false;
@@ -10163,7 +10164,7 @@ RawObject* Library::GetMetadata(const Object& obj) const {
 #else
   if (!obj.IsClass() && !obj.IsField() && !obj.IsFunction() &&
       !obj.IsLibrary() && !obj.IsTypeParameter()) {
-    return Object::null();
+    UNREACHABLE();
   }
   const String& metaname = String::Handle(MakeMetadataName(obj));
   Field& field = Field::Handle(GetMetadataField(metaname));
@@ -10187,6 +10188,25 @@ RawObject* Library::GetMetadata(const Object& obj) const {
     }
   }
   return metadata.raw();
+#endif  // defined(DART_PRECOMPILED_RUNTIME)
+}
+
+RawArray* Library::GetExtendedMetadata(const Object& obj,
+                                       intptr_t count) const {
+#if defined(DART_PRECOMPILED_RUNTIME)
+  return Object::empty_array().raw();
+#else
+  if (!obj.IsFunction()) {
+    UNREACHABLE();
+  }
+  const String& metaname = String::Handle(MakeMetadataName(obj));
+  Field& field = Field::Handle(GetMetadataField(metaname));
+  if (field.IsNull()) {
+    // There is no metadata for this object.
+    return Object::empty_array().raw();
+  }
+  ASSERT(field.is_declared_in_bytecode());
+  return kernel::BytecodeReader::ReadExtendedAnnotations(field, count);
 #endif  // defined(DART_PRECOMPILED_RUNTIME)
 }
 
@@ -12145,7 +12165,8 @@ RawKernelProgramInfo* KernelProgramInfo::New(
     const ExternalTypedData& constants_table,
     const Array& scripts,
     const Array& libraries_cache,
-    const Array& classes_cache) {
+    const Array& classes_cache,
+    const uint32_t binary_version) {
   const KernelProgramInfo& info =
       KernelProgramInfo::Handle(KernelProgramInfo::New());
   info.StorePointer(&info.raw_ptr()->string_offsets_, string_offsets.raw());
@@ -12159,6 +12180,7 @@ RawKernelProgramInfo* KernelProgramInfo::New(
   info.StorePointer(&info.raw_ptr()->constants_table_, constants_table.raw());
   info.StorePointer(&info.raw_ptr()->libraries_cache_, libraries_cache.raw());
   info.StorePointer(&info.raw_ptr()->classes_cache_, classes_cache.raw());
+  info.set_kernel_binary_version(binary_version);
   return info.raw();
 }
 
@@ -12178,6 +12200,10 @@ void KernelProgramInfo::set_scripts(const Array& scripts) const {
 
 void KernelProgramInfo::set_constants(const Array& constants) const {
   StorePointer(&raw_ptr()->constants_, constants.raw());
+}
+
+void KernelProgramInfo::set_kernel_binary_version(uint32_t version) const {
+  StoreNonPointer(&raw_ptr()->kernel_binary_version_, version);
 }
 
 void KernelProgramInfo::set_constants_table(
@@ -12505,14 +12531,12 @@ void Library::CheckFunctionFingerprints() {
   CORE_LIB_INTRINSIC_LIST(CHECK_FINGERPRINTS2);
   CORE_INTEGER_LIB_INTRINSIC_LIST(CHECK_FINGERPRINTS2);
 
+  all_libs.Add(&Library::ZoneHandle(Library::AsyncLibrary()));
   all_libs.Add(&Library::ZoneHandle(Library::MathLibrary()));
   all_libs.Add(&Library::ZoneHandle(Library::TypedDataLibrary()));
   all_libs.Add(&Library::ZoneHandle(Library::CollectionLibrary()));
   all_libs.Add(&Library::ZoneHandle(Library::InternalLibrary()));
-  all_libs.Add(&Library::ZoneHandle(Library::FfiLibrary()));
   OTHER_RECOGNIZED_LIST(CHECK_FINGERPRINTS2);
-  INLINE_WHITE_LIST(CHECK_FINGERPRINTS);
-  INLINE_BLACK_LIST(CHECK_FINGERPRINTS);
   POLYMORPHIC_TARGET_LIST(CHECK_FINGERPRINTS);
 
   all_libs.Clear();
@@ -15534,6 +15558,16 @@ RawLocalVarDescriptors* Bytecode::GetLocalVarDescriptors() const {
   }
   return var_descs.raw();
 #endif
+}
+
+intptr_t Context::GetLevel() const {
+  intptr_t level = 0;
+  Context& parent_ctx = Context::Handle(parent());
+  while (!parent_ctx.IsNull()) {
+    level++;
+    parent_ctx = parent_ctx.parent();
+  }
+  return level;
 }
 
 RawContext* Context::New(intptr_t num_variables, Heap::Space space) {

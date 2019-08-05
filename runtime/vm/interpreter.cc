@@ -5,7 +5,6 @@
 #include <setjmp.h>  // NOLINT
 #include <stdlib.h>
 
-#include "vm/compiler/ffi.h"
 #include "vm/globals.h"
 #if !defined(DART_PRECOMPILED_RUNTIME)
 
@@ -1387,7 +1386,7 @@ DART_NOINLINE bool Interpreter::AllocateMint(Thread* thread,
   } else {
     SP[0] = 0;  // Space for the result.
     SP[1] = thread->isolate()->object_store()->mint_class();  // Class object.
-    SP[2] = Object::null();                                   // Type arguments.
+    SP[2] = Object::null();                                  // Type arguments.
     Exit(thread, FP, SP + 3, pc);
     NativeArguments args(thread, 2, SP + 1, SP);
     if (!InvokeRuntime(thread, this, DRT_AllocateObject, args)) {
@@ -1575,8 +1574,8 @@ RawObject* Interpreter::Call(RawFunction* function,
                              Thread* thread) {
   // Interpreter state (see constants_kbc.h for high-level overview).
   const KBCInstr* pc;  // Program Counter: points to the next op to execute.
-  RawObject** FP;      // Frame Pointer.
-  RawObject** SP;      // Stack Pointer.
+  RawObject** FP;  // Frame Pointer.
+  RawObject** SP;  // Stack Pointer.
 
   uint32_t op;  // Currently executing op.
 
@@ -1927,14 +1926,12 @@ SwitchDispatch:
 
   {
     BYTECODE(StoreLocal, X);
-    DEBUG_CHECK;
     FP[rX] = *SP;
     DISPATCH();
   }
 
   {
     BYTECODE(PopLocal, X);
-    DEBUG_CHECK;
     FP[rX] = *SP--;
     DISPATCH();
   }
@@ -1975,6 +1972,28 @@ SwitchDispatch:
 
   {
     BYTECODE(InterfaceCall, D_F);
+    DEBUG_CHECK;
+    {
+      const uint32_t argc = rF;
+      const uint32_t kidx = rD;
+
+      RawObject** call_base = SP - argc + 1;
+      RawObject** call_top = SP + 1;
+
+      InterpreterHelpers::IncrementUsageCounter(FrameFunction(FP));
+      RawString* target_name =
+          static_cast<RawFunction*>(LOAD_CONSTANT(kidx))->ptr()->name_;
+      argdesc_ = static_cast<RawArray*>(LOAD_CONSTANT(kidx + 1));
+      if (!InterfaceCall(thread, target_name, call_base, call_top, &pc, &FP,
+                         &SP)) {
+        HANDLE_EXCEPTION;
+      }
+    }
+
+    DISPATCH();
+  }
+  {
+    BYTECODE(InstantiatedInterfaceCall, D_F);
     DEBUG_CHECK;
     {
       const uint32_t argc = rF;
@@ -2125,6 +2144,9 @@ SwitchDispatch:
       case MethodRecognizer::kClassIDgetID: {
         SP[0] = InterpreterHelpers::GetClassIdAsSmi(SP[0]);
       } break;
+      case MethodRecognizer::kAsyncStackTraceHelper: {
+        SP[0] = Object::null();
+      } break;
       case MethodRecognizer::kGrowableArrayCapacity: {
         RawGrowableObjectArray* instance =
             reinterpret_cast<RawGrowableObjectArray*>(SP[0]);
@@ -2231,9 +2253,6 @@ SwitchDispatch:
             instance->ptr())[LinkedHashMap::deleted_keys_offset() / kWordSize] =
             SP[0];
         *--SP = null_value;
-      } break;
-      case MethodRecognizer::kFfiAbi: {
-        *++SP = Smi::New(static_cast<int64_t>(compiler::ffi::TargetAbi()));
       } break;
       default: {
         NativeEntryData::Payload* payload =
@@ -2438,7 +2457,6 @@ SwitchDispatch:
 
   {
     BYTECODE(StoreContextVar, A_E);
-    DEBUG_CHECK;
     const uword offset_in_words =
         static_cast<uword>(Context::variable_offset(rE) / kWordSize);
     RawContext* instance = reinterpret_cast<RawContext*>(SP[-1]);
@@ -2670,7 +2688,6 @@ SwitchDispatch:
 
   {
     BYTECODE(Jump, T);
-    DEBUG_CHECK;
     LOAD_JUMP_TARGET();
     DISPATCH();
   }

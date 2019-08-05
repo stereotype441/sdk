@@ -97,8 +97,6 @@ void StubCode::Cleanup() {
 
 #undef STUB_CODE_CLEANUP
 
-void StubCode::VisitObjectPointers(ObjectPointerVisitor* visitor) {}
-
 bool StubCode::HasBeenInitialized() {
   // Use AsynchronousGapMarker as canary.
   return entries_[kAsynchronousGapMarkerIndex] != nullptr;
@@ -198,15 +196,12 @@ RawCode* StubCode::GetAllocationStubForClass(const Class& cls) {
       // changes code page access permissions (makes them temporary not
       // executable).
       {
-        SafepointOperationScope safepoint_scope(thread);
+        ForceGrowthSafepointOperationScope safepoint_scope(thread);
         stub = cls.allocation_stub();
         // Check if stub was already generated.
         if (!stub.IsNull()) {
           return stub.raw();
         }
-        // Do not Garbage collect during this stage and instead allow the
-        // heap to grow.
-        NoHeapGrowthControlScope no_growth_control;
         stub = Code::FinalizeCode(nullptr, &assembler, pool_attachment,
                                   /*optimized=*/false, /*stats=*/nullptr);
         stub.set_owner(cls);
@@ -216,11 +211,6 @@ RawCode* StubCode::GetAllocationStubForClass(const Class& cls) {
       // We notify code observers after finalizing the code in order to be
       // outside a [SafepointOperationScope].
       Code::NotifyCodeObservers(nullptr, stub, /*optimized=*/false);
-
-      Isolate* isolate = thread->isolate();
-      if (isolate->heap()->NeedsGarbageCollection()) {
-        isolate->heap()->CollectMostGarbage();
-      }
     }
 #ifndef PRODUCT
     if (FLAG_support_disassembler && FLAG_disassemble_stubs) {

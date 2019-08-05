@@ -50,8 +50,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   final _VariableSet<Variable> _emptySet;
 
-  final State<Variable, Type> _identity;
-
   /// The [NodeOperations], used to manipulate expressions.
   final NodeOperations<Expression> nodeOperations;
 
@@ -102,14 +100,12 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     TypeOperations<Variable, Type> typeOperations,
     FunctionBodyAccess<Variable> functionBody,
   ) {
-    var identityState = State<Variable, Type>(false);
-    var emptySet = identityState.notAssigned;
+    var emptySet = State<Variable, Type>(false).notAssigned;
     return FlowAnalysis._(
       nodeOperations,
       typeOperations,
       functionBody,
       emptySet,
-      identityState,
     );
   }
 
@@ -118,7 +114,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     this.typeOperations,
     this.functionBody,
     this._emptySet,
-    this._identity,
   ) {
     _current = State<Variable, Type>(true);
   }
@@ -136,9 +131,9 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _condition = expression;
     if (value) {
       _conditionTrue = _current;
-      _conditionFalse = _identity;
+      _conditionFalse = _current.setReachable(false);
     } else {
-      _conditionTrue = _identity;
+      _conditionTrue = _current.setReachable(false);
       _conditionFalse = _current;
     }
   }
@@ -222,8 +217,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _current = _current.removePromotedAll(loopAssigned);
 
     _statementToStackIndex[doStatement] = _stack.length;
-    _stack.add(_identity); // break
-    _stack.add(_identity); // continue
+    _stack.add(null); // break
+    _stack.add(null); // continue
   }
 
   void doStatement_conditionBegin() {
@@ -275,8 +270,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     var trueCondition = _stack.removeLast();
 
     _statementToStackIndex[node] = _stack.length;
-    _stack.add(_identity); // break
-    _stack.add(_identity); // continue
+    _stack.add(null); // break
+    _stack.add(null); // continue
 
     _current = trueCondition;
   }
@@ -496,6 +491,9 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     var breakState = _stack.removeLast();
 
     if (hasDefault) {
+      // breakState should not be null because we should have joined it with
+      // something non-null when handling the default case.
+      assert(breakState != null);
       _current = breakState;
     } else {
       _current = _join(breakState, afterExpression);
@@ -504,8 +502,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   void switchStatement_expressionEnd(Statement switchStatement) {
     _statementToStackIndex[switchStatement] = _stack.length;
-    _stack.add(_identity); // break
-    _stack.add(_identity); // continue
+    _stack.add(null); // break
+    _stack.add(null); // continue
     _stack.add(_current); // afterExpression
   }
 
@@ -570,8 +568,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     var trueCondition = _stack.removeLast();
 
     _statementToStackIndex[whileStatement] = _stack.length;
-    _stack.add(_identity); // break
-    _stack.add(_identity); // continue
+    _stack.add(null); // break
+    _stack.add(null); // continue
 
     _current = trueCondition;
   }
@@ -648,7 +646,7 @@ abstract class NodeOperations<Expression> {
 /// analysis at a single point in the control flow of the function or method
 /// being analyzed.
 ///
-/// Instances of this class are immuatable, so the methods below that "update"
+/// Instances of this class are immutable, so the methods below that "update"
 /// the state actually leave `this` unchanged and return a new state object.
 @visibleForTesting
 class State<Variable, Type> {
@@ -661,9 +659,17 @@ class State<Variable, Type> {
 
   /// For each variable whose type is promoted at this point in the control
   /// flow, the promoted type.  Variables whose type is not promoted are not
-  /// present in the map.  Variables that have gone out of scope are not
-  /// guaranteed to be present in the map even if they were promoted at the time
-  /// they went out of scope.
+  /// present in the map.
+  ///
+  /// Flow analysis has no awareness of scope, so variables that are out of
+  /// scope are retained in the map until such time as their promotions would
+  /// have been lost, if their scope had extended to the entire function being
+  /// analyzed.  So, for example, if a variable is declared and then promoted
+  /// inside the `then` branch of an `if` statement, and the `else` branch of
+  /// the `if` statement ends in a `return` statement, then the promotion
+  /// remains in the map after the `if` statement ends.  This should not have
+  /// any effect on analysis results for error-free code, because it is an error
+  /// to refer to a variable that is no longer in scope.
   final Map<Variable, Type> promoted;
 
   /// Creates a state object with the given [reachable] status.  All variables
@@ -708,24 +714,25 @@ class State<Variable, Type> {
   /// are kept only if they are common to both input states; if a variable is
   /// promoted to one type in one state and a subtype in the other state, the
   /// less specific type promotion is kept.
-  State<Variable, Type> join(
+  State<Variable, Type> join<Variable, Type>(
     TypeOperations typeOperations,
-    State<Variable, Type> other,
+    State<Variable, Type> first,
+    State<Variable, Type> second,
   ) {
-    if (identical(this, _identity)) return other;
-    if (identical(other, _identity)) return this;
+    if (first == null) return second;
+    if (second == null) return first;
 
-    if (this.reachable && !other.reachable) return this;
-    if (!this.reachable && other.reachable) return other;
+    if (first.reachable && !second.reachable) return first;
+    if (!first.reachable && second.reachable) return second;
 
-    var newReachable = this.reachable || other.reachable;
-    var newNotAssigned = this.notAssigned.union(other.notAssigned);
+    var newReachable = first.reachable || second.reachable;
+    var newNotAssigned = first.notAssigned.union(second.notAssigned);
     var newPromoted =
-        State.joinPromoted(typeOperations, this.promoted, other.promoted);
+        State.joinPromoted(typeOperations, first.promoted, second.promoted);
 
     return State._identicalOrNew(
-      this,
-      other,
+      first,
+      second,
       newReachable,
       newNotAssigned,
       newPromoted,
@@ -757,7 +764,8 @@ class State<Variable, Type> {
   }
 
   /// Updates the state to indicate that the given [variable] has been
-  /// determined to satisfy the given [type].
+  /// determined to satisfy the given [type], e.g. as a consequence of an `is`
+  /// expression as the condition of an `if` statement.
   ///
   /// Note that the state is only changed if [type] is a subtype of the
   /// variable's previous (possibly promoted) type.
@@ -788,6 +796,23 @@ class State<Variable, Type> {
 
   /// Updates the state to indicate that the given [variables] are no longer
   /// promoted; they are presumed to have their declared types.
+  ///
+  /// This is used at the top of loops to conservatively cancel the promotion of
+  /// variables that are modified within the loop, so that we correctly analyze
+  /// code like the following:
+  ///
+  ///     if (x is int) {
+  ///       x.isEven; // OK, promoted to int
+  ///       while (true) {
+  ///         x.isEven; // ERROR: promotion lost
+  ///         x = 'foo';
+  ///       }
+  ///     }
+  ///
+  /// Note that a more accurate analysis would be to iterate to a fixed point,
+  /// and only remove promotions if it can be shown that they aren't restored
+  /// later in the loop body.  If we switch to a fixed point analysis, we should
+  /// be able to remove this method.
   State<Variable, Type> removePromotedAll(Set<Variable> variables) {
     var newPromoted = _removePromotedAll(promoted, variables);
 
@@ -803,6 +828,9 @@ class State<Variable, Type> {
   /// Updates the state to reflect a control path that is known to have
   /// previously passed through some [other] state.
   ///
+  /// Approximately, this method forms the union of the definite assignments and
+  /// promotions in `this` state and the [other] state.  More precisely:
+  ///
   /// The control flow path is considered reachable if both this state and the
   /// other state are reachable.  Variables are considered definitely assigned
   /// if they were definitely assigned in either this state or the other state.
@@ -810,6 +838,13 @@ class State<Variable, Type> {
   /// in the other state is more specific, and the variable is "safe".  A
   /// variable is considered safe if there is no chance that it was assigned
   /// more recently than the "other" state.
+  ///
+  /// This is used after a `try/finally` statement to combine the promotions and
+  /// definite assignments that occurred in the `try` and `finally` blocks
+  /// (where `this` is the state from the `finally` block and `other` is the
+  /// state from the `try` block).  Variables that are assigned in the `finally`
+  /// block are considered "unsafe" because the assignment might have cancelled
+  /// the effect of any promotion that occurred inside the `try` block.
   State<Variable, Type> restrict(
     TypeOperations<Variable, Type> typeOperations,
     _VariableSet<Variable> emptySet,

@@ -92,6 +92,16 @@ void f(int i) {
     assertEdge(decoratedTypeAnnotation('int i').node, never, hard: true);
   }
 
+  test_assign_null_to_generic_type() async {
+    await analyze('''
+main() {
+  List<int> x = null;
+}
+''');
+    // TODO(paulberry): edge should be hard.
+    assertEdge(always, decoratedTypeAnnotation('List').node, hard: false);
+  }
+
   test_assignmentExpression_field() async {
     await analyze('''
 class C {
@@ -923,6 +933,42 @@ class C {}
     expect(constructorDecoratedType.typeFormals, isEmpty);
     expect(constructorDecoratedType.returnType.node, same(never));
     expect(constructorDecoratedType.returnType.typeArguments, isEmpty);
+  }
+
+  test_constructorFieldInitializer_generic() async {
+    await analyze('''
+class C<T> {
+  C(T/*1*/ x) : f = x;
+  T/*2*/ f;
+}
+''');
+    assertEdge(decoratedTypeAnnotation('T/*1*/').node,
+        decoratedTypeAnnotation('T/*2*/').node,
+        hard: true);
+  }
+
+  test_constructorFieldInitializer_simple() async {
+    await analyze('''
+class C {
+  C(int/*1*/ i) : f = i;
+  int/*2*/ f;
+}
+''');
+    assertEdge(decoratedTypeAnnotation('int/*1*/').node,
+        decoratedTypeAnnotation('int/*2*/').node,
+        hard: true);
+  }
+
+  test_constructorFieldInitializer_via_this() async {
+    await analyze('''
+class C {
+  C(int/*1*/ i) : this.f = i;
+  int/*2*/ f;
+}
+''');
+    assertEdge(decoratedTypeAnnotation('int/*1*/').node,
+        decoratedTypeAnnotation('int/*2*/').node,
+        hard: true);
   }
 
   test_doubleLiteral() async {
@@ -2307,6 +2353,21 @@ class D<T> implements C {
 class C {
   C(int/*1*/ i, int/*2*/ j) : this.named(j, i);
   C.named(int/*3*/ j, int/*4*/ i);
+}
+''');
+    assertEdge(decoratedTypeAnnotation('int/*1*/').node,
+        decoratedTypeAnnotation('int/*4*/').node,
+        hard: true);
+    assertEdge(decoratedTypeAnnotation('int/*2*/').node,
+        decoratedTypeAnnotation('int/*3*/').node,
+        hard: true);
+  }
+
+  test_redirecting_constructor_ordinary_to_unnamed() async {
+    await analyze('''
+class C {
+  C.named(int/*1*/ i, int/*2*/ j) : this(j, i);
+  C(int/*3*/ j, int/*4*/ i);
 }
 ''');
     assertEdge(decoratedTypeAnnotation('int/*1*/').node,

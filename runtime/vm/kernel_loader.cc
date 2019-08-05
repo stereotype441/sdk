@@ -146,7 +146,7 @@ RawClass* BuildingTranslationHelper::LookupClassByKernelClass(NameIndex klass) {
 }
 
 LibraryIndex::LibraryIndex(const ExternalTypedData& kernel_data,
-                           int32_t binary_version)
+                           uint32_t binary_version)
     : reader_(kernel_data), binary_version_(binary_version) {
   intptr_t data_size = reader_.size();
 
@@ -194,7 +194,8 @@ KernelLoader::KernelLoader(Program* program,
       patch_classes_(Array::ZoneHandle(zone_)),
       active_class_(),
       library_kernel_offset_(-1),  // Set to the correct value in LoadLibrary
-      correction_offset_(-1),      // Set to the correct value in LoadLibrary
+      kernel_binary_version_(program->binary_version()),
+      correction_offset_(-1),  // Set to the correct value in LoadLibrary
       loading_native_wrappers_library_(false),
       library_kernel_data_(ExternalTypedData::ZoneHandle(zone_)),
       kernel_program_info_(KernelProgramInfo::ZoneHandle(zone_)),
@@ -213,8 +214,7 @@ KernelLoader::KernelLoader(Program* program,
       potential_pragma_functions_(GrowableObjectArray::Handle(Z)),
       pragma_class_(Class::Handle(Z)),
       name_index_handle_(Smi::Handle(Z)),
-      expression_evaluation_library_(Library::Handle(Z)),
-      expression_evaluation_function_(Function::Handle(Z)) {
+      expression_evaluation_library_(Library::Handle(Z)) {
   if (!program->is_single_program()) {
     FATAL(
         "Trying to load a concatenated dill file at a time where that is "
@@ -419,7 +419,8 @@ void KernelLoader::InitializeFields(UriToSourceTable* uri_to_source_table) {
 
   kernel_program_info_ = KernelProgramInfo::New(
       offsets, data, names, metadata_payloads, metadata_mappings,
-      constants_table, scripts, libraries_cache, classes_cache);
+      constants_table, scripts, libraries_cache, classes_cache,
+      program_->binary_version());
 
   H.InitFromKernelProgramInfo(kernel_program_info_);
 
@@ -436,13 +437,15 @@ void KernelLoader::InitializeFields(UriToSourceTable* uri_to_source_table) {
 
 KernelLoader::KernelLoader(const Script& script,
                            const ExternalTypedData& kernel_data,
-                           intptr_t data_program_offset)
+                           intptr_t data_program_offset,
+                           uint32_t kernel_binary_version)
     : program_(NULL),
       thread_(Thread::Current()),
       zone_(thread_->zone()),
       isolate_(thread_->isolate()),
       patch_classes_(Array::ZoneHandle(zone_)),
       library_kernel_offset_(data_program_offset),
+      kernel_binary_version_(kernel_binary_version),
       correction_offset_(0),
       loading_native_wrappers_library_(false),
       library_kernel_data_(ExternalTypedData::ZoneHandle(zone_)),
@@ -459,8 +462,7 @@ KernelLoader::KernelLoader(const Script& script,
       potential_pragma_functions_(GrowableObjectArray::Handle(Z)),
       pragma_class_(Class::Handle(Z)),
       name_index_handle_(Smi::Handle(Z)),
-      expression_evaluation_library_(Library::Handle(Z)),
-      expression_evaluation_function_(Function::Handle(Z)) {
+      expression_evaluation_library_(Library::Handle(Z)) {
   ASSERT(T.active_class_ == &active_class_);
   T.finalize_ = false;
 
@@ -653,7 +655,7 @@ void KernelLoader::LoadNativeExtensionLibraries() {
     } else {
       helper_.SetOffset(library.kernel_offset());
 
-      LibraryHelper library_helper(&helper_);
+      LibraryHelper library_helper(&helper_, kernel_binary_version_);
       library_helper.ReadUntilExcluding(LibraryHelper::kAnnotations);
 
       const intptr_t annotation_count = helper_.ReadListLength();
@@ -819,28 +821,32 @@ RawObject* KernelLoader::LoadExpressionEvaluationFunction(
 
   // Load the "evaluate:source" expression evaluation library.
   ASSERT(expression_evaluation_library_.IsNull());
-  ASSERT(expression_evaluation_function_.IsNull());
+  ASSERT(H.GetExpressionEvaluationFunction().IsNull());
   const Object& result = Object::Handle(Z, LoadProgram(true));
   if (result.IsError()) {
     return result.raw();
   }
-  ASSERT(!expression_evaluation_library_.IsNull());
-  ASSERT(!expression_evaluation_function_.IsNull());
+  const Function& function = H.GetExpressionEvaluationFunction();
+  ASSERT(!function.IsNull());
   ASSERT(GrowableObjectArray::Handle(I->object_store()->libraries()).Length() ==
          num_libs);
   ASSERT(I->class_table()->NumCids() == num_cids);
 
-  // Make the expression evaluation function have the right kernel data and
-  // parent.
-  auto& eval_data = ExternalTypedData::Handle(
-      Z, expression_evaluation_library_.kernel_data());
-  auto& eval_script =
-      Script::Handle(Z, expression_evaluation_function_.script());
-  expression_evaluation_function_.SetKernelDataAndScript(
-      eval_script, eval_data, expression_evaluation_library_.kernel_offset());
-  expression_evaluation_function_.set_owner(real_class);
+  // Make the expression evaluation function have the right script,
+  // kernel data and parent.
+  const auto& eval_script = Script::Handle(Z, function.script());
+  auto& kernel_data = ExternalTypedData::Handle(Z);
+  intptr_t kernel_offset = -1;
+  if (!function.is_declared_in_bytecode()) {
+    ASSERT(!expression_evaluation_library_.IsNull());
+    kernel_data = expression_evaluation_library_.kernel_data();
+    kernel_offset = expression_evaluation_library_.kernel_offset();
+  }
+  function.SetKernelDataAndScript(eval_script, kernel_data, kernel_offset);
 
-  return expression_evaluation_function_.raw();
+  function.set_owner(real_class);
+
+  return function.raw();
 }
 
 void KernelLoader::FindModifiedLibraries(Program* program,
@@ -919,7 +925,7 @@ void KernelLoader::walk_incremental_kernel(BitVector* modified_libs,
   for (intptr_t i = 0; i < length; i++) {
     intptr_t kernel_offset = library_offset(i);
     helper_.SetOffset(kernel_offset);
-    LibraryHelper library_helper(&helper_);
+    LibraryHelper library_helper(&helper_, kernel_binary_version_);
     library_helper.ReadUntilIncluding(LibraryHelper::kCanonicalName);
     lib = LookupLibraryOrNull(library_helper.canonical_name_);
     if (!lib.IsNull() && !lib.is_dart_scheme()) {
@@ -930,9 +936,7 @@ void KernelLoader::walk_incremental_kernel(BitVector* modified_libs,
       intptr_t library_end = library_offset(i + 1);
       library_kernel_data_ =
           helper_.reader_.ExternalDataFromTo(kernel_offset, library_end);
-
-      LibraryIndex library_index(library_kernel_data_,
-                                 program_->binary_version());
+      LibraryIndex library_index(library_kernel_data_, kernel_binary_version_);
       num_classes += library_index.class_count();
       num_procedures += library_index.procedure_count();
     }
@@ -990,7 +994,7 @@ RawLibrary* KernelLoader::LoadLibrary(intptr_t index) {
   // offset.
   helper_.SetOffset(library_kernel_offset_);
 
-  LibraryHelper library_helper(&helper_);
+  LibraryHelper library_helper(&helper_, kernel_binary_version_);
   library_helper.ReadUntilIncluding(LibraryHelper::kCanonicalName);
   if (!FLAG_precompiled_mode && !I->should_load_vmservice()) {
     StringIndex lib_name_index =
@@ -1016,7 +1020,7 @@ RawLibrary* KernelLoader::LoadLibrary(intptr_t index) {
   library.set_kernel_data(library_kernel_data_);
   library.set_kernel_offset(library_kernel_offset_);
 
-  LibraryIndex library_index(library_kernel_data_, program_->binary_version());
+  LibraryIndex library_index(library_kernel_data_, kernel_binary_version_);
   intptr_t class_count = library_index.class_count();
 
   library_helper.ReadUntilIncluding(LibraryHelper::kName);
@@ -1308,11 +1312,14 @@ void KernelLoader::LoadLibraryImportsAndExports(Library* library,
         Z, LookupLibrary(dependency_helper.target_library_canonical_name_));
     if (!FLAG_enable_mirrors &&
         target_library.url() == Symbols::DartMirrors().raw()) {
-      H.ReportError("import of dart:mirrors with --enable-mirrors=false");
+      H.ReportError(
+          "import of dart:mirrors is not supported in the current Dart "
+          "runtime");
     }
     if (!Api::IsFfiEnabled() &&
         target_library.url() == Symbols::DartFfi().raw()) {
-      H.ReportError("import of dart:ffi with --enable-ffi=false");
+      H.ReportError(
+          "import of dart:ffi is not supported in the current Dart runtime");
     }
     String& prefix = H.DartSymbolPlain(dependency_helper.name_index_);
     ns = Namespace::New(target_library, show_names, hide_names);
@@ -1709,9 +1716,12 @@ void KernelLoader::FinishLoading(const Class& klass) {
   const intptr_t library_kernel_offset = library.kernel_offset();
   ASSERT(library_kernel_offset > 0);
 
-  KernelLoader kernel_loader(script, library_kernel_data,
-                             library_kernel_offset);
-  LibraryIndex library_index(library_kernel_data, /*binary_version=*/-1);
+  const KernelProgramInfo& info =
+      KernelProgramInfo::Handle(zone, script.kernel_program_info());
+
+  KernelLoader kernel_loader(script, library_kernel_data, library_kernel_offset,
+                             info.kernel_binary_version());
+  LibraryIndex library_index(library_kernel_data, info.kernel_binary_version());
 
   if (klass.IsTopLevel()) {
     ASSERT(klass.raw() == toplevel_class.raw());
@@ -1906,7 +1916,7 @@ void KernelLoader::LoadProcedure(const Library& library,
   if (register_function) {
     functions_.Add(&function);
   } else {
-    expression_evaluation_function_ = function.raw();
+    H.SetExpressionEvaluationFunction(function);
   }
   function.set_kernel_offset(procedure_offset);
   if ((library.is_dart_scheme() &&

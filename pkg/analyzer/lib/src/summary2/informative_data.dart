@@ -146,6 +146,22 @@ class _SetInformativeId extends SimpleAstVisitor<void> {
   }
 
   @override
+  void visitExtensionDeclaration(ExtensionDeclaration node) {
+    setData(
+      node,
+      UnlinkedInformativeDataBuilder.extensionDeclaration(
+        codeOffset: node.offset,
+        codeLength: node.length,
+        documentationComment_tokens: _nodeCommentTokens(node),
+        nameOffset: node.name?.offset ?? 0,
+      ),
+    );
+
+    node.typeParameters?.accept(this);
+    node.members.accept(this);
+  }
+
+  @override
   void visitFieldDeclaration(FieldDeclaration node) {
     setData(
       node,
@@ -251,6 +267,7 @@ class _SetInformativeId extends SimpleAstVisitor<void> {
       node,
       UnlinkedInformativeDataBuilder.importDirective(
         directiveKeywordOffset: node.keyword.offset,
+        importDirective_prefixOffset: node.prefix?.offset ?? 0,
       ),
     );
   }

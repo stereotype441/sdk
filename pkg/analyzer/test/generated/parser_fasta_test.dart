@@ -1018,6 +1018,17 @@ main() { // missing async
     ]);
   }
 
+  void test_constructor_super_cascade_synthetic() {
+    // https://github.com/dart-lang/sdk/issues/37110
+    parseCompilationUnit('class B extends A { B(): super.. {} }', errors: [
+      expectedError(ParserErrorCode.INVALID_SUPER_IN_INITIALIZER, 25, 5),
+      expectedError(ParserErrorCode.EXPECTED_TOKEN, 30, 2),
+      expectedError(ParserErrorCode.MISSING_IDENTIFIER, 33, 1),
+      expectedError(ParserErrorCode.MISSING_FUNCTION_BODY, 34, 1),
+      expectedError(ParserErrorCode.EXPECTED_EXECUTABLE, 36, 1),
+    ]);
+  }
+
   void test_constructor_super_field() {
     // https://github.com/dart-lang/sdk/issues/36262
     // https://github.com/dart-lang/sdk/issues/31198
@@ -1035,6 +1046,33 @@ main() { // missing async
         ]);
   }
 
+  void test_constructor_super_named_method() {
+    // https://github.com/dart-lang/sdk/issues/37600
+    parseCompilationUnit('class B extends A { B(): super.c().create() {} }',
+        errors: [
+          expectedError(ParserErrorCode.INVALID_SUPER_IN_INITIALIZER, 25, 5),
+        ]);
+  }
+
+  void test_constructor_super_named_method_method() {
+    // https://github.com/dart-lang/sdk/issues/37600
+    parseCompilationUnit('class B extends A { B(): super.c().create().x() {} }',
+        errors: [
+          expectedError(ParserErrorCode.INVALID_SUPER_IN_INITIALIZER, 25, 5),
+        ]);
+  }
+
+  void test_constructor_this_cascade_synthetic() {
+    // https://github.com/dart-lang/sdk/issues/37110
+    parseCompilationUnit('class B extends A { B(): this.. {} }', errors: [
+      expectedError(ParserErrorCode.MISSING_ASSIGNMENT_IN_INITIALIZER, 25, 4),
+      expectedError(ParserErrorCode.EXPECTED_TOKEN, 29, 2),
+      expectedError(ParserErrorCode.MISSING_IDENTIFIER, 32, 1),
+      expectedError(ParserErrorCode.MISSING_FUNCTION_BODY, 33, 1),
+      expectedError(ParserErrorCode.EXPECTED_EXECUTABLE, 35, 1),
+    ]);
+  }
+
   void test_constructor_this_field() {
     // https://github.com/dart-lang/sdk/issues/36262
     // https://github.com/dart-lang/sdk/issues/31198
@@ -1049,6 +1087,22 @@ main() { // missing async
     parseCompilationUnit('class B extends A { B(): this().foo(); }', errors: [
       expectedError(ParserErrorCode.INVALID_THIS_IN_INITIALIZER, 25, 4),
     ]);
+  }
+
+  void test_constructor_this_named_method() {
+    // https://github.com/dart-lang/sdk/issues/37600
+    parseCompilationUnit('class B extends A { B(): super.c().create() {} }',
+        errors: [
+          expectedError(ParserErrorCode.INVALID_SUPER_IN_INITIALIZER, 25, 5),
+        ]);
+  }
+
+  void test_constructor_this_named_method_field() {
+    // https://github.com/dart-lang/sdk/issues/37600
+    parseCompilationUnit('class B extends A { B(): super.c().create().x {} }',
+        errors: [
+          expectedError(ParserErrorCode.INVALID_SUPER_IN_INITIALIZER, 25, 5),
+        ]);
   }
 
   @override
@@ -1153,6 +1207,20 @@ class ExpressionParserTest_Fasta extends FastaParserTestCase
     }
   }
 
+  void test_listLiteral_invalid_assert() {
+    // https://github.com/dart-lang/sdk/issues/37674
+    parseExpression('n=<.["\$assert',
+        errors: [
+          expectedError(ParserErrorCode.EXPECTED_TYPE_NAME, 3, 1),
+          expectedError(ParserErrorCode.EXPECTED_TYPE_NAME, 4, 1),
+          expectedError(ParserErrorCode.MISSING_IDENTIFIER, 7, 6),
+          expectedError(ParserErrorCode.EXPECTED_STRING_LITERAL, 7, 6),
+          expectedError(ScannerErrorCode.EXPECTED_TOKEN, 7, 1),
+          expectedError(ScannerErrorCode.UNTERMINATED_STRING_LITERAL, 12, 1),
+        ],
+        expectedEndOffset: 7);
+  }
+
   void test_listLiteral_spread_disabled() {
     ListLiteral list =
         parseExpression('[1, ...[2]]', featureSet: beforeUiAsCode, errors: [
@@ -1171,6 +1239,28 @@ class ExpressionParserTest_Fasta extends FastaParserTestCase
     expect(list.elements, hasLength(1));
     IntegerLiteral first = list.elements[0];
     expect(first.value, 1);
+  }
+
+  void test_lt_dot_bracket_quote() {
+    // https://github.com/dart-lang/sdk/issues/37674
+    ListLiteral list = parseExpression('<.["', errors: [
+      expectedError(ParserErrorCode.EXPECTED_TYPE_NAME, 1, 1),
+      expectedError(ParserErrorCode.EXPECTED_TYPE_NAME, 2, 1),
+      expectedError(ScannerErrorCode.UNTERMINATED_STRING_LITERAL, 3, 1),
+      expectedError(ScannerErrorCode.EXPECTED_TOKEN, 4, 1),
+    ]);
+    expect(list.elements, hasLength(1));
+    StringLiteral first = list.elements[0];
+    expect(first.length, 1);
+  }
+
+  void test_lt_dot_listLiteral() {
+    // https://github.com/dart-lang/sdk/issues/37674
+    ListLiteral list = parseExpression('<.[]', errors: [
+      expectedError(ParserErrorCode.EXPECTED_TYPE_NAME, 1, 1),
+      expectedError(ParserErrorCode.EXPECTED_TYPE_NAME, 2, 2),
+    ]);
+    expect(list.elements, hasLength(0));
   }
 
   void test_mapLiteral() {
@@ -1641,6 +1731,16 @@ class ExtensionMethodsParserTest_Fasta extends FastaParserTestCase {
     expect(extension.name.name, 'E');
     expect(extension.onKeyword.lexeme, 'with');
     expect((extension.extendedType as NamedType).name.name, 'C');
+    expect(extension.members, hasLength(0));
+  }
+
+  void test_void_type() {
+    var unit = parseCompilationUnit('extension E on void { }');
+    expect(unit.declarations, hasLength(1));
+    var extension = unit.declarations[0] as ExtensionDeclaration;
+    expect(extension.name.name, 'E');
+    expect(extension.onKeyword.lexeme, 'on');
+    expect((extension.extendedType as NamedType).name.name, 'void');
     expect(extension.members, hasLength(0));
   }
 }

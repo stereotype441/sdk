@@ -146,6 +146,32 @@ class EnclosedScope extends Scope {
   }
 }
 
+/// The scope defined by an extension.
+class ExtensionScope extends EnclosedScope {
+  /// Initialize a newly created scope, enclosed within the [enclosingScope],
+  /// that represents the given [_extensionElement].
+  ExtensionScope(Scope enclosingScope, ExtensionElement extensionElement)
+      : super(enclosingScope) {
+    _defineMembers(extensionElement);
+  }
+
+  /// Define the static members defined by the given [extensionElement]. The
+  /// instance members should only be found if they would be found by normal
+  /// lookup on `this`.
+  void _defineMembers(ExtensionElement extensionElement) {
+    List<PropertyAccessorElement> accessors = extensionElement.accessors;
+    int accessorLength = accessors.length;
+    for (int i = 0; i < accessorLength; i++) {
+      define(accessors[i]);
+    }
+    List<MethodElement> methods = extensionElement.methods;
+    int methodLength = methods.length;
+    for (int i = 0; i < methodLength; i++) {
+      define(methods[i]);
+    }
+  }
+}
+
 /**
  * The scope defined by a function.
  */

@@ -76,6 +76,8 @@ import '../scope.dart' show AmbiguousBuilder;
 
 import '../source/source_class_builder.dart' show SourceClassBuilder;
 
+import '../source/source_library_builder.dart' show SourceLibraryBuilder;
+
 import '../source/source_loader.dart' show SourceLoader;
 
 import '../target_implementation.dart' show TargetImplementation;
@@ -89,12 +91,10 @@ import 'kernel_builder.dart'
         ClassBuilder,
         Declaration,
         InvalidTypeBuilder,
-        KernelClassBuilder,
-        KernelFieldBuilder,
-        KernelLibraryBuilder,
-        KernelProcedureBuilder,
-        LibraryBuilder,
+        FieldBuilder,
         NamedTypeBuilder,
+        ProcedureBuilder,
+        LibraryBuilder,
         TypeBuilder,
         TypeDeclarationBuilder;
 
@@ -198,14 +198,14 @@ class KernelTarget extends TargetImplementation {
 
   @override
   LibraryBuilder createLibraryBuilder(
-      Uri uri, Uri fileUri, KernelLibraryBuilder origin) {
+      Uri uri, Uri fileUri, SourceLibraryBuilder origin) {
     if (dillTarget.isLoaded) {
       var builder = dillTarget.loader.builders[uri];
       if (builder != null) {
         return builder;
       }
     }
-    return new KernelLibraryBuilder(uri, fileUri, loader, origin);
+    return new SourceLibraryBuilder(uri, fileUri, loader, origin);
   }
 
   /// Returns classes defined in libraries in [loader].
@@ -343,7 +343,7 @@ class KernelTarget extends TargetImplementation {
         AmbiguousBuilder problem = declaration;
         declaration = problem.getFirstDeclaration();
       }
-      if (declaration is KernelProcedureBuilder) {
+      if (declaration is ProcedureBuilder) {
         component.mainMethod = declaration.procedure;
       } else if (declaration is DillMemberBuilder) {
         if (declaration.member is Procedure) {
@@ -404,7 +404,7 @@ class KernelTarget extends TargetImplementation {
     ticker.logMs("Installed synthetic constructors");
   }
 
-  KernelClassBuilder get objectClassBuilder => objectType.declaration;
+  ClassBuilder get objectClassBuilder => objectType.declaration;
 
   Class get objectClass => objectClassBuilder.cls;
 
@@ -457,7 +457,7 @@ class KernelTarget extends TargetImplementation {
     if (supertype.isMixinApplication) {
       installForwardingConstructors(supertype);
     }
-    if (supertype is KernelClassBuilder) {
+    if (supertype is ClassBuilder) {
       if (supertype.cls.constructors.isEmpty) {
         builder.addSyntheticConstructor(makeDefaultConstructor(builder.target));
       } else {
@@ -685,7 +685,7 @@ class KernelTarget extends TargetImplementation {
           if (formal.isFieldFormal) {
             Declaration fieldBuilder = builder.scope.local[formal.name] ??
                 builder.origin.scope.local[formal.name];
-            if (fieldBuilder is KernelFieldBuilder) {
+            if (fieldBuilder is FieldBuilder) {
               myInitializedFields.add(fieldBuilder.field);
             }
           }
@@ -818,11 +818,11 @@ class KernelTarget extends TargetImplementation {
   }
 
   @override
-  void readPatchFiles(KernelLibraryBuilder library) {
+  void readPatchFiles(SourceLibraryBuilder library) {
     assert(library.uri.scheme == "dart");
     List<Uri> patches = uriTranslator.getDartPatches(library.uri.path);
     if (patches != null) {
-      KernelLibraryBuilder first;
+      SourceLibraryBuilder first;
       for (Uri patch in patches) {
         if (first == null) {
           first = library.loader.read(patch, -1,
@@ -830,7 +830,7 @@ class KernelTarget extends TargetImplementation {
         } else {
           // If there's more than one patch file, it's interpreted as a part of
           // the patch library.
-          KernelLibraryBuilder part = library.loader.read(patch, -1,
+          SourceLibraryBuilder part = library.loader.read(patch, -1,
               origin: library, fileUri: patch, accessor: library);
           first.parts.add(part);
           first.partOffsets.add(-1);
@@ -860,7 +860,7 @@ Constructor defaultSuperConstructor(Class cls) {
 
 class KernelDiagnosticReporter
     extends DiagnosticReporter<Message, LocatedMessage> {
-  final Loader<Library> loader;
+  final Loader loader;
 
   KernelDiagnosticReporter(this.loader);
 

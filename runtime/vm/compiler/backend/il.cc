@@ -1172,6 +1172,18 @@ void Instruction::RemoveEnvironment() {
   env_ = NULL;
 }
 
+void Instruction::ReplaceInEnvironment(Definition* current,
+                                       Definition* replacement) {
+  for (Environment::DeepIterator it(env()); !it.Done(); it.Advance()) {
+    Value* use = it.CurrentValue();
+    if (use->definition() == current) {
+      use->RemoveFromUseList();
+      use->set_definition(replacement);
+      replacement->AddEnvUse(use);
+    }
+  }
+}
+
 Instruction* Instruction::RemoveFromGraph(bool return_previous) {
   ASSERT(!IsBlockEntry());
   ASSERT(!IsBranch());
@@ -4628,7 +4640,8 @@ bool StaticCallInstr::InitResultType(Zone* zone) {
     set_is_known_list_constructor(true);
     return true;
   } else if (function().has_pragma()) {
-    intptr_t recognized_cid = MethodRecognizer::ResultCidFromPragma(function());
+    const intptr_t recognized_cid =
+        MethodRecognizer::ResultCidFromPragma(function());
     if (recognized_cid != kDynamicCid) {
       SetResultType(zone, CompileType::FromCid(recognized_cid));
       return true;

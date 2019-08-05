@@ -36,7 +36,7 @@ class ExtensionOverrideTest extends DriverResolutionTest {
     if (declarationUri == null) {
       ExtensionDeclaration declaration =
           findNode.extensionDeclaration('extension $declarationName');
-      extension = declaration?.declaredElement as ExtensionElement;
+      extension = declaration?.declaredElement;
     } else {
       extension =
           findElement.importFind(declarationUri).extension_(declarationName);
@@ -133,6 +133,30 @@ void f(A a) {
     findDeclarationAndOverride(declarationName: 'E ', overrideSearch: 'E(a)');
     validateOverride();
     validatePropertyAccess();
+  }
+
+  test_getter_noPrefix_noTypeArguments_methodInvocation() async {
+    await assertNoErrorsInCode('''
+class A {}
+
+extension E on A {
+  double Function(int) get g => (b) => 2.0;
+}
+
+void f(A a) {
+  E(a).g(0);
+}
+''');
+    findDeclarationAndOverride(declarationName: 'E ', overrideSearch: 'E(a)');
+    validateOverride();
+
+    var invocation = findNode.methodInvocation('g(0);');
+    assertMethodInvocation(
+      invocation,
+      findElement.getter('g'),
+      'double Function(int)',
+      expectedMethodNameType: 'double Function(int) Function()',
+    );
   }
 
   test_getter_noPrefix_typeArguments() async {
@@ -484,6 +508,21 @@ void f(p.A a) {
     validatePropertyAccess();
   }
 
+  test_tearoff() async {
+    await assertNoErrorsInCode('''
+class C {}
+
+extension E on C {
+  void a(int x) {}
+}
+
+f(C c) => E(c).a;
+''');
+    var identifier = findNode.simple('a;');
+    assertElement(identifier, findElement.method('a'));
+    assertType(identifier, 'void Function(int)');
+  }
+
   void validateBinaryExpression() {
     BinaryExpression binary = extensionOverride.parent as BinaryExpression;
     Element resolvedElement = binary.staticElement;
@@ -504,8 +543,12 @@ void f(p.A a) {
 
   void validateInvocation() {
     MethodInvocation invocation = extensionOverride.parent as MethodInvocation;
-    Element resolvedElement = invocation.methodName.staticElement;
-    expect(resolvedElement, extension.getMethod('m'));
+
+    assertMethodInvocation(
+      invocation,
+      extension.getMethod('m'),
+      'void Function()',
+    );
 
     NodeList<Expression> arguments = invocation.argumentList.arguments;
     for (int i = 0; i < arguments.length; i++) {

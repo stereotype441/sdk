@@ -3871,9 +3871,6 @@ class ExtensionDeclarationImpl extends CompilationUnitMemberImpl
   }
 
   @override
-  Token get beginToken => extensionKeyword;
-
-  @override
   Iterable<SyntacticEntity> get childEntities => new ChildEntities()
     ..add(extensionKeyword)
     ..add(name)
@@ -3955,6 +3952,12 @@ class ExtensionOverrideImpl extends ExpressionImpl
   /// arguments were provided.
   TypeArgumentListImpl _typeArguments;
 
+  @override
+  List<DartType> typeArgumentTypes;
+
+  @override
+  DartType extendedType;
+
   ExtensionOverrideImpl(IdentifierImpl extensionName,
       TypeArgumentListImpl typeArguments, ArgumentListImpl argumentList) {
     _extensionName = _becomeParentOf(extensionName);
@@ -3979,7 +3982,7 @@ class ExtensionOverrideImpl extends ExpressionImpl
     ..add(_argumentList);
 
   @override
-  Token get endToken => _argumentList?.endToken;
+  Token get endToken => _argumentList.endToken;
 
   @override
   Identifier get extensionName => _extensionName;
@@ -3992,16 +3995,14 @@ class ExtensionOverrideImpl extends ExpressionImpl
   Precedence get precedence => Precedence.postfix;
 
   @override
+  ExtensionElement get staticElement => extensionName.staticElement;
+
+  @override
   TypeArgumentList get typeArguments => _typeArguments;
 
   void set typeArguments(TypeArgumentList typeArguments) {
     _typeArguments = _becomeParentOf(typeArguments as TypeArgumentListImpl);
   }
-
-  @override
-  // TODO(brianwilkerson) Either implement this getter or remove it if it isn't
-  //  needed.
-  List<DartType> get typeArgumentTypes => null;
 
   @override
   E accept<E>(AstVisitor<E> visitor) {
@@ -8904,6 +8905,9 @@ class SimpleIdentifierImpl extends IdentifierImpl implements SimpleIdentifier {
   /// [AuxiliaryElements] will be set to hold onto the static element from the
   /// getter context.
   AuxiliaryElements auxiliaryElements = null;
+
+  @override
+  List<DartType> tearOffTypeArgumentTypes;
 
   /// Initialize a newly created identifier.
   SimpleIdentifierImpl(this.token);

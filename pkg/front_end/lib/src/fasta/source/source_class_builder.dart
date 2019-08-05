@@ -27,17 +27,14 @@ import '../kernel/kernel_builder.dart'
         ClassBuilder,
         ConstructorReferenceBuilder,
         Declaration,
-        KernelClassBuilder,
-        KernelFieldBuilder,
-        KernelFunctionBuilder,
-        KernelInvalidTypeBuilder,
-        KernelLibraryBuilder,
+        FieldBuilder,
+        FunctionBuilder,
+        InvalidTypeBuilder,
         NamedTypeBuilder,
-        TypeBuilder,
-        KernelTypeVariableBuilder,
         LibraryBuilder,
         MetadataBuilder,
         Scope,
+        TypeBuilder,
         TypeVariableBuilder,
         compareProcedures;
 
@@ -45,19 +42,20 @@ import '../kernel/type_algorithms.dart' show Variance, computeVariance;
 
 import '../problems.dart' show unexpected, unhandled;
 
+import 'source_library_builder.dart' show SourceLibraryBuilder;
+
 Class initializeClass(
     Class cls,
     List<TypeVariableBuilder> typeVariables,
     String name,
-    KernelLibraryBuilder parent,
+    SourceLibraryBuilder parent,
     int startCharOffset,
     int charOffset,
     int charEndOffset) {
   cls ??= new Class(
       name: name,
       typeParameters:
-          KernelTypeVariableBuilder.kernelTypeParametersFromBuilders(
-              typeVariables));
+          TypeVariableBuilder.kernelTypeParametersFromBuilders(typeVariables));
   cls.fileUri ??= parent.fileUri;
   if (cls.startFileOffset == TreeNode.noOffset) {
     cls.startFileOffset = startCharOffset;
@@ -72,7 +70,7 @@ Class initializeClass(
   return cls;
 }
 
-class SourceClassBuilder extends KernelClassBuilder
+class SourceClassBuilder extends ClassBuilder
     implements Comparable<SourceClassBuilder> {
   @override
   final Class actualCls;
@@ -110,9 +108,9 @@ class SourceClassBuilder extends KernelClassBuilder
   Class get cls => origin.actualCls;
 
   @override
-  KernelLibraryBuilder get library => super.library;
+  SourceLibraryBuilder get library => super.library;
 
-  Class build(KernelLibraryBuilder library, LibraryBuilder coreLibrary) {
+  Class build(SourceLibraryBuilder library, LibraryBuilder coreLibrary) {
     void buildBuilders(String name, Declaration declaration) {
       do {
         if (declaration.parent != this) {
@@ -123,14 +121,14 @@ class SourceClassBuilder extends KernelClassBuilder
             unexpected(fullNameForErrors, declaration.parent?.fullNameForErrors,
                 charOffset, fileUri);
           }
-        } else if (declaration is KernelFieldBuilder) {
+        } else if (declaration is FieldBuilder) {
           // TODO(ahe): It would be nice to have a common interface for the
           // build method to avoid duplicating these two cases.
           Member field = declaration.build(library);
           if (!declaration.isPatch && declaration.next == null) {
             cls.addMember(field);
           }
-        } else if (declaration is KernelFunctionBuilder) {
+        } else if (declaration is FunctionBuilder) {
           Member function = declaration.build(library);
           function.parent = cls;
           if (!declaration.isPatch && declaration.next == null) {
@@ -259,7 +257,7 @@ class SourceClassBuilder extends KernelClassBuilder
     }
     if (message != null) {
       return new NamedTypeBuilder(supertype.name, null)
-        ..bind(new KernelInvalidTypeBuilder(supertype.name,
+        ..bind(new InvalidTypeBuilder(supertype.name,
             message.withLocation(fileUri, charOffset, noLength)));
     }
     return supertype;

@@ -347,7 +347,12 @@
 
     "exclude": [
       "^pkg/analysis_server/lib/src/analysis_server\\.dart",
-      "test/extensions/data/"
+      "test/extensions/data/",
+      "test/id_testing/data/",
+      "test/flow_analysis/definite_assignment/data/",
+      "test/flow_analysis/nullability/data/",
+      "test/flow_analysis/reachability/data/",
+      "test/flow_analysis/type_promotion/data/"
     ]
   }
 }

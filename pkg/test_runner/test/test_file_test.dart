@@ -305,6 +305,8 @@ num j = "str";
 /\/ [cfe] Second error.
 /\/[error line 9,column 8,length 7]
 /\/ [cfe] Third.
+/\/[error line 10,column 9]
+/\/ [cfe] No length.
 """, [
     StaticError(
         line: 123,
@@ -318,7 +320,8 @@ num j = "str";
         length: 78,
         code: "CompileTimeErrorCode.SECOND",
         message: "Second error."),
-    StaticError(line: 9, column: 8, length: 7, message: "Third.")
+    StaticError(line: 9, column: 8, length: 7, message: "Third."),
+    StaticError(line: 10, column: 9, message: "No length.")
   ]);
 
   // Multi-line error message.
@@ -359,10 +362,45 @@ int i = "s";
   // Unspecified errors.
   expectParseErrorExpectations("""
 int i = "s";
-/\/ [unspecified error]
+/\/     ^^^
+// [analyzer] unspecified
+// [cfe] unspecified
 int j = "s";
-  /\/ [unspecified error] some additional info
-""", [StaticError.unspecified(1), StaticError.unspecified(3)]);
+/\/     ^^^
+// [analyzer] unspecified
+// [cfe] Message.
+int k = "s";
+/\/     ^^^
+// [analyzer] Error.CODE
+// [cfe] unspecified
+int l = "s";
+/\/     ^^^
+// [analyzer] unspecified
+int m = "s";
+/\/     ^^^
+// [cfe] unspecified
+""", [
+    StaticError(
+        line: 1,
+        column: 8,
+        length: 3,
+        code: "unspecified",
+        message: "unspecified"),
+    StaticError(
+        line: 5,
+        column: 8,
+        length: 3,
+        code: "unspecified",
+        message: "Message."),
+    StaticError(
+        line: 9,
+        column: 8,
+        length: 3,
+        code: "Error.CODE",
+        message: "unspecified"),
+    StaticError(line: 13, column: 8, length: 3, code: "unspecified"),
+    StaticError(line: 16, column: 8, length: 3, message: "unspecified"),
+  ]);
 
   // Ignore multitest markers.
   expectParseErrorExpectations("""
