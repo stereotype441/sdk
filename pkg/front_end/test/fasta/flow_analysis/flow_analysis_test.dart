@@ -59,6 +59,22 @@ main() {
       h.flow.finish();
     });
 
+    test('Infinite loop does not implicitly assign variables', () {
+      var h = _Harness();
+      var x = h.addUnassignedVar('x', 'int');
+      var whileStatement = _Statement();
+      var trueCondition = _Expression();
+      h.flow.whileStatement_conditionBegin({x});
+      h.flow.booleanLiteral(trueCondition, true);
+      h.flow.whileStatement_bodyBegin(whileStatement, trueCondition);
+      h.flow.ifStatement_thenBegin(_Expression());
+      h.flow.handleContinue(whileStatement);
+      h.flow.ifStatement_end(false);
+      h.flow.write(x);
+      h.flow.whileStatement_end();
+      expect(h.flow.isAssigned(x), false);
+    });
+
     void _checkIs(String declaredType, String tryPromoteType,
         String expectedPromotedType) {
       var h = _Harness();
@@ -475,6 +491,12 @@ class _Harness
   _Var addAssignedVar(String name, String type) {
     var v = _Var(name, _Type(type));
     flow.add(v, assigned: true);
+    return v;
+  }
+
+  _Var addUnassignedVar(String name, String type) {
+    var v = _Var(name, _Type(type));
+    flow.add(v, assigned: false);
     return v;
   }
 
