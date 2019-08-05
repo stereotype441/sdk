@@ -62,15 +62,10 @@ main() {
     test('Infinite loop does not implicitly assign variables', () {
       var h = _Harness();
       var x = h.addUnassignedVar('x', 'int');
-      var whileStatement = _Statement();
       var trueCondition = _Expression();
       h.flow.whileStatement_conditionBegin({x});
       h.flow.booleanLiteral(trueCondition, true);
-      h.flow.whileStatement_bodyBegin(whileStatement, trueCondition);
-      h.flow.ifStatement_thenBegin(_Expression());
-      h.flow.handleContinue(whileStatement);
-      h.flow.ifStatement_end(false);
-      h.flow.write(x);
+      h.flow.whileStatement_bodyBegin(_Statement(), trueCondition);
       h.flow.whileStatement_end();
       expect(h.flow.isAssigned(x), false);
     });
