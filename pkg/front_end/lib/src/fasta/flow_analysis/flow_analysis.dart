@@ -629,19 +629,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   }
 }
 
-/// Accessor for function body information.
-abstract class FunctionBodyAccess<Variable> {
-  bool isPotentiallyMutatedInClosure(Variable variable);
-
-  bool isPotentiallyMutatedInScope(Variable variable);
-}
-
-/// Operations on nodes, abstracted from concrete node interfaces.
-abstract class NodeOperations<Expression> {
-  /// If the [node] is a parenthesized expression, recursively unwrap it.
-  Expression unwrapParenthesized(Expression node);
-}
-
 /// An instance of the [FlowModel] class represents the information gathered by
 /// flow analysis at a single point in the control flow of the function or
 /// method being analyzed.
@@ -1077,6 +1064,19 @@ class FlowModel<Variable, Type> {
     }
     return true;
   }
+}
+
+/// Accessor for function body information.
+abstract class FunctionBodyAccess<Variable> {
+  bool isPotentiallyMutatedInClosure(Variable variable);
+
+  bool isPotentiallyMutatedInScope(Variable variable);
+}
+
+/// Operations on nodes, abstracted from concrete node interfaces.
+abstract class NodeOperations<Expression> {
+  /// If the [node] is a parenthesized expression, recursively unwrap it.
+  Expression unwrapParenthesized(Expression node);
 }
 
 /// Operations on types, abstracted from concrete type interfaces.
