@@ -70,6 +70,30 @@ main() {
       expect(h.flow.isAssigned(x), false);
     });
 
+    void _promote(_Harness h, _Var variable, String type) {
+      // if (variable is! type) {
+      var isExpression = _Expression();
+      h.flow.isExpression_end(isExpression, variable, true, _Type(type));
+      h.flow.ifStatement_thenBegin(isExpression);
+      //   return;
+      h.flow.handleExit();
+      // }
+      h.flow.ifStatement_end(false);
+    }
+
+    test('If(false) does not discard promotions', () {
+      var h = _Harness();
+      var x = h.addAssignedVar('x', 'Object');
+      _promote(h, x, 'int');
+      expect(h.flow.promotedType(x).type, 'int');
+      // if (false) {
+      var falseExpression = _Expression();
+      h.flow.booleanLiteral(falseExpression, false);
+      h.flow.ifStatement_thenBegin(falseExpression);
+      expect(h.flow.promotedType(x).type, 'int');
+      h.flow.ifStatement_end(false);
+    });
+
     void _checkIs(String declaredType, String tryPromoteType,
         String expectedPromotedType) {
       var h = _Harness();
@@ -521,6 +545,7 @@ class _Harness
   bool isSubtypeOf(_Type leftType, _Type rightType) {
     const Map<String, bool> _subtypes = const {
       'int <: int?': true,
+      'int <: Object': true,
       'int <: Object?': true,
       'int <: String': false,
       'int? <: int': false,
