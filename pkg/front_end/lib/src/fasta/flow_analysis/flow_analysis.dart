@@ -972,7 +972,7 @@ class State<Variable, Type> {
   /// promoted to one type in one state and a subtype in the other state, the
   /// less specific type promotion is kept.
   static State<Variable, Type> join<Variable, Type>(
-    TypeOperations typeOperations,
+    TypeOperations<Variable, Type> typeOperations,
     State<Variable, Type> first,
     State<Variable, Type> second,
   ) {
@@ -999,7 +999,7 @@ class State<Variable, Type> {
   /// Joins two "promoted" maps.  See [join] for details.
   @visibleForTesting
   static Map<Variable, Type> joinPromoted<Variable, Type>(
-    TypeOperations typeOperations,
+    TypeOperations<Variable, Type> typeOperations,
     Map<Variable, Type> first,
     Map<Variable, Type> second,
   ) {
