@@ -5,7 +5,7 @@
 library fasta.stack_listener;
 
 import 'package:kernel/ast.dart'
-    show AsyncMarker, DartType, Expression, FunctionNode, TreeNode;
+    show AsyncMarker, Expression, FunctionNode, TreeNode;
 
 import '../builder/builder.dart';
 
@@ -133,7 +133,7 @@ abstract class StackListener extends Listener {
           return value is int;
         case ValueKind.TypeVariableListOrNull:
           return value == NullValue.TypeVariables ||
-              value is List<TypeVariableBuilder<TypeBuilder, DartType>>;
+              value is List<TypeVariableBuilder>;
         case ValueKind.TypeBuilder:
           return value is TypeBuilder;
         case ValueKind.Name:
@@ -472,7 +472,7 @@ abstract class StackListener extends Listener {
         lengthOfSpan(startToken, endToken));
   }
 
-  bool isIgnoredError(Code code, Token token) {
+  bool isIgnoredError(Code<dynamic> code, Token token) {
     if (code == codeNativeClauseShouldBeAnnotation) {
       // TODO(danrubel): Ignore this error until we deprecate `native`
       // support.

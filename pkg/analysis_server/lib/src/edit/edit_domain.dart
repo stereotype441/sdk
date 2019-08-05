@@ -23,6 +23,7 @@ import 'package:analysis_server/src/services/correction/assist_internal.dart';
 import 'package:analysis_server/src/services/correction/change_workspace.dart';
 import 'package:analysis_server/src/services/correction/fix.dart';
 import 'package:analysis_server/src/services/correction/fix/analysis_options/fix_generator.dart';
+import 'package:analysis_server/src/services/correction/fix/dart/top_level_declarations.dart';
 import 'package:analysis_server/src/services/correction/fix/manifest/fix_generator.dart';
 import 'package:analysis_server/src/services/correction/fix/pubspec/fix_generator.dart';
 import 'package:analysis_server/src/services/correction/fix_internal.dart';
@@ -406,8 +407,7 @@ class EditDomainHandler extends AbstractRequestHandler {
         return Response.DELAYED_RESPONSE;
       } else if (requestName ==
           EDIT_REQUEST_LIST_POSTFIX_COMPLETION_TEMPLATES) {
-        listPostfixCompletionTemplates(request);
-        return Response.DELAYED_RESPONSE;
+        return listPostfixCompletionTemplates(request);
       }
     } on RequestFailure catch (exception) {
       return exception.response;
@@ -489,17 +489,15 @@ class EditDomainHandler extends AbstractRequestHandler {
     server.sendResponse(response);
   }
 
-  Future listPostfixCompletionTemplates(Request request) async {
-    // TODO(brianwilkerson) Determine whether this await is necessary.
-    await null;
-    var templates = DartPostfixCompletion.ALL_TEMPLATES
-        .map((pfc) =>
-            new PostfixTemplateDescriptor(pfc.name, pfc.key, pfc.example))
+  Response listPostfixCompletionTemplates(Request request) {
+    List<PostfixTemplateDescriptor> templates = DartPostfixCompletion
+        .ALL_TEMPLATES
+        .map((PostfixCompletionKind kind) =>
+            new PostfixTemplateDescriptor(kind.name, kind.key, kind.example))
         .toList();
 
-    Response response = new EditListPostfixCompletionTemplatesResult(templates)
+    return new EditListPostfixCompletionTemplatesResult(templates)
         .toResponse(request.id);
-    server.sendResponse(response);
   }
 
   Future<void> organizeDirectives(Request request) async {
@@ -639,7 +637,16 @@ class EditDomainHandler extends AbstractRequestHandler {
         int errorLine = lineInfo.getLocation(error.offset).lineNumber;
         if (errorLine == requestLine) {
           var workspace = DartChangeWorkspace(server.currentSessions);
-          var context = new DartFixContextImpl(workspace, result, error);
+          var context =
+              new DartFixContextImpl(workspace, result, error, (name) {
+            var tracker = server.declarationsTracker;
+            var provider = TopLevelDeclarationsProvider(tracker);
+            return provider.get(
+              result.session.analysisContext,
+              result.path,
+              name,
+            );
+          });
           List<Fix> fixes =
               await new DartFixContributor().computeFixes(context);
           if (fixes.isNotEmpty) {

@@ -40,7 +40,7 @@ import '../ignored_parser_errors.dart' show isIgnoredParserError;
 import '../kernel/body_builder.dart' show BodyBuilder;
 
 import '../kernel/kernel_builder.dart'
-    show KernelFormalParameterBuilder, KernelTypeAliasBuilder, TypeBuilder;
+    show FormalParameterBuilder, TypeAliasBuilder, TypeBuilder;
 
 import '../parser.dart' show Assert, MemberKind, Parser, optional;
 
@@ -249,13 +249,13 @@ class DietListener extends StackListener {
 
     Declaration typedefBuilder = lookupBuilder(typedefKeyword, null, name);
     parseMetadata(typedefBuilder, metadata, typedefBuilder.target);
-    if (typedefBuilder is KernelTypeAliasBuilder) {
+    if (typedefBuilder is TypeAliasBuilder) {
       TypeBuilder type = typedefBuilder.type;
       if (type is FunctionTypeBuilder) {
-        List<FormalParameterBuilder<TypeBuilder>> formals = type.formals;
+        List<FormalParameterBuilder> formals = type.formals;
         if (formals != null) {
           for (int i = 0; i < formals.length; ++i) {
-            KernelFormalParameterBuilder formal = formals[i];
+            FormalParameterBuilder formal = formals[i];
             List<MetadataBuilder> metadata = formal.metadata;
             if (metadata != null && metadata.length > 0) {
               // [parseMetadata] is using [Parser.parseMetadataStar] under the
@@ -545,7 +545,7 @@ class DietListener extends StackListener {
     checkEmpty(beginToken.charOffset);
     if (name is ParserRecovery || currentClassIsParserRecovery) return;
 
-    ProcedureBuilder builder = lookupConstructor(beginToken, name);
+    FunctionBuilder builder = lookupConstructor(beginToken, name);
     if (bodyToken == null || optional("=", bodyToken.endGroup.next)) {
       buildRedirectingFactoryMethod(
           bodyToken, builder, MemberKind.Factory, metadata);
@@ -592,7 +592,7 @@ class DietListener extends StackListener {
     Token metadata = pop();
     checkEmpty(beginToken.charOffset);
     if (name is ParserRecovery || currentClassIsParserRecovery) return;
-    ProcedureBuilder builder;
+    FunctionBuilder builder;
     if (name is QualifiedName ||
         (getOrSet == null && name == currentClass.name)) {
       builder = lookupConstructor(beginToken, name);
@@ -610,21 +610,34 @@ class DietListener extends StackListener {
 
   StackListener createListener(
       ModifierBuilder builder, Scope memberScope, bool isInstanceMember,
-      [Scope formalParameterScope]) {
+      {VariableDeclaration extensionThis, Scope formalParameterScope}) {
     // Note: we set thisType regardless of whether we are building a static
     // member, since that provides better error recovery.
-    InterfaceType thisType = currentClass?.target?.thisType;
+    // TODO(johnniwinther): Provide a dummy this on static extension methods
+    // for better error recovery?
+    InterfaceType thisType =
+        extensionThis == null ? currentClass?.target?.thisType : null;
     var typeInferrer =
         typeInferenceEngine?.createLocalTypeInferrer(uri, thisType, library);
     ConstantContext constantContext = builder.isConstructor && builder.isConst
         ? ConstantContext.inferred
         : ConstantContext.none;
-    return new BodyBuilder(library, builder, memberScope, formalParameterScope,
-        hierarchy, coreTypes, currentClass, isInstanceMember, uri, typeInferrer)
+    return new BodyBuilder(
+        library,
+        builder,
+        memberScope,
+        formalParameterScope,
+        hierarchy,
+        coreTypes,
+        currentClass,
+        isInstanceMember,
+        extensionThis,
+        uri,
+        typeInferrer)
       ..constantContext = constantContext;
   }
 
-  StackListener createFunctionListener(ProcedureBuilder builder) {
+  StackListener createFunctionListener(FunctionBuilder builder) {
     final Scope typeParameterScope =
         builder.computeTypeParameterScope(memberScope);
     final Scope formalParameterScope =
@@ -632,11 +645,12 @@ class DietListener extends StackListener {
     assert(typeParameterScope != null);
     assert(formalParameterScope != null);
     return createListener(builder, typeParameterScope, builder.isInstanceMember,
-        formalParameterScope);
+        extensionThis: builder.extensionThis,
+        formalParameterScope: formalParameterScope);
   }
 
   void buildRedirectingFactoryMethod(
-      Token token, ProcedureBuilder builder, MemberKind kind, Token metadata) {
+      Token token, FunctionBuilder builder, MemberKind kind, Token metadata) {
     final StackListener listener = createFunctionListener(builder);
     try {
       Parser parser = new Parser(listener);
@@ -992,7 +1006,7 @@ class DietListener extends StackListener {
   }
 
   @override
-  bool isIgnoredError(Code code, Token token) {
+  bool isIgnoredError(Code<dynamic> code, Token token) {
     return isIgnoredParserError(code, token) ||
         super.isIgnoredError(code, token);
   }

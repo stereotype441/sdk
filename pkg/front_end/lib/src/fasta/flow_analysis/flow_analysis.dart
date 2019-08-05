@@ -703,7 +703,7 @@ abstract class NodeOperations<Expression> {
 /// analysis at a single point in the control flow of the function or method
 /// being analyzed.
 ///
-/// Instances of this class are immuatable, so the methods below that "update"
+/// Instances of this class are immutable, so the methods below that "update"
 /// the state actually leave `this` unchanged and return a new state object.
 @visibleForTesting
 class State<Variable, Type> {
@@ -716,9 +716,17 @@ class State<Variable, Type> {
 
   /// For each variable whose type is promoted at this point in the control
   /// flow, the promoted type.  Variables whose type is not promoted are not
-  /// present in the map.  Variables that have gone out of scope are not
-  /// guaranteed to be present in the map even if they were promoted at the time
-  /// they went out of scope.
+  /// present in the map.
+  ///
+  /// Flow analysis has no awareness of scope, so variables that are out of
+  /// scope are retained in the map until such time as their promotions would
+  /// have been lost, if their scope had extended to the entire function being
+  /// analyzed.  So, for example, if a variable is declared and then promoted
+  /// inside the `then` branch of an `if` statement, and the `else` branch of
+  /// the `if` statement ends in a `return` statement, then the promotion
+  /// remains in the map after the `if` statement ends.  This should not have
+  /// any effect on analysis results for error-free code, because it is an error
+  /// to refer to a variable that is no longer in scope.
   final Map<Variable, Type> promoted;
 
   /// Creates a state object with the given [reachable] status.  All variables
@@ -779,7 +787,8 @@ class State<Variable, Type> {
   }
 
   /// Updates the state to indicate that the given [variable] has been
-  /// determined to satisfy the given [type].
+  /// determined to satisfy the given [type], e.g. as a consequence of an `is`
+  /// expression as the condition of an `if` statement.
   ///
   /// Note that the state is only changed if [type] is a subtype of the
   /// variable's previous (possibly promoted) type.
@@ -810,6 +819,23 @@ class State<Variable, Type> {
 
   /// Updates the state to indicate that the given [variables] are no longer
   /// promoted; they are presumed to have their declared types.
+  ///
+  /// This is used at the top of loops to conservatively cancel the promotion of
+  /// variables that are modified within the loop, so that we correctly analyze
+  /// code like the following:
+  ///
+  ///     if (x is int) {
+  ///       x.isEven; // OK, promoted to int
+  ///       while (true) {
+  ///         x.isEven; // ERROR: promotion lost
+  ///         x = 'foo';
+  ///       }
+  ///     }
+  ///
+  /// Note that a more accurate analysis would be to iterate to a fixed point,
+  /// and only remove promotions if it can be shown that they aren't restored
+  /// later in the loop body.  If we switch to a fixed point analysis, we should
+  /// be able to remove this method.
   State<Variable, Type> removePromotedAll(Set<Variable> variables) {
     var newPromoted = _removePromotedAll(promoted, variables);
 
@@ -825,6 +851,9 @@ class State<Variable, Type> {
   /// Updates the state to reflect a control path that is known to have
   /// previously passed through some [other] state.
   ///
+  /// Approximately, this method forms the union of the definite assignments and
+  /// promotions in `this` state and the [other] state.  More precisely:
+  ///
   /// The control flow path is considered reachable if both this state and the
   /// other state are reachable.  Variables are considered definitely assigned
   /// if they were definitely assigned in either this state or the other state.
@@ -832,6 +861,13 @@ class State<Variable, Type> {
   /// in the other state is more specific, and the variable is "safe".  A
   /// variable is considered safe if there is no chance that it was assigned
   /// more recently than the "other" state.
+  ///
+  /// This is used after a `try/finally` statement to combine the promotions and
+  /// definite assignments that occurred in the `try` and `finally` blocks
+  /// (where `this` is the state from the `finally` block and `other` is the
+  /// state from the `try` block).  Variables that are assigned in the `finally`
+  /// block are considered "unsafe" because the assignment might have cancelled
+  /// the effect of any promotion that occurred inside the `try` block.
   State<Variable, Type> restrict(
     TypeOperations<Variable, Type> typeOperations,
     _VariableSet<Variable> emptySet,

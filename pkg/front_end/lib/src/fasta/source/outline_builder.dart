@@ -4,7 +4,7 @@
 
 library fasta.outline_builder;
 
-import 'package:kernel/ast.dart' show DartType, Library, ProcedureKind;
+import 'package:kernel/ast.dart' show ProcedureKind;
 
 import '../builder/builder.dart';
 
@@ -98,7 +98,7 @@ enum MethodBody {
 }
 
 class OutlineBuilder extends StackListener {
-  final SourceLibraryBuilder<TypeBuilder, Library> library;
+  final SourceLibraryBuilder library;
 
   final bool enableNative;
   final bool stringExpectedAfterNative;
@@ -111,7 +111,7 @@ class OutlineBuilder extends StackListener {
   /// Counter used for naming unnamed extension declarations.
   int unnamedExtensionCounter = 0;
 
-  OutlineBuilder(SourceLibraryBuilder<TypeBuilder, Library> library)
+  OutlineBuilder(SourceLibraryBuilder library)
       : library = library,
         enableNative =
             library.loader.target.backendTarget.enableNative(library.uri),
@@ -444,7 +444,7 @@ class OutlineBuilder extends StackListener {
   @override
   void beginClassDeclaration(Token begin, Token abstractToken, Token name) {
     debugEvent("beginClassDeclaration");
-    List<TypeVariableBuilder<TypeBuilder, DartType>> typeVariables = pop();
+    List<TypeVariableBuilder> typeVariables = pop();
     push(typeVariables ?? NullValue.TypeVariables);
     library.currentDeclaration
       ..name = name.lexeme
@@ -456,7 +456,7 @@ class OutlineBuilder extends StackListener {
   @override
   void beginMixinDeclaration(Token mixinKeyword, Token name) {
     debugEvent("beginMixinDeclaration");
-    List<TypeVariableBuilder<TypeBuilder, DartType>> typeVariables = pop();
+    List<TypeVariableBuilder> typeVariables = pop();
     push(typeVariables ?? NullValue.TypeVariables);
     library.currentDeclaration
       ..name = name.lexeme
@@ -478,7 +478,7 @@ class OutlineBuilder extends StackListener {
   void beginNamedMixinApplication(
       Token begin, Token abstractToken, Token name) {
     debugEvent("beginNamedMixinApplication");
-    List<TypeVariableBuilder<TypeBuilder, DartType>> typeVariables = pop();
+    List<TypeVariableBuilder> typeVariables = pop();
     push(typeVariables ?? NullValue.TypeVariables);
     library.currentDeclaration
       ..name = name.lexeme
@@ -532,7 +532,7 @@ class OutlineBuilder extends StackListener {
     int supertypeOffset = pop();
     TypeBuilder supertype = nullIfParserRecovery(pop());
     int modifiers = pop();
-    List<TypeVariableBuilder<TypeBuilder, DartType>> typeVariables = pop();
+    List<TypeVariableBuilder> typeVariables = pop();
     int nameOffset = pop();
     Object name = pop();
     if (typeVariables != null && supertype is MixinApplicationBuilder) {
@@ -572,8 +572,7 @@ class OutlineBuilder extends StackListener {
     String documentationComment = getDocumentationComment(mixinToken);
     List<TypeBuilder> interfaces = pop(NullValue.TypeBuilderList);
     List<TypeBuilder> supertypeConstraints = nullIfParserRecovery(pop());
-    List<TypeVariableBuilder<TypeBuilder, DartType>> typeVariables =
-        pop(NullValue.TypeVariables);
+    List<TypeVariableBuilder> typeVariables = pop(NullValue.TypeVariables);
     int nameOffset = pop();
     Object name = pop();
     List<MetadataBuilder> metadata = pop(NullValue.Metadata);
@@ -613,7 +612,7 @@ class OutlineBuilder extends StackListener {
         [ValueKind.TypeVariableListOrNull, ValueKind.MetadataListOrNull]));
     debugEvent("beginExtensionDeclaration");
     library.beginNestedDeclaration("extension");
-    List<TypeVariableBuilder<TypeBuilder, DartType>> typeVariables = pop();
+    List<TypeVariableBuilder> typeVariables = pop();
     int offset = nameToken?.charOffset ?? extensionKeyword.charOffset;
     String name = nameToken?.lexeme ??
         // Synthesized name used internally.
@@ -640,8 +639,7 @@ class OutlineBuilder extends StackListener {
     debugEvent("endExtensionDeclaration");
     String documentationComment = getDocumentationComment(extensionKeyword);
     TypeBuilder supertype = pop();
-    List<TypeVariableBuilder<TypeBuilder, DartType>> typeVariables =
-        pop(NullValue.TypeVariables);
+    List<TypeVariableBuilder> typeVariables = pop(NullValue.TypeVariables);
     int nameOffset = pop();
     String name = pop(NullValue.Name);
     if (name == null) {
@@ -685,7 +683,7 @@ class OutlineBuilder extends StackListener {
     MethodBody kind = pop();
     List<FormalParameterBuilder> formals = pop();
     int formalsOffset = pop();
-    List<TypeVariableBuilder<TypeBuilder, DartType>> typeVariables = pop();
+    List<TypeVariableBuilder> typeVariables = pop();
     int charOffset = pop();
     Object name = pop();
     TypeBuilder returnType = pop();
@@ -823,7 +821,7 @@ class OutlineBuilder extends StackListener {
     }
     List<FormalParameterBuilder> formals = pop();
     int formalsOffset = pop();
-    List<TypeVariableBuilder<TypeBuilder, DartType>> typeVariables = pop();
+    List<TypeVariableBuilder> typeVariables = pop();
     int charOffset = pop();
     Object nameOrOperator = pop();
     if (Operator.subtract == nameOrOperator && formals == null) {
@@ -984,7 +982,7 @@ class OutlineBuilder extends StackListener {
     List<TypeBuilder> interfaces = popIfNotNull(implementsKeyword);
     Object mixinApplication = pop();
     int modifiers = pop();
-    List<TypeVariableBuilder<TypeBuilder, DartType>> typeVariables = pop();
+    List<TypeVariableBuilder> typeVariables = pop();
     int charOffset = pop();
     Object name = pop();
     List<MetadataBuilder> metadata = pop();
@@ -1029,13 +1027,17 @@ class OutlineBuilder extends StackListener {
 
   @override
   void handleNonNullAssertExpression(Token bang) {
-    reportNonNullAssertExpressionNotEnabled(bang);
+    if (!library.loader.target.enableNonNullable) {
+      reportNonNullAssertExpressionNotEnabled(bang);
+    }
   }
 
   @override
   void handleType(Token beginToken, Token questionMark) {
     debugEvent("Type");
-    reportErrorIfNullableType(questionMark);
+    if (!library.loader.target.enableNonNullable) {
+      reportErrorIfNullableType(questionMark);
+    }
     List<TypeBuilder> arguments = pop();
     int charOffset = pop();
     Object name = pop();
@@ -1069,7 +1071,9 @@ class OutlineBuilder extends StackListener {
   void beginFormalParameter(Token token, MemberKind kind, Token requiredToken,
       Token covariantToken, Token varFinalOrConst) {
     // TODO(danrubel): handle required token
-    reportNonNullableModifierError(requiredToken);
+    if (!library.loader.target.enableNonNullable) {
+      reportNonNullableModifierError(requiredToken);
+    }
     push((covariantToken != null ? covariantMask : 0) |
         Modifier.validateVarFinalOrConst(varFinalOrConst?.lexeme));
   }
@@ -1267,11 +1271,13 @@ class OutlineBuilder extends StackListener {
   @override
   void endFunctionType(Token functionToken, Token questionMark) {
     debugEvent("FunctionType");
-    reportErrorIfNullableType(questionMark);
+    if (!library.loader.target.enableNonNullable) {
+      reportErrorIfNullableType(questionMark);
+    }
     List<FormalParameterBuilder> formals = pop();
     pop(); // formals offset
     TypeBuilder returnType = pop();
-    List<TypeVariableBuilder<TypeBuilder, DartType>> typeVariables = pop();
+    List<TypeVariableBuilder> typeVariables = pop();
     push(library.addFunctionType(
         returnType, typeVariables, formals, functionToken.charOffset));
   }
@@ -1282,8 +1288,10 @@ class OutlineBuilder extends StackListener {
     List<FormalParameterBuilder> formals = pop();
     int formalsOffset = pop();
     TypeBuilder returnType = pop();
-    List<TypeVariableBuilder<TypeBuilder, DartType>> typeVariables = pop();
-    reportErrorIfNullableType(question);
+    List<TypeVariableBuilder> typeVariables = pop();
+    if (!library.loader.target.enableNonNullable) {
+      reportErrorIfNullableType(question);
+    }
     push(library.addFunctionType(
         returnType, typeVariables, formals, formalsOffset));
   }
@@ -1293,7 +1301,7 @@ class OutlineBuilder extends StackListener {
       Token typedefKeyword, Token equals, Token endToken) {
     debugEvent("endFunctionTypeAlias");
     String documentationComment = getDocumentationComment(typedefKeyword);
-    List<TypeVariableBuilder<TypeBuilder, DartType>> typeVariables;
+    List<TypeVariableBuilder> typeVariables;
     Object name;
     int charOffset;
     FunctionTypeBuilder functionType;
@@ -1353,7 +1361,9 @@ class OutlineBuilder extends StackListener {
       Token endToken) {
     debugEvent("endTopLevelFields");
     // TODO(danrubel): handle NNBD 'late' modifier
-    reportNonNullableModifierError(lateToken);
+    if (!library.loader.target.enableNonNullable) {
+      reportNonNullableModifierError(lateToken);
+    }
     List<FieldInfo> fieldInfos = popFieldInfos(count);
     TypeBuilder type = nullIfParserRecovery(pop());
     int modifiers = (staticToken != null ? staticMask : 0) |
@@ -1372,7 +1382,9 @@ class OutlineBuilder extends StackListener {
       Token varFinalOrConst, int count, Token beginToken, Token endToken) {
     debugEvent("Fields");
     // TODO(danrubel): handle NNBD 'late' modifier
-    reportNonNullableModifierError(lateToken);
+    if (!library.loader.target.enableNonNullable) {
+      reportNonNullableModifierError(lateToken);
+    }
     List<FieldInfo> fieldInfos = popFieldInfos(count);
     TypeBuilder type = pop();
     int modifiers = (staticToken != null ? staticMask : 0) |
@@ -1431,8 +1443,7 @@ class OutlineBuilder extends StackListener {
   void handleTypeVariablesDefined(Token token, int count) {
     debugEvent("TypeVariablesDefined");
     assert(count > 0);
-    push(const FixedNullableList<TypeVariableBuilder<TypeBuilder, DartType>>()
-            .pop(stack, count) ??
+    push(const FixedNullableList<TypeVariableBuilder>().pop(stack, count) ??
         NullValue.TypeVariables);
   }
 
@@ -1441,7 +1452,7 @@ class OutlineBuilder extends StackListener {
     debugEvent("endTypeVariable");
     TypeBuilder bound = nullIfParserRecovery(pop());
     // Peek to leave type parameters on top of stack.
-    List<TypeVariableBuilder<TypeBuilder, DartType>> typeParameters = peek();
+    List<TypeVariableBuilder> typeParameters = peek();
     if (typeParameters != null) {
       typeParameters[index].bound = bound;
     }
@@ -1452,7 +1463,7 @@ class OutlineBuilder extends StackListener {
     debugEvent("endTypeVariables");
 
     // Peek to leave type parameters on top of stack.
-    List<TypeVariableBuilder<TypeBuilder, DartType>> typeParameters = peek();
+    List<TypeVariableBuilder> typeParameters = peek();
 
     Map<String, TypeVariableBuilder> typeVariablesByName;
     if (typeParameters != null) {
@@ -1697,7 +1708,7 @@ class OutlineBuilder extends StackListener {
   }
 
   @override
-  bool isIgnoredError(Code code, Token token) {
+  bool isIgnoredError(Code<dynamic> code, Token token) {
     return isIgnoredParserError(code, token) ||
         super.isIgnoredError(code, token);
   }

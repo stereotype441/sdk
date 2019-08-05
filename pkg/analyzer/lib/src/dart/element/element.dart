@@ -1782,19 +1782,16 @@ class CompilationUnitElementImpl extends UriReferencedElementImpl
       var containerRef = reference.getChild('@extension');
       _extensions = <ExtensionElement>[];
       for (var node in linkedNode.declarations) {
-        String name;
         if (node is ExtensionDeclaration) {
-          name = node.name.name;
-        } else {
-          continue;
-        }
-        var reference = containerRef.getChild(name);
-        if (reference.hasElementFor(node)) {
-          _extensions.add(reference.element);
-        } else {
-          _extensions.add(
-            ExtensionElementImpl.forLinkedNode(this, reference, node),
-          );
+          var refName = linkedContext.getExtensionRefName(node);
+          var reference = containerRef.getChild(refName);
+          if (reference.hasElementFor(node)) {
+            _extensions.add(reference.element);
+          } else {
+            _extensions.add(
+              ExtensionElementImpl.forLinkedNode(this, reference, node),
+            );
+          }
         }
       }
       return _extensions;
@@ -2185,6 +2182,7 @@ class CompilationUnitElementImpl extends UriReferencedElementImpl
     super.visitChildren(visitor);
     safelyVisitChildren(accessors, visitor);
     safelyVisitChildren(enums, visitor);
+    safelyVisitChildren(extensions, visitor);
     safelyVisitChildren(functions, visitor);
     safelyVisitChildren(functionTypeAliases, visitor);
     safelyVisitChildren(mixins, visitor);
@@ -5017,7 +5015,42 @@ class ExtensionElementImpl extends ElementImpl
   }
 
   @override
+  int get codeLength {
+    if (linkedNode != null) {
+      return linkedContext.getCodeLength(linkedNode);
+    }
+    if (_unlinkedExtension != null) {
+      return _unlinkedExtension.codeRange?.length;
+    }
+    return super.codeLength;
+  }
+
+  @override
+  int get codeOffset {
+    if (linkedNode != null) {
+      return linkedContext.getCodeOffset(linkedNode);
+    }
+    if (_unlinkedExtension != null) {
+      return _unlinkedExtension.codeRange?.offset;
+    }
+    return super.codeOffset;
+  }
+
+  @override
   String get displayName => name;
+
+  @override
+  String get documentationComment {
+    if (linkedNode != null) {
+      var context = enclosingUnit.linkedContext;
+      var comment = context.getDocumentationComment(linkedNode);
+      return getCommentNodeRawText(comment);
+    }
+    if (_unlinkedExtension != null) {
+      return _unlinkedExtension.documentationComment?.text;
+    }
+    return super.documentationComment;
+  }
 
   @override
   TypeParameterizedElementMixin get enclosingTypeParameterContext => null;
@@ -5070,6 +5103,14 @@ class ExtensionElementImpl extends ElementImpl
       (field as FieldElementImpl).enclosingElement = this;
     }
     _fields = fields;
+  }
+
+  @override
+  String get identifier {
+    if (linkedNode != null) {
+      return reference.name;
+    }
+    return super.identifier;
   }
 
   @override
@@ -5142,7 +5183,7 @@ class ExtensionElementImpl extends ElementImpl
   @override
   String get name {
     if (linkedNode != null) {
-      return reference.name;
+      return (linkedNode as ExtensionDeclaration).name?.name ?? '';
     }
     if (_unlinkedExtension != null) {
       return _unlinkedExtension.name;
@@ -5236,6 +5277,15 @@ class ExtensionElementImpl extends ElementImpl
   PropertyAccessorElement getSetter(String setterName) {
     return AbstractClassElementImpl.getSetterFromAccessors(
         setterName, accessors);
+  }
+
+  @override
+  void visitChildren(ElementVisitor visitor) {
+    super.visitChildren(visitor);
+    safelyVisitChildren(accessors, visitor);
+    safelyVisitChildren(fields, visitor);
+    safelyVisitChildren(methods, visitor);
+    safelyVisitChildren(typeParameters, visitor);
   }
 
   /// Create the accessors and fields when [linkedNode] is not `null`.
@@ -6626,6 +6676,10 @@ class ImportElementImpl extends UriReferencedElementImpl
 
   @override
   int get prefixOffset {
+    if (linkedNode != null) {
+      ImportDirective node = linkedNode;
+      return node.prefix?.offset ?? -1;
+    }
     if (_unlinkedImport != null) {
       return _unlinkedImport.prefixOffset;
     }
@@ -9162,7 +9216,7 @@ class ParameterElementImpl extends VariableElementImpl
         NormalFormalParameter parameterNode = node.parameter;
         var name = parameterNode.identifier?.name ?? '';
         var reference = containerRef.getChild(name);
-        reference.node2 = node;
+        reference.node = node;
         if (parameterNode is FieldFormalParameter) {
           return DefaultFieldFormalParameterElementImpl.forLinkedNode(
             enclosing,

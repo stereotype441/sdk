@@ -4942,6 +4942,7 @@ class LinkedNodeBuilder extends Object
   idl.LinkedNodeFormalParameterKind _variantField_26;
   double _variantField_21;
   LinkedNodeTypeBuilder _variantField_25;
+  String _variantField_20;
   int _flags;
   String _variantField_1;
   int _variantField_36;
@@ -4951,7 +4952,6 @@ class LinkedNodeBuilder extends Object
   idl.LinkedNodeKind _kind;
   List<String> _variantField_34;
   String _name;
-  String _variantField_20;
   bool _variantField_31;
   idl.UnlinkedTokenType _variantField_35;
   TopLevelInferenceErrorBuilder _variantField_32;
@@ -7107,12 +7107,6 @@ class LinkedNodeBuilder extends Object
   }
 
   @override
-  int get importDirective_prefixOffset {
-    assert(kind == idl.LinkedNodeKind.importDirective);
-    return _variantField_15 ??= 0;
-  }
-
-  @override
   int get indexExpression_element {
     assert(kind == idl.LinkedNodeKind.indexExpression);
     return _variantField_15 ??= 0;
@@ -7180,12 +7174,6 @@ class LinkedNodeBuilder extends Object
 
   set emptyStatement_fake(int value) {
     assert(kind == idl.LinkedNodeKind.emptyStatement);
-    assert(value == null || value >= 0);
-    _variantField_15 = value;
-  }
-
-  set importDirective_prefixOffset(int value) {
-    assert(kind == idl.LinkedNodeKind.importDirective);
     assert(value == null || value >= 0);
     _variantField_15 = value;
   }
@@ -7654,6 +7642,41 @@ class LinkedNodeBuilder extends Object
   }
 
   @override
+  String get extensionDeclaration_refName {
+    assert(kind == idl.LinkedNodeKind.extensionDeclaration);
+    return _variantField_20 ??= '';
+  }
+
+  @override
+  String get namespaceDirective_selectedUri {
+    assert(kind == idl.LinkedNodeKind.exportDirective ||
+        kind == idl.LinkedNodeKind.importDirective);
+    return _variantField_20 ??= '';
+  }
+
+  @override
+  String get simpleStringLiteral_value {
+    assert(kind == idl.LinkedNodeKind.simpleStringLiteral);
+    return _variantField_20 ??= '';
+  }
+
+  set extensionDeclaration_refName(String value) {
+    assert(kind == idl.LinkedNodeKind.extensionDeclaration);
+    _variantField_20 = value;
+  }
+
+  set namespaceDirective_selectedUri(String value) {
+    assert(kind == idl.LinkedNodeKind.exportDirective ||
+        kind == idl.LinkedNodeKind.importDirective);
+    _variantField_20 = value;
+  }
+
+  set simpleStringLiteral_value(String value) {
+    assert(kind == idl.LinkedNodeKind.simpleStringLiteral);
+    _variantField_20 = value;
+  }
+
+  @override
   int get flags => _flags ??= 0;
 
   set flags(int value) {
@@ -7825,30 +7848,6 @@ class LinkedNodeBuilder extends Object
 
   set name(String value) {
     this._name = value;
-  }
-
-  @override
-  String get namespaceDirective_selectedUri {
-    assert(kind == idl.LinkedNodeKind.exportDirective ||
-        kind == idl.LinkedNodeKind.importDirective);
-    return _variantField_20 ??= '';
-  }
-
-  @override
-  String get simpleStringLiteral_value {
-    assert(kind == idl.LinkedNodeKind.simpleStringLiteral);
-    return _variantField_20 ??= '';
-  }
-
-  set namespaceDirective_selectedUri(String value) {
-    assert(kind == idl.LinkedNodeKind.exportDirective ||
-        kind == idl.LinkedNodeKind.importDirective);
-    _variantField_20 = value;
-  }
-
-  set simpleStringLiteral_value(String value) {
-    assert(kind == idl.LinkedNodeKind.simpleStringLiteral);
-    _variantField_20 = value;
   }
 
   @override
@@ -8255,18 +8254,18 @@ class LinkedNodeBuilder extends Object
     List<LinkedNodeBuilder> namespaceDirective_combinators,
     List<LinkedNodeBuilder> annotatedNode_metadata,
     List<LinkedNodeBuilder> namespaceDirective_configurations,
+    String namespaceDirective_selectedUri,
     int informativeId,
     LinkedNodeBuilder uriBasedDirective_uri,
-    String namespaceDirective_selectedUri,
     String uriBasedDirective_uriContent,
     int uriBasedDirective_uriElement,
   })  : _kind = idl.LinkedNodeKind.exportDirective,
         _variantField_2 = namespaceDirective_combinators,
         _variantField_4 = annotatedNode_metadata,
         _variantField_3 = namespaceDirective_configurations,
+        _variantField_20 = namespaceDirective_selectedUri,
         _variantField_36 = informativeId,
         _variantField_14 = uriBasedDirective_uri,
-        _variantField_20 = namespaceDirective_selectedUri,
         _variantField_22 = uriBasedDirective_uriContent,
         _variantField_19 = uriBasedDirective_uriElement;
 
@@ -8290,12 +8289,14 @@ class LinkedNodeBuilder extends Object
     LinkedNodeBuilder extensionDeclaration_typeParameters,
     LinkedNodeBuilder extensionDeclaration_extendedType,
     List<LinkedNodeBuilder> extensionDeclaration_members,
+    String extensionDeclaration_refName,
     int informativeId,
   })  : _kind = idl.LinkedNodeKind.extensionDeclaration,
         _variantField_4 = annotatedNode_metadata,
         _variantField_6 = extensionDeclaration_typeParameters,
         _variantField_7 = extensionDeclaration_extendedType,
         _variantField_5 = extensionDeclaration_members,
+        _variantField_20 = extensionDeclaration_refName,
         _variantField_36 = informativeId;
 
   LinkedNodeBuilder.fieldDeclaration({
@@ -8514,23 +8515,21 @@ class LinkedNodeBuilder extends Object
   LinkedNodeBuilder.importDirective({
     List<LinkedNodeBuilder> namespaceDirective_combinators,
     List<LinkedNodeBuilder> annotatedNode_metadata,
-    int importDirective_prefixOffset,
     List<LinkedNodeBuilder> namespaceDirective_configurations,
+    String namespaceDirective_selectedUri,
     String importDirective_prefix,
     int informativeId,
     LinkedNodeBuilder uriBasedDirective_uri,
-    String namespaceDirective_selectedUri,
     String uriBasedDirective_uriContent,
     int uriBasedDirective_uriElement,
   })  : _kind = idl.LinkedNodeKind.importDirective,
         _variantField_2 = namespaceDirective_combinators,
         _variantField_4 = annotatedNode_metadata,
-        _variantField_15 = importDirective_prefixOffset,
         _variantField_3 = namespaceDirective_configurations,
+        _variantField_20 = namespaceDirective_selectedUri,
         _variantField_1 = importDirective_prefix,
         _variantField_36 = informativeId,
         _variantField_14 = uriBasedDirective_uri,
-        _variantField_20 = namespaceDirective_selectedUri,
         _variantField_22 = uriBasedDirective_uriContent,
         _variantField_19 = uriBasedDirective_uriElement;
 
@@ -9960,6 +9959,7 @@ class LinkedNodeBuilder extends Object
       signature.addBool(this.extensionDeclaration_extendedType != null);
       this.extensionDeclaration_extendedType?.collectApiSignature(signature);
       signature.addInt(this.flags ?? 0);
+      signature.addString(this.extensionDeclaration_refName ?? '');
       signature.addString(this.name ?? '');
     } else if (kind == idl.LinkedNodeKind.fieldDeclaration) {
       signature.addInt(this.kind == null ? 0 : this.kind.index);
@@ -10294,7 +10294,6 @@ class LinkedNodeBuilder extends Object
       }
       signature.addBool(this.uriBasedDirective_uri != null);
       this.uriBasedDirective_uri?.collectApiSignature(signature);
-      signature.addInt(this.importDirective_prefixOffset ?? 0);
       signature.addInt(this.flags ?? 0);
       signature.addInt(this.uriBasedDirective_uriElement ?? 0);
       signature.addString(this.namespaceDirective_selectedUri ?? '');
@@ -11051,12 +11050,12 @@ class LinkedNodeBuilder extends Object
     fb.Offset offset_variantField_3;
     fb.Offset offset_variantField_10;
     fb.Offset offset_variantField_25;
+    fb.Offset offset_variantField_20;
     fb.Offset offset_variantField_1;
     fb.Offset offset_variantField_30;
     fb.Offset offset_variantField_14;
     fb.Offset offset_variantField_34;
     fb.Offset offset_name;
-    fb.Offset offset_variantField_20;
     fb.Offset offset_variantField_32;
     fb.Offset offset_variantField_11;
     fb.Offset offset_variantField_22;
@@ -11110,6 +11109,9 @@ class LinkedNodeBuilder extends Object
     if (_variantField_25 != null) {
       offset_variantField_25 = _variantField_25.finish(fbBuilder);
     }
+    if (_variantField_20 != null) {
+      offset_variantField_20 = fbBuilder.writeString(_variantField_20);
+    }
     if (_variantField_1 != null) {
       offset_variantField_1 = fbBuilder.writeString(_variantField_1);
     }
@@ -11125,9 +11127,6 @@ class LinkedNodeBuilder extends Object
     }
     if (_name != null) {
       offset_name = fbBuilder.writeString(_name);
-    }
-    if (_variantField_20 != null) {
-      offset_variantField_20 = fbBuilder.writeString(_variantField_20);
     }
     if (_variantField_32 != null) {
       offset_variantField_32 = _variantField_32.finish(fbBuilder);
@@ -11209,6 +11208,9 @@ class LinkedNodeBuilder extends Object
     if (offset_variantField_25 != null) {
       fbBuilder.addOffset(25, offset_variantField_25);
     }
+    if (offset_variantField_20 != null) {
+      fbBuilder.addOffset(20, offset_variantField_20);
+    }
     if (_flags != null && _flags != 0) {
       fbBuilder.addUint32(18, _flags);
     }
@@ -11235,9 +11237,6 @@ class LinkedNodeBuilder extends Object
     }
     if (offset_name != null) {
       fbBuilder.addOffset(37, offset_name);
-    }
-    if (offset_variantField_20 != null) {
-      fbBuilder.addOffset(20, offset_variantField_20);
     }
     if (_variantField_31 == true) {
       fbBuilder.addBool(31, true);
@@ -11300,6 +11299,7 @@ class _LinkedNodeImpl extends Object
   idl.LinkedNodeFormalParameterKind _variantField_26;
   double _variantField_21;
   idl.LinkedNodeType _variantField_25;
+  String _variantField_20;
   int _flags;
   String _variantField_1;
   int _variantField_36;
@@ -11309,7 +11309,6 @@ class _LinkedNodeImpl extends Object
   idl.LinkedNodeKind _kind;
   List<String> _variantField_34;
   String _name;
-  String _variantField_20;
   bool _variantField_31;
   idl.UnlinkedTokenType _variantField_35;
   idl.TopLevelInferenceError _variantField_32;
@@ -12904,14 +12903,6 @@ class _LinkedNodeImpl extends Object
   }
 
   @override
-  int get importDirective_prefixOffset {
-    assert(kind == idl.LinkedNodeKind.importDirective);
-    _variantField_15 ??=
-        const fb.Uint32Reader().vTableGet(_bc, _bcOffset, 15, 0);
-    return _variantField_15;
-  }
-
-  @override
   int get indexExpression_element {
     assert(kind == idl.LinkedNodeKind.indexExpression);
     _variantField_15 ??=
@@ -13269,6 +13260,31 @@ class _LinkedNodeImpl extends Object
   }
 
   @override
+  String get extensionDeclaration_refName {
+    assert(kind == idl.LinkedNodeKind.extensionDeclaration);
+    _variantField_20 ??=
+        const fb.StringReader().vTableGet(_bc, _bcOffset, 20, '');
+    return _variantField_20;
+  }
+
+  @override
+  String get namespaceDirective_selectedUri {
+    assert(kind == idl.LinkedNodeKind.exportDirective ||
+        kind == idl.LinkedNodeKind.importDirective);
+    _variantField_20 ??=
+        const fb.StringReader().vTableGet(_bc, _bcOffset, 20, '');
+    return _variantField_20;
+  }
+
+  @override
+  String get simpleStringLiteral_value {
+    assert(kind == idl.LinkedNodeKind.simpleStringLiteral);
+    _variantField_20 ??=
+        const fb.StringReader().vTableGet(_bc, _bcOffset, 20, '');
+    return _variantField_20;
+  }
+
+  @override
   int get flags {
     _flags ??= const fb.Uint32Reader().vTableGet(_bc, _bcOffset, 18, 0);
     return _flags;
@@ -13380,23 +13396,6 @@ class _LinkedNodeImpl extends Object
   String get name {
     _name ??= const fb.StringReader().vTableGet(_bc, _bcOffset, 37, '');
     return _name;
-  }
-
-  @override
-  String get namespaceDirective_selectedUri {
-    assert(kind == idl.LinkedNodeKind.exportDirective ||
-        kind == idl.LinkedNodeKind.importDirective);
-    _variantField_20 ??=
-        const fb.StringReader().vTableGet(_bc, _bcOffset, 20, '');
-    return _variantField_20;
-  }
-
-  @override
-  String get simpleStringLiteral_value {
-    assert(kind == idl.LinkedNodeKind.simpleStringLiteral);
-    _variantField_20 ??=
-        const fb.StringReader().vTableGet(_bc, _bcOffset, 20, '');
-    return _variantField_20;
   }
 
   @override
@@ -13822,12 +13821,12 @@ abstract class _LinkedNodeMixin implements idl.LinkedNode {
             namespaceDirective_configurations
                 .map((_value) => _value.toJson())
                 .toList();
-      if (informativeId != 0) _result["informativeId"] = informativeId;
-      if (uriBasedDirective_uri != null)
-        _result["uriBasedDirective_uri"] = uriBasedDirective_uri.toJson();
       if (namespaceDirective_selectedUri != '')
         _result["namespaceDirective_selectedUri"] =
             namespaceDirective_selectedUri;
+      if (informativeId != 0) _result["informativeId"] = informativeId;
+      if (uriBasedDirective_uri != null)
+        _result["uriBasedDirective_uri"] = uriBasedDirective_uri.toJson();
       if (uriBasedDirective_uriContent != '')
         _result["uriBasedDirective_uriContent"] = uriBasedDirective_uriContent;
       if (uriBasedDirective_uriElement != 0)
@@ -13861,6 +13860,8 @@ abstract class _LinkedNodeMixin implements idl.LinkedNode {
         _result["extensionDeclaration_members"] = extensionDeclaration_members
             .map((_value) => _value.toJson())
             .toList();
+      if (extensionDeclaration_refName != '')
+        _result["extensionDeclaration_refName"] = extensionDeclaration_refName;
       if (informativeId != 0) _result["informativeId"] = informativeId;
     }
     if (kind == idl.LinkedNodeKind.fieldDeclaration) {
@@ -14103,21 +14104,19 @@ abstract class _LinkedNodeMixin implements idl.LinkedNode {
       if (annotatedNode_metadata.isNotEmpty)
         _result["annotatedNode_metadata"] =
             annotatedNode_metadata.map((_value) => _value.toJson()).toList();
-      if (importDirective_prefixOffset != 0)
-        _result["importDirective_prefixOffset"] = importDirective_prefixOffset;
       if (namespaceDirective_configurations.isNotEmpty)
         _result["namespaceDirective_configurations"] =
             namespaceDirective_configurations
                 .map((_value) => _value.toJson())
                 .toList();
+      if (namespaceDirective_selectedUri != '')
+        _result["namespaceDirective_selectedUri"] =
+            namespaceDirective_selectedUri;
       if (importDirective_prefix != '')
         _result["importDirective_prefix"] = importDirective_prefix;
       if (informativeId != 0) _result["informativeId"] = informativeId;
       if (uriBasedDirective_uri != null)
         _result["uriBasedDirective_uri"] = uriBasedDirective_uri.toJson();
-      if (namespaceDirective_selectedUri != '')
-        _result["namespaceDirective_selectedUri"] =
-            namespaceDirective_selectedUri;
       if (uriBasedDirective_uriContent != '')
         _result["uriBasedDirective_uriContent"] = uriBasedDirective_uriContent;
       if (uriBasedDirective_uriElement != 0)
@@ -14996,12 +14995,12 @@ abstract class _LinkedNodeMixin implements idl.LinkedNode {
         "namespaceDirective_combinators": namespaceDirective_combinators,
         "annotatedNode_metadata": annotatedNode_metadata,
         "namespaceDirective_configurations": namespaceDirective_configurations,
+        "namespaceDirective_selectedUri": namespaceDirective_selectedUri,
         "flags": flags,
         "informativeId": informativeId,
         "uriBasedDirective_uri": uriBasedDirective_uri,
         "kind": kind,
         "name": name,
-        "namespaceDirective_selectedUri": namespaceDirective_selectedUri,
         "uriBasedDirective_uriContent": uriBasedDirective_uriContent,
         "uriBasedDirective_uriElement": uriBasedDirective_uriElement,
       };
@@ -15037,6 +15036,7 @@ abstract class _LinkedNodeMixin implements idl.LinkedNode {
             extensionDeclaration_typeParameters,
         "extensionDeclaration_extendedType": extensionDeclaration_extendedType,
         "extensionDeclaration_members": extensionDeclaration_members,
+        "extensionDeclaration_refName": extensionDeclaration_refName,
         "flags": flags,
         "informativeId": informativeId,
         "kind": kind,
@@ -15286,15 +15286,14 @@ abstract class _LinkedNodeMixin implements idl.LinkedNode {
       return {
         "namespaceDirective_combinators": namespaceDirective_combinators,
         "annotatedNode_metadata": annotatedNode_metadata,
-        "importDirective_prefixOffset": importDirective_prefixOffset,
         "namespaceDirective_configurations": namespaceDirective_configurations,
+        "namespaceDirective_selectedUri": namespaceDirective_selectedUri,
         "flags": flags,
         "importDirective_prefix": importDirective_prefix,
         "informativeId": informativeId,
         "uriBasedDirective_uri": uriBasedDirective_uri,
         "kind": kind,
         "name": name,
-        "namespaceDirective_selectedUri": namespaceDirective_selectedUri,
         "uriBasedDirective_uriContent": uriBasedDirective_uriContent,
         "uriBasedDirective_uriElement": uriBasedDirective_uriElement,
       };
@@ -15654,10 +15653,10 @@ abstract class _LinkedNodeMixin implements idl.LinkedNode {
     }
     if (kind == idl.LinkedNodeKind.simpleStringLiteral) {
       return {
+        "simpleStringLiteral_value": simpleStringLiteral_value,
         "flags": flags,
         "kind": kind,
         "name": name,
-        "simpleStringLiteral_value": simpleStringLiteral_value,
       };
     }
     if (kind == idl.LinkedNodeKind.spreadElement) {
@@ -23357,6 +23356,7 @@ class UnlinkedInformativeDataBuilder extends Object
   int _variantField_5;
   int _variantField_1;
   List<String> _variantField_4;
+  int _variantField_8;
   idl.LinkedNodeKind _kind;
 
   @override
@@ -23367,6 +23367,7 @@ class UnlinkedInformativeDataBuilder extends Object
         kind == idl.LinkedNodeKind.constructorDeclaration ||
         kind == idl.LinkedNodeKind.defaultFormalParameter ||
         kind == idl.LinkedNodeKind.enumDeclaration ||
+        kind == idl.LinkedNodeKind.extensionDeclaration ||
         kind == idl.LinkedNodeKind.fieldFormalParameter ||
         kind == idl.LinkedNodeKind.functionDeclaration ||
         kind == idl.LinkedNodeKind.functionTypeAlias ||
@@ -23387,6 +23388,7 @@ class UnlinkedInformativeDataBuilder extends Object
         kind == idl.LinkedNodeKind.constructorDeclaration ||
         kind == idl.LinkedNodeKind.defaultFormalParameter ||
         kind == idl.LinkedNodeKind.enumDeclaration ||
+        kind == idl.LinkedNodeKind.extensionDeclaration ||
         kind == idl.LinkedNodeKind.fieldFormalParameter ||
         kind == idl.LinkedNodeKind.functionDeclaration ||
         kind == idl.LinkedNodeKind.functionTypeAlias ||
@@ -23409,6 +23411,7 @@ class UnlinkedInformativeDataBuilder extends Object
         kind == idl.LinkedNodeKind.constructorDeclaration ||
         kind == idl.LinkedNodeKind.defaultFormalParameter ||
         kind == idl.LinkedNodeKind.enumDeclaration ||
+        kind == idl.LinkedNodeKind.extensionDeclaration ||
         kind == idl.LinkedNodeKind.fieldFormalParameter ||
         kind == idl.LinkedNodeKind.functionDeclaration ||
         kind == idl.LinkedNodeKind.functionTypeAlias ||
@@ -23429,6 +23432,7 @@ class UnlinkedInformativeDataBuilder extends Object
         kind == idl.LinkedNodeKind.constructorDeclaration ||
         kind == idl.LinkedNodeKind.defaultFormalParameter ||
         kind == idl.LinkedNodeKind.enumDeclaration ||
+        kind == idl.LinkedNodeKind.extensionDeclaration ||
         kind == idl.LinkedNodeKind.fieldFormalParameter ||
         kind == idl.LinkedNodeKind.functionDeclaration ||
         kind == idl.LinkedNodeKind.functionTypeAlias ||
@@ -23497,6 +23501,7 @@ class UnlinkedInformativeDataBuilder extends Object
         kind == idl.LinkedNodeKind.constructorDeclaration ||
         kind == idl.LinkedNodeKind.enumConstantDeclaration ||
         kind == idl.LinkedNodeKind.enumDeclaration ||
+        kind == idl.LinkedNodeKind.extensionDeclaration ||
         kind == idl.LinkedNodeKind.fieldFormalParameter ||
         kind == idl.LinkedNodeKind.functionDeclaration ||
         kind == idl.LinkedNodeKind.functionTypedFormalParameter ||
@@ -23526,6 +23531,7 @@ class UnlinkedInformativeDataBuilder extends Object
         kind == idl.LinkedNodeKind.constructorDeclaration ||
         kind == idl.LinkedNodeKind.enumConstantDeclaration ||
         kind == idl.LinkedNodeKind.enumDeclaration ||
+        kind == idl.LinkedNodeKind.extensionDeclaration ||
         kind == idl.LinkedNodeKind.fieldFormalParameter ||
         kind == idl.LinkedNodeKind.functionDeclaration ||
         kind == idl.LinkedNodeKind.functionTypedFormalParameter ||
@@ -23547,6 +23553,7 @@ class UnlinkedInformativeDataBuilder extends Object
         kind == idl.LinkedNodeKind.constructorDeclaration ||
         kind == idl.LinkedNodeKind.enumDeclaration ||
         kind == idl.LinkedNodeKind.enumConstantDeclaration ||
+        kind == idl.LinkedNodeKind.extensionDeclaration ||
         kind == idl.LinkedNodeKind.fieldDeclaration ||
         kind == idl.LinkedNodeKind.functionDeclaration ||
         kind == idl.LinkedNodeKind.functionTypeAlias ||
@@ -23564,6 +23571,7 @@ class UnlinkedInformativeDataBuilder extends Object
         kind == idl.LinkedNodeKind.constructorDeclaration ||
         kind == idl.LinkedNodeKind.enumDeclaration ||
         kind == idl.LinkedNodeKind.enumConstantDeclaration ||
+        kind == idl.LinkedNodeKind.extensionDeclaration ||
         kind == idl.LinkedNodeKind.fieldDeclaration ||
         kind == idl.LinkedNodeKind.functionDeclaration ||
         kind == idl.LinkedNodeKind.functionTypeAlias ||
@@ -23573,6 +23581,18 @@ class UnlinkedInformativeDataBuilder extends Object
         kind == idl.LinkedNodeKind.mixinDeclaration ||
         kind == idl.LinkedNodeKind.topLevelVariableDeclaration);
     _variantField_4 = value;
+  }
+
+  @override
+  int get importDirective_prefixOffset {
+    assert(kind == idl.LinkedNodeKind.importDirective);
+    return _variantField_8 ??= 0;
+  }
+
+  set importDirective_prefixOffset(int value) {
+    assert(kind == idl.LinkedNodeKind.importDirective);
+    assert(value == null || value >= 0);
+    _variantField_8 = value;
   }
 
   @override
@@ -23659,6 +23679,17 @@ class UnlinkedInformativeDataBuilder extends Object
   })  : _kind = idl.LinkedNodeKind.exportDirective,
         _variantField_1 = directiveKeywordOffset;
 
+  UnlinkedInformativeDataBuilder.extensionDeclaration({
+    int codeLength,
+    int codeOffset,
+    int nameOffset,
+    List<String> documentationComment_tokens,
+  })  : _kind = idl.LinkedNodeKind.extensionDeclaration,
+        _variantField_2 = codeLength,
+        _variantField_3 = codeOffset,
+        _variantField_1 = nameOffset,
+        _variantField_4 = documentationComment_tokens;
+
   UnlinkedInformativeDataBuilder.fieldDeclaration({
     List<String> documentationComment_tokens,
   })  : _kind = idl.LinkedNodeKind.fieldDeclaration,
@@ -23717,8 +23748,10 @@ class UnlinkedInformativeDataBuilder extends Object
 
   UnlinkedInformativeDataBuilder.importDirective({
     int directiveKeywordOffset,
+    int importDirective_prefixOffset,
   })  : _kind = idl.LinkedNodeKind.importDirective,
-        _variantField_1 = directiveKeywordOffset;
+        _variantField_1 = directiveKeywordOffset,
+        _variantField_8 = importDirective_prefixOffset;
 
   UnlinkedInformativeDataBuilder.libraryDirective({
     int directiveKeywordOffset,
@@ -23801,6 +23834,7 @@ class UnlinkedInformativeDataBuilder extends Object
     } else if (kind == idl.LinkedNodeKind.enumConstantDeclaration) {
     } else if (kind == idl.LinkedNodeKind.enumDeclaration) {
     } else if (kind == idl.LinkedNodeKind.exportDirective) {
+    } else if (kind == idl.LinkedNodeKind.extensionDeclaration) {
     } else if (kind == idl.LinkedNodeKind.fieldDeclaration) {
     } else if (kind == idl.LinkedNodeKind.fieldFormalParameter) {
     } else if (kind == idl.LinkedNodeKind.functionDeclaration) {
@@ -23905,6 +23939,19 @@ class UnlinkedInformativeDataBuilder extends Object
     } else if (kind == idl.LinkedNodeKind.exportDirective) {
       signature.addInt(this.kind == null ? 0 : this.kind.index);
       signature.addInt(this.directiveKeywordOffset ?? 0);
+    } else if (kind == idl.LinkedNodeKind.extensionDeclaration) {
+      signature.addInt(this.kind == null ? 0 : this.kind.index);
+      signature.addInt(this.nameOffset ?? 0);
+      signature.addInt(this.codeLength ?? 0);
+      signature.addInt(this.codeOffset ?? 0);
+      if (this.documentationComment_tokens == null) {
+        signature.addInt(0);
+      } else {
+        signature.addInt(this.documentationComment_tokens.length);
+        for (var x in this.documentationComment_tokens) {
+          signature.addString(x);
+        }
+      }
     } else if (kind == idl.LinkedNodeKind.fieldDeclaration) {
       signature.addInt(this.kind == null ? 0 : this.kind.index);
       if (this.documentationComment_tokens == null) {
@@ -23967,6 +24014,7 @@ class UnlinkedInformativeDataBuilder extends Object
     } else if (kind == idl.LinkedNodeKind.importDirective) {
       signature.addInt(this.kind == null ? 0 : this.kind.index);
       signature.addInt(this.directiveKeywordOffset ?? 0);
+      signature.addInt(this.importDirective_prefixOffset ?? 0);
     } else if (kind == idl.LinkedNodeKind.libraryDirective) {
       signature.addInt(this.kind == null ? 0 : this.kind.index);
       signature.addInt(this.directiveKeywordOffset ?? 0);
@@ -24070,6 +24118,9 @@ class UnlinkedInformativeDataBuilder extends Object
     if (offset_variantField_4 != null) {
       fbBuilder.addOffset(4, offset_variantField_4);
     }
+    if (_variantField_8 != null && _variantField_8 != 0) {
+      fbBuilder.addUint32(8, _variantField_8);
+    }
     if (_kind != null && _kind != idl.LinkedNodeKind.adjacentStrings) {
       fbBuilder.addUint8(0, _kind.index);
     }
@@ -24101,6 +24152,7 @@ class _UnlinkedInformativeDataImpl extends Object
   int _variantField_5;
   int _variantField_1;
   List<String> _variantField_4;
+  int _variantField_8;
   idl.LinkedNodeKind _kind;
 
   @override
@@ -24111,6 +24163,7 @@ class _UnlinkedInformativeDataImpl extends Object
         kind == idl.LinkedNodeKind.constructorDeclaration ||
         kind == idl.LinkedNodeKind.defaultFormalParameter ||
         kind == idl.LinkedNodeKind.enumDeclaration ||
+        kind == idl.LinkedNodeKind.extensionDeclaration ||
         kind == idl.LinkedNodeKind.fieldFormalParameter ||
         kind == idl.LinkedNodeKind.functionDeclaration ||
         kind == idl.LinkedNodeKind.functionTypeAlias ||
@@ -24133,6 +24186,7 @@ class _UnlinkedInformativeDataImpl extends Object
         kind == idl.LinkedNodeKind.constructorDeclaration ||
         kind == idl.LinkedNodeKind.defaultFormalParameter ||
         kind == idl.LinkedNodeKind.enumDeclaration ||
+        kind == idl.LinkedNodeKind.extensionDeclaration ||
         kind == idl.LinkedNodeKind.fieldFormalParameter ||
         kind == idl.LinkedNodeKind.functionDeclaration ||
         kind == idl.LinkedNodeKind.functionTypeAlias ||
@@ -24187,6 +24241,7 @@ class _UnlinkedInformativeDataImpl extends Object
         kind == idl.LinkedNodeKind.constructorDeclaration ||
         kind == idl.LinkedNodeKind.enumConstantDeclaration ||
         kind == idl.LinkedNodeKind.enumDeclaration ||
+        kind == idl.LinkedNodeKind.extensionDeclaration ||
         kind == idl.LinkedNodeKind.fieldFormalParameter ||
         kind == idl.LinkedNodeKind.functionDeclaration ||
         kind == idl.LinkedNodeKind.functionTypedFormalParameter ||
@@ -24208,6 +24263,7 @@ class _UnlinkedInformativeDataImpl extends Object
         kind == idl.LinkedNodeKind.constructorDeclaration ||
         kind == idl.LinkedNodeKind.enumDeclaration ||
         kind == idl.LinkedNodeKind.enumConstantDeclaration ||
+        kind == idl.LinkedNodeKind.extensionDeclaration ||
         kind == idl.LinkedNodeKind.fieldDeclaration ||
         kind == idl.LinkedNodeKind.functionDeclaration ||
         kind == idl.LinkedNodeKind.functionTypeAlias ||
@@ -24219,6 +24275,13 @@ class _UnlinkedInformativeDataImpl extends Object
     _variantField_4 ??= const fb.ListReader<String>(const fb.StringReader())
         .vTableGet(_bc, _bcOffset, 4, const <String>[]);
     return _variantField_4;
+  }
+
+  @override
+  int get importDirective_prefixOffset {
+    assert(kind == idl.LinkedNodeKind.importDirective);
+    _variantField_8 ??= const fb.Uint32Reader().vTableGet(_bc, _bcOffset, 8, 0);
+    return _variantField_8;
   }
 
   @override
@@ -24289,6 +24352,13 @@ abstract class _UnlinkedInformativeDataMixin
       if (directiveKeywordOffset != 0)
         _result["directiveKeywordOffset"] = directiveKeywordOffset;
     }
+    if (kind == idl.LinkedNodeKind.extensionDeclaration) {
+      if (codeLength != 0) _result["codeLength"] = codeLength;
+      if (codeOffset != 0) _result["codeOffset"] = codeOffset;
+      if (nameOffset != 0) _result["nameOffset"] = nameOffset;
+      if (documentationComment_tokens.isNotEmpty)
+        _result["documentationComment_tokens"] = documentationComment_tokens;
+    }
     if (kind == idl.LinkedNodeKind.fieldDeclaration) {
       if (documentationComment_tokens.isNotEmpty)
         _result["documentationComment_tokens"] = documentationComment_tokens;
@@ -24327,6 +24397,8 @@ abstract class _UnlinkedInformativeDataMixin
     if (kind == idl.LinkedNodeKind.importDirective) {
       if (directiveKeywordOffset != 0)
         _result["directiveKeywordOffset"] = directiveKeywordOffset;
+      if (importDirective_prefixOffset != 0)
+        _result["importDirective_prefixOffset"] = importDirective_prefixOffset;
     }
     if (kind == idl.LinkedNodeKind.libraryDirective) {
       if (directiveKeywordOffset != 0)
@@ -24448,6 +24520,15 @@ abstract class _UnlinkedInformativeDataMixin
         "kind": kind,
       };
     }
+    if (kind == idl.LinkedNodeKind.extensionDeclaration) {
+      return {
+        "codeLength": codeLength,
+        "codeOffset": codeOffset,
+        "nameOffset": nameOffset,
+        "documentationComment_tokens": documentationComment_tokens,
+        "kind": kind,
+      };
+    }
     if (kind == idl.LinkedNodeKind.fieldDeclaration) {
       return {
         "documentationComment_tokens": documentationComment_tokens,
@@ -24500,6 +24581,7 @@ abstract class _UnlinkedInformativeDataMixin
     if (kind == idl.LinkedNodeKind.importDirective) {
       return {
         "directiveKeywordOffset": directiveKeywordOffset,
+        "importDirective_prefixOffset": importDirective_prefixOffset,
         "kind": kind,
       };
     }

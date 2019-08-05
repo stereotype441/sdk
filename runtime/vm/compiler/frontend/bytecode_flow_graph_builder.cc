@@ -810,6 +810,15 @@ void BytecodeFlowGraphBuilder::BuildDirectCall() {
     }
   }
 
+  if (!FLAG_causal_async_stacks &&
+      target.recognized_kind() == MethodRecognizer::kAsyncStackTraceHelper) {
+    ASSERT(argc == 1);
+    // Drop the ignored parameter to _asyncStackTraceHelper(:async_op).
+    code_ += B->Drop();
+    code_ += B->NullConstant();
+    return;
+  }
+
   const Array& arg_desc_array =
       Array::Cast(ConstantAt(DecodeOperandD(), 1).value());
   const ArgumentsDescriptor arg_desc(arg_desc_array);
@@ -855,7 +864,7 @@ void BytecodeFlowGraphBuilder::BuildInterfaceCallCommon(
   if (token_kind != Token::kILLEGAL) {
     intptr_t argument_count = arg_desc.Count();
     ASSERT(argument_count <= 2);
-    checked_argument_count = argument_count;
+    checked_argument_count = (token_kind == Token::kSET) ? 1 : argument_count;
   } else if (Library::IsPrivateCoreLibName(name,
                                            Symbols::_simpleInstanceOf())) {
     ASSERT(arg_desc.Count() == 2);

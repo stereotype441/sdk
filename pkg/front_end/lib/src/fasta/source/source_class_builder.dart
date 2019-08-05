@@ -27,17 +27,15 @@ import '../kernel/kernel_builder.dart'
         ClassBuilder,
         ConstructorReferenceBuilder,
         Declaration,
-        KernelClassBuilder,
         KernelFieldBuilder,
-        KernelFunctionBuilder,
-        KernelInvalidTypeBuilder,
+        FunctionBuilder,
+        InvalidTypeBuilder,
         KernelLibraryBuilder,
         NamedTypeBuilder,
-        TypeBuilder,
-        KernelTypeVariableBuilder,
         LibraryBuilder,
         MetadataBuilder,
         Scope,
+        TypeBuilder,
         TypeVariableBuilder,
         compareProcedures;
 
@@ -56,8 +54,7 @@ Class initializeClass(
   cls ??= new Class(
       name: name,
       typeParameters:
-          KernelTypeVariableBuilder.kernelTypeParametersFromBuilders(
-              typeVariables));
+          TypeVariableBuilder.kernelTypeParametersFromBuilders(typeVariables));
   cls.fileUri ??= parent.fileUri;
   if (cls.startFileOffset == TreeNode.noOffset) {
     cls.startFileOffset = startCharOffset;
@@ -72,7 +69,7 @@ Class initializeClass(
   return cls;
 }
 
-class SourceClassBuilder extends KernelClassBuilder
+class SourceClassBuilder extends ClassBuilder
     implements Comparable<SourceClassBuilder> {
   @override
   final Class actualCls;
@@ -130,7 +127,7 @@ class SourceClassBuilder extends KernelClassBuilder
           if (!declaration.isPatch && declaration.next == null) {
             cls.addMember(field);
           }
-        } else if (declaration is KernelFunctionBuilder) {
+        } else if (declaration is FunctionBuilder) {
           Member function = declaration.build(library);
           function.parent = cls;
           if (!declaration.isPatch && declaration.next == null) {
@@ -259,7 +256,7 @@ class SourceClassBuilder extends KernelClassBuilder
     }
     if (message != null) {
       return new NamedTypeBuilder(supertype.name, null)
-        ..bind(new KernelInvalidTypeBuilder(supertype.name,
+        ..bind(new InvalidTypeBuilder(supertype.name,
             message.withLocation(fileUri, charOffset, noLength)));
     }
     return supertype;

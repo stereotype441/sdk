@@ -1169,6 +1169,9 @@ abstract class LinkedNode extends base.SummaryClass {
   @VariantId(5, variant: LinkedNodeKind.extensionDeclaration)
   List<LinkedNode> get extensionDeclaration_members;
 
+  @VariantId(20, variant: LinkedNodeKind.extensionDeclaration)
+  String get extensionDeclaration_refName;
+
   @VariantId(6, variant: LinkedNodeKind.extensionDeclaration)
   LinkedNode get extensionDeclaration_typeParameters;
 
@@ -1315,9 +1318,6 @@ abstract class LinkedNode extends base.SummaryClass {
 
   @VariantId(1, variant: LinkedNodeKind.importDirective)
   String get importDirective_prefix;
-
-  @VariantId(15, variant: LinkedNodeKind.importDirective)
-  int get importDirective_prefixOffset;
 
   @VariantId(15, variant: LinkedNodeKind.indexExpression)
   int get indexExpression_element;
@@ -3621,6 +3621,7 @@ abstract class UnlinkedInformativeData extends base.SummaryClass {
     LinkedNodeKind.constructorDeclaration,
     LinkedNodeKind.defaultFormalParameter,
     LinkedNodeKind.enumDeclaration,
+    LinkedNodeKind.extensionDeclaration,
     LinkedNodeKind.fieldFormalParameter,
     LinkedNodeKind.functionDeclaration,
     LinkedNodeKind.functionTypeAlias,
@@ -3641,6 +3642,7 @@ abstract class UnlinkedInformativeData extends base.SummaryClass {
     LinkedNodeKind.constructorDeclaration,
     LinkedNodeKind.defaultFormalParameter,
     LinkedNodeKind.enumDeclaration,
+    LinkedNodeKind.extensionDeclaration,
     LinkedNodeKind.fieldFormalParameter,
     LinkedNodeKind.functionDeclaration,
     LinkedNodeKind.functionTypeAlias,
@@ -3679,6 +3681,7 @@ abstract class UnlinkedInformativeData extends base.SummaryClass {
     LinkedNodeKind.constructorDeclaration,
     LinkedNodeKind.enumDeclaration,
     LinkedNodeKind.enumConstantDeclaration,
+    LinkedNodeKind.extensionDeclaration,
     LinkedNodeKind.fieldDeclaration,
     LinkedNodeKind.functionDeclaration,
     LinkedNodeKind.functionTypeAlias,
@@ -3690,6 +3693,9 @@ abstract class UnlinkedInformativeData extends base.SummaryClass {
   ])
   List<String> get documentationComment_tokens;
 
+  @VariantId(8, variant: LinkedNodeKind.importDirective)
+  int get importDirective_prefixOffset;
+
   /// The kind of the node.
   @Id(0)
   LinkedNodeKind get kind;
@@ -3700,6 +3706,7 @@ abstract class UnlinkedInformativeData extends base.SummaryClass {
     LinkedNodeKind.constructorDeclaration,
     LinkedNodeKind.enumConstantDeclaration,
     LinkedNodeKind.enumDeclaration,
+    LinkedNodeKind.extensionDeclaration,
     LinkedNodeKind.fieldFormalParameter,
     LinkedNodeKind.functionDeclaration,
     LinkedNodeKind.functionTypedFormalParameter,

@@ -304,8 +304,8 @@ static void CollectBytecodeFunctionTokenPositions(
       object = pool.ObjectAt(i);
       if (object.IsFunction()) {
         closure ^= object.raw();
-        if ((closure.kind() == RawFunction::kClosureFunction) &&
-            (closure.IsLocalFunction())) {
+        if (closure.kind() == RawFunction::kClosureFunction &&
+            closure.IsLocalFunction()) {
           bytecode = closure.bytecode();
           ASSERT(!bytecode.IsNull());
           if (bytecode.HasSourcePositions()) {
@@ -654,6 +654,15 @@ RawObject* BuildParameterDescriptor(const Function& function) {
     TranslationHelper helper(thread);
     Script& script = Script::Handle(zone, function.script());
     helper.InitFromScript(script);
+
+    if (function.is_declared_in_bytecode()) {
+      BytecodeComponentData bytecode_component(
+          &Array::Handle(zone, helper.GetBytecodeComponent()));
+      ActiveClass active_class;
+      BytecodeReaderHelper bytecode_reader_helper(&helper, &active_class,
+                                                  &bytecode_component);
+      return bytecode_reader_helper.BuildParameterDescriptor(function);
+    }
 
     const Class& owner_class = Class::Handle(zone, function.Owner());
     ActiveClass active_class;

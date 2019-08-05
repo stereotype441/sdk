@@ -24,8 +24,6 @@ import '../problems.dart' show unsupported;
 import '../kernel/kernel_builder.dart'
     show
         FormalParameterBuilder,
-        KernelFormalParameterBuilder,
-        KernelTypeVariableBuilder,
         LibraryBuilder,
         TypeBuilder,
         TypeVariableBuilder;
@@ -33,7 +31,7 @@ import '../kernel/kernel_builder.dart'
 class FunctionTypeBuilder extends TypeBuilder {
   final TypeBuilder returnType;
   final List<TypeVariableBuilder> typeVariables;
-  final List<FormalParameterBuilder<TypeBuilder>> formals;
+  final List<FormalParameterBuilder> formals;
 
   FunctionTypeBuilder(this.returnType, this.typeVariables, this.formals);
 
@@ -82,7 +80,7 @@ class FunctionTypeBuilder extends TypeBuilder {
     List<NamedType> namedParameters;
     int requiredParameterCount = 0;
     if (formals != null) {
-      for (KernelFormalParameterBuilder formal in formals) {
+      for (FormalParameterBuilder formal in formals) {
         DartType type = formal.type?.build(library) ?? const DynamicType();
         if (formal.isPositional) {
           positionalParameters.add(type);
@@ -99,7 +97,7 @@ class FunctionTypeBuilder extends TypeBuilder {
     List<TypeParameter> typeParameters;
     if (typeVariables != null) {
       typeParameters = <TypeParameter>[];
-      for (KernelTypeVariableBuilder t in typeVariables) {
+      for (TypeVariableBuilder t in typeVariables) {
         typeParameters.add(t.parameter);
       }
     }
@@ -139,7 +137,7 @@ class FunctionTypeBuilder extends TypeBuilder {
     if (formals != null) {
       clonedFormals = new List<FormalParameterBuilder>(formals.length);
       for (int i = 0; i < clonedFormals.length; i++) {
-        KernelFormalParameterBuilder formal = formals[i];
+        FormalParameterBuilder formal = formals[i];
         clonedFormals[i] = formal.clone(newTypes);
       }
     }

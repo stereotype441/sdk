@@ -30,29 +30,27 @@ class FlowAnalysisHelper {
   final AssignedVariables<Statement, VariableElement> assignedVariables;
 
   /// The result for post-resolution stages of analysis.
-  final FlowAnalysisResult result = FlowAnalysisResult();
+  final FlowAnalysisResult result;
 
   /// The current flow, when resolving a function body, or `null` otherwise.
   FlowAnalysis<Statement, Expression, VariableElement, DartType> flow;
 
   int _blockFunctionBodyLevel = 0;
 
-  factory FlowAnalysisHelper(TypeSystem typeSystem, AstNode node) {
+  factory FlowAnalysisHelper(
+      TypeSystem typeSystem, AstNode node, bool retainDataForTesting) {
     var assignedVariables = AssignedVariables<Statement, VariableElement>();
     node.accept(_AssignedVariablesVisitor(assignedVariables));
 
     return FlowAnalysisHelper._(
-      _NodeOperations(),
-      _TypeSystemTypeOperations(typeSystem),
-      assignedVariables,
-    );
+        _NodeOperations(),
+        _TypeSystemTypeOperations(typeSystem),
+        assignedVariables,
+        retainDataForTesting ? FlowAnalysisResult() : null);
   }
 
-  FlowAnalysisHelper._(
-    this._nodeOperations,
-    this._typeOperations,
-    this.assignedVariables,
-  );
+  FlowAnalysisHelper._(this._nodeOperations, this._typeOperations,
+      this.assignedVariables, this.result);
 
   LocalVariableTypeProvider get localVariableTypeProvider {
     return _LocalVariableTypeProvider(this);
@@ -163,7 +161,7 @@ class FlowAnalysisHelper {
     this.flow = null;
 
     if (!flow.isReachable) {
-      result.functionBodiesThatDontComplete.add(node);
+      result?.functionBodiesThatDontComplete?.add(node);
     }
 
     flow.finish();
@@ -180,13 +178,15 @@ class FlowAnalysisHelper {
     if (flow == null) return;
     if (flow.isReachable) return;
 
-    // Ignore the [node] if it is fully covered by the last unreachable.
-    if (result.unreachableNodes.isNotEmpty) {
-      var last = result.unreachableNodes.last;
-      if (node.offset >= last.offset && node.end <= last.end) return;
-    }
+    if (result != null) {
+      // Ignore the [node] if it is fully covered by the last unreachable.
+      if (result.unreachableNodes.isNotEmpty) {
+        var last = result.unreachableNodes.last;
+        if (node.offset >= last.offset && node.end <= last.end) return;
+      }
 
-    result.unreachableNodes.add(node);
+      result.unreachableNodes.add(node);
+    }
   }
 
   void continueStatement(ContinueStatement node) {
@@ -234,11 +234,19 @@ class FlowAnalysisHelper {
 
     var element = node.staticElement;
     if (element is LocalVariableElement) {
-      if (element.isLate) return false;
-
       var typeSystem = _typeOperations.typeSystem;
       if (typeSystem.isPotentiallyNonNullable(element.type)) {
-        return !flow.isAssigned(element);
+        var isUnassigned = !flow.isAssigned(element);
+        if (isUnassigned) {
+          result?.unassignedNodes?.add(node);
+        }
+        // Note: in principle we could make this slightly more performant by
+        // checking element.isLate earlier, but we would lose the ability to
+        // test the flow analysis mechanism using late variables.  And it seems
+        // unlikely that the `late` modifier will be used often enough for it to
+        // make a significant difference.
+        if (element.isLate) return false;
+        return isUnassigned;
       }
     }
 
@@ -313,8 +321,6 @@ class FlowAnalysisHelper {
 
 /// The result of performing flow analysis on a unit.
 class FlowAnalysisResult {
-  static const _astKey = 'FlowAnalysisResult';
-
   /// The list of nodes, [Expression]s or [Statement]s, that cannot be reached,
   /// for example because a previous statement always exits.
   final List<AstNode> unreachableNodes = [];
@@ -323,13 +329,9 @@ class FlowAnalysisResult {
   /// there is a `return` statement at the end of the function body block.
   final List<FunctionBody> functionBodiesThatDontComplete = [];
 
-  void putIntoNode(AstNode node) {
-    node.setProperty(_astKey, this);
-  }
-
-  static FlowAnalysisResult getFromNode(AstNode node) {
-    return node.getProperty(_astKey);
-  }
+  /// The list of [Expression]s representing variable accesses that occur before
+  /// the corresponding variable has been definitely assigned.
+  final List<AstNode> unassignedNodes = [];
 }
 
 /// The visitor that gathers local variables that are potentially assigned
@@ -477,11 +479,6 @@ class _TypeSystemTypeOperations
 
   @override
   bool isSameType(covariant TypeImpl type1, covariant TypeImpl type2) {
-    if (type1.nullabilitySuffix != type2.nullabilitySuffix) {
-      // TODO(paulberry): after DartType.operator== has been updated to compare
-      // nullabilities, this if test can be dropped.  See dartbug.com/37587.
-      return false;
-    }
     return type1 == type2;
   }
 

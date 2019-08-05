@@ -605,7 +605,7 @@ class AstBinaryReader {
         members: _readNodeListLazy(data.extensionDeclaration_members),
         rightBracket: _Tokens.CLOSE_CURLY_BRACKET,
       );
-      LazyExtensionDeclaration.setData(node, data);
+      LazyExtensionDeclaration(node, data);
       return node;
     } finally {
       timerAstBinaryReaderClass.stop();
@@ -946,9 +946,12 @@ class AstBinaryReader {
       SimpleIdentifier prefix;
       if (data.importDirective_prefix.isNotEmpty) {
         prefix = astFactory.simpleIdentifier(
-          TokenFactory.tokenFromString(data.importDirective_prefix)
-            ..offset = data.importDirective_prefixOffset,
+          TokenFactory.tokenFromString(data.importDirective_prefix),
         );
+
+        var informativeData = _unitContext.getInformativeData(data);
+        prefix.token.offset =
+            informativeData?.importDirective_prefixOffset ?? 0;
       }
 
       var node = astFactory.importDirective(

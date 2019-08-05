@@ -672,10 +672,34 @@ class LazyExtensionDeclaration {
   bool _hasMembers = false;
   bool _hasMetadata = false;
 
-  LazyExtensionDeclaration(this.data);
+  /// The name for use in `Reference`. If the extension is named, the name
+  /// of the extension. If the extension is unnamed, a synthetic name.
+  String _refName;
+
+  LazyExtensionDeclaration(ExtensionDeclaration node, this.data) {
+    node.setProperty(_key, this);
+    if (data != null) {
+      _refName = data.extensionDeclaration_refName;
+    }
+  }
+
+  String get refName => _refName;
+
+  void put(LinkedNodeBuilder builder) {
+    assert(_refName != null);
+    builder.extensionDeclaration_refName = _refName;
+  }
+
+  void setRefName(String referenceName) {
+    _refName = referenceName;
+  }
 
   static LazyExtensionDeclaration get(ExtensionDeclaration node) {
-    return node.getProperty(_key);
+    LazyExtensionDeclaration lazy = node.getProperty(_key);
+    if (lazy == null) {
+      return LazyExtensionDeclaration(node, null);
+    }
+    return lazy;
   }
 
   static int getCodeLength(
@@ -683,7 +707,7 @@ class LazyExtensionDeclaration {
     ExtensionDeclaration node,
   ) {
     var lazy = get(node);
-    if (lazy != null) {
+    if (lazy?.data != null) {
       return context.getInformativeData(lazy.data)?.codeLength ?? 0;
     }
     return node.length;
@@ -694,7 +718,7 @@ class LazyExtensionDeclaration {
     ExtensionDeclaration node,
   ) {
     var lazy = get(node);
-    if (lazy != null) {
+    if (lazy?.data != null) {
       return context.getInformativeData(lazy.data)?.codeOffset ?? 0;
     }
     return node.offset;
@@ -705,7 +729,7 @@ class LazyExtensionDeclaration {
     ExtensionDeclaration node,
   ) {
     var lazy = get(node);
-    if (lazy != null && !lazy._hasDocumentationComment) {
+    if (lazy?.data != null && !lazy._hasDocumentationComment) {
       node.documentationComment = context.createComment(lazy.data);
       lazy._hasDocumentationComment = true;
     }
@@ -716,7 +740,7 @@ class LazyExtensionDeclaration {
     ExtensionDeclaration node,
   ) {
     var lazy = get(node);
-    if (lazy != null && !lazy._hasExtendedType) {
+    if (lazy?.data != null && !lazy._hasExtendedType) {
       (node as ExtensionDeclarationImpl).extendedType = reader.readNode(
         lazy.data.extensionDeclaration_extendedType,
       );
@@ -729,7 +753,7 @@ class LazyExtensionDeclaration {
     ExtensionDeclaration node,
   ) {
     var lazy = get(node);
-    if (lazy != null && !lazy._hasMembers) {
+    if (lazy?.data != null && !lazy._hasMembers) {
       var dataList = lazy.data.extensionDeclaration_members;
       for (var i = 0; i < dataList.length; ++i) {
         var data = dataList[i];
@@ -744,7 +768,7 @@ class LazyExtensionDeclaration {
     ExtensionDeclaration node,
   ) {
     var lazy = get(node);
-    if (lazy != null && !lazy._hasMetadata) {
+    if (lazy?.data != null && !lazy._hasMetadata) {
       var dataList = lazy.data.annotatedNode_metadata;
       for (var i = 0; i < dataList.length; ++i) {
         var data = dataList[i];
@@ -752,10 +776,6 @@ class LazyExtensionDeclaration {
       }
       lazy._hasMetadata = true;
     }
-  }
-
-  static void setData(ExtensionDeclaration node, LinkedNode data) {
-    node.setProperty(_key, LazyExtensionDeclaration(data));
   }
 }
 

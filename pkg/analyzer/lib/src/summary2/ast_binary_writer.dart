@@ -503,6 +503,7 @@ class AstBinaryWriter extends ThrowingAstVisitor<LinkedNodeBuilder> {
     _storeCompilationUnitMember(builder, node);
     _storeInformativeId(builder, node);
     builder.name = node.name?.name;
+    LazyExtensionDeclaration.get(node).put(builder);
 
     return builder;
   }
@@ -771,7 +772,6 @@ class AstBinaryWriter extends ThrowingAstVisitor<LinkedNodeBuilder> {
     try {
       var builder = LinkedNodeBuilder.importDirective(
         importDirective_prefix: node.prefix?.name,
-        importDirective_prefixOffset: node.prefix?.offset ?? 0,
       );
       builder.flags = AstBinaryFlags.encode(
         isDeferred: node.deferredKeyword != null,
