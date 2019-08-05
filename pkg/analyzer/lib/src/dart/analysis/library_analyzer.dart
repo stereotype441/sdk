@@ -22,6 +22,7 @@ import 'package:analyzer/src/dart/constant/utilities.dart';
 import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/handle.dart';
 import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
+import 'package:analyzer/src/dart/resolver/ast_rewrite.dart';
 import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
 import 'package:analyzer/src/dart/resolver/legacy_type_asserter.dart';
 import 'package:analyzer/src/error/codes.dart';
@@ -105,7 +106,8 @@ class LibraryAnalyzer {
       this._library,
       this._resourceProvider,
       {TestingData testingData})
-      : _typeSystem = _context.typeSystem, _testingData = testingData;
+      : _typeSystem = _context.typeSystem,
+        _testingData = testingData;
 
   /**
    * Compute analysis results for all units of the library.
