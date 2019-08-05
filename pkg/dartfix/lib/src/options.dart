@@ -13,6 +13,7 @@ const forceOption = 'force';
 const includeFixOption = 'fix';
 const excludeFixOption = 'excludeFix';
 const overwriteOption = 'overwrite';
+const pedanticOption = 'pedantic';
 const requiredOption = 'required';
 
 const _binaryName = 'dartfix';
@@ -32,6 +33,7 @@ class Options {
   final String sdkPath;
   final String serverSnapshot;
 
+  final bool pedanticFixes;
   final bool requiredFixes;
   final List<String> includeFixes;
   final List<String> excludeFixes;
@@ -47,6 +49,7 @@ class Options {
         includeFixes = (results[includeFixOption] as List ?? []).cast<String>(),
         excludeFixes = (results[excludeFixOption] as List ?? []).cast<String>(),
         overwrite = results[overwriteOption] as bool,
+        pedanticFixes = results[pedanticOption] as bool,
         requiredFixes = results[requiredOption] as bool,
         sdkPath = _getSdkPath(),
         serverSnapshot = results[_serverSnapshot],
@@ -71,11 +74,10 @@ class Options {
           help: 'Include a specific fix.', valueHelp: 'name-of-fix')
       ..addMultiOption(excludeFixOption,
           help: 'Exclude a specific fix.', valueHelp: 'name-of-fix')
+      ..addFlag(pedanticOption,
+          help: 'Apply pedantic fixes.', defaultsTo: false, negatable: false)
       ..addFlag(requiredOption,
-          abbr: 'r',
-          help: 'Apply required fixes.',
-          defaultsTo: false,
-          negatable: false)
+          help: 'Apply required fixes.', defaultsTo: false, negatable: false)
       ..addSeparator('Modifying files:')
       ..addFlag(overwriteOption,
           abbr: 'w',
@@ -113,7 +115,7 @@ class Options {
       logger ??= Logger.standard(ansi: Ansi(Ansi.terminalSupportsAnsi));
       logger.stderr(e.message);
       _showUsage(parser, logger);
-      context.exit(15);
+      context.exit(17);
     }
 
     Options options = Options._fromArgs(context, results);
@@ -142,18 +144,18 @@ class Options {
     String sdkPath = options.sdkPath;
     if (sdkPath == null) {
       logger.stderr('No Dart SDK found.');
-      context.exit(15);
+      context.exit(18);
     }
 
     if (!context.exists(sdkPath)) {
       logger.stderr('Invalid Dart SDK path: $sdkPath');
-      context.exit(15);
+      context.exit(19);
     }
 
     // Check for files and/or directories to analyze.
     if (options.targets == null || options.targets.isEmpty) {
       logger.stderr('Expected at least one file or directory to analyze.');
-      context.exit(15);
+      context.exit(20);
     }
 
     // Normalize and verify paths
@@ -166,7 +168,7 @@ class Options {
         } else {
           logger.stderr('Expected directory, but found: $target');
         }
-        context.exit(15);
+        context.exit(21);
       }
     }
 

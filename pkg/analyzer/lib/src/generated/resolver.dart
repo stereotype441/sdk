@@ -3820,6 +3820,7 @@ class ResolverVisitor extends ScopedVisitor {
     try {
       DartType extendedType = node.declaredElement.extendedType;
       if (extendedType is InterfaceType) {
+        // TODO(brianwilkerson) Handle other cases.
         typeAnalyzer.thisType = extendedType;
       }
       super.visitExtensionDeclaration(node);
@@ -5368,8 +5369,8 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
         if (extendedType is InterfaceType) {
           nameScope = new ClassScope(nameScope, extendedType.element);
         } else if (extendedType is FunctionType) {
-          // TODO(brianwilkerson) Figure out what, if anything, to do here.
-          throw UnsupportedError('Extension of function type');
+          nameScope =
+              new ClassScope(nameScope, typeProvider.functionType.element);
         }
         nameScope = ExtensionScope(nameScope, extensionElement);
         visitExtensionMembersInScope(node);
@@ -6751,6 +6752,9 @@ abstract class TypeProvider {
   /// Return the type representing the built-in type 'Type'.
   InterfaceType get typeType;
 
+  /// Return the type representing the built-in type `void`.
+  VoidType get voidType;
+
   /// Return 'true' if [id] is the name of a getter on
   /// the Object type.
   bool isObjectGetter(String id);
@@ -6987,6 +6991,9 @@ class TypeProviderImpl extends TypeProviderBase {
 
   @override
   InterfaceType get typeType => _typeType;
+
+  @override
+  VoidType get voidType => VoidTypeImpl.instance;
 
   /// Return the type with the given [typeName] from the given [namespace], or
   /// `null` if there is no class with the given name.

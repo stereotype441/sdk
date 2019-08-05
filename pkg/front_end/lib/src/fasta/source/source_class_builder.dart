@@ -27,10 +27,9 @@ import '../kernel/kernel_builder.dart'
         ClassBuilder,
         ConstructorReferenceBuilder,
         Declaration,
-        KernelFieldBuilder,
+        FieldBuilder,
         FunctionBuilder,
         InvalidTypeBuilder,
-        KernelLibraryBuilder,
         NamedTypeBuilder,
         LibraryBuilder,
         MetadataBuilder,
@@ -43,11 +42,13 @@ import '../kernel/type_algorithms.dart' show Variance, computeVariance;
 
 import '../problems.dart' show unexpected, unhandled;
 
+import 'source_library_builder.dart' show SourceLibraryBuilder;
+
 Class initializeClass(
     Class cls,
     List<TypeVariableBuilder> typeVariables,
     String name,
-    KernelLibraryBuilder parent,
+    SourceLibraryBuilder parent,
     int startCharOffset,
     int charOffset,
     int charEndOffset) {
@@ -107,9 +108,9 @@ class SourceClassBuilder extends ClassBuilder
   Class get cls => origin.actualCls;
 
   @override
-  KernelLibraryBuilder get library => super.library;
+  SourceLibraryBuilder get library => super.library;
 
-  Class build(KernelLibraryBuilder library, LibraryBuilder coreLibrary) {
+  Class build(SourceLibraryBuilder library, LibraryBuilder coreLibrary) {
     void buildBuilders(String name, Declaration declaration) {
       do {
         if (declaration.parent != this) {
@@ -120,7 +121,7 @@ class SourceClassBuilder extends ClassBuilder
             unexpected(fullNameForErrors, declaration.parent?.fullNameForErrors,
                 charOffset, fileUri);
           }
-        } else if (declaration is KernelFieldBuilder) {
+        } else if (declaration is FieldBuilder) {
           // TODO(ahe): It would be nice to have a common interface for the
           // build method to avoid duplicating these two cases.
           Member field = declaration.build(library);

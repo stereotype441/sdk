@@ -208,7 +208,7 @@ EntityRefBuilder _createLinkedType(
     result.reference = compilationUnit.addRawReference('*bottom*');
     return result;
   } else if (type is TypeParameterType) {
-    TypeParameterElementImpl element = type.element;
+    TypeParameterElement element = type.element;
     var deBruijnIndex = typeParameterContext?.computeDeBruijnIndex(element);
     if (deBruijnIndex != null) {
       result.paramReference = deBruijnIndex;
@@ -5559,6 +5559,9 @@ class TypeProviderForLink extends TypeProviderBase {
   @override
   InterfaceType get typeType =>
       _typeType ??= _buildInterfaceType(_linker.coreLibrary, 'Type');
+
+  @override
+  VoidType get voidType => VoidTypeImpl.instance;
 
   InterfaceType _buildInterfaceType(
       LibraryElementForLink library, String name) {

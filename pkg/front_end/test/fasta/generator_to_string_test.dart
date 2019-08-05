@@ -32,7 +32,6 @@ import 'package:front_end/src/fasta/dill/dill_target.dart' show DillTarget;
 
 import 'package:front_end/src/fasta/kernel/kernel_builder.dart'
     show
-        KernelLibraryBuilder,
         TypeVariableBuilder,
         LoadLibraryBuilder,
         PrefixBuilder,
@@ -51,6 +50,9 @@ import 'package:front_end/src/fasta/kernel/body_builder.dart' show BodyBuilder;
 
 import 'package:front_end/src/fasta/scanner.dart' show Token, scanString;
 
+import 'package:front_end/src/fasta/source/source_library_builder.dart'
+    show SourceLibraryBuilder;
+
 void check(String expected, Generator generator) {
   Expect.stringEquals(expected, "$generator");
 }
@@ -65,7 +67,7 @@ main() {
     Expression expression =
         new VariableGet(new VariableDeclaration("expression"));
     Expression index = new VariableGet(new VariableDeclaration("index"));
-    KernelLibraryBuilder libraryBuilder = new KernelLibraryBuilder(
+    SourceLibraryBuilder libraryBuilder = new SourceLibraryBuilder(
         uri,
         uri,
         new KernelTarget(
@@ -88,18 +90,16 @@ main() {
     Name binaryOperator = new Name("+");
     Name name = new Name("bar");
     PrefixBuilder prefixBuilder =
-        new PrefixBuilder("myPrefix", false, libraryBuilder, -1, -1);
+        new PrefixBuilder("myPrefix", false, libraryBuilder, null, -1, -1);
     String assignmentOperator = "+=";
-    TypeDeclarationBuilder declaration =
-        new TypeVariableBuilder.fromKernel(
-            new TypeParameter("T"), libraryBuilder);
+    TypeDeclarationBuilder declaration = new TypeVariableBuilder.fromKernel(
+        new TypeParameter("T"), libraryBuilder);
     VariableDeclaration variable = new VariableDeclaration(null);
 
     BodyBuilder helper = new BodyBuilder(libraryBuilder, null, null, null, null,
         null, null, false, null, uri, null);
 
-    Generator generator =
-        new ThisAccessGenerator(helper, token, false, false, null);
+    Generator generator = new ThisAccessGenerator(helper, token, false, false);
 
     Library library = new Library(uri);
     Class cls = new Class();
@@ -170,8 +170,8 @@ main() {
         new LoadLibraryGenerator(helper, token, loadLibraryBuilder));
     check(
         "ThisAccessGenerator(offset: 4, isInitializer: false, "
-        "inFieldInitializer: false, isSuper: false, extensionThis: null)",
-        new ThisAccessGenerator(helper, token, false, false, null));
+        "inFieldInitializer: false, isSuper: false)",
+        new ThisAccessGenerator(helper, token, false, false));
     check("IncompleteErrorGenerator(offset: 4, message: Unspecified)",
         new IncompleteErrorGenerator(helper, token, message));
     check("SendAccessGenerator(offset: 4, name: bar, arguments: (\"arg\"))",
@@ -183,7 +183,7 @@ main() {
         " prefixGenerator: PrefixUseGenerator("
         "offset: 4, prefix: myPrefix, deferred: false),"
         " suffixGenerator: ThisAccessGenerator(offset: 4, isInitializer: false,"
-        " inFieldInitializer: false, isSuper: false, extensionThis: null))",
+        " inFieldInitializer: false, isSuper: false))",
         new DeferredAccessGenerator(
             helper, token, prefixUseGenerator, generator));
     check(
@@ -207,7 +207,7 @@ main() {
     check(
         "UnexpectedQualifiedUseGenerator("
         "offset: 4, prefixGenerator: , isInitializer: false,"
-        " inFieldInitializer: false, isSuper: false, extensionThis: null)",
+        " inFieldInitializer: false, isSuper: false)",
         new UnexpectedQualifiedUseGenerator(helper, token, generator, false));
     return Future<void>.value();
   });

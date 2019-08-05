@@ -7,8 +7,6 @@ library fasta.stack_listener;
 import 'package:kernel/ast.dart'
     show AsyncMarker, Expression, FunctionNode, TreeNode;
 
-import '../builder/builder.dart';
-
 import '../fasta_codes.dart'
     show
         Code,
@@ -29,6 +27,8 @@ import '../problems.dart'
 import '../quote.dart' show unescapeString;
 
 import '../scanner.dart' show Token;
+
+import 'value_kinds.dart';
 
 enum NullValue {
   Arguments,
@@ -76,27 +76,6 @@ enum NullValue {
   WithClause,
 }
 
-/// Enum values used for checking the expected top of the stack in
-/// `StackListener.checkState`.
-enum ValueKind {
-  Integer,
-  TypeVariableListOrNull,
-  TypeBuilder,
-  Name,
-  NameOrNull,
-  NameOrParserRecovery,
-  NameOrParserRecoveryOrNull,
-  MetadataListOrNull,
-  Token,
-  TokenOrNull,
-}
-
-/// Helper method for creating a list of [ValueKind]s of the given length
-/// [count].
-List<ValueKind> valueKinds(ValueKind kind, int count) {
-  return new List.generate(count, (_) => kind);
-}
-
 abstract class StackListener extends Listener {
   final Stack stack = new Stack();
 
@@ -107,78 +86,98 @@ abstract class StackListener extends Listener {
   /// Use this in assert statements like `assert(checkState([ValueKind.Token]))`
   /// to document the expected stack and get earlier errors on unexpected stack
   /// content.
-  bool checkState(List<ValueKind> kinds) {
-    bool success = true;
-    StringBuffer sb = new StringBuffer();
-
-    String padLeft(Object object, int length) {
-      String text = '$object';
-      if (text.length < length) {
-        return ' ' * (length - text.length) + text;
-      }
-      return text;
-    }
-
-    String padRight(Object object, int length) {
-      String text = '$object';
-      if (text.length < length) {
-        return text + ' ' * (length - text.length);
-      }
-      return text;
-    }
-
+  bool checkState(Token token, List<ValueKind> kinds) {
     bool checkValue(ValueKind kind, Object value) {
-      switch (kind) {
-        case ValueKind.Integer:
-          return value is int;
-        case ValueKind.TypeVariableListOrNull:
-          return value == NullValue.TypeVariables ||
-              value is List<TypeVariableBuilder>;
-        case ValueKind.TypeBuilder:
-          return value is TypeBuilder;
-        case ValueKind.Name:
-          return value is String;
-        case ValueKind.NameOrNull:
-          return value == NullValue.Name || value is String;
-        case ValueKind.NameOrParserRecovery:
-          return value is String || value is ParserRecovery;
-        case ValueKind.NameOrParserRecoveryOrNull:
-          return value == NullValue.Name ||
-              value is String ||
-              value is ParserRecovery;
-        case ValueKind.MetadataListOrNull:
-          return value == NullValue.Metadata || value is List<MetadataBuilder>;
-        case ValueKind.Token:
-          return value is Token;
-        case ValueKind.TokenOrNull:
-          return value == NullValue.Token || value is Token;
-      }
-      return false;
+      return kind.check(value);
     }
 
-    for (int i = 0; i < kinds.length; i++) {
-      ValueKind kind = kinds[i];
-      sb.write(padLeft(i, 4));
-      sb.write(': ');
-      sb.write(padRight(kind, 40));
-      int index = stack.arrayLength - i - 1;
-      if (index >= 0) {
-        Object value = stack.array[index];
-        if (checkValue(kind, value)) {
-          sb.write(' ');
-        } else {
-          sb.write('*');
+    bool success = true;
+    for (int kindIndex = 0; kindIndex < kinds.length; kindIndex++) {
+      int stackIndex = stack.arrayLength - kindIndex - 1;
+      ValueKind kind = kinds[kindIndex];
+      if (stackIndex >= 0) {
+        Object value = stack.array[stackIndex];
+        if (!checkValue(kind, value)) {
           success = false;
         }
-        sb.write(value);
-        sb.write(' (${value.runtimeType})');
       } else {
         success = false;
       }
-      sb.writeln();
     }
     if (!success) {
-      throw '$runtimeType failure\n$sb';
+      StringBuffer sb = new StringBuffer();
+
+      String safeToString(Object object) {
+        try {
+          return '$object';
+        } catch (e) {
+          // Judgments fail on toString.
+          return object.runtimeType.toString();
+        }
+      }
+
+      String padLeft(Object object, int length) {
+        String text = safeToString(object);
+        if (text.length < length) {
+          return ' ' * (length - text.length) + text;
+        }
+        return text;
+      }
+
+      String padRight(Object object, int length) {
+        String text = safeToString(object);
+        if (text.length < length) {
+          return text + ' ' * (length - text.length);
+        }
+        return text;
+      }
+
+      // Compute kind/stack frame information for all expected values plus 3 more
+      // stack elements if available.
+      for (int kindIndex = 0; kindIndex < kinds.length + 3; kindIndex++) {
+        int stackIndex = stack.arrayLength - kindIndex - 1;
+        if (stackIndex < 0 && kindIndex >= kinds.length) {
+          // No more stack elements nor kinds to display.
+          break;
+        }
+        sb.write(padLeft(kindIndex, 4));
+        sb.write(': ');
+        ValueKind kind;
+        if (kindIndex < kinds.length) {
+          kind = kinds[kindIndex];
+          sb.write(padRight(kind, 60));
+        } else {
+          sb.write(padRight('---', 60));
+        }
+        if (stackIndex >= 0) {
+          Object value = stack.array[stackIndex];
+          if (kind == null || checkValue(kind, value)) {
+            sb.write(' ');
+          } else {
+            sb.write('*');
+          }
+          sb.write(safeToString(value));
+          sb.write(' (${value.runtimeType})');
+        } else {
+          if (kind == null) {
+            sb.write(' ');
+          } else {
+            sb.write('*');
+          }
+          sb.write('---');
+        }
+        sb.writeln();
+      }
+
+      String message = '$runtimeType failure\n$sb';
+      if (token != null) {
+        // If offset is available report and internal problem to show the
+        // parsed code in the output.
+        throw internalProblem(
+            new Message(null, message: message), token.charOffset, uri);
+      } else {
+        throw message;
+      }
     }
     return success;
   }

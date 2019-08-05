@@ -42,7 +42,7 @@ import '../kernel/body_builder.dart' show BodyBuilder;
 import '../kernel/kernel_builder.dart'
     show FormalParameterBuilder, TypeAliasBuilder, TypeBuilder;
 
-import '../parser.dart' show Assert, MemberKind, Parser, optional;
+import '../parser.dart' show Assert, ClassKind, MemberKind, Parser, optional;
 
 import '../problems.dart'
     show DebugAbort, internalProblem, unexpected, unhandled;
@@ -52,13 +52,9 @@ import '../type_inference/type_inference_engine.dart' show TypeInferenceEngine;
 import 'source_library_builder.dart' show SourceLibraryBuilder;
 
 import 'stack_listener.dart'
-    show
-        FixedNullableList,
-        NullValue,
-        ParserRecovery,
-        StackListener,
-        ValueKind,
-        valueKinds;
+    show FixedNullableList, NullValue, ParserRecovery, StackListener;
+
+import '../source/value_kinds.dart';
 
 import '../quote.dart' show unescapeString;
 
@@ -104,7 +100,7 @@ class DietListener extends StackListener {
 
   @override
   void endMetadataStar(int count) {
-    assert(checkState(valueKinds(ValueKind.Token, count)));
+    assert(checkState(null, repeatedKinds(ValueKind.Token, count)));
     debugEvent("MetadataStar");
     if (count > 0) {
       discard(count - 1);
@@ -707,8 +703,8 @@ class DietListener extends StackListener {
   }
 
   @override
-  void beginClassOrMixinBody(Token token) {
-    assert(checkState([
+  void beginClassOrMixinBody(ClassKind kind, Token token) {
+    assert(checkState(token, [
       ValueKind.Token,
       ValueKind.NameOrParserRecovery,
       ValueKind.TokenOrNull
@@ -728,7 +724,8 @@ class DietListener extends StackListener {
   }
 
   @override
-  void endClassOrMixinBody(int memberCount, Token beginToken, Token endToken) {
+  void endClassOrMixinBody(
+      ClassKind kind, int memberCount, Token beginToken, Token endToken) {
     debugEvent("ClassOrMixinBody");
     currentClass = null;
     currentClassIsParserRecovery = false;
@@ -764,7 +761,7 @@ class DietListener extends StackListener {
     debugEvent("beginExtensionDeclaration");
     String name = nameToken?.lexeme ??
         // Synthesized name used internally.
-        'extension-${unnamedExtensionCounter++}';
+        'extension#${unnamedExtensionCounter++}';
     push(name);
     push(extensionKeyword);
   }
