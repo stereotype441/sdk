@@ -2,9 +2,11 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+import 'package:analyzer/analyzer.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
+import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/generated/resolver.dart';
@@ -76,6 +78,27 @@ class AssignmentCheckerTest extends Object with EdgeTester {
         source: source, destination: destination, hard: hard);
   }
 
+  DecoratedType function(DecoratedType returnType,
+      {List<DecoratedType> required = const [],
+      List<DecoratedType> positional = const [],
+      Map<String, DecoratedType> named = const {}}) {
+    int i = 0;
+    var parameters = required
+        .map((t) => ParameterElementImpl.synthetic(
+            'p${i++}', t.type, ParameterKind.REQUIRED))
+        .toList();
+    parameters.addAll(positional.map((t) => ParameterElementImpl.synthetic(
+        'p${i++}', t.type, ParameterKind.POSITIONAL)));
+    parameters.addAll(named.entries.map((e) => ParameterElementImpl.synthetic(
+        e.key, e.value.type, ParameterKind.NAMED)));
+    return DecoratedType(
+        FunctionTypeImpl.synthetic(returnType.type, const [], parameters),
+        NullabilityNode.forTypeAnnotation(offset++),
+        returnType: returnType,
+        positionalParameters: required.toList()..addAll(positional),
+        namedParameters: named);
+  }
+
   DecoratedType list(DecoratedType elementType) => DecoratedType(
       typeProvider.listType.instantiate([elementType.type]),
       NullabilityNode.forTypeAnnotation(offset++),
@@ -109,6 +132,68 @@ class AssignmentCheckerTest extends Object with EdgeTester {
     var t = object();
     assign(bottom, t);
     assertEdge(never, t.node, hard: false);
+  }
+
+  void test_dynamic_to_dynamic() {
+    assign(dynamic_, dynamic_);
+    // Note: no assertions to do; just need to make sure there wasn't a crash.
+  }
+
+  void test_function_type_named_parameter() {
+    var t1 = function(dynamic_, named: {'x': object()});
+    var t2 = function(dynamic_, named: {'x': object()});
+    assign(t1, t2);
+    // Note: t1 and t2 are swapped due to contravariance.
+    assertEdge(t2.namedParameters['x'].node, t1.namedParameters['x'].node,
+        hard: false);
+  }
+
+  void test_function_type_named_to_no_parameter() {
+    var t1 = function(dynamic_, named: {'x': object()});
+    var t2 = function(dynamic_);
+    assign(t1, t2);
+    // Note: no assertions to do; just need to make sure there wasn't a crash.
+  }
+
+  void test_function_type_positional_parameter() {
+    var t1 = function(dynamic_, positional: [object()]);
+    var t2 = function(dynamic_, positional: [object()]);
+    assign(t1, t2);
+    // Note: t1 and t2 are swapped due to contravariance.
+    assertEdge(t2.positionalParameters[0].node, t1.positionalParameters[0].node,
+        hard: false);
+  }
+
+  void test_function_type_positional_to_no_parameter() {
+    var t1 = function(dynamic_, positional: [object()]);
+    var t2 = function(dynamic_);
+    assign(t1, t2);
+    // Note: no assertions to do; just need to make sure there wasn't a crash.
+  }
+
+  void test_function_type_positional_to_required_parameter() {
+    var t1 = function(dynamic_, positional: [object()]);
+    var t2 = function(dynamic_, required: [object()]);
+    assign(t1, t2);
+    // Note: t1 and t2 are swapped due to contravariance.
+    assertEdge(t2.positionalParameters[0].node, t1.positionalParameters[0].node,
+        hard: false);
+  }
+
+  void test_function_type_required_parameter() {
+    var t1 = function(dynamic_, required: [object()]);
+    var t2 = function(dynamic_, required: [object()]);
+    assign(t1, t2);
+    // Note: t1 and t2 are swapped due to contravariance.
+    assertEdge(t2.positionalParameters[0].node, t1.positionalParameters[0].node,
+        hard: false);
+  }
+
+  void test_function_type_return_type() {
+    var t1 = function(object());
+    var t2 = function(object());
+    assign(t1, t2);
+    assertEdge(t1.returnType.node, t2.returnType.node, hard: false);
   }
 
   test_generic_to_dynamic() {
