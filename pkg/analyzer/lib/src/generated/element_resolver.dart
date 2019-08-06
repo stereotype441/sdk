@@ -19,12 +19,15 @@ import 'package:analyzer/src/dart/ast/ast.dart'
 import 'package:analyzer/src/dart/ast/token.dart';
 import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
+import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/dart/element/type.dart';
+import 'package:analyzer/src/dart/element/type_algebra.dart';
 import 'package:analyzer/src/dart/resolver/extension_member_resolver.dart';
 import 'package:analyzer/src/dart/resolver/method_invocation_resolver.dart';
 import 'package:analyzer/src/error/codes.dart';
 import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/generated/resolver.dart';
+import 'package:analyzer/src/generated/super_context.dart';
 import 'package:analyzer/src/task/strong/checker.dart';
 
 /**
@@ -699,7 +702,8 @@ class ElementResolver extends SimpleAstVisitor<void> {
   @override
   void visitPropertyAccess(PropertyAccess node) {
     Expression target = node.realTarget;
-    if (target is SuperExpression && !_isSuperInValidContext(target)) {
+    if (target is SuperExpression &&
+        SuperContext.of(target) != SuperContext.valid) {
       return;
     } else if (target is ExtensionOverride) {
       if (node.isCascaded) {
@@ -708,32 +712,33 @@ class ElementResolver extends SimpleAstVisitor<void> {
       }
       ExtensionElement element = target.extensionName.staticElement;
       SimpleIdentifier propertyName = node.propertyName;
-      PropertyAccessorElement member;
+      String memberName = propertyName.name;
+      ExecutableElement member;
       if (propertyName.inSetterContext()) {
-        member = element.getSetter(propertyName.name);
+        member = element.getSetter(memberName);
         if (member == null) {
           _resolver.errorReporter.reportErrorForNode(
               CompileTimeErrorCode.UNDEFINED_EXTENSION_SETTER,
               propertyName,
-              [propertyName.name, element.name]);
+              [memberName, element.name]);
         }
         if (propertyName.inGetterContext()) {
-          PropertyAccessorElement getter = element.getGetter(propertyName.name);
+          PropertyAccessorElement getter = element.getGetter(memberName);
           if (getter == null) {
             _resolver.errorReporter.reportErrorForNode(
                 CompileTimeErrorCode.UNDEFINED_EXTENSION_GETTER,
                 propertyName,
-                [propertyName.name, element.name]);
+                [memberName, element.name]);
           }
           propertyName.auxiliaryElements = AuxiliaryElements(getter, null);
         }
       } else if (propertyName.inGetterContext()) {
-        member = element.getGetter(propertyName.name);
+        member = element.getGetter(memberName) ?? element.getMethod(memberName);
         if (member == null) {
           _resolver.errorReporter.reportErrorForNode(
               CompileTimeErrorCode.UNDEFINED_EXTENSION_GETTER,
               propertyName,
-              [propertyName.name, element.name]);
+              [memberName, element.name]);
         }
       }
       if (member != null && member.isStatic) {
@@ -741,6 +746,16 @@ class ElementResolver extends SimpleAstVisitor<void> {
             CompileTimeErrorCode.EXTENSION_OVERRIDE_ACCESS_TO_STATIC_MEMBER,
             propertyName);
       }
+
+      // TODO(scheglov) Improve from() instead.
+      if (element.typeParameters.isNotEmpty) {
+        var substitution = Substitution.fromPairs(
+          element.typeParameters,
+          target.typeArgumentTypes,
+        );
+        member = ExecutableMember.from2(member, substitution);
+      }
+
       propertyName.staticElement = member;
       return;
     }
@@ -936,9 +951,13 @@ class ElementResolver extends SimpleAstVisitor<void> {
 
   @override
   void visitSuperExpression(SuperExpression node) {
-    if (!_isSuperInValidContext(node)) {
+    var context = SuperContext.of(node);
+    if (context == SuperContext.static) {
       _resolver.errorReporter.reportErrorForNode(
           CompileTimeErrorCode.SUPER_IN_INVALID_CONTEXT, node);
+    } else if (context == SuperContext.extension) {
+      _resolver.errorReporter
+          .reportErrorForNode(CompileTimeErrorCode.SUPER_IN_EXTENSION, node);
     }
     super.visitSuperExpression(node);
   }
@@ -1948,24 +1967,6 @@ class ElementResolver extends SimpleAstVisitor<void> {
     if (parent is ConstructorDeclaration) {
       return identical(parent.returnType, identifier) &&
           parent.factoryKeyword != null;
-    }
-    return false;
-  }
-
-  /**
-   * Return `true` if the given 'super' [expression] is used in a valid context.
-   */
-  static bool _isSuperInValidContext(SuperExpression expression) {
-    for (AstNode node = expression; node != null; node = node.parent) {
-      if (node is CompilationUnit) {
-        return false;
-      } else if (node is ConstructorDeclaration) {
-        return node.factoryKeyword == null;
-      } else if (node is ConstructorFieldInitializer) {
-        return false;
-      } else if (node is MethodDeclaration) {
-        return !node.isStatic;
-      }
     }
     return false;
   }

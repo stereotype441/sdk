@@ -1107,6 +1107,19 @@ class C {
 ''');
   }
 
+  test_class_getter_native() async {
+    var library = await checkLibrary('''
+class C {
+  int get x() native;
+}
+''');
+    checkElementText(library, r'''
+class C {
+  external int get x;
+}
+''');
+  }
+
   test_class_getter_static() async {
     var library = await checkLibrary('class C { static int get x => null; }');
     checkElementText(library, r'''
@@ -1217,6 +1230,19 @@ class A {
 }
 class B extends A {
   void A() {}
+}
+''');
+  }
+
+  test_class_method_native() async {
+    var library = await checkLibrary('''
+class C {
+  int m() native;
+}
+''');
+    checkElementText(library, r'''
+class C {
+  external int m() {}
 }
 ''');
   }
@@ -1617,6 +1643,19 @@ class C {
     checkElementText(library, r'''
 class C {
   void set x(dynamic a, dynamic b) {}
+}
+''');
+  }
+
+  test_class_setter_native() async {
+    var library = await checkLibrary('''
+class C {
+  void set x(int value) native;
+}
+''');
+    checkElementText(library, r'''
+class C {
+  external void set x(int value);
 }
 ''');
   }
@@ -5973,6 +6012,19 @@ extension E on int {
 ''');
   }
 
+  test_extension_field_inferredType_const() async {
+    featureSet = enableExtensionMethods;
+    var library = await checkLibrary('''
+extension E on int {
+  static const x = 0;
+}''');
+    checkElementText(library, r'''
+extension E on int {
+  static const int x = 0;
+}
+''');
+  }
+
   test_field_covariant() async {
     var library = await checkLibrary('''
 class C {
@@ -6591,6 +6643,21 @@ typedef F2<V2> = V2 Function();
 typedef F1 = dynamic Function<V1>(V1 Function() );
 typedef F2<V2> = V2 Function();
 ''');
+  }
+
+  test_genericTypeAlias_recursive() async {
+    var library = await checkLibrary('''
+typedef F<X extends F> = Function(F);
+''');
+    if (isAstBasedSummary) {
+      checkElementText(library, r'''
+notSimplyBounded typedef F<X> = dynamic Function();
+''');
+    } else {
+      checkElementText(library, r'''
+notSimplyBounded typedef F<X extends dynamic Function(...)> = dynamic Function(dynamic Function(...) );
+''');
+    }
   }
 
   test_getter_documented() async {

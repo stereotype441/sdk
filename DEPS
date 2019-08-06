@@ -36,7 +36,7 @@ vars = {
   "chromium_git": "https://chromium.googlesource.com",
   "fuchsia_git": "https://fuchsia.googlesource.com",
 
-  "co19_2_rev": "b0220fc898c32d3944cb8c54cf7b78dd8c7cbadb",
+  "co19_2_rev": "796f4de76de460e031bf3b20ce60a52e4ed417d9",
 
   # As Flutter does, we use Fuchsia's GN and Clang toolchain. These revision
   # should be kept up to date with the revisions pulled by the Flutter engine.
@@ -97,7 +97,7 @@ vars = {
   "intl_tag": "0.15.7",
   "jinja2_rev": "2222b31554f03e62600cd7e383376a7c187967a1",
   "json_rpc_2_tag": "2.0.9",
-  "linter_tag": "0.1.95",
+  "linter_tag": "0.1.96",
   "logging_tag": "0.11.3+2",
   "markupsafe_rev": "8f45f5cfa0009d2a70589bcda0349b8cb2b72783",
   "markdown_tag": "2.0.3",
@@ -135,7 +135,7 @@ vars = {
   "term_glyph_tag": "1.0.1",
   "test_reflective_loader_tag": "0.1.8",
   "test_tag": "test-v1.6.4",
-  "tflite_native_rev": "b32366dae7446e0e7c29f407cc74717f44b00b30",
+  "tflite_native_rev": "7f3748a2adf0e7c246813d0b206396312cbaa0db",
   "typed_data_tag": "1.1.6",
   "unittest_rev": "2b8375bc98bb9dc81c539c91aaea6adce12e1072",
   "usage_tag": "3.4.0",

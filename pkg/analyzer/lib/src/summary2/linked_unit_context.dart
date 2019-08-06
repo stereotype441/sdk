@@ -302,7 +302,7 @@ class LinkedUnitContext {
     return node.constants;
   }
 
-  TypeName getExtendedType(ExtensionDeclaration node) {
+  TypeAnnotation getExtendedType(ExtensionDeclaration node) {
     LazyExtensionDeclaration.readExtendedType(_astReader, node);
     return node.extendedType;
   }
@@ -779,7 +779,7 @@ class LinkedUnitContext {
     } else if (node is FunctionDeclaration) {
       return node.externalKeyword != null;
     } else if (node is MethodDeclaration) {
-      return node.externalKeyword != null;
+      return node.externalKeyword != null || node.body is NativeFunctionBody;
     } else {
       throw UnimplementedError('${node.runtimeType}');
     }
@@ -829,6 +829,14 @@ class LinkedUnitContext {
       return false;
     }
     throw UnimplementedError('${node.runtimeType}');
+  }
+
+  bool isNative(AstNode node) {
+    if (node is MethodDeclaration) {
+      return node.body is NativeFunctionBody;
+    } else {
+      throw UnimplementedError('${node.runtimeType}');
+    }
   }
 
   bool isSetter(AstNode node) {

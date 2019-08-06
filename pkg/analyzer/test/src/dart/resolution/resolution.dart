@@ -220,6 +220,7 @@ mixin ResolutionTest implements ResourceProviderMixin {
       ClassElement expectedClassElement, String expectedType,
       {String constructorName,
       bool expectedConstructorMember: false,
+      Map<String, String> expectedSubstitution,
       PrefixElement expectedPrefix}) {
     String expectedClassName = expectedClassElement.name;
 
@@ -251,7 +252,7 @@ mixin ResolutionTest implements ResourceProviderMixin {
 
     if (expectedConstructorMember) {
       expect(actualConstructorElement, const TypeMatcher<Member>());
-      assertMember(creation, expectedType, expectedConstructorElement);
+      assertMember(creation, expectedConstructorElement, expectedSubstitution);
     } else {
       assertElement(creation, expectedConstructorElement);
     }
@@ -279,10 +280,18 @@ mixin ResolutionTest implements ResourceProviderMixin {
   }
 
   void assertMember(
-      Expression node, String expectedDefiningType, Element expectedBase) {
+    Expression node,
+    Element expectedBase,
+    Map<String, String> expectedSubstitution,
+  ) {
     Member actual = getNodeElement(node);
-    expect(typeString(actual.definingType), expectedDefiningType);
+
     expect(actual.baseElement, same(expectedBase));
+
+    var actualMapString = actual.substitution.asMap.map(
+      (k, v) => MapEntry(k.name, '$v'),
+    );
+    expect(actualMapString, expectedSubstitution);
   }
 
   void assertMethodInvocation(
@@ -439,6 +448,8 @@ mixin ResolutionTest implements ResourceProviderMixin {
       return node.staticElement;
     } else if (node is Declaration) {
       return node.declaredElement;
+    } else if (node is ExtensionOverride) {
+      return node.staticElement;
     } else if (node is FormalParameter) {
       return node.declaredElement;
     } else if (node is FunctionExpressionInvocation) {

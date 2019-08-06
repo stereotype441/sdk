@@ -8,11 +8,14 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/ast/ast.dart';
 import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
+import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/dart/element/type.dart';
+import 'package:analyzer/src/dart/element/type_algebra.dart';
 import 'package:analyzer/src/dart/resolver/extension_member_resolver.dart';
 import 'package:analyzer/src/dart/resolver/scope.dart';
 import 'package:analyzer/src/error/codes.dart';
 import 'package:analyzer/src/generated/resolver.dart';
+import 'package:analyzer/src/generated/super_context.dart';
 import 'package:analyzer/src/generated/variable_type_provider.dart';
 
 class MethodInvocationResolver {
@@ -387,6 +390,12 @@ class MethodInvocationResolver {
       return;
     }
 
+    var substitution = Substitution.fromPairs(
+      element.typeParameters,
+      override.typeArgumentTypes,
+    );
+    member = ExecutableMember.from2(member, substitution);
+
     if (member is ExecutableElement && member.isStatic) {
       _resolver.errorReporter.reportErrorForNode(
         CompileTimeErrorCode.EXTENSION_OVERRIDE_ACCESS_TO_STATIC_MEMBER,
@@ -597,11 +606,12 @@ class MethodInvocationResolver {
 
   void _resolveReceiverSuper(MethodInvocation node, SuperExpression receiver,
       SimpleIdentifier nameNode, String name) {
-    if (!_isSuperInValidContext(receiver)) {
+    var enclosingClass = _resolver.enclosingClass;
+    if (SuperContext.of(receiver) != SuperContext.valid) {
       return;
     }
 
-    var receiverType = _resolver.enclosingClass.type;
+    var receiverType = enclosingClass.type;
     var target = _inheritance.getMember(
       receiverType,
       _currentName,
@@ -637,7 +647,7 @@ class MethodInvocationResolver {
     _resolver.errorReporter.reportErrorForNode(
         StaticTypeWarningCode.UNDEFINED_SUPER_METHOD,
         nameNode,
-        [name, _resolver.enclosingClass.displayName]);
+        [name, enclosingClass.displayName]);
   }
 
   void _resolveReceiverTypeLiteral(MethodInvocation node, ClassElement receiver,
