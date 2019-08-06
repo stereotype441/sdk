@@ -474,11 +474,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     _currentFunctionType =
         _variables.decoratedElementType(node.declaredElement);
     _inConditionalControlFlow = false;
-    _flowAnalysis =
-        FlowAnalysis<Statement, Expression, VariableElement, DecoratedType>(
-            const AnalyzerNodeOperations(),
-            DecoratedTypeOperations(_typeSystem, _variables, _graph),
-            AnalyzerFunctionBodyAccess(node.functionExpression.body));
+    _flowAnalysis = _createFlowAnalysis(node.functionExpression.body);
     try {
       node.functionExpression.body.accept(this);
     } finally {
@@ -1011,6 +1007,14 @@ $stackTrace''');
     }
   }
 
+  FlowAnalysis<Statement, Expression, VariableElement, DecoratedType>
+      _createFlowAnalysis(FunctionBody node) {
+    return FlowAnalysis<Statement, Expression, VariableElement, DecoratedType>(
+        const AnalyzerNodeOperations(),
+        DecoratedTypeOperations(_typeSystem, _variables, _graph),
+        AnalyzerFunctionBodyAccess(node));
+  }
+
   DecoratedType _decorateUpperOrLowerBound(AstNode astNode, DartType type,
       DecoratedType left, DecoratedType right, bool isLUB,
       {NullabilityNode node}) {
@@ -1171,6 +1175,7 @@ $stackTrace''');
     parameters?.accept(this);
     _currentFunctionType = _variables.decoratedElementType(declaredElement);
     _inConditionalControlFlow = false;
+    _flowAnalysis = _createFlowAnalysis(body);
     try {
       initializers?.accept(this);
       body.accept(this);
@@ -1253,6 +1258,7 @@ $stackTrace''');
         }
       }
     } finally {
+      _flowAnalysis = null;
       _currentFunctionType = null;
     }
   }
