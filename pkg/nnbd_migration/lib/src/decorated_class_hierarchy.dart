@@ -59,7 +59,7 @@ class DecoratedClassHierarchy {
       // TODO(paulberry): test
       result = result.substitute(type.asSubstitution);
     }
-    return result;
+    return result.withNode(type.node);
   }
 
   /// Computes a map whose keys are all the superclasses of [class_], and whose
