@@ -1445,7 +1445,7 @@ mixin _AssignmentChecker {
         // aren't made up of other types.
       } else {
         // TODO(paulberry): the correct behavior here would be to do a
-        // substitution so that replace sourceType with the type parameter's
+        // substitution so that we replace sourceType with the type parameter's
         // bound and then continue with the comparison.  But most of the time
         // that will result in a no-op, because the destination type is an
         // interface type with no type parameters, so no edges need to be
