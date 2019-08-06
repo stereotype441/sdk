@@ -17,6 +17,7 @@ import 'package:test/test.dart';
 
 import 'abstract_single_unit.dart';
 
+/// Mixin allowing unit tests to check for the presence of graph edges.
 mixin EdgeTester {
   NullabilityGraphForTesting get graph;
 
