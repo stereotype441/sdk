@@ -48,7 +48,7 @@ class AssignmentCheckerForTesting extends Object with _AssignmentChecker {
   void _connect(
       NullabilityNode source, NullabilityNode destination, EdgeOrigin origin,
       {bool hard = false}) {
-    _graph.connect(source, destination, origin);
+    _graph.connect(source, destination, origin, hard: hard);
   }
 }
 
@@ -1473,7 +1473,7 @@ mixin _AssignmentChecker {
       _checkAssignment(origin,
           source: source.returnType,
           destination: destination.returnType,
-          hard: hard);
+          hard: false);
       if (source.typeArguments.isNotEmpty ||
           destination.typeArguments.isNotEmpty) {
         throw UnimplementedError('TODO(paulberry)');
@@ -1486,14 +1486,14 @@ mixin _AssignmentChecker {
         _checkAssignment(origin,
             source: destination.positionalParameters[i],
             destination: source.positionalParameters[i],
-            hard: hard);
+            hard: false);
       }
       for (var entry in destination.namedParameters.entries) {
         // Note: source and destination are swapped due to contravariance.
         _checkAssignment(origin,
             source: entry.value,
             destination: source.namedParameters[entry.key],
-            hard: hard);
+            hard: false);
       }
     } else if (destinationType.isDynamic || sourceType.isDynamic) {
       // ok; nothing further to do.
