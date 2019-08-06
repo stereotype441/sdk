@@ -12,6 +12,7 @@ import 'package:analyzer/error/listener.dart';
 import 'package:analyzer/file_system/file_system.dart';
 import 'package:analyzer/src/dart/analysis/driver.dart';
 import 'package:analyzer/src/dart/analysis/file_state.dart';
+import 'package:analyzer/src/dart/analysis/testing_data.dart';
 import 'package:analyzer/src/dart/ast/ast.dart';
 import 'package:analyzer/src/dart/ast/utilities.dart';
 import 'package:analyzer/src/dart/constant/compute.dart';
@@ -27,7 +28,6 @@ import 'package:analyzer/src/dart/resolver/legacy_type_asserter.dart';
 import 'package:analyzer/src/error/codes.dart';
 import 'package:analyzer/src/error/imports_verifier.dart';
 import 'package:analyzer/src/error/inheritance_override.dart';
-import 'package:analyzer/src/error/pending_error.dart';
 import 'package:analyzer/src/generated/declaration_resolver.dart';
 import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/generated/error_verifier.dart';
@@ -79,10 +79,9 @@ class LibraryAnalyzer {
   final Map<FileState, IgnoreInfo> _fileToIgnoreInfo = {};
   final Map<FileState, RecordingErrorListener> _errorListeners = {};
   final Map<FileState, ErrorReporter> _errorReporters = {};
-  final Map<FileState, FlowAnalysisResult> _fileToFlowAnalysisResult = {};
+  final TestingData _testingData;
   final List<UsedImportedElements> _usedImportedElementsList = [];
   final List<UsedLocalElements> _usedLocalElementsList = [];
-  final Map<FileState, List<PendingError>> _fileToPendingErrors = {};
 
   /**
    * Constants in the current library.
@@ -103,8 +102,10 @@ class LibraryAnalyzer {
       this._elementFactory,
       this._inheritance,
       this._library,
-      this._resourceProvider)
-      : _typeSystem = _context.typeSystem;
+      this._resourceProvider,
+      {TestingData testingData})
+      : _typeSystem = _context.typeSystem,
+        _testingData = testingData;
 
   /**
    * Compute analysis results for all units of the library.
@@ -159,7 +160,6 @@ class LibraryAnalyzer {
 
     units.forEach((file, unit) {
       _resolveFile(file, unit);
-      _computePendingMissingRequiredParameters(file, unit);
     });
     timerLibraryAnalyzerResolve.stop();
 
@@ -265,13 +265,6 @@ class LibraryAnalyzer {
     AnalysisErrorListener errorListener = _getErrorListener(file);
     ErrorReporter errorReporter = _getErrorReporter(file);
 
-    //
-    // Convert the pending errors into actual errors.
-    //
-    for (PendingError pendingError in _fileToPendingErrors[file]) {
-      errorListener.onError(pendingError.toAnalysisError());
-    }
-
     unit.accept(new DeadCodeVerifier(errorReporter, unit.featureSet,
         typeSystem: _context.typeSystem));
 
@@ -368,15 +361,6 @@ class LibraryAnalyzer {
     }
   }
 
-  void _computePendingMissingRequiredParameters(
-      FileState file, CompilationUnit unit) {
-    // TODO(scheglov) This can be done without "pending" if we resynthesize.
-    var computer = new RequiredConstantsComputer(file.source);
-    unit.accept(computer);
-    _constants.addAll(computer.requiredConstants);
-    _fileToPendingErrors[file] = computer.pendingErrors;
-  }
-
   void _computeVerifyErrors(FileState file, CompilationUnit unit) {
     if (file.source == null) {
       return;
@@ -416,8 +400,7 @@ class LibraryAnalyzer {
     // Use the ErrorVerifier to compute errors.
     //
     ErrorVerifier errorVerifier = new ErrorVerifier(
-        errorReporter, _libraryElement, _typeProvider, _inheritance, false,
-        flowAnalysisResult: _fileToFlowAnalysisResult[file]);
+        errorReporter, _libraryElement, _typeProvider, _inheritance, false);
     unit.accept(errorVerifier);
   }
 
@@ -706,9 +689,10 @@ class LibraryAnalyzer {
 
     FlowAnalysisHelper flowAnalysisHelper;
     if (unit.featureSet.isEnabled(Feature.non_nullable)) {
-      flowAnalysisHelper = FlowAnalysisHelper(_context.typeSystem, unit);
-      _fileToFlowAnalysisResult[file] = flowAnalysisHelper.result;
-      flowAnalysisHelper.result.putIntoNode(unit);
+      flowAnalysisHelper =
+          FlowAnalysisHelper(_context.typeSystem, unit, _testingData != null);
+      _testingData?.recordFlowAnalysisResult(
+          file.uri, flowAnalysisHelper.result);
     }
 
     unit.accept(new ResolverVisitor(

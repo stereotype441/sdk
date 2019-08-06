@@ -119,7 +119,9 @@ class PropertyDescription {
 
     await changeBuilder.addFileEdit(resolvedUnit.path, (builder) {
       _changeCode(builder, (builder) {
-        if (enumClassElement != null) {
+        if (value.expression != null) {
+          builder.write(value.expression);
+        } else if (enumClassElement != null) {
           builder.writeReference(enumClassElement);
           builder.write('.');
           builder.write(enumValue.name);
@@ -186,7 +188,8 @@ class PropertyDescription {
             var argumentName = argument.name.label.name;
 
             if (argumentName.compareTo(parameterName) > 0 ||
-                argumentName == 'child') {
+                _isChildArgument(argument) ||
+                _isChildrenArgument(argument)) {
               insertOffset = argument.offset;
               break;
             }
@@ -317,6 +320,18 @@ class PropertyDescription {
   void _formatEnclosingFunctionBody(DartFileEditBuilder builder) {
     var functionBody = _enclosingFunctionBody();
     builder.format(range.node(functionBody));
+  }
+
+  /// TODO(scheglov) Generalize to identifying by type.
+  bool _isChildArgument(NamedExpression argument) {
+    var argumentName = argument.name.label.name;
+    return argumentName == 'child';
+  }
+
+  /// TODO(scheglov) Generalize to identifying by type.
+  bool _isChildrenArgument(NamedExpression argument) {
+    var argumentName = argument.name.label.name;
+    return argumentName == 'children';
   }
 
   String _toPrimitiveValueCode(protocol.FlutterWidgetPropertyValue value) {

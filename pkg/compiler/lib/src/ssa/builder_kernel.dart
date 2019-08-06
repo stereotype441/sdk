@@ -1368,7 +1368,12 @@ class KernelSsaGraphBuilder extends ir.Visitor {
     if (elementType.containsFreeTypeVariables) {
       // Type must be computed in the entry function, where the type variables
       // are in scope, and passed to the body function.
-      inputs.add(_typeBuilder.analyzeTypeArgument(elementType, function));
+      if (options.experimentNewRti) {
+        inputs
+            .add(_typeBuilder.analyzeTypeArgumentNewRti(elementType, function));
+      } else {
+        inputs.add(_typeBuilder.analyzeTypeArgument(elementType, function));
+      }
     } else {
       // Types with no type variables can be emitted as part of the generator,
       // avoiding an extra argument.
@@ -4531,6 +4536,11 @@ class KernelSsaGraphBuilder extends ir.Visitor {
 
       case JsBuiltin.dartClosureConstructor:
         ClassEntity closureClass = closedWorld.commonElements.closureClass;
+        // TODO(sra): Should add a dependency on the constructor used as a
+        // token.
+        registry
+            // ignore:deprecated_member_use_from_same_package
+            .registerInstantiatedClass(closureClass);
         return js.js
             .expressionTemplateYielding(_emitter.typeAccess(closureClass));
 

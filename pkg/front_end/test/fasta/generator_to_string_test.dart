@@ -32,7 +32,6 @@ import 'package:front_end/src/fasta/dill/dill_target.dart' show DillTarget;
 
 import 'package:front_end/src/fasta/kernel/kernel_builder.dart'
     show
-        KernelLibraryBuilder,
         TypeVariableBuilder,
         LoadLibraryBuilder,
         PrefixBuilder,
@@ -51,6 +50,9 @@ import 'package:front_end/src/fasta/kernel/body_builder.dart' show BodyBuilder;
 
 import 'package:front_end/src/fasta/scanner.dart' show Token, scanString;
 
+import 'package:front_end/src/fasta/source/source_library_builder.dart'
+    show SourceLibraryBuilder;
+
 void check(String expected, Generator generator) {
   Expect.stringEquals(expected, "$generator");
 }
@@ -65,7 +67,7 @@ main() {
     Expression expression =
         new VariableGet(new VariableDeclaration("expression"));
     Expression index = new VariableGet(new VariableDeclaration("index"));
-    KernelLibraryBuilder libraryBuilder = new KernelLibraryBuilder(
+    SourceLibraryBuilder libraryBuilder = new SourceLibraryBuilder(
         uri,
         uri,
         new KernelTarget(
@@ -88,7 +90,7 @@ main() {
     Name binaryOperator = new Name("+");
     Name name = new Name("bar");
     PrefixBuilder prefixBuilder =
-        new PrefixBuilder("myPrefix", false, libraryBuilder, -1, -1);
+        new PrefixBuilder("myPrefix", false, libraryBuilder, null, -1, -1);
     String assignmentOperator = "+=";
     TypeDeclarationBuilder declaration = new TypeVariableBuilder.fromKernel(
         new TypeParameter("T"), libraryBuilder);

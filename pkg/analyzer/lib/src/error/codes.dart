@@ -1326,6 +1326,14 @@ class CompileTimeErrorCode extends ErrorCode {
               "isn't assignable to the extended type '{1}'.");
 
   /**
+   * No parameters.
+   */
+  static const CompileTimeErrorCode EXTENSION_OVERRIDE_WITHOUT_ACCESS =
+      const CompileTimeErrorCode('EXTENSION_OVERRIDE_WITHOUT_ACCESS',
+          "An extension override can only be used to access instance members.",
+          correction: 'Consider adding an access to an instance member.');
+
+  /**
    * 12.14.2 Binding Actuals to Formals: It is a static warning if <i>m &lt;
    * h</i> or if <i>m &gt; n</i>.
    *
@@ -3201,6 +3209,15 @@ class CompileTimeErrorCode extends ErrorCode {
           "The prefix of a deferred import can't be used in other import "
               "directives.",
           correction: "Try renaming one of the prefixes.");
+
+  /**
+   * No parameters.
+   */
+  static const CompileTimeErrorCode SUPER_IN_EXTENSION =
+      const CompileTimeErrorCode(
+          'SUPER_IN_EXTENSION',
+          "You can't reference 'super' in an extension because extensions do "
+              "not have a superclass.");
 
   /**
    * 12.15.4 Super Invocation: A super method invocation <i>i</i> has the form

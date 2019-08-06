@@ -29,6 +29,18 @@ abstract class RecipeEncoder {
 
   jsAst.Literal encodeGroundRecipe(ModularEmitter emitter, TypeRecipe recipe);
 
+  /// Return the recipe with type variables replaced with <any>. This is a hack
+  /// until DartType contains <any> and the parameter stub emitter is replaced
+  /// with an SSA path.
+  // TODO(33422): Remove need for this.
+  jsAst.Literal encodeRecipeWithVariablesReplaceByAny(
+      ModularEmitter emitter, DartType dartType);
+
+  /// Converts a recipe into a fragment of code that accesses the evaluated
+  /// recipe.
+  // TODO(33422): Remove need for this by pushing stubs through SSA.
+  jsAst.Expression evaluateRecipe(ModularEmitter emitter, jsAst.Literal recipe);
+
   // TODO(sra): Still need a $signature function when the function type is a
   // function of closed type variables. See if the $signature method can always
   // be generated through SSA in those cases.
@@ -59,6 +71,21 @@ class RecipeEncoderImpl implements RecipeEncoder {
   }
 
   @override
+  jsAst.Literal encodeRecipeWithVariablesReplaceByAny(
+      ModularEmitter emitter, DartType dartType) {
+    return _RecipeGenerator(this, emitter, null, TypeExpressionRecipe(dartType),
+            hackTypeVariablesToAny: true)
+        .run();
+  }
+
+  @override
+  jsAst.Expression evaluateRecipe(
+      ModularEmitter emitter, jsAst.Literal recipe) {
+    return js('#(#)',
+        [emitter.staticFunctionAccess(commonElements.findType), recipe]);
+  }
+
+  @override
   jsAst.Expression encodeSignature(ModularNamer namer, ModularEmitter emitter,
       DartType type, jsAst.Expression this_) {
     // TODO(sra): These inputs (referenced to quell lints) are used by the old
@@ -75,6 +102,7 @@ class _RecipeGenerator implements DartTypeVisitor<void, void> {
   final ModularEmitter _emitter;
   final TypeEnvironmentStructure _environment;
   final TypeRecipe _recipe;
+  final bool hackTypeVariablesToAny;
 
   final List<FunctionTypeVariable> functionTypeVariables = [];
 
@@ -83,7 +111,8 @@ class _RecipeGenerator implements DartTypeVisitor<void, void> {
   final List<int> _codes = [];
 
   _RecipeGenerator(
-      this._encoder, this._emitter, this._environment, this._recipe);
+      this._encoder, this._emitter, this._environment, this._recipe,
+      {this.hackTypeVariablesToAny = false});
 
   JClosedWorld get _closedWorld => _encoder._closedWorld;
   NativeBasicData get _nativeData => _encoder._nativeData;
@@ -180,6 +209,12 @@ class _RecipeGenerator implements DartTypeVisitor<void, void> {
 
   @override
   void visitTypeVariableType(TypeVariableType type, _) {
+    if (hackTypeVariablesToAny) {
+      // Emit 'any' type.
+      _emitExtensionOp(Recipe.pushAnyExtension);
+      return;
+    }
+
     TypeEnvironmentStructure environment = _environment;
     if (environment is SingletonTypeEnvironmentStructure) {
       if (type == environment.variable) {
@@ -381,6 +416,23 @@ class _RecipeGenerator implements DartTypeVisitor<void, void> {
   }
 }
 
+class _RulesetEntry {
+  final InterfaceType _targetType;
+  List<InterfaceType> _supertypes;
+
+  _RulesetEntry(this._targetType, this._supertypes);
+}
+
+class Ruleset {
+  List<_RulesetEntry> _entries;
+
+  Ruleset(this._entries);
+  Ruleset.empty() : this([]);
+
+  void add(InterfaceType targetType, Iterable<InterfaceType> supertypes) =>
+      _entries.add(_RulesetEntry(targetType, supertypes));
+}
+
 class RulesetEncoder {
   final DartTypes _dartTypes;
   final ModularEmitter _emitter;
@@ -401,34 +453,40 @@ class RulesetEncoder {
 
   bool _isObject(InterfaceType type) => identical(type.element, _objectClass);
 
+  void _preprocessEntry(_RulesetEntry entry) =>
+      entry._supertypes.removeWhere(_isObject);
+
+  void _preprocessRuleset(Ruleset ruleset) {
+    ruleset._entries.forEach(_preprocessEntry);
+    ruleset._entries.removeWhere((_RulesetEntry entry) =>
+        _isObject(entry._targetType) || entry._supertypes.isEmpty);
+  }
+
   // TODO(fishythefish): Common substring elimination.
 
   /// Produces a string readable by `JSON.parse()`.
-  jsAst.StringConcatenation encodeRuleset(
-          Map<InterfaceType, Iterable<InterfaceType>> ruleset) =>
+  jsAst.StringConcatenation encodeRuleset(Ruleset ruleset) {
+    _preprocessRuleset(ruleset);
+    return _encodeRuleset(ruleset);
+  }
+
+  jsAst.StringConcatenation _encodeRuleset(Ruleset ruleset) =>
       js.concatenateStrings([
         _quote,
         _leftBrace,
-        ...js.joinLiterals(
-            ruleset.entries
-                .where((entry) => !_isObject(entry.key))
-                .map((entry) => _encodeRule(entry.key, entry.value)),
-            _comma),
+        ...js.joinLiterals(ruleset._entries.map(_encodeEntry), _comma),
         _rightBrace,
         _quote,
       ]);
 
-  jsAst.StringConcatenation _encodeRule(
-          InterfaceType targetType, Iterable<InterfaceType> supertypes) =>
+  jsAst.StringConcatenation _encodeEntry(_RulesetEntry entry) =>
       js.concatenateStrings([
-        js.quoteName(_emitter.typeAccessNewRti(targetType.element)),
+        js.quoteName(_emitter.typeAccessNewRti(entry._targetType.element)),
         _colon,
         _leftBrace,
         ...js.joinLiterals(
-            supertypes
-                .where((InterfaceType supertype) => !_isObject(supertype))
-                .map((InterfaceType supertype) =>
-                    _encodeSupertype(targetType, supertype)),
+            entry._supertypes.map((InterfaceType supertype) =>
+                _encodeSupertype(entry._targetType, supertype)),
             _comma),
         _rightBrace,
       ]);

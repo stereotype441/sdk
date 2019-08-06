@@ -59,6 +59,10 @@ class NamedTypeBuilder extends TypeBuilder {
 
   NamedTypeBuilder(this.name, this.arguments);
 
+  NamedTypeBuilder.fromTypeDeclarationBuilder(this.declaration,
+      [this.arguments])
+      : this.name = declaration.name;
+
   @override
   void bind(TypeDeclarationBuilder declaration) {
     this.declaration = declaration?.origin;
@@ -203,6 +207,7 @@ class NamedTypeBuilder extends TypeBuilder {
   }
 
   DartType build(LibraryBuilder library) {
+    assert(declaration != null, "Declaration has not been resolved on $this.");
     return declaration.buildType(library, arguments);
   }
 

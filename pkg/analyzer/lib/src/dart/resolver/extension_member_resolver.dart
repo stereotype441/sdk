@@ -14,7 +14,11 @@ class ExtensionMemberResolver {
   final ResolverVisitor _resolver;
   ExtensionMemberResolver(this._resolver);
 
+  DartType get _dynamicType => _typeProvider.dynamicType;
+
   Scope get _nameScope => _resolver.nameScope;
+
+  TypeProvider get _typeProvider => _resolver.typeProvider;
 
   TypeSystem get _typeSystem => _resolver.typeSystem;
 
@@ -102,8 +106,8 @@ class ExtensionMemberResolver {
   /// Return an extension for this [type] that matches the given [name] in the
   /// current scope; if the match is ambiguous, report an error.
   ExtensionElement findExtension(
-      InterfaceType type, String name, Expression target) {
-    var extensions = getApplicableExtensions(type, name);
+      InterfaceType type, String name, Expression target, ElementKind kind) {
+    var extensions = getApplicableExtensions(type, name, kind);
     if (extensions.length == 1) {
       return extensions[0];
     }
@@ -129,7 +133,8 @@ class ExtensionMemberResolver {
 
   /// Return extensions for this [type] that match the given [name] in the
   /// current scope.
-  List<ExtensionElement> getApplicableExtensions(DartType type, String name) {
+  List<ExtensionElement> getApplicableExtensions(
+      DartType type, String name, ElementKind kind) {
     final List<ExtensionElement> extensions = [];
 
     /// Return `true` if the [elementName] matches the target [name], taking
@@ -144,16 +149,35 @@ class ExtensionMemberResolver {
     /// Add the given [extension] to the list of [extensions] if it defined a
     /// member whose name matches the target [name].
     void checkExtension(ExtensionElement extension) {
-      for (var accessor in extension.accessors) {
-        if (matchesName(accessor.name)) {
-          extensions.add(extension);
-          return;
+      if (kind == ElementKind.GETTER) {
+        for (var accessor in extension.accessors) {
+          if (accessor.isGetter && matchesName(accessor.name)) {
+            extensions.add(extension);
+            return;
+          }
         }
-      }
-      for (var method in extension.methods) {
-        if (matchesName(method.name)) {
-          extensions.add(extension);
-          return;
+      } else if (kind == ElementKind.SETTER) {
+        for (var accessor in extension.accessors) {
+          if (accessor.isSetter && matchesName(accessor.name)) {
+            extensions.add(extension);
+            return;
+          }
+        }
+      } else if (kind == ElementKind.METHOD) {
+        for (var method in extension.methods) {
+          if (matchesName(method.name)) {
+            extensions.add(extension);
+            return;
+          }
+        }
+        // Check for a getter that matches a function type.
+        for (var accessor in extension.accessors) {
+          if (accessor.type is FunctionType &&
+              accessor.isGetter &&
+              matchesName(accessor.name)) {
+            extensions.add(extension);
+            return;
+          }
         }
       }
     }
@@ -166,6 +190,49 @@ class ExtensionMemberResolver {
       }
     }
     return extensions;
+  }
+
+  /// Given the generic [extension] element, and the [receiverType] to which
+  /// this extension is applied, infer the type arguments that correspond to
+  /// the extension type parameters.
+  ///
+  /// If the extension is used in [ExtensionOverride], the [typeArguments] of
+  /// the override are provided, and take precedence over inference.
+  List<DartType> inferTypeArguments(
+    ExtensionElement extension,
+    DartType receiverType, {
+    TypeArgumentList typeArguments,
+  }) {
+    var typeParameters = extension.typeParameters;
+    if (typeParameters.isEmpty) {
+      return const <DartType>[];
+    }
+
+    if (typeArguments != null) {
+      var arguments = typeArguments.arguments;
+      if (arguments.length == typeParameters.length) {
+        return arguments.map((a) => a.type).toList();
+      } else {
+        // TODO(scheglov) Report an error.
+        return List.filled(typeParameters.length, _dynamicType);
+      }
+    } else {
+      if (receiverType != null) {
+        var inferrer = GenericInferrer(
+          _typeProvider,
+          _typeSystem,
+          typeParameters,
+        );
+        inferrer.constrainArgument(
+          receiverType,
+          extension.extendedType,
+          'extendedType',
+        );
+        return inferrer.infer(typeParameters);
+      } else {
+        return List.filled(typeParameters.length, _dynamicType);
+      }
+    }
   }
 
   /// Ask the type system to instantiate the given type to its bounds.

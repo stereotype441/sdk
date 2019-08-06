@@ -109,8 +109,6 @@ import '../kernel/kernel_builder.dart'
         ConstructorReferenceBuilder,
         Declaration,
         FunctionBuilder,
-        KernelLibraryBuilder,
-        KernelMetadataBuilder,
         NamedTypeBuilder,
         LibraryBuilder,
         MemberBuilder,
@@ -134,6 +132,8 @@ import '../problems.dart'
     show internalProblem, unexpected, unhandled, unimplemented;
 
 import '../scope.dart' show AmbiguousBuilder;
+
+import '../source/source_library_builder.dart' show SourceLibraryBuilder;
 
 import '../type_inference/type_schema.dart' show UnknownType;
 
@@ -209,7 +209,7 @@ abstract class ClassBuilder extends TypeDeclarationBuilder {
       member.buildOutlineExpressions(library);
     }
 
-    KernelMetadataBuilder.buildAnnotations(
+    MetadataBuilder.buildAnnotations(
         isPatch ? origin.target : cls, metadata, library, this, null);
     constructors.forEach(build);
     scope.forEach(build);
@@ -422,7 +422,7 @@ abstract class ClassBuilder extends TypeDeclarationBuilder {
       for (int i = 0; i < result.length; ++i) {
         result[i] = typeVariables[i].defaultType.build(library);
       }
-      if (library is KernelLibraryBuilder) {
+      if (library is SourceLibraryBuilder) {
         library.inferredTypes.addAll(result);
       }
       return result;
@@ -535,7 +535,7 @@ abstract class ClassBuilder extends TypeDeclarationBuilder {
 
   void checkBoundsInSupertype(
       Supertype supertype, TypeEnvironment typeEnvironment) {
-    KernelLibraryBuilder library = this.library;
+    SourceLibraryBuilder library = this.library;
 
     List<TypeArgumentIssue> issues = findTypeArgumentIssues(
         new InterfaceType(supertype.classNode, supertype.typeArguments),
@@ -583,7 +583,7 @@ abstract class ClassBuilder extends TypeDeclarationBuilder {
   }
 
   void checkBoundsInOutline(TypeEnvironment typeEnvironment) {
-    KernelLibraryBuilder library = this.library;
+    SourceLibraryBuilder library = this.library;
 
     // Check in bounds of own type variables.
     for (TypeParameter parameter in cls.typeParameters) {
@@ -657,7 +657,7 @@ abstract class ClassBuilder extends TypeDeclarationBuilder {
   }
 
   void addRedirectingConstructor(
-      ProcedureBuilder constructor, KernelLibraryBuilder library) {
+      ProcedureBuilder constructor, SourceLibraryBuilder library) {
     // Add a new synthetic field to this class for representing factory
     // constructors. This is used to support resolving such constructors in
     // source code.
@@ -822,7 +822,7 @@ abstract class ClassBuilder extends TypeDeclarationBuilder {
     cls.procedures.add(cloned);
     cloned.parent = cls;
 
-    KernelLibraryBuilder library = this.library;
+    SourceLibraryBuilder library = this.library;
     library.forwardersOrigins.add(cloned);
     library.forwardersOrigins.add(procedure);
   }

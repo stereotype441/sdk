@@ -1370,9 +1370,9 @@ class ClassElementImpl extends AbstractClassElementImpl
 
       accessorElement.variable = field;
       if (isGetter) {
-        field.getter = accessorElement;
+        field.getter ??= accessorElement;
       } else {
-        field.setter = accessorElement;
+        field.setter ??= accessorElement;
       }
     }
 
@@ -8850,7 +8850,9 @@ class ParameterElementImpl extends VariableElementImpl
     if (_initializer == null) {
       if (linkedNode != null) {
         if (linkedContext.hasDefaultValue(linkedNode)) {
-          _initializer = new FunctionElementImpl('', -1)..isSynthetic = true;
+          _initializer = FunctionElementImpl('', -1)
+            ..enclosingElement = this
+            ..isSynthetic = true;
         }
       }
       if (unlinkedParam != null) {
