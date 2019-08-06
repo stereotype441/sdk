@@ -47,8 +47,8 @@ class AssignmentCheckerTest extends Object with EdgeTester {
     var typeProvider = TestTypeProvider();
     var graph = NullabilityGraphForTesting();
     var decoratedClassHierarchy = _DecoratedClassHierarchyForTesting();
-    var checker = AssignmentCheckerForTesting(Dart2TypeSystem(typeProvider),
-        Dart2TypeSystem(typeProvider), graph, decoratedClassHierarchy);
+    var checker = AssignmentCheckerForTesting(
+        graph, decoratedClassHierarchy);
     var assignmentCheckerTest =
         AssignmentCheckerTest._(typeProvider, graph, checker);
     decoratedClassHierarchy.assignmentCheckerTest = assignmentCheckerTest;
@@ -3060,21 +3060,6 @@ void f(int i) {
 
 class _DecoratedClassHierarchyForTesting implements DecoratedClassHierarchy {
   AssignmentCheckerTest assignmentCheckerTest;
-
-  @override
-  DecoratedType asInstanceOf(DecoratedType type, ClassElement superclass) {
-    var class_ = (type.type as InterfaceType).element;
-    if (class_ == superclass) return type;
-    if (superclass.name == 'Object') {
-      return DecoratedType(superclass.type, type.node);
-    }
-    if (class_.name == 'MyListOfList' && superclass.name == 'List') {
-      return assignmentCheckerTest._myListOfListSupertype
-          .substitute({class_.typeParameters[0]: type.typeArguments[0]});
-    }
-    throw UnimplementedError(
-        'TODO(paulberry): asInstanceOf($type, $superclass)');
-  }
 
   @override
   DecoratedType getDecoratedSupertype(
