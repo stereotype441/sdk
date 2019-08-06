@@ -21,7 +21,6 @@ import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
 import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/dart/element/type.dart';
-import 'package:analyzer/src/dart/element/type_algebra.dart';
 import 'package:analyzer/src/dart/resolver/extension_member_resolver.dart';
 import 'package:analyzer/src/dart/resolver/method_invocation_resolver.dart';
 import 'package:analyzer/src/error/codes.dart';
@@ -747,14 +746,11 @@ class ElementResolver extends SimpleAstVisitor<void> {
             propertyName);
       }
 
-      // TODO(scheglov) Improve from() instead.
-      if (element.typeParameters.isNotEmpty) {
-        var substitution = Substitution.fromPairs(
-          element.typeParameters,
-          target.typeArgumentTypes,
-        );
-        member = ExecutableMember.from2(member, substitution);
-      }
+      member = ExecutableMember.from3(
+        member,
+        element.typeParameters,
+        target.typeArgumentTypes,
+      );
 
       propertyName.staticElement = member;
       return;
@@ -1099,6 +1095,26 @@ class ElementResolver extends SimpleAstVisitor<void> {
     return _resolveTypeParameter(type);
   }
 
+  ExecutableElement _inferExtensionArgumentTypes(
+    DartType receiverType,
+    ExtensionElement extension,
+    ExecutableElement member,
+  ) {
+    if (member == null) {
+      return null;
+    }
+
+    var typeArguments = _extensionMemberResolver.inferTypeArguments(
+      extension,
+      receiverType,
+    );
+    return ExecutableMember.from3(
+      member,
+      extension.typeParameters,
+      typeArguments,
+    );
+  }
+
   /**
    * Check for a generic method & apply type arguments if any were passed.
    */
@@ -1240,7 +1256,7 @@ class ElementResolver extends SimpleAstVisitor<void> {
         FunctionElement.CALL_METHOD_NAME, _resolver.definingLibrary);
     if (callMethod == null) {
       var extension = _extensionMemberResolver.findExtension(
-          type, FunctionElement.CALL_METHOD_NAME, node);
+          type, FunctionElement.CALL_METHOD_NAME, node, ElementKind.METHOD);
       if (extension != null) {
         callMethod = extension.getMethod(FunctionElement.CALL_METHOD_NAME);
       }
@@ -1263,10 +1279,11 @@ class ElementResolver extends SimpleAstVisitor<void> {
       if (getter != null) {
         return getter;
       }
-      var extension =
-          _extensionMemberResolver.findExtension(type, name, nameNode);
+      var extension = _extensionMemberResolver.findExtension(
+          type, name, nameNode, ElementKind.GETTER);
       if (extension != null) {
-        return extension.getGetter(name);
+        var member = extension.getGetter(name);
+        return _inferExtensionArgumentTypes(type, extension, member);
       }
     }
     return null;
@@ -1301,10 +1318,11 @@ class ElementResolver extends SimpleAstVisitor<void> {
       if (method != null) {
         return method;
       }
-      var extension =
-          _extensionMemberResolver.findExtension(type, name, nameNode);
+      var extension = _extensionMemberResolver.findExtension(
+          type, name, nameNode, ElementKind.METHOD);
       if (extension != null) {
-        return extension.getMethod(name);
+        var member = extension.getMethod(name);
+        return _inferExtensionArgumentTypes(type, extension, member);
       }
     }
     return null;
@@ -1325,10 +1343,11 @@ class ElementResolver extends SimpleAstVisitor<void> {
       if (setter != null) {
         return setter;
       }
-      var extension =
-          _extensionMemberResolver.findExtension(type, name, nameNode);
+      var extension = _extensionMemberResolver.findExtension(
+          type, name, nameNode, ElementKind.SETTER);
       if (extension != null) {
-        return extension.getSetter(name);
+        var member = extension.getSetter(name);
+        return _inferExtensionArgumentTypes(type, extension, member);
       }
     }
     return null;
@@ -1584,8 +1603,8 @@ class ElementResolver extends SimpleAstVisitor<void> {
       }
 
       if (invokeElement == null && leftType is InterfaceType) {
-        ExtensionElement extension =
-            _extensionMemberResolver.findExtension(leftType, methodName, node);
+        ExtensionElement extension = _extensionMemberResolver.findExtension(
+            leftType, methodName, node, ElementKind.METHOD);
         if (extension != null) {
           invokeElement = extension.getMethod(methodName);
         }
@@ -1876,22 +1895,40 @@ class ElementResolver extends SimpleAstVisitor<void> {
           new SyntheticIdentifier('${identifier.name}=', identifier);
       element = _resolver.nameScope.lookup(setterId, _definingLibrary);
     }
-    ClassElement enclosingClass = _resolver.enclosingClass;
-    if (element == null && enclosingClass != null) {
-      InterfaceType enclosingType = enclosingClass.type;
-      if (element == null &&
-          (identifier.inSetterContext() ||
-              identifier.parent is CommentReference)) {
-        element =
-            _lookUpSetter(null, enclosingType, identifier.name, identifier);
+    if (element == null) {
+      InterfaceType enclosingType;
+      ClassElement enclosingClass = _resolver.enclosingClass;
+      if (enclosingClass == null) {
+        var enclosingExtension = _resolver.enclosingExtension;
+        if (enclosingExtension == null) {
+          return null;
+        }
+        DartType extendedType = enclosingExtension.extendedType;
+        if (extendedType is InterfaceType) {
+          enclosingType = extendedType;
+        } else if (extendedType is FunctionType) {
+          enclosingType = _resolver.typeProvider.functionType;
+        } else {
+          return null;
+        }
+      } else {
+        enclosingType = enclosingClass.type;
       }
-      if (element == null && identifier.inGetterContext()) {
-        element =
-            _lookUpGetter(null, enclosingType, identifier.name, identifier);
-      }
-      if (element == null) {
-        element =
-            _lookUpMethod(null, enclosingType, identifier.name, identifier);
+      if (enclosingType != null) {
+        if (element == null &&
+            (identifier.inSetterContext() ||
+                identifier.parent is CommentReference)) {
+          element =
+              _lookUpSetter(null, enclosingType, identifier.name, identifier);
+        }
+        if (element == null && identifier.inGetterContext()) {
+          element =
+              _lookUpGetter(null, enclosingType, identifier.name, identifier);
+        }
+        if (element == null) {
+          element =
+              _lookUpMethod(null, enclosingType, identifier.name, identifier);
+        }
       }
     }
     return element;

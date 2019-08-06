@@ -21,7 +21,6 @@ import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
 import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/dart/element/type.dart';
-import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
 import 'package:analyzer/src/dart/resolver/variance.dart';
 import 'package:analyzer/src/diagnostic/diagnostic_factory.dart';
 import 'package:analyzer/src/error/codes.dart';
@@ -298,10 +297,6 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
   /// fixed.
   final bool disableConflictingGenericsCheck;
 
-  /// If running with [_isNonNullable], the result of the flow analysis of the
-  /// unit being verified by this visitor.
-  final FlowAnalysisResult flowAnalysisResult;
-
   /// The features enabled in the unit currently being checked for errors.
   FeatureSet _featureSet;
 
@@ -323,8 +318,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
       this._typeProvider,
       InheritanceManagerBase inheritanceManager,
       bool enableSuperMixins,
-      {this.disableConflictingGenericsCheck: false,
-      this.flowAnalysisResult})
+      {this.disableConflictingGenericsCheck: false})
       : _errorReporter = errorReporter,
         _inheritanceManager = inheritanceManager.asInheritanceManager3,
         _uninstantiatedBoundChecker =
@@ -750,6 +744,10 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
       _errorReporter.reportErrorForNode(
           CompileTimeErrorCode.INVALID_EXTENSION_ARGUMENT_COUNT,
           node.argumentList);
+    }
+    if (!_isExtensionOverrideInValidContext(node)) {
+      _errorReporter.reportErrorForNode(
+          CompileTimeErrorCode.EXTENSION_OVERRIDE_WITHOUT_ACCESS, node);
     }
     super.visitExtensionOverride(node);
   }
@@ -6466,6 +6464,21 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
       return false;
     }
     return element.name == "List" && element.library.isDartCore;
+  }
+
+  /// Return `true` if the extension override [node] is being used as a target
+  /// of an operation that might be accessing an instance member.
+  bool _isExtensionOverrideInValidContext(ExtensionOverride node) {
+    AstNode parent = node.parent;
+    if ((parent is PropertyAccess && parent.target == node) ||
+        (parent is MethodInvocation && parent.target == node) ||
+        (parent is FunctionExpressionInvocation && parent.function == node) ||
+        (parent is BinaryExpression && parent.leftOperand == node) ||
+        (parent is IndexExpression && parent.target == node) ||
+        parent is PrefixExpression) {
+      return true;
+    }
+    return false;
   }
 
   bool _isFunctionType(DartType type) {

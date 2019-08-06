@@ -67,6 +67,12 @@ class Rti {
     rti._is = fn;
   }
 
+  @pragma('dart2js:tryInline')
+  static bool _isCheck(Rti rti, object) {
+    return JS(
+        'bool', '#.#(#)', rti, JS_GET_NAME(JsGetName.RTI_FIELD_IS), object);
+  }
+
   /// Method called from generated code to evaluate a type environment recipe in
   /// `this` type environment.
   Rti _eval(recipe) {
@@ -343,8 +349,7 @@ Rti instanceType(object) {
     // prototype of Closure class?
     var closureClassConstructor = JS_BUILTIN(
         'depends:none;effects:none;', JsBuiltin.dartClosureConstructor);
-    if (closureClassConstructor != null &&
-        _Utils.instanceOf(object, closureClassConstructor)) {
+    if (_Utils.instanceOf(object, closureClassConstructor)) {
       return _instanceTypeFromConstructor(closureClassConstructor);
     }
 
@@ -458,8 +463,9 @@ _generalAsCheckImplementation(object) {
   // This static method is installed on an Rti object as a JavaScript instance
   // method. The Rti object is 'this'.
   Rti testRti = _castToRti(JS('', 'this'));
+  if (Rti._isCheck(testRti, object)) return object;
+
   Rti objectRti = instanceOrFunctionType(object, testRti);
-  if (isSubtype(_theUniverse(), objectRti, testRti)) return object;
   var message = _Error.compose(object, objectRti, _rtiToString(testRti, null));
   throw _CastError.fromMessage(message);
 }
@@ -470,8 +476,9 @@ _generalTypeCheckImplementation(object) {
   // This static method is installed on an Rti object as a JavaScript instance
   // method. The Rti object is 'this'.
   Rti testRti = _castToRti(JS('', 'this'));
+  if (Rti._isCheck(testRti, object)) return object;
+
   Rti objectRti = instanceOrFunctionType(object, testRti);
-  if (isSubtype(_theUniverse(), objectRti, testRti)) return object;
   var message = _Error.compose(object, objectRti, _rtiToString(testRti, null));
   throw _TypeError.fromMessage(message);
 }

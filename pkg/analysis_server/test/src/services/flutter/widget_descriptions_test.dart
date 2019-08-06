@@ -297,6 +297,30 @@ void main() {
 
 @reflectiveTest
 class SetPropertyValueSelfTest extends WidgetDescriptionBase {
+  test_expression() async {
+    await resolveTestUnit('''
+import 'package:flutter/material.dart';
+
+void main() {
+  Text('', maxLines: 1);
+}
+''');
+    var property = await getWidgetProperty('Text(', 'maxLines');
+
+    var result = await descriptions.setPropertyValue(
+      property.id,
+      protocol.FlutterWidgetPropertyValue(expression: '1 + 2'),
+    );
+
+    assertExpectedChange(result, r'''
+import 'package:flutter/material.dart';
+
+void main() {
+  Text('', maxLines: 1 + 2);
+}
+''');
+  }
+
   test_format_dontFormatOther() async {
     await resolveTestUnit('''
 import 'package:flutter/material.dart';
@@ -350,6 +374,80 @@ void functionAfter() {
       protocol.RequestErrorCode.FLUTTER_SET_WIDGET_PROPERTY_VALUE_INVALID_ID,
     );
     expect(result.change, isNull);
+  }
+
+  test_named_addValue_beforeChild() async {
+    await resolveTestUnit('''
+import 'package:flutter/material.dart';
+
+void main() {
+  MyWidget<int>(
+    child: Text(''),
+  );
+}
+
+class MyWidget<T> {
+  MyWidget({int xxx = 0, @required Widget child});
+}
+''');
+    var property = await getWidgetProperty('MyWidget<int>', 'xxx');
+
+    var result = await descriptions.setPropertyValue(
+      property.id,
+      protocol.FlutterWidgetPropertyValue(intValue: 42),
+    );
+
+    assertExpectedChange(result, r'''
+import 'package:flutter/material.dart';
+
+void main() {
+  MyWidget<int>(
+    xxx: 42,
+    child: Text(''),
+  );
+}
+
+class MyWidget<T> {
+  MyWidget({int xxx = 0, @required Widget child});
+}
+''');
+  }
+
+  test_named_addValue_beforeChildren() async {
+    await resolveTestUnit('''
+import 'package:flutter/material.dart';
+
+void main() {
+  MyWidget<int>(
+    children: [Text('')],
+  );
+}
+
+class MyWidget<T> {
+  MyWidget({int xxx = 0, @required List<Widget> children});
+}
+''');
+    var property = await getWidgetProperty('MyWidget<int>', 'xxx');
+
+    var result = await descriptions.setPropertyValue(
+      property.id,
+      protocol.FlutterWidgetPropertyValue(intValue: 42),
+    );
+
+    assertExpectedChange(result, r'''
+import 'package:flutter/material.dart';
+
+void main() {
+  MyWidget<int>(
+    xxx: 42,
+    children: [Text('')],
+  );
+}
+
+class MyWidget<T> {
+  MyWidget({int xxx = 0, @required List<Widget> children});
+}
+''');
   }
 
   test_named_addValue_hasComma() async {

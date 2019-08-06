@@ -8023,6 +8023,7 @@ class DiagnosticGetServerPortResult implements ResponseResult {
  * {
  *   "included": List<FilePath>
  *   "includedFixes": optional List<String>
+ *   "includePedanticFixes": optional bool
  *   "includeRequiredFixes": optional bool
  *   "excludedFixes": optional List<String>
  * }
@@ -8033,6 +8034,8 @@ class EditDartfixParams implements RequestParams {
   List<String> _included;
 
   List<String> _includedFixes;
+
+  bool _includePedanticFixes;
 
   bool _includeRequiredFixes;
 
@@ -8084,6 +8087,18 @@ class EditDartfixParams implements RequestParams {
   }
 
   /**
+   * A flag indicating that "pedantic" fixes should be applied.
+   */
+  bool get includePedanticFixes => _includePedanticFixes;
+
+  /**
+   * A flag indicating that "pedantic" fixes should be applied.
+   */
+  void set includePedanticFixes(bool value) {
+    this._includePedanticFixes = value;
+  }
+
+  /**
    * A flag indicating that "required" fixes should be applied.
    */
   bool get includeRequiredFixes => _includeRequiredFixes;
@@ -8115,10 +8130,12 @@ class EditDartfixParams implements RequestParams {
 
   EditDartfixParams(List<String> included,
       {List<String> includedFixes,
+      bool includePedanticFixes,
       bool includeRequiredFixes,
       List<String> excludedFixes}) {
     this.included = included;
     this.includedFixes = includedFixes;
+    this.includePedanticFixes = includePedanticFixes;
     this.includeRequiredFixes = includeRequiredFixes;
     this.excludedFixes = excludedFixes;
   }
@@ -8141,6 +8158,11 @@ class EditDartfixParams implements RequestParams {
         includedFixes = jsonDecoder.decodeList(jsonPath + ".includedFixes",
             json["includedFixes"], jsonDecoder.decodeString);
       }
+      bool includePedanticFixes;
+      if (json.containsKey("includePedanticFixes")) {
+        includePedanticFixes = jsonDecoder.decodeBool(
+            jsonPath + ".includePedanticFixes", json["includePedanticFixes"]);
+      }
       bool includeRequiredFixes;
       if (json.containsKey("includeRequiredFixes")) {
         includeRequiredFixes = jsonDecoder.decodeBool(
@@ -8153,6 +8175,7 @@ class EditDartfixParams implements RequestParams {
       }
       return new EditDartfixParams(included,
           includedFixes: includedFixes,
+          includePedanticFixes: includePedanticFixes,
           includeRequiredFixes: includeRequiredFixes,
           excludedFixes: excludedFixes);
     } else {
@@ -8171,6 +8194,9 @@ class EditDartfixParams implements RequestParams {
     result["included"] = included;
     if (includedFixes != null) {
       result["includedFixes"] = includedFixes;
+    }
+    if (includePedanticFixes != null) {
+      result["includePedanticFixes"] = includePedanticFixes;
     }
     if (includeRequiredFixes != null) {
       result["includeRequiredFixes"] = includeRequiredFixes;
@@ -8196,6 +8222,7 @@ class EditDartfixParams implements RequestParams {
               included, other.included, (String a, String b) => a == b) &&
           listEqual(includedFixes, other.includedFixes,
               (String a, String b) => a == b) &&
+          includePedanticFixes == other.includePedanticFixes &&
           includeRequiredFixes == other.includeRequiredFixes &&
           listEqual(excludedFixes, other.excludedFixes,
               (String a, String b) => a == b);
@@ -8208,6 +8235,7 @@ class EditDartfixParams implements RequestParams {
     int hash = 0;
     hash = JenkinsSmiHash.combine(hash, included.hashCode);
     hash = JenkinsSmiHash.combine(hash, includedFixes.hashCode);
+    hash = JenkinsSmiHash.combine(hash, includePedanticFixes.hashCode);
     hash = JenkinsSmiHash.combine(hash, includeRequiredFixes.hashCode);
     hash = JenkinsSmiHash.combine(hash, excludedFixes.hashCode);
     return JenkinsSmiHash.finish(hash);
@@ -16361,6 +16389,7 @@ class FlutterWidgetPropertyEditor implements HasToJson {
  *   BOOL
  *   DOUBLE
  *   ENUM
+ *   ENUM_LIKE
  *   INT
  *   STRING
  * }
@@ -16381,11 +16410,18 @@ class FlutterWidgetPropertyEditorKind implements Enum {
       const FlutterWidgetPropertyEditorKind._("DOUBLE");
 
   /**
-   * The editor for choosing an items of an enumeration, see the enumItems
-   * field of FlutterWidgetPropertyEditor.
+   * The editor for choosing an item of an enumeration, see the enumItems field
+   * of FlutterWidgetPropertyEditor.
    */
   static const FlutterWidgetPropertyEditorKind ENUM =
       const FlutterWidgetPropertyEditorKind._("ENUM");
+
+  /**
+   * The editor for either choosing a pre-defined item from a list of provided
+   * static field references (like ENUM), or specifying a free-form expression.
+   */
+  static const FlutterWidgetPropertyEditorKind ENUM_LIKE =
+      const FlutterWidgetPropertyEditorKind._("ENUM_LIKE");
 
   /**
    * The editor for a property of type int.
@@ -16403,7 +16439,14 @@ class FlutterWidgetPropertyEditorKind implements Enum {
    * A list containing all of the enum values that are defined.
    */
   static const List<FlutterWidgetPropertyEditorKind> VALUES =
-      const <FlutterWidgetPropertyEditorKind>[BOOL, DOUBLE, ENUM, INT, STRING];
+      const <FlutterWidgetPropertyEditorKind>[
+    BOOL,
+    DOUBLE,
+    ENUM,
+    ENUM_LIKE,
+    INT,
+    STRING
+  ];
 
   @override
   final String name;
@@ -16418,6 +16461,8 @@ class FlutterWidgetPropertyEditorKind implements Enum {
         return DOUBLE;
       case "ENUM":
         return ENUM;
+      case "ENUM_LIKE":
+        return ENUM_LIKE;
       case "INT":
         return INT;
       case "STRING":
@@ -16454,6 +16499,7 @@ class FlutterWidgetPropertyEditorKind implements Enum {
  *   "intValue": optional int
  *   "stringValue": optional String
  *   "enumValue": optional FlutterWidgetPropertyValueEnumItem
+ *   "expression": optional String
  * }
  *
  * Clients may not extend, implement or mix-in this class.
@@ -16468,6 +16514,8 @@ class FlutterWidgetPropertyValue implements HasToJson {
   String _stringValue;
 
   FlutterWidgetPropertyValueEnumItem _enumValue;
+
+  String _expression;
 
   bool get boolValue => _boolValue;
 
@@ -16499,17 +16547,31 @@ class FlutterWidgetPropertyValue implements HasToJson {
     this._enumValue = value;
   }
 
+  /**
+   * A free-form expression, which will be used as the value as is.
+   */
+  String get expression => _expression;
+
+  /**
+   * A free-form expression, which will be used as the value as is.
+   */
+  void set expression(String value) {
+    this._expression = value;
+  }
+
   FlutterWidgetPropertyValue(
       {bool boolValue,
       double doubleValue,
       int intValue,
       String stringValue,
-      FlutterWidgetPropertyValueEnumItem enumValue}) {
+      FlutterWidgetPropertyValueEnumItem enumValue,
+      String expression}) {
     this.boolValue = boolValue;
     this.doubleValue = doubleValue;
     this.intValue = intValue;
     this.stringValue = stringValue;
     this.enumValue = enumValue;
+    this.expression = expression;
   }
 
   factory FlutterWidgetPropertyValue.fromJson(
@@ -16543,12 +16605,18 @@ class FlutterWidgetPropertyValue implements HasToJson {
         enumValue = new FlutterWidgetPropertyValueEnumItem.fromJson(
             jsonDecoder, jsonPath + ".enumValue", json["enumValue"]);
       }
+      String expression;
+      if (json.containsKey("expression")) {
+        expression = jsonDecoder.decodeString(
+            jsonPath + ".expression", json["expression"]);
+      }
       return new FlutterWidgetPropertyValue(
           boolValue: boolValue,
           doubleValue: doubleValue,
           intValue: intValue,
           stringValue: stringValue,
-          enumValue: enumValue);
+          enumValue: enumValue,
+          expression: expression);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "FlutterWidgetPropertyValue", json);
     }
@@ -16572,6 +16640,9 @@ class FlutterWidgetPropertyValue implements HasToJson {
     if (enumValue != null) {
       result["enumValue"] = enumValue.toJson();
     }
+    if (expression != null) {
+      result["expression"] = expression;
+    }
     return result;
   }
 
@@ -16585,7 +16656,8 @@ class FlutterWidgetPropertyValue implements HasToJson {
           doubleValue == other.doubleValue &&
           intValue == other.intValue &&
           stringValue == other.stringValue &&
-          enumValue == other.enumValue;
+          enumValue == other.enumValue &&
+          expression == other.expression;
     }
     return false;
   }
@@ -16598,6 +16670,7 @@ class FlutterWidgetPropertyValue implements HasToJson {
     hash = JenkinsSmiHash.combine(hash, intValue.hashCode);
     hash = JenkinsSmiHash.combine(hash, stringValue.hashCode);
     hash = JenkinsSmiHash.combine(hash, enumValue.hashCode);
+    hash = JenkinsSmiHash.combine(hash, expression.hashCode);
     return JenkinsSmiHash.finish(hash);
   }
 }

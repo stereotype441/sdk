@@ -63,6 +63,8 @@ import '../source/scope_listener.dart'
         ParserRecovery,
         ScopeListener;
 
+import '../source/source_library_builder.dart' show SourceLibraryBuilder;
+
 import '../source/value_kinds.dart';
 
 import '../type_inference/type_inferrer.dart' show TypeInferrer;
@@ -145,7 +147,7 @@ class BodyBuilder extends ScopeListener<JumpTarget>
 
   // TODO(ahe): Rename [library] to 'part'.
   @override
-  final KernelLibraryBuilder library;
+  final SourceLibraryBuilder library;
 
   final ModifierBuilder member;
 
@@ -303,7 +305,7 @@ class BodyBuilder extends ScopeListener<JumpTarget>
         legacyMode = library.legacyMode,
         super(enclosingScope);
 
-  BodyBuilder.withParents(KernelFieldBuilder field, KernelLibraryBuilder part,
+  BodyBuilder.withParents(FieldBuilder field, SourceLibraryBuilder part,
       ClassBuilder classBuilder, TypeInferrer typeInferrer)
       : this(
             part,
@@ -318,7 +320,7 @@ class BodyBuilder extends ScopeListener<JumpTarget>
             field.fileUri,
             typeInferrer);
 
-  BodyBuilder.forField(KernelFieldBuilder field, TypeInferrer typeInferrer)
+  BodyBuilder.forField(FieldBuilder field, TypeInferrer typeInferrer)
       : this.withParents(
             field,
             field.parent is ClassBuilder ? field.parent.parent : field.parent,
@@ -326,7 +328,7 @@ class BodyBuilder extends ScopeListener<JumpTarget>
             typeInferrer);
 
   BodyBuilder.forOutlineExpression(
-      KernelLibraryBuilder library,
+      SourceLibraryBuilder library,
       ClassBuilder classBuilder,
       ModifierBuilder member,
       Scope scope,
@@ -488,8 +490,7 @@ class BodyBuilder extends ScopeListener<JumpTarget>
     }
     LocatedMessage context = scope.declare(
         variable.name,
-        new KernelVariableBuilder(
-            variable, member ?? classBuilder ?? library, uri),
+        new VariableBuilder(variable, member ?? classBuilder ?? library, uri),
         uri);
     if (context != null) {
       // This case is different from the above error. In this case, the problem
@@ -610,7 +611,7 @@ class BodyBuilder extends ScopeListener<JumpTarget>
   void finishFields() {
     debugEvent("finishFields");
     int count = pop();
-    List<KernelFieldBuilder> fields = <KernelFieldBuilder>[];
+    List<FieldBuilder> fields = <FieldBuilder>[];
     for (int i = 0; i < count; i++) {
       Expression initializer = pop();
       Identifier identifier = pop();
@@ -621,7 +622,7 @@ class BodyBuilder extends ScopeListener<JumpTarget>
       } else {
         declaration = library.getLocalMember(name);
       }
-      KernelFieldBuilder field;
+      FieldBuilder field;
       if (declaration.isField && declaration.next == null) {
         field = declaration;
       } else {
@@ -4807,7 +4808,7 @@ class BodyBuilder extends ScopeListener<JumpTarget>
     Identifier name = pop();
     List<Expression> annotations = pop();
     TypeVariableBuilder variable =
-        new TypeVariableBuilder(name.name, library, name.charOffset, null);
+        new TypeVariableBuilder(name.name, library, name.charOffset);
     if (annotations != null) {
       inferAnnotations(annotations);
       for (Expression annotation in annotations) {
@@ -5060,7 +5061,7 @@ class BodyBuilder extends ScopeListener<JumpTarget>
                 ..fileOffset = fieldNameOffset)
             ..fileOffset = fieldNameOffset)
         ..fileOffset = fieldNameOffset;
-    } else if (builder is KernelFieldBuilder && builder.isInstanceMember) {
+    } else if (builder is FieldBuilder && builder.isInstanceMember) {
       initializedFields ??= <String, int>{};
       if (initializedFields.containsKey(name)) {
         return buildDuplicatedInitializer(builder.field, expression, name,
@@ -5364,7 +5365,7 @@ class BodyBuilder extends ScopeListener<JumpTarget>
 
   @override
   Expression wrapInDeferredCheck(
-      Expression expression, KernelPrefixBuilder prefix, int charOffset) {
+      Expression expression, PrefixBuilder prefix, int charOffset) {
     VariableDeclaration check = new VariableDeclaration.forValue(
         forest.checkLibraryIsLoaded(prefix.dependency))
       ..fileOffset = charOffset;
@@ -5629,7 +5630,7 @@ class FormalParameters {
   }
 
   FunctionNode buildFunctionNode(
-      KernelLibraryBuilder library,
+      SourceLibraryBuilder library,
       UnresolvedType returnType,
       List<TypeVariableBuilder> typeParameters,
       AsyncMarker asyncModifier,
