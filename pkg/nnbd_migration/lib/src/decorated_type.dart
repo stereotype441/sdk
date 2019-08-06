@@ -275,7 +275,7 @@ class DecoratedType {
     } else if (type is FunctionType) {
       String formals = '';
       if (type.typeFormals.isNotEmpty) {
-        formals = '<${typeFormals.join(', ')}>';
+        formals = '<${type.typeFormals.join(', ')}>';
       }
       List<String> paramStrings = [];
       for (int i = 0; i < positionalParameters.length; i++) {
