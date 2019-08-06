@@ -23,6 +23,8 @@ import 'package:nnbd_migration/src/expression_checks.dart';
 import 'package:nnbd_migration/src/node_builder.dart';
 import 'package:nnbd_migration/src/nullability_node.dart';
 
+/// Test class mixing in _AssignmentChecker, to allow [checkAssignment] to be
+/// more easily unit tested.
 @visibleForTesting
 class AssignmentCheckerForTesting extends Object with _AssignmentChecker {
   @override
@@ -1411,6 +1413,10 @@ $stackTrace''');
   }
 }
 
+/// Implementation of [_checkAssignment] for [EdgeBuilder].
+///
+/// This has been moved to its own mixin to allow it to be more easily unit
+/// tested.
 mixin _AssignmentChecker {
   DecoratedClassHierarchy get _decoratedClassHierarchy;
 
