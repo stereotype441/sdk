@@ -17,6 +17,51 @@ import 'package:test/test.dart';
 
 import 'abstract_single_unit.dart';
 
+mixin EdgeTester {
+  NullabilityGraphForTesting get graph;
+
+  NullabilityEdge assertEdge(
+      NullabilityNode source, NullabilityNode destination,
+      {@required bool hard, List<NullabilityNode> guards = const []}) {
+    var edges = getEdges(source, destination);
+    if (edges.length == 0) {
+      fail('Expected edge $source -> $destination, found none');
+    } else if (edges.length != 1) {
+      fail('Found multiple edges $source -> $destination');
+    } else {
+      var edge = edges[0];
+      expect(edge.hard, hard);
+      expect(edge.guards, unorderedEquals(guards));
+      return edge;
+    }
+  }
+
+  void assertNoEdge(NullabilityNode source, NullabilityNode destination) {
+    var edges = getEdges(source, destination);
+    if (edges.isNotEmpty) {
+      fail('Expected no edge $source -> $destination, found ${edges.length}');
+    }
+  }
+
+  void assertUnion(NullabilityNode x, NullabilityNode y) {
+    var edges = getEdges(x, y);
+    for (var edge in edges) {
+      if (edge.isUnion) {
+        expect(edge.sources, hasLength(1));
+        return;
+      }
+    }
+    fail('Expected union between $x and $y, not found');
+  }
+
+  List<NullabilityEdge> getEdges(
+          NullabilityNode source, NullabilityNode destination) =>
+      graph
+          .getUpstreamEdges(destination)
+          .where((e) => e.primarySource == source)
+          .toList();
+}
+
 /// Mock representation of constraint variables.
 class InstrumentedVariables extends Variables {
   final _conditionalDiscard = <AstNode, ConditionalDiscard>{};
@@ -79,51 +124,6 @@ class InstrumentedVariables extends Variables {
     }
     return expression;
   }
-}
-
-mixin EdgeTester {
-  NullabilityGraphForTesting get graph;
-
-  NullabilityEdge assertEdge(
-      NullabilityNode source, NullabilityNode destination,
-      {@required bool hard, List<NullabilityNode> guards = const []}) {
-    var edges = getEdges(source, destination);
-    if (edges.length == 0) {
-      fail('Expected edge $source -> $destination, found none');
-    } else if (edges.length != 1) {
-      fail('Found multiple edges $source -> $destination');
-    } else {
-      var edge = edges[0];
-      expect(edge.hard, hard);
-      expect(edge.guards, unorderedEquals(guards));
-      return edge;
-    }
-  }
-
-  void assertNoEdge(NullabilityNode source, NullabilityNode destination) {
-    var edges = getEdges(source, destination);
-    if (edges.isNotEmpty) {
-      fail('Expected no edge $source -> $destination, found ${edges.length}');
-    }
-  }
-
-  void assertUnion(NullabilityNode x, NullabilityNode y) {
-    var edges = getEdges(x, y);
-    for (var edge in edges) {
-      if (edge.isUnion) {
-        expect(edge.sources, hasLength(1));
-        return;
-      }
-    }
-    fail('Expected union between $x and $y, not found');
-  }
-
-  List<NullabilityEdge> getEdges(
-      NullabilityNode source, NullabilityNode destination) =>
-      graph
-          .getUpstreamEdges(destination)
-          .where((e) => e.primarySource == source)
-          .toList();
 }
 
 class MigrationVisitorTestBase extends AbstractSingleUnitTest with EdgeTester {

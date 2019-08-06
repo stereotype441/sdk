@@ -49,8 +49,7 @@ class AssignmentCheckerTest extends Object with EdgeTester {
     var typeProvider = TestTypeProvider();
     var graph = NullabilityGraphForTesting();
     var decoratedClassHierarchy = _DecoratedClassHierarchyForTesting();
-    var checker = AssignmentCheckerForTesting(
-        graph, decoratedClassHierarchy);
+    var checker = AssignmentCheckerForTesting(graph, decoratedClassHierarchy);
     var assignmentCheckerTest =
         AssignmentCheckerTest._(typeProvider, graph, checker);
     decoratedClassHierarchy.assignmentCheckerTest = assignmentCheckerTest;
