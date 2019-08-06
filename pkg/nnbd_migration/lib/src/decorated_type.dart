@@ -223,6 +223,22 @@ class DecoratedType {
     }
   }
 
+  @override
+  bool operator ==(Object other) {
+    if (other is DecoratedType) {
+      if (this.type != other.type) return false;
+      if (!identical(this.node, other.node)) return false;
+      if (this.returnType != other.returnType) return false;
+      if (!_compareLists(this.positionalParameters, other.positionalParameters))
+        return false;
+      if (!_compareMaps(this.namedParameters, other.namedParameters))
+        return false;
+      if (!_compareLists(this.typeArguments, other.typeArguments)) return false;
+      return true;
+    }
+    return false;
+  }
+
   /// Converts one function type into another by substituting the given
   /// [argumentTypes] for the function's generic parameters.
   DecoratedType instantiate(List<DecoratedType> argumentTypes) {
@@ -363,6 +379,24 @@ class DecoratedType {
         returnType:
             returnType._substitute(substitution, undecoratedResult.returnType),
         positionalParameters: newPositionalParameters);
+  }
+
+  static bool _compareLists(
+      List<DecoratedType> list1, List<DecoratedType> list2) {
+    if (list1.length != list2.length) return false;
+    for (int i = 0; i < list1.length; i++) {
+      if (list1[i] != list2[i]) return false;
+    }
+    return true;
+  }
+
+  static bool _compareMaps(
+      Map<String, DecoratedType> map1, Map<String, DecoratedType> map2) {
+    if (map1.length != map2.length) return false;
+    for (var entry in map1.entries) {
+      if (entry.value != map2[entry.key]) return false;
+    }
+    return true;
   }
 }
 
