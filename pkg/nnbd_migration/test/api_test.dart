@@ -959,7 +959,7 @@ class C {
     await _checkSingleFileChanges(content, expected);
   }
 
-  test_flow_analysis_simple() async {
+  solo_test_flow_analysis_simple() async {
     var content = '''
 int f(int x) {
   if (x == null) {

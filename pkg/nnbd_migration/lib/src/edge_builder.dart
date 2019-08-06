@@ -11,8 +11,10 @@ import 'package:analyzer/src/dart/element/handle.dart';
 import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
 import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/dart/element/type.dart';
+import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/source.dart';
+import 'package:front_end/src/fasta/flow_analysis/flow_analysis.dart';
 import 'package:meta/meta.dart';
 import 'package:nnbd_migration/nnbd_migration.dart';
 import 'package:nnbd_migration/src/conditional_discard.dart';
@@ -22,6 +24,8 @@ import 'package:nnbd_migration/src/edge_origin.dart';
 import 'package:nnbd_migration/src/expression_checks.dart';
 import 'package:nnbd_migration/src/node_builder.dart';
 import 'package:nnbd_migration/src/nullability_node.dart';
+
+import 'decorated_type_operations.dart';
 
 /// Test class mixing in _AssignmentChecker, to allow [checkAssignment] to be
 /// more easily unit tested.
@@ -90,6 +94,11 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   final DecoratedClassHierarchy _decoratedClassHierarchy;
+
+  /// If we are visiting a function body or initializer, instance of flow
+  /// analysis.  Otherwise `null`.
+  FlowAnalysis<Statement, Expression, VariableElement, DecoratedType>
+      _flowAnalysis;
 
   /// For convenience, a [DecoratedType] representing non-nullable `Object`.
   final DecoratedType _notNullType;
@@ -458,10 +467,16 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     _currentFunctionType =
         _variables.decoratedElementType(node.declaredElement);
     _inConditionalControlFlow = false;
+    _flowAnalysis =
+        FlowAnalysis<Statement, Expression, VariableElement, DecoratedType>(
+            const AnalyzerNodeOperations(),
+            DecoratedTypeOperations(_typeSystem, _variables),
+            AnalyzerFunctionBodyAccess(node.functionExpression.body));
     try {
       node.functionExpression.body.accept(this);
     } finally {
       _currentFunctionType = null;
+      _flowAnalysis = null;
     }
     return null;
   }
@@ -482,8 +497,6 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   DecoratedType visitIfStatement(IfStatement node) {
-    // TODO(paulberry): should the use of a boolean in an if-statement be
-    // treated like an implicit `assert(b != null)`?  Probably.
     _handleAssignment(node.condition, _notNullType);
     _inConditionalControlFlow = true;
     NullabilityNode trueGuard;
@@ -498,6 +511,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       _guards.add(trueGuard);
     }
     try {
+      _flowAnalysis.ifStatement_thenBegin(node.condition);
       node.thenStatement.accept(this);
     } finally {
       if (trueGuard != null) {
@@ -507,9 +521,14 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     if (falseGuard != null) {
       _guards.add(falseGuard);
     }
+    var elseStatement = node.elseStatement;
     try {
-      node.elseStatement?.accept(this);
+      if (elseStatement != null) {
+        _flowAnalysis.ifStatement_elseBegin();
+        elseStatement.accept(this);
+      }
     } finally {
+      _flowAnalysis.ifStatement_end(elseStatement != null);
       if (falseGuard != null) {
         _guards.removeLast();
       }
