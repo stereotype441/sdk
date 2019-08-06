@@ -266,17 +266,24 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       var leftType = node.leftOperand.accept(this);
       node.rightOperand.accept(this);
       if (node.rightOperand is NullLiteral) {
-        // TODO(paulberry): figure out what the rules for isPure should be.
         // TODO(paulberry): only set falseChecksNonNull in unconditional
         // control flow
-        bool isPure = node.leftOperand is SimpleIdentifier;
+        bool notEqual = operatorType == TokenType.BANG_EQ;
+        bool isPure = false;
+        var leftOperand = node.leftOperand;
+        if (leftOperand is SimpleIdentifier) {
+          // TODO(paulberry): figure out what the rules for isPure should be.
+          isPure = true;
+          var element = leftOperand.staticElement;
+          if (element is VariableElement) {
+            _flowAnalysis.conditionEqNull(node, element, notEqual: notEqual);
+          }
+        }
         var conditionInfo = _ConditionInfo(node,
             isPure: isPure,
             trueGuard: leftType.node,
             falseDemonstratesNonNullIntent: leftType.node);
-        _conditionInfo = operatorType == TokenType.EQ_EQ
-            ? conditionInfo
-            : conditionInfo.not(node);
+        _conditionInfo = notEqual ? conditionInfo.not(node) : conditionInfo;
       }
       return _nonNullableBoolType;
     } else if (operatorType == TokenType.AMPERSAND_AMPERSAND ||
@@ -470,7 +477,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     _flowAnalysis =
         FlowAnalysis<Statement, Expression, VariableElement, DecoratedType>(
             const AnalyzerNodeOperations(),
-            DecoratedTypeOperations(_typeSystem, _variables),
+            DecoratedTypeOperations(_typeSystem, _variables, _graph),
             AnalyzerFunctionBodyAccess(node.functionExpression.body));
     try {
       node.functionExpression.body.accept(this);
@@ -868,9 +875,13 @@ $stackTrace''');
   @override
   DecoratedType visitSimpleIdentifier(SimpleIdentifier node) {
     var staticElement = node.staticElement;
-    if (staticElement is ParameterElement ||
-        staticElement is LocalVariableElement ||
-        staticElement is FunctionElement ||
+    if (staticElement is VariableElement) {
+      if (!node.inDeclarationContext()) {
+        var promotedType = _flowAnalysis.promotedType(staticElement);
+        if (promotedType != null) return promotedType;
+      }
+      return getOrComputeElementType(staticElement);
+    } else if (staticElement is FunctionElement ||
         staticElement is MethodElement) {
       return getOrComputeElementType(staticElement);
     } else if (staticElement is PropertyAccessorElement) {
