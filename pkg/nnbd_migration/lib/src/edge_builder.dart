@@ -44,7 +44,7 @@ class AssignmentCheckerForTesting extends Object with _AssignmentChecker {
   void _connect(
       NullabilityNode source, NullabilityNode destination, EdgeOrigin origin,
       {bool hard = false}) {
-    _graph.connect(source, destination, origin);
+    _graph.connect(source, destination, origin, hard: hard);
   }
 }
 
