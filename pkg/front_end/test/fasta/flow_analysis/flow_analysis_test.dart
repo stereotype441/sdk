@@ -412,6 +412,17 @@ main() {
         _check('int', 'int?', true, 'int');
         _check('int', 'String', true, 'int');
       });
+
+      test('variable present in one state but not the other', () {
+        var h = _Harness();
+        var x = _Var('x', _Type('Object?'));
+        var s0 = FlowModel<_Var, _Type>(true);
+        var s1 = s0.add(x, assigned: true);
+        expect(s0.restrict(h, emptySet, s1, {}), same(s0));
+        expect(s0.restrict(h, emptySet, s1, {x}), same(s0));
+        expect(s1.restrict(h, emptySet, s0, {}), same(s1));
+        expect(s1.restrict(h, emptySet, s0, {x}), same(s1));
+      });
     });
   });
 

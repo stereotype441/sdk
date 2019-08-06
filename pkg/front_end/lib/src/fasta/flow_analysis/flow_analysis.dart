@@ -818,7 +818,7 @@ class FlowModel<Variable, Type> {
 
     var newPromoted = <Variable, Type>{};
     bool promotedMatchesThis = true;
-    bool promotedMatchesOther = true;
+    bool promotedMatchesOther = other.promoted.length == promoted.length;
     for (var entry in promoted.entries) {
       var variable = entry.key;
       var thisType = entry.value;
