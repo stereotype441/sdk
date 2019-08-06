@@ -31,7 +31,8 @@ class DecoratedTypeTest extends AbstractSingleUnitTest {
   test_toString_interface_type_argument() async {
     await resolveTestUnit('''List<int> x;''');
     var type = findElement.topVar('x').type as InterfaceType;
-    var decoratedType = DecoratedType(type, always, typeArguments: [DecoratedType(type.typeArguments[0], _node(1))]);
+    var decoratedType = DecoratedType(type, always,
+        typeArguments: [DecoratedType(type.typeArguments[0], _node(1))]);
     expect(decoratedType.toString(), 'List<int?(type(1))>?');
   }
 
