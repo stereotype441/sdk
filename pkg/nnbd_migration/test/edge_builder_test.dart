@@ -105,10 +105,11 @@ class AssignmentCheckerTest extends Object with EdgeTester {
 
   DecoratedType myListOfList(DecoratedType elementType) {
     if (_myListOfListClass == null) {
-      var t = _MockTypeParameter('T', object().type);
+      var t = TypeParameterElementImpl.synthetic('T')..bound = object().type;
       _myListOfListSupertype = list(list(typeParameterType(t)));
-      _myListOfListClass = _MockClass(
-          'MyListOfList', _myListOfListSupertype.type as InterfaceType, [t]);
+      _myListOfListClass = ClassElementImpl('MyListOfList', 0)
+        ..typeParameters = [t]
+        ..supertype = _myListOfListSupertype.type as InterfaceType;
     }
     return DecoratedType(
         InterfaceTypeImpl(_myListOfListClass)
@@ -284,7 +285,7 @@ class AssignmentCheckerTest extends Object with EdgeTester {
   }
 
   void test_typeParam_to_object() {
-    var t = _MockTypeParameter('T', object().type);
+    var t = TypeParameterElementImpl.synthetic('T')..bound = object().type;
     var t1 = typeParameterType(t);
     var t2 = object();
     assign(t1, t2);
@@ -292,7 +293,7 @@ class AssignmentCheckerTest extends Object with EdgeTester {
   }
 
   void test_typeParam_to_typeParam() {
-    var t = _MockTypeParameter('T', object().type);
+    var t = TypeParameterElementImpl.synthetic('T')..bound = object().type;
     var t1 = typeParameterType(t);
     var t2 = typeParameterType(t);
     assign(t1, t2);
@@ -3157,48 +3158,6 @@ class _DecoratedClassHierarchyForTesting implements DecoratedClassHierarchy {
       ClassElement class_, ClassElement superclass) {
     throw UnimplementedError('TODO(paulberry)');
   }
-}
-
-class _MockClass implements ClassElement {
-  @override
-  final String name;
-
-  @override
-  final InterfaceType supertype;
-
-  InterfaceType _type;
-
-  @override
-  final List<TypeParameterElement> typeParameters;
-
-  _MockClass(this.name, this.supertype, this.typeParameters);
-
-  @override
-  String get displayName => name;
-
-  @override
-  InterfaceType get type => _type ??= InterfaceTypeImpl(this)
-    ..typeArguments =
-        typeParameters.map((t) => TypeParameterTypeImpl(t)).toList();
-
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
-class _MockTypeParameter implements TypeParameterElement {
-  @override
-  final String name;
-
-  @override
-  final DartType bound;
-
-  @override
-  TypeParameterType type;
-
-  _MockTypeParameter(this.name, this.bound) {
-    type = TypeParameterTypeImpl(this);
-  }
-
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _TestEdgeOrigin extends EdgeOrigin {
