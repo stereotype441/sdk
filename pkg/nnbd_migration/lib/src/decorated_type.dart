@@ -226,15 +226,26 @@ class DecoratedType {
   @override
   bool operator ==(Object other) {
     if (other is DecoratedType) {
-      if (this.type != other.type) return false;
       if (!identical(this.node, other.node)) return false;
-      if (this.returnType != other.returnType) return false;
-      if (!_compareLists(this.positionalParameters, other.positionalParameters))
-        return false;
-      if (!_compareMaps(this.namedParameters, other.namedParameters))
-        return false;
-      if (!_compareLists(this.typeArguments, other.typeArguments)) return false;
-      return true;
+      var thisType = this.type;
+      var otherType = other.type;
+      if (thisType is FunctionType && otherType is FunctionType) {
+        // TODO(paulberry): handle change of type parameter variables
+        if (this.returnType != other.returnType) return false;
+        if (!_compareLists(this.positionalParameters, other.positionalParameters)) {
+          return false;
+        }
+        if (!_compareMaps(this.namedParameters, other.namedParameters)) {
+          return false;
+        }
+        return true;
+      } else if (thisType is InterfaceType && otherType is InterfaceType) {
+        if (thisType.element != otherType.element) return false;
+        if (!_compareLists(this.typeArguments, other.typeArguments)) { return false; }
+        return true;
+      } else {
+        return thisType == otherType;
+      }
     }
     return false;
   }
