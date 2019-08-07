@@ -232,7 +232,12 @@ class DecoratedType {
       if (thisType is FunctionType && otherType is FunctionType) {
         // TODO(paulberry): handle change of type parameter variables
         if (this.returnType != other.returnType) return false;
-        if (!_compareLists(this.positionalParameters, other.positionalParameters)) {
+        if (thisType.normalParameterTypes.length !=
+            otherType.normalParameterTypes.length) {
+          return false;
+        }
+        if (!_compareLists(
+            this.positionalParameters, other.positionalParameters)) {
           return false;
         }
         if (!_compareMaps(this.namedParameters, other.namedParameters)) {
@@ -241,7 +246,9 @@ class DecoratedType {
         return true;
       } else if (thisType is InterfaceType && otherType is InterfaceType) {
         if (thisType.element != otherType.element) return false;
-        if (!_compareLists(this.typeArguments, other.typeArguments)) { return false; }
+        if (!_compareLists(this.typeArguments, other.typeArguments)) {
+          return false;
+        }
         return true;
       } else {
         return thisType == otherType;

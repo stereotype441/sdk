@@ -42,6 +42,75 @@ class DecoratedTypeTest extends Object
     NullabilityNode.clearDebugNames();
   }
 
+  test_equal_functionType_named_different_names() {
+    var node = newNode();
+    var argType = int_();
+    expect(
+        function(dynamic_, named: {'x': argType}, node: node) ==
+            function(dynamic_, named: {'y': argType}, node: node),
+        isFalse);
+  }
+
+  test_equal_functionType_named_different_types() {
+    var node = newNode();
+    expect(
+        function(dynamic_, named: {'x': int_()}, node: node) ==
+            function(dynamic_, named: {'x': int_()}, node: node),
+        isFalse);
+  }
+
+  test_equal_functionType_named_same() {
+    var node = newNode();
+    var argType = int_();
+    expect(
+        function(dynamic_, named: {'x': argType}, node: node) ==
+            function(dynamic_, named: {'x': argType}, node: node),
+        isTrue);
+  }
+
+  test_equal_functionType_positional_different() {
+    var node = newNode();
+    expect(
+        function(dynamic_, positional: [int_()], node: node) ==
+            function(dynamic_, positional: [int_()], node: node),
+        isFalse);
+  }
+
+  test_equal_functionType_positional_same() {
+    var node = newNode();
+    var argType = int_();
+    expect(
+        function(dynamic_, positional: [argType], node: node) ==
+            function(dynamic_, positional: [argType], node: node),
+        isTrue);
+  }
+
+  test_equal_functionType_required_different() {
+    var node = newNode();
+    expect(
+        function(dynamic_, required: [int_()], node: node) ==
+            function(dynamic_, required: [int_()], node: node),
+        isFalse);
+  }
+
+  test_equal_functionType_required_same() {
+    var node = newNode();
+    var argType = int_();
+    expect(
+        function(dynamic_, required: [argType], node: node) ==
+            function(dynamic_, required: [argType], node: node),
+        isTrue);
+  }
+
+  test_equal_functionType_required_vs_positional() {
+    var node = newNode();
+    var argType = int_();
+    expect(
+        function(dynamic_, required: [argType], node: node) ==
+            function(dynamic_, positional: [argType], node: node),
+        isFalse);
+  }
+
   test_equal_interfaceType_different_args() {
     var node = newNode();
     expect(list(int_(), node: node) == list(int_(), node: node), isFalse);
