@@ -8,6 +8,7 @@ import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart' show SourceEdit;
 import 'package:nnbd_migration/src/nullability_node.dart';
 import 'package:nnbd_migration/src/potential_modification.dart';
+import 'package:analyzer/src/dart/element/element.dart';
 
 /// Representation of a type in the code to be migrated.  In addition to
 /// tracking the (unmigrated) [DartType], we track the [ConstraintVariable]s
@@ -230,8 +231,18 @@ class DecoratedType {
       var thisType = this.type;
       var otherType = other.type;
       if (thisType is FunctionType && otherType is FunctionType) {
-        // TODO(paulberry): handle change of type parameter variables
         if (this.returnType != other.returnType) return false;
+        if (thisType.typeFormals.length != otherType.typeFormals.length) { return false; }
+        if (!_compareTypeFormalLists(thisType.typeFormals, otherType.typeFormals)) {
+          // Create a fresh set of type variables and substitute so we can compare safely.
+          var thisSubstitution = <TypeParameterElement, DecoratedType>{};
+          var otherSubstitution = <TypeParameterElement, DecoratedType>{};
+          for (int i = 0; i < thisType.typeFormals.length; i++) {
+            var newParameter = TypeParameterElementImpl.synthetic(thisType.typeFormals[i].name);
+            throw UnimplementedError('TODO(paulberry): need to add to both substitutions');
+          }
+          throw UnimplementedError('TODO(paulberry): need to perform substitutions, then substitute bounds and compare them');
+        }
         if (thisType.normalParameterTypes.length !=
             otherType.normalParameterTypes.length) {
           return false;
