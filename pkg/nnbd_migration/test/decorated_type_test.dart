@@ -145,6 +145,35 @@ class DecoratedTypeTest extends Object
         isTrue);
   }
 
+  test_equal_functionType_typeFormals_different_bounds() {
+    var node = newNode();
+    var t = typeParameter('T', object());
+    var u = typeParameter('U', int_());
+    expect(
+        function(typeParameterType(t), typeFormals: [t], node: node) ==
+            function(typeParameterType(u), typeFormals: [u], node: node),
+        isFalse);
+  }
+
+  test_equal_functionType_typeFormals_same_bounds() {
+    var node = newNode();
+    var t = typeParameter('T', object());
+    var u = typeParameter('U', object());
+    expect(
+        function(typeParameterType(t), typeFormals: [t], node: node) ==
+            function(typeParameterType(u), typeFormals: [u], node: node),
+        isTrue);
+  }
+
+  test_equal_functionType_typeFormals_same_parameters() {
+    var node = newNode();
+    var t = typeParameter('T', object());
+    expect(
+        function(typeParameterType(t), typeFormals: [t], node: node) ==
+            function(typeParameterType(t), typeFormals: [t], node: node),
+        isTrue);
+  }
+
   test_equal_interfaceType_different_args() {
     var node = newNode();
     expect(list(int_(), node: node) == list(int_(), node: node), isFalse);
