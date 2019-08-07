@@ -37,8 +37,12 @@ class Variables implements VariableRecorder, VariableRepository {
   }
 
   @override
-  DecoratedType decoratedElementType(Element element) =>
-      _decoratedElementTypes[element] ??= _createDecoratedElementType(element);
+  DecoratedType decoratedElementType(Element element) {
+    assert(element is! TypeParameterElement,
+        'Use decoratedTypeParameterBound instead');
+    return _decoratedElementTypes[element] ??=
+        _createDecoratedElementType(element);
+  }
 
   @override
   DecoratedType decoratedTypeAnnotation(
@@ -82,6 +86,8 @@ class Variables implements VariableRecorder, VariableRepository {
 
   void recordDecoratedElementType(Element element, DecoratedType type) {
     assert(() {
+      assert(element is! TypeParameterElement,
+          'Use decoratedTypeParameterBound instead');
       var library = element.library;
       if (library == null) {
         // No problem; the element is probably a parameter of a function type
