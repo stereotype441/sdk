@@ -543,6 +543,8 @@ abstract class VariableRecorder {
   /// Associates decorated type information with the given [element].
   void recordDecoratedElementType(Element element, DecoratedType type);
 
+  void recordDecoratedTypeParameterBound(TypeParameterElement element, DecoratedType type);
+
   /// Associates decorated type information with the given [type] node.
   void recordDecoratedTypeAnnotation(
       Source source, TypeAnnotation node, DecoratedTypeAnnotation type,

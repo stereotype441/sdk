@@ -87,7 +87,7 @@ class Variables implements VariableRecorder, VariableRepository {
   void recordDecoratedElementType(Element element, DecoratedType type) {
     assert(() {
       assert(element is! TypeParameterElement,
-          'Use decoratedTypeParameterBound instead');
+          'Use recordDecoratedTypeParameterBound instead');
       var library = element.library;
       if (library == null) {
         // No problem; the element is probably a parameter of a function type
