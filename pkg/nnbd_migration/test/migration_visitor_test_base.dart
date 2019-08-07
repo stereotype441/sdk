@@ -40,6 +40,7 @@ mixin DecoratedTypeTester implements DecoratedTypeTesterBase {
       {List<DecoratedType> required = const [],
       List<DecoratedType> positional = const [],
       Map<String, DecoratedType> named = const {},
+      List<TypeParameterElement> typeFormals = const [],
       NullabilityNode node}) {
     int i = 0;
     var parameters = required
@@ -51,7 +52,7 @@ mixin DecoratedTypeTester implements DecoratedTypeTesterBase {
     parameters.addAll(named.entries.map((e) => ParameterElementImpl.synthetic(
         e.key, e.value.type, ParameterKind.NAMED)));
     return DecoratedType(
-        FunctionTypeImpl.synthetic(returnType.type, const [], parameters),
+        FunctionTypeImpl.synthetic(returnType.type, typeFormals, parameters),
         node ?? newNode(),
         returnType: returnType,
         positionalParameters: required.toList()..addAll(positional),
@@ -70,6 +71,9 @@ mixin DecoratedTypeTester implements DecoratedTypeTesterBase {
 
   DecoratedType object({NullabilityNode node}) =>
       DecoratedType(typeProvider.objectType, node ?? newNode());
+
+  TypeParameterElement typeParameter(String name, DecoratedType bound) =>
+      TypeParameterElementImpl.synthetic(name)..bound = bound.type;
 
   DecoratedType typeParameterType(TypeParameterElement typeParameter) =>
       DecoratedType(typeParameter.type, newNode());

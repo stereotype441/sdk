@@ -29,7 +29,8 @@ main() {
 }
 
 @reflectiveTest
-class AssignmentCheckerTest extends Object with EdgeTester, DecoratedTypeTester {
+class AssignmentCheckerTest extends Object
+    with EdgeTester, DecoratedTypeTester {
   static const EdgeOrigin origin = const _TestEdgeOrigin();
 
   ClassElement _myListOfListClass;
@@ -66,7 +67,7 @@ class AssignmentCheckerTest extends Object with EdgeTester, DecoratedTypeTester 
 
   DecoratedType myListOfList(DecoratedType elementType) {
     if (_myListOfListClass == null) {
-      var t = TypeParameterElementImpl.synthetic('T')..bound = object().type;
+      var t = typeParameter('T', object());
       _myListOfListSupertype = list(list(typeParameterType(t)));
       _myListOfListClass = ClassElementImpl('MyListOfList', 0)
         ..typeParameters = [t]
@@ -94,10 +95,8 @@ class AssignmentCheckerTest extends Object with EdgeTester, DecoratedTypeTester 
 
   void test_complex_to_typeParam() {
     var bound = list(object());
-    var t = TypeParameterElementImpl.synthetic('T')..bound = bound.type;
-    checker.bounds[t] = bound;
     var t1 = list(object());
-    var t2 = typeParameterType(t);
+    var t2 = typeParameterType(typeParameter('T', bound));
     assign(t1, t2, hard: true);
     assertEdge(t1.node, t2.node, hard: true);
     assertNoEdge(t1.node, bound.node);
@@ -276,9 +275,7 @@ class AssignmentCheckerTest extends Object with EdgeTester, DecoratedTypeTester 
 
   void test_typeParam_to_complex() {
     var bound = list(object());
-    var t = TypeParameterElementImpl.synthetic('T')..bound = bound.type;
-    checker.bounds[t] = bound;
-    var t1 = typeParameterType(t);
+    var t1 = typeParameterType(typeParameter('T', bound));
     var t2 = list(object());
     assign(t1, t2, hard: true);
     assertEdge(t1.node, t2.node, hard: true);
@@ -288,21 +285,25 @@ class AssignmentCheckerTest extends Object with EdgeTester, DecoratedTypeTester 
   }
 
   void test_typeParam_to_object() {
-    var bound = object();
-    var t = TypeParameterElementImpl.synthetic('T')..bound = bound.type;
-    checker.bounds[t] = bound;
-    var t1 = typeParameterType(t);
+    var t1 = typeParameterType(typeParameter('T', object()));
     var t2 = object();
     assign(t1, t2);
     assertEdge(t1.node, t2.node, hard: false);
   }
 
   void test_typeParam_to_typeParam() {
-    var t = TypeParameterElementImpl.synthetic('T')..bound = object().type;
+    var t = typeParameter('T', object());
     var t1 = typeParameterType(t);
     var t2 = typeParameterType(t);
     assign(t1, t2);
     assertEdge(t1.node, t2.node, hard: false);
+  }
+
+  @override
+  TypeParameterElement typeParameter(String name, DecoratedType bound) {
+    var t = super.typeParameter(name, bound);
+    checker.bounds[t] = bound;
+    return t;
   }
 }
 
