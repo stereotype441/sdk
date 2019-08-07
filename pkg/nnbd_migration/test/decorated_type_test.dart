@@ -59,6 +59,15 @@ class DecoratedTypeTest extends Object
         isFalse);
   }
 
+  test_equal_functionType_named_extra() {
+    var node = newNode();
+    var argType = int_();
+    var t1 = function(dynamic_, named: {'x': argType}, node: node);
+    var t2 = function(dynamic_, node: node);
+    expect(t1 == t2, isFalse);
+    expect(t2 == t1, isFalse);
+  }
+
   test_equal_functionType_named_same() {
     var node = newNode();
     var argType = int_();
