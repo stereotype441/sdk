@@ -42,6 +42,31 @@ class DecoratedTypeTest extends Object
     NullabilityNode.clearDebugNames();
   }
 
+  test_equal_interfaceType_different_args() {
+    var node = newNode();
+    expect(list(int_(), node: node) == list(int_(), node: node), isFalse);
+  }
+
+  test_equal_interfaceType_different_classes() {
+    var node = newNode();
+    expect(int_(node: node) == object(node: node), isFalse);
+  }
+
+  test_equal_interfaceType_different_nodes() {
+    expect(int_() == int_(), isFalse);
+  }
+
+  test_equal_interfaceType_same() {
+    var node = newNode();
+    expect(int_(node: node) == int_(node: node), isTrue);
+  }
+
+  test_equal_interfaceType_same_generic() {
+    var argType = int_();
+    var node = newNode();
+    expect(list(argType, node: node) == list(argType, node: node), isTrue);
+  }
+
   test_toString_bottom() {
     var node = newNode();
     var decoratedType = DecoratedType(BottomTypeImpl.instance, node);
