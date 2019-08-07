@@ -42,6 +42,18 @@ class DecoratedTypeTest extends Object
     NullabilityNode.clearDebugNames();
   }
 
+  test_equal_dynamic_vs_void() {
+    expect(dynamic_ == void_, isFalse);
+  }
+
+  test_equal_functionType_different_nodes() {
+    var returnType = int_();
+    expect(
+        function(returnType, node: newNode()) ==
+            function(returnType, node: newNode()),
+        isFalse);
+  }
+
   test_equal_functionType_named_different_names() {
     var node = newNode();
     var argType = int_();
