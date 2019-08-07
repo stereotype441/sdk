@@ -111,6 +111,19 @@ class DecoratedTypeTest extends Object
         isFalse);
   }
 
+  test_equal_functionType_return_different() {
+    var node = newNode();
+    expect(
+        function(int_(), node: node) == function(int_(), node: node), isFalse);
+  }
+
+  test_equal_functionType_return_same() {
+    var node = newNode();
+    var returnType = int_();
+    expect(function(returnType, node: node) == function(returnType, node: node),
+        isTrue);
+  }
+
   test_equal_interfaceType_different_args() {
     var node = newNode();
     expect(list(int_(), node: node) == list(int_(), node: node), isFalse);
