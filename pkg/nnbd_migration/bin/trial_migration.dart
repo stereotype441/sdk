@@ -58,6 +58,7 @@ main() async {
   print('${listener.numNullChecksAdded} null checks added');
   print('${listener.numMetaImportsAdded} meta imports added');
   print('${listener.numRequiredAnnotationsAdded} required annotations added');
+  print('${listener.numDeadCodeSegmentsFound} dead code segments found');
   print('${listener.numExceptions} exceptions in '
       '${listener.groupedExceptions.length} categories');
   print('Exception categories:');
