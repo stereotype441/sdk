@@ -5,15 +5,15 @@
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/handle.dart';
+import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/generated/source.dart';
+import 'package:nnbd_migration/src/already_migrated_code_decorator.dart';
 import 'package:nnbd_migration/src/conditional_discard.dart';
 import 'package:nnbd_migration/src/decorated_type.dart';
 import 'package:nnbd_migration/src/expression_checks.dart';
 import 'package:nnbd_migration/src/node_builder.dart';
 import 'package:nnbd_migration/src/nullability_node.dart';
 import 'package:nnbd_migration/src/potential_modification.dart';
-
-import 'already_migrated_code_decorator.dart';
 
 class Variables implements VariableRecorder, VariableRepository {
   final NullabilityGraph _graph;
@@ -30,7 +30,8 @@ class Variables implements VariableRecorder, VariableRepository {
 
   final AlreadyMigratedCodeDecorator _alreadyMigratedCodeDecorator;
 
-  Variables(this._graph) : _alreadyMigratedCodeDecorator = AlreadyMigratedCodeDecorator(_graph);
+  Variables(this._graph)
+      : _alreadyMigratedCodeDecorator = AlreadyMigratedCodeDecorator(_graph);
 
   @override
   Map<ClassElement, DecoratedType> decoratedDirectSupertypes(
@@ -178,7 +179,32 @@ class Variables implements VariableRecorder, VariableRepository {
       throw StateError('A decorated type for $element should have been stored '
           'by the NodeBuilder via recordDecoratedElementType');
     }
-    return _alreadyMigratedCodeDecorator.decorateElement(element);
+
+    // Sanity check:
+    // Ensure the element is not from a library that is being migrated.
+    // If this assertion fires, it probably means that the NodeBuilder failed to
+    // generate the appropriate decorated type for the element when it was
+    // visiting the source file.
+    if (_graph.isBeingMigrated(element.source)) {
+      throw 'Internal Error: DecorateType.forElement should not be called'
+          ' for elements being migrated: ${element.runtimeType} :: $element';
+    }
+
+    DecoratedType decoratedType;
+    if (element is ExecutableElement) {
+      decoratedType = _alreadyMigratedCodeDecorator.decorate(element.type);
+    } else if (element is TopLevelVariableElement) {
+      decoratedType = _alreadyMigratedCodeDecorator.decorate(element.type);
+    } else if (element is TypeParameterElement) {
+      // By convention, type parameter elements are decorated with the type of
+      // their bounds.
+      decoratedType = _alreadyMigratedCodeDecorator
+          .decorate(element.bound ?? DynamicTypeImpl.instance);
+    } else {
+      // TODO(paulberry)
+      throw UnimplementedError('Decorating ${element.runtimeType}');
+    }
+    return decoratedType;
   }
 
   /// Creates an entry [_decoratedDirectSupertypes] for an already-migrated
