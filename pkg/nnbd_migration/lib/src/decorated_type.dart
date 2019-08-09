@@ -367,8 +367,12 @@ class DecoratedType {
         positionalParameters: newPositionalParameters);
   }
 
-  static void recordTypeParameterBound(TypeParameterElement element, DecoratedType bound) {
-    _decoratedTypeParameterBounds[element] = bound;
+  static void recordTypeParameterBound(TypeParameterElement typeParameter, DecoratedType bound) {
+    _decoratedTypeParameterBounds[typeParameter] = bound;
+  }
+
+  static DecoratedType decoratedTypeParameterBound(TypeParameterElement typeParameter) {
+    return _decoratedTypeParameterBounds[typeParameter];
   }
 }
 

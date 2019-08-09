@@ -918,7 +918,7 @@ $stackTrace''');
       } else {
         for (int i = 0; i < typeArguments.length; i++) {
           DecoratedType bound;
-          bound = _variables.decoratedElementType(element.typeParameters[i]);
+          bound = _variables.decoratedTypeParameterBound(element.typeParameters[i]);
           var argumentType =
               _variables.decoratedTypeAnnotation(_source, typeArguments[i]);
           if (argumentType == null) {

@@ -39,6 +39,11 @@ class Variables implements VariableRecorder, VariableRepository {
   }
 
   @override
+  DecoratedType decoratedTypeParameterBound(TypeParameterElement typeParameter) {
+    return _decoratedTypeParameterBounds[typeParameter] ?? DecoratedType.decoratedTypeParameterBound(typeParameter);
+  }
+
+  @override
   DecoratedType decoratedElementType(Element element) {
     assert(element is! TypeParameterElement,
         'Use decoratedTypeParameterBound instead');
@@ -86,9 +91,9 @@ class Variables implements VariableRecorder, VariableRepository {
     _decoratedDirectSupertypes[class_] = decoratedDirectSupertypes;
   }
 
-  void recordDecoratedTypeParameterBound(TypeParameterElement element, DecoratedType bound) {
-    _decoratedTypeParameterBounds[element] = bound;
-    DecoratedType.recordTypeParameterBound(element, bound);
+  void recordDecoratedTypeParameterBound(TypeParameterElement typeParameter, DecoratedType bound) {
+    _decoratedTypeParameterBounds[typeParameter] = bound;
+    DecoratedType.recordTypeParameterBound(typeParameter, bound);
   }
 
   void recordDecoratedElementType(Element element, DecoratedType type) {

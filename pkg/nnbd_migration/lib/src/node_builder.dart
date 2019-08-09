@@ -346,7 +346,7 @@ $stackTrace''');
           AlwaysNullableTypeOrigin(_source, node.offset));
       decoratedBound = DecoratedType(_typeProvider.objectType, nullabilityNode);
     }
-    _variables.recordDecoratedElementType(element, decoratedBound);
+    _variables.recordDecoratedTypeParameterBound(element, decoratedBound);
     return null;
   }
 
@@ -543,7 +543,7 @@ abstract class VariableRecorder {
   /// Associates decorated type information with the given [element].
   void recordDecoratedElementType(Element element, DecoratedType type);
 
-  void recordDecoratedTypeParameterBound(TypeParameterElement element, DecoratedType bound);
+  void recordDecoratedTypeParameterBound(TypeParameterElement typeParameter, DecoratedType bound);
 
   /// Associates decorated type information with the given [type] node.
   void recordDecoratedTypeAnnotation(
@@ -599,6 +599,8 @@ abstract class VariableRepository {
   /// Associates a set of nullability checks with the given expression [node].
   void recordExpressionChecks(
       Source source, Expression expression, ExpressionChecks checks);
+
+  DecoratedType decoratedTypeParameterBound(TypeParameterElement typeParameter);
 }
 
 /// Types of comments that can influence nullability
