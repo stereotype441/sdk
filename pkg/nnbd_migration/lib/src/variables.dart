@@ -13,6 +13,8 @@ import 'package:nnbd_migration/src/node_builder.dart';
 import 'package:nnbd_migration/src/nullability_node.dart';
 import 'package:nnbd_migration/src/potential_modification.dart';
 
+import 'already_migrated_code_decorator.dart';
+
 class Variables implements VariableRecorder, VariableRepository {
   final NullabilityGraph _graph;
 
@@ -26,7 +28,9 @@ class Variables implements VariableRecorder, VariableRepository {
 
   final _potentialModifications = <Source, List<PotentialModification>>{};
 
-  Variables(this._graph);
+  final AlreadyMigratedCodeDecorator _alreadyMigratedCodeDecorator;
+
+  Variables(this._graph) : _alreadyMigratedCodeDecorator = AlreadyMigratedCodeDecorator(_graph);
 
   @override
   Map<ClassElement, DecoratedType> decoratedDirectSupertypes(
@@ -174,7 +178,7 @@ class Variables implements VariableRecorder, VariableRepository {
       throw StateError('A decorated type for $element should have been stored '
           'by the NodeBuilder via recordDecoratedElementType');
     }
-    return DecoratedType.forElement(element, _graph);
+    return _alreadyMigratedCodeDecorator.decorateElement(element);
   }
 
   /// Creates an entry [_decoratedDirectSupertypes] for an already-migrated
