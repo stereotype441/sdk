@@ -21,12 +21,20 @@ class AlreadyMigratedCodeDecorator {
     if (type.isVoid || type.isDynamic) {
       return DecoratedType(type, _graph.always);
     }
-    // Currently, all types passed to this method have nullability suffix `star`
-    // because (a) we don't yet have a migrated SDK, and (b) we haven't added
-    // support to the migrator for analyzing packages that have already been
-    // migrated with NNBD enabled.
-    // TODO(paulberry): fix this assertion when things change.
-    assert((type as TypeImpl).nullabilitySuffix == NullabilitySuffix.star);
+    var nullabilitySuffix = (type as TypeImpl).nullabilitySuffix;
+    if (nullabilitySuffix == NullabilitySuffix.question) {
+      // TODO(paulberry): add support for depending on already-migrated packages
+      // containing nullable types.
+      throw UnimplementedError(
+          'Migration depends on an already-migrated nullable type');
+    } else {
+      // Currently, all types passed to this method have nullability suffix `star`
+      // because (a) we don't yet have a migrated SDK, and (b) we haven't added
+      // support to the migrator for analyzing packages that have already been
+      // migrated with NNBD enabled.
+      // TODO(paulberry): fix this assertion when things change.
+      assert(nullabilitySuffix == NullabilitySuffix.star);
+    }
     if (type is FunctionType) {
       var positionalParameters = <DecoratedType>[];
       var namedParameters = <String, DecoratedType>{};
@@ -50,7 +58,9 @@ class AlreadyMigratedCodeDecorator {
     } else if (type is TypeParameterType) {
       return DecoratedType(type, _graph.never);
     } else {
-      throw type.runtimeType; // TODO(paulberry)
+      // TODO(paulberry)
+      throw UnimplementedError(
+          'Unable to decorate already-migrated type $type');
     }
   }
 }
