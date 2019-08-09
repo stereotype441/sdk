@@ -18,6 +18,8 @@ class Variables implements VariableRecorder, VariableRepository {
 
   final _decoratedElementTypes = <Element, DecoratedType>{};
 
+  final _decoratedTypeParameterBounds = <Element, DecoratedType>{};
+
   final _decoratedDirectSupertypes =
       <ClassElement, Map<ClassElement, DecoratedType>>{};
 
@@ -82,6 +84,11 @@ class Variables implements VariableRecorder, VariableRepository {
       return true;
     }());
     _decoratedDirectSupertypes[class_] = decoratedDirectSupertypes;
+  }
+
+  void recordDecoratedTypeParameterBound(TypeParameterElement element, DecoratedType bound) {
+    _decoratedTypeParameterBounds[element] = bound;
+    DecoratedType.recordTypeParameterBound(element, bound);
   }
 
   void recordDecoratedElementType(Element element, DecoratedType type) {

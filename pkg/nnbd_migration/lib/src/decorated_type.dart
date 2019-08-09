@@ -35,6 +35,8 @@ class DecoratedType {
   /// TODO(paulberry): how should we handle generic typedefs?
   final List<DecoratedType> typeArguments;
 
+  static final _decoratedTypeParameterBounds = Expando<DecoratedType>();
+
   DecoratedType(this.type, this.node,
       {this.returnType,
       this.positionalParameters = const [],
@@ -363,6 +365,10 @@ class DecoratedType {
         returnType:
             returnType._substitute(substitution, undecoratedResult.returnType),
         positionalParameters: newPositionalParameters);
+  }
+
+  static void recordTypeParameterBound(TypeParameterElement element, DecoratedType bound) {
+    _decoratedTypeParameterBounds[element] = bound;
   }
 }
 
