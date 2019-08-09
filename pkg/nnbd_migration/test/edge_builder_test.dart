@@ -424,7 +424,7 @@ void f(int i) {
     assertEdge(decoratedTypeAnnotation('int i').node, never, hard: true);
   }
 
-  test_assign_bound_to_type_parameter() async {
+  solo_test_assign_bound_to_type_parameter() async {
     await analyze('''
 class C<T extends List<int>> {
   T f(List<int> x) => x;
