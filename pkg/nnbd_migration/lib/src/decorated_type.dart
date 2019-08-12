@@ -212,13 +212,23 @@ class DecoratedType {
           // compare safely.
           var thisSubstitution = <TypeParameterElement, DecoratedType>{};
           var otherSubstitution = <TypeParameterElement, DecoratedType>{};
+          var newParameters = <TypeParameterElement>[];
           for (int i = 0; i < thisType.typeFormals.length; i++) {
             var newParameter = TypeParameterElementImpl.synthetic(
                 thisType.typeFormals[i].name);
+            newParameters.add(newParameter);
             var newParameterType =
                 DecoratedType._forTypeParameterSubstitution(newParameter);
             thisSubstitution[thisType.typeFormals[i]] = newParameterType;
             otherSubstitution[otherType.typeFormals[i]] = newParameterType;
+          }
+          for (int i = 0; i < thisType.typeFormals.length; i++) {
+            var thisBound =
+                this.typeFormalBounds[i].substitute(thisSubstitution);
+            var otherBound =
+                other.typeFormalBounds[i].substitute(otherSubstitution);
+            if (thisBound != otherBound) return false;
+            recordTypeParameterBound(newParameters[i], thisBound);
           }
           // TODO(paulberry): need to substitute bounds and compare them.
           thisReturnType = thisReturnType.substitute(thisSubstitution);

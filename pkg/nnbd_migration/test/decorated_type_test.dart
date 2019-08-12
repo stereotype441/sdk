@@ -145,14 +145,43 @@ class DecoratedTypeTest extends Object
         isTrue);
   }
 
-  test_equal_functionType_typeFormals_different_bounds() {
-    var node = newNode();
+  solo_test_equal_functionType_typeFormals_different_bounds() {
+    var n1 = newNode();
+    var n2 = newNode();
     var t = typeParameter('T', object());
     var u = typeParameter('U', int_());
     expect(
-        function(typeParameterType(t), typeFormals: [t], node: node) ==
-            function(typeParameterType(u), typeFormals: [u], node: node),
+        function(typeParameterType(t, node: n1), typeFormals: [t], node: n2) ==
+            function(typeParameterType(u, node: n1), typeFormals: [u], node: n2),
         isFalse);
+  }
+
+  test_equal_functionType_typeFormals_equivalent_bounds_after_substitution() {
+    var n1 = newNode();
+    var n2 = newNode();
+    var n3 = newNode();
+    var n4 = newNode();
+    var bound = object();
+    var t = typeParameter('T', bound);
+    var u = typeParameter('U', typeParameterType(t, node: n1));
+    var v = typeParameter('V', bound);
+    var w = typeParameter('W', typeParameterType(v, node: n1));
+    expect(
+        function(void_,
+                typeFormals: [t, u],
+                required: [
+                  typeParameterType(t, node: n2),
+                  typeParameterType(u, node: n3)
+                ],
+                node: n4) ==
+            function(void_,
+                typeFormals: [v, w],
+                required: [
+                  typeParameterType(v, node: n2),
+                  typeParameterType(w, node: n3)
+                ],
+                node: n4),
+        isTrue);
   }
 
   test_equal_functionType_typeFormals_same_bounds_named() {
