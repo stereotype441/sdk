@@ -1012,7 +1012,8 @@ $stackTrace''');
       } else {
         for (int i = 0; i < typeArguments.length; i++) {
           DecoratedType bound;
-          bound = _variables.decoratedTypeParameterBound(element.typeParameters[i]);
+          bound =
+              _variables.decoratedTypeParameterBound(element.typeParameters[i]);
           if (bound == null) {
             print('BAD');
           }
@@ -1193,7 +1194,7 @@ $stackTrace''');
     // TODO(paulberry): once we've wired up flow analysis, return promoted
     // bounds if applicable.
     return _variables
-        .decoratedElementType((type.type as TypeParameterType).element);
+        .decoratedTypeParameterBound((type.type as TypeParameterType).element);
   }
 
   /// Creates the necessary constraint(s) for an assignment of the given
