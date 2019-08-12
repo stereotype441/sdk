@@ -155,7 +155,61 @@ class DecoratedTypeTest extends Object
         isFalse);
   }
 
-  test_equal_functionType_typeFormals_same_bounds() {
+  test_equal_functionType_typeFormals_same_bounds_named() {
+    var n1 = newNode();
+    var n2 = newNode();
+    var bound = object();
+    var t = typeParameter('T', bound);
+    var u = typeParameter('U', bound);
+    expect(
+        function(void_,
+                typeFormals: [t],
+                named: {'x': typeParameterType(t, node: n1)},
+                node: n2) ==
+            function(void_,
+                typeFormals: [u],
+                named: {'x': typeParameterType(u, node: n1)},
+                node: n2),
+        isTrue);
+  }
+
+  test_equal_functionType_typeFormals_same_bounds_positional() {
+    var n1 = newNode();
+    var n2 = newNode();
+    var bound = object();
+    var t = typeParameter('T', bound);
+    var u = typeParameter('U', bound);
+    expect(
+        function(void_,
+                typeFormals: [t],
+                positional: [typeParameterType(t, node: n1)],
+                node: n2) ==
+            function(void_,
+                typeFormals: [u],
+                positional: [typeParameterType(u, node: n1)],
+                node: n2),
+        isTrue);
+  }
+
+  test_equal_functionType_typeFormals_same_bounds_required() {
+    var n1 = newNode();
+    var n2 = newNode();
+    var bound = object();
+    var t = typeParameter('T', bound);
+    var u = typeParameter('U', bound);
+    expect(
+        function(void_,
+                typeFormals: [t],
+                required: [typeParameterType(t, node: n1)],
+                node: n2) ==
+            function(void_,
+                typeFormals: [u],
+                required: [typeParameterType(u, node: n1)],
+                node: n2),
+        isTrue);
+  }
+
+  test_equal_functionType_typeFormals_same_bounds_return() {
     var n1 = newNode();
     var n2 = newNode();
     var bound = object();
