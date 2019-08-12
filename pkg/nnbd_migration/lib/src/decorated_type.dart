@@ -69,7 +69,12 @@ class DecoratedType {
       } else if (type is FunctionType) {
         assert(typeFormalBounds.length == type.typeFormals.length);
         for (int i = 0; i < typeFormalBounds.length; i++) {
-          assert(typeFormalBounds[i].type == type.typeFormals[i].bound);
+          var declaredBound = type.typeFormals[i].bound;
+          if (declaredBound == null) {
+            assert(typeFormalBounds[i].type.isDartCoreObject);
+          } else {
+            assert(typeFormalBounds[i].type == declaredBound);
+          }
         }
         assert(returnType.type == type.returnType);
         int positionalParameterCount = 0;
