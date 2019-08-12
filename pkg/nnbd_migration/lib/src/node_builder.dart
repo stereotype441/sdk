@@ -543,12 +543,13 @@ abstract class VariableRecorder {
   /// Associates decorated type information with the given [element].
   void recordDecoratedElementType(Element element, DecoratedType type);
 
-  void recordDecoratedTypeParameterBound(TypeParameterElement typeParameter, DecoratedType bound);
-
   /// Associates decorated type information with the given [type] node.
   void recordDecoratedTypeAnnotation(
       Source source, TypeAnnotation node, DecoratedTypeAnnotation type,
       {bool potentialModification: true});
+
+  void recordDecoratedTypeParameterBound(
+      TypeParameterElement typeParameter, DecoratedType bound);
 
   /// Records that [node] is associated with the question of whether the named
   /// [parameter] should be optional (should not have a `required`
@@ -582,6 +583,8 @@ abstract class VariableRepository {
   DecoratedType decoratedTypeAnnotation(
       Source source, TypeAnnotation typeAnnotation);
 
+  DecoratedType decoratedTypeParameterBound(TypeParameterElement typeParameter);
+
   /// Records conditional discard information for the given AST node (which is
   /// an `if` statement or a conditional (`?:`) expression).
   void recordConditionalDiscard(
@@ -599,8 +602,6 @@ abstract class VariableRepository {
   /// Associates a set of nullability checks with the given expression [node].
   void recordExpressionChecks(
       Source source, Expression expression, ExpressionChecks checks);
-
-  DecoratedType decoratedTypeParameterBound(TypeParameterElement typeParameter);
 }
 
 /// Types of comments that can influence nullability
