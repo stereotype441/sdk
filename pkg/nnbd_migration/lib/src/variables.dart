@@ -71,20 +71,30 @@ class Variables implements VariableRecorder, VariableRepository {
   @override
   DecoratedType decoratedTypeParameterBound(
       TypeParameterElement typeParameter) {
-    var decoratedType = _decoratedTypeParameterBounds[typeParameter] ??
-        DecoratedType.decoratedTypeParameterBound(typeParameter);
-    if (decoratedType == null) {
-      var library = typeParameter.library;
-      if (library != null && _graph.isBeingMigrated(library.source)) {
+    if (typeParameter.enclosingElement == null) {
+      var decoratedType =
+          DecoratedType.decoratedTypeParameterBound(typeParameter);
+      if (decoratedType == null) {
         throw StateError(
             'A decorated type for the bound of $typeParameter should '
             'have been stored by the NodeBuilder via recordTypeParameterBound');
       }
-      decoratedType = _alreadyMigratedCodeDecorator
-          .decorate(typeParameter.bound ?? DynamicTypeImpl.instance);
-      DecoratedType.recordTypeParameterBound(typeParameter, decoratedType);
+      return decoratedType;
+    } else {
+      var decoratedType = _decoratedTypeParameterBounds[typeParameter];
+      if (decoratedType == null) {
+        if (_graph.isBeingMigrated(typeParameter.library.source)) {
+          throw StateError(
+              'A decorated type for the bound of $typeParameter should '
+              'have been stored by the NodeBuilder via '
+              'recordTypeParameterBound');
+        }
+        decoratedType = _alreadyMigratedCodeDecorator
+            .decorate(typeParameter.bound ?? DynamicTypeImpl.instance);
+        _decoratedTypeParameterBounds[typeParameter] = decoratedType;
+      }
+      return decoratedType;
     }
-    return decoratedType;
   }
 
   Map<Source, List<PotentialModification>> getPotentialModifications() =>
@@ -138,8 +148,11 @@ class Variables implements VariableRecorder, VariableRepository {
 
   void recordDecoratedTypeParameterBound(
       TypeParameterElement typeParameter, DecoratedType bound) {
-    _decoratedTypeParameterBounds[typeParameter] = bound;
-    DecoratedType.recordTypeParameterBound(typeParameter, bound);
+    if (typeParameter.enclosingElement == null) {
+      DecoratedType.recordTypeParameterBound(typeParameter, bound);
+    } else {
+      _decoratedTypeParameterBounds[typeParameter] = bound;
+    }
   }
 
   @override
