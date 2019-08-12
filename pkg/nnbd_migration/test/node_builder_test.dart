@@ -910,6 +910,33 @@ main() {
     expect(decoratedType.node, same(always));
   }
 
+  test_method_generic_bounded() async {
+    await analyze('''
+class C {
+  T f<T extends Object>(T t) => t;
+}
+''');
+    var decoratedType = decoratedMethodType('f');
+    var bound = decoratedTypeParameterBound('T extends');
+    expect(decoratedType.typeFormalBounds[0], same(bound));
+    expect(decoratedTypeAnnotation('Object'), same(bound));
+    expect(bound.node, isNot(always));
+    expect(bound.type, typeProvider.objectType);
+  }
+
+  test_method_generic_implicit_bound() async {
+    await analyze('''
+class C {
+  T f<T>(T t) => t;
+}
+''');
+    var decoratedType = decoratedMethodType('f');
+    var bound = decoratedTypeParameterBound('T>');
+    expect(decoratedType.typeFormalBounds[0], same(bound));
+    assertUnion(always, bound.node);
+    expect(bound.type, same(typeProvider.objectType));
+  }
+
   test_method_metadata() async {
     await analyze('''
 class A {
