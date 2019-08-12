@@ -111,6 +111,13 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   /// return statements.
   DecoratedType _currentFunctionType;
 
+  /// The [DecoratedType] of the innermost list or set literal being visited, or
+  /// `null` if the visitor is not inside any function or method.
+  ///
+  /// This is needed to construct the appropriate nullability constraints for
+  /// ui as code list elements.
+  DecoratedType _currentLiteralType;
+
   /// Information about the most recently visited binary expression whose
   /// boolean value could possibly affect nullability analysis.
   _ConditionInfo _conditionInfo;
@@ -124,7 +131,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   final _guards = <NullabilityNode>[];
 
   /// The scope of locals (parameters, variables) that are post-dominated by the
-  /// current node as we walk the AST. We use a [ScopedSet] so that outer
+  /// current node as we walk the AST. We use a [_ScopedLocalSet] so that outer
   /// scopes may track their post-dominators separately from inner scopes.
   ///
   /// Note that this is not guaranteed to be complete. It is used to make hard
@@ -499,36 +506,27 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   DecoratedType visitForStatement(ForStatement node) {
     // TODO do special condition handling
     // TODO do create true/false guards?
-    // Create a scope of for new initializers etc, which includes previous
-    // post-dominators.
-    _postDominatedLocals.doScoped(
-        copyCurrent: true,
-        action: () {
-          final parts = node.forLoopParts;
-          if (parts is ForParts) {
-            if (parts is ForPartsWithDeclarations) {
-              parts.variables.accept(this);
-            }
-            if (parts is ForPartsWithExpression) {
-              parts.initialization.accept(this);
-            }
-            parts.condition.accept(this);
-          }
-          if (parts is ForEachParts) {
-            parts.iterable.accept(this);
-          }
+    final parts = node.forLoopParts;
+    if (parts is ForParts) {
+      if (parts is ForPartsWithDeclarations) {
+        parts.variables?.accept(this);
+      } else if (parts is ForPartsWithExpression) {
+        parts.initialization?.accept(this);
+      }
+      parts.condition?.accept(this);
+    } else if (parts is ForEachParts) {
+      parts.iterable.accept(this);
+    }
 
-          // The condition may fail/iterable may be empty, so the body does not
-          // post-dominate the parts, or the outer scope.
-          _postDominatedLocals.popScope();
-          _postDominatedLocals.pushScope();
+    // The condition may fail/iterable may be empty, so the body gets a new
+    // post-dominator scope.
+    _postDominatedLocals.doScoped(action: () {
+      node.body.accept(this);
 
-          if (parts is ForParts) {
-            parts.updaters.accept(this);
-          }
-
-          node.body.accept(this);
-        });
+      if (parts is ForParts) {
+        parts.updaters.accept(this);
+      }
+    });
     return null;
   }
 
@@ -562,6 +560,44 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     DecoratedType calleeType = node.function.accept(this);
     return _handleInvocationArguments(node, node.argumentList.arguments,
         node.typeArguments, calleeType, null);
+  }
+
+  @override
+  DecoratedType visitIfElement(IfElement node) {
+    _handleAssignment(node.condition, _notNullType);
+    NullabilityNode trueGuard;
+    NullabilityNode falseGuard;
+    if (identical(_conditionInfo?.condition, node.condition)) {
+      trueGuard = _conditionInfo.trueGuard;
+      falseGuard = _conditionInfo.falseGuard;
+      _variables.recordConditionalDiscard(_source, node,
+          ConditionalDiscard(trueGuard, falseGuard, _conditionInfo.isPure));
+    }
+    if (trueGuard != null) {
+      _guards.add(trueGuard);
+    }
+    try {
+      _postDominatedLocals.doScoped(
+          action: () => _handleCollectionElement(node.thenElement));
+    } finally {
+      if (trueGuard != null) {
+        _guards.removeLast();
+      }
+    }
+    if (node.elseElement != null) {
+      if (falseGuard != null) {
+        _guards.add(falseGuard);
+      }
+      try {
+        _postDominatedLocals.doScoped(
+            action: () => _handleCollectionElement(node.elseElement));
+      } finally {
+        if (falseGuard != null) {
+          _guards.removeLast();
+        }
+      }
+    }
+    return null;
   }
 
   @override
@@ -690,15 +726,12 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       if (typeArgumentType == null) {
         _unimplemented(node, 'Could not compute type argument type');
       }
-      for (var element in node.elements) {
-        if (element is Expression) {
-          _handleAssignment(element, typeArgumentType);
-        } else {
-          // Handle spread and control flow elements.
-          element.accept(this);
-          // TODO(brianwilkerson)
-          _unimplemented(node, 'Spread or control flow element');
-        }
+      final previousLiteralType = _currentLiteralType;
+      try {
+        _currentLiteralType = typeArgumentType;
+        node.elements.forEach(_handleCollectionElement);
+      } finally {
+        _currentLiteralType = previousLiteralType;
       }
       return DecoratedType(listType, _graph.never,
           typeArguments: [typeArgumentType]);
@@ -1057,8 +1090,8 @@ $stackTrace''');
 
   @override
   DecoratedType visitWhileStatement(WhileStatement node) {
-    // TODO do special condition handling
-    // TODO do create true/false guards?
+    // Note: we do not create guards. A null check here is *very* unlikely to be
+    // unnecessary after analysis.
     _handleAssignment(node.condition, _notNullType);
     _postDominatedLocals.doScoped(action: () => node.body.accept(this));
     return null;
@@ -1213,6 +1246,15 @@ $stackTrace''');
         destination: destinationType,
         hard: _postDominatedLocals.isReferenceInScope(expression));
     return sourceType;
+  }
+
+  DecoratedType _handleCollectionElement(CollectionElement element) {
+    if (element is Expression) {
+      assert(_currentLiteralType != null);
+      return _handleAssignment(element, _currentLiteralType);
+    } else {
+      return element.accept(this);
+    }
   }
 
   void _handleConstructorRedirection(
