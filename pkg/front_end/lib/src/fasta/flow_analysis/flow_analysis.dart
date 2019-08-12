@@ -60,7 +60,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   final FunctionBodyAccess<Variable> functionBody;
 
   /// The stack of states of variables that are not definitely assigned.
-  final List<State<Variable, Type>> _stack = [];
+  final List<FlowModel<Variable, Type>> _stack = [];
 
   /// The mapping from labeled [Statement]s to the index in the [_stack]
   /// where the first related element is located.  The number of elements
@@ -71,16 +71,16 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// List of all variables passed to [add].
   final List<Variable> _addedVariables = [];
 
-  State<Variable, Type> _current;
+  FlowModel<Variable, Type> _current;
 
   /// The last boolean condition, for [_conditionTrue] and [_conditionFalse].
   Expression _condition;
 
   /// The state when [_condition] evaluates to `true`.
-  State<Variable, Type> _conditionTrue;
+  FlowModel<Variable, Type> _conditionTrue;
 
   /// The state when [_condition] evaluates to `false`.
-  State<Variable, Type> _conditionFalse;
+  FlowModel<Variable, Type> _conditionFalse;
 
   /// If assertions are enabled, keeps track of all variables that have been
   /// passed into the API (other than through a call to [add]).  The [finish]
@@ -100,7 +100,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     TypeOperations<Variable, Type> typeOperations,
     FunctionBodyAccess<Variable> functionBody,
   ) {
-    var emptySet = State<Variable, Type>(false).notAssigned;
+    var emptySet = FlowModel<Variable, Type>(false).notAssigned;
     return FlowAnalysis._(
       nodeOperations,
       typeOperations,
@@ -115,7 +115,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     this.functionBody,
     this._emptySet,
   ) {
-    _current = State<Variable, Type>(true);
+    _current = FlowModel<Variable, Type>(true);
   }
 
   /// Return `true` if the current state is reachable.
@@ -297,8 +297,11 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _stack.add(_current);
 
     Set<Variable> notPromoted = null;
-    for (var variable in _current.promoted.keys) {
-      if (functionBody.isPotentiallyMutatedInScope(variable)) {
+    for (var entry in _current.promoted.entries) {
+      var variable = entry.key;
+      var promotedType = entry.value;
+      if (promotedType != null &&
+          functionBody.isPotentiallyMutatedInScope(variable)) {
         notPromoted ??= Set<Variable>.identity();
         notPromoted.add(variable);
       }
@@ -353,8 +356,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   }
 
   void ifStatement_end(bool hasElse) {
-    State<Variable, Type> afterThen;
-    State<Variable, Type> afterElse;
+    FlowModel<Variable, Type> afterThen;
+    FlowModel<Variable, Type> afterElse;
     if (hasElse) {
       afterThen = _stack.removeLast();
       afterElse = _current;
@@ -394,44 +397,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
       _conditionTrue = _current.promote(typeOperations, variable, type);
       _conditionFalse = _current;
     }
-  }
-
-  @visibleForTesting
-  Map<Variable, Type> joinPromoted(
-    Map<Variable, Type> first,
-    Map<Variable, Type> second,
-  ) {
-    if (identical(first, second)) return first;
-    if (first.isEmpty || second.isEmpty) return const {};
-
-    var result = <Variable, Type>{};
-    var alwaysFirst = true;
-    var alwaysSecond = true;
-    for (var variable in first.keys) {
-      var firstType = first[variable];
-      var secondType = second[variable];
-      if (secondType != null) {
-        if (identical(firstType, secondType)) {
-          result[variable] = firstType;
-        } else if (typeOperations.isSubtypeOf(firstType, secondType)) {
-          result[variable] = secondType;
-          alwaysFirst = false;
-        } else if (typeOperations.isSubtypeOf(secondType, firstType)) {
-          result[variable] = firstType;
-          alwaysSecond = false;
-        } else {
-          alwaysFirst = false;
-          alwaysSecond = false;
-        }
-      } else {
-        alwaysFirst = false;
-      }
-    }
-
-    if (alwaysFirst) return first;
-    if (alwaysSecond && result.length == second.length) return second;
-    if (result.isEmpty) return const {};
-    return result;
   }
 
   void logicalAnd_end(Expression andExpression, Expression rightOperand) {
@@ -638,28 +603,9 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     }
   }
 
-  State<Variable, Type> _join(
-    State<Variable, Type> first,
-    State<Variable, Type> second,
-  ) {
-    if (first == null) return second;
-    if (second == null) return first;
-
-    if (first.reachable && !second.reachable) return first;
-    if (!first.reachable && second.reachable) return second;
-
-    var newReachable = first.reachable || second.reachable;
-    var newNotAssigned = first.notAssigned.union(second.notAssigned);
-    var newPromoted = joinPromoted(first.promoted, second.promoted);
-
-    return State._identicalOrNew(
-      first,
-      second,
-      newReachable,
-      newNotAssigned,
-      newPromoted,
-    );
-  }
+  FlowModel<Variable, Type> _join(
+          FlowModel<Variable, Type> first, FlowModel<Variable, Type> second) =>
+      FlowModel.join(typeOperations, first, second);
 
   /// If assertions are enabled, records that the given variable has been
   /// referenced.  The [finish] method will verify that all referenced variables
@@ -682,27 +628,14 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   }
 }
 
-/// Accessor for function body information.
-abstract class FunctionBodyAccess<Variable> {
-  bool isPotentiallyMutatedInClosure(Variable variable);
-
-  bool isPotentiallyMutatedInScope(Variable variable);
-}
-
-/// Operations on nodes, abstracted from concrete node interfaces.
-abstract class NodeOperations<Expression> {
-  /// If the [node] is a parenthesized expression, recursively unwrap it.
-  Expression unwrapParenthesized(Expression node);
-}
-
-/// An instance of the [State] class represents the information gathered by flow
-/// analysis at a single point in the control flow of the function or method
-/// being analyzed.
+/// An instance of the [FlowModel] class represents the information gathered by
+/// flow analysis at a single point in the control flow of the function or
+/// method being analyzed.
 ///
 /// Instances of this class are immutable, so the methods below that "update"
 /// the state actually leave `this` unchanged and return a new state object.
 @visibleForTesting
-class State<Variable, Type> {
+class FlowModel<Variable, Type> {
   /// Indicates whether this point in the control flow is reachable.
   final bool reachable;
 
@@ -710,32 +643,31 @@ class State<Variable, Type> {
   /// the control flow.
   final _VariableSet<Variable> notAssigned;
 
-  /// For each variable whose type is promoted at this point in the control
-  /// flow, the promoted type.  Variables whose type is not promoted are not
-  /// present in the map.
+  /// For each variable being tracked by flow analysis, the variable's promoted
+  /// type, or `null` if the variable's type is not promoted.
   ///
   /// Flow analysis has no awareness of scope, so variables that are out of
-  /// scope are retained in the map until such time as their promotions would
-  /// have been lost, if their scope had extended to the entire function being
-  /// analyzed.  So, for example, if a variable is declared and then promoted
-  /// inside the `then` branch of an `if` statement, and the `else` branch of
-  /// the `if` statement ends in a `return` statement, then the promotion
-  /// remains in the map after the `if` statement ends.  This should not have
-  /// any effect on analysis results for error-free code, because it is an error
-  /// to refer to a variable that is no longer in scope.
+  /// scope are retained in the map until such time as their declaration no
+  /// longer dominates the control flow.  So, for example, if a variable is
+  /// declared and then promoted inside the `then` branch of an `if` statement,
+  /// and the `else` branch of the `if` statement ends in a `return` statement,
+  /// then the variable remains in the map after the `if` statement ends, even
+  /// though the variable is not in scope anymore.  This should not have any
+  /// effect on analysis results for error-free code, because it is an error to
+  /// refer to a variable that is no longer in scope.
   final Map<Variable, Type> promoted;
 
   /// Creates a state object with the given [reachable] status.  All variables
   /// are assumed to be unpromoted and already assigned, so joining another
   /// state with this one will have no effect on it.
-  State(bool reachable)
+  FlowModel(bool reachable)
       : this._(
           reachable,
           _VariableSet<Variable>._(const []),
           const {},
         );
 
-  State._(
+  FlowModel._(
     this.reachable,
     this.notAssigned,
     this.promoted,
@@ -744,17 +676,15 @@ class State<Variable, Type> {
   /// Updates the state to track a newly declared local [variable].  The
   /// optional [assigned] boolean indicates whether the variable is assigned at
   /// the point of declaration.
-  State<Variable, Type> add(Variable variable, {bool assigned: false}) {
+  FlowModel<Variable, Type> add(Variable variable, {bool assigned: false}) {
     var newNotAssigned = assigned ? notAssigned : notAssigned.add(variable);
+    var newPromoted = Map<Variable, Type>.from(promoted);
+    newPromoted[variable] = null;
 
-    if (identical(newNotAssigned, notAssigned)) {
-      return this;
-    }
-
-    return State<Variable, Type>._(
+    return FlowModel<Variable, Type>._(
       reachable,
       newNotAssigned,
-      promoted,
+      newPromoted,
     );
   }
 
@@ -763,7 +693,7 @@ class State<Variable, Type> {
   ///
   /// TODO(paulberry): should this method mark the variable as definitely
   /// assigned?  Does it matter?
-  State<Variable, Type> markNonNullable(
+  FlowModel<Variable, Type> markNonNullable(
       TypeOperations<Variable, Type> typeOperations, Variable variable) {
     var previousType = promoted[variable];
     previousType ??= typeOperations.variableType(variable);
@@ -772,7 +702,7 @@ class State<Variable, Type> {
     if (!typeOperations.isSameType(type, previousType)) {
       var newPromoted = <Variable, Type>{}..addAll(promoted);
       newPromoted[variable] = type;
-      return State<Variable, Type>._(
+      return FlowModel<Variable, Type>._(
         reachable,
         notAssigned,
         newPromoted,
@@ -791,7 +721,7 @@ class State<Variable, Type> {
   ///
   /// TODO(paulberry): if the type is non-nullable, should this method mark the
   /// variable as definitely assigned?  Does it matter?
-  State<Variable, Type> promote(
+  FlowModel<Variable, Type> promote(
     TypeOperations<Variable, Type> typeOperations,
     Variable variable,
     Type type,
@@ -803,7 +733,7 @@ class State<Variable, Type> {
         !typeOperations.isSameType(type, previousType)) {
       var newPromoted = <Variable, Type>{}..addAll(promoted);
       newPromoted[variable] = type;
-      return State<Variable, Type>._(
+      return FlowModel<Variable, Type>._(
         reachable,
         notAssigned,
         newPromoted,
@@ -832,12 +762,12 @@ class State<Variable, Type> {
   /// and only remove promotions if it can be shown that they aren't restored
   /// later in the loop body.  If we switch to a fixed point analysis, we should
   /// be able to remove this method.
-  State<Variable, Type> removePromotedAll(Set<Variable> variables) {
+  FlowModel<Variable, Type> removePromotedAll(Set<Variable> variables) {
     var newPromoted = _removePromotedAll(promoted, variables);
 
     if (identical(newPromoted, promoted)) return this;
 
-    return State<Variable, Type>._(
+    return FlowModel<Variable, Type>._(
       reachable,
       notAssigned,
       newPromoted,
@@ -864,10 +794,10 @@ class State<Variable, Type> {
   /// state from the `try` block).  Variables that are assigned in the `finally`
   /// block are considered "unsafe" because the assignment might have cancelled
   /// the effect of any promotion that occurred inside the `try` block.
-  State<Variable, Type> restrict(
+  FlowModel<Variable, Type> restrict(
     TypeOperations<Variable, Type> typeOperations,
     _VariableSet<Variable> emptySet,
-    State<Variable, Type> other,
+    FlowModel<Variable, Type> other,
     Set<Variable> unsafe,
   ) {
     var newReachable = reachable && other.reachable;
@@ -884,10 +814,10 @@ class State<Variable, Type> {
 
     var newPromoted = <Variable, Type>{};
     bool promotedMatchesThis = true;
-    bool promotedMatchesOther = true;
-    for (var variable in Set<Variable>.from(promoted.keys)
-      ..addAll(other.promoted.keys)) {
-      var thisType = promoted[variable];
+    bool promotedMatchesOther = other.promoted.length == promoted.length;
+    for (var entry in promoted.entries) {
+      var variable = entry.key;
+      var thisType = entry.value;
       var otherType = other.promoted[variable];
       if (!unsafe.contains(variable)) {
         if (otherType != null &&
@@ -910,6 +840,7 @@ class State<Variable, Type> {
           promotedMatchesOther = false;
         }
       } else {
+        newPromoted[variable] = null;
         if (promotedMatchesOther && otherType != null) {
           promotedMatchesOther = false;
         }
@@ -936,10 +867,10 @@ class State<Variable, Type> {
 
   /// Updates the state to indicate whether the control flow path is
   /// [reachable].
-  State<Variable, Type> setReachable(bool reachable) {
+  FlowModel<Variable, Type> setReachable(bool reachable) {
     if (this.reachable == reachable) return this;
 
-    return State<Variable, Type>._(
+    return FlowModel<Variable, Type>._(
       reachable,
       notAssigned,
       promoted,
@@ -954,7 +885,7 @@ class State<Variable, Type> {
   /// previous type promotion is removed.
   ///
   /// TODO(paulberry): allow for writes that preserve type promotions.
-  State<Variable, Type> write(TypeOperations<Variable, Type> typeOperations,
+  FlowModel<Variable, Type> write(TypeOperations<Variable, Type> typeOperations,
       _VariableSet<Variable> emptySet, Variable variable) {
     var newNotAssigned = typeOperations.isLocalVariable(variable)
         ? notAssigned.remove(emptySet, variable)
@@ -967,7 +898,7 @@ class State<Variable, Type> {
       return this;
     }
 
-    return State<Variable, Type>._(
+    return FlowModel<Variable, Type>._(
       reachable,
       newNotAssigned,
       newPromoted,
@@ -978,16 +909,10 @@ class State<Variable, Type> {
   /// immutable.
   Map<Variable, Type> _removePromoted(
       Map<Variable, Type> map, Variable variable) {
-    if (map.isEmpty) return const {};
+    if (map[variable] == null) return map;
 
-    var result = <Variable, Type>{};
-    for (var key in map.keys) {
-      if (!identical(key, variable)) {
-        result[key] = map[key];
-      }
-    }
-
-    if (result.isEmpty) return const {};
+    var result = Map<Variable, Type>.from(map);
+    result[variable] = null;
     return result;
   }
 
@@ -1002,11 +927,14 @@ class State<Variable, Type> {
 
     var result = <Variable, Type>{};
     var noChanges = true;
-    for (var key in map.keys) {
-      if (variables.contains(key)) {
+    for (var entry in map.entries) {
+      var variable = entry.key;
+      var promotedType = entry.value;
+      if (variables.contains(variable) && promotedType != null) {
+        result[variable] = null;
         noChanges = false;
       } else {
-        result[key] = map[key];
+        result[variable] = promotedType;
       }
     }
 
@@ -1015,11 +943,93 @@ class State<Variable, Type> {
     return result;
   }
 
-  /// Creates a new [State] object, unless it is equivalent to either [first] or
-  /// [second], in which case one of those objects is re-used.
-  static State<Variable, Type> _identicalOrNew<Variable, Type>(
-    State<Variable, Type> first,
-    State<Variable, Type> second,
+  /// Forms a new state to reflect a control flow path that might have come from
+  /// either `this` or the [other] state.
+  ///
+  /// The control flow path is considered reachable if either of the input
+  /// states is reachable.  Variables are considered definitely assigned if they
+  /// were definitely assigned in both of the input states.  Variable promotions
+  /// are kept only if they are common to both input states; if a variable is
+  /// promoted to one type in one state and a subtype in the other state, the
+  /// less specific type promotion is kept.
+  static FlowModel<Variable, Type> join<Variable, Type>(
+    TypeOperations<Variable, Type> typeOperations,
+    FlowModel<Variable, Type> first,
+    FlowModel<Variable, Type> second,
+  ) {
+    if (first == null) return second;
+    if (second == null) return first;
+
+    if (first.reachable && !second.reachable) return first;
+    if (!first.reachable && second.reachable) return second;
+
+    var newReachable = first.reachable || second.reachable;
+    var newNotAssigned = first.notAssigned.union(second.notAssigned);
+    var newPromoted =
+        FlowModel.joinPromoted(typeOperations, first.promoted, second.promoted);
+
+    return FlowModel._identicalOrNew(
+      first,
+      second,
+      newReachable,
+      newNotAssigned,
+      newPromoted,
+    );
+  }
+
+  /// Joins two "promoted" maps.  See [join] for details.
+  @visibleForTesting
+  static Map<Variable, Type> joinPromoted<Variable, Type>(
+    TypeOperations<Variable, Type> typeOperations,
+    Map<Variable, Type> first,
+    Map<Variable, Type> second,
+  ) {
+    if (identical(first, second)) return first;
+    if (first.isEmpty || second.isEmpty) return const {};
+
+    var result = <Variable, Type>{};
+    var alwaysFirst = true;
+    var alwaysSecond = true;
+    for (var entry in first.entries) {
+      var variable = entry.key;
+      if (!second.containsKey(variable)) {
+        alwaysFirst = false;
+      } else {
+        var firstType = entry.value;
+        var secondType = second[variable];
+        if (identical(firstType, secondType)) {
+          result[variable] = firstType;
+        } else if (firstType == null) {
+          result[variable] = null;
+          alwaysSecond = false;
+        } else if (secondType == null) {
+          result[variable] = null;
+          alwaysFirst = false;
+        } else if (typeOperations.isSubtypeOf(firstType, secondType)) {
+          result[variable] = secondType;
+          alwaysFirst = false;
+        } else if (typeOperations.isSubtypeOf(secondType, firstType)) {
+          result[variable] = firstType;
+          alwaysSecond = false;
+        } else {
+          result[variable] = null;
+          alwaysFirst = false;
+          alwaysSecond = false;
+        }
+      }
+    }
+
+    if (alwaysFirst) return first;
+    if (alwaysSecond && result.length == second.length) return second;
+    if (result.isEmpty) return const {};
+    return result;
+  }
+
+  /// Creates a new [FlowModel] object, unless it is equivalent to either
+  /// [first] or [second], in which case one of those objects is re-used.
+  static FlowModel<Variable, Type> _identicalOrNew<Variable, Type>(
+    FlowModel<Variable, Type> first,
+    FlowModel<Variable, Type> second,
     bool newReachable,
     _VariableSet<Variable> newNotAssigned,
     Map<Variable, Type> newPromoted,
@@ -1035,7 +1045,7 @@ class State<Variable, Type> {
       return second;
     }
 
-    return State<Variable, Type>._(
+    return FlowModel<Variable, Type>._(
       newReachable,
       newNotAssigned,
       newPromoted,
@@ -1052,10 +1062,28 @@ class State<Variable, Type> {
     for (var entry in p1.entries) {
       var p1Value = entry.value;
       var p2Value = p2[entry.key];
-      if (!typeOperations.isSameType(p1Value, p2Value)) return false;
+      if (p1Value == null) {
+        if (p2Value != null) return false;
+      } else {
+        if (p2Value == null) return false;
+        if (!typeOperations.isSameType(p1Value, p2Value)) return false;
+      }
     }
     return true;
   }
+}
+
+/// Accessor for function body information.
+abstract class FunctionBodyAccess<Variable> {
+  bool isPotentiallyMutatedInClosure(Variable variable);
+
+  bool isPotentiallyMutatedInScope(Variable variable);
+}
+
+/// Operations on nodes, abstracted from concrete node interfaces.
+abstract class NodeOperations<Expression> {
+  /// If the [node] is a parenthesized expression, recursively unwrap it.
+  Expression unwrapParenthesized(Expression node);
 }
 
 /// Operations on types, abstracted from concrete type interfaces.

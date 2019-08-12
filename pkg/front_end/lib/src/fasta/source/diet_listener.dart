@@ -23,6 +23,8 @@ import '../../scanner/token.dart' show Token;
 
 import '../builder/builder.dart';
 
+import '../builder/declaration_builder.dart';
+
 import '../constant_context.dart' show ConstantContext;
 
 import '../crash.dart' show Crash;
@@ -74,7 +76,8 @@ class DietListener extends StackListener {
   int importExportDirectiveIndex = 0;
   int partDirectiveIndex = 0;
 
-  ClassBuilder currentClass;
+  DeclarationBuilder _currentDeclaration;
+  ClassBuilder _currentClass;
 
   bool currentClassIsParserRecovery = false;
 
@@ -82,7 +85,7 @@ class DietListener extends StackListener {
   int unnamedExtensionCounter = 0;
 
   /// For top-level declarations, this is the library scope. For class members,
-  /// this is the instance scope of [currentClass].
+  /// this is the instance scope of [currentDeclaration].
   Scope memberScope;
 
   @override
@@ -97,6 +100,19 @@ class DietListener extends StackListener {
             library.loader.target.backendTarget.enableNative(library.uri),
         stringExpectedAfterNative =
             library.loader.target.backendTarget.nativeExtensionExpectsString;
+
+  DeclarationBuilder get currentDeclaration => _currentDeclaration;
+
+  void set currentDeclaration(DeclarationBuilder builder) {
+    if (builder == null) {
+      _currentClass = _currentDeclaration = null;
+    } else {
+      _currentDeclaration = builder;
+      _currentClass = builder is ClassBuilder ? builder : null;
+    }
+  }
+
+  ClassBuilder get currentClass => _currentClass;
 
   @override
   void endMetadataStar(int count) {
@@ -243,7 +259,7 @@ class DietListener extends StackListener {
     checkEmpty(typedefKeyword.charOffset);
     if (name is ParserRecovery) return;
 
-    Declaration typedefBuilder = lookupBuilder(typedefKeyword, null, name);
+    Builder typedefBuilder = lookupBuilder(typedefKeyword, null, name);
     parseMetadata(typedefBuilder, metadata, typedefBuilder.target);
     if (typedefBuilder is TypeAliasBuilder) {
       TypeBuilder type = typedefBuilder.type;
@@ -590,7 +606,7 @@ class DietListener extends StackListener {
     if (name is ParserRecovery || currentClassIsParserRecovery) return;
     FunctionBuilder builder;
     if (name is QualifiedName ||
-        (getOrSet == null && name == currentClass.name)) {
+        (getOrSet == null && name == currentClass?.name)) {
       builder = lookupConstructor(beginToken, name);
     } else {
       builder = lookupBuilder(beginToken, getOrSet, name);
@@ -604,9 +620,10 @@ class DietListener extends StackListener {
             : MemberKind.NonStaticMethod);
   }
 
-  StackListener createListener(
-      ModifierBuilder builder, Scope memberScope, bool isInstanceMember,
-      {VariableDeclaration extensionThis, Scope formalParameterScope}) {
+  StackListener createListener(ModifierBuilder builder, Scope memberScope,
+      {bool isDeclarationInstanceMember,
+      VariableDeclaration extensionThis,
+      Scope formalParameterScope}) {
     // Note: we set thisType regardless of whether we are building a static
     // member, since that provides better error recovery.
     // TODO(johnniwinther): Provide a dummy this on static extension methods
@@ -619,17 +636,17 @@ class DietListener extends StackListener {
         ? ConstantContext.inferred
         : ConstantContext.none;
     return new BodyBuilder(
-        library,
-        builder,
-        memberScope,
-        formalParameterScope,
-        hierarchy,
-        coreTypes,
-        currentClass,
-        isInstanceMember,
-        extensionThis,
-        uri,
-        typeInferrer)
+        library: library,
+        member: builder,
+        enclosingScope: memberScope,
+        formalParameterScope: formalParameterScope,
+        hierarchy: hierarchy,
+        coreTypes: coreTypes,
+        classBuilder: currentClass,
+        isDeclarationInstanceMember: isDeclarationInstanceMember,
+        extensionThis: extensionThis,
+        uri: uri,
+        typeInferrer: typeInferrer)
       ..constantContext = constantContext;
   }
 
@@ -640,7 +657,8 @@ class DietListener extends StackListener {
         builder.computeFormalParameterScope(typeParameterScope);
     assert(typeParameterScope != null);
     assert(formalParameterScope != null);
-    return createListener(builder, typeParameterScope, builder.isInstanceMember,
+    return createListener(builder, typeParameterScope,
+        isDeclarationInstanceMember: builder.isDeclarationInstanceMember,
         extensionThis: builder.extensionThis,
         formalParameterScope: formalParameterScope);
   }
@@ -672,11 +690,13 @@ class DietListener extends StackListener {
     checkEmpty(token.charOffset);
     if (names == null || currentClassIsParserRecovery) return;
 
-    Declaration declaration = lookupBuilder(token, null, names.first);
+    Builder declaration = lookupBuilder(token, null, names.first);
     // TODO(paulberry): don't re-parse the field if we've already parsed it
     // for type inference.
     parseFields(
-        createListener(declaration, memberScope, declaration.isInstanceMember),
+        createListener(declaration, memberScope,
+            isDeclarationInstanceMember:
+                declaration.isDeclarationInstanceMember),
         token,
         metadata,
         isTopLevel);
@@ -713,21 +733,21 @@ class DietListener extends StackListener {
     Token beginToken = pop();
     Object name = pop();
     pop(); // Annotation begin token.
-    assert(currentClass == null);
+    assert(currentDeclaration == null);
     assert(memberScope == library.scope);
     if (name is ParserRecovery) {
       currentClassIsParserRecovery = true;
       return;
     }
-    currentClass = lookupBuilder(beginToken, null, name);
-    memberScope = currentClass.scope;
+    currentDeclaration = lookupBuilder(beginToken, null, name);
+    memberScope = currentDeclaration.scope;
   }
 
   @override
   void endClassOrMixinBody(
       ClassKind kind, int memberCount, Token beginToken, Token endToken) {
     debugEvent("ClassOrMixinBody");
-    currentClass = null;
+    currentDeclaration = null;
     currentClassIsParserRecovery = false;
     memberScope = library.scope;
   }
@@ -860,19 +880,19 @@ class DietListener extends StackListener {
     listener.checkEmpty(token.charOffset);
   }
 
-  Declaration lookupBuilder(Token token, Token getOrSet, String name) {
+  Builder lookupBuilder(Token token, Token getOrSet, String name) {
     // TODO(ahe): Can I move this to Scope or ScopeBuilder?
-    Declaration declaration;
-    if (currentClass != null) {
-      if (uri != currentClass.fileUri) {
-        unexpected("$uri", "${currentClass.fileUri}", currentClass.charOffset,
-            currentClass.fileUri);
+    Builder declaration;
+    if (currentDeclaration != null) {
+      if (uri != currentDeclaration.fileUri) {
+        unexpected("$uri", "${currentDeclaration.fileUri}",
+            currentDeclaration.charOffset, currentDeclaration.fileUri);
       }
 
       if (getOrSet != null && optional("set", getOrSet)) {
-        declaration = currentClass.scope.setters[name];
+        declaration = currentDeclaration.scope.setters[name];
       } else {
-        declaration = currentClass.scope.local[name];
+        declaration = currentDeclaration.scope.local[name];
       }
     } else if (getOrSet != null && optional("set", getOrSet)) {
       declaration = library.scope.setters[name];
@@ -884,9 +904,9 @@ class DietListener extends StackListener {
     return declaration;
   }
 
-  Declaration lookupConstructor(Token token, Object nameOrQualified) {
+  Builder lookupConstructor(Token token, Object nameOrQualified) {
     assert(currentClass != null);
-    Declaration declaration;
+    Builder declaration;
     String suffix;
     if (nameOrQualified is QualifiedName) {
       suffix = nameOrQualified.name;
@@ -899,12 +919,12 @@ class DietListener extends StackListener {
     return declaration;
   }
 
-  Declaration handleDuplicatedName(Declaration declaration, Token token) {
+  Builder handleDuplicatedName(Builder declaration, Token token) {
     int offset = token.charOffset;
     if (declaration?.next == null) {
       return declaration;
     } else {
-      Declaration nearestDeclaration;
+      Builder nearestDeclaration;
       int minDistance = -1;
       do {
         // Only look at declarations from this file (part).
@@ -928,7 +948,7 @@ class DietListener extends StackListener {
     }
   }
 
-  void checkBuilder(Token token, Declaration declaration, Object name) {
+  void checkBuilder(Token token, Builder declaration, Object name) {
     if (declaration == null) {
       internalProblem(templateInternalProblemNotFound.withArguments("$name"),
           token.charOffset, uri);
@@ -956,7 +976,8 @@ class DietListener extends StackListener {
   List<Expression> parseMetadata(
       ModifierBuilder builder, Token metadata, TreeNode parent) {
     if (metadata != null) {
-      var listener = createListener(builder, memberScope, false);
+      var listener = createListener(builder, memberScope,
+          isDeclarationInstanceMember: false);
       var parser = new Parser(listener);
       parser.parseMetadataStar(parser.syntheticPreviousToken(metadata));
       return listener.finishMetadata(parent);

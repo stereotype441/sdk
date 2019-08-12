@@ -116,9 +116,10 @@ class ElementResolver extends SimpleAstVisitor<void> {
   /// Whether constant evaluation errors should be reported during resolution.
   final bool reportConstEvaluationErrors;
 
-  final MethodInvocationResolver _methodInvocationResolver;
+  /// Helper for extension method resolution.
+  final ExtensionMemberResolver _extensionResolver;
 
-  final ExtensionMemberResolver _extensionMemberResolver;
+  final MethodInvocationResolver _methodInvocationResolver;
 
   /**
    * Initialize a newly created visitor to work for the given [_resolver] to
@@ -127,7 +128,7 @@ class ElementResolver extends SimpleAstVisitor<void> {
   ElementResolver(this._resolver, {this.reportConstEvaluationErrors: true})
       : _inheritance = _resolver.inheritance,
         _definingLibrary = _resolver.definingLibrary,
-        _extensionMemberResolver = ExtensionMemberResolver(_resolver),
+        _extensionResolver = _resolver.extensionResolver,
         _methodInvocationResolver = new MethodInvocationResolver(_resolver) {
     _dynamicType = _resolver.typeProvider.dynamicType;
     _typeType = _resolver.typeProvider.typeType;
@@ -1095,26 +1096,6 @@ class ElementResolver extends SimpleAstVisitor<void> {
     return _resolveTypeParameter(type);
   }
 
-  ExecutableElement _inferExtensionArgumentTypes(
-    DartType receiverType,
-    ExtensionElement extension,
-    ExecutableElement member,
-  ) {
-    if (member == null) {
-      return null;
-    }
-
-    var typeArguments = _extensionMemberResolver.inferTypeArguments(
-      extension,
-      receiverType,
-    );
-    return ExecutableMember.from3(
-      member,
-      extension.typeParameters,
-      typeArguments,
-    );
-  }
-
   /**
    * Check for a generic method & apply type arguments if any were passed.
    */
@@ -1252,16 +1233,26 @@ class ElementResolver extends SimpleAstVisitor<void> {
    * use the given [node] to report the error.
    */
   MethodElement _lookUpCallMethod(InterfaceType type, Expression node) {
-    MethodElement callMethod = type.lookUpMethod(
-        FunctionElement.CALL_METHOD_NAME, _resolver.definingLibrary);
-    if (callMethod == null) {
-      var extension = _extensionMemberResolver.findExtension(
-          type, FunctionElement.CALL_METHOD_NAME, node, ElementKind.METHOD);
-      if (extension != null) {
-        callMethod = extension.getMethod(FunctionElement.CALL_METHOD_NAME);
-      }
+    var callMethod = type.lookUpMethod(
+      FunctionElement.CALL_METHOD_NAME,
+      _resolver.definingLibrary,
+    );
+    if (callMethod != null) {
+      return callMethod;
     }
-    return callMethod;
+
+    var result = _extensionResolver.findExtension(
+      type,
+      FunctionElement.CALL_METHOD_NAME,
+      node,
+      ElementKind.METHOD,
+    );
+    var instantiatedMember = result.element;
+    if (instantiatedMember is MethodElement) {
+      return instantiatedMember;
+    }
+
+    return null;
   }
 
   /**
@@ -1279,11 +1270,10 @@ class ElementResolver extends SimpleAstVisitor<void> {
       if (getter != null) {
         return getter;
       }
-      var extension = _extensionMemberResolver.findExtension(
+      var result = _extensionResolver.findExtension(
           type, name, nameNode, ElementKind.GETTER);
-      if (extension != null) {
-        var member = extension.getGetter(name);
-        return _inferExtensionArgumentTypes(type, extension, member);
+      if (result.isSingle) {
+        return result.element;
       }
     }
     return null;
@@ -1318,11 +1308,10 @@ class ElementResolver extends SimpleAstVisitor<void> {
       if (method != null) {
         return method;
       }
-      var extension = _extensionMemberResolver.findExtension(
+      var result = _extensionResolver.findExtension(
           type, name, nameNode, ElementKind.METHOD);
-      if (extension != null) {
-        var member = extension.getMethod(name);
-        return _inferExtensionArgumentTypes(type, extension, member);
+      if (result.isSingle) {
+        return result.element;
       }
     }
     return null;
@@ -1343,11 +1332,10 @@ class ElementResolver extends SimpleAstVisitor<void> {
       if (setter != null) {
         return setter;
       }
-      var extension = _extensionMemberResolver.findExtension(
+      var result = _extensionResolver.findExtension(
           type, name, nameNode, ElementKind.SETTER);
-      if (extension != null) {
-        var member = extension.getSetter(name);
-        return _inferExtensionArgumentTypes(type, extension, member);
+      if (result.isSingle) {
+        return result.element;
       }
     }
     return null;
@@ -1603,10 +1591,10 @@ class ElementResolver extends SimpleAstVisitor<void> {
       }
 
       if (invokeElement == null && leftType is InterfaceType) {
-        ExtensionElement extension = _extensionMemberResolver.findExtension(
+        var result = _extensionResolver.findExtension(
             leftType, methodName, node, ElementKind.METHOD);
-        if (extension != null) {
-          invokeElement = extension.getMethod(methodName);
+        if (result.isSingle) {
+          invokeElement = result.element;
         }
       }
 
@@ -1798,19 +1786,17 @@ class ElementResolver extends SimpleAstVisitor<void> {
     }
     propertyName.staticElement = staticElement;
     if (_shouldReportInvalidMember(staticType, staticElement)) {
-      Element staticOrPropagatedEnclosingElt = staticType.element;
-      bool isStaticProperty = _isStatic(staticOrPropagatedEnclosingElt);
+      Element enclosingElement = staticType.element;
+      bool isStaticProperty = _isStatic(enclosingElement);
       // Special getter cases.
       if (propertyName.inGetterContext()) {
-        if (!isStaticProperty &&
-            staticOrPropagatedEnclosingElt is ClassElement) {
-          InterfaceType targetType = staticOrPropagatedEnclosingElt.type;
+        if (!isStaticProperty && enclosingElement is ClassElement) {
+          InterfaceType targetType = enclosingElement.type;
           if (targetType != null &&
               targetType.isDartCoreFunction &&
               propertyName.name == FunctionElement.CALL_METHOD_NAME) {
             return;
-          } else if (staticOrPropagatedEnclosingElt.isEnum &&
-              propertyName.name == "_name") {
+          } else if (enclosingElement.isEnum && propertyName.name == "_name") {
             _resolver.errorReporter.reportErrorForNode(
                 CompileTimeErrorCode.ACCESS_PRIVATE_ENUM_FIELD,
                 propertyName,
@@ -1819,8 +1805,7 @@ class ElementResolver extends SimpleAstVisitor<void> {
           }
         }
       }
-      Element declaringElement =
-          staticType.isVoid ? null : staticOrPropagatedEnclosingElt;
+      Element declaringElement = staticType.isVoid ? null : enclosingElement;
       if (propertyName.inSetterContext()) {
         ErrorCode errorCode;
         var arguments = [propertyName.name, staticType.displayName];

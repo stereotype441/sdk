@@ -5,6 +5,11 @@
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
+import 'package:analyzer/error/listener.dart';
+import 'package:analyzer/src/dart/ast/ast.dart';
+import 'package:analyzer/src/dart/element/member.dart';
+import 'package:analyzer/src/dart/element/type_algebra.dart';
+import 'package:analyzer/src/dart/resolver/resolution_result.dart';
 import 'package:analyzer/src/dart/resolver/scope.dart';
 import 'package:analyzer/src/error/codes.dart';
 import 'package:analyzer/src/generated/resolver.dart';
@@ -12,9 +17,12 @@ import 'package:analyzer/src/generated/type_system.dart';
 
 class ExtensionMemberResolver {
   final ResolverVisitor _resolver;
+
   ExtensionMemberResolver(this._resolver);
 
   DartType get _dynamicType => _typeProvider.dynamicType;
+
+  ErrorReporter get _errorReporter => _resolver.errorReporter;
 
   Scope get _nameScope => _resolver.nameScope;
 
@@ -22,10 +30,132 @@ class ExtensionMemberResolver {
 
   TypeSystem get _typeSystem => _resolver.typeSystem;
 
+  /// Return the most specific extension in the current scope for this [type],
+  /// that defines the member with the the [name] and [kind].
+  ///
+  /// If no applicable extensions, return `null`.
+  ///
+  /// If the match is ambiguous, report an error and return `null`.
+  ResolutionResult findExtension(
+      DartType type, String name, Expression target, ElementKind kind) {
+    var extensions = _getApplicable(type, name, kind);
+
+    if (extensions.isEmpty) {
+      return ResolutionResult.none;
+    }
+
+    if (extensions.length == 1) {
+      return ResolutionResult(extensions[0].instantiatedMember);
+    }
+
+    var extension = _chooseMostSpecific(extensions);
+    if (extension != null) {
+      return ResolutionResult(extension.instantiatedMember);
+    }
+
+    _errorReporter.reportErrorForNode(
+      CompileTimeErrorCode.AMBIGUOUS_EXTENSION_METHOD_ACCESS,
+      target,
+      [
+        name,
+        extensions[0].element.name,
+        extensions[1].element.name,
+      ],
+    );
+    return ResolutionResult.ambiguous;
+  }
+
+  /// Perform upward inference for the override.
+  void resolveOverride(ExtensionOverride node) {
+    var nodeImpl = node as ExtensionOverrideImpl;
+    var element = node.staticElement;
+    var typeParameters = element.typeParameters;
+
+    if (!_isValidContext(node)) {
+      _errorReporter.reportErrorForNode(
+        CompileTimeErrorCode.EXTENSION_OVERRIDE_WITHOUT_ACCESS,
+        node,
+      );
+      nodeImpl.staticType = _dynamicType;
+    }
+
+    var arguments = node.argumentList.arguments;
+    if (arguments.length != 1) {
+      _errorReporter.reportErrorForNode(
+        CompileTimeErrorCode.INVALID_EXTENSION_ARGUMENT_COUNT,
+        node.argumentList,
+      );
+      nodeImpl.typeArgumentTypes = _listOfDynamic(typeParameters);
+      nodeImpl.extendedType = _dynamicType;
+      return;
+    }
+
+    var receiverExpression = arguments[0];
+    var receiverType = receiverExpression.staticType;
+
+    var typeArgumentTypes = _inferTypeArguments(
+      element,
+      receiverType,
+      node.typeArguments,
+    );
+
+    nodeImpl.typeArgumentTypes = typeArgumentTypes;
+    nodeImpl.extendedType = Substitution.fromPairs(
+      typeParameters,
+      typeArgumentTypes,
+    ).substituteType(element.extendedType);
+
+    if (!_typeSystem.isAssignableTo(receiverType, node.extendedType)) {
+      _errorReporter.reportErrorForNode(
+        CompileTimeErrorCode.EXTENSION_OVERRIDE_ARGUMENT_NOT_ASSIGNABLE,
+        receiverExpression,
+        [receiverType, node.extendedType],
+      );
+    }
+  }
+
+  /// Set the type context for the receiver of the override.
+  ///
+  /// The context of the invocation that is made through the override does
+  /// not affect the type inference of the override and the receiver.
+  void setOverrideReceiverContextType(ExtensionOverride node) {
+    var element = node.staticElement;
+    var typeParameters = element.typeParameters;
+
+    var arguments = node.argumentList.arguments;
+    if (arguments.length != 1) {
+      return;
+    }
+
+    List<DartType> typeArgumentTypes;
+    var typeArguments = node.typeArguments;
+    if (typeArguments != null) {
+      var arguments = typeArguments.arguments;
+      if (arguments.length == typeParameters.length) {
+        typeArgumentTypes = arguments.map((a) => a.type).toList();
+      } else {
+        typeArgumentTypes = _listOfDynamic(typeParameters);
+      }
+    } else {
+      typeArgumentTypes = List.filled(
+        typeParameters.length,
+        UnknownInferredType.instance,
+      );
+    }
+
+    var extendedForDownward = Substitution.fromPairs(
+      typeParameters,
+      typeArgumentTypes,
+    ).substituteType(element.extendedType);
+
+    var receiver = arguments[0];
+    InferenceContext.setType(receiver, extendedForDownward);
+  }
+
   /// Return the most specific extension or `null` if no single one can be
   /// identified.
-  ExtensionElement chooseMostSpecificExtension(
-      List<ExtensionElement> extensions, InterfaceType receiverType) {
+  _InstantiatedExtension _chooseMostSpecific(
+      List<_InstantiatedExtension> extensions) {
     //
     // https://github.com/dart-lang/language/blob/master/accepted/future-releases/static-extension-methods/feature-specification.md#extension-conflict-resolution:
     //
@@ -47,95 +177,84 @@ class ExtensionMemberResolver {
     //    instantiate-to-bounds type of T2 and not vice versa.
     //
 
-    int moreSpecific(ExtensionElement e1, ExtensionElement e2) {
-      var t1 = _instantiateToBounds(e1.extendedType);
-      var t2 = _instantiateToBounds(e2.extendedType);
-
-      bool inSdk(DartType type) {
-        if (type.isDynamic || type.isVoid) {
-          return true;
-        }
-        return t2.element.library.isInSdk;
-      }
-
-      if (inSdk(t2)) {
-        //  1. T2 is declared in a platform library, and T1 is not
-        if (!inSdk(t1)) {
-          return -1;
-        }
-      } else if (inSdk(t1)) {
-        return 1;
-      }
-
-      // 2. they are both declared in platform libraries or both declared in
-      //    non-platform libraries, and
-      if (_subtypeOf(t1, t2)) {
-        // 3. the instantiated type (the type after applying type inference from the
-        //    receiver) of T1 is a subtype of the instantiated type of T2 and either
-        //    not vice versa
-        if (!_subtypeOf(t2, t1)) {
-          return -1;
-        } else {
-          // or:
-          // 4. the instantiate-to-bounds type of T1 is a subtype of the
-          //    instantiate-to-bounds type of T2 and not vice versa.
-
-          // todo(pq): implement
-
-        }
-      } else if (_subtypeOf(t2, t1)) {
-        if (!_subtypeOf(t1, t2)) {
-          return 1;
+    for (var i = 0; i < extensions.length; i++) {
+      var e1 = extensions[i];
+      var isMoreSpecific = true;
+      for (var j = 0; j < extensions.length; j++) {
+        var e2 = extensions[j];
+        if (i != j && !_isMoreSpecific(e1, e2)) {
+          isMoreSpecific = false;
+          break;
         }
       }
-
-      return 0;
-    }
-
-    extensions.sort(moreSpecific);
-
-    // If the first extension is definitively more specific, return it.
-    if (moreSpecific(extensions[0], extensions[1]) == -1) {
-      return extensions[0];
+      if (isMoreSpecific) {
+        return e1;
+      }
     }
 
     // Otherwise fail.
     return null;
   }
 
-  /// Return an extension for this [type] that matches the given [name] in the
-  /// current scope; if the match is ambiguous, report an error.
-  ExtensionElement findExtension(
-      InterfaceType type, String name, Expression target, ElementKind kind) {
-    var extensions = getApplicableExtensions(type, name, kind);
-    if (extensions.length == 1) {
-      return extensions[0];
-    }
-    if (extensions.length > 1) {
-      ExtensionElement extension =
-          chooseMostSpecificExtension(extensions, type);
-      if (extension != null) {
-        return extension;
+  /// Return extensions for the [type] that match the given [name] in the
+  /// current scope.
+  List<_InstantiatedExtension> _getApplicable(
+      DartType type, String name, ElementKind kind) {
+    var candidates = _getExtensionsWithMember(name, kind);
+
+    var instantiatedExtensions = <_InstantiatedExtension>[];
+    for (var candidate in candidates) {
+      var typeParameters = candidate.extension.typeParameters;
+      var inferrer = GenericInferrer(
+        _typeProvider,
+        _typeSystem,
+        typeParameters,
+      );
+      inferrer.constrainArgument(
+        type,
+        candidate.extension.extendedType,
+        'extendedType',
+      );
+      var typeArguments = inferrer.infer(typeParameters, failAtError: true);
+      if (typeArguments == null) {
+        continue;
       }
-      _resolver.errorReporter.reportErrorForNode(
-        CompileTimeErrorCode.AMBIGUOUS_EXTENSION_METHOD_ACCESS,
-        target,
-        [
-          name,
-          extensions[0].name,
-          extensions[1].name,
-        ],
+
+      var substitution = Substitution.fromPairs(
+        typeParameters,
+        typeArguments,
+      );
+      var extendedType = substitution.substituteType(
+        candidate.extension.extendedType,
+      );
+      if (!_isSubtypeOf(type, extendedType)) {
+        continue;
+      }
+
+      instantiatedExtensions.add(
+        _InstantiatedExtension(
+          candidate.extension,
+          extendedType,
+          // TODO(scheglov) Hm... Maybe not use from3(), but identify null subst?
+          ExecutableMember.from3(
+            candidate.member,
+            typeParameters,
+            typeArguments,
+          ),
+        ),
       );
     }
 
-    return null;
+    return instantiatedExtensions;
   }
 
-  /// Return extensions for this [type] that match the given [name] in the
-  /// current scope.
-  List<ExtensionElement> getApplicableExtensions(
-      DartType type, String name, ElementKind kind) {
-    final List<ExtensionElement> extensions = [];
+  /// Return extensions from the current scope, that define a member with the
+  /// given[name].
+  List<_CandidateExtension> _getExtensionsWithMember(
+    String name,
+    ElementKind kind,
+  ) {
+    var candidates = <_CandidateExtension>[];
 
     /// Return `true` if the [elementName] matches the target [name], taking
     /// into account the `=` on the end of the names of setters.
@@ -146,27 +265,27 @@ class ExtensionMemberResolver {
       return elementName == name;
     }
 
-    /// Add the given [extension] to the list of [extensions] if it defined a
+    /// Add the given [extension] to the list of [candidates] if it defined a
     /// member whose name matches the target [name].
     void checkExtension(ExtensionElement extension) {
       if (kind == ElementKind.GETTER) {
         for (var accessor in extension.accessors) {
           if (accessor.isGetter && matchesName(accessor.name)) {
-            extensions.add(extension);
+            candidates.add(_CandidateExtension(extension, accessor));
             return;
           }
         }
       } else if (kind == ElementKind.SETTER) {
         for (var accessor in extension.accessors) {
           if (accessor.isSetter && matchesName(accessor.name)) {
-            extensions.add(extension);
+            candidates.add(_CandidateExtension(extension, accessor));
             return;
           }
         }
       } else if (kind == ElementKind.METHOD) {
         for (var method in extension.methods) {
           if (matchesName(method.name)) {
-            extensions.add(extension);
+            candidates.add(_CandidateExtension(extension, method));
             return;
           }
         }
@@ -175,34 +294,31 @@ class ExtensionMemberResolver {
           if (accessor.type is FunctionType &&
               accessor.isGetter &&
               matchesName(accessor.name)) {
-            extensions.add(extension);
+            candidates.add(_CandidateExtension(extension, accessor));
             return;
           }
         }
       }
     }
 
-    var targetType = _instantiateToBounds(type);
     for (var extension in _nameScope.extensions) {
-      var extensionType = _instantiateToBounds(extension.extendedType);
-      if (_subtypeOf(targetType, extensionType)) {
-        checkExtension(extension);
-      }
+      checkExtension(extension);
     }
-    return extensions;
+    return candidates;
   }
 
-  /// Given the generic [extension] element, and the [receiverType] to which
-  /// this extension is applied, infer the type arguments that correspond to
-  /// the extension type parameters.
+  /// Given the generic [extension] element, either return types specified
+  /// explicitly in [typeArguments], or infer type arguments from the given
+  /// [receiverType].
   ///
-  /// If the extension is used in [ExtensionOverride], the [typeArguments] of
-  /// the override are provided, and take precedence over inference.
-  List<DartType> inferTypeArguments(
+  /// If the number of explicit type arguments is different than the number
+  /// of extension's type parameters, or inference fails, return `dynamic`
+  /// for all type parameters.
+  List<DartType> _inferTypeArguments(
     ExtensionElement extension,
-    DartType receiverType, {
+    DartType receiverType,
     TypeArgumentList typeArguments,
-  }) {
+  ) {
     var typeParameters = extension.typeParameters;
     if (typeParameters.isEmpty) {
       return const <DartType>[];
@@ -214,32 +330,117 @@ class ExtensionMemberResolver {
         return arguments.map((a) => a.type).toList();
       } else {
         // TODO(scheglov) Report an error.
-        return List.filled(typeParameters.length, _dynamicType);
+        return _listOfDynamic(typeParameters);
       }
     } else {
-      if (receiverType != null) {
-        var inferrer = GenericInferrer(
-          _typeProvider,
-          _typeSystem,
-          typeParameters,
-        );
-        inferrer.constrainArgument(
-          receiverType,
-          extension.extendedType,
-          'extendedType',
-        );
-        return inferrer.infer(typeParameters);
-      } else {
-        return List.filled(typeParameters.length, _dynamicType);
-      }
+      var inferrer = GenericInferrer(
+        _typeProvider,
+        _typeSystem,
+        typeParameters,
+      );
+      inferrer.constrainArgument(
+        receiverType,
+        extension.extendedType,
+        'extendedType',
+      );
+      return inferrer.infer(typeParameters);
     }
   }
 
-  /// Ask the type system to instantiate the given type to its bounds.
-  DartType _instantiateToBounds(DartType type) =>
-      _typeSystem.instantiateToBounds(type);
+  /// Instantiate the extended type of the [extension] to the bounds of the
+  /// type formals of the extension.
+  DartType _instantiateToBounds(ExtensionElement extension) {
+    var typeParameters = extension.typeParameters;
+    return Substitution.fromPairs(
+      typeParameters,
+      _typeSystem.instantiateTypeFormalsToBounds(typeParameters),
+    ).substituteType(extension.extendedType);
+  }
+
+  bool _isMoreSpecific(_InstantiatedExtension e1, _InstantiatedExtension e2) {
+    var t10 = e1.element.extendedType;
+    var t20 = e2.element.extendedType;
+    var t11 = e1._extendedType;
+    var t21 = e2._extendedType;
+
+    bool inSdk(DartType type) {
+      if (type.isDynamic || type.isVoid) {
+        return true;
+      }
+      return t20.element.library.isInSdk;
+    }
+
+    if (inSdk(t20)) {
+      //  1. T2 is declared in a platform library, and T1 is not
+      if (!inSdk(t10)) {
+        return true;
+      }
+    } else if (inSdk(t10)) {
+      return false;
+    }
+
+    // 2. they are both declared in platform libraries or both declared in
+    //    non-platform libraries, and
+    if (_isSubtypeAndNotViceVersa(t11, t21)) {
+      // 3. the instantiated type (the type after applying type inference from
+      //    the receiver) of T1 is a subtype of the instantiated type of T2 and
+      //    either not vice versa
+      return true;
+    }
+
+    // TODO(scheglov) store instantiated types
+    var t12 = _instantiateToBounds(e1.element);
+    var t22 = _instantiateToBounds(e2.element);
+    if (_isSubtypeAndNotViceVersa(t12, t22)) {
+      // or:
+      // 4. the instantiate-to-bounds type of T1 is a subtype of the
+      //    instantiate-to-bounds type of T2 and not vice versa.
+      return true;
+    }
+
+    return false;
+  }
+
+  bool _isSubtypeAndNotViceVersa(DartType t1, DartType t2) {
+    return _isSubtypeOf(t1, t2) && !_isSubtypeOf(t2, t1);
+  }
 
   /// Ask the type system for a subtype check.
-  bool _subtypeOf(DartType type1, DartType type2) =>
+  bool _isSubtypeOf(DartType type1, DartType type2) =>
       _typeSystem.isSubtypeOf(type1, type2);
+
+  List<DartType> _listOfDynamic(List<TypeParameterElement> parameters) {
+    return List<DartType>.filled(parameters.length, _dynamicType);
+  }
+
+  /// Return `true` if the extension override [node] is being used as a target
+  /// of an operation that might be accessing an instance member.
+  static bool _isValidContext(ExtensionOverride node) {
+    AstNode parent = node.parent;
+    return parent is BinaryExpression && parent.leftOperand == node ||
+        parent is FunctionExpressionInvocation && parent.function == node ||
+        parent is IndexExpression && parent.target == node ||
+        parent is MethodInvocation && parent.target == node ||
+        parent is PrefixExpression ||
+        parent is PropertyAccess && parent.target == node;
+  }
+}
+
+class _CandidateExtension {
+  final ExtensionElement extension;
+  final ExecutableElement member;
+
+  _CandidateExtension(this.extension, this.member);
+}
+
+class _InstantiatedExtension {
+  final ExtensionElement element;
+  final DartType _extendedType;
+  final ExecutableElement instantiatedMember;
+
+  _InstantiatedExtension(
+    this.element,
+    this._extendedType,
+    this.instantiatedMember,
+  );
 }

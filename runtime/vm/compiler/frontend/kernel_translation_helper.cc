@@ -994,13 +994,11 @@ void FieldHelper::ReadUntilExcluding(Field field) {
       if (++next_read_ == field) return;
       FALL_THROUGH;
     case kPosition:
-      position_ = helper_->ReadPosition(false);  // read position.
-      helper_->RecordTokenPosition(position_);
+      position_ = helper_->ReadPosition();  // read position.
       if (++next_read_ == field) return;
       FALL_THROUGH;
     case kEndPosition:
-      end_position_ = helper_->ReadPosition(false);  // read end position.
-      helper_->RecordTokenPosition(end_position_);
+      end_position_ = helper_->ReadPosition();  // read end position.
       if (++next_read_ == field) return;
       FALL_THROUGH;
     case kFlags:
@@ -1056,18 +1054,15 @@ void ProcedureHelper::ReadUntilExcluding(Field field) {
       if (++next_read_ == field) return;
       FALL_THROUGH;
     case kStartPosition:
-      start_position_ = helper_->ReadPosition(false);  // read position.
-      helper_->RecordTokenPosition(start_position_);
+      start_position_ = helper_->ReadPosition();  // read position.
       if (++next_read_ == field) return;
       FALL_THROUGH;
     case kPosition:
-      position_ = helper_->ReadPosition(false);  // read position.
-      helper_->RecordTokenPosition(position_);
+      position_ = helper_->ReadPosition();  // read position.
       if (++next_read_ == field) return;
       FALL_THROUGH;
     case kEndPosition:
-      end_position_ = helper_->ReadPosition(false);  // read end position.
-      helper_->RecordTokenPosition(end_position_);
+      end_position_ = helper_->ReadPosition();  // read end position.
       if (++next_read_ == field) return;
       FALL_THROUGH;
     case kKind:
@@ -1132,17 +1127,14 @@ void ConstructorHelper::ReadUntilExcluding(Field field) {
       FALL_THROUGH;
     case kStartPosition:
       start_position_ = helper_->ReadPosition();  // read position.
-      helper_->RecordTokenPosition(start_position_);
       if (++next_read_ == field) return;
       FALL_THROUGH;
     case kPosition:
       position_ = helper_->ReadPosition();  // read position.
-      helper_->RecordTokenPosition(position_);
       if (++next_read_ == field) return;
       FALL_THROUGH;
     case kEndPosition:
       end_position_ = helper_->ReadPosition();  // read end position.
-      helper_->RecordTokenPosition(end_position_);
       if (++next_read_ == field) return;
       FALL_THROUGH;
     case kFlags:
@@ -1201,18 +1193,15 @@ void ClassHelper::ReadUntilExcluding(Field field) {
       if (++next_read_ == field) return;
       FALL_THROUGH;
     case kStartPosition:
-      start_position_ = helper_->ReadPosition(false);  // read position.
-      helper_->RecordTokenPosition(start_position_);
+      start_position_ = helper_->ReadPosition();  // read position.
       if (++next_read_ == field) return;
       FALL_THROUGH;
     case kPosition:
-      position_ = helper_->ReadPosition(false);  // read position.
-      helper_->RecordTokenPosition(position_);
+      position_ = helper_->ReadPosition();  // read position.
       if (++next_read_ == field) return;
       FALL_THROUGH;
     case kEndPosition:
       end_position_ = helper_->ReadPosition();  // read end position.
-      helper_->RecordTokenPosition(end_position_);
       if (++next_read_ == field) return;
       FALL_THROUGH;
     case kFlags:
@@ -1983,10 +1972,12 @@ void KernelReaderHelper::SkipDartType() {
       SkipFunctionType(true);
       return;
     case kTypedefType:
+      ReadNullability();      // read nullability.
       ReadUInt();             // read index for canonical name.
       SkipListOfDartTypes();  // read list of types.
       return;
     case kTypeParameterType:
+      ReadNullability();       // read nullability.
       ReadUInt();              // read index for parameter.
       SkipOptionalDartType();  // read bound bound.
       return;
@@ -2007,6 +1998,7 @@ void KernelReaderHelper::SkipOptionalDartType() {
 }
 
 void KernelReaderHelper::SkipInterfaceType(bool simple) {
+  ReadNullability();  // read nullability.
   ReadUInt();  // read klass_name.
   if (!simple) {
     SkipListOfDartTypes();  // read list of types.
@@ -2014,6 +2006,8 @@ void KernelReaderHelper::SkipInterfaceType(bool simple) {
 }
 
 void KernelReaderHelper::SkipFunctionType(bool simple) {
+  ReadNullability();  // read nullability.
+
   if (!simple) {
     SkipTypeParametersList();  // read type_parameters.
     ReadUInt();                // read required parameter count.
@@ -2555,11 +2549,9 @@ void KernelReaderHelper::SkipLibraryTypedef() {
   SkipListOfVariableDeclarations();  // read named parameters.
 }
 
-TokenPosition KernelReaderHelper::ReadPosition(bool record) {
+TokenPosition KernelReaderHelper::ReadPosition() {
   TokenPosition position = reader_.ReadPosition();
-  if (record) {
-    RecordTokenPosition(position);
-  }
+  RecordTokenPosition(position);
   return position;
 }
 
@@ -2793,6 +2785,8 @@ void TypeTranslator::BuildInterfaceType(bool simple) {
   // malformed iff `T` is malformed.
   //   => We therefore ignore errors in `A` or `B`.
 
+  helper_->ReadNullability();  // read nullability.
+
   NameIndex klass_name =
       helper_->ReadCanonicalNameReference();  // read klass_name.
 
@@ -2829,6 +2823,8 @@ void TypeTranslator::BuildFunctionType(bool simple) {
                                             ? *active_class_->enclosing
                                             : Function::Handle(Z),
                                         TokenPosition::kNoSource));
+
+  helper_->ReadNullability();  // read nullability.
 
   // Suspend finalization of types inside this one. They will be finalized after
   // the whole function type is constructed.
@@ -2920,6 +2916,7 @@ void TypeTranslator::BuildFunctionType(bool simple) {
 }
 
 void TypeTranslator::BuildTypeParameterType() {
+  helper_->ReadNullability();                      // read nullability.
   intptr_t parameter_index = helper_->ReadUInt();  // read parameter index.
   helper_->SkipOptionalDartType();                 // read bound.
 

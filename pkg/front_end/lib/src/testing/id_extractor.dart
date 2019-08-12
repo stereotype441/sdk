@@ -44,6 +44,11 @@ abstract class DataExtractor<T> extends Visitor with DataRegistry<T> {
   /// If `null` is returned, [cls] has no associated data.
   T computeClassValue(Id id, Class cls) => null;
 
+  /// Implement this to compute the data corresponding to [extension].
+  ///
+  /// If `null` is returned, [extension] has no associated data.
+  T computeExtensionValue(Id id, Extension extension) => null;
+
   /// Implement this to compute the data corresponding to [member].
   ///
   /// If `null` is returned, [member] has no associated data.
@@ -69,6 +74,14 @@ abstract class DataExtractor<T> extends Visitor with DataRegistry<T> {
     TreeNode nodeWithOffset = computeTreeNodeWithOffset(cls);
     registerValue(nodeWithOffset?.location?.file, nodeWithOffset?.fileOffset,
         id, value, cls);
+  }
+
+  void computeForExtension(Extension extension) {
+    ClassId id = new ClassId(extension.name);
+    T value = computeExtensionValue(id, extension);
+    TreeNode nodeWithOffset = computeTreeNodeWithOffset(extension);
+    registerValue(nodeWithOffset?.location?.file, nodeWithOffset?.fileOffset,
+        id, value, extension);
   }
 
   void computeForMember(Member member) {
@@ -135,6 +148,14 @@ abstract class DataExtractor<T> extends Visitor with DataRegistry<T> {
   NodeId createSwitchId(SwitchStatement node) => computeDefaultNodeId(node);
   NodeId createSwitchCaseId(SwitchCase node) =>
       new NodeId(node.expressionOffsets.first, IdKind.node);
+
+  NodeId createImplicitAsId(AsExpression node) {
+    if (node.fileOffset == TreeNode.noOffset) {
+      // TODO(johnniwinther): Find out why we something have no offset.
+      return null;
+    }
+    return new NodeId(node.fileOffset, IdKind.implicitAs);
+  }
 
   void run(Node root) {
     root.accept(this);
@@ -375,5 +396,56 @@ abstract class DataExtractor<T> extends Visitor with DataRegistry<T> {
       computeForNode(node, computeDefaultNodeId(node));
     }
     super.visitThisExpression(node);
+  }
+
+  @override
+  visitAwaitExpression(AwaitExpression node) {
+    computeForNode(node, computeDefaultNodeId(node));
+    super.visitAwaitExpression(node);
+  }
+
+  @override
+  visitConstructorInvocation(ConstructorInvocation node) {
+    // Skip synthetic constructor invocations like for enum constants.
+    // TODO(johnniwinther): Can [skipNodeWithNoOffset] be removed when dart2js
+    // no longer test with cfe constants?
+    computeForNode(
+        node, computeDefaultNodeId(node, skipNodeWithNoOffset: true));
+    super.visitConstructorInvocation(node);
+  }
+
+  @override
+  visitStaticGet(StaticGet node) {
+    computeForNode(node, computeDefaultNodeId(node));
+    super.visitStaticGet(node);
+  }
+
+  @override
+  visitStaticSet(StaticSet node) {
+    computeForNode(node, createUpdateId(node));
+    super.visitStaticSet(node);
+  }
+
+  @override
+  visitStaticInvocation(StaticInvocation node) {
+    computeForNode(node, createInvokeId(node));
+    super.visitStaticInvocation(node);
+  }
+
+  @override
+  visitAsExpression(AsExpression node) {
+    if (node.isTypeError) {
+      computeForNode(node, createImplicitAsId(node));
+    } else {
+      computeForNode(node, computeDefaultNodeId(node));
+    }
+    return super.visitAsExpression(node);
+  }
+
+  @override
+  visitArguments(Arguments node) {
+    computeForNode(
+        node, computeDefaultNodeId(node, skipNodeWithNoOffset: true));
+    return super.visitArguments(node);
   }
 }

@@ -15,6 +15,7 @@ import 'package:kernel/ast.dart'
         DartType,
         DynamicType,
         Expression,
+        Extension,
         Field,
         FunctionNode,
         FunctionType,
@@ -61,7 +62,7 @@ import '../builder/builder.dart'
     show
         ClassBuilder,
         ConstructorReferenceBuilder,
-        Declaration,
+        Builder,
         EnumConstantInfo,
         FormalParameterBuilder,
         FunctionTypeBuilder,
@@ -78,6 +79,8 @@ import '../builder/builder.dart'
         TypeVariableBuilder,
         UnresolvedType,
         flattenName;
+
+import '../builder/extension_builder.dart';
 
 import '../combinator.dart' show Combinator;
 
@@ -97,6 +100,8 @@ import '../fasta_codes.dart'
         messageGenericFunctionTypeInBound,
         messageGenericFunctionTypeUsedAsActualTypeArgument,
         messageIncorrectTypeArgumentVariable,
+        messageLanguageVersionInvalidInDotPackages,
+        messageLanguageVersionMismatchInPart,
         messagePartExport,
         messagePartExportContext,
         messagePartInPart,
@@ -129,6 +134,7 @@ import '../fasta_codes.dart'
         templateIncorrectTypeArgumentQualified,
         templateIncorrectTypeArgumentQualifiedInferred,
         templateIntersectionTypeAsTypeArgument,
+        templateLanguageVersionTooHigh,
         templateLoadLibraryHidesMember,
         templateLocalDefinitionHidesExport,
         templateLocalDefinitionHidesImport,
@@ -150,7 +156,7 @@ import '../kernel/kernel_builder.dart'
         BuiltinTypeBuilder,
         ClassBuilder,
         ConstructorReferenceBuilder,
-        Declaration,
+        Builder,
         DynamicTypeBuilder,
         EnumConstantInfo,
         FormalParameterBuilder,
@@ -215,6 +221,8 @@ import '../type_inference/type_inferrer.dart' show TypeInferrerImpl;
 
 import 'source_class_builder.dart' show SourceClassBuilder;
 
+import 'source_extension_builder.dart' show SourceExtensionBuilder;
+
 import 'source_loader.dart' show SourceLoader;
 
 class SourceLibraryBuilder extends LibraryBuilder {
@@ -222,7 +230,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
 
   final SourceLoader loader;
 
-  final DeclarationBuilder libraryDeclaration;
+  final TypeParameterScopeBuilder libraryDeclaration;
 
   final List<ConstructorReferenceBuilder> constructorReferences =
       <ConstructorReferenceBuilder>[];
@@ -261,7 +269,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
   /// declaration (class, method, and so on), we don't have enough information
   /// to create a builder and this object records its members and types until,
   /// for example, [addClass] is called.
-  DeclarationBuilder currentDeclaration;
+  TypeParameterScopeBuilder currentTypeParameterScopeBuilder;
 
   bool canAddImplementationBuilders = false;
 
@@ -312,10 +320,19 @@ class SourceLibraryBuilder extends LibraryBuilder {
 
   bool languageVersionExplicitlySet = false;
 
+  bool postponedProblemsIssued = false;
+  List<PostponedProblem> postponedProblems;
+
   SourceLibraryBuilder.internal(SourceLoader loader, Uri fileUri, Scope scope,
       SourceLibraryBuilder actualOrigin, Library library, Library nameOrigin)
-      : this.fromScopes(loader, fileUri, new DeclarationBuilder.library(),
-            scope ?? new Scope.top(), actualOrigin, library, nameOrigin);
+      : this.fromScopes(
+            loader,
+            fileUri,
+            new TypeParameterScopeBuilder.library(),
+            scope ?? new Scope.top(),
+            actualOrigin,
+            library,
+            nameOrigin);
 
   SourceLibraryBuilder.fromScopes(
       this.loader,
@@ -325,7 +342,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
       this.actualOrigin,
       this.library,
       this._nameOrigin)
-      : currentDeclaration = libraryDeclaration,
+      : currentTypeParameterScopeBuilder = libraryDeclaration,
         legacyMode = loader.target.legacyMode,
         super(
             fileUri, libraryDeclaration.toScope(importScope), new Scope.top());
@@ -351,15 +368,38 @@ class SourceLibraryBuilder extends LibraryBuilder {
   bool get isSynthetic => accessProblem != null;
 
   TypeBuilder addType(TypeBuilder type, int charOffset) {
-    currentDeclaration.addType(new UnresolvedType(type, charOffset, fileUri));
+    currentTypeParameterScopeBuilder
+        .addType(new UnresolvedType(type, charOffset, fileUri));
     return type;
   }
 
   @override
-  void setLanguageVersion(int major, int minor, {bool explicit}) {
+  void setLanguageVersion(int major, int minor,
+      {int offset: 0, int length: noLength, bool explicit}) {
     if (languageVersionExplicitlySet) return;
-    library.setLanguageVersion(major, minor);
     if (explicit) languageVersionExplicitlySet = true;
+
+    if (major == null || minor == null) {
+      addPostponedProblem(
+          messageLanguageVersionInvalidInDotPackages, offset, length, fileUri);
+      return;
+    }
+
+    // If no language version has been set, the default is used.
+    // If trying to set a langauge version that is higher than the "already-set"
+    // version it's an error.
+    if (major > library.languageVersionMajor ||
+        (major == library.languageVersionMajor &&
+            minor > library.languageVersionMinor)) {
+      addPostponedProblem(
+          templateLanguageVersionTooHigh.withArguments(
+              library.languageVersionMajor, library.languageVersionMinor),
+          offset,
+          length,
+          fileUri);
+      return;
+    }
+    library.setLanguageVersion(major, minor);
   }
 
   ConstructorReferenceBuilder addConstructorReference(Object name,
@@ -370,25 +410,26 @@ class SourceLibraryBuilder extends LibraryBuilder {
     return ref;
   }
 
-  void beginNestedDeclaration(DeclarationKind kind, String name,
+  void beginNestedDeclaration(TypeParameterScopeKind kind, String name,
       {bool hasMembers: true}) {
-    currentDeclaration =
-        currentDeclaration.createNested(kind, name, hasMembers);
+    currentTypeParameterScopeBuilder =
+        currentTypeParameterScopeBuilder.createNested(kind, name, hasMembers);
   }
 
-  DeclarationBuilder endNestedDeclaration(DeclarationKind kind, String name) {
+  TypeParameterScopeBuilder endNestedDeclaration(
+      TypeParameterScopeKind kind, String name) {
     assert(
-        currentDeclaration.kind == kind,
+        currentTypeParameterScopeBuilder.kind == kind,
         "Unexpected declaration. "
-        "Trying to end a ${currentDeclaration.kind} as a $kind.");
+        "Trying to end a ${currentTypeParameterScopeBuilder.kind} as a $kind.");
     assert(
-        (name?.startsWith(currentDeclaration.name) ??
-                (name == currentDeclaration.name)) ||
-            currentDeclaration.name == "operator" ||
+        (name?.startsWith(currentTypeParameterScopeBuilder.name) ??
+                (name == currentTypeParameterScopeBuilder.name)) ||
+            currentTypeParameterScopeBuilder.name == "operator" ||
             identical(name, "<syntax-error>"),
-        "${name} != ${currentDeclaration.name}");
-    DeclarationBuilder previous = currentDeclaration;
-    currentDeclaration = currentDeclaration.parent;
+        "${name} != ${currentTypeParameterScopeBuilder.name}");
+    TypeParameterScopeBuilder previous = currentTypeParameterScopeBuilder;
+    currentTypeParameterScopeBuilder = currentTypeParameterScopeBuilder.parent;
     return previous;
   }
 
@@ -421,7 +462,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
 
   String computeAndValidateConstructorName(Object name, int charOffset,
       {isFactory: false}) {
-    String className = currentDeclaration.name;
+    String className = currentTypeParameterScopeBuilder.name;
     String prefix;
     String suffix;
     if (name is QualifiedName) {
@@ -443,9 +484,9 @@ class SourceLibraryBuilder extends LibraryBuilder {
         messageConstructorWithWrongName, charOffset, prefix.length, fileUri,
         context: [
           templateConstructorWithWrongNameContext
-              .withArguments(currentDeclaration.name)
-              .withLocation(uri, currentDeclaration.charOffset,
-                  currentDeclaration.name.length)
+              .withArguments(currentTypeParameterScopeBuilder.name)
+              .withLocation(uri, currentTypeParameterScopeBuilder.charOffset,
+                  currentTypeParameterScopeBuilder.name.length)
         ]);
 
     return suffix;
@@ -596,14 +637,14 @@ class SourceLibraryBuilder extends LibraryBuilder {
     }
   }
 
-  Declaration addBuilder(String name, Declaration declaration, int charOffset) {
+  Builder addBuilder(String name, Builder declaration, int charOffset) {
     // TODO(ahe): Set the parent correctly here. Could then change the
     // implementation of MemberBuilder.isTopLevel to test explicitly for a
     // LibraryBuilder.
     if (name == null) {
       unhandled("null", "name", charOffset, fileUri);
     }
-    if (currentDeclaration == libraryDeclaration) {
+    if (currentTypeParameterScopeBuilder == libraryDeclaration) {
       if (declaration is MemberBuilder) {
         declaration.parent = this;
       } else if (declaration is TypeDeclarationBuilder) {
@@ -615,20 +656,20 @@ class SourceLibraryBuilder extends LibraryBuilder {
             "${declaration.runtimeType}", "addBuilder", charOffset, fileUri);
       }
     } else {
-      assert(currentDeclaration.parent == libraryDeclaration);
+      assert(currentTypeParameterScopeBuilder.parent == libraryDeclaration);
     }
     bool isConstructor = declaration is FunctionBuilder &&
         (declaration.isConstructor || declaration.isFactory);
-    if (!isConstructor && name == currentDeclaration.name) {
+    if (!isConstructor && name == currentTypeParameterScopeBuilder.name) {
       addProblem(
           messageMemberWithSameNameAsClass, charOffset, noLength, fileUri);
     }
-    Map<String, Declaration> members = isConstructor
-        ? currentDeclaration.constructors
+    Map<String, Builder> members = isConstructor
+        ? currentTypeParameterScopeBuilder.constructors
         : (declaration.isSetter
-            ? currentDeclaration.setters
-            : currentDeclaration.members);
-    Declaration existing = members[name];
+            ? currentTypeParameterScopeBuilder.setters
+            : currentTypeParameterScopeBuilder.members);
+    Builder existing = members[name];
     if (declaration.next != null && declaration.next != existing) {
       unexpected(
           "${declaration.next.fileUri}@${declaration.next.charOffset}",
@@ -639,8 +680,8 @@ class SourceLibraryBuilder extends LibraryBuilder {
     declaration.next = existing;
     if (declaration is PrefixBuilder && existing is PrefixBuilder) {
       assert(existing.next is! PrefixBuilder);
-      Declaration deferred;
-      Declaration other;
+      Builder deferred;
+      Builder other;
       if (declaration.deferred) {
         deferred = declaration;
         other = existing;
@@ -659,7 +700,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
       }
       return existing
         ..exportScope.merge(declaration.exportScope,
-            (String name, Declaration existing, Declaration member) {
+            (String name, Builder existing, Builder member) {
           return computeAmbiguousDeclaration(
               name, existing, member, charOffset);
         });
@@ -667,9 +708,9 @@ class SourceLibraryBuilder extends LibraryBuilder {
       String fullName = name;
       if (isConstructor) {
         if (name.isEmpty) {
-          fullName = currentDeclaration.name;
+          fullName = currentTypeParameterScopeBuilder.name;
         } else {
-          fullName = "${currentDeclaration.name}.$name";
+          fullName = "${currentTypeParameterScopeBuilder.name}.$name";
         }
       }
       addProblem(templateDuplicatedDeclaration.withArguments(fullName),
@@ -684,9 +725,9 @@ class SourceLibraryBuilder extends LibraryBuilder {
     return members[name] = declaration;
   }
 
-  bool isDuplicatedDeclaration(Declaration existing, Declaration other) {
+  bool isDuplicatedDeclaration(Builder existing, Builder other) {
     if (existing == null) return false;
-    Declaration next = existing.next;
+    Builder next = existing.next;
     if (next == null) {
       if (existing.isGetter && other.isSetter) return false;
       if (existing.isSetter && other.isGetter) return false;
@@ -706,21 +747,21 @@ class SourceLibraryBuilder extends LibraryBuilder {
   Library build(LibraryBuilder coreLibrary, {bool modifyTarget}) {
     assert(implementationBuilders.isEmpty);
     canAddImplementationBuilders = true;
-    Iterator<Declaration> iterator = this.iterator;
+    Iterator<Builder> iterator = this.iterator;
     while (iterator.moveNext()) {
       buildBuilder(iterator.current, coreLibrary);
     }
     for (ImplementationInfo info in implementationBuilders) {
       String name = info.name;
-      Declaration declaration = info.declaration;
+      Builder declaration = info.declaration;
       int charOffset = info.charOffset;
       addBuilder(name, declaration, charOffset);
       buildBuilder(declaration, coreLibrary);
     }
     canAddImplementationBuilders = false;
 
-    scope.setters.forEach((String name, Declaration setter) {
-      Declaration member = scopeBuilder[name];
+    scope.setters.forEach((String name, Builder setter) {
+      Builder member = scopeBuilder[name];
       if (member == null ||
           !member.isField ||
           member.isFinal ||
@@ -760,7 +801,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
   /// [MixinApplicationBuilder]
   /// (../kernel/kernel_mixin_application_builder.dart)).
   void addImplementationBuilder(
-      String name, Declaration declaration, int charOffset) {
+      String name, Builder declaration, int charOffset) {
     assert(canAddImplementationBuilders, "$uri");
     implementationBuilders
         .add(new ImplementationInfo(name, declaration, charOffset));
@@ -874,14 +915,29 @@ class SourceLibraryBuilder extends LibraryBuilder {
       }
       return false;
     }
+
+    // Language versions have to match.
+    if ((this.languageVersionExplicitlySet !=
+            part.languageVersionExplicitlySet) ||
+        (this.library.languageVersionMajor !=
+                part.library.languageVersionMajor ||
+            this.library.languageVersionMinor !=
+                part.library.languageVersionMinor)) {
+      // This is an error, but the part is not removed from the list of
+      // parts, so that metadata annotations can be associated with it.
+      addProblem(
+          messageLanguageVersionMismatchInPart, partOffset, noLength, fileUri);
+      return false;
+    }
+
     part.validatePart(this, usedParts);
     NameIterator partDeclarations = part.nameIterator;
     while (partDeclarations.moveNext()) {
       String name = partDeclarations.name;
-      Declaration declaration = partDeclarations.current;
+      Builder declaration = partDeclarations.current;
 
       if (declaration.next != null) {
-        List<Declaration> duplicated = <Declaration>[];
+        List<Builder> duplicated = <Builder>[];
         while (declaration.next != null) {
           duplicated.add(declaration);
           partDeclarations.moveNext();
@@ -909,7 +965,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
         // part library still keeps these declarations in its scope so that
         // DietListener can find them.
         for (int i = duplicated.length; i > 0; i--) {
-          Declaration declaration = duplicated[i - 1];
+          Builder declaration = duplicated[i - 1];
           addBuilder(name, declaration, declaration.charOffset);
         }
       } else {
@@ -965,12 +1021,12 @@ class SourceLibraryBuilder extends LibraryBuilder {
       import.finalizeImports(this);
     }
     if (!explicitCoreImport) {
-      loader.coreLibrary.exportScope.forEach((String name, Declaration member) {
+      loader.coreLibrary.exportScope.forEach((String name, Builder member) {
         addToScope(name, member, -1, true);
       });
     }
 
-    exportScope.forEach((String name, Declaration member) {
+    exportScope.forEach((String name, Builder member) {
       if (member.parent != this) {
         switch (name) {
           case "dynamic":
@@ -988,7 +1044,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
               // library if the have 'next' pointers, so don't add them as
               // additionalExports either. Add the last one only (the one that
               // will eventually be added to the library).
-              Declaration memberLast = member;
+              Builder memberLast = member;
               while (memberLast.next != null) memberLast = memberLast.next;
               library.additionalExports.add(memberLast.target.reference);
             }
@@ -998,11 +1054,10 @@ class SourceLibraryBuilder extends LibraryBuilder {
   }
 
   @override
-  void addToScope(
-      String name, Declaration member, int charOffset, bool isImport) {
-    Map<String, Declaration> map =
+  void addToScope(String name, Builder member, int charOffset, bool isImport) {
+    Map<String, Builder> map =
         member.isSetter ? importScope.setters : importScope.local;
-    Declaration existing = map[name];
+    Builder existing = map[name];
     if (existing != null) {
       if (existing != member) {
         map[name] = computeAmbiguousDeclaration(
@@ -1033,7 +1088,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
   @override
   int resolveConstructors(_) {
     int count = 0;
-    Iterator<Declaration> iterator = this.iterator;
+    Iterator<Builder> iterator = this.iterator;
     while (iterator.moveNext()) {
       count += iterator.current.resolveConstructors(this);
     }
@@ -1105,6 +1160,33 @@ class SourceLibraryBuilder extends LibraryBuilder {
       ..bind(new VoidTypeBuilder(const VoidType(), this, charOffset));
   }
 
+  /// Add a problem that might not be reported immediately.
+  ///
+  /// Problems will be issued after source information has been added.
+  /// Once the problems has been issued, adding a new "postponed" problem will
+  /// be issued immediately.
+  void addPostponedProblem(
+      Message message, int charOffset, int length, Uri fileUri) {
+    if (postponedProblemsIssued) {
+      addProblem(message, charOffset, length, fileUri);
+    } else {
+      postponedProblems ??= <PostponedProblem>[];
+      postponedProblems
+          .add(new PostponedProblem(message, charOffset, length, fileUri));
+    }
+  }
+
+  void issuePostponedProblems() {
+    postponedProblemsIssued = true;
+    if (postponedProblems == null) return;
+    for (int i = 0; i < postponedProblems.length; ++i) {
+      PostponedProblem postponedProblem = postponedProblems[i];
+      addProblem(postponedProblem.message, postponedProblem.charOffset,
+          postponedProblem.length, postponedProblem.fileUri);
+    }
+    postponedProblems = null;
+  }
+
   @override
   FormattedMessage addProblem(
       Message message, int charOffset, int length, Uri fileUri,
@@ -1138,7 +1220,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
       int endOffset,
       int supertypeOffset) {
     _addClass(
-        DeclarationKind.classDeclaration,
+        TypeParameterScopeKind.classDeclaration,
         documentationComment,
         metadata,
         modifiers,
@@ -1165,7 +1247,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
       int endOffset,
       int supertypeOffset) {
     _addClass(
-        DeclarationKind.mixinDeclaration,
+        TypeParameterScopeKind.mixinDeclaration,
         documentationComment,
         metadata,
         modifiers,
@@ -1180,7 +1262,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
   }
 
   void _addClass(
-      DeclarationKind kind,
+      TypeParameterScopeKind kind,
       String documentationComment,
       List<MetadataBuilder> metadata,
       int modifiers,
@@ -1193,8 +1275,9 @@ class SourceLibraryBuilder extends LibraryBuilder {
       int endOffset,
       int supertypeOffset) {
     // Nested declaration began in `OutlineBuilder.beginClassDeclaration`.
-    DeclarationBuilder declaration = endNestedDeclaration(kind, className)
-      ..resolveTypes(typeVariables, this);
+    TypeParameterScopeBuilder declaration =
+        endNestedDeclaration(kind, className)
+          ..resolveTypes(typeVariables, this);
     assert(declaration.parent == libraryDeclaration);
     Map<String, MemberBuilder> members = declaration.members;
     Map<String, MemberBuilder> constructors = declaration.constructors;
@@ -1271,7 +1354,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
   }
 
   Map<String, TypeVariableBuilder> checkTypeVariables(
-      List<TypeVariableBuilder> typeVariables, Declaration owner) {
+      List<TypeVariableBuilder> typeVariables, Builder owner) {
     if (typeVariables?.isEmpty ?? true) return null;
     Map<String, TypeVariableBuilder> typeVariablesByName =
         <String, TypeVariableBuilder>{};
@@ -1312,8 +1395,8 @@ class SourceLibraryBuilder extends LibraryBuilder {
       int nameOffset,
       int endOffset) {
     // Nested declaration began in `OutlineBuilder.beginExtensionDeclaration`.
-    DeclarationBuilder declaration = endNestedDeclaration(
-        DeclarationKind.extensionDeclaration, extensionName)
+    TypeParameterScopeBuilder declaration = endNestedDeclaration(
+        TypeParameterScopeKind.extensionDeclaration, extensionName)
       ..resolveTypes(typeVariables, this);
     assert(declaration.parent == libraryDeclaration);
     Map<String, MemberBuilder> members = declaration.members;
@@ -1324,43 +1407,26 @@ class SourceLibraryBuilder extends LibraryBuilder {
         scope.withTypeVariables(typeVariables), "extension $extensionName",
         isModifiable: false);
 
-    // When looking up a constructor, we don't consider type variables or the
-    // library scope.
-    Scope constructorScope =
-        new Scope(constructors, null, null, extensionName, isModifiable: false);
-    bool isMixinDeclaration = false;
-    if (modifiers & mixinDeclarationMask != 0) {
-      isMixinDeclaration = true;
-      modifiers = (modifiers & ~mixinDeclarationMask) | abstractMask;
-    }
-    if (declaration.hasConstConstructor) {
-      modifiers |= hasConstConstructorMask;
-    }
-    ClassBuilder cls = new SourceClassBuilder(
+    ExtensionBuilder extension = new SourceExtensionBuilder(
         metadata,
         modifiers,
         extensionName,
         typeVariables,
-        null, // No explicit supertype.
-        null, // No implemented interfaces.
-        [type],
+        type,
         classScope,
-        constructorScope,
         this,
-        new List<ConstructorReferenceBuilder>.from(constructorReferences),
         startOffset,
         nameOffset,
-        endOffset,
-        isMixinDeclaration: isMixinDeclaration);
+        endOffset);
     loader.target.metadataCollector
-        ?.setDocumentationComment(cls.target, documentationComment);
+        ?.setDocumentationComment(extension.target, documentationComment);
 
     constructorReferences.clear();
     Map<String, TypeVariableBuilder> typeVariablesByName =
-        checkTypeVariables(typeVariables, cls);
+        checkTypeVariables(typeVariables, extension);
     void setParent(String name, MemberBuilder member) {
       while (member != null) {
-        member.parent = cls;
+        member.parent = extension;
         member = member.next;
       }
     }
@@ -1369,8 +1435,10 @@ class SourceLibraryBuilder extends LibraryBuilder {
       if (typeVariablesByName != null) {
         TypeVariableBuilder tv = typeVariablesByName[name];
         if (tv != null) {
-          cls.addProblem(templateConflictsWithTypeVariable.withArguments(name),
-              member.charOffset, name.length,
+          extension.addProblem(
+              templateConflictsWithTypeVariable.withArguments(name),
+              member.charOffset,
+              name.length,
               context: [
                 messageConflictsWithTypeVariableCause.withLocation(
                     tv.fileUri, tv.charOffset, name.length)
@@ -1383,7 +1451,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
     members.forEach(setParentAndCheckConflicts);
     constructors.forEach(setParentAndCheckConflicts);
     setters.forEach(setParentAndCheckConflicts);
-    addBuilder(extensionName, cls, nameOffset);
+    addBuilder(extensionName, extension, nameOffset);
   }
 
   TypeBuilder applyMixins(TypeBuilder type, int startCharOffset, int charOffset,
@@ -1523,10 +1591,11 @@ class SourceLibraryBuilder extends LibraryBuilder {
           // application in the same order as they're declared on the subclass.
           if (isGeneric) {
             this.beginNestedDeclaration(
-                DeclarationKind.unnamedMixinApplication, "mixin application");
+                TypeParameterScopeKind.unnamedMixinApplication,
+                "mixin application");
 
-            applicationTypeVariables =
-                copyTypeVariables(typeVariables, currentDeclaration);
+            applicationTypeVariables = copyTypeVariables(
+                typeVariables, currentTypeParameterScopeBuilder);
 
             List<TypeBuilder> newTypes = <TypeBuilder>[];
             if (supertype is NamedTypeBuilder && supertype.arguments != null) {
@@ -1540,11 +1609,14 @@ class SourceLibraryBuilder extends LibraryBuilder {
               }
             }
             for (TypeBuilder newType in newTypes) {
-              currentDeclaration.addType(new UnresolvedType(newType, -1, null));
+              currentTypeParameterScopeBuilder
+                  .addType(new UnresolvedType(newType, -1, null));
             }
 
-            DeclarationBuilder mixinDeclaration = this.endNestedDeclaration(
-                DeclarationKind.unnamedMixinApplication, "mixin application");
+            TypeParameterScopeBuilder mixinDeclaration = this
+                .endNestedDeclaration(
+                    TypeParameterScopeKind.unnamedMixinApplication,
+                    "mixin application");
             mixinDeclaration.resolveTypes(applicationTypeVariables, this);
 
             applicationTypeArguments = <TypeBuilder>[];
@@ -1616,7 +1688,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
       int charOffset,
       int charEndOffset) {
     // Nested declaration began in `OutlineBuilder.beginNamedMixinApplication`.
-    endNestedDeclaration(DeclarationKind.namedMixinApplication, name)
+    endNestedDeclaration(TypeParameterScopeKind.namedMixinApplication, name)
         .resolveTypes(typeVariables, this);
     NamedTypeBuilder supertype = applyMixins(mixinApplication, startCharOffset,
         charOffset, charEndOffset, name, false,
@@ -1693,7 +1765,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
       addNativeMethod(procedure);
     }
     if (procedure.isConst) {
-      currentDeclaration?.hasConstConstructor = true;
+      currentTypeParameterScopeBuilder?.hasConstConstructor = true;
       // const constructors will have their initializers compiled and written
       // into the outline.
       procedure.beginInitializers = beginInitializers ?? Token.eof(-1);
@@ -1760,10 +1832,12 @@ class SourceLibraryBuilder extends LibraryBuilder {
       int charEndOffset,
       String nativeMethodName) {
     TypeBuilder returnType = addNamedType(
-        currentDeclaration.parent.name, <TypeBuilder>[], charOffset);
+        currentTypeParameterScopeBuilder.parent.name,
+        <TypeBuilder>[],
+        charOffset);
     // Nested declaration began in `OutlineBuilder.beginFactoryMethod`.
-    DeclarationBuilder factoryDeclaration =
-        endNestedDeclaration(DeclarationKind.factoryMethod, "#factory_method");
+    TypeParameterScopeBuilder factoryDeclaration = endNestedDeclaration(
+        TypeParameterScopeKind.factoryMethod, "#factory_method");
 
     // Prepare the simple procedure name.
     String procedureName;
@@ -1783,7 +1857,8 @@ class SourceLibraryBuilder extends LibraryBuilder {
           returnType,
           procedureName,
           copyTypeVariables(
-              currentDeclaration.typeVariables ?? const <TypeVariableBuilder>[],
+              currentTypeParameterScopeBuilder.typeVariables ??
+                  const <TypeVariableBuilder>[],
               factoryDeclaration),
           formals,
           this,
@@ -1800,7 +1875,8 @@ class SourceLibraryBuilder extends LibraryBuilder {
           returnType,
           procedureName,
           copyTypeVariables(
-              currentDeclaration.typeVariables ?? const <TypeVariableBuilder>[],
+              currentTypeParameterScopeBuilder.typeVariables ??
+                  const <TypeVariableBuilder>[],
               factoryDeclaration),
           formals,
           ProcedureKind.Factory,
@@ -1817,13 +1893,14 @@ class SourceLibraryBuilder extends LibraryBuilder {
         procedure.target, documentationComment);
     metadataCollector?.setConstructorNameOffset(procedure.target, name);
 
-    DeclarationBuilder savedDeclaration = currentDeclaration;
-    currentDeclaration = factoryDeclaration;
+    TypeParameterScopeBuilder savedDeclaration =
+        currentTypeParameterScopeBuilder;
+    currentTypeParameterScopeBuilder = factoryDeclaration;
     for (TypeVariableBuilder tv in procedure.typeVariables) {
       NamedTypeBuilder t = procedure.returnType;
       t.arguments.add(addNamedType(tv.name, null, procedure.charOffset));
     }
-    currentDeclaration = savedDeclaration;
+    currentTypeParameterScopeBuilder = savedDeclaration;
 
     factoryDeclaration.resolveTypes(procedure.typeVariables, this);
     addBuilder(procedureName, procedure, charOffset);
@@ -1861,7 +1938,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
         ?.setDocumentationComment(typedef.target, documentationComment);
     checkTypeVariables(typeVariables, typedef);
     // Nested declaration began in `OutlineBuilder.beginFunctionTypeAlias`.
-    endNestedDeclaration(DeclarationKind.typedef, "#typedef")
+    endNestedDeclaration(TypeParameterScopeKind.typedef, "#typedef")
         .resolveTypes(typeVariables, this);
     addBuilder(name, typedef, charOffset);
   }
@@ -1875,7 +1952,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
     checkTypeVariables(typeVariables, null);
     // Nested declaration began in `OutlineBuilder.beginFunctionType` or
     // `OutlineBuilder.beginFunctionTypedFormalParameter`.
-    endNestedDeclaration(DeclarationKind.functionType, "#function_type")
+    endNestedDeclaration(TypeParameterScopeKind.functionType, "#function_type")
         .resolveTypes(typeVariables, this);
     return addType(builder, charOffset);
   }
@@ -1912,12 +1989,15 @@ class SourceLibraryBuilder extends LibraryBuilder {
     MetadataBuilder.buildAnnotations(library, metadata, this, null, null);
   }
 
-  void buildBuilder(Declaration declaration, LibraryBuilder coreLibrary) {
+  void buildBuilder(Builder declaration, LibraryBuilder coreLibrary) {
     Class cls;
+    Extension extension;
     Member member;
     Typedef typedef;
     if (declaration is SourceClassBuilder) {
       cls = declaration.build(this, coreLibrary);
+    } else if (declaration is SourceExtensionBuilder) {
+      extension = declaration.build(this, coreLibrary);
     } else if (declaration is FieldBuilder) {
       member = declaration.build(this)..isStatic = true;
     } else if (declaration is ProcedureBuilder) {
@@ -1948,7 +2028,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
     if (cls != null) {
       if (declaration.next != null) {
         int count = 0;
-        Declaration current = declaration.next;
+        Builder current = declaration.next;
         while (current != null) {
           count++;
           current = current.next;
@@ -1956,6 +2036,10 @@ class SourceLibraryBuilder extends LibraryBuilder {
         cls.name += "#$count";
       }
       library.addClass(cls);
+    } else if (extension != null) {
+      if (declaration.next == null) {
+        library.addExtension(extension);
+      }
     } else if (member != null) {
       if (declaration.next == null) {
         library.addMember(member);
@@ -1968,7 +2052,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
   }
 
   void addNativeDependency(String nativeImportPath) {
-    Declaration constructor = loader.getNativeAnnotation();
+    Builder constructor = loader.getNativeAnnotation();
     Arguments arguments =
         new Arguments(<Expression>[new StringLiteral(nativeImportPath)]);
     Expression annotation;
@@ -2030,8 +2114,8 @@ class SourceLibraryBuilder extends LibraryBuilder {
   }
 
   @override
-  Declaration computeAmbiguousDeclaration(
-      String name, Declaration declaration, Declaration other, int charOffset,
+  Builder computeAmbiguousDeclaration(
+      String name, Builder declaration, Builder other, int charOffset,
       {bool isExport: false, bool isImport: false}) {
     // TODO(ahe): Can I move this to Scope or Prefix?
     if (declaration == other) return declaration;
@@ -2047,7 +2131,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
     }
     bool isLocal = false;
     bool isLoadLibrary = false;
-    Declaration preferred;
+    Builder preferred;
     Uri uri;
     Uri otherUri;
     Uri preferredUri;
@@ -2101,7 +2185,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
         // imports.
         return declaration
           ..exportScope.merge(other.exportScope,
-              (String name, Declaration existing, Declaration member) {
+              (String name, Builder existing, Builder member) {
             return computeAmbiguousDeclaration(
                 name, existing, member, charOffset,
                 isExport: isExport, isImport: isImport);
@@ -2211,7 +2295,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
   /// If [synthesizeTypeParameterNames] is `true` the names of the
   /// [TypeParameter] are prefix with '#' to indicate that their synthesized.
   List<TypeVariableBuilder> copyTypeVariables(
-      List<TypeVariableBuilder> original, DeclarationBuilder declaration,
+      List<TypeVariableBuilder> original, TypeParameterScopeBuilder declaration,
       {bool synthesizeTypeParameterNames: false}) {
     List<TypeBuilder> newTypes = <TypeBuilder>[];
     List<TypeVariableBuilder> copy = <TypeVariableBuilder>[];
@@ -2304,7 +2388,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
           count += computeDefaultTypesForVariables(
               declaration.typeVariables, legacyMode || issues.isNotEmpty);
         }
-        declaration.forEach((String name, Declaration member) {
+        declaration.forEach((String name, Builder member) {
           if (member is ProcedureBuilder) {
             List<Object> issues = legacyMode
                 ? const <Object>[]
@@ -2344,9 +2428,9 @@ class SourceLibraryBuilder extends LibraryBuilder {
     NameIterator originDeclarations = origin.nameIterator;
     while (originDeclarations.moveNext()) {
       String name = originDeclarations.name;
-      Declaration member = originDeclarations.current;
+      Builder member = originDeclarations.current;
       bool isSetter = member.isSetter;
-      Declaration patch = isSetter ? scope.setters[name] : scope.local[name];
+      Builder patch = isSetter ? scope.setters[name] : scope.local[name];
       if (patch != null) {
         // [patch] has the same name as a [member] in [origin] library, so it
         // must be a patch to [member].
@@ -2366,7 +2450,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
     NameIterator patchDeclarations = nameIterator;
     while (patchDeclarations.moveNext()) {
       String name = patchDeclarations.name;
-      Declaration member = patchDeclarations.current;
+      Builder member = patchDeclarations.current;
       // We need to inject all non-patch members into the origin library. This
       // should only apply to private members.
       if (member.isPatch) {
@@ -2382,14 +2466,14 @@ class SourceLibraryBuilder extends LibraryBuilder {
   int finishPatchMethods() {
     if (!isPatch) return 0;
     int count = 0;
-    Iterator<Declaration> iterator = this.iterator;
+    Iterator<Builder> iterator = this.iterator;
     while (iterator.moveNext()) {
       count += iterator.current.finishPatch();
     }
     return count;
   }
 
-  void injectMemberFromPatch(String name, Declaration member) {
+  void injectMemberFromPatch(String name, Builder member) {
     if (member.isSetter) {
       assert(scope.setters[name] == null);
       scopeBuilder.addSetter(name, member);
@@ -2399,7 +2483,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
     }
   }
 
-  void exportMemberFromPatch(String name, Declaration member) {
+  void exportMemberFromPatch(String name, Builder member) {
     if (uri.scheme != "dart" || !uri.path.startsWith("_")) {
       addProblem(templatePatchInjectionFailed.withArguments(name, uri),
           member.charOffset, noLength, member.fileUri);
@@ -2736,9 +2820,9 @@ class SourceLibraryBuilder extends LibraryBuilder {
 
   void checkBoundsInOutline(TypeEnvironment typeEnvironment) {
     if (loader.target.legacyMode) return;
-    Iterator<Declaration> iterator = this.iterator;
+    Iterator<Builder> iterator = this.iterator;
     while (iterator.moveNext()) {
-      Declaration declaration = iterator.current;
+      Builder declaration = iterator.current;
       if (declaration is FieldBuilder) {
         checkBoundsInField(declaration.target, typeEnvironment);
       } else if (declaration is ProcedureBuilder) {
@@ -2769,7 +2853,9 @@ class SourceLibraryBuilder extends LibraryBuilder {
   }
 }
 
-enum DeclarationKind {
+// The kind of type parameter scope built by a [TypeParameterScopeBuilder]
+// object.
+enum TypeParameterScopeKind {
   library,
   classOrNamedMixinApplication,
   classDeclaration,
@@ -2784,18 +2870,21 @@ enum DeclarationKind {
   functionType,
 }
 
+/// A builder object preparing for building declarations that can introduce type
+/// parameter and/or members.
+///
 /// Unlike [Scope], this scope is used during construction of builders to
 /// ensure types and members are added to and resolved in the correct location.
-class DeclarationBuilder {
-  DeclarationKind _kind;
+class TypeParameterScopeBuilder {
+  TypeParameterScopeKind _kind;
 
-  final DeclarationBuilder parent;
+  final TypeParameterScopeBuilder parent;
 
-  final Map<String, Declaration> members;
+  final Map<String, Builder> members;
 
-  final Map<String, Declaration> constructors;
+  final Map<String, Builder> constructors;
 
-  final Map<String, Declaration> setters;
+  final Map<String, Builder> setters;
 
   final List<UnresolvedType> types = <UnresolvedType>[];
 
@@ -2817,18 +2906,18 @@ class DeclarationBuilder {
 
   bool hasConstConstructor = false;
 
-  DeclarationBuilder(this._kind, this.members, this.setters, this.constructors,
-      this._name, this._charOffset, this.parent) {
+  TypeParameterScopeBuilder(this._kind, this.members, this.setters,
+      this.constructors, this._name, this._charOffset, this.parent) {
     assert(_name != null);
   }
 
-  DeclarationBuilder.library()
-      : this(DeclarationKind.library, <String, Declaration>{},
-            <String, Declaration>{}, null, "<library>", -1, null);
+  TypeParameterScopeBuilder.library()
+      : this(TypeParameterScopeKind.library, <String, Builder>{},
+            <String, Builder>{}, null, "<library>", -1, null);
 
-  DeclarationBuilder createNested(
-      DeclarationKind kind, String name, bool hasMembers) {
-    return new DeclarationBuilder(
+  TypeParameterScopeBuilder createNested(
+      TypeParameterScopeKind kind, String name, bool hasMembers) {
+    return new TypeParameterScopeBuilder(
         kind,
         hasMembers ? <String, MemberBuilder>{} : null,
         hasMembers ? <String, MemberBuilder>{} : null,
@@ -2838,77 +2927,79 @@ class DeclarationBuilder {
         this);
   }
 
-  /// Registers the this declaration as a class declaration with the given
-  /// [name] and [typeVariables] located [charOffset].
-  void registerClassDeclaration(
+  /// Registers that this builder is preparing for a class declaration with the
+  /// given [name] and [typeVariables] located [charOffset].
+  void markAsClassDeclaration(
       String name, int charOffset, List<TypeVariableBuilder> typeVariables) {
-    assert(_kind == DeclarationKind.classOrNamedMixinApplication,
+    assert(_kind == TypeParameterScopeKind.classOrNamedMixinApplication,
         "Unexpected declaration kind: $_kind");
-    _kind = DeclarationKind.classDeclaration;
+    _kind = TypeParameterScopeKind.classDeclaration;
     _name = name;
     _charOffset = charOffset;
     _typeVariables = typeVariables;
   }
 
-  /// Registers the this declaration as a named mixin application with the given
-  /// [name] and [typeVariables] located [charOffset].
-  void registerNamedMixinApplication(
+  /// Registers that this builder is preparing for a named mixin application
+  /// with the given [name] and [typeVariables] located [charOffset].
+  void markAsNamedMixinApplication(
       String name, int charOffset, List<TypeVariableBuilder> typeVariables) {
-    assert(_kind == DeclarationKind.classOrNamedMixinApplication,
+    assert(_kind == TypeParameterScopeKind.classOrNamedMixinApplication,
         "Unexpected declaration kind: $_kind");
-    _kind = DeclarationKind.namedMixinApplication;
+    _kind = TypeParameterScopeKind.namedMixinApplication;
     _name = name;
     _charOffset = charOffset;
     _typeVariables = typeVariables;
   }
 
-  /// Registers the this declaration as a mixin declaration with the given
-  /// [name] and [typeVariables] located [charOffset].
-  void registerMixinDeclaration(
+  /// Registers that this builder is preparing for a mixin declaration with the
+  /// given [name] and [typeVariables] located [charOffset].
+  void markAsMixinDeclaration(
       String name, int charOffset, List<TypeVariableBuilder> typeVariables) {
     // TODO(johnniwinther): Avoid using 'classOrNamedMixinApplication' for mixin
     // declaration. These are syntactically distinct so we don't need the
     // transition.
-    assert(_kind == DeclarationKind.classOrNamedMixinApplication,
+    assert(_kind == TypeParameterScopeKind.classOrNamedMixinApplication,
         "Unexpected declaration kind: $_kind");
-    _kind = DeclarationKind.mixinDeclaration;
+    _kind = TypeParameterScopeKind.mixinDeclaration;
     _name = name;
     _charOffset = charOffset;
     _typeVariables = typeVariables;
   }
 
-  /// Registers the this declaration as an extension declaration with the given
-  /// [name] and [typeVariables] located [charOffset].
-  void registerExtensionDeclaration(
+  /// Registers that this builder is preparing for an extension declaration with
+  /// the given [name] and [typeVariables] located [charOffset].
+  void markAsExtensionDeclaration(
       String name, int charOffset, List<TypeVariableBuilder> typeVariables) {
-    assert(_kind == DeclarationKind.extensionDeclaration,
+    assert(_kind == TypeParameterScopeKind.extensionDeclaration,
         "Unexpected declaration kind: $_kind");
     _name = name;
     _charOffset = charOffset;
     _typeVariables = typeVariables;
   }
 
-  /// Registers the 'extension this type' of this extension declaration.
+  /// Registers the 'extension this type' of the extension declaration prepared
+  /// for by this builder.
   ///
   /// See [extensionThisType] for terminology.
   void registerExtensionThisType(TypeBuilder type) {
-    assert(_kind == DeclarationKind.extensionDeclaration,
+    assert(_kind == TypeParameterScopeKind.extensionDeclaration,
         "DeclarationBuilder.registerExtensionThisType is not supported $_kind");
     assert(_extensionThisType == null,
         "Extension this type has already been set.");
     _extensionThisType = type;
   }
 
-  /// Returns what kind of declaration this [DeclarationBuilder] is creating.
+  /// Returns what kind of declaration this [TypeParameterScopeBuilder] is
+  /// preparing for.
   ///
   /// This information is transient for some declarations. In particular
   /// classes and named mixin applications are initially created with the kind
-  /// [DeclarationKind.classOrNamedMixinApplication] before a call to either
-  /// [registerClassDeclaration] or [registerNamedMixinApplication] sets the
+  /// [TypeParameterScopeKind.classOrNamedMixinApplication] before a call to
+  /// either [markAsClassDeclaration] or [markAsNamedMixinApplication] sets the
   /// value to its actual kind.
   // TODO(johnniwinther): Avoid the transition currently used on mixin
   // declarations.
-  DeclarationKind get kind => _kind;
+  TypeParameterScopeKind get kind => _kind;
 
   String get name => _name;
 
@@ -2916,7 +3007,8 @@ class DeclarationBuilder {
 
   List<TypeVariableBuilder> get typeVariables => _typeVariables;
 
-  /// Returns the 'extension this type' of this extension declaration.
+  /// Returns the 'extension this type' of the extension declaration prepared
+  /// for by this builder.
   ///
   /// The 'extension this type' is the type mentioned in the on-clause of the
   /// extension declaration. For instance `B` in this extension declaration:
@@ -2928,13 +3020,18 @@ class DeclarationBuilder {
   /// The 'extension this type' is the type if `this` expression in instance
   /// methods declared in extension declarations.
   TypeBuilder get extensionThisType {
-    assert(kind == DeclarationKind.extensionDeclaration,
+    assert(kind == TypeParameterScopeKind.extensionDeclaration,
         "DeclarationBuilder.extensionThisType not supported on $kind.");
     assert(_extensionThisType != null,
         "DeclarationBuilder.extensionThisType has not been set on $this.");
     return _extensionThisType;
   }
 
+  /// Adds the yet unresolved [type] to this scope builder.
+  ///
+  /// Unresolved type will be resolved through [resolveTypes] when the scope
+  /// is fully built. This allows for resolving self-referencing types, like
+  /// type parameter used in their own bound, for instance `<T extends A<T>>`.
   void addType(UnresolvedType type) {
     types.add(type);
   }
@@ -2955,7 +3052,7 @@ class DeclarationBuilder {
       String name = nameOrQualified is QualifiedName
           ? nameOrQualified.qualifier
           : nameOrQualified;
-      Declaration declaration;
+      Builder declaration;
       if (name != null) {
         if (members != null) {
           declaration = members[name];
@@ -3009,14 +3106,14 @@ class FieldInfo {
 
 class ImplementationInfo {
   final String name;
-  final Declaration declaration;
+  final Builder declaration;
   final int charOffset;
 
   const ImplementationInfo(this.name, this.declaration, this.charOffset);
 }
 
-Uri computeLibraryUri(Declaration declaration) {
-  Declaration current = declaration;
+Uri computeLibraryUri(Builder declaration) {
+  Builder current = declaration;
   do {
     if (current is LibraryBuilder) return current.uri;
     current = current.parent;
@@ -3026,3 +3123,12 @@ Uri computeLibraryUri(Declaration declaration) {
 }
 
 String extractName(name) => name is QualifiedName ? name.name : name;
+
+class PostponedProblem {
+  final Message message;
+  final int charOffset;
+  final int length;
+  final Uri fileUri;
+
+  PostponedProblem(this.message, this.charOffset, this.length, this.fileUri);
+}

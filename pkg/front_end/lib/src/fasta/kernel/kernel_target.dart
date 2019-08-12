@@ -89,7 +89,7 @@ import 'constant_evaluator.dart' as constants show transformLibraries;
 import 'kernel_builder.dart'
     show
         ClassBuilder,
-        Declaration,
+        Builder,
         InvalidTypeBuilder,
         FieldBuilder,
         NamedTypeBuilder,
@@ -173,7 +173,11 @@ class KernelTarget extends TargetImplementation {
           String asString = "$entryPoint";
           packagesMap ??= uriTranslator.packages.asMap();
           for (String packageName in packagesMap.keys) {
-            String prefix = "${packagesMap[packageName]}";
+            Uri packageUri = packagesMap[packageName];
+            if (packageUri?.hasFragment == true) {
+              packageUri = packageUri.removeFragment();
+            }
+            String prefix = "${packageUri}";
             if (asString.startsWith(prefix)) {
               Uri reversed = Uri.parse(
                   "package:$packageName/${asString.substring(prefix.length)}");
@@ -213,9 +217,9 @@ class KernelTarget extends TargetImplementation {
     List<SourceClassBuilder> result = <SourceClassBuilder>[];
     loader.builders.forEach((Uri uri, LibraryBuilder library) {
       if (library.loader == loader) {
-        Iterator<Declaration> iterator = library.iterator;
+        Iterator<Builder> iterator = library.iterator;
         while (iterator.moveNext()) {
-          Declaration member = iterator.current;
+          Builder member = iterator.current;
           if (member is SourceClassBuilder && !member.isPatch) {
             result.add(member);
           }
@@ -337,8 +341,7 @@ class KernelTarget extends TargetImplementation {
         nameRoot: nameRoot, libraries: libraries, uriToSource: uriToSource));
     if (loader.first != null) {
       // TODO(sigmund): do only for full program
-      Declaration declaration =
-          loader.first.exportScope.lookup("main", -1, null);
+      Builder declaration = loader.first.exportScope.lookup("main", -1, null);
       if (declaration is AmbiguousBuilder) {
         AmbiguousBuilder problem = declaration;
         declaration = problem.getFirstDeclaration();
@@ -364,9 +367,9 @@ class KernelTarget extends TargetImplementation {
     Class objectClass = this.objectClass;
     loader.builders.forEach((Uri uri, LibraryBuilder library) {
       if (library.loader == loader) {
-        Iterator<Declaration> iterator = library.iterator;
+        Iterator<Builder> iterator = library.iterator;
         while (iterator.moveNext()) {
-          Declaration declaration = iterator.current;
+          Builder declaration = iterator.current;
           if (declaration is SourceClassBuilder) {
             Class cls = declaration.target;
             if (cls != objectClass) {
@@ -589,11 +592,11 @@ class KernelTarget extends TargetImplementation {
         libraries.add(library.target);
       }
     }
-    Component plaformLibraries =
+    Component platformLibraries =
         backendTarget.configureComponent(new Component());
     // Add libraries directly to prevent that their parents are changed.
-    plaformLibraries.libraries.addAll(libraries);
-    loader.computeCoreTypes(plaformLibraries);
+    platformLibraries.libraries.addAll(libraries);
+    loader.computeCoreTypes(platformLibraries);
   }
 
   void finishAllConstructors(List<SourceClassBuilder> builders) {
@@ -683,7 +686,7 @@ class KernelTarget extends TargetImplementation {
         for (VariableDeclaration formal
             in constructor.function.positionalParameters) {
           if (formal.isFieldFormal) {
-            Declaration fieldBuilder = builder.scope.local[formal.name] ??
+            Builder fieldBuilder = builder.scope.local[formal.name] ??
                 builder.origin.scope.local[formal.name];
             if (fieldBuilder is FieldBuilder) {
               myInitializedFields.add(fieldBuilder.field);
@@ -795,6 +798,7 @@ class KernelTarget extends TargetImplementation {
         loader.coreTypes,
         loader.hierarchy,
         loader.libraries,
+        environmentDefines,
         new KernelDiagnosticReporter(loader),
         logger: (String msg) => ticker.logMs(msg));
   }

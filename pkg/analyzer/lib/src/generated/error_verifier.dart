@@ -726,30 +726,9 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
   @override
   void visitExtensionDeclaration(ExtensionDeclaration node) {
     _enclosingExtension = node.declaredElement;
+    _checkDuplicateExtensionMembers(node.members);
     super.visitExtensionDeclaration(node);
     _enclosingExtension = null;
-  }
-
-  @override
-  void visitExtensionOverride(ExtensionOverride node) {
-    NodeList<Expression> arguments = node.argumentList.arguments;
-    int argCount = arguments.length;
-    if (argCount == 1) {
-      _checkForAssignableExpression(
-        arguments[0],
-        node.extendedType,
-        CompileTimeErrorCode.EXTENSION_OVERRIDE_ARGUMENT_NOT_ASSIGNABLE,
-      );
-    } else {
-      _errorReporter.reportErrorForNode(
-          CompileTimeErrorCode.INVALID_EXTENSION_ARGUMENT_COUNT,
-          node.argumentList);
-    }
-    if (!_isExtensionOverrideInValidContext(node)) {
-      _errorReporter.reportErrorForNode(
-          CompileTimeErrorCode.EXTENSION_OVERRIDE_WITHOUT_ACCESS, node);
-    }
-    super.visitExtensionOverride(node);
   }
 
   @override
@@ -1757,6 +1736,44 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
             CompileTimeErrorCode.CONFLICTING_STATIC_AND_INSTANCE,
             identifier,
             [enumName, name, enumName]);
+      }
+    }
+  }
+
+  /**
+   * Check that there are no members with the same name.
+   */
+  void _checkDuplicateExtensionMembers(List<ClassMember> members) {
+    var instanceGetters = <String, Element>{};
+    var instanceSetters = <String, Element>{};
+    var staticGetters = <String, Element>{};
+    var staticSetters = <String, Element>{};
+
+    for (var member in members) {
+      if (member is MethodDeclaration) {
+        _checkDuplicateIdentifier(
+          member.isStatic ? staticGetters : instanceGetters,
+          member.name,
+          setterScope: member.isStatic ? staticSetters : instanceSetters,
+        );
+      }
+    }
+
+    // Check for local static members conflicting with local instance members.
+    for (var member in members) {
+      if (member is MethodDeclaration) {
+        if (member.isStatic) {
+          var identifier = member.name;
+          var name = identifier.name;
+          if (instanceGetters.containsKey(name) ||
+              instanceSetters.containsKey(name)) {
+            _errorReporter.reportErrorForNode(
+              CompileTimeErrorCode.EXTENSION_CONFLICTING_STATIC_AND_INSTANCE,
+              identifier,
+              [_enclosingExtension.name, name],
+            );
+          }
+        }
       }
     }
   }
@@ -6464,21 +6481,6 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
       return false;
     }
     return element.name == "List" && element.library.isDartCore;
-  }
-
-  /// Return `true` if the extension override [node] is being used as a target
-  /// of an operation that might be accessing an instance member.
-  bool _isExtensionOverrideInValidContext(ExtensionOverride node) {
-    AstNode parent = node.parent;
-    if ((parent is PropertyAccess && parent.target == node) ||
-        (parent is MethodInvocation && parent.target == node) ||
-        (parent is FunctionExpressionInvocation && parent.function == node) ||
-        (parent is BinaryExpression && parent.leftOperand == node) ||
-        (parent is IndexExpression && parent.target == node) ||
-        parent is PrefixExpression) {
-      return true;
-    }
-    return false;
   }
 
   bool _isFunctionType(DartType type) {

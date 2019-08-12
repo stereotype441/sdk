@@ -14,6 +14,14 @@ import 'package:analyzer/src/dart/element/element.dart';
 /// tracking the (unmigrated) [DartType], we track the [ConstraintVariable]s
 /// indicating whether the type, and the types that compose it, are nullable.
 class DecoratedType {
+  /// Mapping from type parameter elements to the decorated types of those type
+  /// parameters' bounds.
+  ///
+  /// This expando only applies to type parameters whose enclosing element is
+  /// `null`.  Type parameters whose enclosing element is not `null` should be
+  /// stored in [Variables._decoratedTypeParameterBounds].
+  static final _decoratedTypeParameterBounds = Expando<DecoratedType>();
+
   final DartType type;
 
   final NullabilityNode node;
@@ -82,68 +90,6 @@ class DecoratedType {
       }
       return true;
     }());
-  }
-
-  /// Creates a [DecoratedType] corresponding to the given [element], which is
-  /// presumed to have come from code that is already migrated.
-  factory DecoratedType.forElement(Element element, NullabilityGraph graph) {
-    DecoratedType decorate(DartType type) {
-      if (type.isVoid || type.isDynamic) {
-        return DecoratedType(type, graph.always);
-      }
-      assert((type as TypeImpl).nullabilitySuffix ==
-          NullabilitySuffix.star); // TODO(paulberry)
-      if (type is FunctionType) {
-        var positionalParameters = <DecoratedType>[];
-        var namedParameters = <String, DecoratedType>{};
-        for (var parameter in type.parameters) {
-          if (parameter.isPositional) {
-            positionalParameters.add(decorate(parameter.type));
-          } else {
-            namedParameters[parameter.name] = decorate(parameter.type);
-          }
-        }
-        return DecoratedType(type, graph.never,
-            returnType: decorate(type.returnType),
-            namedParameters: namedParameters,
-            positionalParameters: positionalParameters);
-      } else if (type is InterfaceType) {
-        if (type.typeParameters.isNotEmpty) {
-          // TODO(paulberry)
-          throw UnimplementedError('Decorating ${type.displayName}');
-        }
-        return DecoratedType(type, graph.never);
-      } else if (type is TypeParameterType) {
-        return DecoratedType(type, graph.never);
-      } else {
-        throw type.runtimeType; // TODO(paulberry)
-      }
-    }
-
-    // Sanity check:
-    // Ensure the element is not from a library that is being migrated.
-    // If this assertion fires, it probably means that the NodeBuilder failed to
-    // generate the appropriate decorated type for the element when it was
-    // visiting the source file.
-    if (graph.isBeingMigrated(element.source)) {
-      throw 'Internal Error: DecorateType.forElement should not be called'
-          ' for elements being migrated: ${element.runtimeType} :: $element';
-    }
-
-    DecoratedType decoratedType;
-    if (element is ExecutableElement) {
-      decoratedType = decorate(element.type);
-    } else if (element is TopLevelVariableElement) {
-      decoratedType = decorate(element.type);
-    } else if (element is TypeParameterElement) {
-      // By convention, type parameter elements are decorated with the type of
-      // their bounds.
-      decoratedType = decorate(element.bound ?? DynamicTypeImpl.instance);
-    } else {
-      // TODO(paulberry)
-      throw UnimplementedError('Decorating ${element.runtimeType}');
-    }
-    return decoratedType;
   }
 
   /// Creates a decorated type corresponding to [type], with fresh nullability
@@ -408,6 +354,28 @@ class DecoratedType {
         returnType:
             returnType._substitute(substitution, undecoratedResult.returnType),
         positionalParameters: newPositionalParameters);
+  }
+
+  /// Retrieves the decorated bound of the given [typeParameter].
+  ///
+  /// [typeParameter] must have an enclosing element of `null`.  Type parameters
+  /// whose enclosing element is not `null` are tracked by the [Variables]
+  /// class.
+  static DecoratedType decoratedTypeParameterBound(
+      TypeParameterElement typeParameter) {
+    assert(typeParameter.enclosingElement == null);
+    return _decoratedTypeParameterBounds[typeParameter];
+  }
+
+  /// Stores he decorated bound of the given [typeParameter].
+  ///
+  /// [typeParameter] must have an enclosing element of `null`.  Type parameters
+  /// whose enclosing element is not `null` are tracked by the [Variables]
+  /// class.
+  static void recordTypeParameterBound(
+      TypeParameterElement typeParameter, DecoratedType bound) {
+    assert(typeParameter.enclosingElement == null);
+    _decoratedTypeParameterBounds[typeParameter] = bound;
   }
 
   static bool _compareLists(

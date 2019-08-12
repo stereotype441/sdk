@@ -11,6 +11,7 @@ import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
 import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/resolver/extension_member_resolver.dart';
+import 'package:analyzer/src/dart/resolver/resolution_result.dart';
 import 'package:analyzer/src/dart/resolver/scope.dart';
 import 'package:analyzer/src/error/codes.dart';
 import 'package:analyzer/src/generated/resolver.dart';
@@ -41,15 +42,14 @@ class MethodInvocationResolver {
   /// The object providing promoted or declared types of variables.
   final LocalVariableTypeProvider _localVariableTypeProvider;
 
+  /// Helper for extension method resolution.
+  final ExtensionMemberResolver _extensionResolver;
+
   /// The invocation being resolved.
   MethodInvocationImpl _invocation;
 
   /// The [Name] object of the invocation being resolved by [resolve].
   Name _currentName;
-
-  /// Helper for extension method resolution.
-  //todo(pq): consider sharing instance with element_resolver
-  final ExtensionMemberResolver _extensionResolver;
 
   MethodInvocationResolver(this._resolver)
       : _typeType = _resolver.typeProvider.typeType,
@@ -57,7 +57,7 @@ class MethodInvocationResolver {
         _definingLibrary = _resolver.definingLibrary,
         _definingLibraryUri = _resolver.definingLibrary.source.uri,
         _localVariableTypeProvider = _resolver.localVariableTypeProvider,
-        _extensionResolver = ExtensionMemberResolver(_resolver);
+        _extensionResolver = _resolver.extensionResolver;
 
   /// The scope used to resolve identifiers.
   Scope get nameScope => _resolver.nameScope;
@@ -338,73 +338,41 @@ class MethodInvocationResolver {
 
   /// If there is an extension matching the [receiverType] and defining a
   /// member with the given [name], resolve to the corresponding extension
-  /// method and return `true`. Otherwise return `false`.
-  bool _resolveExtension(
+  /// method. Return a result indicating whether the [node] was resolved and if
+  /// not why.
+  ResolutionResult _resolveExtension(
     MethodInvocation node,
     DartType receiverType,
     SimpleIdentifier nameNode,
     String name,
   ) {
-    var extensions = _extensionResolver.getApplicableExtensions(
+    var result = _extensionResolver.findExtension(
       receiverType,
       name,
+      nameNode,
       ElementKind.METHOD,
     );
 
-    if (extensions.isEmpty) {
-      return false;
+    if (!result.isSingle) {
+      _setDynamicResolution(node);
+      return result;
     }
 
-    ExtensionElement extension;
-    if (extensions.length == 1) {
-      extension = extensions[0];
-    } else {
-      extension = _extensionResolver.chooseMostSpecificExtension(
-        extensions,
-        receiverType,
-      );
-      if (extension == null) {
-        _setDynamicResolution(node);
-        _resolver.errorReporter.reportErrorForNode(
-          CompileTimeErrorCode.AMBIGUOUS_EXTENSION_METHOD_ACCESS,
-          nameNode,
-          [
-            name,
-            extensions[0].name,
-            extensions[1].name,
-          ],
-        );
-        return true;
-      }
-    }
-
-    ExecutableElement member = extension.getMethod(name) ??
-        extension.getGetter(name) ??
-        extension.getSetter(name);
+    ExecutableElement member = result.element;
 
     if (member.isStatic) {
       _setDynamicResolution(node);
       _resolver.errorReporter.reportErrorForNode(
-        CompileTimeErrorCode.ACCESS_STATIC_EXTENSION_MEMBER,
-        nameNode,
-      );
-      return true;
+          StaticTypeWarningCode.INSTANCE_ACCESS_TO_STATIC_MEMBER,
+          nameNode,
+          [name, member.kind.displayName, member.enclosingElement.name]);
+      return result;
     }
-
-    var typeArguments = _extensionResolver.inferTypeArguments(
-      extension,
-      receiverType,
-    );
-    member = ExecutableMember.from3(
-      member,
-      extension.typeParameters,
-      typeArguments,
-    );
 
     nameNode.staticElement = member;
     var calleeType = _getCalleeType(node, member);
     _setResolution(node, calleeType);
-    return true;
+    return result;
   }
 
   void _resolveExtensionMember(MethodInvocation node, Identifier receiver,
@@ -512,9 +480,9 @@ class MethodInvocationResolver {
     }
 
     // Look for an applicable extension.
-    {
-      var success = _resolveExtension(node, receiverType, nameNode, name);
-      if (success) return;
+    var result = _resolveExtension(node, receiverType, nameNode, name);
+    if (result.isSingle) {
+      return;
     }
 
     // The interface of the receiver does not have an instance member.
@@ -536,11 +504,13 @@ class MethodInvocationResolver {
     }
 
     _setDynamicResolution(node);
-    _resolver.errorReporter.reportErrorForNode(
-      StaticTypeWarningCode.UNDEFINED_METHOD,
-      nameNode,
-      [name, receiverType.element.displayName],
-    );
+    if (result.isNone) {
+      _resolver.errorReporter.reportErrorForNode(
+        StaticTypeWarningCode.UNDEFINED_METHOD,
+        nameNode,
+        [name, receiverType.element.displayName],
+      );
+    }
   }
 
   void _resolveReceiverNull(
@@ -607,10 +577,10 @@ class MethodInvocationResolver {
       return;
     }
 
-    var extension = _extensionResolver.findExtension(
+    var result = _extensionResolver.findExtension(
         receiverType, name, nameNode, ElementKind.METHOD);
-    if (extension != null) {
-      var target = extension.getMethod(name);
+    if (result.isSingle) {
+      var target = result.element;
       if (target != null) {
         nameNode.staticElement = target;
         var calleeType = _getCalleeType(node, target);
@@ -772,10 +742,10 @@ class MethodInvocationResolver {
     if (type is InterfaceType) {
       var call = _inheritance.getMember(type, _nameCall);
       if (call == null) {
-        var extension = _extensionResolver.findExtension(
+        var result = _extensionResolver.findExtension(
             type, _nameCall.name, node.methodName, ElementKind.METHOD);
-        if (extension != null) {
-          call = extension.getMethod(_nameCall.name);
+        if (result.isSingle) {
+          call = result.element;
         }
       }
       if (call != null && call.kind == ElementKind.METHOD) {

@@ -15,7 +15,6 @@ import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/member.dart' show ConstructorMember;
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type_algebra.dart';
-import 'package:analyzer/src/dart/resolver/extension_member_resolver.dart';
 import 'package:analyzer/src/error/codes.dart';
 import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/generated/resolver.dart';
@@ -69,7 +68,7 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
    * The type representing the class containing the nodes being analyzed,
    * or `null` if the nodes are not within a class.
    */
-  InterfaceType thisType;
+  DartType thisType;
 
   /**
    * The object providing promoted or declared types of variables.
@@ -479,27 +478,7 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
 
   @override
   void visitExtensionOverride(ExtensionOverride node) {
-    var element = node.staticElement;
-    var typeParameters = element.typeParameters;
-
-    DartType targetType;
-    var arguments = node.argumentList.arguments;
-    if (arguments.length == 1) {
-      targetType = arguments[0].staticType;
-    }
-
-    var extensionResolver = ExtensionMemberResolver(_resolver);
-    var typeArgumentTypes = extensionResolver.inferTypeArguments(
-      element,
-      targetType,
-      typeArguments: node.typeArguments,
-    );
-
-    var nodeImpl = node as ExtensionOverrideImpl;
-    nodeImpl.typeArgumentTypes = typeArgumentTypes;
-    nodeImpl.extendedType =
-        Substitution.fromPairs(typeParameters, typeArgumentTypes)
-            .substituteType(element.extendedType);
+    _resolver.extensionResolver.resolveOverride(node);
   }
 
   @override

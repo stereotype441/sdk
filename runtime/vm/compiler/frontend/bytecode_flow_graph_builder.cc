@@ -959,7 +959,13 @@ void BytecodeFlowGraphBuilder::BuildDynamicCall() {
   }
 
   const ICData& icdata = ICData::Cast(ConstantAt(DecodeOperandD()).value());
-  ASSERT(ic_data_array_->At(icdata.deopt_id())->Original() == icdata.raw());
+  const intptr_t deopt_id = icdata.deopt_id();
+  ic_data_array_->EnsureLength(deopt_id + 1, nullptr);
+  if (ic_data_array_->At(deopt_id) == nullptr) {
+    (*ic_data_array_)[deopt_id] = &icdata;
+  } else {
+    ASSERT(ic_data_array_->At(deopt_id)->Original() == icdata.raw());
+  }
 
   const intptr_t argc = DecodeOperandF().value();
   const ArgumentsDescriptor arg_desc(
@@ -1201,6 +1207,25 @@ void BytecodeFlowGraphBuilder::BuildStoreStaticTOS() {
   code_ += B->StoreStaticField(position_, field);
 }
 
+void BytecodeFlowGraphBuilder::BuildLoadStatic() {
+  const Constant operand = ConstantAt(DecodeOperandD());
+  const auto& field = Field::Cast(operand.value());
+  // All constant expressions (including access to const fields) are evaluated
+  // in bytecode. However, values of injected cid fields are only available in
+  // the VM. In such case, evaluate const fields with known value here.
+  if (field.is_const() && !field.has_initializer()) {
+    const auto& value = Object::ZoneHandle(Z, field.StaticValue());
+    ASSERT((value.raw() != Object::sentinel().raw()) &&
+           (value.raw() != Object::transition_sentinel().raw()));
+    code_ += B->Constant(value);
+    return;
+  }
+  PushConstant(operand);
+  code_ += B->LoadStaticField();
+}
+
+static_assert(KernelBytecode::kMinSupportedBytecodeFormatVersion < 19,
+              "Cleanup PushStatic bytecode instruction");
 void BytecodeFlowGraphBuilder::BuildPushStatic() {
   // Note: Field object is both pushed into the stack and
   // available in constant pool entry D.
@@ -1789,22 +1814,7 @@ void BytecodeFlowGraphBuilder::ProcessICDataInObjectPool(
     if (IsICDataEntry(object_pool, i)) {
       const ICData& icdata = ICData::CheckedHandle(Z, object_pool.ObjectAt(i));
       const intptr_t deopt_id = compiler_state.GetNextDeoptId();
-
       ASSERT(icdata.deopt_id() == deopt_id);
-      ASSERT(ic_data_array_->is_empty() ||
-             (ic_data_array_->At(deopt_id)->Original() == icdata.raw()));
-    }
-  }
-
-  if (ic_data_array_->is_empty()) {
-    const intptr_t len = compiler_state.deopt_id();
-    ic_data_array_->EnsureLength(len, nullptr);
-    for (intptr_t i = 0; i < pool_length; ++i) {
-      if (IsICDataEntry(object_pool, i)) {
-        const ICData& icdata =
-            ICData::CheckedHandle(Z, object_pool.ObjectAt(i));
-        (*ic_data_array_)[icdata.deopt_id()] = &icdata;
-      }
     }
   }
 }

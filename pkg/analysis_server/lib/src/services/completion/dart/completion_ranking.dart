@@ -14,9 +14,6 @@ import 'package:analyzer/dart/analysis/features.dart';
 /// Number of lookback tokens.
 const int _LOOKBACK = 100;
 
-/// Maximum [AvailableSuggestionSet] relevance to account for.
-const int _MAX_BASE_RELEVANCE = 9;
-
 /// Minimum probability to prioritize model-only suggestion.
 const double _MODEL_RELEVANCE_CUTOFF = 0.5;
 
@@ -135,24 +132,27 @@ class CompletionRanking {
       List<IncludedSuggestionRelevanceTag> includedSuggestions;
       if (includedSuggestionRelevanceTags != null) {
         includedSuggestions = includedSuggestionRelevanceTags
-            .where((tag) => areCompletionsEquivalent(tag.tag, entry.key))
+            .where((tag) => areCompletionsEquivalent(
+                elementNameFromRelevanceTag(tag.tag), entry.key))
             .toList();
       } else {
         includedSuggestions = [];
       }
       if (!isRequestFollowingDot && entry.value > _MODEL_RELEVANCE_CUTOFF) {
+        final relevance = high--;
         if (completionSuggestions.isNotEmpty ||
             includedSuggestions.isNotEmpty) {
-          final relevance = high--;
           completionSuggestions.forEach((completionSuggestion) {
             completionSuggestion.relevance = relevance;
           });
           includedSuggestions.forEach((includedSuggestion) {
-            includedSuggestion.relevanceBoost = relevance - _MAX_BASE_RELEVANCE;
+            includedSuggestion.relevanceBoost = relevance;
           });
         } else {
           suggestions
               .add(createCompletionSuggestion(entry.key, featureSet, high--));
+          includedSuggestionRelevanceTags
+              .add(IncludedSuggestionRelevanceTag(entry.key, relevance));
         }
       } else if (completionSuggestions.isNotEmpty ||
           includedSuggestions.isNotEmpty) {
@@ -161,11 +161,14 @@ class CompletionRanking {
           completionSuggestion.relevance = relevance;
         });
         includedSuggestions.forEach((includedSuggestion) {
-          includedSuggestion.relevanceBoost = relevance - _MAX_BASE_RELEVANCE;
+          includedSuggestion.relevanceBoost = relevance;
         });
       } else if (!isRequestFollowingDot) {
+        final relevance = low--;
         suggestions
-            .add(createCompletionSuggestion(entry.key, featureSet, low--));
+            .add(createCompletionSuggestion(entry.key, featureSet, relevance));
+        includedSuggestionRelevanceTags
+            .add(IncludedSuggestionRelevanceTag(entry.key, relevance));
       }
     });
 

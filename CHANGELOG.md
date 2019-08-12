@@ -132,6 +132,22 @@ The Linter was updated to `0.1.96`, which includes:
 Dartdoc was updated to `0.28.4`; this version includes several fixes and is based
 on a newer version of the analyzer package.
 
+## 2.4.1 - 2019-08-07
+
+This is a patch release that fixes a performance regression in JIT mode, as
+well as a potential crash of our AOT compiler.
+
+### Dart VM
+
+* Fixed a performance regression where usage of `Int32List` could trigger
+  repeated deoptimizations in JIT mode (Issue [37551][]).
+
+* Fixed a bug where usage of a static getter with name `length` could cause a
+  crash in our AOT compiler (Issue [35121][]).
+
+[37551]: https://github.com/dart-lang/sdk/issues/37551
+[35121]: https://github.com/dart-lang/sdk/issues/35121
+
 ## 2.4.0 - 2019-06-27
 
 ### Core libraries
