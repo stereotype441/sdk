@@ -74,7 +74,7 @@ import '../kernel/kernel_builder.dart'
     show
         ClassBuilder,
         ClassHierarchyBuilder,
-        Declaration,
+        Builder,
         DelayedMember,
         DelayedOverrideCheck,
         EnumBuilder,
@@ -214,7 +214,8 @@ class SourceLoader extends Loader {
       // TODO(jensj): What if we have several? What if it is unsupported?
       // What if the language version was already set via packages and this is
       // higher? Etc
-      library.setLanguageVersion(version.major, version.minor, explicit: true);
+      library.setLanguageVersion(version.major, version.minor,
+          offset: version.offset, length: version.length, explicit: true);
     });
     Token token = result.tokens;
     if (!suppressLexicalErrors) {
@@ -222,7 +223,7 @@ class SourceLoader extends Loader {
       Uri importUri = library.uri;
       if (library.isPatch) {
         // For patch files we create a "fake" import uri.
-        // We cannot use the import uri from the patched libarary because
+        // We cannot use the import uri from the patched library because
         // several different files would then have the same import uri,
         // and the VM does not support that. Also, what would, for instance,
         // setting a breakpoint on line 42 of some import uri mean, if the uri
@@ -236,6 +237,7 @@ class SourceLoader extends Loader {
       target.addSourceInformation(
           importUri, library.fileUri, result.lineStarts, source);
     }
+    library.issuePostponedProblems();
     while (token is ErrorToken) {
       if (!suppressLexicalErrors) {
         ErrorToken error = token;
@@ -306,23 +308,23 @@ class SourceLoader extends Loader {
     }
   }
 
+  // TODO(johnniwinther,jensj): Handle expression in extensions?
   Future<Expression> buildExpression(
       SourceLibraryBuilder library,
       String enclosingClass,
-      bool isInstanceMember,
+      bool isClassInstanceMember,
       FunctionNode parameters) async {
     Token token = await tokenize(library, suppressLexicalErrors: false);
     if (token == null) return null;
     DietListener dietListener = createDietListener(library);
 
-    Declaration parent = library;
+    Builder parent = library;
     if (enclosingClass != null) {
-      Declaration cls =
-          dietListener.memberScope.lookup(enclosingClass, -1, null);
+      Builder cls = dietListener.memberScope.lookup(enclosingClass, -1, null);
       if (cls is ClassBuilder) {
         parent = cls;
         dietListener
-          ..currentClass = cls
+          ..currentDeclaration = cls
           ..memberScope = cls.scope.copyWithParent(
               dietListener.memberScope.withTypeVariables(cls.typeVariables),
               "debugExpression in $enclosingClass");
@@ -332,7 +334,8 @@ class SourceLoader extends Loader {
         null, null, ProcedureKind.Method, library, 0, 0, -1, -1)
       ..parent = parent;
     BodyBuilder listener = dietListener.createListener(
-        builder, dietListener.memberScope, isInstanceMember);
+        builder, dietListener.memberScope,
+        isDeclarationInstanceMember: isClassInstanceMember);
 
     return listener.parseSingleExpression(
         new Parser(listener), token, parameters);
@@ -408,7 +411,7 @@ class SourceLoader extends Loader {
       wasChanged = false;
       for (SourceLibraryBuilder exported in both) {
         for (Export export in exported.exporters) {
-          exported.exportScope.forEach((String name, Declaration member) {
+          exported.exportScope.forEach((String name, Builder member) {
             if (export.addToExportScope(name, member)) {
               wasChanged = true;
             }
@@ -434,16 +437,16 @@ class SourceLoader extends Loader {
   }
 
   void debugPrintExports() {
-    // TODO(sigmund): should be `covarint SourceLibraryBuilder`.
+    // TODO(sigmund): should be `covariant SourceLibraryBuilder`.
     builders.forEach((Uri uri, dynamic l) {
       SourceLibraryBuilder library = l;
-      Set<Declaration> members = new Set<Declaration>();
-      Iterator<Declaration> iterator = library.iterator;
+      Set<Builder> members = new Set<Builder>();
+      Iterator<Builder> iterator = library.iterator;
       while (iterator.moveNext()) {
         members.add(iterator.current);
       }
       List<String> exports = <String>[];
-      library.exportScope.forEach((String name, Declaration member) {
+      library.exportScope.forEach((String name, Builder member) {
         while (member != null) {
           if (!members.contains(member)) {
             exports.add(name);
@@ -575,7 +578,7 @@ class SourceLoader extends Loader {
   }
 
   /// Returns a list of all class builders declared in this loader.  As the
-  /// classes are sorted, any cycles in the hiearchy are reported as
+  /// classes are sorted, any cycles in the hierarchy are reported as
   /// errors. Recover by breaking the cycles. This means that the rest of the
   /// pipeline (including backends) can assume that there are no hierarchy
   /// cycles.
@@ -584,9 +587,9 @@ class SourceLoader extends Loader {
     List<SourceClassBuilder> workList = <SourceClassBuilder>[];
     for (LibraryBuilder library in builders.values) {
       if (library.loader == this) {
-        Iterator<Declaration> members = library.iterator;
+        Iterator<Builder> members = library.iterator;
         while (members.moveNext()) {
-          Declaration member = members.current;
+          Builder member = members.current;
           if (member is SourceClassBuilder) {
             workList.add(member);
           }
@@ -609,11 +612,11 @@ class SourceLoader extends Loader {
       workList = <SourceClassBuilder>[];
       for (int i = 0; i < previousWorkList.length; i++) {
         SourceClassBuilder cls = previousWorkList[i];
-        List<Declaration> directSupertypes =
+        List<Builder> directSupertypes =
             cls.computeDirectSupertypes(objectClass);
         bool allSupertypesProcessed = true;
         for (int i = 0; i < directSupertypes.length; i++) {
-          Declaration supertype = directSupertypes[i];
+          Builder supertype = directSupertypes[i];
           if (supertype is SourceClassBuilder &&
               supertype.library.loader == this &&
               !topologicallySortedClasses.contains(supertype)) {
@@ -655,13 +658,11 @@ class SourceLoader extends Loader {
     return classes;
   }
 
-  void checkClassSupertypes(
-      SourceClassBuilder cls,
-      List<Declaration> directSupertypes,
-      Set<ClassBuilder> blackListedClasses) {
+  void checkClassSupertypes(SourceClassBuilder cls,
+      List<Builder> directSupertypes, Set<ClassBuilder> blackListedClasses) {
     // Check that the direct supertypes aren't black-listed or enums.
     for (int i = 0; i < directSupertypes.length; i++) {
-      Declaration supertype = directSupertypes[i];
+      Builder supertype = directSupertypes[i];
       if (supertype is EnumBuilder) {
         cls.addProblem(templateExtendingEnum.withArguments(supertype.name),
             cls.charOffset, noLength);
@@ -683,8 +684,8 @@ class SourceLoader extends Loader {
         var builder = mixedInType.declaration;
         if (builder is ClassBuilder) {
           isClassBuilder = true;
-          for (Declaration constructory in builder.constructors.local.values) {
-            if (constructory.isConstructor && !constructory.isSynthetic) {
+          for (Builder constructor in builder.constructors.local.values) {
+            if (constructor.isConstructor && !constructor.isSynthetic) {
               cls.addProblem(
                   templateIllegalMixinDueToConstructors
                       .withArguments(builder.fullNameForErrors),
@@ -693,8 +694,8 @@ class SourceLoader extends Loader {
                   context: [
                     templateIllegalMixinDueToConstructorsCause
                         .withArguments(builder.fullNameForErrors)
-                        .withLocation(constructory.fileUri,
-                            constructory.charOffset, noLength)
+                        .withLocation(constructor.fileUri,
+                            constructor.charOffset, noLength)
                   ]);
             }
           }
@@ -977,9 +978,9 @@ class SourceLoader extends Loader {
     builders.forEach((Uri uri, LibraryBuilder library) {
       if (library.loader == this) {
         library.buildOutlineExpressions();
-        Iterator<Declaration> iterator = library.iterator;
+        Iterator<Builder> iterator = library.iterator;
         while (iterator.moveNext()) {
-          Declaration declaration = iterator.current;
+          Builder declaration = iterator.current;
           if (declaration is ClassBuilder) {
             declaration.buildOutlineExpressions(library);
           } else if (declaration is MemberBuilder) {
@@ -1254,7 +1255,7 @@ class _UnmodifiableSet {
 }
 """;
 
-/// A minimal implementation of dart:_internel that is sufficient to create an
+/// A minimal implementation of dart:_internal that is sufficient to create an
 /// instance of [CoreTypes] and compile program.
 const String defaultDartInternalSource = """
 class Symbol {

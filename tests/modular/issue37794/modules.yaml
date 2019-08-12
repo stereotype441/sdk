@@ -3,6 +3,7 @@
 # BSD-style license that can be found in the LICENSE file.
 
 dependencies:
-  main: [def, expect]
+  main: [module1, module2, expect]
+  module2: [module1]
 flags:
   - constant-update-2018

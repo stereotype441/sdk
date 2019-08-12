@@ -11,19 +11,18 @@ import 'package:front_end/src/testing/id_testing.dart';
 import 'package:front_end/src/testing/id_testing_helper.dart'
     show
         CfeDataExtractor,
-        CompilerResult,
+        InternalCompilerResult,
         DataComputer,
         defaultCfeConfig,
         createUriForFileName,
         onFailure,
         runTestFor;
-import 'package:front_end/src/testing/id_testing_utils.dart';
 import 'package:kernel/ast.dart' show Library;
 
 main(List<String> args) async {
   // Fix default/max major and minor version so we can test it.
   Library.defaultLangaugeVersionMajor = 2;
-  Library.defaultLangaugeVersionMinor = 4;
+  Library.defaultLangaugeVersionMinor = 8;
 
   Directory dataDir = new Directory.fromUri(Platform.script.resolve('data'));
   await runTests(dataDir,
@@ -38,8 +37,8 @@ main(List<String> args) async {
 class LanguageVersioningDataComputer extends DataComputer<String> {
   const LanguageVersioningDataComputer();
 
-  void computeLibraryData(CompilerResult compilerResult, Library library,
-      Map<Id, ActualData<String>> actualMap,
+  void computeLibraryData(InternalCompilerResult compilerResult,
+      Library library, Map<Id, ActualData<String>> actualMap,
       {bool verbose}) {
     new LanguageVersioningDataExtractor(compilerResult, actualMap)
         .computeForLibrary(library, useFileUri: true);
@@ -49,8 +48,8 @@ class LanguageVersioningDataComputer extends DataComputer<String> {
   bool get supportsErrors => true;
 
   String computeErrorData(
-      CompilerResult compiler, Id id, List<FormattedMessage> errors) {
-    return errorsToText(errors);
+      InternalCompilerResult compiler, Id id, List<FormattedMessage> errors) {
+    return errors.map((m) => m.code.name).join(',');
   }
 
   @override
@@ -58,8 +57,8 @@ class LanguageVersioningDataComputer extends DataComputer<String> {
 }
 
 class LanguageVersioningDataExtractor extends CfeDataExtractor<String> {
-  LanguageVersioningDataExtractor(
-      CompilerResult compilerResult, Map<Id, ActualData<String>> actualMap)
+  LanguageVersioningDataExtractor(InternalCompilerResult compilerResult,
+      Map<Id, ActualData<String>> actualMap)
       : super(compilerResult, actualMap);
 
   @override

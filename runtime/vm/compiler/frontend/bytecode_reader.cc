@@ -674,6 +674,13 @@ void BytecodeReaderHelper::ReadTypeParametersDeclaration(
   for (intptr_t i = 0; i < num_type_params; ++i) {
     parameter ^= type_parameters.TypeAt(i);
     bound ^= ReadObject();
+    // Convert dynamic to Object in bounds of type parameters so
+    // they are equivalent when doing subtype checks for function types.
+    // TODO(https://github.com/dart-lang/language/issues/495): revise this
+    // when function subtyping is fixed.
+    if (bound.IsDynamicType()) {
+      bound = I->object_store()->object_type();
+    }
     parameter.set_bound(bound);
   }
 }
@@ -1060,6 +1067,7 @@ RawTypedData* BytecodeReaderHelper::NativeEntry(const Function& function,
     case MethodRecognizer::kLinkedHashMap_setUsedData:
     case MethodRecognizer::kLinkedHashMap_getDeletedKeys:
     case MethodRecognizer::kLinkedHashMap_setDeletedKeys:
+    case MethodRecognizer::kFfiAbi:
       break;
     case MethodRecognizer::kAsyncStackTraceHelper:
       // If causal async stacks are disabled the interpreter.cc will handle this

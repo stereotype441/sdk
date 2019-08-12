@@ -26,7 +26,7 @@ import '../kernel/kernel_builder.dart'
     show
         ClassBuilder,
         ConstructorReferenceBuilder,
-        Declaration,
+        Builder,
         FieldBuilder,
         FunctionBuilder,
         InvalidTypeBuilder,
@@ -55,7 +55,7 @@ Class initializeClass(
   cls ??= new Class(
       name: name,
       typeParameters:
-          TypeVariableBuilder.kernelTypeParametersFromBuilders(typeVariables));
+          TypeVariableBuilder.typeParametersFromBuilders(typeVariables));
   cls.fileUri ??= parent.fileUri;
   if (cls.startFileOffset == TreeNode.noOffset) {
     cls.startFileOffset = startCharOffset;
@@ -94,15 +94,15 @@ class SourceClassBuilder extends ClassBuilder
       LibraryBuilder parent,
       this.constructorReferences,
       int startCharOffset,
-      int charOffset,
+      int nameOffset,
       int charEndOffset,
       {Class cls,
       this.mixedInType,
       this.isMixinDeclaration = false})
       : actualCls = initializeClass(cls, typeVariables, name, parent,
-            startCharOffset, charOffset, charEndOffset),
+            startCharOffset, nameOffset, charEndOffset),
         super(metadata, modifiers, name, typeVariables, supertype, interfaces,
-            onTypes, scope, constructors, parent, charOffset);
+            onTypes, scope, constructors, parent, nameOffset);
 
   @override
   Class get cls => origin.actualCls;
@@ -111,7 +111,7 @@ class SourceClassBuilder extends ClassBuilder
   SourceLibraryBuilder get library => super.library;
 
   Class build(SourceLibraryBuilder library, LibraryBuilder coreLibrary) {
-    void buildBuilders(String name, Declaration declaration) {
+    void buildBuilders(String name, Builder declaration) {
       do {
         if (declaration.parent != this) {
           if (fileUri != declaration.parent.fileUri) {
@@ -186,8 +186,8 @@ class SourceClassBuilder extends ClassBuilder
       }
     }
 
-    constructors.forEach((String name, Declaration constructor) {
-      Declaration member = scopeBuilder[name];
+    constructors.forEach((String name, Builder constructor) {
+      Builder member = scopeBuilder[name];
       if (member == null) return;
       if (!member.isStatic) return;
       // TODO(ahe): Revisit these messages. It seems like the last two should
@@ -208,14 +208,15 @@ class SourceClassBuilder extends ClassBuilder
       }
     });
 
-    scope.setters.forEach((String name, Declaration setter) {
-      Declaration member = scopeBuilder[name];
+    scope.setters.forEach((String name, Builder setter) {
+      Builder member = scopeBuilder[name];
       if (member == null ||
           !(member.isField && !member.isFinal && !member.isConst ||
               member.isRegularMethod && member.isStatic && setter.isStatic)) {
         return;
       }
-      if (member.isInstanceMember == setter.isInstanceMember) {
+      if (member.isDeclarationInstanceMember ==
+          setter.isDeclarationInstanceMember) {
         addProblem(templateConflictsWithMember.withArguments(name),
             setter.charOffset, noLength);
         // TODO(ahe): Context argument to previous message?
@@ -230,8 +231,8 @@ class SourceClassBuilder extends ClassBuilder
       }
     });
 
-    scope.setters.forEach((String name, Declaration setter) {
-      Declaration constructor = constructorScopeBuilder[name];
+    scope.setters.forEach((String name, Builder setter) {
+      Builder constructor = constructorScopeBuilder[name];
       if (constructor == null || !setter.isStatic) return;
       addProblem(templateConflictsWithConstructor.withArguments(name),
           setter.charOffset, noLength);
@@ -281,17 +282,17 @@ class SourceClassBuilder extends ClassBuilder
     cls.annotations.forEach((m) => m.fileOffset = origin.cls.fileOffset);
 
     int count = 0;
-    scope.forEach((String name, Declaration declaration) {
+    scope.forEach((String name, Builder declaration) {
       count += declaration.finishPatch();
     });
-    constructors.forEach((String name, Declaration declaration) {
+    constructors.forEach((String name, Builder declaration) {
       count += declaration.finishPatch();
     });
     return count;
   }
 
-  List<Declaration> computeDirectSupertypes(ClassBuilder objectClass) {
-    final List<Declaration> result = <Declaration>[];
+  List<Builder> computeDirectSupertypes(ClassBuilder objectClass) {
+    final List<Builder> result = <Builder>[];
     final TypeBuilder supertype = this.supertype;
     if (supertype != null) {
       result.add(supertype.declaration);

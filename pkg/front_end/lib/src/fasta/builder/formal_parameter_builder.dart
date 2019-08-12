@@ -34,7 +34,7 @@ import '../kernel/body_builder.dart' show BodyBuilder;
 import '../kernel/kernel_builder.dart'
     show
         ClassBuilder,
-        Declaration,
+        Builder,
         ConstructorBuilder,
         FieldBuilder,
         LibraryBuilder,
@@ -132,7 +132,7 @@ class FormalParameterBuilder extends ModifierBuilder {
   void finalizeInitializingFormal() {
     Object cls = parent.parent;
     if (cls is ClassBuilder) {
-      Declaration field = cls.scope.lookup(name, charOffset, fileUri);
+      Builder field = cls.scope.lookup(name, charOffset, fileUri);
       if (field is FieldBuilder) {
         target.type = field.target.type;
       }
@@ -149,7 +149,7 @@ class FormalParameterBuilder extends ModifierBuilder {
     // needed to generated noSuchMethod forwarders.
     final bool isConstConstructorParameter =
         (parent is ConstructorBuilder && parent.target.isConst);
-    if ((isConstConstructorParameter || parent.isInstanceMember) &&
+    if ((isConstConstructorParameter || parent.isClassInstanceMember) &&
         initializerToken != null) {
       final ClassBuilder classBuilder = parent.parent;
       Scope scope = classBuilder.scope;

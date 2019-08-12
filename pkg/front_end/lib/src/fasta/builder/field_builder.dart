@@ -23,7 +23,7 @@ import '../kernel/body_builder.dart' show BodyBuilder;
 import '../kernel/kernel_builder.dart'
     show
         ClassBuilder,
-        Declaration,
+        Builder,
         ImplicitFieldType,
         TypeBuilder,
         LibraryBuilder,
@@ -59,7 +59,7 @@ class FieldBuilder extends MemberBuilder {
   bool hadTypesInferred = false;
 
   FieldBuilder(this.metadata, this.type, this.name, this.modifiers,
-      Declaration compilationUnit, int charOffset, int charEndOffset)
+      Builder compilationUnit, int charOffset, int charEndOffset)
       : field = new Field(null, fileUri: compilationUnit?.fileUri)
           ..fileOffset = charOffset
           ..fileEndOffset = charEndOffset,
@@ -80,7 +80,7 @@ class FieldBuilder extends MemberBuilder {
   bool get isEligibleForInference {
     return !library.legacyMode &&
         type == null &&
-        (hasInitializer || isInstanceMember);
+        (hasInitializer || isClassInstanceMember);
   }
 
   Field build(SourceLibraryBuilder library) {
