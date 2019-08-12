@@ -50,6 +50,16 @@ class _AlreadyMigratedCodeDecoratorTest {
       : typeProvider = TestTypeProvider(),
         decorator = AlreadyMigratedCodeDecorator(graph);
 
+  void checkDynamic(DecoratedType decoratedType) {
+    expect(decoratedType.type, same(typeProvider.dynamicType));
+    expect(decoratedType.node, same(graph.always));
+  }
+
+  void checkVoid(DecoratedType decoratedType) {
+    expect(decoratedType.type, same(typeProvider.voidType));
+    expect(decoratedType.node, same(graph.always));
+  }
+
   DecoratedType decorate(DartType type) {
     var decoratedType = decorator.decorate(type);
     expect(decoratedType.type, same(type));
@@ -57,7 +67,13 @@ class _AlreadyMigratedCodeDecoratorTest {
   }
 
   test_decorate_dynamic() {
-    expect(decorate(typeProvider.dynamicType).node, same(graph.always));
+    checkDynamic(decorate(typeProvider.dynamicType));
+  }
+
+  test_decorate_functionType_returnType() {
+    checkDynamic(
+        decorate(FunctionTypeImpl.synthetic(typeProvider.dynamicType, [], []))
+            .returnType);
   }
 
   test_decorate_functionType_star() {
@@ -68,6 +84,6 @@ class _AlreadyMigratedCodeDecoratorTest {
   }
 
   test_decorate_void() {
-    expect(decorate(typeProvider.voidType).node, same(graph.always));
+    checkVoid(decorate(typeProvider.voidType));
   }
 }
