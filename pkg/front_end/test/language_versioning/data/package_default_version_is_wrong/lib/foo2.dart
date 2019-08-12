@@ -1,15 +1,12 @@
+/*error: LanguageVersionInvalidInDotPackages*/
 // Copyright (c) 2019, the Dart project authors.  Please see the AUTHORS file
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-class B {
-  const B();
-}
+// @dart = 2.4
 
-class A {
-  final B b;
-  const A(this.b);
-}
+/*library: languageVersion=2.4*/
 
-const ab = A(B());
-const b = B();
+foo2() {
+  print("Hello from foo2!");
+}

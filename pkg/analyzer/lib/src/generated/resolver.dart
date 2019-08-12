@@ -25,6 +25,7 @@ import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
 import 'package:analyzer/src/dart/element/member.dart' show ConstructorMember;
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/resolver/exit_detector.dart';
+import 'package:analyzer/src/dart/resolver/extension_member_resolver.dart';
 import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
 import 'package:analyzer/src/dart/resolver/scope.dart';
 import 'package:analyzer/src/diagnostic/diagnostic_factory.dart';
@@ -3050,6 +3051,9 @@ class ResolverVisitor extends ScopedVisitor {
 
   final bool _uiAsCodeEnabled;
 
+  /// Helper for extension method resolution.
+  ExtensionMemberResolver extensionResolver;
+
   /// The object used to resolve the element associated with the current node.
   ElementResolver elementResolver;
 
@@ -3159,6 +3163,7 @@ class ResolverVisitor extends ScopedVisitor {
             nameScope: nameScope) {
     this.typeSystem = definingLibrary.context.typeSystem;
     this._promoteManager = TypePromotionManager(typeSystem);
+    this.extensionResolver = ExtensionMemberResolver(this);
     this.elementResolver = new ElementResolver(this,
         reportConstEvaluationErrors: reportConstEvaluationErrors);
     bool strongModeHints = false;
@@ -3815,16 +3820,25 @@ class ResolverVisitor extends ScopedVisitor {
     //
     try {
       DartType extendedType = node.declaredElement.extendedType;
-      if (extendedType is InterfaceType) {
-        // TODO(brianwilkerson) Handle other cases.
-        typeAnalyzer.thisType = extendedType;
-      }
+      typeAnalyzer.thisType = typeSystem.resolveToBound(extendedType);
       super.visitExtensionDeclaration(node);
       node.accept(elementResolver);
       node.accept(typeAnalyzer);
     } finally {
       typeAnalyzer.thisType = null;
     }
+  }
+
+  @override
+  void visitExtensionOverride(ExtensionOverride node) {
+    node.extensionName.accept(this);
+    node.typeArguments?.accept(this);
+
+    ExtensionMemberResolver(this).setOverrideReceiverContextType(node);
+    node.argumentList.accept(this);
+
+    node.accept(elementResolver);
+    node.accept(typeAnalyzer);
   }
 
   @override
@@ -5368,13 +5382,6 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
           enclosingExtension = extensionElement;
           nameScope = new TypeParameterScope(nameScope, extensionElement);
           visitExtensionDeclarationInScope(node);
-          DartType extendedType = extensionElement.extendedType;
-          if (extendedType is InterfaceType) {
-            nameScope = new ClassScope(nameScope, extendedType.element);
-          } else if (extendedType is FunctionType) {
-            nameScope =
-                new ClassScope(nameScope, typeProvider.functionType.element);
-          }
           nameScope = ExtensionScope(nameScope, extensionElement);
           visitExtensionMembersInScope(node);
         } finally {

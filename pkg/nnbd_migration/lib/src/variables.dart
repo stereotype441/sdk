@@ -174,20 +174,12 @@ class Variables implements VariableRecorder, VariableRepository {
     (_potentialModifications[source] ??= []).add(potentialModification);
   }
 
+  /// Creates a decorated type for the given [element], which should come from
+  /// an already-migrated library (or the SDK).
   DecoratedType _createDecoratedElementType(Element element) {
     if (_graph.isBeingMigrated(element.library.source)) {
       throw StateError('A decorated type for $element should have been stored '
           'by the NodeBuilder via recordDecoratedElementType');
-    }
-
-    // Sanity check:
-    // Ensure the element is not from a library that is being migrated.
-    // If this assertion fires, it probably means that the NodeBuilder failed to
-    // generate the appropriate decorated type for the element when it was
-    // visiting the source file.
-    if (_graph.isBeingMigrated(element.source)) {
-      throw 'Internal Error: DecorateType.forElement should not be called'
-          ' for elements being migrated: ${element.runtimeType} :: $element';
     }
 
     DecoratedType decoratedType;

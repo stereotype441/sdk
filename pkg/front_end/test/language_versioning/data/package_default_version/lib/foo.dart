@@ -5,8 +5,10 @@
 /*library: languageVersion=2.5*/
 
 import 'foo2.dart';
+import 'foo3.dart';
 
 foo() {
   print("Hello from foo!");
   foo2();
+  foo3();
 }

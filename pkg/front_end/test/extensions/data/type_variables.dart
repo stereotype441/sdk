@@ -6,19 +6,21 @@ class A1<T> {}
 
 /*class: A2:
  builder-name=A2,
- builder-onTypes=[A1<T>],
- builder-supertype=Object,
+ builder-onType=A1<T>,
  builder-type-params=[T],
- cls-name=A2,
- cls-supertype=Object,
- cls-type-params=[T]
+ extension-members=[
+  method1=A2|method1,
+  method2=A2|method2],
+ extension-name=A2,
+ extension-onType=A1<T>,
+ extension-type-params=[T]
 */
 extension A2<T> on A1<T> {
-  /*member: A2.method1:
+  /*member: A2|method1:
      builder-name=method1,
      builder-params=[#this],
      builder-type-params=[T,S extends T],
-     member-name=method1,
+     member-name=A2|method1,
      member-params=[#this],
      member-type-params=[#T,S extends #T]
   */
@@ -26,11 +28,11 @@ extension A2<T> on A1<T> {
     return this;
   }
 
-  /*member: A2.method2:
+  /*member: A2|method2:
      builder-name=method2,
      builder-params=[#this,o],
      builder-type-params=[T,S extends A1<T>],
-     member-name=method2,
+     member-name=A2|method2,
      member-params=[#this,o],
      member-type-params=[#T,S extends A1<#T>]
   */
