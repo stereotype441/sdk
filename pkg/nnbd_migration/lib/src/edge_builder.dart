@@ -196,8 +196,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       } else {
         throw element.runtimeType; // TODO(paulberry)
       }
-      return decoratedBaseType.substitute(substitution,
-          undecoratedResult: elementType);
+      return decoratedBaseType.substitute(substitution, elementType);
     } else {
       return decoratedBaseType;
     }

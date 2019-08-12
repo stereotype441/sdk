@@ -182,24 +182,16 @@ class DecoratedType {
       substitution[typeFormals[i]] = argumentType;
     }
     return _substituteFunctionAfterFormals(
-        type.instantiate(undecoratedArgumentTypes), substitution, false);
+        type.instantiate(undecoratedArgumentTypes), substitution);
   }
 
   /// Apply the given [substitution] to this type.
   ///
   /// [undecoratedResult] is the result of the substitution, as determined by
   /// the normal type system.  If not supplied, it is inferred.
-  ///
-  /// If [simplify] is `true`, then the following simplifications will be
-  /// performed on the resulting nullability node:
-  /// - always + x => always
-  /// - never + x => x
-  /// - x + always => always
-  /// - x + never => x
   DecoratedType substitute(
       Map<TypeParameterElement, DecoratedType> substitution,
-      {DartType undecoratedResult,
-      bool simplify: false}) {
+      [DartType undecoratedResult]) {
     if (substitution.isEmpty) return this;
     if (undecoratedResult == null) {
       List<DartType> argumentTypes = [];
@@ -210,7 +202,7 @@ class DecoratedType {
       }
       undecoratedResult = type.substitute2(argumentTypes, parameterTypes);
     }
-    return _substitute(substitution, undecoratedResult, simplify);
+    return _substitute(substitution, undecoratedResult);
   }
 
   @override
@@ -269,28 +261,18 @@ class DecoratedType {
       typeArguments: typeArguments);
 
   /// Internal implementation of [_substitute], used as a recursion target.
-  ///
-  /// If [simplify] is `true`, then the following simplifications will be
-  /// performed on the resulting nullability node:
-  /// - always + x => always
-  /// - never + x => x
-  /// - x + always => always
-  /// - x + never => x
   DecoratedType _substitute(
       Map<TypeParameterElement, DecoratedType> substitution,
-      DartType undecoratedResult,
-      bool simplify) {
+      DartType undecoratedResult) {
     var type = this.type;
     if (type is FunctionType && undecoratedResult is FunctionType) {
       assert(type.typeFormals.isEmpty); // TODO(paulberry)
-      return _substituteFunctionAfterFormals(
-          undecoratedResult, substitution, simplify);
+      return _substituteFunctionAfterFormals(undecoratedResult, substitution);
     } else if (type is InterfaceType && undecoratedResult is InterfaceType) {
       List<DecoratedType> newTypeArguments = [];
       for (int i = 0; i < typeArguments.length; i++) {
-        newTypeArguments.add(typeArguments[i].substitute(substitution,
-            undecoratedResult: undecoratedResult.typeArguments[i],
-            simplify: simplify));
+        newTypeArguments.add(typeArguments[i]
+            .substitute(substitution, undecoratedResult.typeArguments[i]));
       }
       return DecoratedType(undecoratedResult, node,
           typeArguments: newTypeArguments);
@@ -299,8 +281,8 @@ class DecoratedType {
       if (inner == null) {
         return this;
       } else {
-        return inner.withNode(NullabilityNode.forSubstitution(inner.node, node,
-            simplify: simplify));
+        return inner
+            .withNode(NullabilityNode.forSubstitution(inner.node, node));
       }
     } else if (type is VoidType) {
       return this;
@@ -313,7 +295,7 @@ class DecoratedType {
   /// is [undecoratedResult], and whose return type, positional parameters, and
   /// named parameters are formed by performing the given [substitution].
   DecoratedType _substituteFunctionAfterFormals(FunctionType undecoratedResult,
-      Map<TypeParameterElement, DecoratedType> substitution, bool simplify) {
+      Map<TypeParameterElement, DecoratedType> substitution) {
     var newPositionalParameters = <DecoratedType>[];
     for (int i = 0; i < positionalParameters.length; i++) {
       var numRequiredParameters = undecoratedResult.normalParameterTypes.length;
@@ -321,11 +303,11 @@ class DecoratedType {
           ? undecoratedResult.normalParameterTypes[i]
           : undecoratedResult.optionalParameterTypes[i - numRequiredParameters];
       newPositionalParameters.add(positionalParameters[i]
-          ._substitute(substitution, undecoratedParameterType, simplify));
+          ._substitute(substitution, undecoratedParameterType));
     }
     return DecoratedType(undecoratedResult, node,
-        returnType: returnType._substitute(
-            substitution, undecoratedResult.returnType, simplify),
+        returnType:
+            returnType._substitute(substitution, undecoratedResult.returnType),
         positionalParameters: newPositionalParameters);
   }
 
