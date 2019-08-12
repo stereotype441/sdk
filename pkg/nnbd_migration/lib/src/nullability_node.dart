@@ -414,7 +414,6 @@ abstract class NullabilityNode {
   /// returned.
   factory NullabilityNode.forSubstitution(
       NullabilityNode innerNode, NullabilityNode outerNode) {
-    assert(innerNode != null && outerNode != null);
     if (innerNode == null) return outerNode;
     if (outerNode == null) return innerNode;
     return NullabilityNodeForSubstitution._(innerNode, outerNode);
