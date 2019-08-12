@@ -156,21 +156,26 @@ class DecoratedTypeTest extends Object
   }
 
   test_equal_functionType_typeFormals_same_bounds() {
-    var node = newNode();
-    var t = typeParameter('T', object());
-    var u = typeParameter('U', object());
+    var n1 = newNode();
+    var n2 = newNode();
+    var bound = object();
+    var t = typeParameter('T', bound);
+    var u = typeParameter('U', bound);
     expect(
-        function(typeParameterType(t), typeFormals: [t], node: node) ==
-            function(typeParameterType(u), typeFormals: [u], node: node),
+        function(typeParameterType(t, node: n1), typeFormals: [t], node: n2) ==
+            function(typeParameterType(u, node: n1),
+                typeFormals: [u], node: n2),
         isTrue);
   }
 
   test_equal_functionType_typeFormals_same_parameters() {
-    var node = newNode();
+    var n1 = newNode();
+    var n2 = newNode();
     var t = typeParameter('T', object());
     expect(
-        function(typeParameterType(t), typeFormals: [t], node: node) ==
-            function(typeParameterType(t), typeFormals: [t], node: node),
+        function(typeParameterType(t, node: n1), typeFormals: [t], node: n2) ==
+            function(typeParameterType(t, node: n1),
+                typeFormals: [t], node: n2),
         isTrue);
   }
 

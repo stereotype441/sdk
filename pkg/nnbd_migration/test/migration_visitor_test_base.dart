@@ -75,8 +75,9 @@ mixin DecoratedTypeTester implements DecoratedTypeTesterBase {
   TypeParameterElement typeParameter(String name, DecoratedType bound) =>
       TypeParameterElementImpl.synthetic(name)..bound = bound.type;
 
-  DecoratedType typeParameterType(TypeParameterElement typeParameter) =>
-      DecoratedType(typeParameter.type, newNode());
+  DecoratedType typeParameterType(TypeParameterElement typeParameter,
+          {NullabilityNode node}) =>
+      DecoratedType(typeParameter.type, node ?? newNode());
 }
 
 abstract class DecoratedTypeTesterBase {
