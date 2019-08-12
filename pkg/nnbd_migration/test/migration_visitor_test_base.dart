@@ -24,6 +24,9 @@ import 'abstract_single_unit.dart';
 mixin DecoratedTypeTester implements DecoratedTypeTesterBase {
   int _offset = 0;
 
+  Map<TypeParameterElement, DecoratedType> _decoratedTypeParameterBounds =
+      Map.identity();
+
   NullabilityNode get always => graph.always;
 
   DecoratedType get bottom => DecoratedType(typeProvider.bottomType, never);
@@ -54,6 +57,9 @@ mixin DecoratedTypeTester implements DecoratedTypeTesterBase {
     return DecoratedType(
         FunctionTypeImpl.synthetic(returnType.type, typeFormals, parameters),
         node ?? newNode(),
+        typeFormalBounds: typeFormals
+            .map((formal) => _decoratedTypeParameterBounds[formal])
+            .toList(),
         returnType: returnType,
         positionalParameters: required.toList()..addAll(positional),
         namedParameters: named);
@@ -72,8 +78,12 @@ mixin DecoratedTypeTester implements DecoratedTypeTesterBase {
   DecoratedType object({NullabilityNode node}) =>
       DecoratedType(typeProvider.objectType, node ?? newNode());
 
-  TypeParameterElement typeParameter(String name, DecoratedType bound) =>
-      TypeParameterElementImpl.synthetic(name)..bound = bound.type;
+  TypeParameterElement typeParameter(String name, DecoratedType bound) {
+    var element = TypeParameterElementImpl.synthetic(name);
+    element.bound = bound.type;
+    _decoratedTypeParameterBounds[element] = bound;
+    return element;
+  }
 
   DecoratedType typeParameterType(TypeParameterElement typeParameter,
           {NullabilityNode node}) =>
