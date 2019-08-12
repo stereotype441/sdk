@@ -25,6 +25,8 @@ import 'case_block_not_terminated_test.dart' as case_block_not_terminated;
 import 'cast_to_non_type_test.dart' as cast_to_non_type;
 import 'concrete_class_with_abstract_member_test.dart'
     as concrete_class_with_abstract_member;
+import 'conflicting_static_and_instance_test.dart'
+    as conflicting_static_and_instance;
 import 'const_constructor_param_type_mismatch_test.dart'
     as const_constructor_param_type_mismatch;
 import 'const_constructor_with_mixin_with_field_test.dart'
@@ -227,7 +229,8 @@ import 'sdk_version_as_expression_in_const_context_test.dart'
     as sdk_version_as_expression_in_const_context;
 import 'sdk_version_async_exported_from_core_test.dart'
     as sdk_version_async_exported_from_core;
-import 'sdk_version_bool_operator_test.dart' as sdk_version_bool_operator;
+import 'sdk_version_bool_operator_in_const_context_test.dart'
+    as sdk_version_bool_operator_in_const_context;
 import 'sdk_version_eq_eq_operator_test.dart' as sdk_version_eq_eq_operator;
 import 'sdk_version_gt_gt_gt_operator_test.dart'
     as sdk_version_gt_gt_gt_operator;
@@ -306,6 +309,7 @@ main() {
     case_block_not_terminated.main();
     cast_to_non_type.main();
     concrete_class_with_abstract_member.main();
+    conflicting_static_and_instance.main();
     const_constructor_param_type_mismatch.main();
     const_constructor_with_mixin_with_field.main();
     const_eval_throws_exception.main();
@@ -445,7 +449,7 @@ main() {
     set_element_from_deferred_library.main();
     sdk_version_as_expression_in_const_context.main();
     sdk_version_async_exported_from_core.main();
-    sdk_version_bool_operator.main();
+    sdk_version_bool_operator_in_const_context.main();
     sdk_version_eq_eq_operator.main();
     sdk_version_gt_gt_gt_operator.main();
     sdk_version_is_expression_in_const_context.main();
