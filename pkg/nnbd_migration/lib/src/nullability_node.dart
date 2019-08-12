@@ -410,32 +410,12 @@ abstract class NullabilityNode {
   /// variable being eliminated by the substitution, and [innerNode] is the
   /// nullability node for the type being substituted in its place.
   ///
-  /// If [simplify] is `true`, then the following simplifications will be
-  /// performed:
-  /// - always + x => always
-  /// - never + x => x
-  /// - x + always => always
-  /// - x + never => x
+  /// If either [innerNode] or [outerNode] is `null`, then the other node is
+  /// returned.
   factory NullabilityNode.forSubstitution(
-      NullabilityNode innerNode, NullabilityNode outerNode,
-      {bool simplify: false}) {
-    assert(innerNode != null && outerNode != null);
-    if (simplify) {
-      if (innerNode is _NullabilityNodeImmutable) {
-        if (innerNode.isNullable) {
-          return innerNode;
-        } else {
-          return outerNode;
-        }
-      }
-      if (outerNode is _NullabilityNodeImmutable) {
-        if (outerNode.isNullable) {
-          return outerNode;
-        } else {
-          return innerNode;
-        }
-      }
-    }
+      NullabilityNode innerNode, NullabilityNode outerNode) {
+    if (innerNode == null) return outerNode;
+    if (outerNode == null) return innerNode;
     return NullabilityNodeForSubstitution._(innerNode, outerNode);
   }
 
