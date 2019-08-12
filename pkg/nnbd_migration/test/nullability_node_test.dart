@@ -48,8 +48,9 @@ class NullabilityNodeTest {
     unsatisfiedSubstitutions = graph.unsatisfiedSubstitutions.toList();
   }
 
-  NullabilityNode subst(NullabilityNode inner, NullabilityNode outer) {
-    return NullabilityNode.forSubstitution(inner, outer);
+  NullabilityNode subst(NullabilityNode inner, NullabilityNode outer,
+      {bool simplify: false}) {
+    return NullabilityNode.forSubstitution(inner, outer, simplify: simplify);
   }
 
   test_always_and_never_state() {
@@ -592,6 +593,22 @@ class NullabilityNodeTest {
     propagate();
     assertUnsatisfied([]);
     expect(edge.isSatisfied, true);
+  }
+
+  test_substitution_simplify_always() {
+    var n1 = newNode(1);
+    expect(subst(always, n1, simplify: true), same(always));
+    expect(subst(n1, always, simplify: true), same(always));
+    expect(subst(always, n1, simplify: false), isNot(same(always)));
+    expect(subst(n1, always, simplify: false), isNot(same(always)));
+  }
+
+  test_substitution_simplify_never() {
+    var n1 = newNode(1);
+    expect(subst(never, n1, simplify: true), same(n1));
+    expect(subst(n1, never, simplify: true), same(n1));
+    expect(subst(never, n1, simplify: false), isNot(same(n1)));
+    expect(subst(n1, never, simplify: false), isNot(same(n1)));
   }
 
   test_unconstrainted_node_non_nullable() {
