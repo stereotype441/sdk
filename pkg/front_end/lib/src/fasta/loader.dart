@@ -8,10 +8,10 @@ import 'dart:async' show Future;
 
 import 'dart:collection' show Queue;
 
-import 'package:kernel/ast.dart' show Library;
+import 'package:kernel/ast.dart' show Class, DartType, Library;
 
 import 'builder/builder.dart'
-    show ClassBuilder, Declaration, LibraryBuilder, TypeBuilder;
+    show ClassBuilder, Builder, LibraryBuilder, TypeBuilder;
 
 import 'crash.dart' show firstSourceUri;
 
@@ -121,7 +121,7 @@ abstract class Loader {
             break;
         }
       }
-      bool hasValidPackageSpecifiedLanguageVersion = false;
+      bool hasPackageSpecifiedLanguageVersion = false;
       int packageSpecifiedLanguageVersionMajor;
       int packageSpecifiedLanguageVersionMinor;
       if (packageFragment != null) {
@@ -129,6 +129,7 @@ abstract class Loader {
         for (int i = 0; i < properties.length; ++i) {
           String property = properties[i];
           if (property.startsWith("dart=")) {
+            hasPackageSpecifiedLanguageVersion = true;
             String langaugeVersionString = property.substring(5);
 
             // Verify that the version is x.y[whatever]
@@ -138,23 +139,14 @@ abstract class Loader {
                   int.tryParse(dotSeparatedParts[0]);
               packageSpecifiedLanguageVersionMinor =
                   int.tryParse(dotSeparatedParts[1]);
-              if (packageSpecifiedLanguageVersionMajor != null &&
-                  packageSpecifiedLanguageVersionMinor != null) {
-                hasValidPackageSpecifiedLanguageVersion = true;
-              }
             }
-
-            if (!hasValidPackageSpecifiedLanguageVersion) {
-              // TODO(jensj): Issue error here.
-            }
-
             break;
           }
         }
       }
       LibraryBuilder library =
           target.createLibraryBuilder(uri, fileUri, origin);
-      if (hasValidPackageSpecifiedLanguageVersion) {
+      if (hasPackageSpecifiedLanguageVersion) {
         library.setLanguageVersion(packageSpecifiedLanguageVersionMajor,
             packageSpecifiedLanguageVersionMinor,
             explicit: false);
@@ -331,19 +323,19 @@ fileUri: ${contextMessage.uri}
     return formattedMessage;
   }
 
-  Declaration getAbstractClassInstantiationError() {
+  Builder getAbstractClassInstantiationError() {
     return target.getAbstractClassInstantiationError(this);
   }
 
-  Declaration getCompileTimeError() => target.getCompileTimeError(this);
+  Builder getCompileTimeError() => target.getCompileTimeError(this);
 
-  Declaration getDuplicatedFieldInitializerError() {
+  Builder getDuplicatedFieldInitializerError() {
     return target.getDuplicatedFieldInitializerError(this);
   }
 
-  Declaration getNativeAnnotation() => target.getNativeAnnotation(this);
+  Builder getNativeAnnotation() => target.getNativeAnnotation(this);
 
-  ClassBuilder computeClassBuilderFromTargetClass(covariant Object cls);
+  ClassBuilder computeClassBuilderFromTargetClass(Class cls);
 
-  TypeBuilder computeTypeBuilder(covariant Object type);
+  TypeBuilder computeTypeBuilder(DartType type);
 }

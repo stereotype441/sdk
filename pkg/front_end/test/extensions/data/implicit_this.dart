@@ -9,32 +9,35 @@ class A1 {
 
 /*class: A2:
  builder-name=A2,
- builder-onTypes=[A1],
- builder-supertype=Object,
- cls-name=A2,
- cls-supertype=Object
+ builder-onType=A1,
+ extension-members=[
+  method2=A2|method2,
+  method3=A2|method3,
+  method4=A2|method4],
+ extension-name=A2,
+ extension-onType=A1
 */
 extension A2 on A1 {
-  /*member: A2.method2:
+  /*member: A2|method2:
    builder-name=method2,
    builder-params=[#this],
-   member-name=method2,
+   member-name=A2|method2,
    member-params=[#this]
   */
   void method2() => method1();
 
-  /*member: A2.method3:
+  /*member: A2|method3:
    builder-name=method3,
    builder-params=[#this],
-   member-name=method3,
+   member-name=A2|method3,
    member-params=[#this]
   */
   Object method3() => field;
 
-  /*member: A2.method4:
+  /*member: A2|method4:
    builder-name=method4,
    builder-params=[#this,o],
-   member-name=method4,
+   member-name=A2|method4,
    member-params=[#this,o]
   */
   void method4(Object o) {

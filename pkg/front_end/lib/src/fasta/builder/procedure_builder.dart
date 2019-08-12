@@ -15,7 +15,7 @@ import 'package:kernel/type_algebra.dart';
 
 import 'builder.dart'
     show
-        Declaration,
+        Builder,
         FormalParameterBuilder,
         LibraryBuilder,
         MemberBuilder,
@@ -23,6 +23,8 @@ import 'builder.dart'
         Scope,
         TypeBuilder,
         TypeVariableBuilder;
+
+import 'extension_builder.dart';
 
 import 'package:kernel/ast.dart'
     show
@@ -65,7 +67,7 @@ import '../kernel/kernel_builder.dart'
     show
         ClassBuilder,
         ConstructorReferenceBuilder,
-        Declaration,
+        Builder,
         FormalParameterBuilder,
         LibraryBuilder,
         MetadataBuilder,
@@ -96,8 +98,6 @@ import '../problems.dart' show unexpected;
 
 import '../source/source_library_builder.dart' show SourceLibraryBuilder;
 
-import '../source/source_loader.dart' show SourceLoader;
-
 import '../type_inference/type_inference_engine.dart'
     show IncludesTypeParametersNonCovariantly, Variance;
 
@@ -116,9 +116,9 @@ abstract class FunctionBuilder extends MemberBuilder {
   final List<FormalParameterBuilder> formals;
 
   /// If this procedure is an instance member declared in an extension
-  /// declaration, [extensionThis] holds the synthetically added `this`
+  /// declaration, [_extensionThis] holds the synthetically added `this`
   /// parameter.
-  VariableDeclaration extensionThis;
+  VariableDeclaration _extensionThis;
 
   FunctionBuilder(
       this.metadata,
@@ -157,10 +157,10 @@ abstract class FunctionBuilder extends MemberBuilder {
   bool get isFactory => identical(ProcedureKind.Factory, kind);
 
   /// This is the formal parameter scope as specified in the Dart Programming
-  /// Language Specifiction, 4th ed, section 9.2.
+  /// Language Specification, 4th ed, section 9.2.
   Scope computeFormalParameterScope(Scope parent) {
     if (formals == null) return parent;
-    Map<String, Declaration> local = <String, Declaration>{};
+    Map<String, Builder> local = <String, Builder>{};
     for (FormalParameterBuilder formal in formals) {
       if (!isConstructor || !formal.isInitializingFormal) {
         local[formal.name] = formal;
@@ -187,7 +187,7 @@ abstract class FunctionBuilder extends MemberBuilder {
     // parameter initializer scope.
 
     if (formals == null) return parent;
-    Map<String, Declaration> local = <String, Declaration>{};
+    Map<String, Builder> local = <String, Builder>{};
     for (FormalParameterBuilder formal in formals) {
       local[formal.name] = formal.forFormalParameterInitializerScope();
     }
@@ -196,11 +196,11 @@ abstract class FunctionBuilder extends MemberBuilder {
   }
 
   /// This scope doesn't correspond to any scope specified in the Dart
-  /// Programming Language Specifiction, 4th ed. It's an unspecified extension
+  /// Programming Language Specification, 4th ed. It's an unspecified extension
   /// to support generic methods.
   Scope computeTypeParameterScope(Scope parent) {
     if (typeVariables == null) return parent;
-    Map<String, Declaration> local = <String, Declaration>{};
+    Map<String, Builder> local = <String, Builder>{};
     for (TypeVariableBuilder variable in typeVariables) {
       local[variable.name] = variable;
     }
@@ -324,7 +324,9 @@ abstract class FunctionBuilder extends MemberBuilder {
     if (returnType != null) {
       result.returnType = returnType.build(library);
     }
-    if (!isConstructor && !isInstanceMember && parent is ClassBuilder) {
+    if (!isConstructor &&
+        !isDeclarationInstanceMember &&
+        parent is ClassBuilder) {
       List<TypeParameter> typeParameters = parent.target.typeParameters;
       if (typeParameters.isNotEmpty) {
         Map<TypeParameter, DartType> substitution;
@@ -356,13 +358,18 @@ abstract class FunctionBuilder extends MemberBuilder {
         }
       }
     }
-    if (parent is ClassBuilder) {
-      ClassBuilder cls = parent;
-      if (cls.isExtension && isInstanceMember) {
-        extensionThis = result.positionalParameters.first;
-      }
+    if (isExtensionInstanceMember) {
+      _extensionThis = result.positionalParameters.first;
     }
     return function = result;
+  }
+
+  /// Returns the parameter for 'this' synthetically added to extension
+  /// instance members.
+  VariableDeclaration get extensionThis {
+    assert(_extensionThis != null || !isExtensionInstanceMember,
+        "ProcedureBuilder.extensionThis has not been set.");
+    return _extensionThis;
   }
 
   Member build(SourceLibraryBuilder library);
@@ -384,7 +391,7 @@ abstract class FunctionBuilder extends MemberBuilder {
   }
 
   void becomeNative(Loader loader) {
-    Declaration constructor = loader.getNativeAnnotation();
+    Builder constructor = loader.getNativeAnnotation();
     Arguments arguments =
         new Arguments(<Expression>[new StringLiteral(nativeMethodName)]);
     Expression annotation;
@@ -411,7 +418,7 @@ abstract class FunctionBuilder extends MemberBuilder {
     return true;
   }
 
-  void reportPatchMismatch(Declaration patch) {
+  void reportPatchMismatch(Builder patch) {
     library.addProblem(messagePatchDeclarationMismatch, patch.charOffset,
         noLength, patch.fileUri, context: [
       messagePatchDeclarationOrigin.withLocation(fileUri, charOffset, noLength)
@@ -477,7 +484,7 @@ class ProcedureBuilder extends FunctionBuilder {
 
   bool get isEligibleForTopLevelInference {
     if (library.legacyMode) return false;
-    if (isInstanceMember) {
+    if (isDeclarationInstanceMember) {
       if (returnType == null) return true;
       if (formals != null) {
         for (var formal in formals) {
@@ -488,6 +495,11 @@ class ProcedureBuilder extends FunctionBuilder {
     return false;
   }
 
+  /// Returns `true` if this procedure is declared in an extension declaration.
+  bool get isExtensionMethod {
+    return parent is ExtensionBuilder;
+  }
+
   Procedure build(SourceLibraryBuilder library) {
     // TODO(ahe): I think we may call this twice on parts. Investigate.
     if (procedure.name == null) {
@@ -496,10 +508,18 @@ class ProcedureBuilder extends FunctionBuilder {
       procedure.function.fileOffset = charOpenParenOffset;
       procedure.function.fileEndOffset = procedure.fileEndOffset;
       procedure.isAbstract = isAbstract;
-      procedure.isStatic = isStatic;
       procedure.isExternal = isExternal;
       procedure.isConst = isConst;
-      procedure.name = new Name(name, library.target);
+      if (isExtensionMethod) {
+        ExtensionBuilder extension = parent;
+        procedure.isStatic = false;
+        procedure.isExtensionMethod = true;
+        procedure.kind = ProcedureKind.Method;
+        procedure.name = new Name('${extension.name}|${name}', library.target);
+      } else {
+        procedure.isStatic = isStatic;
+        procedure.name = new Name(name, library.target);
+      }
     }
     return procedure;
   }
@@ -533,7 +553,7 @@ class ProcedureBuilder extends FunctionBuilder {
   }
 
   @override
-  void applyPatch(Declaration patch) {
+  void applyPatch(Builder patch) {
     if (patch is ProcedureBuilder) {
       if (checkPatch(patch)) {
         patch.actualOrigin = this;
@@ -584,7 +604,11 @@ class ConstructorBuilder extends FunctionBuilder {
   @override
   ConstructorBuilder get origin => actualOrigin ?? this;
 
-  bool get isInstanceMember => false;
+  @override
+  bool get isDeclarationInstanceMember => false;
+
+  @override
+  bool get isClassInstanceMember => false;
 
   bool get isConstructor => true;
 
@@ -640,11 +664,6 @@ class ConstructorBuilder extends FunctionBuilder {
           library, classBuilder, this, classBuilder.scope, fileUri);
       bodyBuilder.constantContext = ConstantContext.inferred;
       bodyBuilder.parseInitializers(beginInitializers);
-      if (library.loader is SourceLoader) {
-        SourceLoader loader = library.loader;
-        loader.transformPostInference(target, bodyBuilder.transformSetLiterals,
-            bodyBuilder.transformCollections);
-      }
       bodyBuilder.resolveRedirectingFactoryTargets();
     }
     beginInitializers = null;
@@ -746,7 +765,7 @@ class ConstructorBuilder extends FunctionBuilder {
   }
 
   @override
-  void applyPatch(Declaration patch) {
+  void applyPatch(Builder patch) {
     if (patch is ConstructorBuilder) {
       if (checkPatch(patch)) {
         patch.actualOrigin = this;

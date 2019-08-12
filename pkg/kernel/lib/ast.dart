@@ -352,6 +352,7 @@ class Library extends NamedNode
 
   final List<Typedef> typedefs;
   final List<Class> classes;
+  final List<Extension> extensions;
   final List<Procedure> procedures;
   final List<Field> fields;
 
@@ -363,6 +364,7 @@ class Library extends NamedNode
       List<LibraryPart> parts,
       List<Typedef> typedefs,
       List<Class> classes,
+      List<Extension> extensions,
       List<Procedure> procedures,
       List<Field> fields,
       this.fileUri,
@@ -372,6 +374,7 @@ class Library extends NamedNode
         this.parts = parts ?? <LibraryPart>[],
         this.typedefs = typedefs ?? <Typedef>[],
         this.classes = classes ?? <Class>[],
+        this.extensions = extensions ?? <Extension>[],
         this.procedures = procedures ?? <Procedure>[],
         this.fields = fields ?? <Field>[],
         super(reference) {
@@ -380,6 +383,7 @@ class Library extends NamedNode
     setParents(this.parts, this);
     setParents(this.typedefs, this);
     setParents(this.classes, this);
+    setParents(this.extensions, this);
     setParents(this.procedures, this);
     setParents(this.fields, this);
   }
@@ -410,6 +414,11 @@ class Library extends NamedNode
   void addClass(Class class_) {
     class_.parent = this;
     classes.add(class_);
+  }
+
+  void addExtension(Extension extension) {
+    extension.parent = this;
+    extensions.add(extension);
   }
 
   void addField(Field field) {
@@ -1105,6 +1114,129 @@ class Class extends NamedNode implements Annotatable, FileUriNode {
   }
 }
 
+/// Declaration of an extension.
+///
+/// The members are converted into top-level procedures and only accessible
+/// by reference in the [Extension] node.
+class Extension extends NamedNode implements FileUriNode {
+  /// Name of the extension.
+  ///
+  /// If unnamed, the extension will be given a synthesized name by the
+  /// front end.
+  String name;
+
+  /// The URI of the source file this class was loaded from.
+  Uri fileUri;
+
+  /// Type parameters declared on the extension.
+  final List<TypeParameter> typeParameters;
+
+  /// The type in the 'on clause' of the extension declaration.
+  ///
+  /// For instance A in:
+  ///
+  ///   class A {}
+  ///   extension B on A {}
+  ///
+  DartType onType;
+
+  /// The members declared by the extension.
+  ///
+  /// The members are converted into top-level members and only accessible
+  /// by reference through [ExtensionMemberDescriptor].
+  final List<ExtensionMemberDescriptor> members;
+
+  Extension(
+      {this.name,
+      List<TypeParameter> typeParameters,
+      this.onType,
+      List<Reference> members,
+      this.fileUri,
+      Reference reference})
+      : this.typeParameters = typeParameters ?? <TypeParameter>[],
+        this.members = members ?? <ExtensionMemberDescriptor>[],
+        super(reference);
+
+  Library get enclosingLibrary => parent;
+
+  @override
+  accept(TreeVisitor v) => v.visitExtension(this);
+
+  @override
+  visitChildren(Visitor v) {}
+
+  @override
+  transformChildren(Transformer v) => v.visitExtension(this);
+}
+
+/// Information about an member declaration in an extension.
+class ExtensionMemberDescriptor {
+  /// The name of the extension member.
+  ///
+  /// The name of the generated top-level member is mangled to ensure
+  /// uniqueness. This name is used to lookup an extension method the
+  /// extension itself.
+  Name name;
+
+  /// [ProcedureKind] kind of the original member, if the extension is a
+  /// [Procedure] and `null` otherwise.
+  ///
+  /// This can be either `Method`, `Getter`, `Setter`, or `Operator`.
+  ///
+  /// An extension method is converted into a regular top-level method. For
+  /// instance:
+  ///
+  ///     class A {
+  ///       var foo;
+  ///     }
+  ///     extension B on A {
+  ///       get bar => this.foo;
+  ///     }
+  ///
+  /// will be converted into
+  ///
+  ///     class A {}
+  ///     B|get|bar(A #this) => #this.foo;
+  ///
+  /// where `B|get|bar` is the synthesized name of the top-level method and
+  /// `#this` is the synthesized parameter that holds represents `this`.
+  ///
+  ProcedureKind kind;
+
+  int flags = 0;
+
+  /// Reference to the top-level member created for the extension method.
+  Reference member;
+
+  ExtensionMemberDescriptor(
+      {this.name,
+      this.kind,
+      bool isStatic: false,
+      bool isExternal: false,
+      this.member}) {
+    this.isStatic = isStatic;
+    this.isExternal = isExternal;
+  }
+
+  /// Return `true` if the extension method was declared as `static`.
+  bool get isStatic => flags & Procedure.FlagStatic != 0;
+
+  /// Return `true` if the extension method was declared as `external`.
+  bool get isExternal => flags & Procedure.FlagExternal != 0;
+
+  void set isStatic(bool value) {
+    flags = value
+        ? (flags | Procedure.FlagStatic)
+        : (flags & ~Procedure.FlagStatic);
+  }
+
+  void set isExternal(bool value) {
+    flags = value
+        ? (flags | Procedure.FlagExternal)
+        : (flags & ~Procedure.FlagExternal);
+  }
+}
+
 // ------------------------------------------------------------------------
 //                            MEMBERS
 // ------------------------------------------------------------------------
@@ -1649,6 +1781,7 @@ class Procedure extends Member {
       bool isConst: false,
       bool isForwardingStub: false,
       bool isForwardingSemiStub: false,
+      bool isExtensionMethod: false,
       int transformerFlags: 0,
       Uri fileUri,
       Reference reference,
@@ -1661,6 +1794,7 @@ class Procedure extends Member {
             isConst: isConst,
             isForwardingStub: isForwardingStub,
             isForwardingSemiStub: isForwardingSemiStub,
+            isExtensionMethod: isExtensionMethod,
             transformerFlags: transformerFlags,
             fileUri: fileUri,
             reference: reference,
@@ -1676,6 +1810,7 @@ class Procedure extends Member {
       bool isConst: false,
       bool isForwardingStub: false,
       bool isForwardingSemiStub: false,
+      bool isExtensionMethod: false,
       int transformerFlags: 0,
       Uri fileUri,
       Reference reference,
@@ -1689,6 +1824,7 @@ class Procedure extends Member {
     this.isConst = isConst;
     this.isForwardingStub = isForwardingStub;
     this.isForwardingSemiStub = isForwardingSemiStub;
+    this.isExtensionMethod = isExtensionMethod;
     this.transformerFlags = transformerFlags;
   }
 
@@ -1701,6 +1837,7 @@ class Procedure extends Member {
   // TODO(29841): Remove this flag after the issue is resolved.
   static const int FlagRedirectingFactoryConstructor = 1 << 6;
   static const int FlagNoSuchMethodForwarder = 1 << 7;
+  static const int FlagExtensionMethod = 1 << 8;
 
   bool get isStatic => flags & FlagStatic != 0;
   bool get isAbstract => flags & FlagAbstract != 0;
@@ -1736,6 +1873,18 @@ class Procedure extends Member {
   bool get isSyntheticForwarder => isForwardingStub && !isForwardingSemiStub;
 
   bool get isNoSuchMethodForwarder => flags & FlagNoSuchMethodForwarder != 0;
+
+  /// If `true` this procedure is compiled from a method declared in
+  /// an extension declaration.
+  ///
+  /// For instance `method1` and `method2` in:
+  ///
+  ///     extension A on B {
+  ///       B method1() => this;
+  ///       static B method2() => new B();
+  ///     }
+  ///
+  bool get isExtensionMethod => flags & FlagExtensionMethod != 0;
 
   void set isStatic(bool value) {
     flags = value ? (flags | FlagStatic) : (flags & ~FlagStatic);
@@ -1774,6 +1923,11 @@ class Procedure extends Member {
     flags = value
         ? (flags | FlagNoSuchMethodForwarder)
         : (flags & ~FlagNoSuchMethodForwarder);
+  }
+
+  void set isExtensionMethod(bool value) {
+    flags =
+        value ? (flags | FlagExtensionMethod) : (flags & ~FlagExtensionMethod);
   }
 
   bool get isInstanceMember => !isStatic;

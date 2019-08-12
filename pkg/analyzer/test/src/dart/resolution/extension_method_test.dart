@@ -4,6 +4,7 @@
 
 import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/src/dart/analysis/driver.dart';
+import 'package:analyzer/src/error/codes.dart';
 import 'package:analyzer/src/generated/engine.dart';
 import 'package:test/test.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
@@ -152,12 +153,68 @@ extension on C {}
     assertElement(extendedType, findElement.class_('C'));
     assertType(extendedType, 'C');
   }
+
+  test_visibility_hidden() async {
+    newFile('/test/lib/lib.dart', content: '''
+class C {}
+extension E on C {
+  int a = 1;
+}
+''');
+    await assertErrorsInCode('''
+import 'lib.dart' hide E;
+
+f(C c) {
+  c.a;
+}
+''', [
+      error(StaticTypeWarningCode.UNDEFINED_GETTER, 40, 1),
+    ]);
+  }
+
+  test_visibility_notShown() async {
+    newFile('/test/lib/lib.dart', content: '''
+class C {}
+extension E on C {
+  int a = 1;
+}
+''');
+    await assertErrorsInCode('''
+import 'lib.dart' show C;
+
+f(C c) {
+  c.a;
+}
+''', [
+      error(StaticTypeWarningCode.UNDEFINED_GETTER, 40, 1),
+    ]);
+  }
 }
 
 /// Tests that extension members can be correctly resolved when referenced
 /// by code external to the extension declaration.
 @reflectiveTest
 class ExtensionMethodsExternalReferenceTest extends BaseExtensionMethodsTest {
+  /// Corresponds to: extension_member_resolution_t07
+  test_dynamicInvocation() async {
+    await assertNoErrorsInCode(r'''
+class A {}
+class C extends A {
+  String method(int i) => "$i";
+  noSuchMethod(Invocation i) { }
+}
+
+extension E<T extends A> on T {
+  String method(int i, String s) => '';
+}
+
+main() {
+  dynamic c = new C();
+  c.method(42, "-42");
+}
+''');
+  }
+
   test_instance_call_fromExtendedType() async {
     await assertNoErrorsInCode('''
 class C {
@@ -977,6 +1034,35 @@ f() => E.a;
     assertElement(identifier, findElement.method('a'));
     assertType(identifier, 'void Function(int)');
   }
+
+  test_thisAccessOnDynamic() async {
+    await assertNoErrorsInCode('''
+extension on dynamic {
+  int get d => 3;
+
+  void testDynamic() {
+    // Static type of `this` is dynamic, allows dynamic invocation.
+    this.arglebargle();
+  }
+}
+''');
+  }
+
+  test_thisAccessOnFunction() async {
+    await assertNoErrorsInCode('''
+extension on Function {
+  int get f => 4;
+
+  void testFunction() {
+    // Static type of `this` is Function. Allows any dynamic invocation.
+    this();
+    this(1);
+    this(x: 1);
+    // No function can have both optional positional and named parameters.
+  }
+}
+''');
+  }
 }
 
 /// Tests that extension members can be correctly resolved when referenced
@@ -1403,5 +1489,117 @@ extension E on C {
     var identifier = findNode.simple('a;');
     assertElement(identifier, findElement.method('a'));
     assertType(identifier, 'void Function(int)');
+  }
+
+  test_topLevel_function_fromInstance() async {
+    await assertNoErrorsInCode('''
+class C {
+  void a() {}
+}
+
+void a() {}
+
+extension E on C {
+  void b() {
+    a();
+  }
+}
+''');
+    var invocation = findNode.methodInvocation('a();');
+    assertElement(invocation, findElement.topFunction('a'));
+    assertInvokeType(invocation, 'void Function()');
+  }
+
+  test_topLevel_function_fromStatic() async {
+    await assertNoErrorsInCode('''
+class C {
+  void a() {}
+}
+
+void a() {}
+
+extension E on C {
+  static void b() {
+    a();
+  }
+}
+''');
+    var invocation = findNode.methodInvocation('a();');
+    assertElement(invocation, findElement.topFunction('a'));
+    assertInvokeType(invocation, 'void Function()');
+  }
+
+  test_topLevel_getter_fromInstance() async {
+    await assertNoErrorsInCode('''
+class C {
+  int get a => 0;
+}
+
+int get a => 0;
+
+extension E on C {
+  void b() {
+    a;
+  }
+}
+''');
+    var identifier = findNode.simple('a;');
+    assertElement(identifier, findElement.topGet('a'));
+    assertType(identifier, 'int');
+  }
+
+  test_topLevel_getter_fromStatic() async {
+    await assertNoErrorsInCode('''
+class C {
+  int get a => 0;
+}
+
+int get a => 0;
+
+extension E on C {
+  static void b() {
+    a;
+  }
+}
+''');
+    var identifier = findNode.simple('a;');
+    assertElement(identifier, findElement.topGet('a'));
+    assertType(identifier, 'int');
+  }
+
+  test_topLevel_setter_fromInstance() async {
+    await assertNoErrorsInCode('''
+class C {
+  set a(int _) {}
+}
+
+set a(int _) {}
+
+extension E on C {
+  void b() {
+    a = 0;
+  }
+}
+''');
+    var identifier = findNode.simple('a = 0;');
+    assertElement(identifier, findElement.topSet('a'));
+  }
+
+  test_topLevel_setter_fromStatic() async {
+    await assertNoErrorsInCode('''
+class C {
+  set a(int _) {}
+}
+
+set a(int _) {}
+
+extension E on C {
+  static void b() {
+    a = 0;
+  }
+}
+''');
+    var identifier = findNode.simple('a = 0;');
+    assertElement(identifier, findElement.topSet('a'));
   }
 }

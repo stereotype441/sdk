@@ -80,6 +80,7 @@ DEFINE_FLAG(bool,
             false,
             "Remove script timestamps to allow for deterministic testing.");
 
+DECLARE_FLAG(bool, dual_map_code);
 DECLARE_FLAG(bool, intrinsify);
 DECLARE_FLAG(bool, show_invisible_frames);
 DECLARE_FLAG(bool, trace_deoptimization);
@@ -8085,8 +8086,9 @@ void Function::SetDeoptReasonForAll(intptr_t deopt_id,
 }
 
 bool Function::CheckSourceFingerprint(const char* prefix, int32_t fp) const {
-  // TODO(alexmarkov): '(kernel_offset() <= 0)' looks like an impossible
-  // condition, fix this and re-enable fingerprints checking.
+  // TODO(36376): Restore checking fingerprints of recognized methods.
+  // '(kernel_offset() <= 0)' looks like an impossible condition, fix this and
+  //  re-enable fingerprints checking.
   if (!Isolate::Current()->obfuscate() && !is_declared_in_bytecode() &&
       (kernel_offset() <= 0) && (SourceFingerprint() != fp)) {
     const bool recalculatingFingerprints = false;
@@ -12536,6 +12538,7 @@ void Library::CheckFunctionFingerprints() {
   all_libs.Add(&Library::ZoneHandle(Library::TypedDataLibrary()));
   all_libs.Add(&Library::ZoneHandle(Library::CollectionLibrary()));
   all_libs.Add(&Library::ZoneHandle(Library::InternalLibrary()));
+  all_libs.Add(&Library::ZoneHandle(Library::FfiLibrary()));
   OTHER_RECOGNIZED_LIST(CHECK_FINGERPRINTS2);
   POLYMORPHIC_TARGET_LIST(CHECK_FINGERPRINTS);
 
@@ -14964,15 +14967,24 @@ RawCode* Code::FinalizeCode(FlowGraphCompiler* compiler,
       // Check if a dual mapping exists.
       instrs = Instructions::RawCast(HeapPage::ToExecutable(instrs.raw()));
       uword exec_address = RawObject::ToAddr(instrs.raw());
-      if (exec_address != address) {
+      const bool use_dual_mapping = exec_address != address;
+      ASSERT(use_dual_mapping == FLAG_dual_map_code);
+
+      // When dual mapping is enabled the executable mapping is RX from the
+      // point of allocation and never changes protection.
+      // Yet the writable mapping is still turned back from RW to R.
+      if (use_dual_mapping) {
         VirtualMemory::Protect(reinterpret_cast<void*>(address),
                                instrs.raw()->HeapSize(),
                                VirtualMemory::kReadOnly);
         address = exec_address;
+      } else {
+        // If dual mapping is disabled and we write protect then we have to
+        // change the single mapping from RW -> RX.
+        VirtualMemory::Protect(reinterpret_cast<void*>(address),
+                               instrs.raw()->HeapSize(),
+                               VirtualMemory::kReadExecute);
       }
-      VirtualMemory::Protect(reinterpret_cast<void*>(address),
-                             instrs.raw()->HeapSize(),
-                             VirtualMemory::kReadExecute);
     }
 
     // Hook up Code and Instructions objects.

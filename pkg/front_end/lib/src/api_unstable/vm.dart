@@ -3,7 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 export '../api_prototype/compiler_options.dart'
-    show CompilerOptions, parseExperimentalFlags;
+    show CompilerOptions, parseExperimentalArguments, parseExperimentalFlags;
 
 export '../api_prototype/diagnostic_message.dart'
     show DiagnosticMessage, DiagnosticMessageHandler, getMessageUri;
@@ -14,11 +14,13 @@ export '../api_prototype/experimental_flags.dart'
 export '../api_prototype/file_system.dart'
     show FileSystem, FileSystemEntity, FileSystemException;
 
+export '../api_prototype/front_end.dart' show CompilerResult;
+
 export '../api_prototype/incremental_kernel_generator.dart'
     show IncrementalKernelGenerator, isLegalIdentifier;
 
 export '../api_prototype/kernel_generator.dart'
-    show kernelForComponent, kernelForProgram;
+    show kernelForModule, kernelForProgram;
 
 export '../api_prototype/memory_file_system.dart' show MemoryFileSystem;
 

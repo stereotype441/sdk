@@ -29,12 +29,12 @@ jsBuiltin_rawRtiToJsConstructorName() {
   return JS_BUILTIN('String', JsBuiltin.rawRtiToJsConstructorName, null);
 }
 
-/*member: jsEmbeddedGlobal_getTypeFromName:SideEffects(reads static; writes nothing)*/
+/*member: jsEmbeddedGlobal_getTypeFromName:SideEffects(reads nothing; writes nothing)*/
 jsEmbeddedGlobal_getTypeFromName() {
   return JS_EMBEDDED_GLOBAL('', GET_TYPE_FROM_NAME);
 }
 
-/*member: jsEmbeddedGlobal_libraries:SideEffects(reads static; writes nothing)*/
+/*member: jsEmbeddedGlobal_libraries:SideEffects(reads nothing; writes nothing)*/
 jsEmbeddedGlobal_libraries() {
   return JS_EMBEDDED_GLOBAL('JSExtendableArray|Null', LIBRARIES);
 }
