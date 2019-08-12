@@ -1013,9 +1013,6 @@ $stackTrace''');
           DecoratedType bound;
           bound =
               _variables.decoratedTypeParameterBound(element.typeParameters[i]);
-          if (bound == null) {
-            print('BAD');
-          }
           assert(bound != null);
           var argumentType =
               _variables.decoratedTypeAnnotation(_source, typeArguments[i]);

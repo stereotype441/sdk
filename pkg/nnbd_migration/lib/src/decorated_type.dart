@@ -13,6 +13,12 @@ import 'package:nnbd_migration/src/potential_modification.dart';
 /// tracking the (unmigrated) [DartType], we track the [ConstraintVariable]s
 /// indicating whether the type, and the types that compose it, are nullable.
 class DecoratedType {
+  /// Mapping from type parameter elements to the decorated types of those type
+  /// parameters' bounds.
+  ///
+  /// This expando only applies to type parameters whose enclosing element is
+  /// `null`.  Type parameters whose enclosing element is not `null` should be
+  /// stored in [Variables._decoratedTypeParameterBounds].
   static final _decoratedTypeParameterBounds = Expando<DecoratedType>();
 
   final DartType type;
@@ -305,12 +311,22 @@ class DecoratedType {
         positionalParameters: newPositionalParameters);
   }
 
+  /// Retrieves the decorated bound of the given [typeParameter].
+  ///
+  /// [typeParameter] must have an enclosing element of `null`.  Type parameters
+  /// whose enclosing element is not `null` are tracked by the [Variables]
+  /// class.
   static DecoratedType decoratedTypeParameterBound(
       TypeParameterElement typeParameter) {
     assert(typeParameter.enclosingElement == null);
     return _decoratedTypeParameterBounds[typeParameter];
   }
 
+  /// Stores he decorated bound of the given [typeParameter].
+  ///
+  /// [typeParameter] must have an enclosing element of `null`.  Type parameters
+  /// whose enclosing element is not `null` are tracked by the [Variables]
+  /// class.
   static void recordTypeParameterBound(
       TypeParameterElement typeParameter, DecoratedType bound) {
     assert(typeParameter.enclosingElement == null);

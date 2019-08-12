@@ -146,6 +146,7 @@ class Variables implements VariableRecorder, VariableRepository {
         {})[_uniqueOffsetForTypeAnnotation(node)] = type;
   }
 
+  @override
   void recordDecoratedTypeParameterBound(
       TypeParameterElement typeParameter, DecoratedType bound) {
     if (typeParameter.enclosingElement == null) {

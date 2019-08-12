@@ -548,6 +548,7 @@ abstract class VariableRecorder {
       Source source, TypeAnnotation node, DecoratedTypeAnnotation type,
       {bool potentialModification: true});
 
+  /// Stores he decorated bound of the given [typeParameter].
   void recordDecoratedTypeParameterBound(
       TypeParameterElement typeParameter, DecoratedType bound);
 
@@ -583,6 +584,7 @@ abstract class VariableRepository {
   DecoratedType decoratedTypeAnnotation(
       Source source, TypeAnnotation typeAnnotation);
 
+  /// Retrieves the decorated bound of the given [typeParameter].
   DecoratedType decoratedTypeParameterBound(TypeParameterElement typeParameter);
 
   /// Records conditional discard information for the given AST node (which is
