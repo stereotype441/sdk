@@ -13,6 +13,8 @@ import 'package:nnbd_migration/src/potential_modification.dart';
 /// tracking the (unmigrated) [DartType], we track the [ConstraintVariable]s
 /// indicating whether the type, and the types that compose it, are nullable.
 class DecoratedType {
+  static final _decoratedTypeParameterBounds = Expando<DecoratedType>();
+
   final DartType type;
 
   final NullabilityNode node;
@@ -34,8 +36,6 @@ class DecoratedType {
   ///
   /// TODO(paulberry): how should we handle generic typedefs?
   final List<DecoratedType> typeArguments;
-
-  static final _decoratedTypeParameterBounds = Expando<DecoratedType>();
 
   DecoratedType(this.type, this.node,
       {this.returnType,
@@ -305,12 +305,16 @@ class DecoratedType {
         positionalParameters: newPositionalParameters);
   }
 
-  static void recordTypeParameterBound(TypeParameterElement typeParameter, DecoratedType bound) {
-    _decoratedTypeParameterBounds[typeParameter] = bound;
+  static DecoratedType decoratedTypeParameterBound(
+      TypeParameterElement typeParameter) {
+    assert(typeParameter.enclosingElement == null);
+    return _decoratedTypeParameterBounds[typeParameter];
   }
 
-  static DecoratedType decoratedTypeParameterBound(TypeParameterElement typeParameter) {
-    return _decoratedTypeParameterBounds[typeParameter];
+  static void recordTypeParameterBound(
+      TypeParameterElement typeParameter, DecoratedType bound) {
+    assert(typeParameter.enclosingElement == null);
+    _decoratedTypeParameterBounds[typeParameter] = bound;
   }
 }
 
