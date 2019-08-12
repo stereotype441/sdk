@@ -1006,7 +1006,7 @@ $stackTrace''');
         for (int i = 0; i < instantiatedType.typeArguments.length; i++) {
           _unionDecoratedTypes(
               instantiatedType.typeArguments[i],
-              _variables.decoratedElementType(element.typeParameters[i]),
+              _variables.decoratedTypeParameterBound(element.typeParameters[i]),
               origin);
         }
       } else {
