@@ -90,6 +90,8 @@ mixin DecoratedTypeTester implements DecoratedTypeTesterBase {
       DecoratedType(typeParameter.type, node ?? newNode());
 }
 
+/// Base functionality that must be implemented by classes mixing in
+/// [DecoratedTypeTester].
 abstract class DecoratedTypeTesterBase {
   NullabilityGraph get graph;
 
