@@ -145,14 +145,15 @@ class DecoratedTypeTest extends Object
         isTrue);
   }
 
-  solo_test_equal_functionType_typeFormals_different_bounds() {
+  test_equal_functionType_typeFormals_different_bounds() {
     var n1 = newNode();
     var n2 = newNode();
     var t = typeParameter('T', object());
     var u = typeParameter('U', int_());
     expect(
         function(typeParameterType(t, node: n1), typeFormals: [t], node: n2) ==
-            function(typeParameterType(u, node: n1), typeFormals: [u], node: n2),
+            function(typeParameterType(u, node: n1),
+                typeFormals: [u], node: n2),
         isFalse);
   }
 
