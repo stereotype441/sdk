@@ -4,6 +4,9 @@
 
 /*library: languageVersion=2.5*/
 
+import 'foo2.dart';
+
 foo() {
   print("Hello from foo!");
+  foo2();
 }

@@ -1121,6 +1121,11 @@ static void TrySwitchInstanceCall(const ICData& ic_data,
   if (caller_function.unoptimized_code() != caller_code.raw()) {
     return;
   }
+#if !defined(PRODUCT)
+  // Skip functions that contain breakpoints or when debugger is in single
+  // stepping mode.
+  if (Debugger::IsDebugging(thread, caller_function)) return;
+#endif
 
   intptr_t num_checks = ic_data.NumberOfChecks();
 
@@ -1131,6 +1136,12 @@ static void TrySwitchInstanceCall(const ICData& ic_data,
     // needs it.
     if (target_function.HasOptionalParameters() ||
         target_function.IsGeneric()) {
+      return;
+    }
+
+    // Avoid forcing foreground compilation if target function is still
+    // interpreted.
+    if (FLAG_enable_interpreter && !target_function.HasCode()) {
       return;
     }
 
@@ -3012,7 +3023,8 @@ extern "C" void DFLRT_ExitSafepoint(NativeArguments __unusable_) {
   CHECK_STACK_ALIGNMENT;
   Thread* thread = Thread::Current();
   ASSERT(thread->top_exit_frame_info() != 0);
-  ASSERT(thread->execution_state() == Thread::kThreadInNative);
+
+  ASSERT(thread->execution_state() == Thread::kThreadInVM);
   thread->ExitSafepoint();
 }
 DEFINE_RAW_LEAF_RUNTIME_ENTRY(ExitSafepoint, 0, false, &DFLRT_ExitSafepoint);
