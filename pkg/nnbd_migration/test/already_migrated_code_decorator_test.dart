@@ -72,6 +72,10 @@ class _AlreadyMigratedCodeDecoratorTest {
     ])).positionalParameters[0]);
   }
 
+  test_decorate_interfaceType_simple_star() {
+    checkInt(decorate(InterfaceTypeImpl(typeProvider.intType.element, nullabilitySuffix: NullabilitySuffix.star)))
+  }
+
   test_decorate_functionType_positional_parameter() {
     checkDynamic(
         decorate(FunctionTypeImpl.synthetic(typeProvider.voidType, [], [
@@ -88,7 +92,7 @@ class _AlreadyMigratedCodeDecoratorTest {
 
   test_decorate_functionType_star() {
     expect(
-        decorate(FunctionTypeImpl.synthetic(typeProvider.voidType, [], []))
+        decorate(FunctionTypeImpl.synthetic(typeProvider.voidType, [], [], nullabilitySuffix: NullabilitySuffix.star))
             .node,
         same(graph.never));
   }
