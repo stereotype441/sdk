@@ -56,12 +56,28 @@ class _AlreadyMigratedCodeDecoratorTest {
     checkDynamic(decorate(typeProvider.dynamicType));
   }
 
+  test_decorate_functionType_named_parameter() {
+    checkDynamic(
+        decorate(FunctionTypeImpl.synthetic(typeProvider.voidType, [], [
+      ParameterElementImpl.synthetic(
+          'x', typeProvider.dynamicType, ParameterKind.NAMED)
+    ])).namedParameters['x']);
+  }
+
   test_decorate_functionType_ordinary_parameter() {
     checkDynamic(
         decorate(FunctionTypeImpl.synthetic(typeProvider.voidType, [], [
       ParameterElementImpl.synthetic(
           'x', typeProvider.dynamicType, ParameterKind.REQUIRED)
-    ])));
+    ])).positionalParameters[0]);
+  }
+
+  test_decorate_functionType_positional_parameter() {
+    checkDynamic(
+        decorate(FunctionTypeImpl.synthetic(typeProvider.voidType, [], [
+      ParameterElementImpl.synthetic(
+          'x', typeProvider.dynamicType, ParameterKind.POSITIONAL)
+    ])).positionalParameters[0]);
   }
 
   test_decorate_functionType_returnType() {
