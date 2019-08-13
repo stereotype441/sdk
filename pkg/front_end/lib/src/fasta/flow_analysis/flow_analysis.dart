@@ -56,9 +56,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// The [TypeOperations], used to access types, and check subtyping.
   final TypeOperations<Variable, Type> typeOperations;
 
-  /// The enclosing function body, used to check for potential mutations.
-  final FunctionBodyAccess<Variable> functionBody;
-
   /// The stack of states of variables that are not definitely assigned.
   final List<FlowModel<Variable, Type>> _stack = [];
 
@@ -95,16 +92,12 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   final Set<Variable> _referencedVariables =
       _assertionsEnabled ? Set<Variable>() : null;
 
-  factory FlowAnalysis(
-    NodeOperations<Expression> nodeOperations,
-    TypeOperations<Variable, Type> typeOperations,
-    FunctionBodyAccess<Variable> functionBody,
-  ) {
+  factory FlowAnalysis(NodeOperations<Expression> nodeOperations,
+      TypeOperations<Variable, Type> typeOperations) {
     var emptySet = FlowModel<Variable, Type>(false).notAssigned;
     return FlowAnalysis._(
       nodeOperations,
       typeOperations,
-      functionBody,
       emptySet,
     );
   }
@@ -112,7 +105,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   FlowAnalysis._(
     this.nodeOperations,
     this.typeOperations,
-    this.functionBody,
     this._emptySet,
   ) {
     _current = FlowModel<Variable, Type>(true);
@@ -192,10 +184,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   void conditionEqNull(Expression binaryExpression, Variable variable,
       {bool notEqual: false}) {
     _variableReferenced(variable);
-    if (functionBody.isPotentiallyMutatedInClosure(variable)) {
-      return;
-    }
-
     _condition = binaryExpression;
     var currentPromoted = _current.markNonNullable(typeOperations, variable);
     if (notEqual) {
@@ -300,8 +288,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     for (var entry in _current.promoted.entries) {
       var variable = entry.key;
       var promotedType = entry.value;
-      if (promotedType != null &&
-          functionBody.isPotentiallyMutatedInScope(variable)) {
+      if (promotedType != null) {
         notPromoted ??= Set<Variable>.identity();
         notPromoted.add(variable);
       }
@@ -385,10 +372,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   void isExpression_end(
       Expression isExpression, Variable variable, bool isNot, Type type) {
     _variableReferenced(variable);
-    if (functionBody.isPotentiallyMutatedInClosure(variable)) {
-      return;
-    }
-
     _condition = isExpression;
     if (isNot) {
       _conditionTrue = _current;
@@ -1071,13 +1054,6 @@ class FlowModel<Variable, Type> {
     }
     return true;
   }
-}
-
-/// Accessor for function body information.
-abstract class FunctionBodyAccess<Variable> {
-  bool isPotentiallyMutatedInClosure(Variable variable);
-
-  bool isPotentiallyMutatedInScope(Variable variable);
 }
 
 /// Operations on nodes, abstracted from concrete node interfaces.

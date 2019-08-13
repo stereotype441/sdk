@@ -13,23 +13,6 @@ import 'package:analyzer/src/generated/variable_type_provider.dart';
 import 'package:front_end/src/fasta/flow_analysis/flow_analysis.dart';
 import 'package:meta/meta.dart';
 
-class AnalyzerFunctionBodyAccess
-    implements FunctionBodyAccess<VariableElement> {
-  final FunctionBody node;
-
-  AnalyzerFunctionBodyAccess(this.node);
-
-  @override
-  bool isPotentiallyMutatedInClosure(VariableElement variable) {
-    return node.isPotentiallyMutatedInClosure(variable);
-  }
-
-  @override
-  bool isPotentiallyMutatedInScope(VariableElement variable) {
-    return node.isPotentiallyMutatedInScope(variable);
-  }
-}
-
 class AnalyzerNodeOperations implements NodeOperations<Expression> {
   const AnalyzerNodeOperations();
 
@@ -134,10 +117,7 @@ class FlowAnalysisHelper {
       assert(flow != null);
     } else {
       flow = FlowAnalysis<Statement, Expression, VariableElement, DartType>(
-        _nodeOperations,
-        _typeOperations,
-        AnalyzerFunctionBodyAccess(node),
-      );
+          _nodeOperations, _typeOperations);
     }
 
     var parameters = _enclosingExecutableParameters(node);

@@ -509,14 +509,11 @@ Matcher get _asserts {
 class _Expression {}
 
 class _Harness
-    implements
-        NodeOperations<_Expression>,
-        TypeOperations<_Var, _Type>,
-        FunctionBodyAccess<_Var> {
+    implements NodeOperations<_Expression>, TypeOperations<_Var, _Type> {
   FlowAnalysis<_Statement, _Expression, _Var, _Type> flow;
 
   _Harness() {
-    flow = FlowAnalysis<_Statement, _Expression, _Var, _Type>(this, this, this);
+    flow = FlowAnalysis<_Statement, _Expression, _Var, _Type>(this, this);
   }
 
   _Var addAssignedVar(String name, String type) {
@@ -535,17 +532,6 @@ class _Harness
   bool isLocalVariable(_Var variable) {
     // TODO(paulberry): make tests where this returns false
     return true;
-  }
-
-  @override
-  bool isPotentiallyMutatedInClosure(_Var variable) {
-    // TODO(paulberry): make tests where this returns true
-    return false;
-  }
-
-  @override
-  bool isPotentiallyMutatedInScope(_Var variable) {
-    throw UnimplementedError('TODO(paulberry)');
   }
 
   @override
