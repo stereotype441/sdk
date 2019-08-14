@@ -1459,6 +1459,18 @@ double f() {
     assertNoUpstreamNullability(decoratedTypeAnnotation('double').node);
   }
 
+  test_field_initializer_flow_analysis() async {
+    await analyze('''
+bool b1 = true;
+bool b2 = true;
+class C {
+  bool b = b1 || b2;
+}
+''');
+    // No assertions; we just want to verify that the presence of `||` inside a
+    // field doesn't cause flow analysis to crash.
+  }
+
   test_field_type_inferred() async {
     await analyze('''
 int f() => 1;
