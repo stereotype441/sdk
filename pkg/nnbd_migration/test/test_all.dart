@@ -4,7 +4,8 @@
 
 import 'package:test_reflective_loader/test_reflective_loader.dart';
 
-import 'already_migrated_code_decorator_test.dart' as already_migrated_code_decorator_test;
+import 'already_migrated_code_decorator_test.dart'
+    as already_migrated_code_decorator_test;
 import 'api_test.dart' as api_test;
 import 'decorated_class_hierarchy_test.dart' as decorated_class_hierarchy_test;
 import 'decorated_type_test.dart' as decorated_type_test;
