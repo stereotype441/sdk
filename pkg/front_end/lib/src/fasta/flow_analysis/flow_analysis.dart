@@ -1070,8 +1070,14 @@ class FlowModel<Variable, Type> {
         if (p2Value != null) return false;
       } else {
         if (p2Value == null) return false;
-        if (!typeOperations.isSameType(
-            p1Value.promotedType, p2Value.promotedType)) return false;
+        var p1Type = p1Value.promotedType;
+        var p2Type = p2Value.promotedType;
+        if (p1Type == null) {
+          if (p2Type != null) return false;
+        } else {
+          if (p2Type == null) return false;
+          if (!typeOperations.isSameType(p1Type, p2Type)) return false;
+        }
       }
     }
     return true;
