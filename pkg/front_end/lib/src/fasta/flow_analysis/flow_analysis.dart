@@ -821,7 +821,7 @@ class FlowModel<Variable, Type> {
     for (var entry in variableInfo.entries) {
       var variable = entry.key;
       var thisType = entry.value.promotedType;
-      var otherType = other.variableInfo[variable].promotedType;
+      var otherType = other.variableInfo[variable]?.promotedType;
       if (!unsafe.contains(variable)) {
         if (otherType != null &&
             (thisType == null ||
