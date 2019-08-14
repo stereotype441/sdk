@@ -988,7 +988,7 @@ class FlowModel<Variable, Type> {
     );
   }
 
-  /// Joins two "promoted" maps.  See [join] for details.
+  /// Joins two "variable info" maps.  See [join] for details.
   @visibleForTesting
   static Map<Variable, VariableModel<Type>> joinVariableInfo<Variable, Type>(
     TypeOperations<Variable, Type> typeOperations,
@@ -1011,10 +1011,10 @@ class FlowModel<Variable, Type> {
         if (identical(firstType, secondType)) {
           result[variable] = VariableModel<Type>(firstType);
         } else if (firstType == null) {
-          result[variable] = null;
+          result[variable] = VariableModel<Type>(null);
           alwaysSecond = false;
         } else if (secondType == null) {
-          result[variable] = null;
+          result[variable] = VariableModel<Type>(null);
           alwaysFirst = false;
         } else if (typeOperations.isSubtypeOf(firstType, secondType)) {
           result[variable] = VariableModel<Type>(secondType);

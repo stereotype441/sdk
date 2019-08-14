@@ -440,16 +440,25 @@ main() {
   });
 
   group('join', () {
+    var x = _Var('x', null);
+    var y = _Var('y', null);
+    var intType = _Type('int');
+    var intQType = _Type('int?');
+    var stringType = _Type('String');
+    const emptyMap = <Null, VariableModel<Null>>{};
+
+    VariableModel<_Type> model(_Type type) => VariableModel<_Type>(type);
+
+    group('without input reuse', () {
+      test('promoted with unpromoted', () {
+        var h = _Harness();
+        var p1 = {x: model(intType), y: model(null)};
+        var p2 = {x: model(null), y: model(intType)};
+        expect(FlowModel.joinVariableInfo(h, p1, p2),
+            {x: model(null), y: model(null)});
+      });
+    });
     group('should re-use an input if possible', () {
-      var x = _Var('x', null);
-      var y = _Var('y', null);
-      var intType = _Type('int');
-      var intQType = _Type('int?');
-      var stringType = _Type('String');
-      const emptyMap = <Null, VariableModel<Null>>{};
-
-      VariableModel<_Type> model(_Type type) => VariableModel<_Type>(type);
-
       test('identical inputs', () {
         var h = _Harness();
         var p = {x: model(intType), y: model(stringType)};
@@ -462,6 +471,14 @@ main() {
         var p2 = <_Var, VariableModel<_Type>>{};
         expect(FlowModel.joinVariableInfo(h, p1, p2), same(emptyMap));
         expect(FlowModel.joinVariableInfo(h, p2, p1), same(emptyMap));
+      });
+
+      test('promoted with unpromoted', () {
+        var h = _Harness();
+        var p1 = {x: model(intType)};
+        var p2 = {x: model(null)};
+        expect(FlowModel.joinVariableInfo(h, p1, p2), same(p2));
+        expect(FlowModel.joinVariableInfo(h, p2, p1), same(p2));
       });
 
       test('related types', () {
