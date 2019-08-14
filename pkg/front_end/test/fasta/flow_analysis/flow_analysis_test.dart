@@ -439,7 +439,7 @@ main() {
       var intType = _Type('int');
       var intQType = _Type('int?');
       var stringType = _Type('String');
-      const emptyMap = <Null, Null>{};
+      const emptyMap = <Null, VariableModel<Null>>{};
 
       VariableModel<_Type> model(_Type type) => VariableModel<_Type>(type);
 
