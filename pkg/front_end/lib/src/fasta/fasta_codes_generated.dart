@@ -6571,6 +6571,54 @@ Message _withArgumentsLabelNotFound(String name) {
 }
 
 // DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const Code<Null> codeLanguageVersionInvalidInDotPackages =
+    messageLanguageVersionInvalidInDotPackages;
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const MessageCode messageLanguageVersionInvalidInDotPackages = const MessageCode(
+    "LanguageVersionInvalidInDotPackages",
+    message:
+        r"""The language version is not specified correctly in the .packages file.""");
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const Code<Null> codeLanguageVersionMismatchInPart =
+    messageLanguageVersionMismatchInPart;
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const MessageCode messageLanguageVersionMismatchInPart = const MessageCode(
+    "LanguageVersionMismatchInPart",
+    message:
+        r"""The language version override has to be the same in the library and its part(s).""");
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const Template<
+    Message Function(
+        int count,
+        int
+            count2)> templateLanguageVersionTooHigh = const Template<
+        Message Function(int count, int count2)>(
+    messageTemplate:
+        r"""The specified language version is too high. The highest supported language version is #count.#count2.""",
+    withArguments: _withArgumentsLanguageVersionTooHigh);
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const Code<Message Function(int count, int count2)> codeLanguageVersionTooHigh =
+    const Code<Message Function(int count, int count2)>(
+  "LanguageVersionTooHigh",
+  templateLanguageVersionTooHigh,
+);
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+Message _withArgumentsLanguageVersionTooHigh(int count, int count2) {
+  if (count == null) throw 'No count provided';
+  if (count2 == null) throw 'No count provided';
+  return new Message(codeLanguageVersionTooHigh,
+      message:
+          """The specified language version is too high. The highest supported language version is ${count}.${count2}.""",
+      arguments: {'count': count, 'count2': count2});
+}
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
 const Code<Null> codeLibraryDirectiveNotFirst = messageLibraryDirectiveNotFirst;
 
 // DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
