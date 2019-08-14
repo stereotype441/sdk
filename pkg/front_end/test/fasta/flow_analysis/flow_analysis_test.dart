@@ -59,6 +59,13 @@ main() {
       h.flow.finish();
     });
 
+    test('promotedType handles not-yet-seen variables', () {
+      // Note: this is needed for error recovery in the analyzer.
+      var h = _Harness();
+      var x = _Var('x', _Type('int'));
+      expect(h.flow.promotedType(x), isNull);
+    });
+
     test('Infinite loop does not implicitly assign variables', () {
       var h = _Harness();
       var x = h.addUnassignedVar('x', 'int');

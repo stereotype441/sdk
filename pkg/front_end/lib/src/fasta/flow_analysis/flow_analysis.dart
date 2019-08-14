@@ -471,7 +471,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// is currently promoted.  Otherwise returns `null`.
   Type promotedType(Variable variable) {
     _variableReferenced(variable);
-    return _current.variableInfo[variable].promotedType;
+    return _current.variableInfo[variable]?.promotedType;
   }
 
   /// The [notPromoted] set contains all variables that are potentially
