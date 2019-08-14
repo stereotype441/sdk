@@ -22,6 +22,7 @@ import 'package:front_end/src/api_unstable/vm.dart'
     show
         CompilerContext,
         CompilerOptions,
+        CompilerResult,
         DiagnosticMessage,
         DiagnosticMessageHandler,
         FileSystem,
@@ -32,6 +33,7 @@ import 'package:front_end/src/api_unstable/vm.dart'
         StandardFileSystem,
         getMessageUri,
         kernelForProgram,
+        parseExperimentalArguments,
         parseExperimentalFlags,
         printDiagnosticMessage;
 
@@ -214,7 +216,9 @@ Future<int> runCompiler(ArgResults options, String usage) async {
     ..fileSystem = fileSystem
     ..linkedDependencies = linkedDependencies
     ..packagesFileUri = packagesUri
-    ..experimentalFlags = parseExperimentalFlags(experimentalFlags, print)
+    ..experimentalFlags = parseExperimentalFlags(
+        parseExperimentalArguments(experimentalFlags),
+        onError: print)
     ..onDiagnostic = (DiagnosticMessage m) {
       errorDetector(m);
     }
@@ -288,7 +292,8 @@ Future<Component> compileToKernel(Uri source, CompilerOptions options,
   options.onDiagnostic = errorDetector;
 
   setVMEnvironmentDefines(environmentDefines, options);
-  Component component = await kernelForProgram(source, options);
+  CompilerResult compilerResult = await kernelForProgram(source, options);
+  Component component = compilerResult?.component;
 
   // Run global transformations only if component is correct.
   if (aot && component != null) {

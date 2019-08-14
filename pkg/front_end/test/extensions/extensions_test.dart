@@ -4,6 +4,7 @@
 
 import 'dart:io' show Directory, Platform;
 import 'package:front_end/src/fasta/builder/builder.dart';
+import 'package:front_end/src/fasta/builder/extension_builder.dart';
 import 'package:front_end/src/fasta/kernel/kernel_builder.dart';
 import 'package:front_end/src/testing/id.dart' show ActualData, Id;
 import 'package:front_end/src/testing/features.dart';
@@ -29,17 +30,25 @@ class ExtensionsDataComputer extends DataComputer<Features> {
   const ExtensionsDataComputer();
 
   @override
-  void computeMemberData(CompilerResult compilerResult, Member member,
+  void computeMemberData(InternalCompilerResult compilerResult, Member member,
       Map<Id, ActualData<Features>> actualMap,
       {bool verbose}) {
     member.accept(new ExtensionsDataExtractor(compilerResult, actualMap));
   }
 
   @override
-  void computeClassData(CompilerResult compilerResult, Class cls,
+  void computeClassData(InternalCompilerResult compilerResult, Class cls,
       Map<Id, ActualData<Features>> actualMap,
       {bool verbose}) {
     new ExtensionsDataExtractor(compilerResult, actualMap).computeForClass(cls);
+  }
+
+  @override
+  void computeExtensionData(InternalCompilerResult compilerResult,
+      Extension extension, Map<Id, ActualData<Features>> actualMap,
+      {bool verbose}) {
+    new ExtensionsDataExtractor(compilerResult, actualMap)
+        .computeForExtension(extension);
   }
 
   @override
@@ -47,7 +56,7 @@ class ExtensionsDataComputer extends DataComputer<Features> {
 
   @override
   Features computeErrorData(
-      CompilerResult compiler, Id id, List<FormattedMessage> errors) {
+      InternalCompilerResult compiler, Id id, List<FormattedMessage> errors) {
     Features features = new Features();
     for (FormattedMessage error in errors) {
       if (error.message.contains(',')) {
@@ -71,6 +80,7 @@ class Tags {
   static const String builderSupertype = 'builder-supertype';
   static const String builderInterfaces = 'builder-interfaces';
   static const String builderOnTypes = 'builder-onTypes';
+  static const String builderOnType = 'builder-onType';
   static const String builderRequiredParameters = 'builder-params';
   static const String builderPositionalParameters = 'builder-pos-params';
   static const String builderNamedParameters = 'builder-named-params';
@@ -79,6 +89,11 @@ class Tags {
   static const String clsTypeParameters = 'cls-type-params';
   static const String clsSupertype = 'cls-supertype';
   static const String clsInterfaces = 'cls-interfaces';
+
+  static const String extensionName = 'extension-name';
+  static const String extensionTypeParameters = 'extension-type-params';
+  static const String extensionOnType = 'extension-onType';
+  static const String extensionMembers = 'extension-members';
 
   static const String memberName = 'member-name';
   static const String memberTypeParameters = 'member-type-params';
@@ -92,8 +107,8 @@ class Tags {
 }
 
 class ExtensionsDataExtractor extends CfeDataExtractor<Features> {
-  ExtensionsDataExtractor(
-      CompilerResult compilerResult, Map<Id, ActualData<Features>> actualMap)
+  ExtensionsDataExtractor(InternalCompilerResult compilerResult,
+      Map<Id, ActualData<Features>> actualMap)
       : super(compilerResult, actualMap);
 
   @override
@@ -136,6 +151,41 @@ class ExtensionsDataExtractor extends CfeDataExtractor<Features> {
   }
 
   @override
+  Features computeExtensionValue(Id id, Extension extension) {
+    ExtensionBuilder extensionBuilder =
+        lookupExtensionBuilder(compilerResult, extension);
+    if (!extensionBuilder.isExtension) {
+      return null;
+    }
+    Features features = new Features();
+    features[Tags.builderName] = extensionBuilder.name;
+    if (extensionBuilder.typeParameters != null) {
+      for (TypeVariableBuilder typeVariable
+          in extensionBuilder.typeParameters) {
+        features.addElement(Tags.builderTypeParameters,
+            typeVariableBuilderToText(typeVariable));
+      }
+    }
+    if (extensionBuilder.onType != null) {
+      features[Tags.builderOnType] = typeBuilderToText(extensionBuilder.onType);
+    }
+
+    features[Tags.extensionName] = extension.name;
+    if (extension.onType != null) {
+      features[Tags.extensionOnType] = typeToText(extension.onType);
+    }
+    for (TypeParameter typeParameter in extension.typeParameters) {
+      features.addElement(
+          Tags.extensionTypeParameters, typeParameterToText(typeParameter));
+    }
+    for (ExtensionMemberDescriptor descriptor in extension.members) {
+      features.addElement(
+          Tags.extensionMembers, extensionMethodDescriptorToText(descriptor));
+    }
+    return features;
+  }
+
+  @override
   Features computeMemberValue(Id id, Member member) {
     if (!(member is Procedure && member.isExtensionMethod)) {
       return null;
@@ -143,9 +193,10 @@ class ExtensionsDataExtractor extends CfeDataExtractor<Features> {
     String memberName = member.name.name;
     String extensionName = memberName.substring(0, memberName.indexOf('|'));
     memberName = memberName.substring(extensionName.length + 1);
-    Class cls = lookupClass(member.enclosingLibrary, extensionName);
-    MemberBuilder memberBuilder =
-        lookupClassMemberBuilder(compilerResult, cls, member, memberName);
+    Extension extension =
+        lookupExtension(member.enclosingLibrary, extensionName);
+    MemberBuilder memberBuilder = lookupExtensionMemberBuilder(
+        compilerResult, extension, member, memberName);
     Features features = new Features();
     features[Tags.builderName] = memberBuilder.name;
     if (memberBuilder is FunctionBuilder) {

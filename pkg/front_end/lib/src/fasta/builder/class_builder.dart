@@ -63,8 +63,9 @@ import 'builder.dart'
         Scope,
         ScopeBuilder,
         TypeBuilder,
-        TypeDeclarationBuilder,
         TypeVariableBuilder;
+
+import 'declaration_builder.dart';
 
 import '../fasta_codes.dart'
     show
@@ -137,7 +138,7 @@ import '../source/source_library_builder.dart' show SourceLibraryBuilder;
 
 import '../type_inference/type_schema.dart' show UnknownType;
 
-abstract class ClassBuilder extends TypeDeclarationBuilder {
+abstract class ClassBuilder extends DeclarationBuilder {
   /// The type variables declared on a class, extension or mixin declaration.
   List<TypeVariableBuilder> typeVariables;
 
@@ -153,11 +154,7 @@ abstract class ClassBuilder extends TypeDeclarationBuilder {
   /// The types in the `on` clause of an extension or mixin declaration.
   List<TypeBuilder> onTypes;
 
-  final Scope scope;
-
   final Scope constructors;
-
-  final ScopeBuilder scopeBuilder;
 
   final ScopeBuilder constructorScopeBuilder;
 
@@ -173,13 +170,12 @@ abstract class ClassBuilder extends TypeDeclarationBuilder {
       this.supertype,
       this.interfaces,
       this.onTypes,
-      this.scope,
+      Scope scope,
       this.constructors,
       LibraryBuilder parent,
       int charOffset)
-      : scopeBuilder = new ScopeBuilder(scope),
-        constructorScopeBuilder = new ScopeBuilder(constructors),
-        super(metadata, modifiers, name, parent, charOffset);
+      : constructorScopeBuilder = new ScopeBuilder(constructors),
+        super(metadata, modifiers, name, parent, charOffset, scope);
 
   String get debugName => "ClassBuilder";
 
@@ -197,11 +193,6 @@ abstract class ClassBuilder extends TypeDeclarationBuilder {
   void set mixedInType(TypeBuilder mixin);
 
   List<ConstructorReferenceBuilder> get constructorReferences => null;
-
-  LibraryBuilder get library {
-    LibraryBuilder library = parent;
-    return library.partOfLibrary ?? library;
-  }
 
   void buildOutlineExpressions(LibraryBuilder library) {
     void build(String ignore, Builder declaration) {
@@ -369,16 +360,10 @@ abstract class ClassBuilder extends TypeDeclarationBuilder {
             null);
   }
 
-  void addProblem(Message message, int charOffset, int length,
-      {bool wasHandled: false, List<LocatedMessage> context}) {
-    library.addProblem(message, charOffset, length, fileUri,
-        wasHandled: wasHandled, context: context);
-  }
-
   /// Find the first member of this class with [name]. This method isn't
   /// suitable for scope lookups as it will throw an error if the name isn't
   /// declared. The [scope] should be used for that. This method is used to
-  /// find a member that is known to exist and it wil pick the first
+  /// find a member that is known to exist and it will pick the first
   /// declaration if the name is ambiguous.
   ///
   /// For example, this method is convenient for use when building synthetic
@@ -1424,9 +1409,9 @@ abstract class ClassBuilder extends TypeDeclarationBuilder {
 
   void checkMixinDeclaration() {
     assert(cls.isMixinDeclaration);
-    for (Builder constructory in constructors.local.values) {
-      if (!constructory.isSynthetic &&
-          (constructory.isFactory || constructory.isConstructor)) {
+    for (Builder constructor in constructors.local.values) {
+      if (!constructor.isSynthetic &&
+          (constructor.isFactory || constructor.isConstructor)) {
         addProblem(
             templateIllegalMixinDueToConstructors
                 .withArguments(fullNameForErrors),
@@ -1436,7 +1421,7 @@ abstract class ClassBuilder extends TypeDeclarationBuilder {
               templateIllegalMixinDueToConstructorsCause
                   .withArguments(fullNameForErrors)
                   .withLocation(
-                      constructory.fileUri, constructory.charOffset, noLength)
+                      constructor.fileUri, constructor.charOffset, noLength)
             ]);
       }
     }

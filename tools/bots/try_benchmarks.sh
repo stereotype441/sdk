@@ -84,6 +84,8 @@ for command; do
     tar -czf linux-ia32_profile.tar.gz \
       --exclude .git \
       --exclude .gitignore \
+      --exclude pkg/analysis_server/language_model \
+      --exclude out/ReleaseIA32/dart-sdk/model \
       -- \
       third_party/d8/linux/ia32/natives_blob.bin \
       third_party/d8/linux/ia32/snapshot_blob.bin \
@@ -167,6 +169,8 @@ for command; do
     tar -czf linux-ia32.tar.gz \
       --exclude .git \
       --exclude .gitignore \
+      --exclude pkg/analysis_server/language_model \
+      --exclude out/ReleaseIA32/dart-sdk/model \
       -- \
       third_party/d8/linux/ia32/natives_blob.bin \
       third_party/d8/linux/ia32/snapshot_blob.bin \
@@ -225,8 +229,7 @@ EOF
     out/ReleaseIA32/dart benchmarks/FfiBoringssl/dart/FfiBoringssl.dart
     out/ReleaseIA32/dart benchmarks/FfiCall/dart/FfiCall.dart
     out/ReleaseIA32/dart benchmarks/FfiMemory/dart/FfiMemory.dart
-    # below is commented out due to revert of struct support in ffi
-    # out/ReleaseIA32/dart benchmarks/FfiStruct/dart/FfiStruct.dart
+    out/ReleaseIA32/dart benchmarks/FfiStruct/dart/FfiStruct.dart
     cd ..
     rm -rf tmp
   elif [ "$command" = linux-x64-build ] ||
@@ -250,6 +253,8 @@ EOF
     tar -czf linux-x64_profile.tar.gz \
       --exclude .git \
       --exclude .gitignore \
+      --exclude pkg/analysis_server/language_model \
+      --exclude out/ReleaseX64/dart-sdk/model \
       -- \
       third_party/d8/linux/x64/natives_blob.bin \
       third_party/d8/linux/x64/snapshot_blob.bin \
@@ -353,6 +358,8 @@ EOF
     tar -czf linux-x64.tar.gz \
       --exclude .git \
       --exclude .gitignore \
+      --exclude pkg/analysis_server/language_model \
+      --exclude out/ReleaseX64/dart-sdk/model \
       -- \
       third_party/d8/linux/x64/natives_blob.bin \
       third_party/d8/linux/x64/snapshot_blob.bin \

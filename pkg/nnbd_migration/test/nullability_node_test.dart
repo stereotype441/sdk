@@ -19,6 +19,8 @@ class NullabilityNodeTest {
 
   List<NullabilityEdge> unsatisfiedEdges;
 
+  List<NullabilityNodeForSubstitution> unsatisfiedSubstitutions;
+
   NullabilityNode get always => graph.always;
 
   NullabilityNode get never => graph.never;
@@ -41,7 +43,9 @@ class NullabilityNodeTest {
       NullabilityNode.forTypeAnnotation(offset);
 
   void propagate() {
-    unsatisfiedEdges = graph.propagate();
+    graph.propagate();
+    unsatisfiedEdges = graph.unsatisfiedEdges.toList();
+    unsatisfiedSubstitutions = graph.unsatisfiedSubstitutions.toList();
   }
 
   NullabilityNode subst(NullabilityNode inner, NullabilityNode outer) {
@@ -316,10 +320,13 @@ class NullabilityNodeTest {
     var n2 = newNode(2);
     connect(n1, never, hard: true);
     connect(n2, never, hard: true);
-    connect(always, subst(n1, n2));
+    var substitutionNode = subst(n1, n2);
+    connect(always, substitutionNode);
     propagate();
     expect(n1.isNullable, false);
     expect(n2.isNullable, false);
+    expect(unsatisfiedSubstitutions, hasLength(1));
+    expect(unsatisfiedSubstitutions[0], same(substitutionNode));
   }
 
   test_propagation_downstream_through_lub_both() {
@@ -585,6 +592,12 @@ class NullabilityNodeTest {
     propagate();
     assertUnsatisfied([]);
     expect(edge.isSatisfied, true);
+  }
+
+  test_substitution_simplify_null() {
+    var n1 = newNode(1);
+    expect(subst(null, n1), same(n1));
+    expect(subst(n1, null), same(n1));
   }
 
   test_unconstrainted_node_non_nullable() {

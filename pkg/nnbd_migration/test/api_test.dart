@@ -1834,6 +1834,42 @@ int f(int x, int Function(int i) g) {
     await _checkSingleFileChanges(content, expected);
   }
 
+  test_postdominating_usage_after_cfg_altered() async {
+    // By altering the control-flow graph, we can create new postdominators,
+    // which are not recognized as such. This is not a problem as we only do
+    // hard edges on a best-effort basis, and this case would be a lot of
+    // additional complexity.
+    var content = '''
+int f(int a, int b, int c) {
+  if (a != null) {
+    b.toDouble();
+  } else {
+    return null;
+  }
+  c.toDouble;
+}
+
+void main() {
+  f(1, null, null);
+}
+''';
+    var expected = '''
+int f(int a, int? b, int? c) {
+  /* if (a != null) {
+    */ b!.toDouble(); /*
+  } else {
+    return null;
+  } */
+  c!.toDouble;
+}
+
+void main() {
+  f(1, null, null);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_prefix_minus() async {
     var content = '''
 class C {
@@ -1961,6 +1997,31 @@ class C {
 }
 main() {
   C.named(null, 1);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  @failingTest
+  test_removed_if_element_doesnt_introduce_nullability() async {
+    // Failing for two reasons: 1. we don't add ! to recover(), and 2. we get
+    // an unimplemented error.
+    var content = '''
+f(int x) {
+  <int>[if (x == null) recover(), 0];
+}
+int recover() {
+  assert(false);
+  return null;
+}
+''';
+    var expected = '''
+f(int x) {
+  <int>[if (x == null) recover()!, 0];
+}
+int? recover() {
+  assert(false);
+  return null;
 }
 ''';
     await _checkSingleFileChanges(content, expected);

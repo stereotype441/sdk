@@ -2,14 +2,15 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'package:expect/expect.dart';
+// Set version of this file (not technically in package) explicitly to test as
+// much as possibly separately.
 
-import 'def.dart';
+// @dart = 2.4
+
+import 'package:foo/foo.dart';
+
+/*library: languageVersion=2.4*/
 
 main() {
-  const v1 = A(B());
-  const v2 = ab;
-  const v3 = A(b);
-  Expect.equals(v1, v2);
-  Expect.equals(v2, v3);
+  main();
 }

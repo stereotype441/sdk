@@ -4,6 +4,7 @@
 
 import 'dart:async' show Future;
 
+import 'package:kernel/class_hierarchy.dart';
 import 'package:kernel/kernel.dart' show Component, CanonicalName;
 
 import 'package:kernel/target/targets.dart' show Target;
@@ -31,14 +32,15 @@ import 'compiler_state.dart'
 
 import 'util.dart' show equalLists, equalMaps;
 
-export '../api_prototype/compiler_options.dart' show CompilerOptions;
+export '../api_prototype/compiler_options.dart'
+    show CompilerOptions, parseExperimentalFlags, parseExperimentalArguments;
 
 export '../api_prototype/diagnostic_message.dart' show DiagnosticMessage;
 
 export '../api_prototype/experimental_flags.dart'
     show ExperimentalFlag, parseExperimentalFlag;
 
-export '../api_prototype/kernel_generator.dart' show kernelForComponent;
+export '../api_prototype/kernel_generator.dart' show kernelForModule;
 
 export '../api_prototype/memory_file_system.dart' show MemoryFileSystem;
 
@@ -67,8 +69,10 @@ export 'compiler_state.dart'
 class DdcResult {
   final Component component;
   final List<Component> inputSummaries;
+  final ClassHierarchy classHierarchy;
 
-  DdcResult(this.component, this.inputSummaries);
+  DdcResult(this.component, this.inputSummaries, this.classHierarchy)
+      : assert(classHierarchy != null);
 }
 
 Future<InitializedCompilerState> initializeCompiler(
@@ -138,7 +142,8 @@ Future<InitializedCompilerState> initializeIncrementalCompiler(
     Target target,
     {FileSystem fileSystem,
     Map<ExperimentalFlag, bool> experiments,
-    Map<String, String> environmentDefines}) async {
+    Map<String, String> environmentDefines,
+    bool trackNeededDillLibraries: false}) async {
   inputSummaries.sort((a, b) => a.toString().compareTo(b.toString()));
 
   IncrementalCompiler incrementalCompiler;
@@ -185,6 +190,7 @@ Future<InitializedCompilerState> initializeIncrementalCompiler(
     workerInputCache[sdkSummary] = cachedSdkInput;
     incrementalCompiler = new IncrementalCompiler.fromComponent(
         new CompilerContext(processedOpts), cachedSdkInput.component);
+    incrementalCompiler.trackNeededDillLibraries = trackNeededDillLibraries;
   } else {
     options = oldState.options;
     options.inputSummaries = inputSummaries;
@@ -201,6 +207,7 @@ Future<InitializedCompilerState> initializeIncrementalCompiler(
     // Reuse the incremental compiler, but reset as needed.
     incrementalCompiler = oldState.incrementalCompiler;
     incrementalCompiler.invalidateAllSources();
+    incrementalCompiler.trackNeededDillLibraries = trackNeededDillLibraries;
     options.packagesFileUri = packagesFile;
     options.fileSystem = fileSystem;
     processedOpts.clearFileSystemCache();
@@ -211,6 +218,10 @@ Future<InitializedCompilerState> initializeIncrementalCompiler(
       incrementalCompiler: incrementalCompiler);
 
   CanonicalName nameRoot = cachedSdkInput.component.root;
+  Map<Uri, Uri> libraryToInputDill;
+  if (trackNeededDillLibraries) {
+    libraryToInputDill = new Map<Uri, Uri>();
+  }
   List<int> loadFromDillIndexes = new List<int>();
 
   // Notice that the ordering of the input summaries matter, so we need to
@@ -234,6 +245,9 @@ Future<InitializedCompilerState> initializeIncrementalCompiler(
       var component = cachedInput.component;
       for (var lib in component.libraries) {
         lib.isExternal = cachedInput.externalLibs.contains(lib.importUri);
+        if (trackNeededDillLibraries) {
+          libraryToInputDill[lib.importUri] = inputSummary;
+        }
       }
       component.computeCanonicalNames();
       doneInputSummaries[i] = component;
@@ -254,13 +268,19 @@ Future<InitializedCompilerState> initializeIncrementalCompiler(
             .loadComponent(bytes, nameRoot, alwaysCreateNewNamedNodes: true));
     workerInputCache[summary] = cachedInput;
     doneInputSummaries[index] = cachedInput.component;
+    if (trackNeededDillLibraries) {
+      for (var lib in cachedInput.component.libraries) {
+        libraryToInputDill[lib.importUri] = summary;
+      }
+    }
   }
 
   incrementalCompiler.setModulesToLoadOnNextComputeDelta(doneInputSummaries);
 
   return new InitializedCompilerState(options, processedOpts,
       workerInputCache: workerInputCache,
-      incrementalCompiler: incrementalCompiler);
+      incrementalCompiler: incrementalCompiler,
+      libraryToInputDill: libraryToInputDill);
 }
 
 Future<DdcResult> compile(InitializedCompilerState compilerState,
@@ -272,12 +292,13 @@ Future<DdcResult> compile(InitializedCompilerState compilerState,
   processedOpts.inputs.clear();
   processedOpts.inputs.addAll(inputs);
 
-  var compilerResult = await generateKernel(processedOpts);
+  var compilerResult =
+      await generateKernel(processedOpts, includeHierarchyAndCoreTypes: true);
 
   var component = compilerResult?.component;
   if (component == null) return null;
 
   // This should be cached.
   var summaries = await processedOpts.loadInputSummaries(null);
-  return new DdcResult(component, summaries);
+  return new DdcResult(component, summaries, compilerResult.classHierarchy);
 }
