@@ -674,6 +674,28 @@ bool f(int i, int j) => i == j;
     assertNoUpstreamNullability(decoratedTypeAnnotation('bool f').node);
   }
 
+  test_binaryExpression_equal_null() async {
+    await analyze('''
+void f(int i) {
+  if (i == null) {
+    g(i);
+  } else {
+    h(i);
+  }
+}
+void g(int j) {}
+void h(int k) {}
+''');
+    var iNode = decoratedTypeAnnotation('int i').node;
+    var jNode = decoratedTypeAnnotation('int j').node;
+    var kNode = decoratedTypeAnnotation('int k').node;
+    // No edge from i to k because i is known to be non-nullable at the site of
+    // the call to h()
+    assertNoEdge(iNode, kNode);
+    // But there is an edge from i to j
+    assertEdge(iNode, jNode, hard: false, guards: [iNode]);
+  }
+
   test_binaryExpression_gt_result_not_null() async {
     await analyze('''
 bool f(int i, int j) => i > j;
@@ -736,6 +758,28 @@ bool f(int i, int j) => i != j;
 ''');
 
     assertNoUpstreamNullability(decoratedTypeAnnotation('bool f').node);
+  }
+
+  test_binaryExpression_notEqual_null() async {
+    await analyze('''
+void f(int i) {
+  if (i != null) {
+    h(i);
+  } else {
+    j(i);
+  }
+}
+void g(int j) {}
+void h(int k) {}
+''');
+    var iNode = decoratedTypeAnnotation('int i').node;
+    var jNode = decoratedTypeAnnotation('int j').node;
+    var kNode = decoratedTypeAnnotation('int k').node;
+    // No edge from i to k because i is known to be non-nullable at the site of
+    // the call to h()
+    assertNoEdge(iNode, kNode);
+    // But there is an edge from i to j
+    assertEdge(iNode, jNode, hard: false, guards: [iNode]);
   }
 
   test_binaryExpression_percent_result_not_null() async {
