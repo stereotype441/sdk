@@ -850,9 +850,10 @@ class FlowModel<Variable, Type> {
       }
     }
     assert(promotedMatchesThis ==
-        _promotionsEqual(typeOperations, newVariableInfo, variableInfo));
+        _variableInfosEqual(typeOperations, newVariableInfo, variableInfo));
     assert(promotedMatchesOther ==
-        _promotionsEqual(typeOperations, newVariableInfo, other.variableInfo));
+        _variableInfosEqual(
+            typeOperations, newVariableInfo, other.variableInfo));
     if (promotedMatchesThis) {
       newVariableInfo = variableInfo;
     } else if (promotedMatchesOther) {
@@ -1056,10 +1057,10 @@ class FlowModel<Variable, Type> {
   }
 
   /// Determines whether the given "promoted" maps are equivalent.
-  static bool _promotionsEqual<Variable, Type>(
+  static bool _variableInfosEqual<Variable, Type>(
       TypeOperations<Variable, Type> typeOperations,
-      Map<Variable, Type> p1,
-      Map<Variable, Type> p2) {
+      Map<Variable, VariableModel<Type>> p1,
+      Map<Variable, VariableModel<Type>> p2) {
     if (p1.length != p2.length) return false;
     if (!p1.keys.toSet().containsAll(p2.keys)) return false;
     for (var entry in p1.entries) {
@@ -1069,7 +1070,8 @@ class FlowModel<Variable, Type> {
         if (p2Value != null) return false;
       } else {
         if (p2Value == null) return false;
-        if (!typeOperations.isSameType(p1Value, p2Value)) return false;
+        if (!typeOperations.isSameType(
+            p1Value.promotedType, p2Value.promotedType)) return false;
       }
     }
     return true;
