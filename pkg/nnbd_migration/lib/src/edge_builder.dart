@@ -563,7 +563,6 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
           action: () => node.functionExpression.body.accept(this));
     } finally {
       _currentFunctionType = null;
-      _flowAnalysis.finish();
       _flowAnalysis = null;
     }
     return null;
@@ -1418,7 +1417,6 @@ $stackTrace''');
         }
       }
     } finally {
-      _flowAnalysis.finish();
       _flowAnalysis = null;
       _currentFunctionType = null;
       _postDominatedLocals.popScope();
