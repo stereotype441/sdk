@@ -1792,6 +1792,28 @@ void f(bool b1, bool b2) {
         hard: false);
   }
 
+  test_if_flow_analysis() async {
+    await analyze('''
+void f(int i) {
+  if (i == null) {
+    g(i);
+  } else {
+    h(i);
+  }
+}
+void g(int j) {}
+void h(int k) {}
+''');
+    var iNode = decoratedTypeAnnotation('int i').node;
+    var jNode = decoratedTypeAnnotation('int j').node;
+    var kNode = decoratedTypeAnnotation('int k').node;
+    // No edge from i to k because i is known to be non-nullable at the site of
+    // the call to h()
+    assertNoEdge(iNode, kNode);
+    // But there is an edge from i to j
+    assertEdge(iNode, jNode, hard: false, guards: [iNode]);
+  }
+
   test_if_guard_equals_null() async {
     await analyze('''
 int f(int i, int j, int k) {
@@ -1852,6 +1874,28 @@ int f(bool b, int i) {
     var nullable_return = decoratedTypeAnnotation('int f').node;
     assertNullCheck(checkExpression('i/*check*/'),
         assertEdge(nullable_i, nullable_return, hard: false));
+  }
+
+  test_if_without_else_flow_analysis() async {
+    await analyze('''
+void f(int i) {
+  if (i == null) {
+    g(i);
+    return;
+  }
+  h(i);
+}
+void g(int j) {}
+void h(int k) {}
+''');
+    var iNode = decoratedTypeAnnotation('int i').node;
+    var jNode = decoratedTypeAnnotation('int j').node;
+    var kNode = decoratedTypeAnnotation('int k').node;
+    // No edge from i to k because i is known to be non-nullable at the site of
+    // the call to h()
+    assertNoEdge(iNode, kNode);
+    // But there is an edge from i to j
+    assertEdge(iNode, jNode, hard: false, guards: [iNode]);
   }
 
   test_indexExpression_index() async {
