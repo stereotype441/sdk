@@ -655,7 +655,7 @@ bool g(int j) => j.isEven;
     assertEdge(jNode, never, hard: true);
   }
 
-  solo_test_binaryExpression_ampersandAmpersand_flow_analysis_right() async {
+  test_binaryExpression_ampersandAmpersand_flow_analysis_right() async {
     await analyze('''
 void f(bool b, int i, int j) {
   if (b && i != null) {
