@@ -1230,6 +1230,21 @@ class C {
     // exception to be thrown.
   }
 
+  solo_test_constructorDeclaration_redirection_flow_analysis() async {
+    await analyze('''
+class C {
+  C(bool b1, bool b2);
+  C.redirect(int i, int j) : this(i == null || i.isEven, j.isEven);
+}
+''');
+    var iNode = decoratedTypeAnnotation('int i').node;
+    var jNode = decoratedTypeAnnotation('int j').node;
+    // No edge from i to `never` because i's type is promoted to non-nullable
+    assertNoEdge(iNode, never);
+    // But there is an edge from j to `never`.
+    assertEdge(jNode, never, hard: false);
+  }
+
   test_constructorDeclaration_returnType_generic() async {
     await analyze('''
 class C<T, U> {
