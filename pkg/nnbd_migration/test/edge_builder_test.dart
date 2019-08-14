@@ -1290,7 +1290,7 @@ class C {
     // exception to be thrown.
   }
 
-  solo_test_constructorDeclaration_redirection_flow_analysis() async {
+  test_constructorDeclaration_redirection_flow_analysis() async {
     await analyze('''
 class C {
   C(bool b1, bool b2);
@@ -1302,7 +1302,7 @@ class C {
     // No edge from i to `never` because i's type is promoted to non-nullable
     assertNoEdge(iNode, never);
     // But there is an edge from j to `never`.
-    assertEdge(jNode, never, hard: false);
+    assertEdge(jNode, never, hard: true);
   }
 
   test_constructorDeclaration_returnType_generic() async {
