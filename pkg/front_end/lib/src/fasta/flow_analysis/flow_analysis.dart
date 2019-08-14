@@ -1125,6 +1125,12 @@ class VariableModel<Type> {
   VariableModel(this.promotedType);
 
   @override
+  operator ==(Object other) {
+    return other is VariableModel<Type> &&
+        this.promotedType == other.promotedType;
+  }
+
+  @override
   String toString() => 'VariableModel($promotedType)';
 }
 
