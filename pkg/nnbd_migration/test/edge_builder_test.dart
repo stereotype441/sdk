@@ -1578,6 +1578,19 @@ int/*1*/ f(int/*2*/ i) => i/*3*/;
             hard: true));
   }
 
+  test_functionDeclaration_expression_body_flow_analysis() async {
+    await analyze('''
+bool f(int i) => i == null || i.isEven;
+bool g(int j) => j.isEven;
+''');
+    var iNode = decoratedTypeAnnotation('int i').node;
+    var jNode = decoratedTypeAnnotation('int j').node;
+    // No edge from i to `never` because i's type is promoted to non-nullable
+    assertNoEdge(iNode, never);
+    // But there is an edge from j to `never`.
+    assertEdge(jNode, never, hard: true);
+  }
+
   test_functionDeclaration_flow_analysis() async {
     await analyze('''
 void f(int i, int j) {
