@@ -933,6 +933,7 @@ $stackTrace''');
       _handleAssignment(returnValue, returnType);
     }
 
+    _flowAnalysis.handleExit();
     // Later statements no longer post-dominate the declarations because we
     // exited (or, in parent scopes, conditionally exited).
     // TODO(mfairhurst): don't clear post-dominators beyond the current function.
