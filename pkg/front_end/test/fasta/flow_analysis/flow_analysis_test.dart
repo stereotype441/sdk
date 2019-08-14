@@ -469,8 +469,8 @@ main() {
         var h = _Harness();
         var p1 = {x: model(intType)};
         var p2 = {x: model(stringType)};
-        expect(FlowModel.joinVariableInfo(h, p1, p2), {x: null});
-        expect(FlowModel.joinVariableInfo(h, p2, p1), {x: null});
+        expect(FlowModel.joinVariableInfo(h, p1, p2), {x: model(null)});
+        expect(FlowModel.joinVariableInfo(h, p2, p1), {x: model(null)});
       });
 
       test('sub-map', () {
@@ -494,9 +494,9 @@ main() {
         var p1 = {x: model(intQType), y: model(stringType)};
         var p2 = {x: model(intType)};
         var join12 = FlowModel.joinVariableInfo(h, p1, p2);
-        _Type.allowComparisons(() => expect(join12, {x: intQType}));
+        _Type.allowComparisons(() => expect(join12, {x: model(intQType)}));
         var join21 = FlowModel.joinVariableInfo(h, p2, p1);
-        _Type.allowComparisons(() => expect(join21, {x: intQType}));
+        _Type.allowComparisons(() => expect(join21, {x: model(intQType)}));
       });
     });
   });
