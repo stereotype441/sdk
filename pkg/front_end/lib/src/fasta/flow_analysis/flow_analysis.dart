@@ -297,9 +297,9 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _stack.add(_current);
 
     Set<Variable> notPromoted = null;
-    for (var entry in _current.promoted.entries) {
+    for (var entry in _current.variableInfo.entries) {
       var variable = entry.key;
-      var promotedType = entry.value;
+      var promotedType = entry.value.promotedType;
       if (promotedType != null &&
           functionBody.isPotentiallyMutatedInScope(variable)) {
         notPromoted ??= Set<Variable>.identity();
@@ -471,7 +471,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// is currently promoted.  Otherwise returns `null`.
   Type promotedType(Variable variable) {
     _variableReferenced(variable);
-    return _current.promoted[variable];
+    return _current.variableInfo[variable].promotedType;
   }
 
   /// The [notPromoted] set contains all variables that are potentially
@@ -655,7 +655,7 @@ class FlowModel<Variable, Type> {
   /// though the variable is not in scope anymore.  This should not have any
   /// effect on analysis results for error-free code, because it is an error to
   /// refer to a variable that is no longer in scope.
-  final Map<Variable, Type> promoted;
+  final Map<Variable, VariableModel<Type> /*!*/ > variableInfo;
 
   /// Creates a state object with the given [reachable] status.  All variables
   /// are assumed to be unpromoted and already assigned, so joining another
@@ -670,7 +670,7 @@ class FlowModel<Variable, Type> {
   FlowModel._(
     this.reachable,
     this.notAssigned,
-    this.promoted,
+    this.variableInfo,
   );
 
   /// Updates the state to track a newly declared local [variable].  The
@@ -678,13 +678,13 @@ class FlowModel<Variable, Type> {
   /// the point of declaration.
   FlowModel<Variable, Type> add(Variable variable, {bool assigned: false}) {
     var newNotAssigned = assigned ? notAssigned : notAssigned.add(variable);
-    var newPromoted = Map<Variable, Type>.from(promoted);
-    newPromoted[variable] = null;
+    var newVariableInfo = Map<Variable, VariableModel<Type>>.from(variableInfo);
+    newVariableInfo[variable] = VariableModel<Type>(null);
 
     return FlowModel<Variable, Type>._(
       reachable,
       newNotAssigned,
-      newPromoted,
+      newVariableInfo,
     );
   }
 
@@ -695,17 +695,18 @@ class FlowModel<Variable, Type> {
   /// assigned?  Does it matter?
   FlowModel<Variable, Type> markNonNullable(
       TypeOperations<Variable, Type> typeOperations, Variable variable) {
-    var previousType = promoted[variable];
+    var previousType = variableInfo[variable].promotedType;
     previousType ??= typeOperations.variableType(variable);
     var type = typeOperations.promoteToNonNull(previousType);
 
     if (!typeOperations.isSameType(type, previousType)) {
-      var newPromoted = <Variable, Type>{}..addAll(promoted);
-      newPromoted[variable] = type;
+      var newVariableInfo = <Variable, VariableModel<Type>>{}
+        ..addAll(variableInfo);
+      newVariableInfo[variable] = VariableModel<Type>(type);
       return FlowModel<Variable, Type>._(
         reachable,
         notAssigned,
-        newPromoted,
+        newVariableInfo,
       );
     }
 
@@ -726,17 +727,18 @@ class FlowModel<Variable, Type> {
     Variable variable,
     Type type,
   ) {
-    var previousType = promoted[variable];
+    var previousType = variableInfo[variable].promotedType;
     previousType ??= typeOperations.variableType(variable);
 
     if (typeOperations.isSubtypeOf(type, previousType) &&
         !typeOperations.isSameType(type, previousType)) {
-      var newPromoted = <Variable, Type>{}..addAll(promoted);
-      newPromoted[variable] = type;
+      var newVariableInfo = <Variable, VariableModel<Type>>{}
+        ..addAll(variableInfo);
+      newVariableInfo[variable] = VariableModel<Type>(type);
       return FlowModel<Variable, Type>._(
         reachable,
         notAssigned,
-        newPromoted,
+        newVariableInfo,
       );
     }
 
@@ -763,14 +765,14 @@ class FlowModel<Variable, Type> {
   /// later in the loop body.  If we switch to a fixed point analysis, we should
   /// be able to remove this method.
   FlowModel<Variable, Type> removePromotedAll(Set<Variable> variables) {
-    var newPromoted = _removePromotedAll(promoted, variables);
+    var newVariableInfo = _removePromotedAll(variableInfo, variables);
 
-    if (identical(newPromoted, promoted)) return this;
+    if (identical(newVariableInfo, variableInfo)) return this;
 
     return FlowModel<Variable, Type>._(
       reachable,
       notAssigned,
-      newPromoted,
+      newVariableInfo,
     );
   }
 
@@ -812,18 +814,19 @@ class FlowModel<Variable, Type> {
       newNotAssigned = other.notAssigned;
     }
 
-    var newPromoted = <Variable, Type>{};
+    var newVariableInfo = <Variable, VariableModel<Type>>{};
     bool promotedMatchesThis = true;
-    bool promotedMatchesOther = other.promoted.length == promoted.length;
-    for (var entry in promoted.entries) {
+    bool promotedMatchesOther =
+        other.variableInfo.length == variableInfo.length;
+    for (var entry in variableInfo.entries) {
       var variable = entry.key;
-      var thisType = entry.value;
-      var otherType = other.promoted[variable];
+      var thisType = entry.value.promotedType;
+      var otherType = other.variableInfo[variable].promotedType;
       if (!unsafe.contains(variable)) {
         if (otherType != null &&
             (thisType == null ||
                 typeOperations.isSubtypeOf(otherType, thisType))) {
-          newPromoted[variable] = otherType;
+          newVariableInfo[variable] = VariableModel<Type>(otherType);
           if (promotedMatchesThis &&
               (thisType == null ||
                   !typeOperations.isSameType(thisType, otherType))) {
@@ -833,27 +836,27 @@ class FlowModel<Variable, Type> {
         }
       }
       if (thisType != null) {
-        newPromoted[variable] = thisType;
+        newVariableInfo[variable] = VariableModel<Type>(thisType);
         if (promotedMatchesOther &&
             (otherType == null ||
                 !typeOperations.isSameType(thisType, otherType))) {
           promotedMatchesOther = false;
         }
       } else {
-        newPromoted[variable] = null;
+        newVariableInfo[variable] = VariableModel<Type>(null);
         if (promotedMatchesOther && otherType != null) {
           promotedMatchesOther = false;
         }
       }
     }
     assert(promotedMatchesThis ==
-        _promotionsEqual(typeOperations, newPromoted, promoted));
+        _promotionsEqual(typeOperations, newVariableInfo, variableInfo));
     assert(promotedMatchesOther ==
-        _promotionsEqual(typeOperations, newPromoted, other.promoted));
+        _promotionsEqual(typeOperations, newVariableInfo, other.variableInfo));
     if (promotedMatchesThis) {
-      newPromoted = promoted;
+      newVariableInfo = variableInfo;
     } else if (promotedMatchesOther) {
-      newPromoted = other.promoted;
+      newVariableInfo = other.variableInfo;
     }
 
     return _identicalOrNew(
@@ -861,7 +864,7 @@ class FlowModel<Variable, Type> {
       other,
       newReachable,
       newNotAssigned,
-      newPromoted,
+      newVariableInfo,
     );
   }
 
@@ -873,12 +876,12 @@ class FlowModel<Variable, Type> {
     return FlowModel<Variable, Type>._(
       reachable,
       notAssigned,
-      promoted,
+      variableInfo,
     );
   }
 
   @override
-  String toString() => '($reachable, $notAssigned, $promoted)';
+  String toString() => '($reachable, $notAssigned, $variableInfo)';
 
   /// Updates the state to indicate that an assignment was made to the given
   /// [variable].  The variable is marked as definitely assigned, and any
@@ -891,50 +894,50 @@ class FlowModel<Variable, Type> {
         ? notAssigned.remove(emptySet, variable)
         : notAssigned;
 
-    var newPromoted = _removePromoted(promoted, variable);
+    var newVariableInfo = _removePromoted(variableInfo, variable);
 
     if (identical(newNotAssigned, notAssigned) &&
-        identical(newPromoted, promoted)) {
+        identical(newVariableInfo, variableInfo)) {
       return this;
     }
 
     return FlowModel<Variable, Type>._(
       reachable,
       newNotAssigned,
-      newPromoted,
+      newVariableInfo,
     );
   }
 
   /// Removes a [variable] from a "promoted" [map], treating the map as
   /// immutable.
-  Map<Variable, Type> _removePromoted(
-      Map<Variable, Type> map, Variable variable) {
-    if (map[variable] == null) return map;
+  Map<Variable, VariableModel<Type>> _removePromoted(
+      Map<Variable, VariableModel<Type>> map, Variable variable) {
+    if (map[variable].promotedType == null) return map;
 
-    var result = Map<Variable, Type>.from(map);
-    result[variable] = null;
+    var result = Map<Variable, VariableModel<Type>>.from(map);
+    result[variable] = VariableModel<Type>(null);
     return result;
   }
 
   /// Removes a set of [variable]s from a "promoted" [map], treating the map as
   /// immutable.
-  Map<Variable, Type> _removePromotedAll(
-    Map<Variable, Type> map,
+  Map<Variable, VariableModel<Type>> _removePromotedAll(
+    Map<Variable, VariableModel<Type>> map,
     Set<Variable> variables,
   ) {
     if (map.isEmpty) return const {};
     if (variables.isEmpty) return map;
 
-    var result = <Variable, Type>{};
+    var result = <Variable, VariableModel<Type>>{};
     var noChanges = true;
     for (var entry in map.entries) {
       var variable = entry.key;
-      var promotedType = entry.value;
+      var promotedType = entry.value.promotedType;
       if (variables.contains(variable) && promotedType != null) {
         result[variable] = null;
         noChanges = false;
       } else {
-        result[variable] = promotedType;
+        result[variable] = VariableModel<Type>(promotedType);
       }
     }
 
@@ -965,21 +968,21 @@ class FlowModel<Variable, Type> {
 
     var newReachable = first.reachable || second.reachable;
     var newNotAssigned = first.notAssigned.union(second.notAssigned);
-    var newPromoted =
-        FlowModel.joinPromoted(typeOperations, first.promoted, second.promoted);
+    var newVariableInfo = FlowModel.joinVariableInfo(
+        typeOperations, first.variableInfo, second.variableInfo);
 
     return FlowModel._identicalOrNew(
       first,
       second,
       newReachable,
       newNotAssigned,
-      newPromoted,
+      newVariableInfo,
     );
   }
 
   /// Joins two "promoted" maps.  See [join] for details.
   @visibleForTesting
-  static Map<Variable, Type> joinPromoted<Variable, Type>(
+  static Map<Variable, Type> joinVariableInfo<Variable, Type>(
     TypeOperations<Variable, Type> typeOperations,
     Map<Variable, Type> first,
     Map<Variable, Type> second,
@@ -1032,23 +1035,23 @@ class FlowModel<Variable, Type> {
     FlowModel<Variable, Type> second,
     bool newReachable,
     _VariableSet<Variable> newNotAssigned,
-    Map<Variable, Type> newPromoted,
+    Map<Variable, VariableModel<Type>> newVariableInfo,
   ) {
     if (first.reachable == newReachable &&
         identical(first.notAssigned, newNotAssigned) &&
-        identical(first.promoted, newPromoted)) {
+        identical(first.variableInfo, newVariableInfo)) {
       return first;
     }
     if (second.reachable == newReachable &&
         identical(second.notAssigned, newNotAssigned) &&
-        identical(second.promoted, newPromoted)) {
+        identical(second.variableInfo, newVariableInfo)) {
       return second;
     }
 
     return FlowModel<Variable, Type>._(
       newReachable,
       newNotAssigned,
-      newPromoted,
+      newVariableInfo,
     );
   }
 
@@ -1105,6 +1108,24 @@ abstract class TypeOperations<Variable, Type> {
 
   /// Return the static type of the given [variable].
   Type variableType(Variable variable);
+}
+
+/// An instance of the [VariableModel] class represents the information gathered
+/// by flow analysis for a single variable at a single point in the control flow
+/// of the function or method being analyzed.
+///
+/// Instances of this class are immutable, so the methods below that "update"
+/// the state actually leave `this` unchanged and return a new state object.
+@visibleForTesting
+class VariableModel<Type> {
+  /// The type that the variable has been promoted to, or `null` if the variable
+  /// is not promoted.
+  final Type promotedType;
+
+  VariableModel(this.promotedType);
+
+  @override
+  String toString() => 'VariableModel($promotedType)';
 }
 
 /// List based immutable set of variables.
