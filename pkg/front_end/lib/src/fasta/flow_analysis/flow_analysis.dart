@@ -935,7 +935,7 @@ class FlowModel<Variable, Type> {
       var variable = entry.key;
       var promotedType = entry.value.promotedType;
       if (variables.contains(variable) && promotedType != null) {
-        result[variable] = null;
+        result[variable] = VariableModel<Type>(null);
         noChanges = false;
       } else {
         result[variable] = VariableModel<Type>(promotedType);
