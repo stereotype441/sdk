@@ -41,6 +41,18 @@ class _AlreadyMigratedCodeDecoratorTest {
     expect(decoratedType.node, same(graph.always));
   }
 
+  void checkInt(DecoratedType decoratedType) {
+    expect(decoratedType.type, typeProvider.intType);
+    expect(decoratedType.node, same(graph.never));
+  }
+
+  void checkTypeParameter(
+      DecoratedType decoratedType, TypeParameterElementImpl expectedElement) {
+    var type = decoratedType.type as TypeParameterTypeImpl;
+    expect(type.element, same(expectedElement));
+    expect(decoratedType.node, same(graph.never));
+  }
+
   void checkVoid(DecoratedType decoratedType) {
     expect(decoratedType.type, same(typeProvider.voidType));
     expect(decoratedType.node, same(graph.always));
@@ -72,10 +84,6 @@ class _AlreadyMigratedCodeDecoratorTest {
     ])).positionalParameters[0]);
   }
 
-  test_decorate_interfaceType_simple_star() {
-    checkInt(decorate(InterfaceTypeImpl(typeProvider.intType.element, nullabilitySuffix: NullabilitySuffix.star)))
-  }
-
   test_decorate_functionType_positional_parameter() {
     checkDynamic(
         decorate(FunctionTypeImpl.synthetic(typeProvider.voidType, [], [
@@ -92,9 +100,23 @@ class _AlreadyMigratedCodeDecoratorTest {
 
   test_decorate_functionType_star() {
     expect(
-        decorate(FunctionTypeImpl.synthetic(typeProvider.voidType, [], [], nullabilitySuffix: NullabilitySuffix.star))
+        decorate(FunctionTypeImpl.synthetic(typeProvider.voidType, [], [],
+                nullabilitySuffix: NullabilitySuffix.star))
             .node,
         same(graph.never));
+  }
+
+  test_decorate_interfaceType_simple_star() {
+    checkInt(decorate(InterfaceTypeImpl(typeProvider.intType.element,
+        nullabilitySuffix: NullabilitySuffix.star)));
+  }
+
+  test_decorate_typeParameterType_star() {
+    var element = TypeParameterElementImpl.synthetic('T');
+    checkTypeParameter(
+        decorate(TypeParameterTypeImpl(element,
+            nullabilitySuffix: NullabilitySuffix.star)),
+        element);
   }
 
   test_decorate_void() {
