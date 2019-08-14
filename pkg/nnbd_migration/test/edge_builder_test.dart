@@ -642,6 +642,19 @@ bool f(bool i, bool j) => i && j;
     assertNoUpstreamNullability(decoratedTypeAnnotation('bool i').node);
   }
 
+  solo_test_binaryExpression_ampersandAmpersand_flow_analysis() async {
+    await analyze('''
+bool f(int i) => i != null && i.isEven;
+bool g(int j) => j.isEven;
+''');
+    var iNode = decoratedTypeAnnotation('int i').node;
+    var jNode = decoratedTypeAnnotation('int j').node;
+    // No edge from i to `never` because i's type is promoted to non-nullable
+    assertNoEdge(iNode, never);
+    // But there is an edge from j to `never`.
+    assertEdge(jNode, never, hard: true);
+  }
+
   test_binaryExpression_bar_result_not_null() async {
     await analyze('''
 int f(int i, int j) => i | j;
