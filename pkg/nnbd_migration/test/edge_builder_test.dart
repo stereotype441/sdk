@@ -1290,6 +1290,36 @@ class C {
     // exception to be thrown.
   }
 
+  test_constructorDeclaration_assert_flow_analysis() async {
+    await analyze('''
+class C {
+  C(int i, int j) : assert(i == null || i.isEven, j.isEven);
+}
+''');
+    var iNode = decoratedTypeAnnotation('int i').node;
+    var jNode = decoratedTypeAnnotation('int j').node;
+    // No edge from i to `never` because i's type is promoted to non-nullable
+    assertNoEdge(iNode, never);
+    // But there is an edge from j to `never`.
+    assertEdge(jNode, never, hard: true);
+  }
+
+  test_constructorDeclaration_initializer_flow_analysis() async {
+    await analyze('''
+class C {
+  bool b1;
+  bool b2;
+  C(int i, int j) : b1 = i == null || i.isEven, b2 = j.isEven;
+}
+''');
+    var iNode = decoratedTypeAnnotation('int i').node;
+    var jNode = decoratedTypeAnnotation('int j').node;
+    // No edge from i to `never` because i's type is promoted to non-nullable
+    assertNoEdge(iNode, never);
+    // But there is an edge from j to `never`.
+    assertEdge(jNode, never, hard: true);
+  }
+
   test_constructorDeclaration_redirection_flow_analysis() async {
     await analyze('''
 class C {
