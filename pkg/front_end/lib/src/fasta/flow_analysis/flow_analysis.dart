@@ -982,15 +982,15 @@ class FlowModel<Variable, Type> {
 
   /// Joins two "promoted" maps.  See [join] for details.
   @visibleForTesting
-  static Map<Variable, Type> joinVariableInfo<Variable, Type>(
+  static Map<Variable, VariableModel<Type>> joinVariableInfo<Variable, Type>(
     TypeOperations<Variable, Type> typeOperations,
-    Map<Variable, Type> first,
-    Map<Variable, Type> second,
+    Map<Variable, VariableModel<Type>> first,
+    Map<Variable, VariableModel<Type>> second,
   ) {
     if (identical(first, second)) return first;
     if (first.isEmpty || second.isEmpty) return const {};
 
-    var result = <Variable, Type>{};
+    var result = <Variable, VariableModel<Type>>{};
     var alwaysFirst = true;
     var alwaysSecond = true;
     for (var entry in first.entries) {
@@ -998,10 +998,10 @@ class FlowModel<Variable, Type> {
       if (!second.containsKey(variable)) {
         alwaysFirst = false;
       } else {
-        var firstType = entry.value;
-        var secondType = second[variable];
+        var firstType = entry.value.promotedType;
+        var secondType = second[variable].promotedType;
         if (identical(firstType, secondType)) {
-          result[variable] = firstType;
+          result[variable] = VariableModel<Type>(firstType);
         } else if (firstType == null) {
           result[variable] = null;
           alwaysSecond = false;
@@ -1009,13 +1009,13 @@ class FlowModel<Variable, Type> {
           result[variable] = null;
           alwaysFirst = false;
         } else if (typeOperations.isSubtypeOf(firstType, secondType)) {
-          result[variable] = secondType;
+          result[variable] = VariableModel<Type>(secondType);
           alwaysFirst = false;
         } else if (typeOperations.isSubtypeOf(secondType, firstType)) {
-          result[variable] = firstType;
+          result[variable] = VariableModel<Type>(firstType);
           alwaysSecond = false;
         } else {
-          result[variable] = null;
+          result[variable] = VariableModel<Type>(null);
           alwaysFirst = false;
           alwaysSecond = false;
         }

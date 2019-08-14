@@ -441,56 +441,58 @@ main() {
       var stringType = _Type('String');
       const emptyMap = <Null, Null>{};
 
+      VariableModel<_Type> model(_Type type) => VariableModel<_Type>(type);
+
       test('identical inputs', () {
         var h = _Harness();
-        var p = {x: intType, y: stringType};
+        var p = {x: model(intType), y: model(stringType)};
         expect(FlowModel.joinVariableInfo(h, p, p), same(p));
       });
 
       test('one input empty', () {
         var h = _Harness();
-        var p1 = {x: intType, y: stringType};
-        var p2 = <_Var, _Type>{};
+        var p1 = {x: model(intType), y: model(stringType)};
+        var p2 = <_Var, VariableModel<_Type>>{};
         expect(FlowModel.joinVariableInfo(h, p1, p2), same(emptyMap));
         expect(FlowModel.joinVariableInfo(h, p2, p1), same(emptyMap));
       });
 
       test('related types', () {
         var h = _Harness();
-        var p1 = {x: intType};
-        var p2 = {x: intQType};
+        var p1 = {x: model(intType)};
+        var p2 = {x: model(intQType)};
         expect(FlowModel.joinVariableInfo(h, p1, p2), same(p2));
         expect(FlowModel.joinVariableInfo(h, p2, p1), same(p2));
       });
 
       test('unrelated types', () {
         var h = _Harness();
-        var p1 = {x: intType};
-        var p2 = {x: stringType};
+        var p1 = {x: model(intType)};
+        var p2 = {x: model(stringType)};
         expect(FlowModel.joinVariableInfo(h, p1, p2), {x: null});
         expect(FlowModel.joinVariableInfo(h, p2, p1), {x: null});
       });
 
       test('sub-map', () {
         var h = _Harness();
-        var p1 = {x: intType, y: stringType};
-        var p2 = {x: intType};
+        var p1 = {x: model(intType), y: model(stringType)};
+        var p2 = {x: model(intType)};
         expect(FlowModel.joinVariableInfo(h, p1, p2), same(p2));
         expect(FlowModel.joinVariableInfo(h, p2, p1), same(p2));
       });
 
       test('sub-map with matched subtype', () {
         var h = _Harness();
-        var p1 = {x: intType, y: stringType};
-        var p2 = {x: intQType};
+        var p1 = {x: model(intType), y: model(stringType)};
+        var p2 = {x: model(intQType)};
         expect(FlowModel.joinVariableInfo(h, p1, p2), same(p2));
         expect(FlowModel.joinVariableInfo(h, p2, p1), same(p2));
       });
 
       test('sub-map with mismatched subtype', () {
         var h = _Harness();
-        var p1 = {x: intQType, y: stringType};
-        var p2 = {x: intType};
+        var p1 = {x: model(intQType), y: model(stringType)};
+        var p2 = {x: model(intType)};
         var join12 = FlowModel.joinVariableInfo(h, p1, p2);
         _Type.allowComparisons(() => expect(join12, {x: intQType}));
         var join21 = FlowModel.joinVariableInfo(h, p2, p1);
