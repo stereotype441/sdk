@@ -924,10 +924,7 @@ $stackTrace''');
             returnType.type.isDartAsyncFutureOr) &&
         node.thisOrAncestorOfType<FunctionBody>().isAsynchronous &&
         !returnValue.staticType.isDartAsyncFuture) {
-      returnType = returnType.typeArguments?.first;
-      if (returnType == null) {
-        return null;
-      }
+      returnType = returnType.typeArguments.first;
     }
     if (returnValue == null) {
       _checkAssignment(null,
@@ -1109,8 +1106,18 @@ $stackTrace''');
         }
       }
     }
-    _postDominatedLocals
-        .addAll(node.variables.map((variable) => variable.declaredElement));
+
+    // Track post-dominators, except we cannot make hard edges to multi
+    // declarations. Consider:
+    //
+    // int? x = null, y = 0;
+    // y.toDouble();
+    //
+    // We cannot make a hard edge from y to never in this case.
+    if (node.variables.length == 1) {
+      _postDominatedLocals.add(node.variables.single.declaredElement);
+    }
+
     return null;
   }
 

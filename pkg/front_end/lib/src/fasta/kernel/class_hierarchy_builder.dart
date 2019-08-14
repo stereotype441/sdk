@@ -254,8 +254,9 @@ class ClassHierarchyBuilder {
     Builder supertypeDeclaration = supertypeNode.cls;
     if (depth < supertypes.length) {
       TypeBuilder asSupertypeOf = supertypes[depth];
-      if (asSupertypeOf.declaration == supertypeDeclaration)
+      if (asSupertypeOf.declaration == supertypeDeclaration) {
         return asSupertypeOf;
+      }
     }
     supertypes = clsNode.interfaces;
     for (int i = 0; i < supertypes.length; i++) {
@@ -1916,6 +1917,9 @@ class TypeBuilderConstraintGatherer extends TypeConstraintGatherer
 
   @override
   Class get functionClass => hierarchy.functionKernelClass;
+
+  @override
+  Class get futureClass => hierarchy.futureKernelClass;
 
   @override
   Class get futureOrClass => hierarchy.futureOrKernelClass;

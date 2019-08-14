@@ -19,7 +19,6 @@ import 'package:analyzer/src/dart/ast/ast.dart'
 import 'package:analyzer/src/dart/ast/token.dart';
 import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
-import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/resolver/extension_member_resolver.dart';
 import 'package:analyzer/src/dart/resolver/method_invocation_resolver.dart';
@@ -406,8 +405,8 @@ class ElementResolver extends SimpleAstVisitor<void> {
     Expression function = node.function;
     DartType functionType;
     if (function is ExtensionOverride) {
-      ExtensionElement element = function.extensionName.staticElement;
-      MethodElement member = element.getMethod('call');
+      var member = _extensionResolver.getOverrideMember(
+          function, 'call', ElementKind.METHOD);
       if (member != null && member.isStatic) {
         _resolver.errorReporter.reportErrorForNode(
             CompileTimeErrorCode.EXTENSION_OVERRIDE_ACCESS_TO_STATIC_MEMBER,
@@ -717,7 +716,8 @@ class ElementResolver extends SimpleAstVisitor<void> {
       String memberName = propertyName.name;
       ExecutableElement member;
       if (propertyName.inSetterContext()) {
-        member = element.getSetter(memberName);
+        member = _extensionResolver.getOverrideMember(
+            target, memberName, ElementKind.SETTER);
         if (member == null) {
           _resolver.errorReporter.reportErrorForNode(
               CompileTimeErrorCode.UNDEFINED_EXTENSION_SETTER,
@@ -725,7 +725,8 @@ class ElementResolver extends SimpleAstVisitor<void> {
               [memberName, element.name]);
         }
         if (propertyName.inGetterContext()) {
-          PropertyAccessorElement getter = element.getGetter(memberName);
+          PropertyAccessorElement getter = _extensionResolver.getOverrideMember(
+              target, memberName, ElementKind.GETTER);
           if (getter == null) {
             _resolver.errorReporter.reportErrorForNode(
                 CompileTimeErrorCode.UNDEFINED_EXTENSION_GETTER,
@@ -735,7 +736,10 @@ class ElementResolver extends SimpleAstVisitor<void> {
           propertyName.auxiliaryElements = AuxiliaryElements(getter, null);
         }
       } else if (propertyName.inGetterContext()) {
-        member = element.getGetter(memberName) ?? element.getMethod(memberName);
+        member = _extensionResolver.getOverrideMember(
+                target, memberName, ElementKind.GETTER) ??
+            _extensionResolver.getOverrideMember(
+                target, memberName, ElementKind.METHOD);
         if (member == null) {
           _resolver.errorReporter.reportErrorForNode(
               CompileTimeErrorCode.UNDEFINED_EXTENSION_GETTER,
@@ -748,12 +752,6 @@ class ElementResolver extends SimpleAstVisitor<void> {
             CompileTimeErrorCode.EXTENSION_OVERRIDE_ACCESS_TO_STATIC_MEMBER,
             propertyName);
       }
-
-      member = ExecutableMember.from3(
-        member,
-        element.typeParameters,
-        target.typeArgumentTypes,
-      );
 
       propertyName.staticElement = member;
       return;
@@ -1078,19 +1076,6 @@ class ElementResolver extends SimpleAstVisitor<void> {
    * type analysis.
    */
   DartType _getStaticType(Expression expression, {bool read: false}) {
-    DartType staticType = _getStaticTypeOrFunctionType(expression, read: read);
-    if (staticType is FunctionType) {
-      //
-      // All function types are subtypes of 'Function', which is itself a
-      // subclass of 'Object'.
-      //
-      staticType = _resolver.typeProvider.functionType;
-    }
-    return staticType;
-  }
-
-  DartType _getStaticTypeOrFunctionType(Expression expression,
-      {bool read: false}) {
     if (expression is NullLiteral) {
       return _resolver.typeProvider.nullType;
     }
@@ -1265,16 +1250,28 @@ class ElementResolver extends SimpleAstVisitor<void> {
   ResolutionResult _lookUpGetter(
       Expression target, DartType type, String name, Expression nameNode) {
     type = _resolveTypeParameter(type);
-    if (type is InterfaceType) {
+    ResolutionResult result = ResolutionResult.none;
+
+    void lookupIn(InterfaceType type) {
       var getter = type.lookUpInheritedGetter(name,
           library: _definingLibrary, thisType: target is! SuperExpression);
       if (getter != null) {
-        return ResolutionResult(getter);
+        result = ResolutionResult(getter);
       }
-      return _extensionResolver.findExtension(
+    }
+
+    if (type is InterfaceType) {
+      lookupIn(type);
+    } else if (type is FunctionType) {
+      lookupIn(_resolver.typeProvider.functionType);
+    } else {
+      return ResolutionResult.none;
+    }
+    if (result.isNone) {
+      result = _extensionResolver.findExtension(
           type, name, nameNode, ElementKind.GETTER);
     }
-    return ResolutionResult.none;
+    return result;
   }
 
   /**
@@ -1299,16 +1296,28 @@ class ElementResolver extends SimpleAstVisitor<void> {
   ResolutionResult _lookUpMethod(
       Expression target, DartType type, String name, Expression nameNode) {
     type = _resolveTypeParameter(type);
-    if (type is InterfaceType) {
+    ResolutionResult result = ResolutionResult.none;
+
+    void lookupIn(InterfaceType type) {
       var method = type.lookUpInheritedMethod(name,
           library: _definingLibrary, thisType: target is! SuperExpression);
       if (method != null) {
-        return ResolutionResult(method);
+        result = ResolutionResult(method);
       }
-      return _extensionResolver.findExtension(
+    }
+
+    if (type is InterfaceType) {
+      lookupIn(type);
+    } else if (type is FunctionType) {
+      lookupIn(_resolver.typeProvider.functionType);
+    } else {
+      return ResolutionResult.none;
+    }
+    if (result.isNone) {
+      result = _extensionResolver.findExtension(
           type, name, nameNode, ElementKind.METHOD);
     }
-    return ResolutionResult.none;
+    return result;
   }
 
   /**
@@ -1319,16 +1328,28 @@ class ElementResolver extends SimpleAstVisitor<void> {
   ResolutionResult _lookUpSetter(
       Expression target, DartType type, String name, Expression nameNode) {
     type = _resolveTypeParameter(type);
-    if (type is InterfaceType) {
+    ResolutionResult result = ResolutionResult.none;
+
+    void lookupIn(InterfaceType type) {
       var setter = type.lookUpInheritedSetter(name,
           library: _definingLibrary, thisType: target is! SuperExpression);
       if (setter != null) {
-        return ResolutionResult(setter);
+        result = ResolutionResult(setter);
       }
-      return _extensionResolver.findExtension(
+    }
+
+    if (type is InterfaceType) {
+      lookupIn(type);
+    } else if (type is FunctionType) {
+      lookupIn(_resolver.typeProvider.functionType);
+    } else {
+      return ResolutionResult.none;
+    }
+    if (result.isNone) {
+      result = _extensionResolver.findExtension(
           type, name, nameNode, ElementKind.SETTER);
     }
-    return ResolutionResult.none;
+    return result;
   }
 
   /**
@@ -1572,9 +1593,10 @@ class ElementResolver extends SimpleAstVisitor<void> {
       var isSuper = leftOperand is SuperExpression;
 
       ResolutionResult result = ResolutionResult.none;
-      if (leftType is InterfaceType) {
+
+      void lookupIn(InterfaceType type) {
         ExecutableElement invokeElement = _inheritance.getMember(
-          leftType,
+          type,
           new Name(_definingLibrary.source.uri, methodName),
           forSuper: isSuper,
         );
@@ -1583,7 +1605,13 @@ class ElementResolver extends SimpleAstVisitor<void> {
         }
       }
 
-      if (result.isNone && leftType is InterfaceType) {
+      if (leftType is InterfaceType) {
+        lookupIn(leftType);
+      } else if (leftType is FunctionType) {
+        lookupIn(_resolver.typeProvider.functionType);
+      }
+
+      if (result.isNone) {
         result = _extensionResolver.findExtension(
             leftType, methodName, node, ElementKind.METHOD);
       }
@@ -1703,6 +1731,11 @@ class ElementResolver extends SimpleAstVisitor<void> {
   void _resolvePropertyAccess(
       Expression target, SimpleIdentifier propertyName, bool isCascaded) {
     DartType staticType = _getStaticType(target);
+    //
+    // If this property access is of the form 'E.m' where 'E' is an extension,
+    // then look for the member in the extension. This does not apply to
+    // conditional property accesses (i.e. 'C?.m').
+    //
     ResolutionResult result = ResolutionResult.none;
     if (target is Identifier && target.staticElement is ExtensionElement) {
       Element staticElement;
@@ -1787,6 +1820,10 @@ class ElementResolver extends SimpleAstVisitor<void> {
     }
     propertyName.staticElement = result.element;
     if (_shouldReportInvalidMember(staticType, result)) {
+      if (staticType is FunctionType &&
+          propertyName.name == FunctionElement.CALL_METHOD_NAME) {
+        return;
+      }
       Element enclosingElement = staticType.element;
       bool isStaticProperty = _isStatic(enclosingElement);
       // Special getter cases.

@@ -148,7 +148,9 @@ Future<Map<Uri, List<int>>> scanReachableFiles(Uri entryUri) async {
 
   inputSize = 0;
   // adjust size because there is a null-terminator on the contents.
-  for (var source in files.values) inputSize += (source.length - 1);
+  for (var source in files.values) {
+    inputSize += (source.length - 1);
+  }
   print('input size: $inputSize chars');
   var loadTime = loadTimer.elapsedMicroseconds - scanTimer.elapsedMicroseconds;
   report('load', loadTime);
@@ -227,7 +229,7 @@ generateKernel(Uri entryUri,
     {bool compileSdk: true, bool legacyMode: false}) async {
   // TODO(sigmund): this is here only to compute the input size,
   // we should extract the input size from the frontend instead.
-  scanReachableFiles(entryUri);
+  await scanReachableFiles(entryUri);
 
   var timer = new Stopwatch()..start();
   var options = new CompilerOptions()

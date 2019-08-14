@@ -14,9 +14,11 @@
 #include "vm/dart_api_impl.h"  // For Api::IsFfiEnabled().
 #include "vm/dart_entry.h"
 #include "vm/debugger.h"
+#include "vm/hash.h"
 #include "vm/longjump.h"
 #include "vm/object_store.h"
 #include "vm/reusable_handles.h"
+#include "vm/scopes.h"
 #include "vm/stack_frame_kbc.h"
 #include "vm/timeline.h"
 
@@ -3459,11 +3461,7 @@ RawLocalVarDescriptors* BytecodeReader::ComputeLocalVarDescriptors(
   ASSERT(!bytecode.IsNull());
   ASSERT(function.bytecode() == bytecode.raw());
 
-  struct VarDesc {
-    const String* name;
-    RawLocalVarDescriptors::VarInfo info;
-  };
-  GrowableArray<VarDesc> vars(8);
+  LocalVarDescriptorsBuilder vars;
 
   if (function.IsLocalFunction()) {
     const auto& parent = Function::Handle(zone, function.parent_function());
@@ -3484,8 +3482,8 @@ RawLocalVarDescriptors* BytecodeReader::ComputeLocalVarDescriptors(
             function.token_pos() <= var_info.end_pos) ||
            (function.token_pos() <= var_info.begin_pos &&
             var_info.begin_pos <= function.end_token_pos()))) {
-        vars.Add(
-            VarDesc{&String::Handle(zone, parent_vars.GetName(i)), var_info});
+        vars.Add(LocalVarDescriptorsBuilder::VarDesc{
+            &String::Handle(zone, parent_vars.GetName(i)), var_info});
       }
     }
   }
@@ -3501,7 +3499,7 @@ RawLocalVarDescriptors* BytecodeReader::ComputeLocalVarDescriptors(
           context_level = local_vars.ContextLevel();
         } break;
         case BytecodeLocalVariablesIterator::kVariableDeclaration: {
-          VarDesc desc;
+          LocalVarDescriptorsBuilder::VarDesc desc;
           desc.name = &String::Handle(zone, local_vars.Name());
           if (local_vars.IsCaptured()) {
             desc.info.set_kind(RawLocalVarDescriptors::kContextVar);
@@ -3526,7 +3524,7 @@ RawLocalVarDescriptors* BytecodeReader::ComputeLocalVarDescriptors(
         case BytecodeLocalVariablesIterator::kContextVariable: {
           ASSERT(local_vars.Index() >= 0);
           const intptr_t context_variable_index = -local_vars.Index();
-          VarDesc desc;
+          LocalVarDescriptorsBuilder::VarDesc desc;
           desc.name = &Symbols::CurrentContextVar();
           desc.info.set_kind(RawLocalVarDescriptors::kSavedCurrentContext);
           desc.info.scope_id = 0;
@@ -3540,15 +3538,7 @@ RawLocalVarDescriptors* BytecodeReader::ComputeLocalVarDescriptors(
     }
   }
 
-  if (vars.is_empty()) {
-    return Object::empty_var_descriptors().raw();
-  }
-  const LocalVarDescriptors& var_desc = LocalVarDescriptors::Handle(
-      zone, LocalVarDescriptors::New(vars.length()));
-  for (intptr_t i = 0; i < vars.length(); i++) {
-    var_desc.SetVar(i, *(vars[i].name), &vars[i].info);
-  }
-  return var_desc.raw();
+  return vars.Done();
 }
 #endif  // !defined(PRODUCT)
 

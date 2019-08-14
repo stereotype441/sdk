@@ -8,7 +8,6 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/ast/ast.dart';
 import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
-import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/resolver/extension_member_resolver.dart';
 import 'package:analyzer/src/dart/resolver/resolution_result.dart';
@@ -359,6 +358,7 @@ class MethodInvocationResolver {
     }
 
     ExecutableElement member = result.element;
+    nameNode.staticElement = member;
 
     if (member.isStatic) {
       _setDynamicResolution(node);
@@ -369,7 +369,6 @@ class MethodInvocationResolver {
       return result;
     }
 
-    nameNode.staticElement = member;
     var calleeType = _getCalleeType(node, member);
     _setResolution(node, calleeType);
     return result;
@@ -395,27 +394,22 @@ class MethodInvocationResolver {
 
   void _resolveExtensionOverride(MethodInvocation node,
       ExtensionOverride override, SimpleIdentifier nameNode, String name) {
-    ExtensionElement element = override.extensionName.staticElement;
-    ExecutableElement member =
-        element.getMethod(name) ?? element.getGetter(name);
+    var member = _extensionResolver.getOverrideMember(
+            override, name, ElementKind.METHOD) ??
+        _extensionResolver.getOverrideMember(
+            override, name, ElementKind.GETTER);
 
     if (member == null) {
       _setDynamicResolution(node);
       _resolver.errorReporter.reportErrorForNode(
         CompileTimeErrorCode.UNDEFINED_EXTENSION_METHOD,
         nameNode,
-        [name, element.name],
+        [name, override.staticElement.name],
       );
       return;
     }
 
-    member = ExecutableMember.from3(
-      member,
-      element.typeParameters,
-      override.typeArgumentTypes,
-    );
-
-    if (member is ExecutableElement && member.isStatic) {
+    if (member.isStatic) {
       _resolver.errorReporter.reportErrorForNode(
         CompileTimeErrorCode.EXTENSION_OVERRIDE_ACCESS_TO_STATIC_MEMBER,
         nameNode,
@@ -447,9 +441,17 @@ class MethodInvocationResolver {
       return;
     }
 
+    ResolutionResult result = _extensionResolver.findExtension(
+        receiverType, name, nameNode, ElementKind.METHOD);
+    if (result.isSingle) {
+      nameNode.staticElement = result.element;
+      return _setResolution(node, result.element.type);
+    } else if (result.isAmbiguous) {
+      return;
+    }
     // We can invoke Object methods on Function.
     var member = _inheritance.getMember(
-      _resolver.typeProvider.objectType,
+      _resolver.typeProvider.functionType,
       new Name(null, name),
     );
     if (member != null) {
