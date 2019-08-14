@@ -671,7 +671,14 @@ class FlowModel<Variable, Type> {
     this.reachable,
     this.notAssigned,
     this.variableInfo,
-  );
+  ) {
+    assert(() {
+      for (var value in variableInfo.values) {
+        assert(value != null);
+      }
+      return true;
+    }());
+  }
 
   /// Updates the state to track a newly declared local [variable].  The
   /// optional [assigned] boolean indicates whether the variable is assigned at
