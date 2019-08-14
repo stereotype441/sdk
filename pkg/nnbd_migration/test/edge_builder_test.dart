@@ -766,7 +766,7 @@ void f(int i) {
   if (i != null) {
     h(i);
   } else {
-    j(i);
+    g(i);
   }
 }
 void g(int j) {}
