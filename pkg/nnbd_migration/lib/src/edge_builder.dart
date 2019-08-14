@@ -508,6 +508,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   DecoratedType visitFieldDeclaration(FieldDeclaration node) {
+    node.metadata.accept(this);
     _createFlowAnalysis(null);
     try {
       node.fields.accept(this);
