@@ -3948,6 +3948,18 @@ bool b3 = b1 || b2;
     // top level variable doesn't cause flow analysis to crash.
   }
 
+  test_topLevelVar_metadata() async {
+    await analyze('''
+class A {
+  const A();
+}
+@A()
+int v;
+''');
+    // No assertions needed; the AnnotationTracker mixin verifies that the
+    // metadata was visited.
+  }
+
   test_topLevelVar_reference() async {
     await analyze('''
 double pi = 3.1415;
