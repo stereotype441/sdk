@@ -1339,7 +1339,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   /// Creates the necessary constraint(s) for an assignment of the given
   /// [expression] to a destination whose type is [destinationType].
   ///
-  /// Optionally, the caller my supply a [destinationExpression] instead of
+  /// Optionally, the caller may supply a [destinationExpression] instead of
   /// [destinationType].  In this case, then the type comes from visiting the
   /// destination expression.  If the destination expression refers to a local
   /// variable, we mark it as assigned in flow analysis at the proper time.
