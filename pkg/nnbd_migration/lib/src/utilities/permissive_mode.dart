@@ -6,9 +6,16 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:nnbd_migration/nnbd_migration.dart';
 
+/// Mixin that catches exceptions when visiting an AST recursively, and reports
+/// them to an optional listener.  This is used to implement the migration
+/// tool's "permissive mode".
+///
+/// If the [listener] is `null`, exceptions are not caught.
 mixin PermissiveModeVisitor<T> on GeneralizingAstVisitor<T> {
   NullabilityMigrationListener /*?*/ get listener;
-  
+
+  /// Executes [callback].  If [listener] is not `null`, and an exception
+  /// occurs, the exception is caught and reported to the [listener].
   void reportExceptionsIfPermissive(void callback()) {
     if (listener != null) {
       try {

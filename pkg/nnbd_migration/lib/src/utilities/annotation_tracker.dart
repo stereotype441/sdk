@@ -6,12 +6,20 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:nnbd_migration/src/utilities/permissive_mode.dart';
 
+/// Mixin that verifies (via assertion checks) that a visitor does not miss any
+/// annotations when processing a compilation unit.
+///
+/// Mixing in this class should have very low overhead when assertions are
+/// disabled.
 mixin AnnotationTracker<T> on AstVisitor<T>, PermissiveModeVisitor<T> {
   static _AnnotationTracker _annotationTracker;
 
   @override
   T visitAnnotation(Annotation node) {
-    _annotationTracker?._nodeVisited(node);
+    assert(() {
+      _annotationTracker._nodeVisited(node);
+      return true;
+    }());
     return super.visitAnnotation(node);
   }
 
