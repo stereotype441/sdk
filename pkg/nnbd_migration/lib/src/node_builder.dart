@@ -199,8 +199,10 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
   }
 
   @override
-  DeclaredType visitFunctionExpression(FunctionExpression node) {
-    _handleExecutableDeclaration(node.declaredElement, node.metadata, node.returnType, node.typeParameters, node.parameters, null, node.body, null, node);
+  DecoratedType visitFunctionExpression(FunctionExpression node) {
+    _handleExecutableDeclaration(node.declaredElement, null, null,
+        node.typeParameters, node.parameters, null, node.body, null);
+    return null;
   }
 
   @override
@@ -398,7 +400,7 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
       NodeList<ConstructorInitializer> initializers,
       FunctionBody body,
       ConstructorName redirectedConstructor) {
-    metadata.accept(this);
+    metadata?.accept(this);
     var functionType = declaredElement.type;
     DecoratedType decoratedReturnType;
     if (returnType != null) {
