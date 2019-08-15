@@ -596,19 +596,12 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   DecoratedType visitFunctionDeclaration(FunctionDeclaration node) {
-    node.functionExpression.parameters?.accept(this);
-    assert(_currentFunctionType == null);
-    _currentFunctionType =
-        _variables.decoratedElementType(node.declaredElement);
     _createFlowAnalysis(
         node.functionExpression.body, node.functionExpression.parameters);
     // Initialize a new postDominator scope that contains only the parameters.
     try {
-      _postDominatedLocals.doScoped(
-          elements: node.functionExpression.declaredElement.parameters,
-          action: () => node.functionExpression.body.accept(this));
+      node.functionExpression.accept(this);
     } finally {
-      _currentFunctionType = null;
       _flowAnalysis.finish();
       _flowAnalysis = null;
     }
@@ -617,9 +610,19 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   DecoratedType visitFunctionExpression(FunctionExpression node) {
-    // TODO(brianwilkerson)
     // TODO(mfairhurst): enable edge builder "_insideFunction" hard edge tests.
-    _unimplemented(node, 'FunctionExpression');
+    node.parameters?.accept(this);
+    var previousFunctionType = _currentFunctionType;
+    _currentFunctionType =
+        _variables.decoratedElementType(node.declaredElement);
+    try {
+      _postDominatedLocals.doScoped(
+          elements: node.declaredElement.parameters,
+          action: () => node.body.accept(this));
+    } finally {
+      _currentFunctionType = previousFunctionType;
+    }
+    return null;
   }
 
   @override

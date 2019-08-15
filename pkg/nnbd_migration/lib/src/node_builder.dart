@@ -201,6 +201,11 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
   }
 
   @override
+  DeclaredType visitFunctionExpression(FunctionExpression node) {
+    _handleExecutableDeclaration(node.declaredElement, node.metadata, node.returnType, node.typeParameters, node.parameters, null, node.body, null, node);
+  }
+
+  @override
   DecoratedType visitFunctionTypeAlias(FunctionTypeAlias node) {
     // TODO(brianwilkerson)
     _unimplemented(node, 'FunctionTypeAlias');
