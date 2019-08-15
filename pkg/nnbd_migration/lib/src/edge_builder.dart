@@ -530,10 +530,11 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   @override
   DecoratedType visitFieldDeclaration(FieldDeclaration node) {
     node.metadata.accept(this);
-    _createFlowAnalysis(null);
+    _createFlowAnalysis(null, null);
     try {
       node.fields.accept(this);
     } finally {
+      _flowAnalysis.finish();
       _flowAnalysis = null;
     }
     return null;
@@ -1071,10 +1072,11 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   DecoratedType visitTopLevelVariableDeclaration(
       TopLevelVariableDeclaration node) {
     node.metadata.accept(this);
-    _createFlowAnalysis(null);
+    _createFlowAnalysis(null, null);
     try {
       node.variables.accept(this);
     } finally {
+      _flowAnalysis.finish();
       _flowAnalysis = null;
     }
     return null;
