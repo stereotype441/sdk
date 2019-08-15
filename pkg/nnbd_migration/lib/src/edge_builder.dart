@@ -1190,7 +1190,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     }
   }
 
-  _createFlowAnalysis(FunctionBody node, FormalParameterList parameters) {
+  void _createFlowAnalysis(FunctionBody node, FormalParameterList parameters) {
     assert(_flowAnalysis == null);
     _flowAnalysis =
         FlowAnalysis<Statement, Expression, VariableElement, DecoratedType>(
