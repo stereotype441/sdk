@@ -615,6 +615,7 @@ cycles
 cyclic
 dart
 dart2js
+dartdevc
 data
 date
 dead
@@ -1456,6 +1457,7 @@ larger
 last
 late
 later
+latest
 latter
 lax
 lazily
@@ -1889,6 +1891,7 @@ pasted
 patch
 patched
 patches
+patching
 paths
 pattern
 peek
@@ -2461,6 +2464,7 @@ spread
 spreadable
 spreads
 square
+squiggly
 stable
 stack
 stage
@@ -2869,6 +2873,7 @@ virtual
 visible
 visit
 visited
+visiting
 visitor
 visual
 vm

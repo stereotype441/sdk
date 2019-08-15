@@ -349,10 +349,26 @@ Rti evalInInstance(instance, String recipe) {
   return _rtiEval(instanceType(instance), recipe);
 }
 
+/// Returns [genericFunctionRti] with type parameters bound to those specified
+/// by [instantiationRti].
+///
+/// [genericFunctionRti] must be an rti representation with a number of generic
+/// type parameters matching the number of types provided by [instantiationRti].
+///
+/// Called from generated code.
+@pragma('dart2js:noInline')
+Rti instantiatedGenericFunctionType(
+    Rti genericFunctionRti, Rti instantiationRti) {
+  // TODO(fishythefish)
+  throw UnimplementedError('instantiatedGenericFunctionType');
+}
+
 bool _isClosure(object) => _Utils.instanceOf(object,
     JS_BUILTIN('depends:none;effects:none;', JsBuiltin.dartClosureConstructor));
 
-Rti _closureFunctionType(closure) {
+/// Returns the structural function [Rti] of [closure].
+/// Called from generated code.
+Rti closureFunctionType(closure) {
   var signatureName = JS_GET_NAME(JsGetName.SIGNATURE_NAME);
   var signature = JS('', '#[#]', closure, signatureName);
   if (signature != null) {
@@ -383,7 +399,7 @@ Rti instanceOrFunctionType(object, Rti testRti) {
       // If [testRti] is e.g. `FutureOr<Action>` (where `Action` is some
       // function type), we don't need to worry about the `Future<Action>`
       // branch because closures can't be `Future`s.
-      Rti rti = _closureFunctionType(object);
+      Rti rti = closureFunctionType(object);
       if (rti != null) return rti;
     }
     return _closureInterfaceType(object);
@@ -409,24 +425,36 @@ Rti _nonClosureInstanceType(object) {
       object,
       JS_BUILTIN(
           'depends:none;effects:none;', JsBuiltin.dartObjectConstructor))) {
-    var rti = JS('', r'#[#]', object, JS_GET_NAME(JsGetName.RTI_NAME));
-    if (rti != null) return _castToRti(rti);
-
-    return _instanceTypeFromConstructor(JS('', '#.constructor', object));
+    return _instanceType(object);
   }
 
   if (_Utils.isArray(object)) {
-    var rti = JS('', r'#[#]', object, JS_GET_NAME(JsGetName.RTI_NAME));
-    // TODO(sra): Do we need to protect against an Array passed between two Dart
-    // programs loaded into the same JavaScript isolate (e.g. via JS-interop).
-    // FWIW, the legacy rti has this problem too. Perhaps JSArrays should use a
-    // program-local `symbol` for the type field.
-    if (rti != null) return _castToRti(rti);
-    return _castToRti(getJSArrayInteropRti());
+    return _arrayInstanceType(object);
   }
 
   var interceptor = getInterceptor(object);
   return _instanceTypeFromConstructor(JS('', '#.constructor', interceptor));
+}
+
+/// Returns the Rti type of JavaScript Array [object].
+/// Called from generated code.
+Rti _arrayInstanceType(object) {
+  // TODO(sra): Do we need to protect against an Array passed between two Dart
+  // programs loaded into the same JavaScript isolate (e.g. via JS-interop).
+  // FWIW, the legacy rti has this problem too. Perhaps JSArrays should use a
+  // program-local `symbol` for the type field.
+  var rti = JS('', r'#[#]', object, JS_GET_NAME(JsGetName.RTI_NAME));
+  return rti != null ? _castToRti(rti) : _castToRti(getJSArrayInteropRti());
+}
+
+/// Returns the Rti type of user-defined class [object].
+/// [object] must not be an intercepted class or a closure.
+/// Called from generated code.
+Rti _instanceType(object) {
+  var rti = JS('', r'#[#]', object, JS_GET_NAME(JsGetName.RTI_NAME));
+  return rti != null
+      ? _castToRti(rti)
+      : _instanceTypeFromConstructor(JS('', '#.constructor', object));
 }
 
 Rti _instanceTypeFromConstructor(constructor) {
@@ -437,7 +465,7 @@ Rti _instanceTypeFromConstructor(constructor) {
 /// Returns the structural function type of [object], or `null` if the object is
 /// not a closure.
 Rti _instanceFunctionType(object) {
-  if (_isClosure(object)) return _closureFunctionType(object);
+  if (_isClosure(object)) return closureFunctionType(object);
   return null;
 }
 
@@ -1135,6 +1163,10 @@ class _Universe {
   static String _canonicalRecipeOfAny() =>
       Recipe.pushAnyExtensionString + Recipe.extensionOpString;
 
+  static String _canonicalRecipeOfStar(Rti baseType) =>
+      Rti._getCanonicalRecipe(baseType) + Recipe.wrapStarString;
+  static String _canonicalRecipeOfQuestion(Rti baseType) =>
+      Rti._getCanonicalRecipe(baseType) + Recipe.wrapQuestionString;
   static String _canonicalRecipeOfFutureOr(Rti baseType) =>
       Rti._getCanonicalRecipe(baseType) + Recipe.wrapFutureOrString;
 
@@ -1173,18 +1205,33 @@ class _Universe {
     return _finishRti(universe, rti);
   }
 
-  static Rti _lookupFutureOrRti(universe, Rti baseType) {
-    String canonicalRecipe = _canonicalRecipeOfFutureOr(baseType);
+  static Rti _lookupStarRti(universe, Rti baseType) => _lookupUnaryRti(
+      universe, Rti.kindStar, baseType, _canonicalRecipeOfStar(baseType));
+
+  static Rti _lookupQuestionRti(universe, Rti baseType) => _lookupUnaryRti(
+      universe,
+      Rti.kindQuestion,
+      baseType,
+      _canonicalRecipeOfQuestion(baseType));
+
+  static Rti _lookupFutureOrRti(universe, Rti baseType) => _lookupUnaryRti(
+      universe,
+      Rti.kindFutureOr,
+      baseType,
+      _canonicalRecipeOfFutureOr(baseType));
+
+  static Rti _lookupUnaryRti(
+      universe, int kind, Rti baseType, String canonicalRecipe) {
     var cache = evalCache(universe);
     var probe = _cacheGet(cache, canonicalRecipe);
     if (probe != null) return _castToRti(probe);
-    return _createFutureOrRti(universe, baseType, canonicalRecipe);
+    return _createUnaryRti(universe, kind, baseType, canonicalRecipe);
   }
 
-  static Rti _createFutureOrRti(
-      universe, Rti baseType, String canonicalRecipe) {
+  static Rti _createUnaryRti(
+      universe, int kind, Rti baseType, String canonicalRecipe) {
     Rti rti = Rti.allocate();
-    Rti._setKind(rti, Rti.kindFutureOr);
+    Rti._setKind(rti, kind);
     Rti._setPrimary(rti, baseType);
     Rti._setCanonicalRecipe(rti, canonicalRecipe);
     return _finishRti(universe, rti);
@@ -1587,6 +1634,22 @@ class _Parser {
 
           case Recipe.extensionOp:
             handleExtendedOperations(parser, stack);
+            break;
+
+          case Recipe.wrapStar:
+            Object u = universe(parser);
+            push(
+                stack,
+                _Universe._lookupStarRti(
+                    u, toType(u, environment(parser), pop(stack))));
+            break;
+
+          case Recipe.wrapQuestion:
+            Object u = universe(parser);
+            push(
+                stack,
+                _Universe._lookupQuestionRti(
+                    u, toType(u, environment(parser), pop(stack))));
             break;
 
           case Recipe.wrapFutureOr:
