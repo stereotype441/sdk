@@ -774,6 +774,8 @@ class BackendImpacts {
       BackendImpact(staticUses: [
         _commonElements.findType,
         _commonElements.instanceType,
+        _commonElements.arrayInstanceType,
+        _commonElements.simpleInstanceType,
         _commonElements.rtiEvalMethod,
         _commonElements.rtiBindMethod,
         _commonElements.generalIsTestImplementation,
@@ -795,6 +797,8 @@ class BackendImpacts {
         _commonElements.specializedIsString,
         _commonElements.specializedAsStringNullable,
         _commonElements.specializedCheckStringNullable,
+        _commonElements.instantiatedGenericFunctionTypeNewRti,
+        _commonElements.closureFunctionType,
       ], globalClasses: [
         _commonElements.closureClass, // instanceOrFunctionType uses this.
       ], globalUses: [])

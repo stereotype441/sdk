@@ -483,6 +483,8 @@ abstract class CommonElements {
 
   FunctionEntity get findType;
   FunctionEntity get instanceType;
+  FunctionEntity get arrayInstanceType;
+  FunctionEntity get simpleInstanceType;
   FunctionEntity get typeLiteralMaker;
   FunctionEntity get checkTypeBound;
   FieldEntity get rtiAsField;
@@ -510,6 +512,9 @@ abstract class CommonElements {
   FunctionEntity get specializedIsString;
   FunctionEntity get specializedAsStringNullable;
   FunctionEntity get specializedCheckStringNullable;
+
+  FunctionEntity get instantiatedGenericFunctionTypeNewRti;
+  FunctionEntity get closureFunctionType;
 
   // From dart:_internal
 
@@ -1846,6 +1851,16 @@ class CommonElementsImpl
   FunctionEntity get instanceType =>
       _instanceType ??= _findRtiFunction('instanceType');
 
+  FunctionEntity _arrayInstanceType;
+  @override
+  FunctionEntity get arrayInstanceType =>
+      _arrayInstanceType ??= _findRtiFunction('_arrayInstanceType');
+
+  FunctionEntity _simpleInstanceType;
+  @override
+  FunctionEntity get simpleInstanceType =>
+      _simpleInstanceType ??= _findRtiFunction('_instanceType');
+
   FunctionEntity _typeLiteralMaker;
   @override
   FunctionEntity get typeLiteralMaker =>
@@ -1958,6 +1973,14 @@ class CommonElementsImpl
   @override
   FunctionEntity get specializedCheckStringNullable =>
       _findRtiFunction('_checkStringNullable');
+
+  @override
+  FunctionEntity get instantiatedGenericFunctionTypeNewRti =>
+      _findRtiFunction('instantiatedGenericFunctionType');
+
+  @override
+  FunctionEntity get closureFunctionType =>
+      _findRtiFunction('closureFunctionType');
 
   // From dart:_internal
 
