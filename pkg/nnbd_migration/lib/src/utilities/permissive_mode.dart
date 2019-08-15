@@ -27,7 +27,7 @@ mixin PermissiveModeVisitor<T> on GeneralizingAstVisitor<T> {
       callback();
     }
   }
-  
+
   @override
   T visitNode(AstNode node) {
     if (listener != null) {
