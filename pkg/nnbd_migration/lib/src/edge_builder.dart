@@ -624,10 +624,10 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       _postDominatedLocals.doScoped(
           elements: node.declaredElement.parameters,
           action: () => node.body.accept(this));
+      return _currentFunctionType;
     } finally {
       _currentFunctionType = previousFunctionType;
     }
-    return null;
   }
 
   @override
