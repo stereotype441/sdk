@@ -2912,7 +2912,6 @@ void test(C c1, C c2, C c3, C c4) {
         assertEdge(decoratedTypeAnnotation('C c4').node, never, hard: false));
   }
 
-  @failingTest
   test_postDominators_subFunction() async {
     await analyze('''
 class C {
@@ -2952,7 +2951,6 @@ void test() {
         assertEdge(decoratedTypeAnnotation('C c').node, never, hard: false));
   }
 
-  @failingTest
   test_postDominators_subFunction_ifStatement_unconditional() async {
     // Failing because function expressions aren't implemented
     await analyze('''
