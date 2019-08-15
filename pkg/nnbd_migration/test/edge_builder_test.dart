@@ -3924,6 +3924,16 @@ main() { x = null; }
     assertEdge(always, setXType.node, hard: false);
   }
 
+  test_topLevelVar_initializer_flow_analysis() async {
+    await analyze('''
+bool b1 = true;
+bool b2 = true;
+bool b3 = b1 || b2;
+''');
+    // No assertions; we just want to verify that the presence of `||` inside a
+    // top level variable doesn't cause flow analysis to crash.
+  }
+
   test_topLevelVar_reference() async {
     await analyze('''
 double pi = 3.1415;

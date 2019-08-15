@@ -1062,6 +1062,19 @@ $stackTrace''');
   }
 
   @override
+  DecoratedType visitTopLevelVariableDeclaration(
+      TopLevelVariableDeclaration node) {
+    node.metadata.accept(this);
+    _createFlowAnalysis(null);
+    try {
+      node.variables.accept(this);
+    } finally {
+      _flowAnalysis = null;
+    }
+    return null;
+  }
+
+  @override
   DecoratedType visitTypeName(TypeName typeName) {
     var typeArguments = typeName.typeArguments?.arguments;
     var element = typeName.name.staticElement;
