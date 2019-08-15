@@ -38,7 +38,7 @@ mixin PermissiveModeVisitor<T> on GeneralizingAstVisitor<T> {
   void _reportException(Object exception, StackTrace stackTrace) {
     listener.addDetail('''
 $exception
-  
+
 $stackTrace''');
   }
 }
