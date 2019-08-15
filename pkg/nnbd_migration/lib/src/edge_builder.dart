@@ -568,6 +568,9 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       }
       parts.condition?.accept(this);
     } else if (parts is ForEachParts) {
+      if (parts is ForEachPartsWithDeclaration) {
+        _flowAnalysis.add(parts.loopVariable.declaredElement, assigned: true);
+      }
       parts.iterable.accept(this);
     }
 
