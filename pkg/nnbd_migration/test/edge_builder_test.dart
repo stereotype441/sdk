@@ -1471,6 +1471,20 @@ class C {
     // field doesn't cause flow analysis to crash.
   }
 
+  test_field_metadata() async {
+    await analyze('''
+class A {
+  const A();
+}
+class C {
+  @A()
+  int f;
+}
+''');
+    // No assertions needed; the AnnotationTracker mixin verifies that the
+    // metadata was visited.
+  }
+
   test_field_type_inferred() async {
     await analyze('''
 int f() => 1;
