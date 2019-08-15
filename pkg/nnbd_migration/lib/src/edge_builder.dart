@@ -24,6 +24,8 @@ import 'package:nnbd_migration/src/edge_origin.dart';
 import 'package:nnbd_migration/src/expression_checks.dart';
 import 'package:nnbd_migration/src/node_builder.dart';
 import 'package:nnbd_migration/src/nullability_node.dart';
+import 'package:nnbd_migration/src/utilities/annotation_tracker.dart';
+import 'package:nnbd_migration/src/utilities/permissive_mode.dart';
 import 'package:nnbd_migration/src/utilities/scoped_set.dart';
 
 import 'decorated_type_operations.dart';
@@ -77,7 +79,10 @@ class AssignmentCheckerForTesting extends Object with _AssignmentChecker {
 /// variables that will determine its nullability.  For `visit...` methods that
 /// don't visit expressions, `null` will be returned.
 class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
-    with _AssignmentChecker {
+    with
+        _AssignmentChecker,
+        PermissiveModeVisitor<DecoratedType>,
+        AnnotationTracker<DecoratedType> {
   final TypeSystem _typeSystem;
 
   final InheritanceManager3 _inheritanceManager;
@@ -523,6 +528,18 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   }
 
   @override
+  DecoratedType visitFieldDeclaration(FieldDeclaration node) {
+    node.metadata.accept(this);
+    _createFlowAnalysis(null);
+    try {
+      node.fields.accept(this);
+    } finally {
+      _flowAnalysis = null;
+    }
+    return null;
+  }
+
+  @override
   DecoratedType visitFieldFormalParameter(FieldFormalParameter node) {
     var parameterElement = node.declaredElement as FieldFormalParameterElement;
     var parameterType = _variables.decoratedElementType(parameterElement);
@@ -571,7 +588,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     assert(_currentFunctionType == null);
     _currentFunctionType =
         _variables.decoratedElementType(node.declaredElement);
-    _flowAnalysis = _createFlowAnalysis(
+    _createFlowAnalysis(
         node.functionExpression.body, node.functionExpression.parameters);
     // Initialize a new postDominator scope that contains only the parameters.
     try {
@@ -830,23 +847,6 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   }
 
   @override
-  DecoratedType visitNode(AstNode node) {
-    if (listener != null) {
-      try {
-        return super.visitNode(node);
-      } catch (exception, stackTrace) {
-        listener.addDetail('''
-$exception
-
-$stackTrace''');
-        return null;
-      }
-    } else {
-      return super.visitNode(node);
-    }
-  }
-
-  @override
   DecoratedType visitNullLiteral(NullLiteral node) {
     return _nullType;
   }
@@ -1068,6 +1068,19 @@ $stackTrace''');
   }
 
   @override
+  DecoratedType visitTopLevelVariableDeclaration(
+      TopLevelVariableDeclaration node) {
+    node.metadata.accept(this);
+    _createFlowAnalysis(null);
+    try {
+      node.variables.accept(this);
+    } finally {
+      _flowAnalysis = null;
+    }
+    return null;
+  }
+
+  @override
   DecoratedType visitTypeName(TypeName typeName) {
     var typeArguments = typeName.typeArguments?.arguments;
     var element = typeName.name.staticElement;
@@ -1177,19 +1190,18 @@ $stackTrace''');
     }
   }
 
-  FlowAnalysis<Statement, Expression, VariableElement, DecoratedType>
-      _createFlowAnalysis(FunctionBody node, FormalParameterList parameters) {
-    var flowAnalysis =
+  _createFlowAnalysis(FunctionBody node, FormalParameterList parameters) {
+    assert(_flowAnalysis == null);
+    _flowAnalysis =
         FlowAnalysis<Statement, Expression, VariableElement, DecoratedType>(
             const AnalyzerNodeOperations(),
             DecoratedTypeOperations(_typeSystem, _variables, _graph),
             AnalyzerFunctionBodyAccess(node));
     if (parameters != null) {
       for (var parameter in parameters.parameters) {
-        flowAnalysis.add(parameter.declaredElement, assigned: true);
+        _flowAnalysis.add(parameter.declaredElement, assigned: true);
       }
     }
-    return flowAnalysis;
   }
 
   DecoratedType _decorateUpperOrLowerBound(AstNode astNode, DartType type,
@@ -1359,7 +1371,7 @@ $stackTrace''');
     returnType?.accept(this);
     parameters?.accept(this);
     _currentFunctionType = _variables.decoratedElementType(declaredElement);
-    _flowAnalysis = _createFlowAnalysis(body, parameters);
+    _createFlowAnalysis(body, parameters);
     // Push a scope of post-dominated declarations on the stack.
     _postDominatedLocals.pushScope(elements: declaredElement.parameters);
     try {
