@@ -6213,8 +6213,9 @@ class TypeNameResolver {
       }
     } else {
       if (element is GenericTypeAliasElementImpl) {
+        var ts = typeSystem as Dart2TypeSystem;
         List<DartType> typeArguments =
-            typeSystem.instantiateTypeFormalsToBounds(element.typeParameters);
+            ts.instantiateTypeFormalsToBounds2(element);
         type = GenericTypeAliasElementImpl.typeAfterSubstitution(
                 element, typeArguments) ??
             dynamicType;
@@ -6460,8 +6461,8 @@ class TypeNameResolver {
       if (redirectedType != null) {
         typeArguments = redirectedType.typeArguments;
       } else {
-        var typeFormals = typeParameters;
-        typeArguments = typeSystem.instantiateTypeFormalsToBounds(typeFormals);
+        var ts = typeSystem as Dart2TypeSystem;
+        typeArguments = ts.instantiateTypeFormalsToBounds2(element);
       }
     }
 
