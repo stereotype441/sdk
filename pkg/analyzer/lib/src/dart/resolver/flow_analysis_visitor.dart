@@ -285,7 +285,7 @@ class FlowAnalysisHelper {
   /// Return the target of the `break` or `continue` statement with the
   /// [element] label. The [element] might be `null` (when the statement does
   /// not specify a label), so the default enclosing target is returned.
-  static AstNode getLabelTarget(AstNode node, LabelElement element) {
+  static Statement getLabelTarget(AstNode node, LabelElement element) {
     for (; node != null; node = node.parent) {
       if (node is DoStatement ||
           node is ForStatement ||
