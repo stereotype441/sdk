@@ -318,7 +318,6 @@ void f(int i) {
   L: do {
     do {
       if (i != null) continue L;
-      g(i);
     } while (g(i));
     break;
   } while (h(i));
