@@ -302,6 +302,22 @@ void f() {
     assertEdge(jNode, never, hard: false);
   }
 
+  solo_test_conditionalExpression() async {
+    await analyze('''
+int f(int i) => i == null ? g(i) : h(i);
+int g(int j) => 1;
+int h(int k) => 1;
+''');
+    var iNode = decoratedTypeAnnotation('int i').node;
+    var jNode = decoratedTypeAnnotation('int j').node;
+    var kNode = decoratedTypeAnnotation('int k').node;
+    // No edge from i to k because i is known to be non-nullable at the site of
+    // the call to h()
+    assertNoEdge(iNode, kNode);
+    // But there is an edge from i to j
+    assertEdge(iNode, jNode, hard: false, guards: [iNode]);
+  }
+
   test_if() async {
     await analyze('''
 void f(int i) {

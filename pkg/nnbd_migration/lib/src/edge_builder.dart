@@ -447,8 +447,11 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     // Note: we don't have to create a scope for each branch because they can't
     // define variables.
     _postDominatedLocals.doScoped(action: () {
+      _flowAnalysis.conditional_thenBegin(node, node.condition);
       thenType = node.thenExpression.accept(this);
+      _flowAnalysis.conditional_elseBegin(node, node.thenExpression, isBool);
       elseType = node.elseExpression.accept(this);
+      _flowAnalysis.conditional_end(node, node.elseExpression, isBool);
     });
 
     var overallType = _decorateUpperOrLowerBound(
