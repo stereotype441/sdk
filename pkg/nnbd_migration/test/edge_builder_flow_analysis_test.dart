@@ -148,48 +148,38 @@ void f(bool b, int i, int j) {
 
   test_booleanLiteral_false() async {
     await analyze('''
-void f(int i) {
-  if (false || i == null) {} else {
-    g(i);
-  }
-  if (false && i == null) {} else {
-    h(i);
-  }
+void f(int i, int j) {
+  if (i != null || false) {} else return;
+  if (j != null || true) {} else return;
+  i.isEven;
+  j.isEven;
 }
-void g(int j) {}
-void h(int k) {}
 ''');
     var iNode = decoratedTypeAnnotation('int i').node;
     var jNode = decoratedTypeAnnotation('int j').node;
-    var kNode = decoratedTypeAnnotation('int k').node;
-    // No edge from i to j because i is known to be non-nullable at the site of
-    // the call to g()
-    assertNoEdge(iNode, jNode);
-    // But there is an edge from i to k
-    assertEdge(iNode, kNode, hard: false);
+    // No edge from i to never i is known to be non-nullable at the site of
+    // the call to i.isEven
+    assertNoEdge(iNode, never);
+    // But there is an edge from j to never
+    assertEdge(jNode, never, hard: false);
   }
 
   test_booleanLiteral_true() async {
     await analyze('''
-void f(int i) {
-  if (true && i != null) {
-    g(i);
-  }
-  if (true || i != null) {
-    h(i);
-  }
+void f(int i, int j) {
+  if (i == null && true) return;
+  if (j == null && false) return;
+  i.isEven;
+  j.isEven;
 }
-void g(int j) {}
-void h(int k) {}
 ''');
     var iNode = decoratedTypeAnnotation('int i').node;
     var jNode = decoratedTypeAnnotation('int j').node;
-    var kNode = decoratedTypeAnnotation('int k').node;
-    // No edge from i to j because i is known to be non-nullable at the site of
-    // the call to g()
-    assertNoEdge(iNode, jNode);
-    // But there is an edge from i to k
-    assertEdge(iNode, kNode, hard: false);
+    // No edge from i to never i is known to be non-nullable at the site of
+    // the call to i.isEven
+    assertNoEdge(iNode, never);
+    // But there is an edge from j to never
+    assertEdge(jNode, never, hard: false);
   }
 
   test_constructorDeclaration_assert() async {
