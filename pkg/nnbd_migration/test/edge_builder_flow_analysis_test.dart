@@ -149,10 +149,12 @@ void f(bool b, int i, int j) {
   test_booleanLiteral_false() async {
     await analyze('''
 void f(int i) {
-  if (false || i == null) {} else {
+  if (true && i != null) {
     g(i);
   }
-  h(i);
+  if (false && i != null) {
+    h(i);
+  }
 }
 void g(int j) {}
 void h(int k) {}
@@ -164,16 +166,18 @@ void h(int k) {}
     // the call to g()
     assertNoEdge(iNode, jNode);
     // But there is an edge from i to k
-    assertEdge(iNode, kNode, hard: true);
+    assertEdge(iNode, kNode, hard: false);
   }
 
   test_booleanLiteral_true() async {
     await analyze('''
 void f(int i) {
-  if (true && i != null) {
+  if (false || i == null) {} else {
     g(i);
   }
-  h(i);
+  if (true || i == null) {} else {
+    h(i);
+  }
 }
 void g(int j) {}
 void h(int k) {}
@@ -185,7 +189,7 @@ void h(int k) {}
     // the call to g()
     assertNoEdge(iNode, jNode);
     // But there is an edge from i to k
-    assertEdge(iNode, kNode, hard: true);
+    assertEdge(iNode, kNode, hard: false);
   }
 
   test_constructorDeclaration_assert() async {
