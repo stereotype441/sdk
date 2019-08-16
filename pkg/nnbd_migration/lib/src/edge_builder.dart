@@ -106,6 +106,10 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   FlowAnalysis<Statement, Expression, VariableElement, DecoratedType>
       _flowAnalysis;
 
+  /// If we are visiting a function body or initializer, assigned variable
+  /// information  used in flow analysis.  Otherwise `null`.
+  AssignedVariables<Statement, VariableElement> _assignedVariables;
+
   /// For convenience, a [DecoratedType] representing non-nullable `Object`.
   final DecoratedType _notNullType;
 
@@ -542,12 +546,13 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   @override
   DecoratedType visitFieldDeclaration(FieldDeclaration node) {
     node.metadata.accept(this);
-    _createFlowAnalysis(null);
+    _createFlowAnalysis(node);
     try {
       node.fields.accept(this);
     } finally {
       _flowAnalysis.finish();
       _flowAnalysis = null;
+      _assignedVariables = null;
     }
     return null;
   }
@@ -611,6 +616,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       } finally {
         _flowAnalysis.finish();
         _flowAnalysis = null;
+        _assignedVariables = null;
       }
     }
     return null;
@@ -1097,12 +1103,13 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   DecoratedType visitTopLevelVariableDeclaration(
       TopLevelVariableDeclaration node) {
     node.metadata.accept(this);
-    _createFlowAnalysis(null);
+    _createFlowAnalysis(node);
     try {
       node.variables.accept(this);
     } finally {
       _flowAnalysis.finish();
       _flowAnalysis = null;
+      _assignedVariables = null;
     }
     return null;
   }
@@ -1228,13 +1235,15 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     }
   }
 
-  void _createFlowAnalysis(FunctionBody node) {
+  void _createFlowAnalysis(AstNode node) {
     assert(_flowAnalysis == null);
+    assert(_assignedVariables == null);
     _flowAnalysis =
         FlowAnalysis<Statement, Expression, VariableElement, DecoratedType>(
             const AnalyzerNodeOperations(),
             DecoratedTypeOperations(_typeSystem, _variables, _graph),
-            AnalyzerFunctionBodyAccess(node));
+            AnalyzerFunctionBodyAccess(node is FunctionBody ? node : null));
+    _assignedVariables = FlowAnalysisHelper.computeAssignedVariables(node);
   }
 
   DecoratedType _decorateUpperOrLowerBound(AstNode astNode, DartType type,
@@ -1519,6 +1528,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     } finally {
       _flowAnalysis.finish();
       _flowAnalysis = null;
+      _assignedVariables = null;
       _currentFunctionType = null;
       _postDominatedLocals.popScope();
     }
