@@ -2952,7 +2952,6 @@ void test() {
   }
 
   test_postDominators_subFunction_ifStatement_unconditional() async {
-    // Failing because function expressions aren't implemented
     await analyze('''
 class C {
   void m() {}
