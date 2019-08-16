@@ -149,10 +149,10 @@ void f(bool b, int i, int j) {
   test_booleanLiteral_false() async {
     await analyze('''
 void f(int i) {
-  if (true && i != null) {
+  if (false || i == null) {} else {
     g(i);
   }
-  if (false && i != null) {
+  if (false && i == null) {} else {
     h(i);
   }
 }
@@ -172,10 +172,10 @@ void h(int k) {}
   test_booleanLiteral_true() async {
     await analyze('''
 void f(int i) {
-  if (false || i == null) {} else {
+  if (true && i != null) {
     g(i);
   }
-  if (true || i == null) {} else {
+  if (true || i != null) {
     h(i);
   }
 }
