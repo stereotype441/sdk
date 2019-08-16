@@ -589,6 +589,17 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     }
   }
 
+  void _dumpState() {
+    print('  current: $_current');
+    print('  condition: $_condition');
+    print('  conditionTrue: $_conditionTrue');
+    print('  conditionFalse: $_conditionFalse');
+    print('  stack:');
+    for (var stackEntry in _stack.reversed) {
+      print('    $stackEntry');
+    }
+  }
+
   FlowModel<Variable, Type> _join(
           FlowModel<Variable, Type> first, FlowModel<Variable, Type> second) =>
       FlowModel.join(typeOperations, first, second);
@@ -611,6 +622,96 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
       _referencedVariables.addAll(variables);
       return true;
     }());
+  }
+}
+
+class FlowAnalysisDebug<Statement, Expression, Variable, Type>
+    implements FlowAnalysis<Statement, Expression, Variable, Type> {
+  FlowAnalysis<Statement, Expression, Variable, Type> _wrapped;
+
+  bool _noSuchMethodOccurred = false;
+
+  FlowAnalysisDebug(
+      NodeOperations<Expression> nodeOperations,
+      TypeOperations<Variable, Type> typeOperations,
+      FunctionBodyAccess<Variable> functionBody)
+      : _wrapped = FlowAnalysis(nodeOperations, typeOperations, functionBody);
+
+  @override
+  void add(Variable variable, {bool assigned: false}) {
+    print('add($variable, assigned: $assigned)');
+    _wrapped.add(variable, assigned: assigned);
+    _wrapped._dumpState();
+  }
+
+  @override
+  void booleanLiteral(Expression expression, bool value) {
+    print('booleanLiteral($expression, $value)');
+    _wrapped.booleanLiteral(expression, value);
+    _wrapped._dumpState();
+  }
+
+  @override
+  void conditionEqNull(Expression binaryExpression, Variable variable,
+      {bool notEqual: false}) {
+    print('conditionEqNull($binaryExpression, $variable, notEqual: $notEqual)');
+    _wrapped.conditionEqNull(binaryExpression, variable, notEqual: notEqual);
+    _wrapped._dumpState();
+  }
+
+  @override
+  void finish() {
+    if (_noSuchMethodOccurred) {
+      print('finish() (skipped)');
+    } else {
+      print('finish()');
+      _wrapped.finish();
+    }
+  }
+
+  @override
+  void ifStatement_end(bool hasElse) {
+    print('ifStatement_end($hasElse)');
+    _wrapped.ifStatement_end(hasElse);
+    _wrapped._dumpState();
+  }
+
+  @override
+  void ifStatement_thenBegin(Expression condition) {
+    print('ifStatement_thenBegin($condition)');
+    _wrapped.ifStatement_thenBegin(condition);
+    _wrapped._dumpState();
+  }
+
+  @override
+  void logicalBinaryOp_end(Expression wholeExpression, Expression rightOperand,
+      {@required bool isAnd}) {
+    print(
+        'logicalBinaryOp_end($wholeExpression, $rightOperand, isAnd: $isAnd)');
+    _wrapped.logicalBinaryOp_end(wholeExpression, rightOperand, isAnd: isAnd);
+    _wrapped._dumpState();
+  }
+
+  @override
+  void logicalBinaryOp_rightBegin(Expression leftOperand,
+      {@required bool isAnd}) {
+    print('logicalBinaryOp_rightBegin($leftOperand, isAnd: $isAnd)');
+    _wrapped.logicalBinaryOp_rightBegin(leftOperand, isAnd: isAnd);
+    _wrapped._dumpState();
+  }
+
+  @override
+  noSuchMethod(Invocation invocation) {
+    _noSuchMethodOccurred = true;
+    return super.noSuchMethod(invocation);
+  }
+
+  @override
+  Type promotedType(Variable variable) {
+    print('promotedType($variable)');
+    var result = _wrapped.promotedType(variable);
+    print('  => $result');
+    return result;
   }
 }
 
