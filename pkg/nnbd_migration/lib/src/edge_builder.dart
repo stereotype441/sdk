@@ -523,8 +523,11 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   DecoratedType visitDoStatement(DoStatement node) {
+    _flowAnalysis.doStatement_bodyBegin(node, _assignedVariables[node]);
     node.body.accept(this);
+    _flowAnalysis.doStatement_conditionBegin();
     _handleAssignment(node.condition, destinationType: _nonNullableBoolType);
+    _flowAnalysis.doStatement_end(node, node.condition);
     return null;
   }
 
