@@ -426,4 +426,21 @@ bool b3 = b1 || b2;
     // No assertions; we just want to verify that the presence of `||` inside a
     // top level variable doesn't cause flow analysis to crash.
   }
+
+  test_while_promotes() async {
+    await analyze('''
+void f(int i, int j) {
+  while (i != null) {
+    i.isEven;
+    j.isEven;
+  }
+}
+''');
+    var iNode = decoratedTypeAnnotation('int i').node;
+    var jNode = decoratedTypeAnnotation('int j').node;
+    // No edge from i to never because is is promoted.
+    assertNoEdge(iNode, never);
+    // But there is an edge from j to never.
+    assertEdge(jNode, never, hard: false);
+  }
 }

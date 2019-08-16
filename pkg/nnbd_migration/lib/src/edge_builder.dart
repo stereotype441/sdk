@@ -1189,8 +1189,11 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   DecoratedType visitWhileStatement(WhileStatement node) {
     // Note: we do not create guards. A null check here is *very* unlikely to be
     // unnecessary after analysis.
+    _flowAnalysis.whileStatement_conditionBegin({});
     _handleAssignment(node.condition, destinationType: _notNullType);
+    _flowAnalysis.whileStatement_bodyBegin(node, node.condition);
     _postDominatedLocals.doScoped(action: () => node.body.accept(this));
+    _flowAnalysis.whileStatement_end();
     return null;
   }
 
