@@ -212,9 +212,9 @@ void h(int k) {}
 void f(int i) {
   while (true) {
     if (i != null) break;
-    h(i);
+    g(i);
   }
-  g(i);
+  h(i);
 }
 bool b() => true;
 void g(int j) {}
