@@ -527,7 +527,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     node.body.accept(this);
     _flowAnalysis.doStatement_conditionBegin();
     _handleAssignment(node.condition, destinationType: _nonNullableBoolType);
-    _flowAnalysis.doStatement_end(node, node.condition);
+    _flowAnalysis.doStatement_end(node.condition);
     return null;
   }
 

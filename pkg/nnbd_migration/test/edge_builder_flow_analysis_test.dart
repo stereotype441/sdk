@@ -384,7 +384,7 @@ void h(int k) {}
     assertEdge(iNode, jNode, hard: false);
   }
 
-  solo_test_do_cancels_promotions_for_assignments_in_body() async {
+  test_do_cancels_promotions_for_assignments_in_body() async {
     await analyze('''
 void f(int i, int j) {
   if (i == null) return;
