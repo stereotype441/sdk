@@ -146,6 +146,48 @@ void f(bool b, int i, int j) {
     assertEdge(jNode, never, hard: false);
   }
 
+  test_booleanLiteral_false() async {
+    await analyze('''
+void f(int i) {
+  if (false || i == null) {} else {
+    g(i);
+  }
+  h(i);
+}
+void g(int j) {}
+void h(int k) {}
+''');
+    var iNode = decoratedTypeAnnotation('int i').node;
+    var jNode = decoratedTypeAnnotation('int j').node;
+    var kNode = decoratedTypeAnnotation('int k').node;
+    // No edge from i to j because i is known to be non-nullable at the site of
+    // the call to g()
+    assertNoEdge(iNode, jNode);
+    // But there is an edge from i to k
+    assertEdge(iNode, kNode, hard: true);
+  }
+
+  test_booleanLiteral_true() async {
+    await analyze('''
+void f(int i) {
+  if (true && i != null) {
+    g(i);
+  }
+  h(i);
+}
+void g(int j) {}
+void h(int k) {}
+''');
+    var iNode = decoratedTypeAnnotation('int i').node;
+    var jNode = decoratedTypeAnnotation('int j').node;
+    var kNode = decoratedTypeAnnotation('int k').node;
+    // No edge from i to j because i is known to be non-nullable at the site of
+    // the call to g()
+    assertNoEdge(iNode, jNode);
+    // But there is an edge from i to k
+    assertEdge(iNode, kNode, hard: true);
+  }
+
   test_constructorDeclaration_assert() async {
     await analyze('''
 class C {
