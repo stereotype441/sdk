@@ -580,13 +580,13 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   DecoratedType visitForElement(ForElement node) {
-    _handleForLoopParts(node.forLoopParts, node.body);
+    _handleForLoopParts(node, node.forLoopParts, node.body);
     return null;
   }
 
   @override
   DecoratedType visitForStatement(ForStatement node) {
-    _handleForLoopParts(node.forLoopParts, node.body);
+    _handleForLoopParts(node, node.forLoopParts, node.body);
     return null;
   }
 
@@ -1539,7 +1539,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     }
   }
 
-  void _handleForLoopParts(ForLoopParts parts, AstNode body) {
+  void _handleForLoopParts(AstNode node, ForLoopParts parts, AstNode body) {
+    // TODO(paulberry): remove `is Statement` checks
     if (parts is ForParts) {
       if (parts is ForPartsWithDeclarations) {
         parts.variables?.accept(this);
@@ -1550,10 +1551,13 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         _checkExpressionNotNull(parts.condition);
       }
     } else if (parts is ForEachParts) {
-      if (parts is ForEachPartsWithDeclaration) {
+      if (parts is ForEachPartsWithDeclaration && node is Statement) {
         _flowAnalysis.add(parts.loopVariable.declaredElement, assigned: true);
       }
       _checkExpressionNotNull(parts.iterable);
+      if (node is Statement) {
+        _flowAnalysis.forEachStatement_bodyBegin(_assignedVariables[node]);
+      }
     }
 
     // The condition may fail/iterable may be empty, so the body gets a new
@@ -1563,6 +1567,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
       if (parts is ForParts) {
         parts.updaters.accept(this);
+      } else {
+        _flowAnalysis.forEachStatement_end();
       }
     });
   }

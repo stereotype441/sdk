@@ -455,6 +455,71 @@ class C {
     // field doesn't cause flow analysis to crash.
   }
 
+  test_for_each_break_target() async {
+    await analyze('''
+void f(int i, Iterable<Object> x, Iterable<Object> y) {
+  L: for (var v1 in x) {
+    for (var v2 in x) {
+      if (i != null) break L;
+      if (b()) break;
+      return;
+    }
+    g(i);
+    return;
+  }
+  h(i);
+}
+bool b() => true;
+void g(int j) {}
+void h(int k) {}
+''');
+    var iNode = decoratedTypeAnnotation('int i').node;
+    var jNode = decoratedTypeAnnotation('int j').node;
+    var kNode = decoratedTypeAnnotation('int k').node;
+    // No edge from i to k because i is promoted at the time of the call to h.
+    assertNoEdge(iNode, kNode);
+    // But there is an edge from i to j, because i is not promoted at the time
+    // of the call to g.
+    assertEdge(iNode, jNode, hard: false);
+  }
+
+  test_for_each_cancels_promotions_for_assignments_in_body() async {
+    await analyze('''
+void f(int i, int j, Iterable<Object> x) {
+  if (i == null) return;
+  if (j == null) return;
+  for (var v in x) {
+    i.isEven;
+    j.isEven;
+    j = null;
+  }
+}
+''');
+    var iNode = decoratedTypeAnnotation('int i').node;
+    var jNode = decoratedTypeAnnotation('int j').node;
+    // No edge from i to never because is is promoted.
+    assertNoEdge(iNode, never);
+    // But there is an edge from j to never because its promotion was cancelled.
+    assertEdge(jNode, never, hard: false);
+  }
+
+  test_for_each_preserves_promotions_for_assignments_in_iterable() async {
+    await analyze('''
+void f(int i, int j) {
+  if (i == null) return;
+  for(var v in h(i.isEven && j.isEven && g(i = null))) {}
+}
+bool g(int k) => true;
+Iterable<Object> h(bool b) => [];
+''');
+    var iNode = decoratedTypeAnnotation('int i').node;
+    var jNode = decoratedTypeAnnotation('int j').node;
+    // No edge from i to never because it is promoted.
+    assertNoEdge(iNode, never);
+    // But there is an edge from j to never.
+    assertEdge(jNode, never, hard: false);
+  }
+
   test_functionDeclaration() async {
     await analyze('''
 void f(int i, int j) {
