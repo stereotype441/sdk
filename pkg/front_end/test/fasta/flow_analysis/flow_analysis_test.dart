@@ -521,7 +521,7 @@ main() {
             .add(objectQVar)
             .add(intQVar)
             .promote(h, objectQVar, _Type('int'));
-        var s2 = s1.removePromotedAll([intQVar].toSet());
+        var s2 = s1.removePromotedAll([intQVar], null);
         expect(s2, same(s1));
       });
 
@@ -532,7 +532,7 @@ main() {
             .add(intQVar)
             .promote(h, objectQVar, _Type('int'))
             .promote(h, intQVar, _Type('int'));
-        var s2 = s1.removePromotedAll([intQVar].toSet());
+        var s2 = s1.removePromotedAll([intQVar], null);
         expect(s2.reachable, true);
         expect(s2.notAssigned, same(s1.notAssigned));
         _Type.allowComparisons(() {
