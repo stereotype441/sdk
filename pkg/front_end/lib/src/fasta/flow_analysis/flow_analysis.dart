@@ -682,22 +682,12 @@ class FlowModel<Variable, Type> {
   /// assigned?  Does it matter?
   FlowModel<Variable, Type> markNonNullable(
       TypeOperations<Variable, Type> typeOperations, Variable variable) {
-    var previousType = variableInfo[variable].promotedType;
+    var info = variableInfo[variable];
+    var previousType = info.promotedType;
     previousType ??= typeOperations.variableType(variable);
     var type = typeOperations.promoteToNonNull(previousType);
-
-    if (!typeOperations.isSameType(type, previousType)) {
-      var newVariableInfo = <Variable, VariableModel<Type>>{}
-        ..addAll(variableInfo);
-      newVariableInfo[variable] = VariableModel<Type>(type);
-      return FlowModel<Variable, Type>._(
-        reachable,
-        notAssigned,
-        newVariableInfo,
-      );
-    }
-
-    return this;
+    if (typeOperations.isSameType(type, previousType)) return this;
+    return _updateVariableInfo(variable, info.withPromotedType(type));
   }
 
   /// Updates the state to indicate that the given [variable] has been
@@ -714,22 +704,15 @@ class FlowModel<Variable, Type> {
     Variable variable,
     Type type,
   ) {
-    var previousType = variableInfo[variable].promotedType;
+    var info = variableInfo[variable];
+    var previousType = info.promotedType;
     previousType ??= typeOperations.variableType(variable);
 
-    if (typeOperations.isSubtypeOf(type, previousType) &&
-        !typeOperations.isSameType(type, previousType)) {
-      var newVariableInfo = <Variable, VariableModel<Type>>{}
-        ..addAll(variableInfo);
-      newVariableInfo[variable] = VariableModel<Type>(type);
-      return FlowModel<Variable, Type>._(
-        reachable,
-        notAssigned,
-        newVariableInfo,
-      );
+    if (!typeOperations.isSubtypeOf(type, previousType) ||
+        typeOperations.isSameType(type, previousType)) {
+      return this;
     }
-
-    return this;
+    return _updateVariableInfo(variable, info.withPromotedType(type));
   }
 
   /// Updates the state to indicate that the given [variables] are no longer
@@ -878,10 +861,11 @@ class FlowModel<Variable, Type> {
   /// immutable.
   Map<Variable, VariableModel<Type>> _removePromoted(
       Map<Variable, VariableModel<Type>> map, Variable variable) {
-    if (map[variable].promotedType == null) return map;
+    var info = map[variable];
+    if (info.promotedType == null) return map;
 
     var result = Map<Variable, VariableModel<Type>>.from(map);
-    result[variable] = VariableModel<Type>(null);
+    result[variable] = info.withPromotedType(null);
     return result;
   }
 
@@ -894,22 +878,28 @@ class FlowModel<Variable, Type> {
     if (map.isEmpty) return const {};
     if (variables.isEmpty) return map;
 
-    var result = <Variable, VariableModel<Type>>{};
-    var noChanges = true;
+    Map<Variable, VariableModel<Type>> result;
     for (var entry in map.entries) {
       var variable = entry.key;
-      var promotedType = entry.value.promotedType;
+      var info = entry.value;
+      var promotedType = info.promotedType;
       if (variables.contains(variable) && promotedType != null) {
-        result[variable] = VariableModel<Type>(null);
-        noChanges = false;
-      } else {
-        result[variable] = VariableModel<Type>(promotedType);
+        (result ??= Map<Variable, VariableModel<Type>>.from(map))[variable] =
+            info.withPromotedType(null);
       }
     }
 
-    if (noChanges) return map;
-    if (result.isEmpty) return const {};
+    if (result == null) return map;
     return result;
+  }
+
+  /// Returns a new [FlowModel] where the information for [variable] is replaced
+  /// with [model].
+  FlowModel<Variable, Type> _updateVariableInfo(
+      Variable variable, VariableModel<Type> model) {
+    var newVariableInfo = Map<Variable, VariableModel<Type>>.from(variableInfo);
+    newVariableInfo[variable] = model;
+    return FlowModel<Variable, Type>._(reachable, notAssigned, newVariableInfo);
   }
 
   /// Forms a new state to reflect a control flow path that might have come from
@@ -1088,6 +1078,9 @@ class VariableModel<Type> {
         this.promotedType == other.promotedType;
   }
 
+  /// Returns an updated model reflect a control path that is known to have
+  /// previously passed through some [other] state.  See [FlowModel.restrict]
+  /// for details.
   restrict(TypeOperations<Object, Type> typeOperations,
       VariableModel<Type> otherModel, bool unsafe) {
     var thisType = promotedType;
@@ -1109,6 +1102,12 @@ class VariableModel<Type> {
   @override
   String toString() => 'VariableModel($promotedType)';
 
+  /// Returns a new [VariableModel] where the promoted type is replaced with
+  /// [promotedType].
+  VariableModel<Type> withPromotedType(Type promotedType) =>
+      VariableModel<Type>(promotedType);
+
+  /// Joins two variable models.  See [FlowModel.join] for details.
   static join<Type>(TypeOperations<Object, Type> typeOperations,
       VariableModel<Type> first, VariableModel<Type> second) {
     var firstType = first.promotedType;
@@ -1128,6 +1127,8 @@ class VariableModel<Type> {
     return _identicalOrNew(first, second, newPromotedType);
   }
 
+  /// Creates a new [VariableModel] object, unless it is equivalent to either
+  /// [first] or [second], in which case one of those objects is re-used.
   static _identicalOrNew<Type>(VariableModel<Type> first,
       VariableModel<Type> second, Type newPromotedType) {
     if (identical(first.promotedType, newPromotedType)) {
