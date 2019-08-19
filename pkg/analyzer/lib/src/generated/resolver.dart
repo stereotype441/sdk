@@ -3427,10 +3427,10 @@ class ResolverVisitor extends ScopedVisitor {
       left?.accept(this);
 
       if (_flowAnalysis != null) {
-        flow?.logicalAnd_rightBegin(node, left);
+        flow?.logicalBinaryOp_rightBegin(left, isAnd: true);
         _flowAnalysis.checkUnreachableNode(right);
         right.accept(this);
-        flow?.logicalAnd_end(node, right);
+        flow?.logicalBinaryOp_end(node, right, isAnd: true);
       } else {
         _promoteManager.visitBinaryExpression_and_rhs(
           left,
@@ -3448,10 +3448,10 @@ class ResolverVisitor extends ScopedVisitor {
 
       left?.accept(this);
 
-      flow?.logicalOr_rightBegin(node, left);
+      flow?.logicalBinaryOp_rightBegin(left, isAnd: false);
       _flowAnalysis?.checkUnreachableNode(right);
       right.accept(this);
-      flow?.logicalOr_end(node, right);
+      flow?.logicalBinaryOp_end(node, right, isAnd: false);
 
       node.accept(elementResolver);
     } else if (operator == TokenType.BANG_EQ || operator == TokenType.EQ_EQ) {
@@ -3610,7 +3610,7 @@ class ResolverVisitor extends ScopedVisitor {
 
     if (_flowAnalysis != null) {
       if (flow != null) {
-        flow.conditional_thenBegin(node, condition);
+        flow.conditional_thenBegin(condition);
         _flowAnalysis.checkUnreachableNode(thenExpression);
       }
       thenExpression.accept(this);
@@ -3628,11 +3628,10 @@ class ResolverVisitor extends ScopedVisitor {
     InferenceContext.setTypeFromNode(elseExpression, node);
 
     if (flow != null) {
-      var isBool = thenExpression.staticType.isDartCoreBool;
-      flow.conditional_elseBegin(node, thenExpression, isBool);
+      flow.conditional_elseBegin(thenExpression);
       _flowAnalysis.checkUnreachableNode(elseExpression);
       elseExpression.accept(this);
-      flow.conditional_end(node, elseExpression, isBool);
+      flow.conditional_end(node, elseExpression);
     } else {
       elseExpression.accept(this);
     }
@@ -3744,7 +3743,7 @@ class ResolverVisitor extends ScopedVisitor {
     _flowAnalysis?.flow?.doStatement_conditionBegin();
     condition.accept(this);
 
-    _flowAnalysis?.flow?.doStatement_end(node, node.condition);
+    _flowAnalysis?.flow?.doStatement_end(node.condition);
   }
 
   @override
@@ -6214,8 +6213,9 @@ class TypeNameResolver {
       }
     } else {
       if (element is GenericTypeAliasElementImpl) {
+        var ts = typeSystem as Dart2TypeSystem;
         List<DartType> typeArguments =
-            typeSystem.instantiateTypeFormalsToBounds(element.typeParameters);
+            ts.instantiateTypeFormalsToBounds2(element);
         type = GenericTypeAliasElementImpl.typeAfterSubstitution(
                 element, typeArguments) ??
             dynamicType;
@@ -6461,8 +6461,8 @@ class TypeNameResolver {
       if (redirectedType != null) {
         typeArguments = redirectedType.typeArguments;
       } else {
-        var typeFormals = typeParameters;
-        typeArguments = typeSystem.instantiateTypeFormalsToBounds(typeFormals);
+        var ts = typeSystem as Dart2TypeSystem;
+        typeArguments = ts.instantiateTypeFormalsToBounds2(element);
       }
     }
 

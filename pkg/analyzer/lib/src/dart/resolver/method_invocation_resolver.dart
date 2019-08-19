@@ -358,6 +358,7 @@ class MethodInvocationResolver {
     }
 
     ExecutableElement member = result.element;
+    nameNode.staticElement = member;
 
     if (member.isStatic) {
       _setDynamicResolution(node);
@@ -368,7 +369,6 @@ class MethodInvocationResolver {
       return result;
     }
 
-    nameNode.staticElement = member;
     var calleeType = _getCalleeType(node, member);
     _setResolution(node, calleeType);
     return result;
@@ -441,9 +441,18 @@ class MethodInvocationResolver {
       return;
     }
 
+    ResolutionResult result = _extensionResolver.findExtension(
+        receiverType, name, nameNode, ElementKind.METHOD);
+    if (result.isSingle) {
+      nameNode.staticElement = result.element;
+      var calleeType = _getCalleeType(node, result.element);
+      return _setResolution(node, calleeType);
+    } else if (result.isAmbiguous) {
+      return;
+    }
     // We can invoke Object methods on Function.
     var member = _inheritance.getMember(
-      _resolver.typeProvider.objectType,
+      _resolver.typeProvider.functionType,
       new Name(null, name),
     );
     if (member != null) {

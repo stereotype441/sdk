@@ -103,6 +103,7 @@ def
 depended
 depfile
 deviation
+dfast
 dictionaries
 dictionary
 differs
@@ -166,6 +167,7 @@ fox
 framework
 fulfill
 func
+futures
 gallery
 gamma
 gen
@@ -244,6 +246,7 @@ mismatched
 miss
 misspelled
 mistake
+mistakes
 month
 mx
 mysdk
@@ -380,6 +383,7 @@ typeargs
 typeparam
 typeparambounds
 unassigned
+unawaited
 unbreak
 unification
 unordered

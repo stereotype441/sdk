@@ -49,6 +49,7 @@ import 'package:kernel/ast.dart'
         StaticInvocation,
         StringLiteral,
         SuperInitializer,
+        TreeNode,
         TypeParameter,
         TypeParameterType,
         VariableDeclaration,
@@ -115,10 +116,14 @@ abstract class FunctionBuilder extends MemberBuilder {
 
   final List<FormalParameterBuilder> formals;
 
-  /// If this procedure is an instance member declared in an extension
-  /// declaration, [_extensionThis] holds the synthetically added `this`
-  /// parameter.
+  /// If this procedure is an extension instance member, [_extensionThis] holds
+  /// the synthetically added `this` parameter.
   VariableDeclaration _extensionThis;
+
+  /// If this procedure is an extension instance member,
+  /// [_extensionTypeParameters] holds the type parameters copied from the
+  /// extension declaration.
+  List<TypeParameter> _extensionTypeParameters;
 
   FunctionBuilder(
       this.metadata,
@@ -239,7 +244,7 @@ abstract class FunctionBuilder extends MemberBuilder {
       // but which needs to have a forwarding stub body in order to ensure that
       // covariance checks occur.  We don't want to replace the forwarding stub
       // body with null.
-      var parent = function.parent;
+      TreeNode parent = function.parent;
       if (!(newBody == null &&
           parent is Procedure &&
           parent.isForwardingSemiStub)) {
@@ -274,7 +279,8 @@ abstract class FunctionBuilder extends MemberBuilder {
       if (enclosingClass.typeParameters.isNotEmpty) {
         needsCheckVisitor = new IncludesTypeParametersNonCovariantly(
             enclosingClass.typeParameters,
-            // We are checking the parameter types which are in a contravariant position.
+            // We are checking the parameter types which are in a
+            // contravariant position.
             initialVariance: Variance.contravariant);
       }
     }
@@ -309,7 +315,9 @@ abstract class FunctionBuilder extends MemberBuilder {
         }
       }
     }
-    if (isSetter && (formals?.length != 1 || formals[0].isOptional)) {
+    if (!isExtensionInstanceMember &&
+        isSetter &&
+        (formals?.length != 1 || formals[0].isOptional)) {
       // Replace illegal parameters by single dummy parameter.
       // Do this after building the parameters, since the diet listener
       // assumes that parameters are built, even if illegal in number.
@@ -359,7 +367,15 @@ abstract class FunctionBuilder extends MemberBuilder {
       }
     }
     if (isExtensionInstanceMember) {
+      ExtensionBuilder extensionBuilder = parent;
       _extensionThis = result.positionalParameters.first;
+      if (extensionBuilder.typeParameters != null) {
+        int count = extensionBuilder.typeParameters.length;
+        _extensionTypeParameters = new List<TypeParameter>(count);
+        for (int index = 0; index < count; index++) {
+          _extensionTypeParameters[index] = result.typeParameters[index];
+        }
+      }
     }
     return function = result;
   }
@@ -370,6 +386,16 @@ abstract class FunctionBuilder extends MemberBuilder {
     assert(_extensionThis != null || !isExtensionInstanceMember,
         "ProcedureBuilder.extensionThis has not been set.");
     return _extensionThis;
+  }
+
+  /// Returns a list of synthetic type parameters added to extension instance
+  /// members.
+  List<TypeParameter> get extensionTypeParameters {
+    // Use [_extensionThis] as marker for whether extension type parameters have
+    // been computed.
+    assert(_extensionThis != null || !isExtensionInstanceMember,
+        "ProcedureBuilder.extensionTypeParameters has not been set.");
+    return _extensionTypeParameters;
   }
 
   Member build(SourceLibraryBuilder library);
@@ -429,6 +455,7 @@ abstract class FunctionBuilder extends MemberBuilder {
 class ProcedureBuilder extends FunctionBuilder {
   final Procedure procedure;
   final int charOpenParenOffset;
+  final ProcedureKind kind;
 
   AsyncMarker actualAsyncModifier = AsyncMarker.Sync;
 
@@ -444,7 +471,7 @@ class ProcedureBuilder extends FunctionBuilder {
       String name,
       List<TypeVariableBuilder> typeVariables,
       List<FormalParameterBuilder> formals,
-      ProcedureKind kind,
+      this.kind,
       SourceLibraryBuilder compilationUnit,
       int startCharOffset,
       int charOffset,
@@ -461,8 +488,6 @@ class ProcedureBuilder extends FunctionBuilder {
 
   @override
   ProcedureBuilder get origin => actualOrigin ?? this;
-
-  ProcedureKind get kind => procedure.kind;
 
   AsyncMarker get asyncModifier => actualAsyncModifier;
 
@@ -487,7 +512,7 @@ class ProcedureBuilder extends FunctionBuilder {
     if (isDeclarationInstanceMember) {
       if (returnType == null) return true;
       if (formals != null) {
-        for (var formal in formals) {
+        for (FormalParameterBuilder formal in formals) {
           if (formal.type == null) return true;
         }
       }
@@ -512,10 +537,31 @@ class ProcedureBuilder extends FunctionBuilder {
       procedure.isConst = isConst;
       if (isExtensionMethod) {
         ExtensionBuilder extension = parent;
-        procedure.isStatic = false;
-        procedure.isExtensionMethod = true;
-        procedure.kind = ProcedureKind.Method;
-        procedure.name = new Name('${extension.name}|${name}', library.target);
+        procedure.isExtensionMember = true;
+        procedure.isStatic = true;
+        String kindInfix = '';
+        if (isExtensionInstanceMember) {
+          // Instance getter and setter are converted to methods so we use an
+          // infix to make their names unique.
+          switch (kind) {
+            case ProcedureKind.Getter:
+              kindInfix = 'get#';
+              break;
+            case ProcedureKind.Setter:
+              kindInfix = 'set#';
+              break;
+            case ProcedureKind.Method:
+            case ProcedureKind.Operator:
+              kindInfix = '';
+              break;
+            case ProcedureKind.Factory:
+              throw new UnsupportedError(
+                  'Unexpected extension method kind ${kind}');
+          }
+          procedure.kind = ProcedureKind.Method;
+        }
+        procedure.name =
+            new Name('${extension.name}|${kindInfix}${name}', library.target);
       } else {
         procedure.isStatic = isStatic;
         procedure.name = new Name(name, library.target);
@@ -623,7 +669,7 @@ class ConstructorBuilder extends FunctionBuilder {
   bool get isEligibleForTopLevelInference {
     if (library.legacyMode) return false;
     if (formals != null) {
-      for (var formal in formals) {
+      for (FormalParameterBuilder formal in formals) {
         if (formal.type == null && formal.isInitializingFormal) return true;
       }
     }

@@ -83,7 +83,8 @@ import '../kernel/kernel_builder.dart'
         LibraryBuilder,
         MemberBuilder,
         NamedTypeBuilder,
-        TypeBuilder;
+        TypeBuilder,
+        TypeDeclarationBuilder;
 
 import '../kernel/kernel_target.dart' show KernelTarget;
 
@@ -599,8 +600,8 @@ class SourceLoader extends Loader {
 
     Set<ClassBuilder> blackListedClasses = new Set<ClassBuilder>();
     for (int i = 0; i < blacklistedCoreClasses.length; i++) {
-      blackListedClasses
-          .add(coreLibrary.getLocalMember(blacklistedCoreClasses[i]));
+      blackListedClasses.add(coreLibrary
+          .lookupLocalMember(blacklistedCoreClasses[i], required: true));
     }
 
     // Sort the classes topologically.
@@ -681,7 +682,7 @@ class SourceLoader extends Loader {
     if (mixedInType != null) {
       bool isClassBuilder = false;
       if (mixedInType is NamedTypeBuilder) {
-        var builder = mixedInType.declaration;
+        TypeDeclarationBuilder builder = mixedInType.declaration;
         if (builder is ClassBuilder) {
           isClassBuilder = true;
           for (Builder constructor in builder.constructors.local.values) {
@@ -1113,7 +1114,7 @@ class SourceLoader extends Loader {
     if (library == null) {
       return target.dillTarget.loader.computeClassBuilderFromTargetClass(cls);
     }
-    return library.getLocalMember(cls.name);
+    return library.lookupLocalMember(cls.name, required: true);
   }
 
   @override
