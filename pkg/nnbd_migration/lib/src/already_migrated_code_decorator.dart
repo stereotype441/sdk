@@ -54,8 +54,13 @@ class AlreadyMigratedCodeDecorator {
           positionalParameters: positionalParameters);
     } else if (type is InterfaceType) {
       if (type.typeParameters.isNotEmpty) {
-        // TODO(paulberry)
-        throw UnimplementedError('Decorating ${type.displayName}');
+        if (type.typeArguments.length == type.typeParameters.length) {
+          return DecoratedType(type, _graph.never,
+              typeArguments: type.typeArguments.map(decorate).toList());
+        } else {
+          // TODO(paulberry)
+          throw UnimplementedError('Decorating ${type.displayName}');
+        }
       }
       return DecoratedType(type, _graph.never);
     } else if (type is TypeParameterType) {
