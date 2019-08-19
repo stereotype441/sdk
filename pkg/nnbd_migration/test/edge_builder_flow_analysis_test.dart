@@ -455,34 +455,6 @@ class C {
     // field doesn't cause flow analysis to crash.
   }
 
-  test_for_each_break_target() async {
-    await analyze('''
-void f(int i, Iterable<Object> x, Iterable<Object> y) {
-  L: for (var v1 in x) {
-    for (var v2 in x) {
-      if (i != null) break L;
-      if (b()) break;
-      return;
-    }
-    g(i);
-    return;
-  }
-  h(i);
-}
-bool b() => true;
-void g(int j) {}
-void h(int k) {}
-''');
-    var iNode = decoratedTypeAnnotation('int i').node;
-    var jNode = decoratedTypeAnnotation('int j').node;
-    var kNode = decoratedTypeAnnotation('int k').node;
-    // No edge from i to k because i is promoted at the time of the call to h.
-    assertNoEdge(iNode, kNode);
-    // But there is an edge from i to j, because i is not promoted at the time
-    // of the call to g.
-    assertEdge(iNode, jNode, hard: false);
-  }
-
   test_for_each_cancels_promotions_for_assignments_in_body() async {
     await analyze('''
 void f(int i, int j, Iterable<Object> x) {
@@ -510,7 +482,7 @@ void f(int i, int j) {
   for(var v in h(i.isEven && j.isEven && g(i = null))) {}
 }
 bool g(int k) => true;
-Iterable<Object> h(bool b) => [];
+Iterable<Object> h(bool b) => <Object>[];
 ''');
     var iNode = decoratedTypeAnnotation('int i').node;
     var jNode = decoratedTypeAnnotation('int j').node;
