@@ -2,7 +2,6 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/element.dart';
@@ -308,17 +307,7 @@ class AssignmentCheckerTest extends Object
 }
 
 @reflectiveTest
-class EdgeBuilderTest extends MigrationVisitorTestBase {
-  /// Analyzes the given source code, producing constraint variables and
-  /// constraints for it.
-  @override
-  Future<CompilationUnit> analyze(String code) async {
-    var unit = await super.analyze(code);
-    unit.accept(EdgeBuilder(
-        typeProvider, typeSystem, variables, graph, testSource, null));
-    return unit;
-  }
-
+class EdgeBuilderTest extends EdgeBuilderTestBase {
   void assertGLB(
       NullabilityNode node, NullabilityNode left, NullabilityNode right) {
     expect(node, isNot(TypeMatcher<NullabilityNodeForLUB>()));
@@ -674,6 +663,28 @@ bool f(int i, int j) => i == j;
     assertNoUpstreamNullability(decoratedTypeAnnotation('bool f').node);
   }
 
+  test_binaryExpression_equal_null() async {
+    await analyze('''
+void f(int i) {
+  if (i == null) {
+    g(i);
+  } else {
+    h(i);
+  }
+}
+void g(int j) {}
+void h(int k) {}
+''');
+    var iNode = decoratedTypeAnnotation('int i').node;
+    var jNode = decoratedTypeAnnotation('int j').node;
+    var kNode = decoratedTypeAnnotation('int k').node;
+    // No edge from i to k because i is known to be non-nullable at the site of
+    // the call to h()
+    assertNoEdge(iNode, kNode);
+    // But there is an edge from i to j
+    assertEdge(iNode, jNode, hard: false, guards: [iNode]);
+  }
+
   test_binaryExpression_gt_result_not_null() async {
     await analyze('''
 bool f(int i, int j) => i > j;
@@ -736,6 +747,28 @@ bool f(int i, int j) => i != j;
 ''');
 
     assertNoUpstreamNullability(decoratedTypeAnnotation('bool f').node);
+  }
+
+  test_binaryExpression_notEqual_null() async {
+    await analyze('''
+void f(int i) {
+  if (i != null) {
+    h(i);
+  } else {
+    g(i);
+  }
+}
+void g(int j) {}
+void h(int k) {}
+''');
+    var iNode = decoratedTypeAnnotation('int i').node;
+    var jNode = decoratedTypeAnnotation('int j').node;
+    var kNode = decoratedTypeAnnotation('int k').node;
+    // No edge from i to k because i is known to be non-nullable at the site of
+    // the call to h()
+    assertNoEdge(iNode, kNode);
+    // But there is an edge from i to j
+    assertEdge(iNode, jNode, hard: false, guards: [iNode]);
   }
 
   test_binaryExpression_percent_result_not_null() async {
@@ -1310,6 +1343,20 @@ double f() {
     assertNoUpstreamNullability(decoratedTypeAnnotation('double').node);
   }
 
+  test_field_metadata() async {
+    await analyze('''
+class A {
+  const A();
+}
+class C {
+  @A()
+  int f;
+}
+''');
+    // No assertions needed; the AnnotationTracker mixin verifies that the
+    // metadata was visited.
+  }
+
   test_field_type_inferred() async {
     await analyze('''
 int f() => 1;
@@ -1496,22 +1543,6 @@ void f([int i]) {}
 ''');
 
     assertEdge(always, decoratedTypeAnnotation('int').node, hard: false);
-  }
-
-  test_functionDeclaration_resets_unconditional_control_flow() async {
-    await analyze('''
-void f(bool b, int i, int j) {
-  assert(i != null);
-  if (b) return;
-  assert(j != null);
-}
-void g(int k) {
-  assert(k != null);
-}
-''');
-    assertEdge(decoratedTypeAnnotation('int i').node, never, hard: true);
-    assertNoEdge(always, decoratedTypeAnnotation('int j').node);
-    assertEdge(decoratedTypeAnnotation('int k').node, never, hard: true);
   }
 
   test_functionExpressionInvocation_parameterType() async {
@@ -2555,9 +2586,8 @@ void test(bool b1, C _c) {
 }
 ''');
 
-    // TODO(mfairhurst): enable this check
-    //assertNullCheck(checkExpression('b1/*check*/'),
-    //    assertEdge(decoratedTypeAnnotation('bool b1').node, never, hard: true));
+    assertNullCheck(checkExpression('b1/*check*/'),
+        assertEdge(decoratedTypeAnnotation('bool b1').node, never, hard: true));
     assertNullCheck(checkExpression('b2/*check*/'),
         assertEdge(decoratedTypeAnnotation('bool b2').node, never, hard: true));
     assertNullCheck(checkExpression('c.m'),
@@ -2581,9 +2611,8 @@ void test(bool b1, C _c) {
 }
 ''');
 
-    // TODO(mfairhurst): enable this check
-    //assertNullCheck(checkExpression('b1/*check*/'),
-    //    assertEdge(decoratedTypeAnnotation('bool b1').node, never, hard: true));
+    assertNullCheck(checkExpression('b1/*check*/'),
+        assertEdge(decoratedTypeAnnotation('bool b1').node, never, hard: true));
     assertNullCheck(checkExpression('b2/*check*/'),
         assertEdge(decoratedTypeAnnotation('bool b2').node, never, hard: true));
     assertNullCheck(checkExpression('c.m'),
@@ -2636,13 +2665,53 @@ void test(bool b, C c1, C c2) {
         assertEdge(decoratedTypeAnnotation('C c3').node, never, hard: true));
   }
 
+  test_postDominators_forElement() async {
+    await analyze('''
+class C {
+  int m() => 0;
+}
+
+void test(bool _b, C c1, C c2) {
+  <int>[for (bool b1 = _b; b1/*check*/; c2.m()) c1.m()];
+}
+''');
+
+    assertNullCheck(checkExpression('b1/*check*/'),
+        assertEdge(decoratedTypeAnnotation('bool b1').node, never, hard: true));
+    assertNullCheck(checkExpression('c1.m'),
+        assertEdge(decoratedTypeAnnotation('C c1').node, never, hard: false));
+    assertNullCheck(checkExpression('c2.m'),
+        assertEdge(decoratedTypeAnnotation('C c2').node, never, hard: false));
+  }
+
+  test_postDominators_forInElement() async {
+    await analyze('''
+class C {
+  int m() => 0;
+}
+void test(List<C> l, C c1) {
+  <int>[for (C _c in l/*check*/) c1.m()];
+  <int>[for (C c2 in <C>[]) c2.m()];
+}
+''');
+
+    assertNullCheck(
+        checkExpression('l/*check*/'),
+        assertEdge(decoratedTypeAnnotation('List<C> l').node, never,
+            hard: true));
+    assertNullCheck(checkExpression('c1.m'),
+        assertEdge(decoratedTypeAnnotation('C c1').node, never, hard: false));
+    assertNullCheck(checkExpression('c2.m'),
+        assertEdge(decoratedTypeAnnotation('C c2').node, never, hard: false));
+  }
+
   test_postDominators_forInStatement_unconditional() async {
     await analyze('''
 class C {
   void m() {}
 }
 void test(List<C> l, C c1, C c2) {
-  for (C c3 in l) {
+  for (C c3 in l/*check*/) {
     c1.m();
     c3.m();
   }
@@ -2651,9 +2720,10 @@ void test(List<C> l, C c1, C c2) {
 }
 ''');
 
-    //TODO(mfairhurst): enable this check
-    //assertNullCheck(checkExpression('l/*check*/'),
-    //    assertEdge(decoratedTypeAnnotation('List<C> l').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('l/*check*/'),
+        assertEdge(decoratedTypeAnnotation('List<C> l').node, never,
+            hard: true));
     assertNullCheck(checkExpression('c1.m'),
         assertEdge(decoratedTypeAnnotation('C c1').node, never, hard: false));
     assertNullCheck(checkExpression('c2.m'),
@@ -2679,9 +2749,8 @@ void test(bool b1, C c1, C c2, C c3) {
 }
 ''');
 
-    //TODO(mfairhurst): enable this check
-    //assertNullCheck(checkExpression('b1/*check*/'),
-    //    assertEdge(decoratedTypeAnnotation('bool b1').node, never, hard: true));
+    assertNullCheck(checkExpression('b1/*check*/'),
+        assertEdge(decoratedTypeAnnotation('bool b1').node, never, hard: true));
     assertNullCheck(checkExpression('c4.m'),
         assertEdge(decoratedTypeAnnotation('C c4').node, never, hard: true));
     assertNullCheck(checkExpression('c2.m'),
@@ -2706,9 +2775,9 @@ void test(bool b1, C c1, C c2, C c3) {
 }
 ''');
 
-    //TODO(mfairhurst): enable this check
     assertNullCheck(checkExpression('b1/*check*/'),
         assertEdge(decoratedTypeAnnotation('bool b1').node, never, hard: true));
+    //TODO(mfairhurst): enable this check
     //assertNullCheck(checkExpression('b2/*check*/'),
     //    assertEdge(decoratedTypeAnnotation('bool b2').node, never, hard: true));
     //assertEdge(decoratedTypeAnnotation('b3 =').node, never, hard: false);
@@ -2840,9 +2909,8 @@ void test(bool b1, C _c) {
 }
 ''');
 
-    // TODO(mfairhurst): enable this check
-    //assertNullCheck(checkExpression('b1/*check*/'),
-    //    assertEdge(decoratedTypeAnnotation('bool b1').node, never, hard: true));
+    assertNullCheck(checkExpression('b1/*check*/'),
+        assertEdge(decoratedTypeAnnotation('bool b1').node, never, hard: true));
     assertNullCheck(checkExpression('b2/*check*/'),
         assertEdge(decoratedTypeAnnotation('bool b2').node, never, hard: true));
     assertNullCheck(checkExpression('c1.m'),
@@ -2909,7 +2977,6 @@ void test(C c1, C c2, C c3, C c4) {
         assertEdge(decoratedTypeAnnotation('C c4').node, never, hard: false));
   }
 
-  @failingTest
   test_postDominators_subFunction() async {
     await analyze('''
 class C {
@@ -2949,9 +3016,7 @@ void test() {
         assertEdge(decoratedTypeAnnotation('C c').node, never, hard: false));
   }
 
-  @failingTest
   test_postDominators_subFunction_ifStatement_unconditional() async {
-    // Failing because function expressions aren't implemented
     await analyze('''
 class C {
   void m() {}
@@ -3012,9 +3077,8 @@ void test(bool b, C c1, C c2) {
 }
 ''');
 
-    //TODO(mfairhurst): enable this check
-    //assertNullCheck(checkExpression('b/*check*/'),
-    //    assertEdge(decoratedTypeAnnotation('bool b').node, never, hard: true));
+    assertNullCheck(checkExpression('b/*check*/'),
+        assertEdge(decoratedTypeAnnotation('bool b').node, never, hard: true));
     assertNullCheck(checkExpression('c1.m'),
         assertEdge(decoratedTypeAnnotation('C c1').node, never, hard: false));
     assertNullCheck(checkExpression('c2.m'),
@@ -3672,6 +3736,18 @@ main() { x = null; }
 ''');
     var setXType = decoratedTypeAnnotation('int value');
     assertEdge(always, setXType.node, hard: false);
+  }
+
+  test_topLevelVar_metadata() async {
+    await analyze('''
+class A {
+  const A();
+}
+@A()
+int v;
+''');
+    // No assertions needed; the AnnotationTracker mixin verifies that the
+    // metadata was visited.
   }
 
   test_topLevelVar_reference() async {

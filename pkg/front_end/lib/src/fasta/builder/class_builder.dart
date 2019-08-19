@@ -349,15 +349,20 @@ abstract class ClassBuilder extends DeclarationBuilder {
     scope.forEach(f);
   }
 
-  /// Don't use for scope lookup. Only use when an element is known to exist
-  /// (and isn't a setter).
-  MemberBuilder getLocalMember(String name) {
-    return scope.local[name] ??
-        internalProblem(
-            templateInternalProblemNotFoundIn.withArguments(
-                name, fullNameForErrors),
-            -1,
-            null);
+  @override
+  Builder lookupLocalMember(String name, {bool required: false}) {
+    Builder builder = scope.local[name];
+    if (builder == null && isPatch) {
+      builder = origin.scope.local[name];
+    }
+    if (required && builder == null) {
+      internalProblem(
+          templateInternalProblemNotFoundIn.withArguments(
+              name, fullNameForErrors),
+          -1,
+          null);
+    }
+    return builder;
   }
 
   /// Find the first member of this class with [name]. This method isn't
@@ -369,7 +374,7 @@ abstract class ClassBuilder extends DeclarationBuilder {
   /// For example, this method is convenient for use when building synthetic
   /// members, such as those of an enum.
   MemberBuilder firstMemberNamed(String name) {
-    Builder declaration = getLocalMember(name);
+    Builder declaration = lookupLocalMember(name, required: true);
     while (declaration.next != null) {
       declaration = declaration.next;
     }
@@ -384,6 +389,9 @@ abstract class ClassBuilder extends DeclarationBuilder {
 
   @override
   ClassBuilder get origin => actualOrigin ?? this;
+
+  @override
+  InterfaceType get thisType => cls.thisType;
 
   /// [arguments] have already been built.
   InterfaceType buildTypesWithBuiltArguments(
@@ -1215,8 +1223,10 @@ abstract class ClassBuilder extends DeclarationBuilder {
         i < declaredFunction.positionalParameters.length &&
             i < interfaceFunction.positionalParameters.length;
         i++) {
-      var declaredParameter = declaredFunction.positionalParameters[i];
-      var interfaceParameter = interfaceFunction.positionalParameters[i];
+      VariableDeclaration declaredParameter =
+          declaredFunction.positionalParameters[i];
+      VariableDeclaration interfaceParameter =
+          interfaceFunction.positionalParameters[i];
       _checkTypes(
           types,
           interfaceSubstitution,
@@ -1293,7 +1303,7 @@ abstract class ClassBuilder extends DeclarationBuilder {
           break outer;
         }
       }
-      var declaredParameter = declaredNamedParameters.current;
+      VariableDeclaration declaredParameter = declaredNamedParameters.current;
       _checkTypes(
           types,
           interfaceSubstitution,
@@ -1316,8 +1326,8 @@ abstract class ClassBuilder extends DeclarationBuilder {
         types, declaredMember, interfaceMember, null, null, isInterfaceCheck);
     Substitution declaredSubstitution =
         _computeDeclaredSubstitution(types, declaredMember);
-    var declaredType = declaredMember.getterType;
-    var interfaceType = interfaceMember.getterType;
+    DartType declaredType = declaredMember.getterType;
+    DartType interfaceType = interfaceMember.getterType;
     _checkTypes(
         types,
         interfaceSubstitution,
@@ -1339,9 +1349,9 @@ abstract class ClassBuilder extends DeclarationBuilder {
         types, declaredMember, interfaceMember, null, null, isInterfaceCheck);
     Substitution declaredSubstitution =
         _computeDeclaredSubstitution(types, declaredMember);
-    var declaredType = declaredMember.setterType;
-    var interfaceType = interfaceMember.setterType;
-    var declaredParameter =
+    DartType declaredType = declaredMember.setterType;
+    DartType interfaceType = interfaceMember.setterType;
+    VariableDeclaration declaredParameter =
         declaredMember.function?.positionalParameters?.elementAt(0);
     bool isCovariant = declaredParameter?.isCovariant ?? false;
     if (!isCovariant && declaredMember is Field) {
@@ -1553,7 +1563,8 @@ abstract class ClassBuilder extends DeclarationBuilder {
         DartType typeParameterBound =
             substitution.substituteType(typeParameter.bound);
         DartType typeArgument = typeArguments[i];
-        // Check whether the [typeArgument] respects the bounds of [typeParameter].
+        // Check whether the [typeArgument] respects the bounds of
+        // [typeParameter].
         if (!typeEnvironment.isSubtypeOf(typeArgument, typeParameterBound)) {
           addProblem(
               templateRedirectingFactoryIncompatibleTypeArgument.withArguments(

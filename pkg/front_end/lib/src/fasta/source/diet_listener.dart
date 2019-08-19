@@ -13,6 +13,7 @@ import 'package:kernel/ast.dart'
         LibraryDependency,
         LibraryPart,
         TreeNode,
+        TypeParameter,
         VariableDeclaration;
 
 import 'package:kernel/class_hierarchy.dart' show ClassHierarchy;
@@ -50,6 +51,8 @@ import '../problems.dart'
     show DebugAbort, internalProblem, unexpected, unhandled;
 
 import '../type_inference/type_inference_engine.dart' show TypeInferenceEngine;
+
+import '../type_inference/type_inferrer.dart' show TypeInferrer;
 
 import 'source_library_builder.dart' show SourceLibraryBuilder;
 
@@ -365,6 +368,15 @@ class DietListener extends StackListener {
 
   @override
   void handleQualified(Token period) {
+    assert(checkState(period, [
+      /*suffix*/ ValueKind.NameOrParserRecovery,
+      /*prefix*/ unionOfKinds([
+        ValueKind.Name,
+        ValueKind.Generator,
+        ValueKind.ParserRecovery,
+        ValueKind.QualifiedName,
+      ]),
+    ]));
     debugEvent("handleQualified");
     Object suffix = pop();
     Object prefix = pop();
@@ -623,14 +635,15 @@ class DietListener extends StackListener {
   StackListener createListener(ModifierBuilder builder, Scope memberScope,
       {bool isDeclarationInstanceMember,
       VariableDeclaration extensionThis,
+      List<TypeParameter> extensionTypeParameters,
       Scope formalParameterScope}) {
     // Note: we set thisType regardless of whether we are building a static
     // member, since that provides better error recovery.
     // TODO(johnniwinther): Provide a dummy this on static extension methods
     // for better error recovery?
     InterfaceType thisType =
-        extensionThis == null ? currentClass?.target?.thisType : null;
-    var typeInferrer =
+        extensionThis == null ? currentDeclaration?.thisType : null;
+    TypeInferrer typeInferrer =
         typeInferenceEngine?.createLocalTypeInferrer(uri, thisType, library);
     ConstantContext constantContext = builder.isConstructor && builder.isConst
         ? ConstantContext.inferred
@@ -642,9 +655,10 @@ class DietListener extends StackListener {
         formalParameterScope: formalParameterScope,
         hierarchy: hierarchy,
         coreTypes: coreTypes,
-        classBuilder: currentClass,
+        declarationBuilder: currentDeclaration,
         isDeclarationInstanceMember: isDeclarationInstanceMember,
         extensionThis: extensionThis,
+        extensionTypeParameters: extensionTypeParameters,
         uri: uri,
         typeInferrer: typeInferrer)
       ..constantContext = constantContext;
@@ -660,6 +674,7 @@ class DietListener extends StackListener {
     return createListener(builder, typeParameterScope,
         isDeclarationInstanceMember: builder.isDeclarationInstanceMember,
         extensionThis: builder.extensionThis,
+        extensionTypeParameters: builder.extensionTypeParameters,
         formalParameterScope: formalParameterScope);
   }
 
@@ -848,7 +863,7 @@ class DietListener extends StackListener {
       }
       token = parser.parseFormalParametersOpt(
           parser.syntheticPreviousToken(token), kind);
-      var formals = listener.pop();
+      Object formals = listener.pop();
       listener.checkEmpty(token.next.charOffset);
       token = parser.parseInitializersOpt(token);
       token = parser.parseAsyncModifierOpt(token);
@@ -856,7 +871,7 @@ class DietListener extends StackListener {
       bool isExpression = false;
       bool allowAbstract = asyncModifier == AsyncMarker.Sync;
       parser.parseFunctionBody(token, isExpression, allowAbstract);
-      var body = listener.pop();
+      Object body = listener.pop();
       listener.checkEmpty(token.charOffset);
       listenerFinishFunction(
           listener, startToken, kind, formals, asyncModifier, body);
@@ -976,9 +991,9 @@ class DietListener extends StackListener {
   List<Expression> parseMetadata(
       ModifierBuilder builder, Token metadata, TreeNode parent) {
     if (metadata != null) {
-      var listener = createListener(builder, memberScope,
+      StackListener listener = createListener(builder, memberScope,
           isDeclarationInstanceMember: false);
-      var parser = new Parser(listener);
+      Parser parser = new Parser(listener);
       parser.parseMetadataStar(parser.syntheticPreviousToken(metadata));
       return listener.finishMetadata(parent);
     }
