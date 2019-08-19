@@ -169,6 +169,26 @@ main() {
       expect(() => h.flow.finish(), _asserts);
     });
 
+    test('functionExpression_begin() cancels promotions',
+        () {
+      var h = _Harness();
+      var x = h.addAssignedVar('x', 'int?');
+      var y = h.addAssignedVar('y', 'int?');
+      h.promote(x, 'int');
+      h.promote(y, 'int');
+      expect(h.flow.promotedType(x).type, 'int');
+      expect(h.flow.promotedType(y).type, 'int');
+      h.flow.functionExpression_begin({x});
+      // All variables are de-promoted within the local function
+      expect(h.flow.promotedType(x), isNull);
+      expect(h.flow.promotedType(y), isNull);
+      h.flow.functionExpression_end();
+      // Write-captured variables are de-promoted after the local function too
+      expect(h.flow.promotedType(x), isNull);
+      expect(h.flow.promotedType(y).type, 'int');
+      h.flow.finish();
+    });
+
     test('ifStatement_end(false) keeps else branch if then branch exits', () {
       var h = _Harness();
       var x = h.addAssignedVar('x', 'int?');

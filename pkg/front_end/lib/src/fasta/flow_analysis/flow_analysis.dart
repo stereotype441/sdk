@@ -275,7 +275,11 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _current = _join(afterBody, continueState);
   }
 
-  void functionExpression_begin() {
+  void functionExpression_begin(Iterable<Variable> writeCaptured) {
+    _stack.add(_current.removePromotedAll(writeCaptured));
+
+    TODO;
+
     _stack.add(_current);
 
     Set<Variable> notPromoted = null;
