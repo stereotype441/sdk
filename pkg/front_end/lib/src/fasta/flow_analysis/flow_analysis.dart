@@ -983,30 +983,15 @@ class FlowModel<Variable, Type> {
     var alwaysSecond = true;
     for (var entry in first.entries) {
       var variable = entry.key;
-      if (!second.containsKey(variable)) {
+      var secondModel = second[variable];
+      if (secondModel == null) {
         alwaysFirst = false;
       } else {
-        var firstType = entry.value.promotedType;
-        var secondType = second[variable].promotedType;
-        if (identical(firstType, secondType)) {
-          result[variable] = VariableModel<Type>(firstType);
-        } else if (firstType == null) {
-          result[variable] = VariableModel<Type>(null);
-          alwaysSecond = false;
-        } else if (secondType == null) {
-          result[variable] = VariableModel<Type>(null);
-          alwaysFirst = false;
-        } else if (typeOperations.isSubtypeOf(firstType, secondType)) {
-          result[variable] = VariableModel<Type>(secondType);
-          alwaysFirst = false;
-        } else if (typeOperations.isSubtypeOf(secondType, firstType)) {
-          result[variable] = VariableModel<Type>(firstType);
-          alwaysSecond = false;
-        } else {
-          result[variable] = VariableModel<Type>(null);
-          alwaysFirst = false;
-          alwaysSecond = false;
-        }
+        var joined =
+            VariableModel.join<Type>(typeOperations, entry.value, secondModel);
+        result[variable] = joined;
+        if (!identical(joined, entry.value)) alwaysFirst = false;
+        if (!identical(joined, secondModel)) alwaysSecond = false;
       }
     }
 
@@ -1127,6 +1112,36 @@ class VariableModel<Type> {
 
   @override
   String toString() => 'VariableModel($promotedType)';
+
+  static join<Type>(TypeOperations<Object, Type> typeOperations,
+      VariableModel<Type> first, VariableModel<Type> second) {
+    var firstType = first.promotedType;
+    var secondType = second.promotedType;
+    Type newPromotedType;
+    if (identical(firstType, secondType)) {
+      newPromotedType = firstType;
+    } else if (firstType == null || secondType == null) {
+      newPromotedType = null;
+    } else if (typeOperations.isSubtypeOf(firstType, secondType)) {
+      newPromotedType = secondType;
+    } else if (typeOperations.isSubtypeOf(secondType, firstType)) {
+      newPromotedType = firstType;
+    } else {
+      newPromotedType = null;
+    }
+    return _identicalOrNew(first, second, newPromotedType);
+  }
+
+  static _identicalOrNew<Type>(VariableModel<Type> first,
+      VariableModel<Type> second, Type newPromotedType) {
+    if (identical(first.promotedType, newPromotedType)) {
+      return first;
+    } else if (identical(second.promotedType, newPromotedType)) {
+      return second;
+    } else {
+      return VariableModel<Type>(newPromotedType);
+    }
+  }
 }
 
 /// List based immutable set of variables.

@@ -680,8 +680,9 @@ main() {
 
       test('sub-map', () {
         var h = _Harness();
-        var p1 = {x: model(intType), y: model(stringType)};
-        var p2 = {x: model(intType)};
+        var xModel = model(intType);
+        var p1 = {x: xModel, y: model(stringType)};
+        var p2 = {x: xModel};
         expect(FlowModel.joinVariableInfo(h, p1, p2), same(p2));
         expect(FlowModel.joinVariableInfo(h, p2, p1), same(p2));
       });
