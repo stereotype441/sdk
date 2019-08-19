@@ -802,48 +802,26 @@ class FlowModel<Variable, Type> {
     }
 
     var newVariableInfo = <Variable, VariableModel<Type>>{};
-    bool promotedMatchesThis = true;
-    bool promotedMatchesOther =
+    bool variableInfoMatchesThis = true;
+    bool variableInfoMatchesOther =
         other.variableInfo.length == variableInfo.length;
     for (var entry in variableInfo.entries) {
       var variable = entry.key;
-      var thisType = entry.value.promotedType;
-      var otherType = other.variableInfo[variable]?.promotedType;
-      if (!unsafe.contains(variable)) {
-        if (otherType != null &&
-            (thisType == null ||
-                typeOperations.isSubtypeOf(otherType, thisType))) {
-          newVariableInfo[variable] = VariableModel<Type>(otherType);
-          if (promotedMatchesThis &&
-              (thisType == null ||
-                  !typeOperations.isSameType(thisType, otherType))) {
-            promotedMatchesThis = false;
-          }
-          continue;
-        }
-      }
-      if (thisType != null) {
-        newVariableInfo[variable] = VariableModel<Type>(thisType);
-        if (promotedMatchesOther &&
-            (otherType == null ||
-                !typeOperations.isSameType(thisType, otherType))) {
-          promotedMatchesOther = false;
-        }
-      } else {
-        newVariableInfo[variable] = VariableModel<Type>(null);
-        if (promotedMatchesOther && otherType != null) {
-          promotedMatchesOther = false;
-        }
-      }
+      var otherModel = other.variableInfo[variable];
+      var restricted = entry.value
+          .restrict(typeOperations, otherModel, unsafe.contains(variable));
+      newVariableInfo[variable] = restricted;
+      if (!identical(restricted, entry.value)) variableInfoMatchesThis = false;
+      if (!identical(restricted, otherModel)) variableInfoMatchesOther = false;
     }
-    assert(promotedMatchesThis ==
+    assert(variableInfoMatchesThis ==
         _variableInfosEqual(typeOperations, newVariableInfo, variableInfo));
-    assert(promotedMatchesOther ==
+    assert(variableInfoMatchesOther ==
         _variableInfosEqual(
             typeOperations, newVariableInfo, other.variableInfo));
-    if (promotedMatchesThis) {
+    if (variableInfoMatchesThis) {
       newVariableInfo = variableInfo;
-    } else if (promotedMatchesOther) {
+    } else if (variableInfoMatchesOther) {
       newVariableInfo = other.variableInfo;
     }
 
@@ -1108,6 +1086,24 @@ class VariableModel<Type> {
   operator ==(Object other) {
     return other is VariableModel<Type> &&
         this.promotedType == other.promotedType;
+  }
+
+  restrict(TypeOperations<Object, Type> typeOperations,
+      VariableModel<Type> otherModel, bool unsafe) {
+    var thisType = promotedType;
+    var otherType = otherModel?.promotedType;
+    if (!unsafe) {
+      if (otherType != null &&
+          (thisType == null ||
+              typeOperations.isSubtypeOf(otherType, thisType))) {
+        return _identicalOrNew(this, otherModel, otherType);
+      }
+    }
+    if (thisType != null) {
+      return _identicalOrNew(this, otherModel, thisType);
+    } else {
+      return _identicalOrNew(this, otherModel, null);
+    }
   }
 
   @override
