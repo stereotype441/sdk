@@ -46,9 +46,11 @@ class _AlreadyMigratedCodeDecoratorTest {
     expect(decoratedType.node, same(graph.never));
   }
 
-  void checkIterableDynamic(DecoratedType decoratedType) {
+  void checkIterable(
+      DecoratedType decoratedType, void Function(DecoratedType) checkArgument) {
     expect(decoratedType.type, typeProvider.iterableDynamicType);
     expect(decoratedType.node, same(graph.never));
+    checkArgument(decoratedType.typeArguments[0]);
   }
 
   void checkTypeParameter(
@@ -116,10 +118,9 @@ class _AlreadyMigratedCodeDecoratorTest {
         nullabilitySuffix: NullabilitySuffix.star)));
   }
 
-  test_decorate_list_dynamic() {
+  test_decorate_iterable_dynamic() {
     var decorated = decorate(typeProvider.iterableDynamicType);
-    checkIterableDynamic(decorated);
-    checkDynamic(decorated.typeArguments[0]);
+    checkIterable(decorated, checkDynamic);
   }
 
   test_decorate_typeParameterType_star() {
