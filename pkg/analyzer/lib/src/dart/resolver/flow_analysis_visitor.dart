@@ -54,7 +54,7 @@ class FlowAnalysisHelper {
   final _TypeSystemTypeOperations _typeOperations;
 
   /// Precomputed sets of potentially assigned variables.
-  final AssignedVariables<Statement, VariableElement> assignedVariables;
+  final AssignedVariables<VariableElement> assignedVariables;
 
   /// The result for post-resolution stages of analysis.
   final FlowAnalysisResult result;
@@ -282,6 +282,14 @@ class FlowAnalysisHelper {
     return null;
   }
 
+  /// Computes the [AssignedVariables] map for the given [node].
+  static AssignedVariables<VariableElement> computeAssignedVariables(
+      AstNode node) {
+    var assignedVariables = AssignedVariables<VariableElement>();
+    node.accept(_AssignedVariablesVisitor(assignedVariables));
+    return assignedVariables;
+  }
+
   /// Return the target of the `break` or `continue` statement with the
   /// [element] label. The [element] might be `null` (when the statement does
   /// not specify a label), so the default enclosing target is returned.
@@ -314,14 +322,6 @@ class FlowAnalysisHelper {
       }
     }
     return null;
-  }
-
-  /// Computes the [AssignedVariables] map for the given [node].
-  static AssignedVariables<Statement, VariableElement> computeAssignedVariables(
-      AstNode node) {
-    var assignedVariables = AssignedVariables<Statement, VariableElement>();
-    node.accept(_AssignedVariablesVisitor(assignedVariables));
-    return assignedVariables;
   }
 }
 
