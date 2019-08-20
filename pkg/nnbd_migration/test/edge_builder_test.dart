@@ -358,16 +358,6 @@ class EdgeBuilderTest extends EdgeBuilderTestBase {
     return variables.decoratedExpressionType(findNode.expression(text));
   }
 
-  solo_test_foo() async {
-    await analyze('''
-void f(Iterable<int> x) {}
-void g(List<int> x) {
-  f(x);
-}
-''');
-    fail('TODO(paulberry): finish test');
-  }
-
   test_assert_demonstrates_non_null_intent() async {
     await analyze('''
 void f(int i) {
@@ -418,6 +408,25 @@ class C<T extends List<int>> {
     assertEdge(
         boundType.typeArguments[0].node, returnType.typeArguments[0].node,
         hard: false);
+  }
+
+  test_assign_upcast_generic() async {
+    await analyze('''
+void f(Iterable<int> x) {}
+void g(List<int> x) {
+  f(x);
+}
+''');
+
+    var iterableInt = decoratedTypeAnnotation('Iterable<int>');
+    var listInt = decoratedTypeAnnotation('List<int>');
+    assertEdge(listInt.node, iterableInt.node, hard: true);
+    var substitution = graph
+        .getUpstreamEdges(iterableInt.typeArguments[0].node)
+        .single
+        .primarySource as NullabilityNodeForSubstitution;
+    expect(substitution.innerNode, same(listInt.typeArguments[0].node));
+    expect(substitution.outerNode, same(never));
   }
 
   test_assignmentExpression_field() async {
