@@ -67,7 +67,7 @@ static_assert(offsetof(AbiAlignmentDouble, d) == 8,
               "FFI transformation alignment");
 static_assert(offsetof(AbiAlignmentUint64, i) == 8,
               "FFI transformation alignment");
-#elif (defined(HOST_ARCH_IA32) &&                                              \
+#elif (defined(HOST_ARCH_IA32) && /* NOLINT(whitespace/parens) */              \
        (defined(HOST_OS_LINUX) || defined(HOST_OS_MACOS) ||                    \
         defined(HOST_OS_ANDROID))) ||                                          \
     (defined(HOST_ARCH_ARM) && defined(HOST_OS_IOS))
@@ -89,7 +89,7 @@ static_assert(offsetof(AbiAlignmentUint64, i) == 8,
 static Abi HostAbi() {
 #if defined(HOST_ARCH_X64) || defined(HOST_ARCH_ARM64)
   return Abi::kWordSize64;
-#elif (defined(HOST_ARCH_IA32) &&                                              \
+#elif (defined(HOST_ARCH_IA32) && /* NOLINT(whitespace/parens) */              \
        (defined(HOST_OS_LINUX) || defined(HOST_OS_MACOS) ||                    \
         defined(HOST_OS_ANDROID))) ||                                          \
     (defined(HOST_ARCH_ARM) && defined(HOST_OS_IOS))
@@ -108,7 +108,7 @@ Abi TargetAbi() {
   return HostAbi();
 #elif defined(TARGET_ARCH_X64) || defined(TARGET_ARCH_ARM64)
   return Abi::kWordSize64;
-#elif (defined(TARGET_ARCH_IA32) &&                                            \
+#elif (defined(TARGET_ARCH_IA32) && /* NOLINT(whitespace/parens) */            \
        (defined(TARGET_OS_LINUX) || defined(TARGET_OS_MACOS) ||                \
         defined(TARGET_OS_ANDROID))) ||                                        \
     (defined(TARGET_ARCH_ARM) && defined(TARGET_OS_IOS))
