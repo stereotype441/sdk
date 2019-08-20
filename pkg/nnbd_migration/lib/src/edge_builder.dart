@@ -95,7 +95,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   final NullabilityGraph _graph;
 
-  /// The file being analyzed.
+  @override
   final Source source;
 
   @override

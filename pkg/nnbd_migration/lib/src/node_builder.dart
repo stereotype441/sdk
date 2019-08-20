@@ -35,7 +35,7 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
   /// Constraint variables and decorated types are stored here.
   final VariableRecorder _variables;
 
-  /// The file being analyzed.
+  @override
   final Source source;
 
   /// If the parameters of a function or method are being visited, the

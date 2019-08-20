@@ -87,6 +87,9 @@ abstract class NullabilityMigrationListener {
   /// [addFix] is called once for each source change.
   void addFix(SingleNullabilityFix fix);
 
+  /// [reportException] is called once for each exception that occurs in
+  /// "permissive mode", reporting the location of the exception and the
+  /// exception details.
   void reportException(
       Source source, AstNode node, Object exception, StackTrace stackTrace);
 }
