@@ -4,34 +4,32 @@
 
 import 'package:meta/meta.dart';
 
-/// Sets of local variables that are potentially assigned in a statement or
-/// expression.
-///
-/// These statements are loops, `switch`, and `try` statements.
-class AssignedVariables<Variable> {
+/// Sets of local variables that are potentially assigned in a loop statement,
+/// switch statement, try statement, or loop collection element.
+class AssignedVariables<StatementOrElement, Variable> {
   final emptySet = Set<Variable>();
 
   /// Mapping from a statement or expression to the set of local variables that
-  /// are potentially assigned in that statement or expression.
-  final Map<Object, Set<Variable>> _map = {};
+  /// are potentially assigned in that statement or collection element.
+  final Map<StatementOrElement, Set<Variable>> _map = {};
 
-  /// The stack of nested statements.
+  /// The stack of nested statements or collection elements.
   final List<Set<Variable>> _stack = [];
 
   AssignedVariables();
 
   /// Return the set of variables that are potentially assigned in the
-  /// [statementOrExpression].
-  Set<Variable> operator [](Object statementOrExpression) {
-    return _map[statementOrExpression] ?? emptySet;
+  /// [statementOrElement].
+  Set<Variable> operator [](StatementOrElement statementOrElement) {
+    return _map[statementOrElement] ?? emptySet;
   }
 
-  void beginStatement() {
+  void beginStatementOrElement() {
     Set<Variable> set = Set<Variable>.identity();
     _stack.add(set);
   }
 
-  void endStatement(Object node) {
+  void endStatementOrElement(StatementOrElement node) {
     _map[node] = _stack.removeLast();
   }
 

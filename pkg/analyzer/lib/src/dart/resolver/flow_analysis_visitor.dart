@@ -54,7 +54,7 @@ class FlowAnalysisHelper {
   final _TypeSystemTypeOperations _typeOperations;
 
   /// Precomputed sets of potentially assigned variables.
-  final AssignedVariables<VariableElement> assignedVariables;
+  final AssignedVariables<AstNode, VariableElement> assignedVariables;
 
   /// The result for post-resolution stages of analysis.
   final FlowAnalysisResult result;
@@ -283,9 +283,9 @@ class FlowAnalysisHelper {
   }
 
   /// Computes the [AssignedVariables] map for the given [node].
-  static AssignedVariables<VariableElement> computeAssignedVariables(
+  static AssignedVariables<AstNode, VariableElement> computeAssignedVariables(
       AstNode node) {
-    var assignedVariables = AssignedVariables<VariableElement>();
+    var assignedVariables = AssignedVariables<AstNode, VariableElement>();
     node.accept(_AssignedVariablesVisitor(assignedVariables));
     return assignedVariables;
   }
@@ -363,14 +363,22 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitDoStatement(DoStatement node) {
-    assignedVariables.beginStatement();
+    assignedVariables.beginStatementOrElement();
     super.visitDoStatement(node);
-    assignedVariables.endStatement(node);
+    assignedVariables.endStatementOrElement(node);
   }
 
   @override
   void visitForStatement(ForStatement node) {
-    var forLoopParts = node.forLoopParts;
+    _handleFor(node, node.forLoopParts, node.body);
+  }
+
+  @override
+  void visitForElement(ForElement node) {
+    _handleFor(node, node.forLoopParts, node.body);
+  }
+
+  void _handleFor(AstNode node, ForLoopParts forLoopParts, AstNode body) {
     if (forLoopParts is ForParts) {
       if (forLoopParts is ForPartsWithExpression) {
         forLoopParts.initialization?.accept(this);
@@ -380,20 +388,19 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
         throw new StateError('Unrecognized for loop parts');
       }
 
-      assignedVariables.beginStatement();
+      assignedVariables.beginStatementOrElement();
       forLoopParts.condition?.accept(this);
-      node.body.accept(this);
+      body.accept(this);
       forLoopParts.updaters?.accept(this);
-      assignedVariables.endStatement(node);
+      assignedVariables.endStatementOrElement(node);
     } else if (forLoopParts is ForEachParts) {
       var iterable = forLoopParts.iterable;
-      var body = node.body;
 
       iterable.accept(this);
 
-      assignedVariables.beginStatement();
+      assignedVariables.beginStatementOrElement();
       body.accept(this);
-      assignedVariables.endStatement(node);
+      assignedVariables.endStatementOrElement(node);
     } else {
       throw new StateError('Unrecognized for loop parts');
     }
@@ -406,32 +413,32 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
 
     expression.accept(this);
 
-    assignedVariables.beginStatement();
+    assignedVariables.beginStatementOrElement();
     members.accept(this);
-    assignedVariables.endStatement(node);
+    assignedVariables.endStatementOrElement(node);
   }
 
   @override
   void visitTryStatement(TryStatement node) {
-    assignedVariables.beginStatement();
+    assignedVariables.beginStatementOrElement();
     node.body.accept(this);
-    assignedVariables.endStatement(node.body);
+    assignedVariables.endStatementOrElement(node.body);
 
     node.catchClauses.accept(this);
 
     var finallyBlock = node.finallyBlock;
     if (finallyBlock != null) {
-      assignedVariables.beginStatement();
+      assignedVariables.beginStatementOrElement();
       finallyBlock.accept(this);
-      assignedVariables.endStatement(finallyBlock);
+      assignedVariables.endStatementOrElement(finallyBlock);
     }
   }
 
   @override
   void visitWhileStatement(WhileStatement node) {
-    assignedVariables.beginStatement();
+    assignedVariables.beginStatementOrElement();
     super.visitWhileStatement(node);
-    assignedVariables.endStatement(node);
+    assignedVariables.endStatementOrElement(node);
   }
 }
 
