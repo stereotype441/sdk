@@ -193,13 +193,13 @@ class FlowAnalysisHelper {
   }
 
   void forStatement_bodyBegin(ForStatement node, Expression condition) {
-    flow.forStatement_bodyBegin(node, condition ?? _trueLiteral);
+    flow.for_bodyBegin(node, condition ?? _trueLiteral);
   }
 
   void forStatement_conditionBegin(ForStatement node, Expression condition) {
     if (condition != null) {
       var assigned = assignedVariables[node];
-      flow.forStatement_conditionBegin(assigned);
+      flow.for_conditionBegin(assigned);
     } else {
       flow.booleanLiteral(_trueLiteral, true);
     }

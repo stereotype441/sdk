@@ -243,36 +243,27 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     }());
   }
 
-  void forEachStatement_bodyBegin(Set<Variable> loopAssigned) {
-    _variablesReferenced(loopAssigned);
-    _stack.add(_current);
-    _current = _current.removePromotedAll(loopAssigned);
-  }
-
-  void forEachStatement_end() {
-    FlowModel<Variable, Type> afterIterable = _stack.removeLast();
-    _current = _join(_current, afterIterable);
-  }
-
-  void forStatement_bodyBegin(Statement node, Expression condition) {
+  void for_bodyBegin(Statement node, Expression condition) {
     _conditionalEnd(condition);
     // Tail of the stack: falseCondition, trueCondition
 
     FlowModel<Variable, Type> trueCondition = _stack.removeLast();
 
-    _statementToStackIndex[node] = _stack.length;
+    if (node != null) {
+      _statementToStackIndex[node] = _stack.length;
+    }
     _stack.add(null); // break
     _stack.add(null); // continue
 
     _current = trueCondition;
   }
 
-  void forStatement_conditionBegin(Set<Variable> loopAssigned) {
+  void for_conditionBegin(Set<Variable> loopAssigned) {
     _variablesReferenced(loopAssigned);
     _current = _current.removePromotedAll(loopAssigned);
   }
 
-  void forStatement_end() {
+  void for_end() {
     // Tail of the stack: falseCondition, break
     FlowModel<Variable, Type> breakState = _stack.removeLast();
     FlowModel<Variable, Type> falseCondition = _stack.removeLast();
@@ -280,12 +271,23 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _current = _join(falseCondition, breakState);
   }
 
-  void forStatement_updaterBegin() {
+  void for_updaterBegin() {
     // Tail of the stack: falseCondition, break, continue
     FlowModel<Variable, Type> afterBody = _current;
     FlowModel<Variable, Type> continueState = _stack.removeLast();
 
     _current = _join(afterBody, continueState);
+  }
+
+  void forEach_bodyBegin(Set<Variable> loopAssigned) {
+    _variablesReferenced(loopAssigned);
+    _stack.add(_current);
+    _current = _current.removePromotedAll(loopAssigned);
+  }
+
+  void forEach_end() {
+    FlowModel<Variable, Type> afterIterable = _stack.removeLast();
+    _current = _join(_current, afterIterable);
   }
 
   void functionExpression_begin() {
