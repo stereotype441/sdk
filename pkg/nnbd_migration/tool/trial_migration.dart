@@ -14,6 +14,10 @@ import 'package:analyzer/dart/analysis/analysis_context_collection.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart';
 import 'package:nnbd_migration/nnbd_migration.dart';
 
+/// Set this to a non-null value to cause any exception to be printed in full
+/// if its category contains the string.
+const String categoryOfInterest = null;
+
 main() async {
   var rootUri = Platform.script.resolve('../../..');
   var listener = _Listener();
@@ -91,6 +95,9 @@ class _Listener implements NullabilityMigrationListener {
       throw StateError('Could not decode exception $detail');
     var stackTrace = detail.substring(breakLocation + 2).split('\n');
     var category = _classifyStackTrace(stackTrace);
+    if (categoryOfInterest != null && category.contains(categoryOfInterest)) {
+      print(detail);
+    }
     (groupedExceptions[category] ??= []).add(detail);
     ++numExceptions;
   }
