@@ -1568,7 +1568,9 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       if (parts is ForParts) {
         parts.updaters.accept(this);
       } else {
-        _flowAnalysis.forEachStatement_end();
+        if (node is Statement) {
+          _flowAnalysis.forEachStatement_end();
+        }
       }
     });
   }
