@@ -358,6 +358,16 @@ class EdgeBuilderTest extends EdgeBuilderTestBase {
     return variables.decoratedExpressionType(findNode.expression(text));
   }
 
+  solo_test_foo() async {
+    await analyze('''
+void f(Iterable<int> x) {}
+void g(List<int> x) {
+  f(x);
+}
+''');
+    fail('TODO(paulberry): finish test');
+  }
+
   test_assert_demonstrates_non_null_intent() async {
     await analyze('''
 void f(int i) {
