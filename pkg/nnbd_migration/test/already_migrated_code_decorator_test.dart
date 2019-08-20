@@ -46,6 +46,11 @@ class _AlreadyMigratedCodeDecoratorTest {
     expect(decoratedType.node, same(graph.never));
   }
 
+  void checkIterableDynamic(DecoratedType decoratedType) {
+    expect(decoratedType.type, typeProvider.iterableDynamicType);
+    expect(decoratedType.node, same(graph.never));
+  }
+
   void checkTypeParameter(
       DecoratedType decoratedType, TypeParameterElementImpl expectedElement) {
     var type = decoratedType.type as TypeParameterTypeImpl;
@@ -109,6 +114,12 @@ class _AlreadyMigratedCodeDecoratorTest {
   test_decorate_interfaceType_simple_star() {
     checkInt(decorate(InterfaceTypeImpl(typeProvider.intType.element,
         nullabilitySuffix: NullabilitySuffix.star)));
+  }
+
+  test_decorate_list_dynamic() {
+    var decorated = decorate(typeProvider.iterableDynamicType);
+    checkIterableDynamic(decorated);
+    checkDynamic(decorated.typeArguments[0]);
   }
 
   test_decorate_typeParameterType_star() {

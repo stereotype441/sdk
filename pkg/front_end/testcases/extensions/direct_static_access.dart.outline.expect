@@ -1,0 +1,87 @@
+library;
+import self as self;
+import "dart:core" as core;
+
+class Class<T extends core::Object* = dynamic> extends core::Object {
+  static field dynamic field;
+  synthetic constructor •() → self::Class<self::Class::T*>*
+    ;
+}
+extension Extension<T extends core::Object* = dynamic> on self::Class<T*>* {
+  static get property = get self::Extension|property;
+  static field field = self::Extension|field;
+  static method readGetter = self::Extension|readGetter;
+  static method writeSetterRequired = self::Extension|writeSetterRequired;
+  static method writeSetterOptional = self::Extension|writeSetterOptional;
+  static method writeSetterNamed = self::Extension|writeSetterNamed;
+  static method genericWriteSetterRequired = self::Extension|genericWriteSetterRequired;
+  static method genericWriteSetterOptional = self::Extension|genericWriteSetterOptional;
+  static method genericWriteSetterNamed = self::Extension|genericWriteSetterNamed;
+  static get tearOffGetterNoArgs = get self::Extension|tearOffGetterNoArgs;
+  static get tearOffGetterRequired = get self::Extension|tearOffGetterRequired;
+  static get tearOffGetterOptional = get self::Extension|tearOffGetterOptional;
+  static get tearOffGetterNamed = get self::Extension|tearOffGetterNamed;
+  static get tearOffGetterGenericRequired = get self::Extension|tearOffGetterGenericRequired;
+  static get tearOffGetterGenericOptional = get self::Extension|tearOffGetterGenericOptional;
+  static get tearOffGetterGenericNamed = get self::Extension|tearOffGetterGenericNamed;
+  static method invocationsFromStaticContext = self::Extension|invocationsFromStaticContext;
+  static method tearOffsFromStaticContext = self::Extension|tearOffsFromStaticContext;
+  static method fieldAccessFromStaticContext = self::Extension|fieldAccessFromStaticContext;
+  static method getterCallsFromStaticContext = self::Extension|getterCallsFromStaticContext;
+  method invocationsFromInstanceContext = self::Extension|invocationsFromInstanceContext;
+  method tearOffsFromInstanceContext = self::Extension|tearOffsFromInstanceContext;
+  method fieldAccessFromInstanceContext = self::Extension|fieldAccessFromInstanceContext;
+  method getterCallsFromInstanceContext = self::Extension|getterCallsFromInstanceContext;
+  static set property = set self::Extension|property;
+}
+static field dynamic Extension|field;
+static get Extension|property() → dynamic
+  ;
+static set Extension|property(dynamic value) → void
+  ;
+static method Extension|readGetter() → dynamic
+  ;
+static method Extension|writeSetterRequired(dynamic value) → dynamic
+  ;
+static method Extension|writeSetterOptional([dynamic value]) → dynamic
+  ;
+static method Extension|writeSetterNamed({dynamic value}) → dynamic
+  ;
+static method Extension|genericWriteSetterRequired<S extends core::Object* = dynamic>(self::Extension|genericWriteSetterRequired::S* value) → dynamic
+  ;
+static method Extension|genericWriteSetterOptional<S extends core::Object* = dynamic>([self::Extension|genericWriteSetterOptional::S* value]) → dynamic
+  ;
+static method Extension|genericWriteSetterNamed<S extends core::Object* = dynamic>({self::Extension|genericWriteSetterNamed::S* value}) → dynamic
+  ;
+static get Extension|tearOffGetterNoArgs() → dynamic
+  ;
+static get Extension|tearOffGetterRequired() → dynamic
+  ;
+static get Extension|tearOffGetterOptional() → dynamic
+  ;
+static get Extension|tearOffGetterNamed() → dynamic
+  ;
+static get Extension|tearOffGetterGenericRequired() → dynamic
+  ;
+static get Extension|tearOffGetterGenericOptional() → dynamic
+  ;
+static get Extension|tearOffGetterGenericNamed() → dynamic
+  ;
+static method Extension|invocationsFromStaticContext(core::int* value) → dynamic
+  ;
+static method Extension|tearOffsFromStaticContext(core::int* value) → dynamic
+  ;
+static method Extension|fieldAccessFromStaticContext() → dynamic
+  ;
+static method Extension|getterCallsFromStaticContext(core::int* value) → dynamic
+  ;
+static method Extension|invocationsFromInstanceContext<#T extends core::Object* = dynamic>(final self::Class<self::Extension|invocationsFromInstanceContext::#T*>* #this, self::Extension|invocationsFromInstanceContext::#T* value) → dynamic
+  ;
+static method Extension|tearOffsFromInstanceContext<#T extends core::Object* = dynamic>(final self::Class<self::Extension|tearOffsFromInstanceContext::#T*>* #this, self::Extension|tearOffsFromInstanceContext::#T* value) → dynamic
+  ;
+static method Extension|fieldAccessFromInstanceContext<#T extends core::Object* = dynamic>(final self::Class<self::Extension|fieldAccessFromInstanceContext::#T*>* #this) → dynamic
+  ;
+static method Extension|getterCallsFromInstanceContext<#T extends core::Object* = dynamic>(final self::Class<self::Extension|getterCallsFromInstanceContext::#T*>* #this, self::Extension|getterCallsFromInstanceContext::#T* value) → dynamic
+  ;
+static method main() → dynamic
+  ;
