@@ -863,9 +863,9 @@ typedef F = T Function<T, U>(U u);
     var decoratedType = variables.decoratedElementType(element);
     expect(decoratedType,
         same(decoratedGenericFunctionTypeAnnotation('T Function')));
-    var t = element.typeParameters[0];
-    var u = element.typeParameters[1];
-    expect(decoratedType.typeFormals, [t, u]);
+    expect(decoratedType.typeFormals, hasLength(2));
+    var t = decoratedType.typeFormals[0];
+    var u = decoratedType.typeFormals[1];
     expect(decoratedType.returnType, same(decoratedTypeAnnotation('T F')));
     expect(
         (decoratedType.returnType.type as TypeParameterType).element, same(t));
