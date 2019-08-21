@@ -259,10 +259,20 @@ main() {
       var x = h.addAssignedVar('x', 'int?');
       h.promote(x, 'int');
       expect(h.flow.promotedType(x).type, 'int');
-      expect(h.flow.promotedType(x), isNull);
       h.flow.forEach_bodyBegin({x});
-      h.flow.for_updaterBegin();
-      h.flow.for_end();
+      expect(h.flow.promotedType(x), isNull);
+      h.flow.forEach_end();
+      h.flow.finish();
+    });
+
+    test('forEach_end() restores state before loop', () {
+      var h = _Harness();
+      var x = h.addAssignedVar('x', 'int?');
+      h.flow.forEach_bodyBegin({});
+      h.promote(x, 'int');
+      expect(h.flow.promotedType(x).type, 'int');
+      h.flow.forEach_end();
+      expect(h.flow.promotedType(x), isNull);
       h.flow.finish();
     });
 

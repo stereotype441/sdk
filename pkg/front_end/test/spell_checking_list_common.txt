@@ -2241,6 +2241,7 @@ responsible
 rest
 restore
 restored
+restores
 restrict
 restricted
 result
