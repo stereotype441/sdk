@@ -3788,7 +3788,7 @@ class ResolverVisitor extends ScopedVisitor {
       return;
     }
     try {
-      _flowAnalysis.functionBody_enter(node);
+      _flowAnalysis?.functionBody_enter(node);
       InferenceContext.setTypeFromNode(node.expression, node);
       inferenceContext.pushReturnContext(node);
       super.visitExpressionFunctionBody(node);
@@ -3802,7 +3802,7 @@ class ResolverVisitor extends ScopedVisitor {
       }
     } finally {
       inferenceContext.popReturnContext(node);
-      _flowAnalysis.functionBody_exit(node);
+      _flowAnalysis?.functionBody_exit(node);
     }
   }
 
