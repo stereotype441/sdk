@@ -193,7 +193,8 @@ class FlowAnalysisHelper {
   }
 
   void for_bodyBegin(AstNode node, Expression condition) {
-    flow.for_bodyBegin(node is Statement ? node : null, condition ?? _trueLiteral);
+    flow.for_bodyBegin(
+        node is Statement ? node : null, condition ?? _trueLiteral);
   }
 
   void for_conditionBegin(AstNode node, Expression condition) {

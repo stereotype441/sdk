@@ -3891,7 +3891,8 @@ class ResolverVisitor extends ScopedVisitor {
       iterable?.accept(this);
       _flowAnalysis?.loopVariable(loopVariable);
       loopVariable?.accept(this);
-      _flowAnalysis?.flow?.forEach_bodyBegin(_flowAnalysis?.assignedVariables[node]);
+      _flowAnalysis?.flow
+          ?.forEach_bodyBegin(_flowAnalysis?.assignedVariables[node]);
       node.body?.accept(this);
       _flowAnalysis?.flow?.forEach_end();
 
