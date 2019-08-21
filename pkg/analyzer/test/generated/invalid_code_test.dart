@@ -91,6 +91,25 @@ class C {
 ''');
   }
 
+  test_fuzz_07() async {
+    // typedef v(<T extends T>(e
+    await _assertCanBeAnalyzed(r'''
+typedef F(a<TT extends TT>(e));
+''');
+  }
+
+  test_fuzz_08() async {
+//    class{const v
+//    v=((){try catch
+    // When we resolve initializers of typed constant variables,
+    // we should build locale elements.
+    await _assertCanBeAnalyzed(r'''
+class C {
+  const Object v = () { var a = 0; };
+}
+''');
+  }
+
   test_genericFunction_asTypeArgument_ofUnresolvedClass() async {
     await _assertCanBeAnalyzed(r'''
 C<int Function()> c;
