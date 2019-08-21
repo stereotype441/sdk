@@ -58,19 +58,21 @@ void forEach_outerIsType_loopAssigned(Object x) {
 }
 
 void collection_for_declaredVar() {
-  [for (Object x = g(); x is int; x = g()) /*int*/ x];
+  [for (Object x = g(); x is int; x = g()) /*int*/ x ];
 }
 
 void collection_for_outerIsType(bool b, Object x) {
   if (x is String) {
-    [for (; b;) /*String*/ x];
+    [for (; b;) /*String*/ x ];
     /*String*/ x;
   }
 }
 
 void collection_for_outerIsType_loopAssigned_body(bool b, Object x) {
   if (x is String) {
-    [for (; b;) [x, (x = 42)]];
+    [
+      for (; b;) [x, (x = 42)]
+    ];
     x;
   }
 }
@@ -91,7 +93,9 @@ void collection_for_outerIsType_loopAssigned_updaters(bool b, Object x) {
 
 void collection_forEach_outerIsType_loopAssigned(Object x) {
   if (x is String) {
-    [for (var _ in [0, 1, 2]) [x, (x = 42)]];
+    [
+      for (var _ in [0, 1, 2]) [x, (x = 42)]
+    ];
     x;
   }
 }
