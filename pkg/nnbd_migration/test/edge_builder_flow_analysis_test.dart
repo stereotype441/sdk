@@ -475,6 +475,39 @@ void f(int i, int j, Iterable<Object> x) {
     assertEdge(jNode, never, hard: false);
   }
 
+  test_for_each_collection_cancels_promotions_for_assignments_in_body() async {
+    await analyze('''
+void f(int i, int j, Iterable<Object> x) {
+  if (i == null) return;
+  if (j == null) return;
+  [for (var v in x) [i.isEven, j.isEven, (j = null)]];
+}
+''');
+    var iNode = decoratedTypeAnnotation('int i').node;
+    var jNode = decoratedTypeAnnotation('int j').node;
+    // No edge from i to never because is is promoted.
+    assertNoEdge(iNode, never);
+    // But there is an edge from j to never because its promotion was cancelled.
+    assertEdge(jNode, never, hard: false);
+  }
+
+  test_for_each_collection_preserves_promotions_for_assignments_in_iterable() async {
+    await analyze('''
+void f(int i, int j) {
+  if (i == null) return;
+  [for(var v in h(i.isEven && j.isEven && g(i = null))) null];
+}
+bool g(int k) => true;
+Iterable<Object> h(bool b) => <Object>[];
+''');
+    var iNode = decoratedTypeAnnotation('int i').node;
+    var jNode = decoratedTypeAnnotation('int j').node;
+    // No edge from i to never because it is promoted.
+    assertNoEdge(iNode, never);
+    // But there is an edge from j to never.
+    assertEdge(jNode, never, hard: false);
+  }
+
   test_for_each_preserves_promotions_for_assignments_in_iterable() async {
     await analyze('''
 void f(int i, int j) {
