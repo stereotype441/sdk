@@ -91,7 +91,7 @@ void collection_for_outerIsType_loopAssigned_updaters(bool b, Object x) {
 
 void collection_forEach_outerIsType_loopAssigned(Object x) {
   if (x is String) {
-    [for (var _ in [0, 1, 2]) [x, (x = 42)];
+    [for (var _ in [0, 1, 2]) [x, (x = 42)]];
     x;
   }
 }
