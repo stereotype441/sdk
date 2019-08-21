@@ -356,6 +356,11 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
         _namedParameters = previousNamedParameters;
         _typeFormalBounds = previousTypeFormalBounds;
       }
+    } else if (type is FunctionType) {
+      // node is a reference to a typedef.  Treat it like an inferred type (we
+      // synthesize new nodes for it).  These nodes will be unioned with the
+      // typedef nodes by the edge builder.
+      TODO;
     }
     NullabilityNode nullabilityNode;
     var parent = node.parent;
