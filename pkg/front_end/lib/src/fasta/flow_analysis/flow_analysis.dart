@@ -4,33 +4,32 @@
 
 import 'package:meta/meta.dart';
 
-/// Sets of local variables that are potentially assigned in a statement.
-///
-/// These statements are loops, `switch`, and `try` statements.
-class AssignedVariables<Statement, Variable> {
+/// Sets of local variables that are potentially assigned in a loop statement,
+/// switch statement, try statement, or loop collection element.
+class AssignedVariables<StatementOrElement, Variable> {
   final emptySet = Set<Variable>();
 
-  /// Mapping from a [Statement] to the set of local variables that are
-  /// potentially assigned in that statement.
-  final Map<Statement, Set<Variable>> _map = {};
+  /// Mapping from a statement or element to the set of local variables that
+  /// are potentially assigned in that statement or element.
+  final Map<StatementOrElement, Set<Variable>> _map = {};
 
-  /// The stack of nested statements.
+  /// The stack of nested statements or collection elements.
   final List<Set<Variable>> _stack = [];
 
   AssignedVariables();
 
   /// Return the set of variables that are potentially assigned in the
-  /// [statement].
-  Set<Variable> operator [](Statement statement) {
-    return _map[statement] ?? emptySet;
+  /// [statementOrElement].
+  Set<Variable> operator [](StatementOrElement statementOrElement) {
+    return _map[statementOrElement] ?? emptySet;
   }
 
-  void beginStatement() {
+  void beginStatementOrElement() {
     Set<Variable> set = Set<Variable>.identity();
     _stack.add(set);
   }
 
-  void endStatement(Statement node) {
+  void endStatementOrElement(StatementOrElement node) {
     _map[node] = _stack.removeLast();
   }
 
@@ -244,36 +243,27 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     }());
   }
 
-  void forEachStatement_bodyBegin(Set<Variable> loopAssigned) {
-    _variablesReferenced(loopAssigned);
-    _stack.add(_current);
-    _current = _current.removePromotedAll(loopAssigned);
-  }
-
-  void forEachStatement_end() {
-    FlowModel<Variable, Type> afterIterable = _stack.removeLast();
-    _current = _join(_current, afterIterable);
-  }
-
-  void forStatement_bodyBegin(Statement node, Expression condition) {
+  void for_bodyBegin(Statement node, Expression condition) {
     _conditionalEnd(condition);
     // Tail of the stack: falseCondition, trueCondition
 
     FlowModel<Variable, Type> trueCondition = _stack.removeLast();
 
-    _statementToStackIndex[node] = _stack.length;
+    if (node != null) {
+      _statementToStackIndex[node] = _stack.length;
+    }
     _stack.add(null); // break
     _stack.add(null); // continue
 
     _current = trueCondition;
   }
 
-  void forStatement_conditionBegin(Set<Variable> loopAssigned) {
+  void for_conditionBegin(Set<Variable> loopAssigned) {
     _variablesReferenced(loopAssigned);
     _current = _current.removePromotedAll(loopAssigned);
   }
 
-  void forStatement_end() {
+  void for_end() {
     // Tail of the stack: falseCondition, break
     FlowModel<Variable, Type> breakState = _stack.removeLast();
     FlowModel<Variable, Type> falseCondition = _stack.removeLast();
@@ -281,12 +271,23 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _current = _join(falseCondition, breakState);
   }
 
-  void forStatement_updaterBegin() {
+  void for_updaterBegin() {
     // Tail of the stack: falseCondition, break, continue
     FlowModel<Variable, Type> afterBody = _current;
     FlowModel<Variable, Type> continueState = _stack.removeLast();
 
     _current = _join(afterBody, continueState);
+  }
+
+  void forEach_bodyBegin(Set<Variable> loopAssigned) {
+    _variablesReferenced(loopAssigned);
+    _stack.add(_current);
+    _current = _current.removePromotedAll(loopAssigned);
+  }
+
+  void forEach_end() {
+    FlowModel<Variable, Type> afterIterable = _stack.removeLast();
+    _current = _join(_current, afterIterable);
   }
 
   void functionExpression_begin() {

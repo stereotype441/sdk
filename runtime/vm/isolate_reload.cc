@@ -1933,7 +1933,11 @@ class InvalidationCollector : public ObjectVisitor {
     }
     const Object& handle = Object::Handle(zone_, obj);
     if (handle.IsFunction()) {
-      functions_->Add(&Function::Cast(handle));
+      const auto& func = Function::Cast(handle);
+      if (!func.ForceOptimize()) {
+        // Force-optimized functions cannot deoptimize.
+        functions_->Add(&func);
+      }
     } else if (handle.IsKernelProgramInfo()) {
       kernel_infos_->Add(&KernelProgramInfo::Cast(handle));
     }
@@ -1953,6 +1957,14 @@ void IsolateReloadContext::RunInvalidationVisitors() {
   Thread* thread = Thread::Current();
   StackZone stack_zone(thread);
   Zone* zone = stack_zone.GetZone();
+
+  Thread* mutator_thread = isolate()->mutator_thread();
+  if (mutator_thread != nullptr) {
+    Interpreter* interpreter = mutator_thread->interpreter();
+    if (interpreter != nullptr) {
+      interpreter->ClearLookupCache();
+    }
+  }
 
   GrowableArray<const Function*> functions(4 * KB);
   GrowableArray<const KernelProgramInfo*> kernel_infos(KB);
@@ -1983,6 +1995,10 @@ void IsolateReloadContext::RunInvalidationVisitors() {
       IntHashMap table(&key, &value, &data);
       table.Clear();
       info.set_classes_cache(table.Release());
+    }
+    // Clear the bytecode object table.
+    if (info.bytecode_component() != Array::null()) {
+      kernel::BytecodeReader::ResetObjectTable(info);
     }
   }
 
