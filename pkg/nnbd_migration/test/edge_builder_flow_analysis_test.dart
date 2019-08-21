@@ -480,7 +480,7 @@ void f(int i, int j, Iterable<Object> x) {
 void f(int i, int j, Iterable<Object> x) {
   if (i == null) return;
   if (j == null) return;
-  [for (var v in x) [i.isEven, j.isEven, (j = null)]];
+  <Object>[for (var v in x) <Object>[i.isEven, j.isEven, (j = null)]];
 }
 ''');
     var iNode = decoratedTypeAnnotation('int i').node;
@@ -495,7 +495,7 @@ void f(int i, int j, Iterable<Object> x) {
     await analyze('''
 void f(int i, int j) {
   if (i == null) return;
-  [for(var v in h(i.isEven && j.isEven && g(i = null))) null];
+  <Object>[for(var v in h(i.isEven && j.isEven && g(i = null))) null];
 }
 bool g(int k) => true;
 Iterable<Object> h(bool b) => <Object>[];
