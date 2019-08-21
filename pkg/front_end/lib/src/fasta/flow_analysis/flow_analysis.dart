@@ -9,8 +9,8 @@ import 'package:meta/meta.dart';
 class AssignedVariables<StatementOrElement, Variable> {
   final emptySet = Set<Variable>();
 
-  /// Mapping from a statement or expression to the set of local variables that
-  /// are potentially assigned in that statement or collection element.
+  /// Mapping from a statement or element to the set of local variables that
+  /// are potentially assigned in that statement or element.
   final Map<StatementOrElement, Set<Variable>> _map = {};
 
   /// The stack of nested statements or collection elements.
