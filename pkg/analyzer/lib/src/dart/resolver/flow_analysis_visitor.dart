@@ -369,41 +369,13 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
   }
 
   @override
-  void visitForStatement(ForStatement node) {
-    _handleFor(node, node.forLoopParts, node.body);
-  }
-
-  @override
   void visitForElement(ForElement node) {
     _handleFor(node, node.forLoopParts, node.body);
   }
 
-  void _handleFor(AstNode node, ForLoopParts forLoopParts, AstNode body) {
-    if (forLoopParts is ForParts) {
-      if (forLoopParts is ForPartsWithExpression) {
-        forLoopParts.initialization?.accept(this);
-      } else if (forLoopParts is ForPartsWithDeclarations) {
-        forLoopParts.variables?.accept(this);
-      } else {
-        throw new StateError('Unrecognized for loop parts');
-      }
-
-      assignedVariables.beginStatementOrElement();
-      forLoopParts.condition?.accept(this);
-      body.accept(this);
-      forLoopParts.updaters?.accept(this);
-      assignedVariables.endStatementOrElement(node);
-    } else if (forLoopParts is ForEachParts) {
-      var iterable = forLoopParts.iterable;
-
-      iterable.accept(this);
-
-      assignedVariables.beginStatementOrElement();
-      body.accept(this);
-      assignedVariables.endStatementOrElement(node);
-    } else {
-      throw new StateError('Unrecognized for loop parts');
-    }
+  @override
+  void visitForStatement(ForStatement node) {
+    _handleFor(node, node.forLoopParts, node.body);
   }
 
   @override
@@ -439,6 +411,34 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
     assignedVariables.beginStatementOrElement();
     super.visitWhileStatement(node);
     assignedVariables.endStatementOrElement(node);
+  }
+
+  void _handleFor(AstNode node, ForLoopParts forLoopParts, AstNode body) {
+    if (forLoopParts is ForParts) {
+      if (forLoopParts is ForPartsWithExpression) {
+        forLoopParts.initialization?.accept(this);
+      } else if (forLoopParts is ForPartsWithDeclarations) {
+        forLoopParts.variables?.accept(this);
+      } else {
+        throw new StateError('Unrecognized for loop parts');
+      }
+
+      assignedVariables.beginStatementOrElement();
+      forLoopParts.condition?.accept(this);
+      body.accept(this);
+      forLoopParts.updaters?.accept(this);
+      assignedVariables.endStatementOrElement(node);
+    } else if (forLoopParts is ForEachParts) {
+      var iterable = forLoopParts.iterable;
+
+      iterable.accept(this);
+
+      assignedVariables.beginStatementOrElement();
+      body.accept(this);
+      assignedVariables.endStatementOrElement(node);
+    } else {
+      throw new StateError('Unrecognized for loop parts');
+    }
   }
 }
 
