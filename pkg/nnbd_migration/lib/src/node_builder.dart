@@ -255,6 +255,23 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
   }
 
   @override
+  DecoratedType visitGenericTypeAlias(GenericTypeAlias node) {
+    node.metadata.accept(this);
+    var previousTypeFormalBounds = _typeFormalBounds;
+    _typeFormalBounds = [];
+    DecoratedType decoratedFunctionType;
+    try {
+      node.typeParameters?.accept(this);
+      decoratedFunctionType = node.functionType.accept(this);
+    } finally {
+      _typeFormalBounds = previousTypeFormalBounds;
+    }
+    _variables.recordDecoratedElementType(
+        node.declaredElement, decoratedFunctionType);
+    return null;
+  }
+
+  @override
   DecoratedType visitMethodDeclaration(MethodDeclaration node) {
     _handleExecutableDeclaration(
         node.declaredElement,
@@ -302,6 +319,7 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
     DecoratedType decoratedReturnType;
     var positionalParameters = const <DecoratedType>[];
     var namedParameters = const <String, DecoratedType>{};
+    var typeFormalBounds = const <DecoratedType>[];
     if (type is InterfaceType && type.typeParameters.isNotEmpty) {
       if (node is TypeName) {
         if (node.typeArguments == null) {
@@ -321,21 +339,22 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
       decoratedReturnType = returnType == null
           ? DecoratedType.forImplicitType(DynamicTypeImpl.instance, _graph)
           : returnType.accept(this);
-      if (node.typeParameters != null) {
-        // TODO(paulberry)
-        _unimplemented(node, 'Generic function type with type parameters');
-      }
       positionalParameters = <DecoratedType>[];
       namedParameters = <String, DecoratedType>{};
+      typeFormalBounds = <DecoratedType>[];
       var previousPositionalParameters = _positionalParameters;
       var previousNamedParameters = _namedParameters;
+      var previousTypeFormalBounds = _typeFormalBounds;
       try {
         _positionalParameters = positionalParameters;
         _namedParameters = namedParameters;
+        _typeFormalBounds = typeFormalBounds;
+        node.typeParameters?.accept(this);
         node.parameters.accept(this);
       } finally {
         _positionalParameters = previousPositionalParameters;
         _namedParameters = previousNamedParameters;
+        _typeFormalBounds = previousTypeFormalBounds;
       }
     }
     NullabilityNode nullabilityNode;
@@ -354,7 +373,8 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
         typeArguments: typeArguments,
         returnType: decoratedReturnType,
         positionalParameters: positionalParameters,
-        namedParameters: namedParameters);
+        namedParameters: namedParameters,
+        typeFormalBounds: typeFormalBounds);
     _variables.recordDecoratedTypeAnnotation(source, node, decoratedType);
     var commentToken = node.endToken.next.precedingComments;
     switch (_classifyComment(commentToken)) {

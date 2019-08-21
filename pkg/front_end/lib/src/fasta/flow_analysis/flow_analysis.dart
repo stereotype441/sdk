@@ -243,6 +243,17 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     }());
   }
 
+  /// Call this method just before visiting the body of a conventional "for"
+  /// statement or collection element.  See [for_conditionBegin] for details.
+  ///
+  /// If a "for" statement is being entered, [node] is an opaque representation
+  /// of the loop, for use as the target of future calls to [handleBreak] or
+  /// [handleContinue].  If a "for" collection element is being entered, [node]
+  /// should be `null`.
+  ///
+  /// [condition] is an opaque representation of the loop condition; it is
+  /// matched against expressions passed to previous calls to determine whether
+  /// the loop condition should cause any promotions to occur.
   void for_bodyBegin(Statement node, Expression condition) {
     _conditionalEnd(condition);
     // Tail of the stack: falseCondition, trueCondition
@@ -258,11 +269,33 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _current = trueCondition;
   }
 
+  /// Call this method just before visiting the condition of a conventional
+  /// "for" statement or collection element.
+  ///
+  /// Note that a conventional "for" statement is a statement of the form
+  /// `for (initializers; condition; updaters) body`.  Statements of the form
+  /// `for (variable in iterable) body` should use [forEach_bodyBegin].  Similar
+  /// for "for" collection elements.
+  ///
+  /// The order of visiting a "for" statement or collection element should be:
+  /// - Visit the initializers.
+  /// - Call [for_conditionBegin].
+  /// - Visit the condition.
+  /// - Call [for_bodyBegin].
+  /// - Visit the body.
+  /// - Call [for_updaterBegin].
+  /// - Visit the updaters.
+  /// - Call [for_end].
+  ///
+  /// [loopAssigned] should be the set of variables that are assigned anywhere
+  /// in the loop's condition, updaters, or body.
   void for_conditionBegin(Set<Variable> loopAssigned) {
     _variablesReferenced(loopAssigned);
     _current = _current.removePromotedAll(loopAssigned);
   }
 
+  /// Call this method just after visiting the updaters of a conventional "for"
+  /// statement or collection element.  See [for_conditionBegin] for details.
   void for_end() {
     // Tail of the stack: falseCondition, break
     FlowModel<Variable, Type> breakState = _stack.removeLast();
@@ -271,6 +304,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _current = _join(falseCondition, breakState);
   }
 
+  /// Call this method just before visiting the updaters of a conventional "for"
+  /// statement or collection element.  See [for_conditionBegin] for details.
   void for_updaterBegin() {
     // Tail of the stack: falseCondition, break, continue
     FlowModel<Variable, Type> afterBody = _current;
@@ -279,12 +314,26 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _current = _join(afterBody, continueState);
   }
 
+  /// Call this method just before visiting the body of a "for-in" statement or
+  /// collection element.
+  ///
+  /// The order of visiting a "for-in" statement or collection element should
+  /// be:
+  /// - Visit the iterable expression.
+  /// - Call [forEach_bodyBegin].
+  /// - Visit the body.
+  /// - Call [forEach_end].
+  ///
+  /// [loopAssigned] should be the set of variables that are assigned anywhere
+  /// in the loop's body.
   void forEach_bodyBegin(Set<Variable> loopAssigned) {
     _variablesReferenced(loopAssigned);
     _stack.add(_current);
     _current = _current.removePromotedAll(loopAssigned);
   }
 
+  /// Call this method just before visiting the body of a "for-in" statement or
+  /// collection element.  See [forEach_bodyBegin] for details.
   void forEach_end() {
     FlowModel<Variable, Type> afterIterable = _stack.removeLast();
     _current = _join(_current, afterIterable);
