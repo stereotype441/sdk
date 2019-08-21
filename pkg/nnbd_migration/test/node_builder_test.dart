@@ -1423,6 +1423,31 @@ class C<T> {}
     expect(bound.type, same(typeProvider.objectType));
   }
 
+  test_typedef_reference_generic_uninstantiated() async {
+    await analyze('''
+typedef F = T Function<T extends num>();
+F f;
+''');
+    // The instantiation of F should produce fresh nullability nodes, distinct
+    // from the ones in the typedef (they will be unified by the edge builder).
+    // This is necessary because there is no guarantee of whether the typedef or
+    // its usage will be visited first.
+    var typedefDecoratedType =
+        variables.decoratedElementType(findElement.genericTypeAlias('F'));
+    var decoratedType = decoratedTypeAnnotation('F f');
+    expect(decoratedType.node, TypeMatcher<NullabilityNodeMutable>());
+    expect(decoratedType.node, isNot(same(typedefDecoratedType.node)));
+    expect(decoratedType.returnType.type.toString(), 'T');
+    expect(
+        decoratedType.returnType.node, TypeMatcher<NullabilityNodeMutable>());
+    expect(decoratedType.returnType.node,
+        isNot(same(typedefDecoratedType.returnType.node)));
+    expect(decoratedType.typeFormalBounds, hasLength(1));
+    expect(decoratedType.typeFormalBounds[0].type.toString(), 'num');
+    expect(decoratedType.typeFormalBounds[0].node,
+        isNot(same(typedefDecoratedType.typeFormalBounds[0].node)));
+  }
+
   test_typedef_reference_simple() async {
     await analyze('''
 typedef int F(String s);
