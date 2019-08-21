@@ -377,8 +377,8 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
       // node is a reference to a typedef.  Treat it like an inferred type (we
       // synthesize new nodes for it).  These nodes will be unioned with the
       // typedef nodes by the edge builder.
-      decoratedType =
-          DecoratedType.forImplicitFunction(type, nullabilityNode, _graph);
+      decoratedType = DecoratedType.forImplicitFunction(
+          _typeProvider, type, nullabilityNode, _graph);
     } else {
       decoratedType = DecoratedType(type, nullabilityNode,
           typeArguments: typeArguments,
