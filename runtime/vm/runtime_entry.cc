@@ -82,6 +82,10 @@ DEFINE_FLAG(bool,
             unopt_megamorphic_calls,
             true,
             "Enable specializing megamorphic calls from unoptimized code.");
+DEFINE_FLAG(bool,
+            verbose_stack_overflow,
+            false,
+            "Print additional details about stack overflow.");
 
 DECLARE_FLAG(int, reload_every);
 DECLARE_FLAG(bool, reload_every_optimized);
@@ -890,8 +894,8 @@ DEFINE_RUNTIME_ENTRY(NonBoolTypeError, 1) {
 
     // No source code for this assertion, set url to null.
     args.SetAt(1, String::Handle(zone, String::null()));
-    args.SetAt(2, Smi::Handle(zone, Smi::New(0)));
-    args.SetAt(3, Smi::Handle(zone, Smi::New(0)));
+    args.SetAt(2, Object::smi_zero());
+    args.SetAt(3, Object::smi_zero());
     args.SetAt(4, String::Handle(zone, String::null()));
 
     Exceptions::ThrowByType(Exceptions::kAssertion, args);
@@ -1871,10 +1875,10 @@ DEFINE_RUNTIME_ENTRY(NoSuchMethodFromCallStub, 4) {
   Class& cls = Class::Handle(zone, receiver.clazz());
   Function& function = Function::Handle(zone);
 
-// Dart distinguishes getters and regular methods and allows their calls
-// to mix with conversions, and its selectors are independent of arity. So do
-// a zigzagged lookup to see if this call failed because of an arity mismatch,
-// need for conversion, or there really is no such method.
+  // Dart distinguishes getters and regular methods and allows their calls
+  // to mix with conversions, and its selectors are independent of arity. So do
+  // a zigzagged lookup to see if this call failed because of an arity mismatch,
+  // need for conversion, or there really is no such method.
 
 #define NO_SUCH_METHOD()                                                       \
   const Object& result = Object::Handle(                                       \
@@ -2260,6 +2264,38 @@ DEFINE_RUNTIME_ENTRY(StackOverflow, 0) {
   // TODO(regis): Warning: IsCalleeFrameOf is overridden in stack_frame_dbc.h.
   if (interpreter_stack_overflow || !thread->os_thread()->HasStackHeadroom() ||
       IsCalleeFrameOf(thread->saved_stack_limit(), stack_pos)) {
+    if (FLAG_verbose_stack_overflow) {
+      OS::PrintErr("Stack overflow in %s\n",
+                   interpreter_stack_overflow ? "interpreter" : "native code");
+      OS::PrintErr("  Native SP = %" Px ", stack limit = %" Px "\n", stack_pos,
+                   thread->saved_stack_limit());
+#if !defined(DART_PRECOMPILED_RUNTIME)
+      if (thread->interpreter() != nullptr) {
+        OS::PrintErr("  Interpreter SP = %" Px ", stack limit = %" Px "\n",
+                     thread->interpreter()->get_sp(),
+                     thread->interpreter()->overflow_stack_limit());
+      }
+#endif  // !defined(DART_PRECOMPILED_RUNTIME)
+
+      OS::PrintErr("Call stack:\n");
+      OS::PrintErr("size | frame\n");
+      StackFrameIterator frames(ValidationPolicy::kDontValidateFrames, thread,
+                                StackFrameIterator::kNoCrossThreadIteration);
+      uword fp = stack_pos;
+      StackFrame* frame = frames.NextFrame();
+      while (frame != NULL) {
+        if (frame->is_interpreted() == interpreter_stack_overflow) {
+          uword delta = interpreter_stack_overflow ? (fp - frame->fp())
+                                                   : (frame->fp() - fp);
+          fp = frame->fp();
+          OS::PrintErr("%4" Pd " %s\n", delta, frame->ToCString());
+        } else {
+          OS::PrintErr("     %s\n", frame->ToCString());
+        }
+        frame = frames.NextFrame();
+      }
+    }
+
     // Use the preallocated stack overflow exception to avoid calling
     // into dart code.
     const Instance& exception =
@@ -3030,7 +3066,8 @@ extern "C" void DFLRT_ExitSafepoint(NativeArguments __unusable_) {
 DEFINE_RAW_LEAF_RUNTIME_ENTRY(ExitSafepoint, 0, false, &DFLRT_ExitSafepoint);
 
 // Not registered as a runtime entry because we can't use Thread to look it up.
-extern "C" Thread* DLRT_GetThreadForNativeCallback() {
+static Thread* GetThreadForNativeCallback(uword callback_id,
+                                          uword return_address) {
   Thread* const thread = Thread::Current();
   if (thread == nullptr) {
     FATAL("Cannot invoke native callback outside an isolate.");
@@ -3041,17 +3078,46 @@ extern "C" Thread* DLRT_GetThreadForNativeCallback() {
   if (!thread->IsMutatorThread()) {
     FATAL("Native callbacks must be invoked on the mutator thread.");
   }
+
+  // Set the execution state to VM while waiting for the safepoint to end.
+  // This isn't strictly necessary but enables tests to check that we're not
+  // in native code anymore. See tests/ffi/function_gc_test.dart for example.
+  thread->set_execution_state(Thread::kThreadInVM);
+
+  thread->ExitSafepoint();
+  thread->VerifyCallbackIsolate(callback_id, return_address);
+
   return thread;
 }
 
-extern "C" void DLRT_VerifyCallbackIsolate(int32_t callback_id,
-                                           uword return_address) {
-  Thread::Current()->VerifyCallbackIsolate(callback_id, return_address);
+#if defined(HOST_OS_WINDOWS)
+#pragma intrinsic(_ReturnAddress)
+#endif
+
+// This is called directly by NativeEntryInstr. At the moment we enter this
+// routine, the caller is generated code in the Isolate heap. Therefore we check
+// that the return address (caller) corresponds to the declared callback ID's
+// code within this Isolate.
+extern "C" Thread* DLRT_GetThreadForNativeCallback(uword callback_id) {
+  CHECK_STACK_ALIGNMENT;
+#if defined(HOST_OS_WINDOWS)
+  void* return_address = _ReturnAddress();
+#else
+  void* return_address = __builtin_return_address(0);
+#endif
+  return GetThreadForNativeCallback(callback_id,
+                                    reinterpret_cast<uword>(return_address));
 }
-DEFINE_RAW_LEAF_RUNTIME_ENTRY(
-    VerifyCallbackIsolate,
-    1,
-    false /* is_float */,
-    reinterpret_cast<RuntimeFunction>(&DLRT_VerifyCallbackIsolate));
+
+// This is called by a native callback trampoline
+// (see StubCodeCompiler::GenerateJITCallbackTrampolines). There is no need to
+// check the return address because the trampoline will use the callback ID to
+// look up the generated code. We still check that the callback ID is valid for
+// this isolate.
+extern "C" Thread* DLRT_GetThreadForNativeCallbackTrampoline(
+    uword callback_id) {
+  CHECK_STACK_ALIGNMENT;
+  return GetThreadForNativeCallback(callback_id, 0);
+}
 
 }  // namespace dart

@@ -12,6 +12,7 @@
 #include "vm/bit_vector.h"
 #include "vm/bootstrap.h"
 #include "vm/class_finalizer.h"
+#include "vm/code_comments.h"
 #include "vm/code_observers.h"
 #include "vm/compiler/aot/precompiler.h"
 #include "vm/compiler/assembler/assembler.h"
@@ -871,6 +872,7 @@ void Object::Init(Isolate* isolate) {
   *bool_false_ = Bool::New(false);
 
   *smi_illegal_cid_ = Smi::New(kIllegalCid);
+  *smi_zero_ = Smi::New(0);
 
   String& error_str = String::Handle();
   error_str = String::New("SnapshotWriter Error", Heap::kOld);
@@ -962,6 +964,7 @@ void Object::Init(Isolate* isolate) {
   ASSERT(!bool_false_->IsSmi());
   ASSERT(bool_false_->IsBool());
   ASSERT(smi_illegal_cid_->IsSmi());
+  ASSERT(smi_zero_->IsSmi());
   ASSERT(!snapshot_writer_error_->IsSmi());
   ASSERT(snapshot_writer_error_->IsLanguageError());
   ASSERT(!branch_offset_error_->IsSmi());
@@ -10995,7 +10998,7 @@ void Library::AddExport(const Namespace& ns) const {
 static RawArray* NewDictionary(intptr_t initial_size) {
   const Array& dict = Array::Handle(Array::New(initial_size + 1, Heap::kOld));
   // The last element of the dictionary specifies the number of in use slots.
-  dict.SetAt(initial_size, Smi::Handle(Smi::New(0)));
+  dict.SetAt(initial_size, Object::smi_zero());
   return dict.raw();
 }
 
@@ -13685,7 +13688,10 @@ void ICData::WriteSentinelAt(intptr_t index) const {
   const intptr_t len = Length();
   ASSERT(index >= 0);
   ASSERT(index < len);
-  Array& data = Array::Handle(entries());
+  Thread* thread = Thread::Current();
+  REUSABLE_ARRAY_HANDLESCOPE(thread);
+  Array& data = thread->ArrayHandle();
+  data = entries();
   const intptr_t start = index * TestEntryLength();
   const intptr_t end = start + TestEntryLength();
   for (intptr_t i = start; i < end; i++) {
@@ -13712,7 +13718,10 @@ void ICData::ClearAndSetStaticTarget(const Function& func) const {
   const intptr_t num_args_tested = NumArgsTested();
   if (num_args_tested == 0) {
     // No type feedback is being collected.
-    const Array& data = Array::Handle(entries());
+    Thread* thread = Thread::Current();
+    REUSABLE_ARRAY_HANDLESCOPE(thread);
+    Array& data = thread->ArrayHandle();
+    data = entries();
     // Static calls with no argument checks hold only one target and the
     // sentinel value.
     ASSERT(len == 2);
@@ -13722,24 +13731,24 @@ void ICData::ClearAndSetStaticTarget(const Function& func) const {
     data.SetAt(TargetIndexFor(num_args_tested), func);
     // Set count to 0 as this is called during compilation, before the
     // call has been executed.
-    const Smi& value = Smi::Handle(Smi::New(0));
-    data.SetAt(CountIndexFor(num_args_tested), value);
+    data.SetAt(CountIndexFor(num_args_tested), Object::smi_zero());
   } else {
     // Type feedback on arguments is being collected.
-    const Array& data = Array::Handle(entries());
-
     // Fill all but the first entry with the sentinel.
     for (intptr_t i = len - 1; i > 0; i--) {
       WriteSentinelAt(i);
     }
+    Thread* thread = Thread::Current();
+    REUSABLE_ARRAY_HANDLESCOPE(thread);
+    Array& data = thread->ArrayHandle();
+    data = entries();
     // Rewrite the dummy entry.
     const Smi& object_cid = Smi::Handle(Smi::New(kObjectCid));
     for (intptr_t i = 0; i < NumArgsTested(); i++) {
       data.SetAt(i, object_cid);
     }
     data.SetAt(TargetIndexFor(num_args_tested), func);
-    const Smi& value = Smi::Handle(Smi::New(0));
-    data.SetAt(CountIndexFor(num_args_tested), value);
+    data.SetAt(CountIndexFor(num_args_tested), Object::smi_zero());
   }
 }
 
@@ -13803,7 +13812,10 @@ void ICData::AddTarget(const Function& target) const {
   // Can add only once.
   const intptr_t old_num = NumberOfChecks();
   ASSERT(old_num == 0);
-  Array& data = Array::Handle(entries());
+  Thread* thread = Thread::Current();
+  REUSABLE_ARRAY_HANDLESCOPE(thread);
+  Array& data = thread->ArrayHandle();
+  data = entries();
   const intptr_t new_len = data.Length() + TestEntryLength();
   data = Array::Grow(data, new_len, Heap::kOld);
   WriteSentinel(data, TestEntryLength());
@@ -13812,8 +13824,7 @@ void ICData::AddTarget(const Function& target) const {
   data.SetAt(data_pos + TargetIndexFor(NumArgsTested()), target);
   // Set count to 0 as this is called during compilation, before the
   // call has been executed.
-  const Smi& value = Smi::Handle(Smi::New(0));
-  data.SetAt(data_pos + CountIndexFor(NumArgsTested()), value);
+  data.SetAt(data_pos + CountIndexFor(NumArgsTested()), Object::smi_zero());
   // Multithreaded access to ICData requires setting of array to be the last
   // operation.
   set_entries(data);
@@ -13977,7 +13988,10 @@ StaticTypeExactnessState ICData::GetExactnessAt(intptr_t index) const {
   if (!is_tracking_exactness()) {
     return StaticTypeExactnessState::NotTracking();
   }
-  const Array& data = Array::Handle(entries());
+  Thread* thread = Thread::Current();
+  REUSABLE_ARRAY_HANDLESCOPE(thread);
+  Array& data = thread->ArrayHandle();
+  data = entries();
   intptr_t data_pos =
       index * TestEntryLength() + ExactnessIndexFor(NumArgsTested());
   return StaticTypeExactnessState::Decode(
@@ -13991,7 +14005,10 @@ void ICData::GetCheckAt(intptr_t index,
   ASSERT(class_ids != NULL);
   ASSERT(target != NULL);
   class_ids->Clear();
-  const Array& data = Array::Handle(entries());
+  Thread* thread = Thread::Current();
+  REUSABLE_ARRAY_HANDLESCOPE(thread);
+  Array& data = thread->ArrayHandle();
+  data = entries();
   intptr_t data_pos = index * TestEntryLength();
   for (intptr_t i = 0; i < NumArgsTested(); i++) {
     class_ids->Add(Smi::Value(Smi::RawCast(data.At(data_pos + i))));
@@ -14001,7 +14018,10 @@ void ICData::GetCheckAt(intptr_t index,
 
 bool ICData::IsSentinelAt(intptr_t index) const {
   ASSERT(index < Length());
-  const Array& data = Array::Handle(entries());
+  Thread* thread = Thread::Current();
+  REUSABLE_ARRAY_HANDLESCOPE(thread);
+  Array& data = thread->ArrayHandle();
+  data = entries();
   const intptr_t entry_length = TestEntryLength();
   intptr_t data_pos = index * TestEntryLength();
   for (intptr_t i = 0; i < entry_length; i++) {
@@ -14019,7 +14039,10 @@ void ICData::GetClassIdsAt(intptr_t index,
   ASSERT(class_ids != NULL);
   ASSERT(!IsSentinelAt(index));
   class_ids->Clear();
-  const Array& data = Array::Handle(entries());
+  Thread* thread = Thread::Current();
+  REUSABLE_ARRAY_HANDLESCOPE(thread);
+  Array& data = thread->ArrayHandle();
+  data = entries();
   intptr_t data_pos = index * TestEntryLength();
   for (intptr_t i = 0; i < NumArgsTested(); i++) {
     class_ids->Add(Smi::Value(Smi::RawCast(data.At(data_pos++))));
@@ -14032,7 +14055,10 @@ void ICData::GetOneClassCheckAt(intptr_t index,
   ASSERT(class_id != NULL);
   ASSERT(target != NULL);
   ASSERT(NumArgsTested() == 1);
-  const Array& data = Array::Handle(entries());
+  Thread* thread = Thread::Current();
+  REUSABLE_ARRAY_HANDLESCOPE(thread);
+  Array& data = thread->ArrayHandle();
+  data = entries();
   const intptr_t data_pos = index * TestEntryLength();
   *class_id = Smi::Value(Smi::RawCast(data.At(data_pos)));
   *target ^= data.At(data_pos + TargetIndexFor(NumArgsTested()));
@@ -14040,7 +14066,10 @@ void ICData::GetOneClassCheckAt(intptr_t index,
 
 intptr_t ICData::GetCidAt(intptr_t index) const {
   ASSERT(NumArgsTested() == 1);
-  const Array& data = Array::Handle(entries());
+  Thread* thread = Thread::Current();
+  REUSABLE_ARRAY_HANDLESCOPE(thread);
+  Array& data = thread->ArrayHandle();
+  data = entries();
   const intptr_t data_pos = index * TestEntryLength();
   return Smi::Value(Smi::RawCast(data.At(data_pos)));
 }
@@ -14090,7 +14119,10 @@ void ICData::SetCountAt(intptr_t index, intptr_t value) const {
   ASSERT(0 <= value);
   ASSERT(value <= Smi::kMaxValue);
 
-  const Array& data = Array::Handle(entries());
+  Thread* thread = Thread::Current();
+  REUSABLE_ARRAY_HANDLESCOPE(thread);
+  Array& data = thread->ArrayHandle();
+  data = entries();
   const intptr_t data_pos =
       index * TestEntryLength() + CountIndexFor(NumArgsTested());
   data.SetAt(data_pos, Smi::Handle(Smi::New(value)));
@@ -14098,7 +14130,10 @@ void ICData::SetCountAt(intptr_t index, intptr_t value) const {
 
 intptr_t ICData::GetCountAt(intptr_t index) const {
   ASSERT(Isolate::Current()->compilation_allowed());
-  const Array& data = Array::Handle(entries());
+  Thread* thread = Thread::Current();
+  REUSABLE_ARRAY_HANDLESCOPE(thread);
+  Array& data = thread->ArrayHandle();
+  data = entries();
   const intptr_t data_pos =
       index * TestEntryLength() + CountIndexFor(NumArgsTested());
   intptr_t value = Smi::Value(Smi::RawCast(data.At(data_pos)));
@@ -14122,7 +14157,10 @@ intptr_t ICData::AggregateCount() const {
 
 void ICData::SetCodeAt(intptr_t index, const Code& value) const {
   ASSERT(!Isolate::Current()->compilation_allowed());
-  const Array& data = Array::Handle(entries());
+  Thread* thread = Thread::Current();
+  REUSABLE_ARRAY_HANDLESCOPE(thread);
+  Array& data = thread->ArrayHandle();
+  data = entries();
   const intptr_t data_pos =
       index * TestEntryLength() + CodeIndexFor(NumArgsTested());
   data.SetAt(data_pos, value);
@@ -14130,7 +14168,10 @@ void ICData::SetCodeAt(intptr_t index, const Code& value) const {
 
 void ICData::SetEntryPointAt(intptr_t index, const Smi& value) const {
   ASSERT(!Isolate::Current()->compilation_allowed());
-  const Array& data = Array::Handle(entries());
+  Thread* thread = Thread::Current();
+  REUSABLE_ARRAY_HANDLESCOPE(thread);
+  Array& data = thread->ArrayHandle();
+  data = entries();
   const intptr_t data_pos =
       index * TestEntryLength() + EntryPointIndexFor(NumArgsTested());
   data.SetAt(data_pos, value);
@@ -14432,8 +14473,7 @@ RawICData* ICData::NewDescriptor(Zone* zone,
 }
 
 bool ICData::IsImmutable() const {
-  const Array& data = Array::Handle(entries());
-  return data.IsImmutable();
+  return entries()->IsImmutableArray();
 }
 
 RawICData* ICData::New() {
@@ -14857,42 +14897,6 @@ RawCode* Code::New(intptr_t pointer_offsets_length) {
 }
 
 #if !defined(DART_PRECOMPILED_RUNTIME)
-#if !defined(PRODUCT)
-class CodeCommentsWrapper final : public CodeComments {
- public:
-  explicit CodeCommentsWrapper(const Code::Comments& comments)
-      : comments_(comments), string_(String::Handle()) {}
-
-  intptr_t Length() const override { return comments_.Length(); }
-
-  intptr_t PCOffsetAt(intptr_t i) const override {
-    return comments_.PCOffsetAt(i);
-  }
-
-  const char* CommentAt(intptr_t i) const override {
-    string_ = comments_.CommentAt(i);
-    return string_.ToCString();
-  }
-
- private:
-  const Code::Comments& comments_;
-  String& string_;
-};
-
-static const Code::Comments& CreateCommentsFrom(
-    compiler::Assembler* assembler) {
-  const auto& comments = assembler->comments();
-  Code::Comments& result = Code::Comments::New(comments.length());
-
-  for (intptr_t i = 0; i < comments.length(); i++) {
-    result.SetPCOffsetAt(i, comments[i]->pc_offset());
-    result.SetCommentAt(i, comments[i]->comment());
-  }
-
-  return result;
-}
-#endif
-
 RawCode* Code::FinalizeCodeAndNotify(const Function& function,
                                      FlowGraphCompiler* compiler,
                                      compiler::Assembler* assembler,
@@ -15091,7 +15095,6 @@ void Code::NotifyCodeObservers(const char* name,
   }
 #endif
 }
-
 #endif  // !defined(DART_PRECOMPILED_RUNTIME)
 
 bool Code::SlowFindRawCodeVisitor::FindObject(RawObject* raw_obj) const {

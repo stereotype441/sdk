@@ -152,6 +152,8 @@ class DecoratedType {
           type, NullabilityNode.forInferredType(), graph);
     } else if (type is TypeParameterType) {
       return DecoratedType(type, NullabilityNode.forInferredType());
+    } else if (type is BottomTypeImpl) {
+      return DecoratedType(type, NullabilityNode.forInferredType());
     }
     // TODO(paulberry)
     throw UnimplementedError(
@@ -505,12 +507,14 @@ class DecoratedTypeAnnotation extends DecoratedType
       {List<DecoratedType> typeArguments = const [],
       DecoratedType returnType,
       List<DecoratedType> positionalParameters = const [],
-      Map<String, DecoratedType> namedParameters = const {}})
+      Map<String, DecoratedType> namedParameters = const {},
+      List<DecoratedType> typeFormalBounds = const []})
       : super(type, nullabilityNode,
             typeArguments: typeArguments,
             returnType: returnType,
             positionalParameters: positionalParameters,
-            namedParameters: namedParameters);
+            namedParameters: namedParameters,
+            typeFormalBounds: typeFormalBounds);
 
   @override
   bool get isEmpty => !node.isNullable;
