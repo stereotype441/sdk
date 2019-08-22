@@ -28,7 +28,7 @@ class AssignedVariables<Node, Variable> {
 
   final List<Set<Variable>> _closureStack = [];
 
-  final List<int> _closureIndexStack = [0];
+  final List<int> _closureIndexStack = [];
 
   AssignedVariables();
 
@@ -70,13 +70,15 @@ class AssignedVariables<Node, Variable> {
   }
 
   void write(Variable variable) {
-    _assignedInClosure.add(variable);
     for (int i = 0; i < _stack.length; ++i) {
       _stack[i].add(variable);
     }
-    int closureIndex = _closureIndexStack.last;
-    for (int i = 0; i < closureIndex; ++i) {
-      _closureStack[i].add(variable);
+    if (_closureIndexStack.isNotEmpty) {
+      _assignedInClosure.add(variable);
+      int closureIndex = _closureIndexStack.last;
+      for (int i = 0; i < closureIndex; ++i) {
+        _closureStack[i].add(variable);
+      }
     }
   }
 }
