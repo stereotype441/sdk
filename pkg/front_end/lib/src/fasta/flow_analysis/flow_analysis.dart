@@ -1138,7 +1138,7 @@ class VariableModel<Type> {
   VariableModel(this.promotedType);
 
   @override
-  operator ==(Object other) {
+  bool operator ==(Object other) {
     return other is VariableModel<Type> &&
         this.promotedType == other.promotedType;
   }
@@ -1146,7 +1146,7 @@ class VariableModel<Type> {
   /// Returns an updated model reflect a control path that is known to have
   /// previously passed through some [other] state.  See [FlowModel.restrict]
   /// for details.
-  restrict(TypeOperations<Object, Type> typeOperations,
+  VariableModel<Type> restrict(TypeOperations<Object, Type> typeOperations,
       VariableModel<Type> otherModel, bool unsafe) {
     Type thisType = promotedType;
     Type otherType = otherModel?.promotedType;
@@ -1173,8 +1173,10 @@ class VariableModel<Type> {
       VariableModel<Type>(promotedType);
 
   /// Joins two variable models.  See [FlowModel.join] for details.
-  static join<Type>(TypeOperations<Object, Type> typeOperations,
-      VariableModel<Type> first, VariableModel<Type> second) {
+  static VariableModel<Type> join<Type>(
+      TypeOperations<Object, Type> typeOperations,
+      VariableModel<Type> first,
+      VariableModel<Type> second) {
     Type firstType = first.promotedType;
     Type secondType = second.promotedType;
     Type newPromotedType;
@@ -1194,7 +1196,7 @@ class VariableModel<Type> {
 
   /// Creates a new [VariableModel] object, unless it is equivalent to either
   /// [first] or [second], in which case one of those objects is re-used.
-  static _identicalOrNew<Type>(VariableModel<Type> first,
+  static VariableModel<Type> _identicalOrNew<Type>(VariableModel<Type> first,
       VariableModel<Type> second, Type newPromotedType) {
     if (identical(first.promotedType, newPromotedType)) {
       return first;
