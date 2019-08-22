@@ -343,7 +343,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _stack.add(_current);
 
     Set<Variable> notPromoted = null;
-    for (MapEntry<Variable, Type> entry in _current.variableInfo.entries) {
+    for (MapEntry<Variable, VariableModel<Type>> entry
+        in _current.variableInfo.entries) {
       Variable variable = entry.key;
       Type promotedType = entry.value.promotedType;
       if (promotedType != null &&
@@ -719,7 +720,8 @@ class FlowModel<Variable, Type> {
   FlowModel<Variable, Type> add(Variable variable, {bool assigned: false}) {
     _VariableSet<Variable> newNotAssigned =
         assigned ? notAssigned : notAssigned.add(variable);
-    Map<Variable, VariableModel<Type>> newVariableInfo = Map<Variable, VariableModel<Type>>.from(variableInfo);
+    Map<Variable, VariableModel<Type>> newVariableInfo =
+        Map<Variable, VariableModel<Type>>.from(variableInfo);
     newVariableInfo[variable] = VariableModel<Type>(null);
 
     return FlowModel<Variable, Type>._(
@@ -741,7 +743,8 @@ class FlowModel<Variable, Type> {
     Type type = typeOperations.promoteToNonNull(previousType);
 
     if (!typeOperations.isSameType(type, previousType)) {
-      Map<Variable, VariableModel<Type>> newVariableInfo = Map<Variable, VariableModel<Type>>.from(variableInfo);
+      Map<Variable, VariableModel<Type>> newVariableInfo =
+          Map<Variable, VariableModel<Type>>.from(variableInfo);
       newVariableInfo[variable] = VariableModel<Type>(type);
       return FlowModel<Variable, Type>._(
         reachable,
@@ -772,7 +775,8 @@ class FlowModel<Variable, Type> {
 
     if (typeOperations.isSubtypeOf(type, previousType) &&
         !typeOperations.isSameType(type, previousType)) {
-      Map<Variable, VariableModel> newVariableInfo = Map<Variable, VariableModel<Type>>.from(variableInfo);
+      Map<Variable, VariableModel> newVariableInfo =
+          Map<Variable, VariableModel<Type>>.from(variableInfo);
       newVariableInfo[variable] = VariableModel<Type>(type);
       return FlowModel<Variable, Type>._(
         reachable,
@@ -804,7 +808,8 @@ class FlowModel<Variable, Type> {
   /// later in the loop body.  If we switch to a fixed point analysis, we should
   /// be able to remove this method.
   FlowModel<Variable, Type> removePromotedAll(Set<Variable> variables) {
-    Map<Variable, Type> newVariableInfo = _removePromotedAll(variableInfo, variables);
+    Map<Variable, VariableModel<Type>> newVariableInfo =
+        _removePromotedAll(variableInfo, variables);
 
     if (identical(newVariableInfo, variableInfo)) return this;
 
@@ -853,11 +858,13 @@ class FlowModel<Variable, Type> {
       newNotAssigned = other.notAssigned;
     }
 
-    Map<Variable, Type> newVariableInfo = <Variable, VariableModel<Type>>{};
+    Map<Variable, VariableModel<Type>> newVariableInfo =
+        <Variable, VariableModel<Type>>{};
     bool promotedMatchesThis = true;
     bool promotedMatchesOther =
         other.variableInfo.length == variableInfo.length;
-    for (MapEntry<Variable, Type> entry in variableInfo.entries) {
+    for (MapEntry<Variable, VariableModel<Type>> entry
+        in variableInfo.entries) {
       Variable variable = entry.key;
       Type thisType = entry.value.promotedType;
       Type otherType = other.variableInfo[variable]?.promotedType;
@@ -935,7 +942,8 @@ class FlowModel<Variable, Type> {
             ? notAssigned.remove(emptySet, variable)
             : notAssigned;
 
-    Map<Variable, Type> newVariableInfo = _removePromoted(variableInfo, variable);
+    Map<Variable, VariableModel<Type>> newVariableInfo =
+        _removePromoted(variableInfo, variable);
 
     if (identical(newNotAssigned, notAssigned) &&
         identical(newVariableInfo, variableInfo)) {
@@ -955,7 +963,8 @@ class FlowModel<Variable, Type> {
       Map<Variable, VariableModel<Type>> map, Variable variable) {
     if (map[variable].promotedType == null) return map;
 
-    Map<Variable, VariableModel<Type>> result = Map<Variable, VariableModel<Type>>.from(map);
+    Map<Variable, VariableModel<Type>> result =
+        Map<Variable, VariableModel<Type>>.from(map);
     result[variable] = VariableModel<Type>(null);
     return result;
   }
@@ -969,9 +978,10 @@ class FlowModel<Variable, Type> {
     if (map.isEmpty) return const {};
     if (variables.isEmpty) return map;
 
-    Map<Variable, VariableModel<Type>> result = <Variable, VariableModel<Type>>{};
+    Map<Variable, VariableModel<Type>> result =
+        <Variable, VariableModel<Type>>{};
     bool noChanges = true;
-    for (MapEntry<Variable, Type> entry in map.entries) {
+    for (MapEntry<Variable, VariableModel<Type>> entry in map.entries) {
       Variable variable = entry.key;
       Type promotedType = entry.value.promotedType;
       if (variables.contains(variable) && promotedType != null) {
@@ -1010,8 +1020,9 @@ class FlowModel<Variable, Type> {
     bool newReachable = first.reachable || second.reachable;
     _VariableSet<Variable> newNotAssigned =
         first.notAssigned.union(second.notAssigned);
-    Map<Variable, Type> newVariableInfo = FlowModel.joinVariableInfo(
-        typeOperations, first.variableInfo, second.variableInfo);
+    Map<Variable, VariableModel<Type>> newVariableInfo =
+        FlowModel.joinVariableInfo(
+            typeOperations, first.variableInfo, second.variableInfo);
 
     return FlowModel._identicalOrNew(
       first,
@@ -1032,11 +1043,11 @@ class FlowModel<Variable, Type> {
     if (identical(first, second)) return first;
     if (first.isEmpty || second.isEmpty) return const {};
 
-    Map<Variable, VariableModel<Type>> result = <Variable, VariableModel<Type>>{};
-    Map<Variable, Type> result = <Variable, Type>{};
+    Map<Variable, VariableModel<Type>> result =
+        <Variable, VariableModel<Type>>{};
     bool alwaysFirst = true;
     bool alwaysSecond = true;
-    for (MapEntry<Variable, Type> entry in first.entries) {
+    for (MapEntry<Variable, VariableModel<Type>> entry in first.entries) {
       Variable variable = entry.key;
       if (!second.containsKey(variable)) {
         alwaysFirst = false;
@@ -1105,9 +1116,9 @@ class FlowModel<Variable, Type> {
       Map<Variable, VariableModel<Type>> p2) {
     if (p1.length != p2.length) return false;
     if (!p1.keys.toSet().containsAll(p2.keys)) return false;
-    for (MapEntry<Variable, Type> entry in p1.entries) {
-      Type p1Value = entry.value;
-      Type p2Value = p2[entry.key];
+    for (MapEntry<Variable, VariableModel<Type>> entry in p1.entries) {
+      VariableModel<Type> p1Value = entry.value;
+      VariableModel<Type> p2Value = p2[entry.key];
       if (p1Value == null) {
         if (p2Value != null) return false;
       } else {
