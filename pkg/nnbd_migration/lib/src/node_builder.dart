@@ -35,8 +35,8 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
   /// Constraint variables and decorated types are stored here.
   final VariableRecorder _variables;
 
-  /// The file being analyzed.
-  final Source _source;
+  @override
+  final Source source;
 
   /// If the parameters of a function or method are being visited, the
   /// [DecoratedType]s of the function's named parameters that have been seen so
@@ -62,7 +62,7 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
   /// For convenience, a [DecoratedType] representing non-nullable `Object`.
   final DecoratedType _nonNullableObjectType;
 
-  NodeBuilder(this._variables, this._source, this.listener, this._graph,
+  NodeBuilder(this._variables, this.source, this.listener, this._graph,
       this._typeProvider)
       : _nonNullableObjectType =
             DecoratedType(_typeProvider.objectType, _graph.never);
@@ -129,7 +129,7 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   DecoratedType visitCompilationUnit(CompilationUnit node) {
-    _graph.migrating(_source);
+    _graph.migrating(source);
     return super.visitCompilationUnit(node);
   }
 
@@ -174,7 +174,7 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
           '(${node.parent.parent.toSource()}) offset=${node.offset}');
     }
     decoratedType.node.trackPossiblyOptional();
-    _variables.recordPossiblyOptional(_source, node, decoratedType.node);
+    _variables.recordPossiblyOptional(source, node, decoratedType.node);
     return null;
   }
 
@@ -207,8 +207,44 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   DecoratedType visitFunctionTypeAlias(FunctionTypeAlias node) {
-    // TODO(brianwilkerson)
-    _unimplemented(node, 'FunctionTypeAlias');
+    node.metadata.accept(this);
+    var declaredElement = node.declaredElement;
+    var functionType = declaredElement.function.type;
+    var returnType = node.returnType;
+    DecoratedType decoratedReturnType;
+    if (returnType != null) {
+      decoratedReturnType = returnType.accept(this);
+    } else {
+      // Inferred return type.
+      decoratedReturnType =
+          DecoratedType.forImplicitType(functionType.returnType, _graph);
+    }
+    var previousPositionalParameters = _positionalParameters;
+    var previousNamedParameters = _namedParameters;
+    var previousTypeFormalBounds = _typeFormalBounds;
+    _positionalParameters = [];
+    _namedParameters = {};
+    _typeFormalBounds = [];
+    DecoratedType decoratedFunctionType;
+    try {
+      node.typeParameters?.accept(this);
+      node.parameters?.accept(this);
+      // Node: we don't pass _typeFormalBounds into DecoratedType because we're
+      // not defining a generic function type, we're defining a generic typedef
+      // of an ordinary (non-generic) function type.
+      decoratedFunctionType = DecoratedType(functionType, _graph.never,
+          typeFormalBounds: const [],
+          returnType: decoratedReturnType,
+          positionalParameters: _positionalParameters,
+          namedParameters: _namedParameters);
+    } finally {
+      _positionalParameters = previousPositionalParameters;
+      _namedParameters = previousNamedParameters;
+      _typeFormalBounds = previousTypeFormalBounds;
+    }
+    _variables.recordDecoratedElementType(
+        declaredElement, decoratedFunctionType);
+    return null;
   }
 
   @override
@@ -216,6 +252,23 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
       FunctionTypedFormalParameter node) {
     return _handleFormalParameter(
         node, node.returnType, node.typeParameters, node.parameters);
+  }
+
+  @override
+  DecoratedType visitGenericTypeAlias(GenericTypeAlias node) {
+    node.metadata.accept(this);
+    var previousTypeFormalBounds = _typeFormalBounds;
+    _typeFormalBounds = [];
+    DecoratedType decoratedFunctionType;
+    try {
+      node.typeParameters?.accept(this);
+      decoratedFunctionType = node.functionType.accept(this);
+    } finally {
+      _typeFormalBounds = previousTypeFormalBounds;
+    }
+    _variables.recordDecoratedElementType(
+        node.declaredElement, decoratedFunctionType);
+    return null;
   }
 
   @override
@@ -255,10 +308,10 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
     if (type.isVoid || type.isDynamic) {
       var nullabilityNode = NullabilityNode.forTypeAnnotation(node.end);
       _graph.connect(_graph.always, nullabilityNode,
-          AlwaysNullableTypeOrigin(_source, node.offset));
+          AlwaysNullableTypeOrigin(source, node.offset));
       var decoratedType =
           DecoratedTypeAnnotation(type, nullabilityNode, node.offset);
-      _variables.recordDecoratedTypeAnnotation(_source, node, decoratedType,
+      _variables.recordDecoratedTypeAnnotation(source, node, decoratedType,
           potentialModification: false);
       return decoratedType;
     }
@@ -266,6 +319,7 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
     DecoratedType decoratedReturnType;
     var positionalParameters = const <DecoratedType>[];
     var namedParameters = const <String, DecoratedType>{};
+    var typeFormalBounds = const <DecoratedType>[];
     if (type is InterfaceType && type.typeParameters.isNotEmpty) {
       if (node is TypeName) {
         if (node.typeArguments == null) {
@@ -285,21 +339,22 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
       decoratedReturnType = returnType == null
           ? DecoratedType.forImplicitType(DynamicTypeImpl.instance, _graph)
           : returnType.accept(this);
-      if (node.typeParameters != null) {
-        // TODO(paulberry)
-        _unimplemented(node, 'Generic function type with type parameters');
-      }
       positionalParameters = <DecoratedType>[];
       namedParameters = <String, DecoratedType>{};
+      typeFormalBounds = <DecoratedType>[];
       var previousPositionalParameters = _positionalParameters;
       var previousNamedParameters = _namedParameters;
+      var previousTypeFormalBounds = _typeFormalBounds;
       try {
         _positionalParameters = positionalParameters;
         _namedParameters = namedParameters;
+        _typeFormalBounds = typeFormalBounds;
+        node.typeParameters?.accept(this);
         node.parameters.accept(this);
       } finally {
         _positionalParameters = previousPositionalParameters;
         _namedParameters = previousNamedParameters;
+        _typeFormalBounds = previousTypeFormalBounds;
       }
     }
     NullabilityNode nullabilityNode;
@@ -318,18 +373,19 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
         typeArguments: typeArguments,
         returnType: decoratedReturnType,
         positionalParameters: positionalParameters,
-        namedParameters: namedParameters);
-    _variables.recordDecoratedTypeAnnotation(_source, node, decoratedType);
+        namedParameters: namedParameters,
+        typeFormalBounds: typeFormalBounds);
+    _variables.recordDecoratedTypeAnnotation(source, node, decoratedType);
     var commentToken = node.endToken.next.precedingComments;
     switch (_classifyComment(commentToken)) {
       case _NullabilityComment.bang:
         _graph.connect(decoratedType.node, _graph.never,
-            NullabilityCommentOrigin(_source, commentToken.offset),
+            NullabilityCommentOrigin(source, commentToken.offset),
             hard: true);
         break;
       case _NullabilityComment.question:
         _graph.connect(_graph.always, decoratedType.node,
-            NullabilityCommentOrigin(_source, commentToken.offset));
+            NullabilityCommentOrigin(source, commentToken.offset));
         break;
       case _NullabilityComment.none:
         break;
@@ -350,7 +406,7 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
     } else {
       var nullabilityNode = NullabilityNode.forInferredType();
       _graph.union(_graph.always, nullabilityNode,
-          AlwaysNullableTypeOrigin(_source, node.offset));
+          AlwaysNullableTypeOrigin(source, node.offset));
       decoratedBound = DecoratedType(_typeProvider.objectType, nullabilityNode);
     }
     _typeFormalBounds?.add(decoratedBound);

@@ -925,8 +925,10 @@ InvalidVoid:
 # TODO(danrubel): Review where this error is generated and consider generating
 # FieldInitializedOutsideDeclaringClass instead of this in some situations.
 InvalidInitializer:
+  index: 90
   template: "Not a valid initializer."
   tip: "To initialize a field, use the syntax 'name = value'."
+  analyzerCode: ParserErrorCode.INVALID_INITIALIZER
 
 FieldInitializedOutsideDeclaringClass:
   index: 88
@@ -1255,8 +1257,9 @@ FinalFieldWithoutInitializer:
   analyzerCode: FINAL_NOT_INITIALIZED
 
 MetadataTypeArguments:
+  index: 91
   template: "An annotation (metadata) can't use type arguments."
-  analyzerCode: ANNOTATION_WITH_TYPE_ARGUMENTS
+  analyzerCode: ParserErrorCode.ANNOTATION_WITH_TYPE_ARGUMENTS
 
 ConstructorNotFound:
   template: "Couldn't find constructor '#name'."
