@@ -191,14 +191,14 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     }
 
     _condition = binaryExpression;
-    FlowModel<Variable, Type> currentPromoted =
+    FlowModel<Variable, Type> currentModel =
         _current.markNonNullable(typeOperations, variable);
     if (notEqual) {
-      _conditionTrue = currentPromoted;
+      _conditionTrue = currentModel;
       _conditionFalse = _current;
     } else {
       _conditionTrue = _current;
-      _conditionFalse = currentPromoted;
+      _conditionFalse = currentModel;
     }
   }
 
@@ -677,18 +677,17 @@ class FlowModel<Variable, Type> {
   /// the control flow.
   final _VariableSet<Variable> notAssigned;
 
-  /// For each variable being tracked by flow analysis, the variable's promoted
-  /// type, or `null` if the variable's type is not promoted.
+  /// For each variable being tracked by flow analysis, the variable's model.
   ///
   /// Flow analysis has no awareness of scope, so variables that are out of
   /// scope are retained in the map until such time as their declaration no
   /// longer dominates the control flow.  So, for example, if a variable is
-  /// declared and then promoted inside the `then` branch of an `if` statement,
-  /// and the `else` branch of the `if` statement ends in a `return` statement,
-  /// then the variable remains in the map after the `if` statement ends, even
-  /// though the variable is not in scope anymore.  This should not have any
-  /// effect on analysis results for error-free code, because it is an error to
-  /// refer to a variable that is no longer in scope.
+  /// declared inside the `then` branch of an `if` statement, and the `else`
+  /// branch of the `if` statement ends in a `return` statement, then the
+  /// variable remains in the map after the `if` statement ends, even though the
+  /// variable is not in scope anymore.  This should not have any effect on
+  /// analysis results for error-free code, because it is an error to refer to a
+  /// variable that is no longer in scope.
   final Map<Variable, VariableModel<Type> /*!*/ > variableInfo;
 
   /// Creates a state object with the given [reachable] status.  All variables
@@ -918,8 +917,8 @@ class FlowModel<Variable, Type> {
     );
   }
 
-  /// Removes a [variable] from a "promoted" [map], treating the map as
-  /// immutable.
+  /// Updates a "variableInfo" [map] to indicate that a [variable] is no longer
+  /// promoted, treating the map as immutable.
   Map<Variable, VariableModel<Type>> _removePromoted(
       Map<Variable, VariableModel<Type>> map, Variable variable) {
     VariableModel<Type> info = map[variable];
@@ -931,8 +930,8 @@ class FlowModel<Variable, Type> {
     return result;
   }
 
-  /// Removes a set of [variable]s from a "promoted" [map], treating the map as
-  /// immutable.
+  /// Updates a "variableInfo" [map] to indicate that a set of [variable] is no
+  /// longer promoted, treating the map as immutable.
   Map<Variable, VariableModel<Type>> _removePromotedAll(
     Map<Variable, VariableModel<Type>> map,
     Set<Variable> variables,
@@ -1062,7 +1061,7 @@ class FlowModel<Variable, Type> {
     );
   }
 
-  /// Determines whether the given "promoted" maps are equivalent.
+  /// Determines whether the given "variableInfo" maps are equivalent.
   static bool _variableInfosEqual<Variable, Type>(
       TypeOperations<Variable, Type> typeOperations,
       Map<Variable, VariableModel<Type>> p1,
