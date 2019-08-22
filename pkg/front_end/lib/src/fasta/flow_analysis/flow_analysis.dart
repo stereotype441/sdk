@@ -5,23 +5,53 @@
 import 'package:meta/meta.dart';
 
 /// Sets of local variables that are potentially assigned in a loop statement,
-/// switch statement, try statement, or loop collection element.
-class AssignedVariables<StatementOrElement, Variable> {
+/// switch statement, try statement, loop collection element, local function,
+/// or closure.
+class AssignedVariables<Node, Variable> {
   final emptySet = Set<Variable>();
 
   /// Mapping from a statement or element to the set of local variables that
   /// are potentially assigned in that statement or element.
-  final Map<StatementOrElement, Set<Variable>> _map = {};
+  final Map<Node, Set<Variable>> _assignedByNode = {};
+
+  /// Mapping from a statement or element to the set of local variables that are
+  /// potentially assigned inside a local function or closure inside that
+  /// statement or element.
+  final Map<Node, Set<Variable>> _assignedInClosureByNode = {};
+
+  /// Set of local variables that are potentially assigned inside a local
+  /// function or closure anywhere inside the code being analyzed.
+  final Set<Variable> _assignedInClosure = {};
 
   /// The stack of nested statements or collection elements.
   final List<Set<Variable>> _stack = [];
 
+  final List<Set<Variable>> _closureStack = [];
+
+  final List<int> _closureIndexStack = [0];
+
   AssignedVariables();
 
-  /// Return the set of variables that are potentially assigned in the
+  /// Returns the set of variables that are potentially assigned within a
+  /// local function or closure anywhere in the code being analyzed.
+  Set<Variable> get assignedInClosureAnywhere => _assignedInClosure;
+
+  /// Returns the set of variables that are potentially assigned in the
   /// [statementOrElement].
-  Set<Variable> operator [](StatementOrElement statementOrElement) {
-    return _map[statementOrElement] ?? emptySet;
+  Set<Variable> assigned(Node node) {
+    return _assignedByNode[node] ?? emptySet;
+  }
+
+  /// Returns the set of variables that are potentially assigned within a
+  /// local function or closure inside the [node].
+  Set<Variable> assignedInClosure(Node node) {
+    return _assignedInClosureByNode[node] ?? emptySet;
+  }
+
+  void beginClosure() {
+    _stack.add(Set<Variable>.identity());
+    _closureIndexStack.add(_closureStack.length);
+    _closureStack.add(Set<Variable>.identity());
   }
 
   void beginStatementOrElement() {
@@ -29,13 +59,24 @@ class AssignedVariables<StatementOrElement, Variable> {
     _stack.add(set);
   }
 
-  void endStatementOrElement(StatementOrElement node) {
-    _map[node] = _stack.removeLast();
+  void endClosure(Node node) {
+    _assignedByNode[node] = _stack.removeLast();
+    _assignedInClosureByNode[node] = _closureStack.removeLast();
+    _closureIndexStack.removeLast();
+  }
+
+  void endStatementOrElement(Node node) {
+    _assignedByNode[node] = _stack.removeLast();
   }
 
   void write(Variable variable) {
+    _assignedInClosure.add(variable);
     for (int i = 0; i < _stack.length; ++i) {
       _stack[i].add(variable);
+    }
+    int closureIndex = _closureIndexStack.last;
+    for (int i = 0; i < closureIndex; ++i) {
+      _closureStack[i].add(variable);
     }
   }
 }

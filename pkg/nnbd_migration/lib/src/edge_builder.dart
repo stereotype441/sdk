@@ -523,7 +523,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   DecoratedType visitDoStatement(DoStatement node) {
-    _flowAnalysis.doStatement_bodyBegin(node, _assignedVariables[node]);
+    _flowAnalysis.doStatement_bodyBegin(
+        node, _assignedVariables.assigned(node));
     node.body.accept(this);
     _flowAnalysis.doStatement_conditionBegin();
     _checkExpressionNotNull(node.condition);
@@ -1189,7 +1190,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   DecoratedType visitWhileStatement(WhileStatement node) {
     // Note: we do not create guards. A null check here is *very* unlikely to be
     // unnecessary after analysis.
-    _flowAnalysis.whileStatement_conditionBegin(_assignedVariables[node]);
+    _flowAnalysis
+        .whileStatement_conditionBegin(_assignedVariables.assigned(node));
     _checkExpressionNotNull(node.condition);
     _flowAnalysis.whileStatement_bodyBegin(node, node.condition);
     _postDominatedLocals.doScoped(action: () => node.body.accept(this));
@@ -1554,7 +1556,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         _flowAnalysis.add(parts.loopVariable.declaredElement, assigned: true);
       }
       _checkExpressionNotNull(parts.iterable);
-      _flowAnalysis.forEach_bodyBegin(_assignedVariables[node]);
+      _flowAnalysis.forEach_bodyBegin(_assignedVariables.assigned(node));
     }
 
     // The condition may fail/iterable may be empty, so the body gets a new

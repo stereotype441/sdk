@@ -3736,7 +3736,7 @@ class ResolverVisitor extends ScopedVisitor {
 
     _flowAnalysis?.flow?.doStatement_bodyBegin(
       node,
-      _flowAnalysis?.assignedVariables[node],
+      _flowAnalysis.assignedVariables.assigned(node),
     );
     visitStatementInScope(body);
 
@@ -3894,7 +3894,7 @@ class ResolverVisitor extends ScopedVisitor {
       _flowAnalysis?.loopVariable(loopVariable);
       loopVariable?.accept(this);
       _flowAnalysis?.flow
-          ?.forEach_bodyBegin(_flowAnalysis?.assignedVariables[node]);
+          ?.forEach_bodyBegin(_flowAnalysis.assignedVariables.assigned(node));
       node.body?.accept(this);
       _flowAnalysis?.flow?.forEach_end();
 
@@ -3971,7 +3971,7 @@ class ResolverVisitor extends ScopedVisitor {
       loopVariable?.accept(this);
 
       _flowAnalysis?.flow?.forEach_bodyBegin(
-        _flowAnalysis?.assignedVariables[node],
+        _flowAnalysis.assignedVariables.assigned(node),
       );
 
       Statement body = node.body;
@@ -4454,7 +4454,7 @@ class ResolverVisitor extends ScopedVisitor {
 
       if (_flowAnalysis != null) {
         var flow = _flowAnalysis.flow;
-        var assignedInCases = _flowAnalysis.assignedVariables[node];
+        var assignedInCases = _flowAnalysis.assignedVariables.assigned(node);
 
         flow.switchStatement_expressionEnd(node);
 
@@ -4510,7 +4510,7 @@ class ResolverVisitor extends ScopedVisitor {
     flow.tryCatchStatement_bodyBegin();
     body.accept(this);
     flow.tryCatchStatement_bodyEnd(
-      _flowAnalysis.assignedVariables[body],
+      _flowAnalysis.assignedVariables.assigned(node),
     );
 
     var catchLength = catchClauses.length;
@@ -4531,11 +4531,11 @@ class ResolverVisitor extends ScopedVisitor {
 
     if (finallyBlock != null) {
       flow.tryFinallyStatement_finallyBegin(
-        _flowAnalysis.assignedVariables[body],
+        _flowAnalysis.assignedVariables.assigned(body),
       );
       finallyBlock.accept(this);
       flow.tryFinallyStatement_end(
-        _flowAnalysis.assignedVariables[finallyBlock],
+        _flowAnalysis.assignedVariables.assigned(finallyBlock),
       );
     }
   }
@@ -4587,7 +4587,7 @@ class ResolverVisitor extends ScopedVisitor {
       InferenceContext.setType(condition, typeProvider.boolType);
 
       _flowAnalysis?.flow?.whileStatement_conditionBegin(
-        _flowAnalysis?.assignedVariables[node],
+        _flowAnalysis.assignedVariables.assigned(node),
       );
       condition?.accept(this);
 

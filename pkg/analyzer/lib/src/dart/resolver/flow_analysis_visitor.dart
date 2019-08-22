@@ -124,6 +124,47 @@ class FlowAnalysisHelper {
     }
   }
 
+  void breakStatement(BreakStatement node) {
+    var target = getLabelTarget(node, node.label?.staticElement);
+    flow.handleBreak(target);
+  }
+
+  /// Mark the [node] as unreachable if it is not covered by another node that
+  /// is already known to be unreachable.
+  void checkUnreachableNode(AstNode node) {
+    if (flow == null) return;
+    if (flow.isReachable) return;
+
+    if (result != null) {
+      // Ignore the [node] if it is fully covered by the last unreachable.
+      if (result.unreachableNodes.isNotEmpty) {
+        var last = result.unreachableNodes.last;
+        if (node.offset >= last.offset && node.end <= last.end) return;
+      }
+
+      result.unreachableNodes.add(node);
+    }
+  }
+
+  void continueStatement(ContinueStatement node) {
+    var target = getLabelTarget(node, node.label?.staticElement);
+    flow.handleContinue(target);
+  }
+
+  void for_bodyBegin(AstNode node, Expression condition) {
+    flow.for_bodyBegin(
+        node is Statement ? node : null, condition ?? _trueLiteral);
+  }
+
+  void for_conditionBegin(AstNode node, Expression condition) {
+    if (condition != null) {
+      var assigned = assignedVariables.assigned(node);
+      flow.for_conditionBegin(assigned);
+    } else {
+      flow.booleanLiteral(_trueLiteral, true);
+    }
+  }
+
   void functionBody_enter(FunctionBody node) {
     _blockFunctionBodyLevel++;
 
@@ -163,47 +204,6 @@ class FlowAnalysisHelper {
     }
 
     flow.finish();
-  }
-
-  void breakStatement(BreakStatement node) {
-    var target = getLabelTarget(node, node.label?.staticElement);
-    flow.handleBreak(target);
-  }
-
-  /// Mark the [node] as unreachable if it is not covered by another node that
-  /// is already known to be unreachable.
-  void checkUnreachableNode(AstNode node) {
-    if (flow == null) return;
-    if (flow.isReachable) return;
-
-    if (result != null) {
-      // Ignore the [node] if it is fully covered by the last unreachable.
-      if (result.unreachableNodes.isNotEmpty) {
-        var last = result.unreachableNodes.last;
-        if (node.offset >= last.offset && node.end <= last.end) return;
-      }
-
-      result.unreachableNodes.add(node);
-    }
-  }
-
-  void continueStatement(ContinueStatement node) {
-    var target = getLabelTarget(node, node.label?.staticElement);
-    flow.handleContinue(target);
-  }
-
-  void for_bodyBegin(AstNode node, Expression condition) {
-    flow.for_bodyBegin(
-        node is Statement ? node : null, condition ?? _trueLiteral);
-  }
-
-  void for_conditionBegin(AstNode node, Expression condition) {
-    if (condition != null) {
-      var assigned = assignedVariables[node];
-      flow.for_conditionBegin(assigned);
-    } else {
-      flow.booleanLiteral(_trueLiteral, true);
-    }
   }
 
   void isExpression(IsExpression node) {
