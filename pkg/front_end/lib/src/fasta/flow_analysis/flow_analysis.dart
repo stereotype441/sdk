@@ -738,22 +738,12 @@ class FlowModel<Variable, Type> {
   /// assigned?  Does it matter?
   FlowModel<Variable, Type> markNonNullable(
       TypeOperations<Variable, Type> typeOperations, Variable variable) {
-    Type previousType = variableInfo[variable].promotedType;
+    VariableModel<Type> info = variableInfo[variable];
+    Type previousType = info.promotedType;
     previousType ??= typeOperations.variableType(variable);
     Type type = typeOperations.promoteToNonNull(previousType);
-
-    if (!typeOperations.isSameType(type, previousType)) {
-      Map<Variable, VariableModel<Type>> newVariableInfo =
-          Map<Variable, VariableModel<Type>>.from(variableInfo);
-      newVariableInfo[variable] = VariableModel<Type>(type);
-      return FlowModel<Variable, Type>._(
-        reachable,
-        notAssigned,
-        newVariableInfo,
-      );
-    }
-
-    return this;
+    if (typeOperations.isSameType(type, previousType)) return this;
+    return _updateVariableInfo(variable, info.withPromotedType(type));
   }
 
   /// Updates the state to indicate that the given [variable] has been
@@ -770,22 +760,15 @@ class FlowModel<Variable, Type> {
     Variable variable,
     Type type,
   ) {
-    Type previousType = variableInfo[variable].promotedType;
+    VariableModel<Type> info = variableInfo[variable];
+    Type previousType = info.promotedType;
     previousType ??= typeOperations.variableType(variable);
 
-    if (typeOperations.isSubtypeOf(type, previousType) &&
-        !typeOperations.isSameType(type, previousType)) {
-      Map<Variable, VariableModel<Type>> newVariableInfo =
-          Map<Variable, VariableModel<Type>>.from(variableInfo);
-      newVariableInfo[variable] = VariableModel<Type>(type);
-      return FlowModel<Variable, Type>._(
-        reachable,
-        notAssigned,
-        newVariableInfo,
-      );
+    if (!typeOperations.isSubtypeOf(type, previousType) ||
+        typeOperations.isSameType(type, previousType)) {
+      return this;
     }
-
-    return this;
+    return _updateVariableInfo(variable, info.withPromotedType(type));
   }
 
   /// Updates the state to indicate that the given [variables] are no longer
@@ -858,51 +841,27 @@ class FlowModel<Variable, Type> {
       newNotAssigned = other.notAssigned;
     }
 
-    Map<Variable, VariableModel<Type>> newVariableInfo =
-        <Variable, VariableModel<Type>>{};
-    bool promotedMatchesThis = true;
-    bool promotedMatchesOther =
+    Map<Variable, VariableModel<Type>> newVariableInfo = <Variable, VariableModel<Type>>{};
+    bool variableInfoMatchesThis = true;
+    bool variableInfoMatchesOther =
         other.variableInfo.length == variableInfo.length;
-    for (MapEntry<Variable, VariableModel<Type>> entry
-        in variableInfo.entries) {
+    for (MapEntry<Variable, VariableModel<Type>> entry in variableInfo.entries) {
       Variable variable = entry.key;
-      Type thisType = entry.value.promotedType;
-      Type otherType = other.variableInfo[variable]?.promotedType;
-      if (!unsafe.contains(variable)) {
-        if (otherType != null &&
-            (thisType == null ||
-                typeOperations.isSubtypeOf(otherType, thisType))) {
-          newVariableInfo[variable] = VariableModel<Type>(otherType);
-          if (promotedMatchesThis &&
-              (thisType == null ||
-                  !typeOperations.isSameType(thisType, otherType))) {
-            promotedMatchesThis = false;
-          }
-          continue;
-        }
-      }
-      if (thisType != null) {
-        newVariableInfo[variable] = VariableModel<Type>(thisType);
-        if (promotedMatchesOther &&
-            (otherType == null ||
-                !typeOperations.isSameType(thisType, otherType))) {
-          promotedMatchesOther = false;
-        }
-      } else {
-        newVariableInfo[variable] = VariableModel<Type>(null);
-        if (promotedMatchesOther && otherType != null) {
-          promotedMatchesOther = false;
-        }
-      }
+      VariableModel<Type> otherModel = other.variableInfo[variable];
+      VariableModel<Type> restricted = entry.value
+          .restrict(typeOperations, otherModel, unsafe.contains(variable));
+      newVariableInfo[variable] = restricted;
+      if (!identical(restricted, entry.value)) variableInfoMatchesThis = false;
+      if (!identical(restricted, otherModel)) variableInfoMatchesOther = false;
     }
-    assert(promotedMatchesThis ==
+    assert(variableInfoMatchesThis ==
         _variableInfosEqual(typeOperations, newVariableInfo, variableInfo));
-    assert(promotedMatchesOther ==
+    assert(variableInfoMatchesOther ==
         _variableInfosEqual(
             typeOperations, newVariableInfo, other.variableInfo));
-    if (promotedMatchesThis) {
+    if (variableInfoMatchesThis) {
       newVariableInfo = variableInfo;
-    } else if (promotedMatchesOther) {
+    } else if (variableInfoMatchesOther) {
       newVariableInfo = other.variableInfo;
     }
 
@@ -961,11 +920,11 @@ class FlowModel<Variable, Type> {
   /// immutable.
   Map<Variable, VariableModel<Type>> _removePromoted(
       Map<Variable, VariableModel<Type>> map, Variable variable) {
-    if (map[variable].promotedType == null) return map;
+    var info = map[variable];
+    if (info.promotedType == null) return map;
 
-    Map<Variable, VariableModel<Type>> result =
-        Map<Variable, VariableModel<Type>>.from(map);
-    result[variable] = VariableModel<Type>(null);
+    Map<Variable, VariableModel<Type>> result = Map<Variable, VariableModel<Type>>.from(map);
+    result[variable] = info.withPromotedType(null);
     return result;
   }
 
@@ -978,23 +937,28 @@ class FlowModel<Variable, Type> {
     if (map.isEmpty) return const {};
     if (variables.isEmpty) return map;
 
-    Map<Variable, VariableModel<Type>> result =
-        <Variable, VariableModel<Type>>{};
-    bool noChanges = true;
+    Map<Variable, VariableModel<Type>> result;
     for (MapEntry<Variable, VariableModel<Type>> entry in map.entries) {
       Variable variable = entry.key;
-      Type promotedType = entry.value.promotedType;
+      VariableModel<Type> info = entry.value;
+      Type promotedType = info.promotedType;
       if (variables.contains(variable) && promotedType != null) {
-        result[variable] = VariableModel<Type>(null);
-        noChanges = false;
-      } else {
-        result[variable] = VariableModel<Type>(promotedType);
+        (result ??= Map<Variable, VariableModel<Type>>.from(map))[variable] =
+            info.withPromotedType(null);
       }
     }
 
-    if (noChanges) return map;
-    if (result.isEmpty) return const {};
+    if (result == null) return map;
     return result;
+  }
+
+  /// Returns a new [FlowModel] where the information for [variable] is replaced
+  /// with [model].
+  FlowModel<Variable, Type> _updateVariableInfo(
+      Variable variable, VariableModel<Type> model) {
+    var newVariableInfo = Map<Variable, VariableModel<Type>>.from(variableInfo);
+    newVariableInfo[variable] = model;
+    return FlowModel<Variable, Type>._(reachable, notAssigned, newVariableInfo);
   }
 
   /// Forms a new state to reflect a control flow path that might have come from
@@ -1043,36 +1007,20 @@ class FlowModel<Variable, Type> {
     if (identical(first, second)) return first;
     if (first.isEmpty || second.isEmpty) return const {};
 
-    Map<Variable, VariableModel<Type>> result =
-        <Variable, VariableModel<Type>>{};
+    Map<Variable, VariableModel<Type>> result = <Variable, VariableModel<Type>>{};
     bool alwaysFirst = true;
     bool alwaysSecond = true;
     for (MapEntry<Variable, VariableModel<Type>> entry in first.entries) {
       Variable variable = entry.key;
-      if (!second.containsKey(variable)) {
+      VariableModel<Type> secondModel = second[variable];
+      if (secondModel == null) {
         alwaysFirst = false;
       } else {
-        Type firstType = entry.value.promotedType;
-        Type secondType = second[variable].promotedType;
-        if (identical(firstType, secondType)) {
-          result[variable] = VariableModel<Type>(firstType);
-        } else if (firstType == null) {
-          result[variable] = VariableModel<Type>(null);
-          alwaysSecond = false;
-        } else if (secondType == null) {
-          result[variable] = VariableModel<Type>(null);
-          alwaysFirst = false;
-        } else if (typeOperations.isSubtypeOf(firstType, secondType)) {
-          result[variable] = VariableModel<Type>(secondType);
-          alwaysFirst = false;
-        } else if (typeOperations.isSubtypeOf(secondType, firstType)) {
-          result[variable] = VariableModel<Type>(firstType);
-          alwaysSecond = false;
-        } else {
-          result[variable] = VariableModel<Type>(null);
-          alwaysFirst = false;
-          alwaysSecond = false;
-        }
+        VariableModel<Type> joined =
+            VariableModel.join<Type>(typeOperations, entry.value, secondModel);
+        result[variable] = joined;
+        if (!identical(joined, entry.value)) alwaysFirst = false;
+        if (!identical(joined, secondModel)) alwaysSecond = false;
       }
     }
 
@@ -1191,8 +1139,67 @@ class VariableModel<Type> {
         this.promotedType == other.promotedType;
   }
 
+  /// Returns an updated model reflect a control path that is known to have
+  /// previously passed through some [other] state.  See [FlowModel.restrict]
+  /// for details.
+  restrict(TypeOperations<Object, Type> typeOperations,
+      VariableModel<Type> otherModel, bool unsafe) {
+    var thisType = promotedType;
+    var otherType = otherModel?.promotedType;
+    if (!unsafe) {
+      if (otherType != null &&
+          (thisType == null ||
+              typeOperations.isSubtypeOf(otherType, thisType))) {
+        return _identicalOrNew(this, otherModel, otherType);
+      }
+    }
+    if (thisType != null) {
+      return _identicalOrNew(this, otherModel, thisType);
+    } else {
+      return _identicalOrNew(this, otherModel, null);
+    }
+  }
+
   @override
   String toString() => 'VariableModel($promotedType)';
+
+  /// Returns a new [VariableModel] where the promoted type is replaced with
+  /// [promotedType].
+  VariableModel<Type> withPromotedType(Type promotedType) =>
+      VariableModel<Type>(promotedType);
+
+  /// Joins two variable models.  See [FlowModel.join] for details.
+  static join<Type>(TypeOperations<Object, Type> typeOperations,
+      VariableModel<Type> first, VariableModel<Type> second) {
+    var firstType = first.promotedType;
+    var secondType = second.promotedType;
+    Type newPromotedType;
+    if (identical(firstType, secondType)) {
+      newPromotedType = firstType;
+    } else if (firstType == null || secondType == null) {
+      newPromotedType = null;
+    } else if (typeOperations.isSubtypeOf(firstType, secondType)) {
+      newPromotedType = secondType;
+    } else if (typeOperations.isSubtypeOf(secondType, firstType)) {
+      newPromotedType = firstType;
+    } else {
+      newPromotedType = null;
+    }
+    return _identicalOrNew(first, second, newPromotedType);
+  }
+
+  /// Creates a new [VariableModel] object, unless it is equivalent to either
+  /// [first] or [second], in which case one of those objects is re-used.
+  static _identicalOrNew<Type>(VariableModel<Type> first,
+      VariableModel<Type> second, Type newPromotedType) {
+    if (identical(first.promotedType, newPromotedType)) {
+      return first;
+    } else if (identical(second.promotedType, newPromotedType)) {
+      return second;
+    } else {
+      return VariableModel<Type>(newPromotedType);
+    }
+  }
 }
 
 /// List based immutable set of variables.
