@@ -775,7 +775,7 @@ class FlowModel<Variable, Type> {
 
     if (typeOperations.isSubtypeOf(type, previousType) &&
         !typeOperations.isSameType(type, previousType)) {
-      Map<Variable, VariableModel> newVariableInfo =
+      Map<Variable, VariableModel<Type>> newVariableInfo =
           Map<Variable, VariableModel<Type>>.from(variableInfo);
       newVariableInfo[variable] = VariableModel<Type>(type);
       return FlowModel<Variable, Type>._(
