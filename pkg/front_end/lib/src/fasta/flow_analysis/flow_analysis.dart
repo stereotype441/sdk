@@ -841,11 +841,13 @@ class FlowModel<Variable, Type> {
       newNotAssigned = other.notAssigned;
     }
 
-    Map<Variable, VariableModel<Type>> newVariableInfo = <Variable, VariableModel<Type>>{};
+    Map<Variable, VariableModel<Type>> newVariableInfo =
+        <Variable, VariableModel<Type>>{};
     bool variableInfoMatchesThis = true;
     bool variableInfoMatchesOther =
         other.variableInfo.length == variableInfo.length;
-    for (MapEntry<Variable, VariableModel<Type>> entry in variableInfo.entries) {
+    for (MapEntry<Variable, VariableModel<Type>> entry
+        in variableInfo.entries) {
       Variable variable = entry.key;
       VariableModel<Type> otherModel = other.variableInfo[variable];
       VariableModel<Type> restricted = entry.value
@@ -923,7 +925,8 @@ class FlowModel<Variable, Type> {
     var info = map[variable];
     if (info.promotedType == null) return map;
 
-    Map<Variable, VariableModel<Type>> result = Map<Variable, VariableModel<Type>>.from(map);
+    Map<Variable, VariableModel<Type>> result =
+        Map<Variable, VariableModel<Type>>.from(map);
     result[variable] = info.withPromotedType(null);
     return result;
   }
@@ -1007,7 +1010,8 @@ class FlowModel<Variable, Type> {
     if (identical(first, second)) return first;
     if (first.isEmpty || second.isEmpty) return const {};
 
-    Map<Variable, VariableModel<Type>> result = <Variable, VariableModel<Type>>{};
+    Map<Variable, VariableModel<Type>> result =
+        <Variable, VariableModel<Type>>{};
     bool alwaysFirst = true;
     bool alwaysSecond = true;
     for (MapEntry<Variable, VariableModel<Type>> entry in first.entries) {
