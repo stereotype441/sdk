@@ -943,7 +943,7 @@ class FlowModel<Variable, Type> {
     Map<Variable, VariableModel<Type>> result;
     for (Variable variable in variables) {
       assert(() {
-        referencedVariables.add(variable);
+        referencedVariables?.add(variable);
         return true;
       }());
       VariableModel<Type> info = map[variable];
