@@ -253,12 +253,22 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   ///
   /// [condition] is an opaque representation of the loop condition; it is
   /// matched against expressions passed to previous calls to determine whether
-  /// the loop condition should cause any promotions to occur.
+  /// the loop condition should cause any promotions to occur.  If [condition]
+  /// is null, the condition is understood to be empty (equvialent to a
+  /// condition of `true`).
   void for_bodyBegin(Statement node, Expression condition) {
-    _conditionalEnd(condition);
-    // Tail of the stack: falseCondition, trueCondition
+    FlowModel<Variable, Type> trueCondition;
+    if (condition == null) {
+      _condition = blet;
+        _conditionTrue = _current;
+        _conditionFalse = _current.setReachable(false);
+      _conditionalEnd(blet);
+    } else {
+      _conditionalEnd(condition);
+      // Tail of the stack: falseCondition, trueCondition
 
-    FlowModel<Variable, Type> trueCondition = _stack.removeLast();
+      trueCondition = _stack.removeLast();
+    }
 
     if (node != null) {
       _statementToStackIndex[node] = _stack.length;
