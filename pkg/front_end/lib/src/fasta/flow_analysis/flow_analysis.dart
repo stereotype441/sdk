@@ -707,7 +707,7 @@ class FlowModel<Variable, Type> {
     this.variableInfo,
   ) {
     assert(() {
-      for (var value in variableInfo.values) {
+      for (VariableModel<Type> value in variableInfo.values) {
         assert(value != null);
       }
       return true;
@@ -922,7 +922,7 @@ class FlowModel<Variable, Type> {
   /// immutable.
   Map<Variable, VariableModel<Type>> _removePromoted(
       Map<Variable, VariableModel<Type>> map, Variable variable) {
-    var info = map[variable];
+    VariableModel<Type> info = map[variable];
     if (info.promotedType == null) return map;
 
     Map<Variable, VariableModel<Type>> result =
@@ -959,7 +959,8 @@ class FlowModel<Variable, Type> {
   /// with [model].
   FlowModel<Variable, Type> _updateVariableInfo(
       Variable variable, VariableModel<Type> model) {
-    var newVariableInfo = Map<Variable, VariableModel<Type>>.from(variableInfo);
+    Map<Variable, VariableModel<Type>> newVariableInfo =
+        Map<Variable, VariableModel<Type>>.from(variableInfo);
     newVariableInfo[variable] = model;
     return FlowModel<Variable, Type>._(reachable, notAssigned, newVariableInfo);
   }
@@ -1075,8 +1076,8 @@ class FlowModel<Variable, Type> {
         if (p2Value != null) return false;
       } else {
         if (p2Value == null) return false;
-        var p1Type = p1Value.promotedType;
-        var p2Type = p2Value.promotedType;
+        Type p1Type = p1Value.promotedType;
+        Type p2Type = p2Value.promotedType;
         if (p1Type == null) {
           if (p2Type != null) return false;
         } else {
@@ -1148,8 +1149,8 @@ class VariableModel<Type> {
   /// for details.
   restrict(TypeOperations<Object, Type> typeOperations,
       VariableModel<Type> otherModel, bool unsafe) {
-    var thisType = promotedType;
-    var otherType = otherModel?.promotedType;
+    Type thisType = promotedType;
+    Type otherType = otherModel?.promotedType;
     if (!unsafe) {
       if (otherType != null &&
           (thisType == null ||
@@ -1175,8 +1176,8 @@ class VariableModel<Type> {
   /// Joins two variable models.  See [FlowModel.join] for details.
   static join<Type>(TypeOperations<Object, Type> typeOperations,
       VariableModel<Type> first, VariableModel<Type> second) {
-    var firstType = first.promotedType;
-    var secondType = second.promotedType;
+    Type firstType = first.promotedType;
+    Type secondType = second.promotedType;
     Type newPromotedType;
     if (identical(firstType, secondType)) {
       newPromotedType = firstType;
