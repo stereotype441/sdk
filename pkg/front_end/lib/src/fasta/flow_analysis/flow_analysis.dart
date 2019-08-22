@@ -4,82 +4,130 @@
 
 import 'package:meta/meta.dart';
 
-/// Sets of local variables that are potentially assigned in a loop statement,
-/// switch statement, try statement, loop collection element, local function,
-/// or closure.
+/// [AssignedVariables] is a helper class capable of computing the set of
+/// variables that are potentially written to, and potentially captured by
+/// closures, at various locations inside the code being analyzed.  This class
+/// is meant to be used can be used prior to running flow analysis, to compute
+/// the sets of variables to pass in to flow analysis.
+///
+/// This class is intended to be used in two phases.  In the first phase, the
+/// client should traverse the source code recursively, making calls to
+/// [beginNode] and [endNode] to indicate the constructs in which writes should
+/// be tracked, and calls to [write] to indicate when a write is encountered.
+/// The order of visiting is not important provided that nesting is respected.
+/// This phase is called the "pre-traversal" beause it should happen prior to
+/// flow analysis.
+///
+/// Then, in the second phase, the client may make queries using
+/// [capturedAnywhere], [writtenInNode], and [capturedInNode].
+///
+/// We use the term "node" to refer generally to a loop statement, switch
+/// statement, try statement, loop collection element, local function, or
+/// closure.
 class AssignedVariables<Node, Variable> {
   final emptySet = Set<Variable>();
 
-  /// Mapping from a statement or element to the set of local variables that
-  /// are potentially assigned in that statement or element.
-  final Map<Node, Set<Variable>> _assignedByNode = {};
+  /// Mapping from a node to the set of local variables that are potentially
+  /// written to within that node.
+  final Map<Node, Set<Variable>> _writtenInNode = {};
 
-  /// Mapping from a statement or element to the set of local variables that are
-  /// potentially assigned inside a local function or closure inside that
-  /// statement or element.
-  final Map<Node, Set<Variable>> _assignedInClosureByNode = {};
+  /// Mapping from a node to the set of local variables for which a potential
+  /// write is captured by a local function or closure inside that node.
+  final Map<Node, Set<Variable>> _capturedInNode = {};
 
-  /// Set of local variables that are potentially assigned inside a local
-  /// function or closure anywhere inside the code being analyzed.
-  final Set<Variable> _assignedInClosure = {};
+  /// Set of local variables for which a potential write is captured by a local
+  /// function or closure anywhere in the code being analyzed.
+  final Set<Variable> _capturedAnywhere = {};
 
-  /// The stack of nested statements or collection elements.
-  final List<Set<Variable>> _stack = [];
+  /// Stack of sets accumulating variables that are potentially written to.
+  ///
+  /// A set is pushed onto the stack when a node is entered, and popped when
+  /// a node is left.
+  final List<Set<Variable>> _writtenStack = [];
 
-  final List<Set<Variable>> _closureStack = [];
+  /// Stack of sets accumulating variables for which a potential write is
+  /// captured by a local function or closure.
+  ///
+  /// A set is pushed onto the stack when a node is entered, and popped when
+  /// a node is left.
+  final List<Set<Variable>> _capturedStack = [];
 
+  /// Stack of integers counting the number of entries in [_capturedStack] that
+  /// should be updated when a variable write is seen.
+  ///
+  /// When a closure is entered, the length of [_capturedStack] is pushed onto
+  /// this stack; when a node is left, it is popped.
+  ///
+  /// Each time a write occurs, we consult the top of this stack to determine
+  /// how many elements of [capturedStack] should be updated.
   final List<int> _closureIndexStack = [];
 
   AssignedVariables();
 
-  /// Returns the set of variables that are potentially assigned within a
+  /// Queries the set of variables for which a potential write is captured by a
   /// local function or closure anywhere in the code being analyzed.
-  Set<Variable> get assignedInClosureAnywhere => _assignedInClosure;
+  Set<Variable> get capturedAnywhere => _capturedAnywhere;
 
-  /// Returns the set of variables that are potentially assigned in the
-  /// [statementOrElement].
-  Set<Variable> assigned(Node node) {
-    return _assignedByNode[node] ?? emptySet;
+  /// This method should be called during pre-traversal, to mark the start of a
+  /// loop statement, switch statement, try statement, loop collection element,
+  /// local function, or closure which might need to be queried later.
+  ///
+  /// [isClosure] should be true if the node is a local function or closure.
+  ///
+  /// The span between the call to [beginNode] and [endNode] should cover any
+  /// statements and expressions that might be crossed by a backwards jump.  So
+  /// for instance, in a "for" loop, the condition, updaters, and body should be
+  /// covered, but the initializers should not.  Similarly, in a switch
+  /// statement, the body of the switch statement should be covered, but the
+  /// switch expression should not.
+  void beginNode({bool isClosure: false}) {
+    _writtenStack.add(Set<Variable>.identity());
+    if (isClosure) {
+      _closureIndexStack.add(_capturedStack.length);
+    }
+    _capturedStack.add(Set<Variable>.identity());
   }
 
-  /// Returns the set of variables that are potentially assigned within a
+  /// Queries the set of variables for which a potential write is captured by a
   /// local function or closure inside the [node].
-  Set<Variable> assignedInClosure(Node node) {
-    return _assignedInClosureByNode[node] ?? emptySet;
+  Set<Variable> capturedInNode(Node node) {
+    return _capturedInNode[node] ?? emptySet;
   }
 
-  void beginClosure() {
-    _stack.add(Set<Variable>.identity());
-    _closureIndexStack.add(_closureStack.length);
-    _closureStack.add(Set<Variable>.identity());
+  /// This method should be called during pre-traversal, to mark the end of a
+  /// loop statement, switch statement, try statement, loop collection element,
+  /// local function, or closure which might need to be queried later.
+  ///
+  /// [isClosure] should be true if the node is a local function or closure.
+  ///
+  /// See [beginNode] for more details.
+  void endNode(Node node, {bool isClosure: false}) {
+    _writtenInNode[node] = _writtenStack.removeLast();
+    _capturedInNode[node] = _capturedStack.removeLast();
+    if (isClosure) {
+      _closureIndexStack.removeLast();
+    }
   }
 
-  void beginStatementOrElement() {
-    Set<Variable> set = Set<Variable>.identity();
-    _stack.add(set);
-  }
-
-  void endClosure(Node node) {
-    _assignedByNode[node] = _stack.removeLast();
-    _assignedInClosureByNode[node] = _closureStack.removeLast();
-    _closureIndexStack.removeLast();
-  }
-
-  void endStatementOrElement(Node node) {
-    _assignedByNode[node] = _stack.removeLast();
-  }
-
+  /// This method should be called during pre-traversal, to mark a write to a
+  /// variable.
   void write(Variable variable) {
-    for (int i = 0; i < _stack.length; ++i) {
-      _stack[i].add(variable);
+    for (int i = 0; i < _writtenStack.length; ++i) {
+      _writtenStack[i].add(variable);
     }
     if (_closureIndexStack.isNotEmpty) {
-      _assignedInClosure.add(variable);
+      _capturedAnywhere.add(variable);
       int closureIndex = _closureIndexStack.last;
       for (int i = 0; i < closureIndex; ++i) {
-        _closureStack[i].add(variable);
+        _capturedStack[i].add(variable);
       }
     }
+  }
+
+  /// Queries the set of variables that are potentially written to inside the
+  /// [node].
+  Set<Variable> writtenInNode(Node node) {
+    return _writtenInNode[node] ?? emptySet;
   }
 }
 
