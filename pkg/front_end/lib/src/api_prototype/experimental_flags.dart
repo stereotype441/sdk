@@ -48,11 +48,11 @@ const Map<ExperimentalFlag, bool> defaultExperimentalFlags = {
 };
 
 const Map<ExperimentalFlag, bool> expiredExperimentalFlags = {
-  ExperimentalFlag.constantUpdate2018: false,
-  ExperimentalFlag.controlFlowCollections: false,
+  ExperimentalFlag.constantUpdate2018: true,
+  ExperimentalFlag.controlFlowCollections: true,
   ExperimentalFlag.extensionMethods: false,
   ExperimentalFlag.nonNullable: false,
   ExperimentalFlag.setLiterals: true,
-  ExperimentalFlag.spreadCollections: false,
+  ExperimentalFlag.spreadCollections: true,
   ExperimentalFlag.tripleShift: false,
 };

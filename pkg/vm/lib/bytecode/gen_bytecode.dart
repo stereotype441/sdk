@@ -40,6 +40,7 @@ import 'generics.dart'
         getDefaultFunctionTypeArguments,
         getInstantiatorTypeArguments,
         getStaticType,
+        getTypeParameterTypes,
         hasFreeTypeParameters,
         hasInstantiatorTypeArguments,
         isAllDynamic,
@@ -210,29 +211,32 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
     return members;
   }
 
-  ObjectHandle getScript(Uri uri, bool includeSource) {
+  ObjectHandle getScript(Uri uri, bool includeSourceInfo) {
     SourceFile source;
-    if (includeSource &&
-        (options.emitSourceFiles || options.emitSourcePositions)) {
-      source = bytecodeComponent.uriToSource[uri];
-      if (source == null) {
-        final astSource = astUriToSource[uri];
-        if (astSource != null) {
+    if (options.emitSourceFiles || options.emitSourcePositions) {
+      final astSource = astUriToSource[uri];
+      if (astSource != null) {
+        source = bytecodeComponent.uriToSource[uri];
+        if (source == null) {
           final importUri =
               objectTable.getNameHandle(null, astSource.importUri.toString());
-          LineStarts lineStarts;
-          if (options.emitSourcePositions) {
-            lineStarts = new LineStarts(astSource.lineStarts);
-            bytecodeComponent.lineStarts.add(lineStarts);
-          }
-          String text = '';
-          if (options.emitSourceFiles) {
-            text = astSource.cachedText ??
-                utf8.decode(astSource.source, allowMalformed: true);
-          }
-          source = new SourceFile(importUri, lineStarts, text);
+          source = new SourceFile(importUri);
           bytecodeComponent.sourceFiles.add(source);
           bytecodeComponent.uriToSource[uri] = source;
+        }
+        if (options.emitSourcePositions &&
+            includeSourceInfo &&
+            source.lineStarts == null) {
+          LineStarts lineStarts = new LineStarts(astSource.lineStarts);
+          bytecodeComponent.lineStarts.add(lineStarts);
+          source.lineStarts = lineStarts;
+        }
+        if (options.emitSourceFiles &&
+            includeSourceInfo &&
+            source.source == null) {
+          String text = astSource.cachedText ??
+              utf8.decode(astSource.source, allowMalformed: true);
+          source.source = text;
         }
       }
     }
@@ -255,9 +259,8 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
     }
     final name = objectTable.getNameHandle(null, library.name ?? '');
     final script = getScript(library.fileUri, true);
-    final extensionUris = getNativeExtensionUris(library)
-        .map((String uri) => objectTable.getNameHandle(null, uri))
-        .toList();
+    final extensionUris =
+        objectTable.getPublicNameHandles(getNativeExtensionUris(library));
     if (extensionUris.isNotEmpty) {
       flags |= LibraryDeclaration.hasExtensionsFlag;
     }
@@ -278,10 +281,7 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
     if (hasInstantiatorTypeArguments(cls)) {
       flags |= ClassDeclaration.hasTypeArgumentsFlag;
       numTypeArguments = flattenInstantiatorTypeArguments(
-              cls,
-              cls.typeParameters
-                  .map((tp) => new TypeParameterType(tp))
-                  .toList())
+              cls, getTypeParameterTypes(cls.typeParameters))
           .length;
       assert(numTypeArguments > 0);
       if (cls.typeParameters.isNotEmpty) {
@@ -617,9 +617,12 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
         objectTable.mangleMemberName(member, false, false));
 
     final parameters = <ParameterDeclaration>[];
-    parameters
-        .addAll(function.positionalParameters.map(getParameterDeclaration));
-    parameters.addAll(function.namedParameters.map(getParameterDeclaration));
+    for (var param in function.positionalParameters) {
+      parameters.add(getParameterDeclaration(param));
+    }
+    for (var param in function.namedParameters) {
+      parameters.add(getParameterDeclaration(param));
+    }
 
     return new FunctionDeclaration(
         flags,
@@ -667,10 +670,8 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
 
   TypeParametersDeclaration getTypeParametersDeclaration(
       List<TypeParameter> typeParams) {
-    return new TypeParametersDeclaration(typeParams
-        .map((tp) => new NameAndType(objectTable.getNameHandle(null, tp.name),
-            objectTable.getHandle(tp.bound)))
-        .toList());
+    return new TypeParametersDeclaration(
+        objectTable.getTypeParameterHandles(typeParams));
   }
 
   ParameterDeclaration getParameterDeclaration(VariableDeclaration variable) {
@@ -694,9 +695,13 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       return flags;
     }
 
-    List<int> paramFlags = <int>[];
-    paramFlags.addAll(function.positionalParameters.map(getFlags));
-    paramFlags.addAll(function.namedParameters.map(getFlags));
+    final List<int> paramFlags = <int>[];
+    for (var param in function.positionalParameters) {
+      paramFlags.add(getFlags(param));
+    }
+    for (var param in function.namedParameters) {
+      paramFlags.add(getFlags(param));
+    }
 
     for (int flags in paramFlags) {
       if (flags != 0) {
@@ -775,6 +780,16 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       return false;
     }
     if (member is Field) {
+      // TODO(dartbug.com/34277)
+      // Front-end inserts synthetic static fields "_redirecting#" to record
+      // information about redirecting constructors in kernel.
+      // The problem is that initializers of these synthetic static fields
+      // contain incorrect kernel AST, e.g. StaticGet which takes tear-off
+      // of a constructor. Do not generate bytecode for them, as they should
+      // never be used.
+      if (member.isStatic && member.name.name == "_redirecting#") {
+        return false;
+      }
       return hasInitializerCode(member);
     }
     return true;
@@ -1275,6 +1290,9 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
   /// Returns value of the given expression if it is a bool constant.
   /// Otherwise, returns `null`.
   bool _constantConditionValue(Expression condition) {
+    if (options.keepUnreachableCode) {
+      return null;
+    }
     // TODO(dartbug.com/34585): use constant evaluator to evaluate
     // expressions in a non-constant context.
     if (condition is Not) {
@@ -1384,11 +1402,9 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
         }
       }
       if (hasInstantiatorTypeArguments(enclosingClass)) {
-        final typeParameters = (isFactory
-                ? node.function.typeParameters
-                : enclosingClass.typeParameters)
-            .map((p) => new TypeParameterType(p))
-            .toList();
+        final typeParameters = getTypeParameterTypes(isFactory
+            ? node.function.typeParameters
+            : enclosingClass.typeParameters);
         instantiatorTypeArguments =
             flattenInstantiatorTypeArguments(enclosingClass, typeParameters);
       }
@@ -2174,11 +2190,15 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
         break;
     }
 
-    final List<NameAndType> parameters = function.positionalParameters
-        .followedBy(function.namedParameters)
-        .map((v) => new NameAndType(objectTable.getNameHandle(null, v.name),
-            objectTable.getHandle(v.type)))
-        .toList();
+    final List<NameAndType> parameters = <NameAndType>[];
+    for (var v in function.positionalParameters) {
+      parameters.add(new NameAndType(objectTable.getNameHandle(null, v.name),
+          objectTable.getHandle(v.type)));
+    }
+    for (var v in function.namedParameters) {
+      parameters.add(new NameAndType(objectTable.getNameHandle(null, v.name),
+          objectTable.getHandle(v.type)));
+    }
     if (function.requiredParameterCount != parameters.length) {
       if (function.namedParameters.isNotEmpty) {
         flags |= ClosureDeclaration.hasOptionalNamedParamsFlag;
@@ -2187,10 +2207,8 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       }
     }
 
-    final typeParams = function.typeParameters
-        .map((tp) => new NameAndType(objectTable.getNameHandle(null, tp.name),
-            objectTable.getHandle(tp.bound)))
-        .toList();
+    final typeParams =
+        objectTable.getTypeParameterHandles(function.typeParameters);
     if (typeParams.isNotEmpty) {
       flags |= ClosureDeclaration.hasTypeParamsFlag;
     }
@@ -2895,7 +2913,7 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
     }
     // Front-end guarantees that all calls with known function type
     // do not need any argument type checks.
-    if (isUncheckedClosureCall(node, typeEnvironment)) {
+    if (isUncheckedClosureCall(node, typeEnvironment, options)) {
       final int receiverTemp = locals.tempIndexInFrame(node);
       _genArguments(node.receiver, args, storeReceiverToLocal: receiverTemp);
       // Duplicate receiver (closure) for UncheckedClosureCall.
@@ -3081,6 +3099,8 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
     } else if (target is Procedure) {
       if (target.isGetter) {
         _genDirectCall(target, objectTable.getArgDescHandle(0), 0, isGet: true);
+      } else if (target.isFactory || target.isRedirectingFactoryConstructor) {
+        throw 'Unexpected target for StaticGet: factory $target';
       } else {
         asm.emitPushConstant(cp.addObjectRef(new TearOffConstant(target)));
       }

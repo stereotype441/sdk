@@ -44,7 +44,7 @@ abstract class TestRunner {
   String description;
 
   // Factory.
-  static TestRunner getTestRunner(String mode, String top, String tmp,
+  static TestRunner getTestRunner(String mode, bool ffi, String top, String tmp,
       Map<String, String> env, String fileName, Random rand) {
     String prefix = mode.substring(0, 3).toUpperCase();
     String tag = getTag(mode);
@@ -87,7 +87,8 @@ abstract class TestRunner {
       } else if (r == 4) {
         prefix += '-DEPOPTEVERY';
         extraFlags += ['--deoptimize_every=100'];
-      } else if (r == 5) {
+      } else if (r == 5 && !ffi) {
+        // TODO: https://github.com/dart-lang/sdk/issues/37606
         prefix += '-STACKTRACEEVERY';
         extraFlags += ['--stacktrace_every=100'];
       } else if (r == 6) {
@@ -288,12 +289,14 @@ class DartFuzzTest {
     rand = new Random();
     tmpDir = Directory.systemTemp.createTempSync('dart_fuzz');
     fileName = '${tmpDir.path}/fuzz.dart';
-    runner1 =
-        TestRunner.getTestRunner(mode1, top, tmpDir.path, env, fileName, rand);
-    runner2 =
-        TestRunner.getTestRunner(mode2, top, tmpDir.path, env, fileName, rand);
     fp = samePrecision(mode1, mode2);
-    isolate = 'Isolate (${tmpDir.path}) ${fp ? "" : "NO-"}FP : '
+    ffi = ffiCapable(mode1, mode2);
+    runner1 = TestRunner.getTestRunner(
+        mode1, ffi, top, tmpDir.path, env, fileName, rand);
+    runner2 = TestRunner.getTestRunner(
+        mode2, ffi, top, tmpDir.path, env, fileName, rand);
+    isolate =
+        'Isolate (${tmpDir.path}) ${ffi ? "" : "NO-"}FFI ${fp ? "" : "NO-"}FP : '
         '${runner1.description} - ${runner2.description}';
 
     start_time = new DateTime.now().millisecondsSinceEpoch;
@@ -308,9 +311,13 @@ class DartFuzzTest {
     numDivergences = 0;
   }
 
-  bool samePrecision(String mode1, String mode2) {
-    return mode1.contains('64') == mode2.contains('64');
-  }
+  bool samePrecision(String mode1, String mode2) =>
+      mode1.contains('64') == mode2.contains('64');
+
+  bool ffiCapable(String mode1, String mode2) =>
+      (mode1.startsWith('jit') || mode1.startsWith('kbc')) &&
+      (mode2.startsWith('jit') || mode2.startsWith('kbc')) &&
+      (!mode1.contains('arm') && !mode2.contains('arm'));
 
   bool timeIsUp() {
     if (time > 0) {
@@ -339,7 +346,7 @@ class DartFuzzTest {
 
   void generateTest() {
     final file = new File(fileName).openSync(mode: FileMode.write);
-    new DartFuzz(seed, fp, file).run();
+    new DartFuzz(seed, fp, ffi, file).run();
     file.closeSync();
   }
 
@@ -449,6 +456,7 @@ class DartFuzzTest {
   TestRunner runner1;
   TestRunner runner2;
   bool fp;
+  bool ffi;
   String isolate;
   int seed;
 

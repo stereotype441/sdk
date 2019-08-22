@@ -17,6 +17,7 @@
 #include "vm/flags.h"
 #include "vm/globals.h"
 #include "vm/interpreter.h"
+#include "vm/isolate_reload.h"
 #include "vm/json_stream.h"
 #include "vm/kernel.h"
 #include "vm/longjump.h"
@@ -860,7 +861,7 @@ RawObject* ActivationFrame::GetAsyncContextVariable(const String& name) {
           // Bytecode uses absolute context levels, i.e. the frame context level
           // on entry must be calculated.
           const intptr_t frame_ctx_level =
-              IsInterpreted() ? ctx_.GetLevel() : 0;
+              function().is_declared_in_bytecode() ? ctx_.GetLevel() : 0;
           return GetRelativeContextVar(var_info.scope_id,
                                        variable_index.value(), frame_ctx_level);
         }
@@ -994,6 +995,13 @@ intptr_t ActivationFrame::GetAwaitJumpVariable() {
     if (var_descriptors_.GetName(i) == Symbols::AwaitJumpVar().raw()) {
       ASSERT(kind == RawLocalVarDescriptors::kContextVar);
       ASSERT(!ctx_.IsNull());
+      // Variable descriptors constructed from bytecode have all variables of
+      // enclosing functions, even shadowed by the current function.
+      // Check context level in order to pick correct :await_jump_var variable.
+      if (function().is_declared_in_bytecode() &&
+          (ctx_.GetLevel() != var_info.scope_id)) {
+        continue;
+      }
       Object& await_jump_index = Object::Handle(ctx_.At(var_info.index()));
       ASSERT(await_jump_index.IsSmi());
       await_jump_var = Smi::Cast(await_jump_index).Value();
@@ -2025,6 +2033,7 @@ void Debugger::DeoptimizeWorld() {
   // TODO(hausner): Could possibly be combined with RemoveOptimizedCode()
   const ClassTable& class_table = *isolate_->class_table();
   Zone* zone = Thread::Current()->zone();
+  CallSiteResetter resetter(zone);
   Class& cls = Class::Handle(zone);
   Array& functions = Array::Handle(zone);
   GrowableObjectArray& closures = GrowableObjectArray::Handle(zone);
@@ -2053,7 +2062,7 @@ void Debugger::DeoptimizeWorld() {
           }
           code = function.unoptimized_code();
           if (!code.IsNull()) {
-            code.ResetSwitchableCalls(zone);
+            resetter.ResetSwitchableCalls(code);
           }
           // Also disable any optimized implicit closure functions.
           if (function.HasImplicitClosureFunction()) {
@@ -2063,7 +2072,7 @@ void Debugger::DeoptimizeWorld() {
             }
             code = function.unoptimized_code();
             if (!code.IsNull()) {
-              code.ResetSwitchableCalls(zone);
+              resetter.ResetSwitchableCalls(code);
             }
           }
         }
@@ -2082,7 +2091,7 @@ void Debugger::DeoptimizeWorld() {
     }
     code = function.unoptimized_code();
     if (!code.IsNull()) {
-      code.ResetSwitchableCalls(zone);
+      resetter.ResetSwitchableCalls(code);
     }
   }
 #endif  // defined(DART_PRECOMPILED_RUNTIME)

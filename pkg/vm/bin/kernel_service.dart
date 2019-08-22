@@ -82,6 +82,11 @@ abstract class Compiler {
   final bool bytecode;
   final String packageConfig;
 
+  // Code coverage and hot reload are only supported by incremental compiler,
+  // which is used if vm-service is enabled.
+  final bool supportCodeCoverage;
+  final bool supportHotReload;
+
   final List<String> errors = new List<String>();
 
   CompilerOptions options;
@@ -91,6 +96,8 @@ abstract class Compiler {
       this.enableAsserts: false,
       this.experimentalFlags: null,
       this.bytecode: false,
+      this.supportCodeCoverage: false,
+      this.supportHotReload: false,
       this.packageConfig: null}) {
     Uri packagesUri = null;
     if (packageConfig != null) {
@@ -157,27 +164,31 @@ abstract class Compiler {
 
       if (options.bytecode && errors.isEmpty) {
         await runWithFrontEndCompilerContext(script, options, component, () {
-          // TODO(alexmarkov): disable source positions, local variables info,
+          // TODO(alexmarkov): disable local variables info,
           //  debugger stops and source files in VM PRODUCT mode.
           // TODO(rmacnak): disable annotations if mirrors are not enabled.
           generateBytecode(component,
               coreTypes: compilerResult.coreTypes,
               hierarchy: compilerResult.classHierarchy,
               options: new BytecodeOptions(
-                  enableAsserts: enableAsserts,
-                  environmentDefines: options.environmentDefines,
-                  // Needed both for stack traces and the debugger.
-                  emitSourcePositions: true,
-                  // Only needed when the debugger is available.
-                  emitLocalVarInfo: true,
-                  // Only needed when the debugger is available.
-                  emitDebuggerStops: true,
-                  // Only needed when the VM service is available.
-                  emitSourceFiles: true,
-                  // Only needed when reload is available.
-                  emitInstanceFieldInitializers: true,
-                  // Only needed when mirrors are available.
-                  emitAnnotations: true));
+                enableAsserts: enableAsserts,
+                environmentDefines: options.environmentDefines,
+                // Needed both for stack traces and the debugger.
+                emitSourcePositions: true,
+                // Only needed when the debugger is available.
+                emitLocalVarInfo: true,
+                // Only needed when the debugger is available.
+                emitDebuggerStops: true,
+                // Only needed when the VM service is available.
+                emitSourceFiles: true,
+                // Only needed when reload is available.
+                emitInstanceFieldInitializers: supportHotReload,
+                // Only needed when mirrors are available.
+                emitAnnotations: true,
+                // Only needed when observatory (source report) is available.
+                keepUnreachableCode: supportCodeCoverage,
+                avoidClosureCallInstructions: supportCodeCoverage,
+              ));
           component = createFreshComponentWithBytecode(component);
         });
       }
@@ -250,6 +261,8 @@ class IncrementalCompilerWrapper extends Compiler {
             enableAsserts: enableAsserts,
             experimentalFlags: experimentalFlags,
             bytecode: bytecode,
+            supportHotReload: true,
+            supportCodeCoverage: true,
             packageConfig: packageConfig);
 
   @override
@@ -731,7 +744,7 @@ FileSystem _buildFileSystem(List sourceFiles, List<int> platformKernel,
   return fileSystem;
 }
 
-train(String scriptUri, String platformKernelPath) {
+train(String scriptUri, String platformKernelPath, bool bytecode) {
   var tag = kTrainTag;
   var responsePort = new RawReceivePort();
   responsePort.handler = (response) {
@@ -757,7 +770,7 @@ train(String scriptUri, String platformKernelPath) {
     false /* suppress warnings */,
     false /* enable asserts */,
     null /* experimental_flags */,
-    false /* generate bytecode */,
+    bytecode,
     null /* package_config */,
     null /* multirootFilepaths */,
     null /* multirootScheme */,
@@ -767,9 +780,20 @@ train(String scriptUri, String platformKernelPath) {
 
 main([args]) {
   if ((args?.length ?? 0) > 1 && args[0] == '--train') {
-    // This entry point is used when creating an app snapshot. The argument
-    // provides a script to compile to warm-up generated code.
-    train(args[1], args.length > 2 ? args[2] : null);
+    // This entry point is used when creating an app snapshot.
+    // It takes the following extra arguments:
+    // 1) Script to compile.
+    // 2) Optional '--bytecode' argument to train bytecode generation.
+    // 3) Optional platform kernel path.
+    int argIndex = 1;
+    final String script = args[argIndex++];
+    bool bytecode = false;
+    if ((argIndex < args.length) && (args[argIndex] == '--bytecode')) {
+      bytecode = true;
+      ++argIndex;
+    }
+    final String platform = (argIndex < args.length) ? args[argIndex] : null;
+    train(script, platform, bytecode);
   } else {
     // Entry point for the Kernel isolate.
     return new RawReceivePort()..handler = _processLoadRequest;

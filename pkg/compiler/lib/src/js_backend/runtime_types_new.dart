@@ -301,8 +301,12 @@ class _RecipeGenerator implements DartTypeVisitor<void, void> {
 
     if (_closedWorld.isUsedAsMixin(cls)) return null;
 
+    // TODO(fishythefish): We should only check strict subclasses for
+    // non-trivial substitutions in the general case. We should check all strict
+    // subtypes only when [cls] is a mixin (above) or when [cls] is a type
+    // argument to `extractTypeArguments`.
     ClassHierarchy classHierarchy = _closedWorld.classHierarchy;
-    if (classHierarchy.anyStrictSubclassOf(cls, (ClassEntity subclass) {
+    if (classHierarchy.anyStrictSubtypeOf(cls, (ClassEntity subclass) {
       return !_rtiSubstitutions.isTrivialSubstitution(subclass, cls);
     })) {
       return null;
@@ -322,6 +326,11 @@ class _RecipeGenerator implements DartTypeVisitor<void, void> {
   @override
   void visitDynamicType(DynamicType type, _) {
     _emitCode(Recipe.pushDynamic);
+  }
+
+  @override
+  void visitAnyType(AnyType type, _) {
+    _emitExtensionOp(Recipe.pushAnyExtension);
   }
 
   @override

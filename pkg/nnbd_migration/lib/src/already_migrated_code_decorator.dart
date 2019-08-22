@@ -36,6 +36,9 @@ class AlreadyMigratedCodeDecorator {
       assert(nullabilitySuffix == NullabilitySuffix.star);
     }
     if (type is FunctionType) {
+      if (type.typeFormals.isNotEmpty) {
+        throw UnimplementedError('Decorating generic function type');
+      }
       var positionalParameters = <DecoratedType>[];
       var namedParameters = <String, DecoratedType>{};
       for (var parameter in type.parameters) {
@@ -51,8 +54,9 @@ class AlreadyMigratedCodeDecorator {
           positionalParameters: positionalParameters);
     } else if (type is InterfaceType) {
       if (type.typeParameters.isNotEmpty) {
-        // TODO(paulberry)
-        throw UnimplementedError('Decorating ${type.displayName}');
+        assert(type.typeArguments.length == type.typeParameters.length);
+        return DecoratedType(type, _graph.never,
+            typeArguments: type.typeArguments.map(decorate).toList());
       }
       return DecoratedType(type, _graph.never);
     } else if (type is TypeParameterType) {

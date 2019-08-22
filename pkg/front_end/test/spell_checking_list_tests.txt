@@ -32,6 +32,7 @@ b1x
 b2x
 ba
 backed
+bailout
 bash
 bat
 batch
@@ -103,12 +104,15 @@ def
 depended
 depfile
 deviation
+dfast
 dictionaries
 dictionary
 differs
 dillfile
+dills
 dirname
 disagree
+disallowed
 disconnect
 discovering
 dispatcher
@@ -166,6 +170,7 @@ fox
 framework
 fulfill
 func
+futures
 gallery
 gamma
 gen
@@ -223,6 +228,7 @@ lets
 lightly
 likewise
 linebreaks
+lints
 linux
 listening
 ll
@@ -244,6 +250,7 @@ mismatched
 miss
 misspelled
 mistake
+mistakes
 month
 mx
 mysdk
@@ -313,6 +320,8 @@ say
 scans
 screen
 scripts
+sdkroot
+sdks
 secondary
 seconds
 segment
@@ -338,6 +347,7 @@ strip
 strongest
 structures
 stub's
+stupid
 subcommand
 subscription
 subtool
@@ -380,6 +390,7 @@ typeargs
 typeparam
 typeparambounds
 unassigned
+unawaited
 unbreak
 unification
 unordered

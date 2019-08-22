@@ -336,6 +336,8 @@ capabilities
 capability
 capital
 capture
+captured
+captures
 capturing
 care
 careful
@@ -393,6 +395,7 @@ clean
 cleaned
 cleaning
 cleans
+cleanup
 clear
 cleared
 clearer
@@ -562,6 +565,7 @@ control
 controller
 convenience
 convenient
+conventional
 conventions
 convert
 converted
@@ -615,6 +619,7 @@ cycles
 cyclic
 dart
 dart2js
+dartdevc
 data
 date
 dead
@@ -868,6 +873,7 @@ ensures
 ensuring
 entails
 enter
+entered
 entering
 entire
 entirely
@@ -977,6 +983,7 @@ extract
 extraction
 extractor
 extraneous
+face
 facilitate
 fact
 fact's
@@ -1054,12 +1061,14 @@ flux
 fold
 folded
 folder
+folders
 follow
 followed
 following
 follows
 for
 force
+forced
 forest
 forget
 fork
@@ -1249,6 +1258,7 @@ imported
 importer
 importing
 imports
+imposed
 imposes
 impossible
 improve
@@ -1455,6 +1465,7 @@ larger
 last
 late
 later
+latest
 latter
 lax
 lazily
@@ -1492,6 +1503,7 @@ library's
 license
 licensing
 light
+lightweight
 like
 likely
 limit
@@ -1546,6 +1558,7 @@ looks
 lookup
 lookups
 loop
+loop's
 looping
 loops
 loosely
@@ -1785,6 +1798,8 @@ once
 one
 ones
 only
+onto
+opaque
 open
 opener
 openers
@@ -1887,6 +1902,7 @@ pasted
 patch
 patched
 patches
+patching
 paths
 pattern
 peek
@@ -2229,6 +2245,7 @@ responsible
 rest
 restore
 restored
+restores
 restrict
 restricted
 result
@@ -2459,6 +2476,7 @@ spread
 spreadable
 spreads
 square
+squiggly
 stable
 stack
 stage
@@ -2583,6 +2601,7 @@ syntactically
 syntax
 synthesize
 synthesized
+synthesizing
 synthetic
 synthetically
 system
@@ -2867,6 +2886,7 @@ virtual
 visible
 visit
 visited
+visiting
 visitor
 visual
 vm

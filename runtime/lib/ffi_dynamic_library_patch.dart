@@ -8,6 +8,8 @@ import "dart:_internal" show patch;
 import 'dart:typed_data' show TypedData;
 
 DynamicLibrary _open(String name) native "Ffi_dl_open";
+DynamicLibrary _processLibrary() native "Ffi_dl_processLibrary";
+DynamicLibrary _executableLibrary() native "Ffi_dl_executableLibrary";
 
 @patch
 @pragma("vm:entry-point")
@@ -18,10 +20,16 @@ class DynamicLibrary {
   }
 
   @patch
+  factory DynamicLibrary.process() => _processLibrary();
+
+  @patch
+  factory DynamicLibrary.executable() => _executableLibrary();
+
+  @patch
   Pointer<T> lookup<T extends NativeType>(String symbolName)
       native "Ffi_dl_lookup";
 
-  // The real implementation of this function lives in FfiUseSitesTransformer
+  // The real implementation of this function lives in FfiUseSiteTransformer
   // for interface calls. Only dynamic calls (which are illegal) reach this
   // implementation.
   @patch

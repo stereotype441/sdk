@@ -742,7 +742,12 @@ void BytecodeFlowGraphBuilder::BuildDebugCheck() {
   if (is_generating_interpreter()) {
     UNIMPLEMENTED();  // TODO(alexmarkov): interpreter
   }
-  code_ += B->DebugStepCheck(position_);
+  // DebugStepCheck instructions are emitted for all explicit DebugCheck
+  // opcodes as well as for implicit DEBUG_CHECK executed by the interpreter
+  // for some opcodes, but not before the first explicit DebugCheck opcode is
+  // encountered.
+  build_debug_step_checks_ = true;
+  BuildDebugStepCheck();
 }
 
 void BytecodeFlowGraphBuilder::BuildPushConstant() {
@@ -789,6 +794,8 @@ void BytecodeFlowGraphBuilder::BuildDirectCall() {
     UNIMPLEMENTED();  // TODO(alexmarkov): interpreter
   }
 
+  // A DebugStepCheck is performed as part of the calling stub.
+
   const Function& target = Function::Cast(ConstantAt(DecodeOperandD()).value());
   const intptr_t argc = DecodeOperandF().value();
 
@@ -831,12 +838,11 @@ void BytecodeFlowGraphBuilder::BuildDirectCall() {
 
   ArgumentArray arguments = GetArguments(argc);
 
-  // TODO(alexmarkov): pass ICData::kSuper for super calls
-  // (need to distinguish them in bytecode).
   StaticCallInstr* call = new (Z) StaticCallInstr(
       position_, target, arg_desc.TypeArgsLen(),
       Array::ZoneHandle(Z, arg_desc.GetArgumentNames()), arguments,
-      *ic_data_array_, B->GetNextDeoptId(), ICData::kStatic);
+      *ic_data_array_, B->GetNextDeoptId(),
+      target.IsDynamicFunction() ? ICData::kSuper : ICData::kStatic);
 
   if (target.MayHaveUncheckedEntryPoint(isolate())) {
     call->set_entry_kind(Code::EntryKind::kUnchecked);
@@ -854,6 +860,8 @@ void BytecodeFlowGraphBuilder::BuildInterfaceCallCommon(
   if (is_generating_interpreter()) {
     UNIMPLEMENTED();  // TODO(alexmarkov): interpreter
   }
+
+  // A DebugStepCheck is performed as part of the calling stub.
 
   const Function& interface_target =
       Function::Cast(ConstantAt(DecodeOperandD()).value());
@@ -929,6 +937,8 @@ void BytecodeFlowGraphBuilder::BuildUncheckedClosureCall() {
     UNIMPLEMENTED();  // TODO(alexmarkov): interpreter
   }
 
+  BuildDebugStepCheck();
+
   const Array& arg_desc_array =
       Array::Cast(ConstantAt(DecodeOperandD()).value());
   const ArgumentsDescriptor arg_desc(arg_desc_array);
@@ -957,6 +967,8 @@ void BytecodeFlowGraphBuilder::BuildDynamicCall() {
   if (is_generating_interpreter()) {
     UNIMPLEMENTED();  // TODO(alexmarkov): interpreter
   }
+
+  // A DebugStepCheck is performed as part of the calling stub.
 
   const ICData& icdata = ICData::Cast(ConstantAt(DecodeOperandD()).value());
   const intptr_t deopt_id = icdata.deopt_id();
@@ -1199,6 +1211,8 @@ void BytecodeFlowGraphBuilder::BuildStoreStaticTOS() {
   if (is_generating_interpreter()) {
     UNIMPLEMENTED();  // TODO(alexmarkov): interpreter
   }
+
+  BuildDebugStepCheck();
 
   LoadStackSlots(1);
   Operand cp_index = DecodeOperandD();
@@ -1535,6 +1549,7 @@ void BytecodeFlowGraphBuilder::BuildDrop1() {
 }
 
 void BytecodeFlowGraphBuilder::BuildReturnTOS() {
+  BuildDebugStepCheck();
   LoadStackSlots(1);
   ASSERT(code_.is_open());
   code_ += B->Return(position_);
@@ -1549,6 +1564,8 @@ void BytecodeFlowGraphBuilder::BuildThrow() {
   if (is_generating_interpreter()) {
     UNIMPLEMENTED();  // TODO(alexmarkov): interpreter
   }
+
+  BuildDebugStepCheck();
 
   if (DecodeOperandA().value() == 0) {
     // throw
@@ -1606,6 +1623,8 @@ void BytecodeFlowGraphBuilder::BuildSetFrame() {
 }
 
 void BytecodeFlowGraphBuilder::BuildEqualsNull() {
+  BuildDebugStepCheck();
+
   ASSERT(scratch_var_ != nullptr);
   LoadStackSlots(1);
 
@@ -1638,6 +1657,8 @@ void BytecodeFlowGraphBuilder::BuildPrimitiveOp(
     int num_args) {
   ASSERT((num_args == 1) || (num_args == 2));
   ASSERT(MethodTokenRecognizer::RecognizeTokenKind(name) == token_kind);
+
+  // A DebugStepCheck is performed as part of the calling stub.
 
   LoadStackSlots(num_args);
   const ArgumentArray arguments = GetArguments(num_args);
@@ -1793,6 +1814,14 @@ void BytecodeFlowGraphBuilder::BuildFfiAsFunction() {
   // Drop type arguments, preserving pointer.
   code_ += B->DropTempsPreserveTop(1);
   code_ += B->BuildFfiAsFunctionInternalCall(type_args);
+}
+
+void BytecodeFlowGraphBuilder::BuildDebugStepCheck() {
+#if !defined(PRODUCT)
+  if (build_debug_step_checks_) {
+    code_ += B->DebugStepCheck(position_);
+  }
+#endif  // !defined(PRODUCT)
 }
 
 static bool IsICDataEntry(const ObjectPool& object_pool, intptr_t index) {

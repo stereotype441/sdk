@@ -244,9 +244,7 @@ Future<ComputeKernelResult> computeKernel(List<String> args,
   fe.InitializedCompilerState state;
   bool usingIncrementalCompiler = false;
   bool recordUsedInputs = parsedArgs["used-inputs"] != null;
-  if (parsedArgs['use-incremental-compiler'] &&
-      linkedInputs.isEmpty &&
-      isWorker) {
+  if (parsedArgs['use-incremental-compiler'] && isWorker) {
     usingIncrementalCompiler = true;
 
     /// Build a map of uris to digests.
@@ -261,7 +259,7 @@ Future<ComputeKernelResult> computeKernel(List<String> args,
         _toUri(parsedArgs['dart-sdk-summary']),
         _toUri(parsedArgs['packages-file']),
         _toUri(parsedArgs['libraries-file']),
-        summaryInputs,
+        [...summaryInputs, ...linkedInputs],
         inputDigests,
         target,
         fileSystem,
@@ -321,7 +319,11 @@ Future<ComputeKernelResult> computeKernel(List<String> args,
             includeSources: false, includeOffsets: false));
       }
 
-      return Future.value(fe.serializeComponent(incrementalComponent));
+      return Future.value(fe.serializeComponent(incrementalComponent,
+          filter: excludeNonSources
+              ? (library) => sources.contains(library.importUri)
+              : null,
+          includeOffsets: true));
     });
   } else if (summaryOnly) {
     kernel = await fe.compileSummary(state, sources, onDiagnostic,

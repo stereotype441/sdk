@@ -48,7 +48,6 @@ class C {
 ''');
   }
 
-  @FailingTest(issue: 'https://github.com/dart-lang/sdk/issues/37733')
   test_fuzz_01() async {
     await _assertCanBeAnalyzed(r'''
 typedef K=Function(<>($
@@ -61,7 +60,6 @@ class G<class G{d
 ''');
   }
 
-  @FailingTest(issue: 'https://github.com/dart-lang/sdk/issues/37735')
   test_fuzz_03() async {
     await _assertCanBeAnalyzed('''
 class{const():super.{n
@@ -74,6 +72,16 @@ f({a: ({b = 0}) {}}) {}
 ''');
   }
 
+  test_fuzz_05() async {
+    // Here 'v' is used as both the local variable name, and its type.
+    // This triggers "reference before declaration" diagnostics.
+    // It attempts to ask the enclosing unit element for "v".
+    // Every (not library or unit) element must have the enclosing unit.
+    await _assertCanBeAnalyzed('''
+f({a = [for (v v in [])]}) {}
+''');
+  }
+
   test_fuzz_06() async {
     await _assertCanBeAnalyzed(r'''
 class C {
@@ -83,9 +91,60 @@ class C {
 ''');
   }
 
+  test_fuzz_07() async {
+    // typedef v(<T extends T>(e
+    await _assertCanBeAnalyzed(r'''
+typedef F(a<TT extends TT>(e));
+''');
+  }
+
+  test_fuzz_08() async {
+//    class{const v
+//    v=((){try catch
+    // When we resolve initializers of typed constant variables,
+    // we should build locale elements.
+    await _assertCanBeAnalyzed(r'''
+class C {
+  const Object v = () { var a = 0; };
+}
+''');
+  }
+
   test_genericFunction_asTypeArgument_ofUnresolvedClass() async {
     await _assertCanBeAnalyzed(r'''
 C<int Function()> c;
+''');
+  }
+
+  test_keywordInConstructorInitializer_assert() async {
+    await _assertCanBeAnalyzed('''
+class C {
+  C() : assert = 0;
+}
+''');
+  }
+
+  test_keywordInConstructorInitializer_null() async {
+    await _assertCanBeAnalyzed('''
+class C {
+  C() : null = 0;
+}
+''');
+  }
+
+  test_keywordInConstructorInitializer_super() async {
+    await _assertCanBeAnalyzed('''
+class C {
+  C() : super = 0;
+}
+''');
+  }
+
+  test_keywordInConstructorInitializer_this() async {
+    await _assertCanBeAnalyzed('''
+class C {
+  C() : this = 0;
+}
 ''');
   }
 

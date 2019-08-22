@@ -733,6 +733,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
   void visitExtensionDeclaration(ExtensionDeclaration node) {
     _enclosingExtension = node.declaredElement;
     _duplicateDefinitionVerifier.checkExtension(node);
+    _checkForMismatchedAccessorTypesInExtension(node);
     super.visitExtensionDeclaration(node);
     _enclosingExtension = null;
   }
@@ -791,11 +792,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
       return;
     }
     if (_checkForEachParts(node, identifier)) {
-      Element variableElement = identifier.staticElement;
-      if (variableElement is VariableElement && variableElement.isConst) {
-        _errorReporter.reportErrorForNode(
-            CompileTimeErrorCode.FOR_IN_WITH_CONST_VARIABLE, identifier);
-      }
+      _checkForAssignmentToFinal(identifier);
     }
     super.visitForEachPartsWithIdentifier(node);
   }
@@ -1094,7 +1091,8 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
     if (target != null) {
       ClassElement typeReference = ElementResolver.getTypeReference(target);
       _checkForStaticAccessToInstanceMember(typeReference, methodName);
-      _checkForInstanceAccessToStaticMember(typeReference, methodName);
+      _checkForInstanceAccessToStaticMember(
+          typeReference, node.target, methodName);
       _checkForUnnecessaryNullAware(target, node.operator);
     } else {
       _checkForUnqualifiedReferenceToNonLocalStaticMember(methodName);
@@ -1181,7 +1179,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
           ElementResolver.getTypeReference(node.prefix);
       SimpleIdentifier name = node.identifier;
       _checkForStaticAccessToInstanceMember(typeReference, name);
-      _checkForInstanceAccessToStaticMember(typeReference, name);
+      _checkForInstanceAccessToStaticMember(typeReference, node.prefix, name);
     }
     String property = node.identifier.name;
     if (node.staticElement is ExecutableElement &&
@@ -1214,7 +1212,8 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
         ElementResolver.getTypeReference(node.realTarget);
     SimpleIdentifier propertyName = node.propertyName;
     _checkForStaticAccessToInstanceMember(typeReference, propertyName);
-    _checkForInstanceAccessToStaticMember(typeReference, propertyName);
+    _checkForInstanceAccessToStaticMember(
+        typeReference, node.target, propertyName);
     if (node.operator?.type != TokenType.QUESTION_PERIOD &&
         !_objectPropertyNames.contains(propertyName.name)) {
       _checkForNullableDereference(node.target);
@@ -3378,25 +3377,39 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
    * See [StaticTypeWarningCode.INSTANCE_ACCESS_TO_STATIC_MEMBER].
    */
   void _checkForInstanceAccessToStaticMember(
-      ClassElement typeReference, SimpleIdentifier name) {
-    // OK, in comment
+      ClassElement typeReference, Expression target, SimpleIdentifier name) {
     if (_isInComment) {
-      return;
-    }
-    // OK, target is a type
-    if (typeReference != null) {
+      // OK, in comment
       return;
     }
     // prepare member Element
     Element element = name.staticElement;
     if (element is ExecutableElement) {
-      // OK, top-level element
-      if (element.enclosingElement is! ClassElement) {
+      if (!element.isStatic) {
+        // OK, instance member
         return;
       }
-      // OK, instance member
-      if (!element.isStatic) {
-        return;
+      Element enclosingElement = element.enclosingElement;
+      if (enclosingElement is ExtensionElement) {
+        if (target is ExtensionOverride) {
+          // OK, target is an extension override
+          return;
+        } else if (target is SimpleIdentifier &&
+            target.staticElement is ExtensionElement) {
+          return;
+        } else if (target is PrefixedIdentifier &&
+            target.staticElement is ExtensionElement) {
+          return;
+        }
+      } else {
+        if (typeReference != null) {
+          // OK, target is a type
+          return;
+        }
+        if (enclosingElement is! ClassElement) {
+          // OK, top-level element
+          return;
+        }
       }
       _errorReporter.reportErrorForNode(
           StaticTypeWarningCode.INSTANCE_ACCESS_TO_STATIC_MEMBER,
@@ -3691,6 +3704,36 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
             StaticWarningCode.MISMATCHED_GETTER_AND_SETTER_TYPES,
             accessorDeclaration,
             [accessorTextName, getterType, setterType, accessorTextName]);
+      }
+    }
+  }
+
+  /**
+   * Check whether all similarly named accessors have consistent types.
+   */
+  void _checkForMismatchedAccessorTypesInExtension(
+      ExtensionDeclaration extension) {
+    for (ClassMember member in extension.members) {
+      if (member is MethodDeclaration && member.isGetter) {
+        PropertyAccessorElement getterElement =
+            member.declaredElement as PropertyAccessorElement;
+        PropertyAccessorElement setterElement =
+            getterElement.correspondingSetter;
+        if (setterElement != null) {
+          DartType getterType = _getGetterType(getterElement);
+          DartType setterType = _getSetterType(setterElement);
+          if (setterType != null &&
+              getterType != null &&
+              !_typeSystem.isAssignableTo(getterType, setterType,
+                  featureSet: _featureSet)) {
+            SimpleIdentifier nameNode = member.name;
+            String name = nameNode.name;
+            _errorReporter.reportTypeErrorForNode(
+                StaticWarningCode.MISMATCHED_GETTER_AND_SETTER_TYPES,
+                nameNode,
+                [name, getterType, setterType, name]);
+          }
+        }
       }
     }
   }

@@ -43,6 +43,9 @@ class ParserErrorCode extends ErrorCode {
       'ABSTRACT_TYPEDEF', "Typedefs can't be declared to be 'abstract'.",
       correction: "Try removing the keyword 'abstract'.");
 
+  static const ParserErrorCode ANNOTATION_WITH_TYPE_ARGUMENTS =
+      _ANNOTATION_WITH_TYPE_ARGUMENTS;
+
   /**
    * 16.32 Identifier Reference: It is a compile-time error if any of the
    * identifiers async, await, or yield is used as an identifier in a function
@@ -356,6 +359,8 @@ class ParserErrorCode extends ErrorCode {
               "Try using a generic function type (returnType 'Function(' parameters ')').");
 
   static const ParserErrorCode INVALID_HEX_ESCAPE = _INVALID_HEX_ESCAPE;
+
+  static const ParserErrorCode INVALID_INITIALIZER = _INVALID_INITIALIZER;
 
   static const ParserErrorCode INVALID_LITERAL_IN_CONFIGURATION =
       const ParserErrorCode('INVALID_LITERAL_IN_CONFIGURATION',

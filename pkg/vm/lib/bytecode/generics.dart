@@ -11,6 +11,8 @@ import 'package:kernel/core_types.dart' show CoreTypes;
 import 'package:kernel/type_algebra.dart' show Substitution;
 import 'package:kernel/type_environment.dart' show TypeEnvironment;
 
+import 'options.dart' show BytecodeOptions;
+
 bool hasInstantiatorTypeArguments(Class c) {
   for (; c != null; c = c.superclass) {
     if (c.typeParameters.isNotEmpty) {
@@ -18,6 +20,17 @@ bool hasInstantiatorTypeArguments(Class c) {
     }
   }
   return false;
+}
+
+List<DartType> getTypeParameterTypes(List<TypeParameter> typeParameters) {
+  if (typeParameters.isEmpty) {
+    return const <DartType>[];
+  }
+  final types = new List<DartType>(typeParameters.length);
+  for (int i = 0; i < typeParameters.length; ++i) {
+    types[i] = new TypeParameterType(typeParameters[i]);
+  }
+  return types;
 }
 
 bool _canReuseSuperclassTypeArguments(List<DartType> superTypeArgs,
@@ -59,7 +72,9 @@ List<DartType> flattenInstantiatorTypeArguments(
   final substitution = Substitution.fromPairs(typeParameters, typeArgs);
 
   List<DartType> flatTypeArgs = <DartType>[];
-  flatTypeArgs.addAll(superTypeArgs.map((t) => substitution.substituteType(t)));
+  for (var type in superTypeArgs) {
+    flatTypeArgs.add(substitution.substituteType(type));
+  }
   flatTypeArgs.addAll(typeArgs.getRange(overlap, typeArgs.length));
 
   return flatTypeArgs;
@@ -76,11 +91,23 @@ List<DartType> getInstantiatorTypeArguments(
 }
 
 List<DartType> getDefaultFunctionTypeArguments(FunctionNode function) {
-  List<DartType> defaultTypes = function.typeParameters
-      .map((p) => p.defaultType ?? const DynamicType())
-      .toList();
-  if (isAllDynamic(defaultTypes)) {
+  final typeParameters = function.typeParameters;
+  if (typeParameters.isEmpty) {
     return null;
+  }
+  bool dynamicOnly = true;
+  for (var tp in typeParameters) {
+    if (tp.defaultType != null && tp.defaultType != const DynamicType()) {
+      dynamicOnly = false;
+      break;
+    }
+  }
+  if (dynamicOnly) {
+    return null;
+  }
+  List<DartType> defaultTypes = <DartType>[];
+  for (var tp in typeParameters) {
+    defaultTypes.add(tp.defaultType ?? const DynamicType());
   }
   return defaultTypes;
 }
@@ -254,7 +281,8 @@ bool _hasGenericCovariantParameters(Member target) {
 
 /// Returns true if invocation [node] is a closure call with statically known
 /// function type. Such invocations can omit argument type checks.
-bool isUncheckedClosureCall(
-        MethodInvocation node, TypeEnvironment typeEnvironment) =>
+bool isUncheckedClosureCall(MethodInvocation node,
+        TypeEnvironment typeEnvironment, BytecodeOptions options) =>
     node.name.name == 'call' &&
-    getStaticType(node.receiver, typeEnvironment) is FunctionType;
+    getStaticType(node.receiver, typeEnvironment) is FunctionType &&
+    !options.avoidClosureCallInstructions;

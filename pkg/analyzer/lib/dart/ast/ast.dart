@@ -989,7 +989,10 @@ abstract class ClassDeclaration implements ClassOrMixinDeclaration {
   ConstructorDeclaration getConstructor(String name);
 }
 
-/// A node that declares a name within the scope of a class.
+/// A node that declares a name within the scope of a class declarations.
+///
+/// When the 'extension-methods' experiment is enabled, these nodes can also be
+/// located inside extension declarations.
 ///
 /// Clients may not extend, implement or mix-in this class.
 abstract class ClassMember implements Declaration {}
@@ -1257,11 +1260,12 @@ abstract class CompilationUnit implements AstNode {
 ///
 ///    compilationUnitMember ::=
 ///        [ClassDeclaration]
+///      | [MixinDeclaration]
+///      | [ExtensionDeclaration]
+///      | [EnumDeclaration]
 ///      | [TypeAlias]
 ///      | [FunctionDeclaration]
-///      | [MethodDeclaration]
-///      | [VariableDeclaration]
-///      | [VariableDeclaration]
+///      | [TopLevelVariableDeclaration]
 ///
 /// Clients may not extend, implement or mix-in this class.
 abstract class CompilationUnitMember implements Declaration {}
@@ -2189,6 +2193,10 @@ abstract class ExtensionOverride implements Expression {
 ///    fieldDeclaration ::=
 ///        'static'? [VariableDeclarationList] ';'
 ///
+/// Prior to the 'extension-methods' experiment, these nodes were always
+/// children of a class declaration. When the experiment is enabled, these nodes
+/// can also be children of an extension declaration.
+///
 /// Clients may not extend, implement or mix-in this class.
 abstract class FieldDeclaration implements ClassMember {
   /// The 'covariant' keyword, or `null` if the keyword was not used.
@@ -2807,6 +2815,9 @@ abstract class FunctionExpressionInvocation implements InvocationExpression {
 ///
 /// Clients may not extend, implement or mix-in this class.
 abstract class FunctionTypeAlias implements TypeAlias {
+  @override
+  FunctionTypeAliasElement get declaredElement;
+
   /// Return the parameters associated with the function type.
   FormalParameterList get parameters;
 
@@ -3738,6 +3749,10 @@ abstract class MapLiteralEntry implements CollectionElement {
 ///    methodName ::=
 ///        [SimpleIdentifier]
 ///      | 'operator' [SimpleIdentifier]
+///
+/// Prior to the 'extension-methods' experiment, these nodes were always
+/// children of a class declaration. When the experiment is enabled, these nodes
+/// can also be children of an extension declaration.
 ///
 /// Clients may not extend, implement or mix-in this class.
 abstract class MethodDeclaration implements ClassMember {

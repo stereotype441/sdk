@@ -4,38 +4,37 @@
 
 import 'package:meta/meta.dart';
 
-/// Sets of local variables that are potentially assigned in a statement.
-///
-/// These statements are loops, `switch`, and `try` statements.
-class AssignedVariables<Statement, Variable> {
+/// Sets of local variables that are potentially assigned in a loop statement,
+/// switch statement, try statement, or loop collection element.
+class AssignedVariables<StatementOrElement, Variable> {
   final emptySet = Set<Variable>();
 
-  /// Mapping from a [Statement] to the set of local variables that are
-  /// potentially assigned in that statement.
-  final Map<Statement, Set<Variable>> _map = {};
+  /// Mapping from a statement or element to the set of local variables that
+  /// are potentially assigned in that statement or element.
+  final Map<StatementOrElement, Set<Variable>> _map = {};
 
-  /// The stack of nested statements.
+  /// The stack of nested statements or collection elements.
   final List<Set<Variable>> _stack = [];
 
   AssignedVariables();
 
   /// Return the set of variables that are potentially assigned in the
-  /// [statement].
-  Set<Variable> operator [](Statement statement) {
-    return _map[statement] ?? emptySet;
+  /// [statementOrElement].
+  Set<Variable> operator [](StatementOrElement statementOrElement) {
+    return _map[statementOrElement] ?? emptySet;
   }
 
-  void beginStatement() {
-    var set = Set<Variable>.identity();
+  void beginStatementOrElement() {
+    Set<Variable> set = Set<Variable>.identity();
     _stack.add(set);
   }
 
-  void endStatement(Statement node) {
+  void endStatementOrElement(StatementOrElement node) {
     _map[node] = _stack.removeLast();
   }
 
   void write(Variable variable) {
-    for (var i = 0; i < _stack.length; ++i) {
+    for (int i = 0; i < _stack.length; ++i) {
       _stack[i].add(variable);
     }
   }
@@ -100,7 +99,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     TypeOperations<Variable, Type> typeOperations,
     FunctionBodyAccess<Variable> functionBody,
   ) {
-    var emptySet = FlowModel<Variable, Type>(false).notAssigned;
+    _VariableSet<Variable> emptySet =
+        FlowModel<Variable, Type>(false).notAssigned;
     return FlowAnalysis._(
       nodeOperations,
       typeOperations,
@@ -138,52 +138,46 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     }
   }
 
-  void conditional_elseBegin(Expression conditionalExpression,
-      Expression thenExpression, bool isBool) {
-    var afterThen = _current;
-    var falseCondition = _stack.removeLast();
+  void conditional_elseBegin(Expression thenExpression) {
+    FlowModel<Variable, Type> afterThen = _current;
+    FlowModel<Variable, Type> falseCondition = _stack.removeLast();
 
-    if (isBool) {
-      _conditionalEnd(thenExpression);
-      // Tail of the stack: falseThen, trueThen
-    }
+    _conditionalEnd(thenExpression);
+    // Tail of the stack: falseThen, trueThen
 
     _stack.add(afterThen);
     _current = falseCondition;
   }
 
-  void conditional_end(Expression conditionalExpression,
-      Expression elseExpression, bool isBool) {
-    var afterThen = _stack.removeLast();
-    var afterElse = _current;
+  void conditional_end(
+      Expression conditionalExpression, Expression elseExpression) {
+    FlowModel<Variable, Type> afterThen = _stack.removeLast();
+    FlowModel<Variable, Type> afterElse = _current;
 
-    if (isBool) {
-      _conditionalEnd(elseExpression);
-      // Tail of the stack: falseThen, trueThen, falseElse, trueElse
+    _conditionalEnd(elseExpression);
+    // Tail of the stack: falseThen, trueThen, falseElse, trueElse
 
-      var trueElse = _stack.removeLast();
-      var falseElse = _stack.removeLast();
+    FlowModel<Variable, Type> trueElse = _stack.removeLast();
+    FlowModel<Variable, Type> falseElse = _stack.removeLast();
 
-      var trueThen = _stack.removeLast();
-      var falseThen = _stack.removeLast();
+    FlowModel<Variable, Type> trueThen = _stack.removeLast();
+    FlowModel<Variable, Type> falseThen = _stack.removeLast();
 
-      var trueResult = _join(trueThen, trueElse);
-      var falseResult = _join(falseThen, falseElse);
+    FlowModel<Variable, Type> trueResult = _join(trueThen, trueElse);
+    FlowModel<Variable, Type> falseResult = _join(falseThen, falseElse);
 
-      _condition = conditionalExpression;
-      _conditionTrue = trueResult;
-      _conditionFalse = falseResult;
-    }
+    _condition = conditionalExpression;
+    _conditionTrue = trueResult;
+    _conditionFalse = falseResult;
 
     _current = _join(afterThen, afterElse);
   }
 
-  void conditional_thenBegin(
-      Expression conditionalExpression, Expression condition) {
+  void conditional_thenBegin(Expression condition) {
     _conditionalEnd(condition);
     // Tail of the stack: falseCondition, trueCondition
 
-    var trueCondition = _stack.removeLast();
+    FlowModel<Variable, Type> trueCondition = _stack.removeLast();
     _current = trueCondition;
   }
 
@@ -197,7 +191,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     }
 
     _condition = binaryExpression;
-    var currentPromoted = _current.markNonNullable(typeOperations, variable);
+    FlowModel<Variable, Type> currentPromoted =
+        _current.markNonNullable(typeOperations, variable);
     if (notEqual) {
       _conditionTrue = currentPromoted;
       _conditionFalse = _current;
@@ -220,17 +215,17 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   void doStatement_conditionBegin() {
     // Tail of the stack: break, continue
 
-    var continueState = _stack.removeLast();
+    FlowModel<Variable, Type> continueState = _stack.removeLast();
     _current = _join(_current, continueState);
   }
 
-  void doStatement_end(Statement doStatement, Expression condition) {
+  void doStatement_end(Expression condition) {
     _conditionalEnd(condition);
     // Tail of the stack:  break, falseCondition, trueCondition
 
     _stack.removeLast(); // trueCondition
-    var falseCondition = _stack.removeLast();
-    var breakState = _stack.removeLast();
+    FlowModel<Variable, Type> falseCondition = _stack.removeLast();
+    FlowModel<Variable, Type> breakState = _stack.removeLast();
 
     _current = _join(falseCondition, breakState);
   }
@@ -240,7 +235,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   void finish() {
     assert(_stack.isEmpty);
     assert(() {
-      var variablesNotAdded =
+      Set<Variable> variablesNotAdded =
           _referencedVariables.difference(Set<Variable>.from(_addedVariables));
       assert(variablesNotAdded.isEmpty,
           'Variables not passed to add: $variablesNotAdded');
@@ -248,58 +243,109 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     }());
   }
 
-  void forEachStatement_bodyBegin(Set<Variable> loopAssigned) {
-    _variablesReferenced(loopAssigned);
-    _stack.add(_current);
-    _current = _current.removePromotedAll(loopAssigned);
-  }
-
-  void forEachStatement_end() {
-    var afterIterable = _stack.removeLast();
-    _current = _join(_current, afterIterable);
-  }
-
-  void forStatement_bodyBegin(Statement node, Expression condition) {
+  /// Call this method just before visiting the body of a conventional "for"
+  /// statement or collection element.  See [for_conditionBegin] for details.
+  ///
+  /// If a "for" statement is being entered, [node] is an opaque representation
+  /// of the loop, for use as the target of future calls to [handleBreak] or
+  /// [handleContinue].  If a "for" collection element is being entered, [node]
+  /// should be `null`.
+  ///
+  /// [condition] is an opaque representation of the loop condition; it is
+  /// matched against expressions passed to previous calls to determine whether
+  /// the loop condition should cause any promotions to occur.
+  void for_bodyBegin(Statement node, Expression condition) {
     _conditionalEnd(condition);
     // Tail of the stack: falseCondition, trueCondition
 
-    var trueCondition = _stack.removeLast();
+    FlowModel<Variable, Type> trueCondition = _stack.removeLast();
 
-    _statementToStackIndex[node] = _stack.length;
+    if (node != null) {
+      _statementToStackIndex[node] = _stack.length;
+    }
     _stack.add(null); // break
     _stack.add(null); // continue
 
     _current = trueCondition;
   }
 
-  void forStatement_conditionBegin(Set<Variable> loopAssigned) {
+  /// Call this method just before visiting the condition of a conventional
+  /// "for" statement or collection element.
+  ///
+  /// Note that a conventional "for" statement is a statement of the form
+  /// `for (initializers; condition; updaters) body`.  Statements of the form
+  /// `for (variable in iterable) body` should use [forEach_bodyBegin].  Similar
+  /// for "for" collection elements.
+  ///
+  /// The order of visiting a "for" statement or collection element should be:
+  /// - Visit the initializers.
+  /// - Call [for_conditionBegin].
+  /// - Visit the condition.
+  /// - Call [for_bodyBegin].
+  /// - Visit the body.
+  /// - Call [for_updaterBegin].
+  /// - Visit the updaters.
+  /// - Call [for_end].
+  ///
+  /// [loopAssigned] should be the set of variables that are assigned anywhere
+  /// in the loop's condition, updaters, or body.
+  void for_conditionBegin(Set<Variable> loopAssigned) {
     _variablesReferenced(loopAssigned);
     _current = _current.removePromotedAll(loopAssigned);
   }
 
-  void forStatement_end() {
+  /// Call this method just after visiting the updaters of a conventional "for"
+  /// statement or collection element.  See [for_conditionBegin] for details.
+  void for_end() {
     // Tail of the stack: falseCondition, break
-    var breakState = _stack.removeLast();
-    var falseCondition = _stack.removeLast();
+    FlowModel<Variable, Type> breakState = _stack.removeLast();
+    FlowModel<Variable, Type> falseCondition = _stack.removeLast();
 
     _current = _join(falseCondition, breakState);
   }
 
-  void forStatement_updaterBegin() {
+  /// Call this method just before visiting the updaters of a conventional "for"
+  /// statement or collection element.  See [for_conditionBegin] for details.
+  void for_updaterBegin() {
     // Tail of the stack: falseCondition, break, continue
-    var afterBody = _current;
-    var continueState = _stack.removeLast();
+    FlowModel<Variable, Type> afterBody = _current;
+    FlowModel<Variable, Type> continueState = _stack.removeLast();
 
     _current = _join(afterBody, continueState);
+  }
+
+  /// Call this method just before visiting the body of a "for-in" statement or
+  /// collection element.
+  ///
+  /// The order of visiting a "for-in" statement or collection element should
+  /// be:
+  /// - Visit the iterable expression.
+  /// - Call [forEach_bodyBegin].
+  /// - Visit the body.
+  /// - Call [forEach_end].
+  ///
+  /// [loopAssigned] should be the set of variables that are assigned anywhere
+  /// in the loop's body.
+  void forEach_bodyBegin(Set<Variable> loopAssigned) {
+    _variablesReferenced(loopAssigned);
+    _stack.add(_current);
+    _current = _current.removePromotedAll(loopAssigned);
+  }
+
+  /// Call this method just before visiting the body of a "for-in" statement or
+  /// collection element.  See [forEach_bodyBegin] for details.
+  void forEach_end() {
+    FlowModel<Variable, Type> afterIterable = _stack.removeLast();
+    _current = _join(_current, afterIterable);
   }
 
   void functionExpression_begin() {
     _stack.add(_current);
 
     Set<Variable> notPromoted = null;
-    for (var entry in _current.variableInfo.entries) {
-      var variable = entry.key;
-      var promotedType = entry.value.promotedType;
+    for (MapEntry<Variable, Type> entry in _current.variableInfo.entries) {
+      Variable variable = entry.key;
+      Type promotedType = entry.value.promotedType;
       if (promotedType != null &&
           functionBody.isPotentiallyMutatedInScope(variable)) {
         notPromoted ??= Set<Variable>.identity();
@@ -317,7 +363,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   }
 
   void handleBreak(Statement target) {
-    var breakIndex = _statementToStackIndex[target];
+    int breakIndex = _statementToStackIndex[target];
     if (breakIndex != null) {
       _stack[breakIndex] = _join(_stack[breakIndex], _current);
     }
@@ -325,9 +371,9 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   }
 
   void handleContinue(Statement target) {
-    var breakIndex = _statementToStackIndex[target];
+    int breakIndex = _statementToStackIndex[target];
     if (breakIndex != null) {
-      var continueIndex = breakIndex + 1;
+      int continueIndex = breakIndex + 1;
       _stack[continueIndex] = _join(_stack[continueIndex], _current);
     }
     _current = _current.setReachable(false);
@@ -340,7 +386,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   }
 
   void ifNullExpression_end() {
-    var afterLeft = _stack.removeLast();
+    FlowModel<Variable, Type> afterLeft = _stack.removeLast();
     _current = _join(_current, afterLeft);
   }
 
@@ -349,8 +395,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   }
 
   void ifStatement_elseBegin() {
-    var afterThen = _current;
-    var falseCondition = _stack.removeLast();
+    FlowModel<Variable, Type> afterThen = _current;
+    FlowModel<Variable, Type> falseCondition = _stack.removeLast();
     _stack.add(afterThen);
     _current = falseCondition;
   }
@@ -372,7 +418,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _conditionalEnd(condition);
     // Tail of the stack:  falseCondition, trueCondition
 
-    var trueCondition = _stack.removeLast();
+    FlowModel<Variable, Type> trueCondition = _stack.removeLast();
     _current = trueCondition;
   }
 
@@ -399,72 +445,58 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     }
   }
 
-  void logicalAnd_end(Expression andExpression, Expression rightOperand) {
+  void logicalBinaryOp_end(Expression wholeExpression, Expression rightOperand,
+      {@required bool isAnd}) {
     _conditionalEnd(rightOperand);
     // Tail of the stack: falseLeft, trueLeft, falseRight, trueRight
 
-    var trueRight = _stack.removeLast();
-    var falseRight = _stack.removeLast();
+    FlowModel<Variable, Type> trueRight = _stack.removeLast();
+    FlowModel<Variable, Type> falseRight = _stack.removeLast();
 
-    _stack.removeLast(); // trueLeft is not used
-    var falseLeft = _stack.removeLast();
+    FlowModel<Variable, Type> trueLeft = _stack.removeLast();
+    FlowModel<Variable, Type> falseLeft = _stack.removeLast();
 
-    var trueResult = trueRight;
-    var falseResult = _join(falseLeft, falseRight);
-    var afterResult = _join(trueResult, falseResult);
+    FlowModel<Variable, Type> trueResult;
+    FlowModel<Variable, Type> falseResult;
+    if (isAnd) {
+      trueResult = trueRight;
+      falseResult = _join(falseLeft, falseRight);
+    } else {
+      trueResult = _join(trueLeft, trueRight);
+      falseResult = falseRight;
+    }
 
-    _condition = andExpression;
+    FlowModel<Variable, Type> afterResult = _join(trueResult, falseResult);
+
+    _condition = wholeExpression;
     _conditionTrue = trueResult;
     _conditionFalse = falseResult;
 
     _current = afterResult;
   }
 
-  void logicalAnd_rightBegin(Expression andExpression, Expression leftOperand) {
+  void logicalBinaryOp_rightBegin(Expression leftOperand,
+      {@required bool isAnd}) {
     _conditionalEnd(leftOperand);
     // Tail of the stack: falseLeft, trueLeft
 
-    var trueLeft = _stack.last;
-    _current = trueLeft;
+    if (isAnd) {
+      FlowModel<Variable, Type> trueLeft = _stack.last;
+      _current = trueLeft;
+    } else {
+      FlowModel<Variable, Type> falseLeft = _stack[_stack.length - 2];
+      _current = falseLeft;
+    }
   }
 
   void logicalNot_end(Expression notExpression, Expression operand) {
     _conditionalEnd(operand);
-    var trueExpr = _stack.removeLast();
-    var falseExpr = _stack.removeLast();
+    FlowModel<Variable, Type> trueExpr = _stack.removeLast();
+    FlowModel<Variable, Type> falseExpr = _stack.removeLast();
 
     _condition = notExpression;
     _conditionTrue = falseExpr;
     _conditionFalse = trueExpr;
-  }
-
-  void logicalOr_end(Expression orExpression, Expression rightOperand) {
-    _conditionalEnd(rightOperand);
-    // Tail of the stack: falseLeft, trueLeft, falseRight, trueRight
-
-    var trueRight = _stack.removeLast();
-    var falseRight = _stack.removeLast();
-
-    var trueLeft = _stack.removeLast();
-    _stack.removeLast(); // falseLeft is not used
-
-    var trueResult = _join(trueLeft, trueRight);
-    var falseResult = falseRight;
-    var afterResult = _join(trueResult, falseResult);
-
-    _condition = orExpression;
-    _conditionTrue = trueResult;
-    _conditionFalse = falseResult;
-
-    _current = afterResult;
-  }
-
-  void logicalOr_rightBegin(Expression orExpression, Expression leftOperand) {
-    _conditionalEnd(leftOperand);
-    // Tail of the stack: falseLeft, trueLeft
-
-    var falseLeft = _stack[_stack.length - 2];
-    _current = falseLeft;
   }
 
   /// Retrieves the type that the [variable] is promoted to, if the [variable]
@@ -485,9 +517,9 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   void switchStatement_end(Statement switchStatement, bool hasDefault) {
     // Tail of the stack: break, continue, afterExpression
-    var afterExpression = _current = _stack.removeLast();
+    FlowModel<Variable, Type> afterExpression = _current = _stack.removeLast();
     _stack.removeLast(); // continue
-    var breakState = _stack.removeLast();
+    FlowModel<Variable, Type> breakState = _stack.removeLast();
 
     if (hasDefault) {
       // breakState should not be null because we should have joined it with
@@ -513,25 +545,26 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   void tryCatchStatement_bodyEnd(Set<Variable> assignedInBody) {
     _variablesReferenced(assignedInBody);
-    var beforeBody = _stack.removeLast();
-    var beforeCatch = beforeBody.removePromotedAll(assignedInBody);
+    FlowModel<Variable, Type> beforeBody = _stack.removeLast();
+    FlowModel<Variable, Type> beforeCatch =
+        beforeBody.removePromotedAll(assignedInBody);
     _stack.add(beforeCatch);
     _stack.add(_current); // afterBodyAndCatches
     // Tail of the stack: beforeCatch, afterBodyAndCatches
   }
 
   void tryCatchStatement_catchBegin() {
-    var beforeCatch = _stack[_stack.length - 2];
+    FlowModel<Variable, Type> beforeCatch = _stack[_stack.length - 2];
     _current = beforeCatch;
   }
 
   void tryCatchStatement_catchEnd() {
-    var afterBodyAndCatches = _stack.last;
+    FlowModel<Variable, Type> afterBodyAndCatches = _stack.last;
     _stack.last = _join(afterBodyAndCatches, _current);
   }
 
   void tryCatchStatement_end() {
-    var afterBodyAndCatches = _stack.removeLast();
+    FlowModel<Variable, Type> afterBodyAndCatches = _stack.removeLast();
     _stack.removeLast(); // beforeCatch
     _current = afterBodyAndCatches;
   }
@@ -542,7 +575,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   void tryFinallyStatement_end(Set<Variable> assignedInFinally) {
     _variablesReferenced(assignedInFinally);
-    var afterBody = _stack.removeLast();
+    FlowModel<Variable, Type> afterBody = _stack.removeLast();
     _current = _current.restrict(
       typeOperations,
       _emptySet,
@@ -553,8 +586,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   void tryFinallyStatement_finallyBegin(Set<Variable> assignedInBody) {
     _variablesReferenced(assignedInBody);
-    var beforeTry = _stack.removeLast();
-    var afterBody = _current;
+    FlowModel<Variable, Type> beforeTry = _stack.removeLast();
+    FlowModel<Variable, Type> afterBody = _current;
     _stack.add(afterBody);
     _current = _join(afterBody, beforeTry.removePromotedAll(assignedInBody));
   }
@@ -564,7 +597,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _conditionalEnd(condition);
     // Tail of the stack: falseCondition, trueCondition
 
-    var trueCondition = _stack.removeLast();
+    FlowModel<Variable, Type> trueCondition = _stack.removeLast();
 
     _statementToStackIndex[whileStatement] = _stack.length;
     _stack.add(null); // break
@@ -580,8 +613,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   void whileStatement_end() {
     _stack.removeLast(); // continue
-    var breakState = _stack.removeLast();
-    var falseCondition = _stack.removeLast();
+    FlowModel<Variable, Type> breakState = _stack.removeLast();
+    FlowModel<Variable, Type> falseCondition = _stack.removeLast();
 
     _current = _join(falseCondition, breakState);
   }
@@ -684,8 +717,9 @@ class FlowModel<Variable, Type> {
   /// optional [assigned] boolean indicates whether the variable is assigned at
   /// the point of declaration.
   FlowModel<Variable, Type> add(Variable variable, {bool assigned: false}) {
-    var newNotAssigned = assigned ? notAssigned : notAssigned.add(variable);
-    var newVariableInfo = Map<Variable, VariableModel<Type>>.from(variableInfo);
+    _VariableSet<Variable> newNotAssigned =
+        assigned ? notAssigned : notAssigned.add(variable);
+    Map<Variable, VariableModel<Type>> newVariableInfo = Map<Variable, VariableModel<Type>>.from(variableInfo);
     newVariableInfo[variable] = VariableModel<Type>(null);
 
     return FlowModel<Variable, Type>._(
@@ -702,13 +736,12 @@ class FlowModel<Variable, Type> {
   /// assigned?  Does it matter?
   FlowModel<Variable, Type> markNonNullable(
       TypeOperations<Variable, Type> typeOperations, Variable variable) {
-    var previousType = variableInfo[variable].promotedType;
+    Type previousType = variableInfo[variable].promotedType;
     previousType ??= typeOperations.variableType(variable);
-    var type = typeOperations.promoteToNonNull(previousType);
+    Type type = typeOperations.promoteToNonNull(previousType);
 
     if (!typeOperations.isSameType(type, previousType)) {
-      var newVariableInfo = <Variable, VariableModel<Type>>{}
-        ..addAll(variableInfo);
+      Map<Variable, VariableModel<Type>> newVariableInfo = Map<Variable, VariableModel<Type>>.from(variableInfo);
       newVariableInfo[variable] = VariableModel<Type>(type);
       return FlowModel<Variable, Type>._(
         reachable,
@@ -734,13 +767,12 @@ class FlowModel<Variable, Type> {
     Variable variable,
     Type type,
   ) {
-    var previousType = variableInfo[variable].promotedType;
+    Type previousType = variableInfo[variable].promotedType;
     previousType ??= typeOperations.variableType(variable);
 
     if (typeOperations.isSubtypeOf(type, previousType) &&
         !typeOperations.isSameType(type, previousType)) {
-      var newVariableInfo = <Variable, VariableModel<Type>>{}
-        ..addAll(variableInfo);
+      Map<Variable, VariableModel> newVariableInfo = Map<Variable, VariableModel<Type>>.from(variableInfo);
       newVariableInfo[variable] = VariableModel<Type>(type);
       return FlowModel<Variable, Type>._(
         reachable,
@@ -772,7 +804,7 @@ class FlowModel<Variable, Type> {
   /// later in the loop body.  If we switch to a fixed point analysis, we should
   /// be able to remove this method.
   FlowModel<Variable, Type> removePromotedAll(Set<Variable> variables) {
-    var newVariableInfo = _removePromotedAll(variableInfo, variables);
+    Map<Variable, Type> newVariableInfo = _removePromotedAll(variableInfo, variables);
 
     if (identical(newVariableInfo, variableInfo)) return this;
 
@@ -809,8 +841,8 @@ class FlowModel<Variable, Type> {
     FlowModel<Variable, Type> other,
     Set<Variable> unsafe,
   ) {
-    var newReachable = reachable && other.reachable;
-    var newNotAssigned = notAssigned.intersect(
+    bool newReachable = reachable && other.reachable;
+    _VariableSet<Variable> newNotAssigned = notAssigned.intersect(
       empty: emptySet,
       other: other.notAssigned,
     );
@@ -821,14 +853,14 @@ class FlowModel<Variable, Type> {
       newNotAssigned = other.notAssigned;
     }
 
-    var newVariableInfo = <Variable, VariableModel<Type>>{};
+    Map<Variable, Type> newVariableInfo = <Variable, VariableModel<Type>>{};
     bool promotedMatchesThis = true;
     bool promotedMatchesOther =
         other.variableInfo.length == variableInfo.length;
-    for (var entry in variableInfo.entries) {
-      var variable = entry.key;
-      var thisType = entry.value.promotedType;
-      var otherType = other.variableInfo[variable]?.promotedType;
+    for (MapEntry<Variable, Type> entry in variableInfo.entries) {
+      Variable variable = entry.key;
+      Type thisType = entry.value.promotedType;
+      Type otherType = other.variableInfo[variable]?.promotedType;
       if (!unsafe.contains(variable)) {
         if (otherType != null &&
             (thisType == null ||
@@ -898,11 +930,12 @@ class FlowModel<Variable, Type> {
   /// TODO(paulberry): allow for writes that preserve type promotions.
   FlowModel<Variable, Type> write(TypeOperations<Variable, Type> typeOperations,
       _VariableSet<Variable> emptySet, Variable variable) {
-    var newNotAssigned = typeOperations.isLocalVariable(variable)
-        ? notAssigned.remove(emptySet, variable)
-        : notAssigned;
+    _VariableSet<Variable> newNotAssigned =
+        typeOperations.isLocalVariable(variable)
+            ? notAssigned.remove(emptySet, variable)
+            : notAssigned;
 
-    var newVariableInfo = _removePromoted(variableInfo, variable);
+    Map<Variable, Type> newVariableInfo = _removePromoted(variableInfo, variable);
 
     if (identical(newNotAssigned, notAssigned) &&
         identical(newVariableInfo, variableInfo)) {
@@ -922,7 +955,7 @@ class FlowModel<Variable, Type> {
       Map<Variable, VariableModel<Type>> map, Variable variable) {
     if (map[variable].promotedType == null) return map;
 
-    var result = Map<Variable, VariableModel<Type>>.from(map);
+    Map<Variable, VariableModel<Type>> result = Map<Variable, VariableModel<Type>>.from(map);
     result[variable] = VariableModel<Type>(null);
     return result;
   }
@@ -936,11 +969,11 @@ class FlowModel<Variable, Type> {
     if (map.isEmpty) return const {};
     if (variables.isEmpty) return map;
 
-    var result = <Variable, VariableModel<Type>>{};
-    var noChanges = true;
-    for (var entry in map.entries) {
-      var variable = entry.key;
-      var promotedType = entry.value.promotedType;
+    Map<Variable, VariableModel<Type>> result = <Variable, VariableModel<Type>>{};
+    bool noChanges = true;
+    for (MapEntry<Variable, Type> entry in map.entries) {
+      Variable variable = entry.key;
+      Type promotedType = entry.value.promotedType;
       if (variables.contains(variable) && promotedType != null) {
         result[variable] = VariableModel<Type>(null);
         noChanges = false;
@@ -974,9 +1007,10 @@ class FlowModel<Variable, Type> {
     if (first.reachable && !second.reachable) return first;
     if (!first.reachable && second.reachable) return second;
 
-    var newReachable = first.reachable || second.reachable;
-    var newNotAssigned = first.notAssigned.union(second.notAssigned);
-    var newVariableInfo = FlowModel.joinVariableInfo(
+    bool newReachable = first.reachable || second.reachable;
+    _VariableSet<Variable> newNotAssigned =
+        first.notAssigned.union(second.notAssigned);
+    Map<Variable, Type> newVariableInfo = FlowModel.joinVariableInfo(
         typeOperations, first.variableInfo, second.variableInfo);
 
     return FlowModel._identicalOrNew(
@@ -998,16 +1032,17 @@ class FlowModel<Variable, Type> {
     if (identical(first, second)) return first;
     if (first.isEmpty || second.isEmpty) return const {};
 
-    var result = <Variable, VariableModel<Type>>{};
-    var alwaysFirst = true;
-    var alwaysSecond = true;
-    for (var entry in first.entries) {
-      var variable = entry.key;
+    Map<Variable, VariableModel<Type>> result = <Variable, VariableModel<Type>>{};
+    Map<Variable, Type> result = <Variable, Type>{};
+    bool alwaysFirst = true;
+    bool alwaysSecond = true;
+    for (MapEntry<Variable, Type> entry in first.entries) {
+      Variable variable = entry.key;
       if (!second.containsKey(variable)) {
         alwaysFirst = false;
       } else {
-        var firstType = entry.value.promotedType;
-        var secondType = second[variable].promotedType;
+        Type firstType = entry.value.promotedType;
+        Type secondType = second[variable].promotedType;
         if (identical(firstType, secondType)) {
           result[variable] = VariableModel<Type>(firstType);
         } else if (firstType == null) {
@@ -1070,9 +1105,9 @@ class FlowModel<Variable, Type> {
       Map<Variable, VariableModel<Type>> p2) {
     if (p1.length != p2.length) return false;
     if (!p1.keys.toSet().containsAll(p2.keys)) return false;
-    for (var entry in p1.entries) {
-      var p1Value = entry.value;
-      var p2Value = p2[entry.key];
+    for (MapEntry<Variable, Type> entry in p1.entries) {
+      Type p1Value = entry.value;
+      Type p2Value = p2[entry.key];
       if (p1Value == null) {
         if (p2Value != null) return false;
       } else {
@@ -1160,9 +1195,9 @@ class _VariableSet<Variable> {
       return this;
     }
 
-    var length = variables.length;
-    var newVariables = List<Variable>(length + 1);
-    for (var i = 0; i < length; ++i) {
+    int length = variables.length;
+    List<Variable> newVariables = List<Variable>(length + 1);
+    for (int i = 0; i < length; ++i) {
       newVariables[i] = variables[i];
     }
     newVariables[length] = addedVariable;
@@ -1170,16 +1205,16 @@ class _VariableSet<Variable> {
   }
 
   _VariableSet<Variable> addAll(Iterable<Variable> variables) {
-    var result = this;
-    for (var variable in variables) {
+    _VariableSet<Variable> result = this;
+    for (Variable variable in variables) {
       result = result.add(variable);
     }
     return result;
   }
 
   bool contains(Variable variable) {
-    var length = variables.length;
-    for (var i = 0; i < length; ++i) {
+    int length = variables.length;
+    for (int i = 0; i < length; ++i) {
       if (identical(variables[i], variable)) {
         return true;
       }
@@ -1195,7 +1230,7 @@ class _VariableSet<Variable> {
     if (identical(this, other)) return this;
 
     // TODO(scheglov) optimize
-    var newVariables =
+    List<Variable> newVariables =
         variables.toSet().intersection(other.variables.toSet()).toList();
 
     if (newVariables.isEmpty) return empty;
@@ -1210,15 +1245,15 @@ class _VariableSet<Variable> {
       return this;
     }
 
-    var length = variables.length;
+    int length = variables.length;
     if (length == 1) {
       return empty;
     }
 
-    var newVariables = List<Variable>(length - 1);
-    var newIndex = 0;
-    for (var i = 0; i < length; ++i) {
-      var variable = variables[i];
+    List<Variable> newVariables = List<Variable>(length - 1);
+    int newIndex = 0;
+    for (int i = 0; i < length; ++i) {
+      Variable variable = variables[i];
       if (!identical(variable, removedVariable)) {
         newVariables[newIndex++] = variable;
       }
@@ -1235,10 +1270,10 @@ class _VariableSet<Variable> {
       return this;
     }
 
-    var result = this;
-    var otherVariables = other.variables;
-    for (var i = 0; i < otherVariables.length; ++i) {
-      var otherVariable = otherVariables[i];
+    _VariableSet<Variable> result = this;
+    List<Variable> otherVariables = other.variables;
+    for (int i = 0; i < otherVariables.length; ++i) {
+      Variable otherVariable = otherVariables[i];
       result = result.add(otherVariable);
     }
     return result;
