@@ -1097,6 +1097,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   DecoratedType visitThrowExpression(ThrowExpression node) {
     node.expression.accept(this);
     // TODO(paulberry): do we need to check the expression type?  I think not.
+    _flowAnalysis.handleExit();
     return DecoratedType(node.staticType, _graph.never);
   }
 

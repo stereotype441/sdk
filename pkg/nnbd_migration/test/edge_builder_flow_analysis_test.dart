@@ -845,7 +845,7 @@ void f(int i, int j) {
   test_throw() async {
     await analyze('''
 void f(int i, int j) {
-  if (i == null) throw UnimplementedError();
+  if (i == null) throw 'foo';
   print(i.isEven);
   print(j.isEven);
 }
@@ -855,7 +855,7 @@ void f(int i, int j) {
     // No edge from i to `never` because i's type is promoted to non-nullable
     assertNoEdge(iNode, never);
     // But there is an edge from j to `never`.
-    assertEdge(jNode, never, hard: false);
+    assertEdge(jNode, never, hard: true);
   }
 
   test_topLevelVar_initializer() async {
