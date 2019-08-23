@@ -153,10 +153,8 @@ class FlowAnalysisHelper {
   }
 
   void for_conditionBegin(AstNode node, Expression condition) {
-    if (condition != null) {
-      var assigned = assignedVariables[node];
-      flow.for_conditionBegin(assigned);
-    }
+    var assigned = assignedVariables[node];
+    flow.for_conditionBegin(assigned);
   }
 
   void functionBody_enter(FunctionBody node) {
