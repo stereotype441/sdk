@@ -1684,6 +1684,17 @@ void f(bool b) {
         assertEdge(decoratedTypeAnnotation('bool b').node, never, hard: true));
   }
 
+  test_if_collection_condition() async {
+    await analyze('''
+void f(bool b) {
+  <Object>[if (b) 0]
+}
+''');
+
+    assertNullCheck(checkExpression('b) {}'),
+        assertEdge(decoratedTypeAnnotation('bool b').node, never, hard: true));
+  }
+
   test_if_conditional_control_flow_after() async {
     // Asserts after ifs don't demonstrate non-null intent.
     // TODO(paulberry): if both branches complete normally, they should.
@@ -1695,6 +1706,21 @@ void f(bool b, int i) {
 ''');
 
     assertNoEdge(always, decoratedTypeAnnotation('int i').node);
+  }
+
+  test_if_collection_conditional_control_flow_after() async {
+    // Asserts after if elements do demonstrate non-null intent, since the only
+    // way if elements can exit non-locally is to throw an exception, and we
+    // only care about exception-free code paths when doing post-dominator
+    // analysis.
+    await analyze('''
+void f(bool b, int i) {
+  <Object>[if (b) 1];
+  assert(i != null);
+}
+''');
+
+    assertEdge(decoratedTypeAnnotation('int i').node, never, hard: true);
   }
 
   test_if_conditional_control_flow_within() async {
