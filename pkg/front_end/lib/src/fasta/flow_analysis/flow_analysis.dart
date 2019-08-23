@@ -259,16 +259,15 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   void for_bodyBegin(Statement node, Expression condition) {
     FlowModel<Variable, Type> trueCondition;
     if (condition == null) {
-      _condition = blet;
-        _conditionTrue = _current;
-        _conditionFalse = _current.setReachable(false);
-      _conditionalEnd(blet);
+      trueCondition = _current;
+      _stack.add(_current.setReachable(false));
     } else {
       _conditionalEnd(condition);
       // Tail of the stack: falseCondition, trueCondition
 
       trueCondition = _stack.removeLast();
     }
+    // Tail of the stack: falseCondition
 
     if (node != null) {
       _statementToStackIndex[node] = _stack.length;
