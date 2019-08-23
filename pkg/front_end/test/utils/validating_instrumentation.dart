@@ -8,27 +8,30 @@ import 'dart:convert' show utf8;
 
 import 'dart:io' show File;
 
-import '../../base/instrumentation.dart';
+import 'package:front_end/src/base/instrumentation.dart'
+    show Instrumentation, InstrumentationValue;
 
-import '../../scanner/token.dart' as analyzer;
+import 'package:front_end/src/fasta/compiler_context.dart' show CompilerContext;
 
-import '../compiler_context.dart' show CompilerContext;
+import 'package:front_end/src/fasta/messages.dart'
+    show noLength, templateUnspecified;
 
-import '../messages.dart' show noLength, templateUnspecified;
+import 'package:front_end/src/fasta/scanner.dart'
+    show ScannerResult, Token, scan;
 
-import '../scanner.dart' show ScannerResult, Token, scan;
+import 'package:front_end/src/fasta/scanner/io.dart' show readBytesFromFile;
 
-import '../scanner/io.dart' show readBytesFromFile;
+import 'package:front_end/src/fasta/severity.dart' show Severity;
 
-import '../severity.dart' show Severity;
+import 'package:front_end/src/scanner/token.dart' as analyzer show Token;
 
 /// Implementation of [Instrumentation] which checks property/value pairs
 /// against expectations encoded in source files using "/*@...*/" comments.
 class ValidatingInstrumentation implements Instrumentation {
-  static final _ESCAPE_SEQUENCE = new RegExp(r'\\(.)');
+  static final RegExp _ESCAPE_SEQUENCE = new RegExp(r'\\(.)');
 
   /// Map from feature names to the property names they are short for.
-  static const _FEATURES = const {
+  static const Map<String, List<String>> _FEATURES = const {
     'inference': const [
       'typeArg',
       'typeArgs',

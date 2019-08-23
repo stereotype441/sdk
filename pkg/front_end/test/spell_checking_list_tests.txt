@@ -112,6 +112,7 @@ dillfile
 dills
 dirname
 disagree
+disallowed
 disconnect
 discovering
 dispatcher
@@ -227,6 +228,7 @@ lets
 lightly
 likewise
 linebreaks
+lints
 linux
 listening
 ll
@@ -286,6 +288,7 @@ prop
 propagated
 protected
 provider
+pubspec
 pure
 pv
 px
