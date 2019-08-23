@@ -2,14 +2,12 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-class A {
-  const A();
+import "package:testing/src/run_tests.dart" as testing show main;
 
-  A operator -() => this;
-}
-
-main() {
-  const a = const A();
-  const c = //# 01: compile-time error
-      const bool.fromEnvironment('foo') ? null : -a; //# 01: continued
+main() async {
+  return await testing.main(<String>[
+    "--config=pkg/front_end/testing_with_lints.json",
+    "--verbose",
+    "analyze"
+  ]);
 }
