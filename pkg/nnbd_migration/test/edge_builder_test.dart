@@ -1694,7 +1694,7 @@ void f(bool b, int i) {
 }
 ''');
 
-    assertNoEdge(always, decoratedTypeAnnotation('int i').node);
+    assertNoEdge(decoratedTypeAnnotation('int i').node, never);
   }
 
   test_if_conditional_control_flow_within() async {
