@@ -805,7 +805,7 @@ void f() {
     assertEdge(jNode, never, hard: false);
   }
 
-  test_rethrow() async {
+  solo_test_rethrow() async {
     await analyze('''
 void f(int i, int j) {
   try {
@@ -816,6 +816,7 @@ void f(int i, int j) {
     print(j.isEven);
   }
 }
+void g() {}
 ''');
     var iNode = decoratedTypeAnnotation('int i').node;
     var jNode = decoratedTypeAnnotation('int j').node;
