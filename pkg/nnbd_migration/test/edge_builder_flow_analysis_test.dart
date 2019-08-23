@@ -765,6 +765,43 @@ void h(int k) {}
     assertEdge(iNode, jNode, hard: false, guards: [iNode]);
   }
 
+  test_if_collection() async {
+    await analyze('''
+void f(int i) {
+  <Object>[if (i == null) g(i) else h(i)];
+}
+int g(int j) => 1;
+int h(int k) => 1;
+''');
+    var iNode = decoratedTypeAnnotation('int i').node;
+    var jNode = decoratedTypeAnnotation('int j').node;
+    var kNode = decoratedTypeAnnotation('int k').node;
+    // No edge from i to k because i is known to be non-nullable at the site of
+    // the call to h()
+    assertNoEdge(iNode, kNode);
+    // But there is an edge from i to j
+    assertEdge(iNode, jNode, hard: false, guards: [iNode]);
+  }
+
+  test_if_collection_without_else() async {
+    await analyze('''
+void f(int i) {
+  <Object>[if (i == null) (throw g(i))];
+  h(i);
+}
+int g(int j) => 1;
+void h(int k) {}
+''');
+    var iNode = decoratedTypeAnnotation('int i').node;
+    var jNode = decoratedTypeAnnotation('int j').node;
+    var kNode = decoratedTypeAnnotation('int k').node;
+    // No edge from i to k because i is known to be non-nullable at the site of
+    // the call to h()
+    assertNoEdge(iNode, kNode);
+    // But there is an edge from i to j
+    assertEdge(iNode, jNode, hard: false, guards: [iNode]);
+  }
+
   test_if_without_else() async {
     await analyze('''
 void f(int i) {
