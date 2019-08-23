@@ -805,7 +805,7 @@ void f() {
     assertEdge(jNode, never, hard: false);
   }
 
-  solo_test_rethrow() async {
+  test_rethrow() async {
     await analyze('''
 void f(int i, int j) {
   try {
