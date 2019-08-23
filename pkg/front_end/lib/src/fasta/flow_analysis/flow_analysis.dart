@@ -253,7 +253,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// [condition] is an opaque representation of the loop condition; it is
   /// matched against expressions passed to previous calls to determine whether
   /// the loop condition should cause any promotions to occur.  If [condition]
-  /// is null, the condition is understood to be empty (equvialent to a
+  /// is null, the condition is understood to be empty (equivalent to a
   /// condition of `true`).
   void for_bodyBegin(Statement node, Expression condition) {
     FlowModel<Variable, Type> trueCondition;
