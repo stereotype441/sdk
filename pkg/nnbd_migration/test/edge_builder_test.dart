@@ -1700,7 +1700,6 @@ void f(bool b, int i, int j) {
   }
 
   test_if_conditional_control_flow_after_normal_completion() async {
-    // TODO(paulberry): if both branches complete normally, they should.
     await analyze('''
 void f(bool b1, bool b2, int i, int j) {
   if (b1) {}
