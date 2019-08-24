@@ -1685,7 +1685,6 @@ void f(bool b) {
   }
 
   test_if_conditional_control_flow_after() async {
-    // TODO(paulberry): if both branches complete normally, they should.
     await analyze('''
 void f(bool b, int i, int j) {
   assert(j != null);
