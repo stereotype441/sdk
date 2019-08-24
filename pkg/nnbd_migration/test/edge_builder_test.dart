@@ -1684,17 +1684,6 @@ void f(bool b) {
         assertEdge(decoratedTypeAnnotation('bool b').node, never, hard: true));
   }
 
-  test_if_collection_condition() async {
-    await analyze('''
-void f(bool b) {
-  <Object>[if (b) 0]
-}
-''');
-
-    assertNullCheck(checkExpression('b) {}'),
-        assertEdge(decoratedTypeAnnotation('bool b').node, never, hard: true));
-  }
-
   test_if_conditional_control_flow_after() async {
     await analyze('''
 void f(bool b, int i, int j) {
@@ -1725,21 +1714,6 @@ void f(bool b1, bool b2, int i, int j) {
     // But asserts after `if (...) {}` do, since both branches of the `if`
     // complete normally, so the assertion is unconditionally reachable.
     assertEdge(decoratedTypeAnnotation('int j').node, never, hard: true);
-  }
-
-  test_if_collection_conditional_control_flow_after() async {
-    // Asserts after if elements do demonstrate non-null intent, since the only
-    // way if elements can exit non-locally is to throw an exception, and we
-    // only care about exception-free code paths when doing post-dominator
-    // analysis.
-    await analyze('''
-void f(bool b, int i) {
-  <Object>[if (b) 1];
-  assert(i != null);
-}
-''');
-
-    assertEdge(decoratedTypeAnnotation('int i').node, never, hard: true);
   }
 
   test_if_conditional_control_flow_within() async {
@@ -1777,6 +1751,64 @@ void f(bool b) {
     assertEdge(decoratedTypeAnnotation('int i2').node,
         decoratedTypeAnnotation('int>[').node,
         hard: false);
+  }
+
+  test_if_element_condition() async {
+    await analyze('''
+void f(bool b) {
+  <Object>[if (b) 0];
+}
+''');
+
+    assertNullCheck(checkExpression('b) 0'),
+        assertEdge(decoratedTypeAnnotation('bool b').node, never, hard: true));
+  }
+
+  test_if_element_conditional_control_flow_after() async {
+    await analyze('''
+void f(bool b, int i, int j) {
+  assert(j != null);
+  <Object>[if (b) (throw 'foo')];
+  assert(i != null);
+}
+''');
+
+    // Asserts after ifs don't demonstrate non-null intent.
+    assertNoEdge(decoratedTypeAnnotation('int i').node, never);
+    // But asserts before ifs do
+    assertEdge(decoratedTypeAnnotation('int j').node, never, hard: true);
+  }
+
+  test_if_element_conditional_control_flow_after_normal_completion() async {
+    await analyze('''
+void f(bool b1, bool b2, int i, int j) {
+  <Object>[if (b1) 1];
+  assert(j != null);
+  <Object>[if (b2) (throw 'foo')];
+  assert(i != null);
+}
+''');
+
+    // Asserts after `if (...) return` s don't demonstrate non-null intent.
+    assertNoEdge(decoratedTypeAnnotation('int i').node, never);
+    // But asserts after `if (...) {}` do, since both branches of the `if`
+    // complete normally, so the assertion is unconditionally reachable.
+    assertEdge(decoratedTypeAnnotation('int j').node, never, hard: true);
+  }
+
+  test_if_element_conditional_control_flow_within() async {
+    await analyze('''
+void f(bool b, int i, int j, int k) {
+  k.isEven;
+  <Object>[if (b) i.isEven else j.isEven];
+}
+''');
+
+    // Usages inside ifs don't demonstrate non-null intent (soft edge).
+    assertEdge(decoratedTypeAnnotation('int i').node, never, hard: false);
+    assertEdge(decoratedTypeAnnotation('int j').node, never, hard: false);
+    // But asserts outside ifs do (hard edge).
+    assertEdge(decoratedTypeAnnotation('int k').node, never, hard: true);
   }
 
   @failingTest
@@ -3027,6 +3059,38 @@ void test(bool b, int i1, int i2) {
         assertEdge(decoratedTypeAnnotation('int i2').node, never, hard: false));
   }
 
+  test_postDominators_rethrow() async {
+    await analyze('''
+void test(bool b) {
+  try {} catch (_) {
+    int i = f();
+    int j = f();
+    i.isEven;
+    if (b) rethrow;
+    j.isEven;
+  }
+}
+''');
+    // i's edge should be hard because `i.isEven` is unconditionally reachable.
+    assertEdge(decoratedTypeAnnotation('int i').node, never, hard: true);
+    // j's edge should be soft because `j.isEven` might not be executed.
+    assertEdge(decoratedTypeAnnotation('int j').node, never, hard: false);
+  }
+
+  test_postDominators_return() async {
+    await analyze('''
+void test(bool b, int i, int j) {
+  i.isEven;
+  if (b) return;
+  j.isEven;
+}
+''');
+    // i's edge should be hard because `i.isEven` is unconditionally reachable.
+    assertEdge(decoratedTypeAnnotation('int i').node, never, hard: true);
+    // j's edge should be soft because `j.isEven` might not be executed.
+    assertEdge(decoratedTypeAnnotation('int j').node, never, hard: false);
+  }
+
   test_postDominators_shortCircuitOperators() async {
     await analyze('''
 class C {
@@ -3133,6 +3197,20 @@ void test(C c1, C c2, C c3, C c4) {
 
     assertNullCheck(checkExpression('c3.m'),
         assertEdge(decoratedTypeAnnotation('C c3').node, never, hard: false));
+  }
+
+  test_postDominators_throw() async {
+    await analyze('''
+void test(bool b, int i, int j) {
+  i.isEven;
+  if (b) throw 'foo';
+  j.isEven;
+}
+''');
+    // i's edge should be hard because `i.isEven` is unconditionally reachable.
+    assertEdge(decoratedTypeAnnotation('int i').node, never, hard: true);
+    // j's edge should be soft because `j.isEven` might not be executed.
+    assertEdge(decoratedTypeAnnotation('int j').node, never, hard: false);
   }
 
   test_postDominators_tryCatch() async {
