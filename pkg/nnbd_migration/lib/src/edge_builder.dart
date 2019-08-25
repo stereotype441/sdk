@@ -961,7 +961,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   DecoratedType visitRethrowExpression(RethrowExpression node) {
-    _handleExit();
+    _flowAnalysis.handleExit();
     return DecoratedType(node.staticType, _graph.never);
   }
 
@@ -984,18 +984,13 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       _handleAssignment(returnValue, destinationType: returnType);
     }
 
-    _handleExit();
-    return null;
-  }
-
-  /// Updates state appropriately when encountering code that does a non-local
-  /// exit (by throwing an exception or returning).
-  void _handleExit() {
     _flowAnalysis.handleExit();
     // Later statements no longer post-dominate the declarations because we
     // exited (or, in parent scopes, conditionally exited).
     // TODO(mfairhurst): don't clear post-dominators beyond the current function.
     _postDominatedLocals.clearEachScope();
+
+    return null;
   }
 
   @override
@@ -1099,7 +1094,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   DecoratedType visitThrowExpression(ThrowExpression node) {
     node.expression.accept(this);
     // TODO(paulberry): do we need to check the expression type?  I think not.
-    _handleExit();
+    _flowAnalysis.handleExit();
     return DecoratedType(node.staticType, _graph.never);
   }
 
