@@ -1753,17 +1753,6 @@ void f(bool b) {
         hard: false);
   }
 
-  test_if_element_condition() async {
-    await analyze('''
-void f(bool b) {
-  <Object>[if (b) 0];
-}
-''');
-
-    assertNullCheck(checkExpression('b) 0'),
-        assertEdge(decoratedTypeAnnotation('bool b').node, never, hard: true));
-  }
-
   test_if_element_conditional_control_flow_within() async {
     await analyze('''
 void f(bool b, int i, int j, int k) {
@@ -3025,20 +3014,6 @@ void test(bool b, int i1, int i2) {
 
     assertNullCheck(checkExpression('i2.toDouble'),
         assertEdge(decoratedTypeAnnotation('int i2').node, never, hard: false));
-  }
-
-  test_postDominators_return() async {
-    await analyze('''
-void test(bool b, int i, int j) {
-  i.isEven;
-  if (b) return;
-  j.isEven;
-}
-''');
-    // i's edge should be hard because `i.isEven` is unconditionally reachable.
-    assertEdge(decoratedTypeAnnotation('int i').node, never, hard: true);
-    // j's edge should be soft because `j.isEven` might not be executed.
-    assertEdge(decoratedTypeAnnotation('int j').node, never, hard: false);
   }
 
   test_postDominators_shortCircuitOperators() async {
