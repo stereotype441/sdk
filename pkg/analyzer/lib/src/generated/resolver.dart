@@ -4463,7 +4463,7 @@ class ResolverVisitor extends ScopedVisitor {
         for (var member in members) {
           flow.switchStatement_beginCase(
             member.labels.isNotEmpty,
-                assignedInCases,
+            assignedInCases,
           );
           member.accept(this);
 
