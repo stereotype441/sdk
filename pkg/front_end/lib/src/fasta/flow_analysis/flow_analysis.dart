@@ -741,6 +741,27 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
   }
 
   @override
+  void handleBreak(Statement target) {
+    print('handleBreak($target)');
+    _wrapped.handleBreak(target);
+    _wrapped._dumpState();
+  }
+
+  @override
+  void handleContinue(Statement target) {
+    print('handleContinue($target)');
+    _wrapped.handleContinue(target);
+    _wrapped._dumpState();
+  }
+
+  @override
+  void handleExit() {
+    print('handleExit()');
+    _wrapped.handleExit();
+    _wrapped._dumpState();
+  }
+
+  @override
   void ifStatement_end(bool hasElse) {
     print('ifStatement_end($hasElse)');
     _wrapped.ifStatement_end(hasElse);
@@ -783,6 +804,36 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
     var result = _wrapped.promotedType(variable);
     print('  => $result');
     return result;
+  }
+
+  @override
+  void switchStatement_beginCase(
+      bool hasLabel, Iterable<Variable> notPromoted) {
+    notPromoted = notPromoted.toList();
+    print('switchStatement_beginCase($hasLabel, $notPromoted)');
+    _wrapped.switchStatement_beginCase(hasLabel, notPromoted);
+    _wrapped._dumpState();
+  }
+
+  @override
+  void switchStatement_end(bool hasDefault) {
+    print('switchStatement_end($hasDefault)');
+    _wrapped.switchStatement_end(hasDefault);
+    _wrapped._dumpState();
+  }
+
+  @override
+  void switchStatement_expressionEnd(Statement switchStatement) {
+    print('switchStatement_expressionEnd($switchStatement)');
+    _wrapped.switchStatement_expressionEnd(switchStatement);
+    _wrapped._dumpState();
+  }
+
+  @override
+  void write(Variable variable) {
+    print('write($variable)');
+    _wrapped.write(variable);
+    _wrapped._dumpState();
   }
 }
 
