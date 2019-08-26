@@ -1067,6 +1067,29 @@ bool b3 = b1 || b2;
     // top level variable doesn't cause flow analysis to crash.
   }
 
+  test_try_falls_through_to_after_try() async {
+    await analyze('''
+void f(int i) {
+  try {
+    g(i);
+    if (i == null) return;
+  } catch (_) {
+    return;
+  }
+  h(i);
+}
+void g(int j) {}
+void h(int k) {}
+''');
+    var iNode = decoratedTypeAnnotation('int i').node;
+    var jNode = decoratedTypeAnnotation('int j').node;
+    var kNode = decoratedTypeAnnotation('int k').node;
+    // No edge from i to k because i's type is promoted to non-nullable
+    assertNoEdge(iNode, kNode);
+    // But there is an edge from i to j.
+    assertEdge(iNode, jNode, hard: true);
+  }
+
   test_while_break_target() async {
     await analyze('''
 void f(int i) {
