@@ -2204,6 +2204,25 @@ class C {
     assertEdge(decoratedTypeAnnotation('int k').node, never, hard: true);
   }
 
+  test_methodInvocation_dynamic() async {
+    await analyze('''
+class C {
+  int g(int i) => i;
+}
+int f(dynamic d, int j) {
+  return d.g(j);
+}
+''');
+    // The call `d.g(j)` is dynamic, so we can't tell what method it resolves
+    // to.  There's no reason to assume it resolves to `C.g`.
+    assertNoEdge(decoratedTypeAnnotation('int j').node,
+        decoratedTypeAnnotation('int i').node);
+    assertNoEdge(decoratedTypeAnnotation('int g').node,
+        decoratedTypeAnnotation('int f').node);
+    // We do, however, assume that it might return anything, including `null`.
+    assertEdge(always, decoratedTypeAnnotation('int f').node, hard: false);
+  }
+
   test_methodInvocation_parameter_contravariant() async {
     await analyze('''
 class C<T> {
