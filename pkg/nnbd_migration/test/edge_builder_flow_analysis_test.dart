@@ -934,7 +934,7 @@ void h(int k) {}
 ''');
     var iNode = decoratedTypeAnnotation('int i').node;
     var jNode = decoratedTypeAnnotation('int j').node;
-    var kNode = decoratedTypeAnnotation('int j').node;
+    var kNode = decoratedTypeAnnotation('int k').node;
     // No edge from i to k because i's type is promoted to non-nullable at the
     // time of the call to h.
     assertNoEdge(iNode, kNode);
