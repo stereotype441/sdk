@@ -1685,22 +1685,41 @@ void f(bool b) {
   }
 
   test_if_conditional_control_flow_after() async {
-    // Asserts after ifs don't demonstrate non-null intent.
-    // TODO(paulberry): if both branches complete normally, they should.
     await analyze('''
-void f(bool b, int i) {
+void f(bool b, int i, int j) {
+  assert(j != null);
   if (b) return;
   assert(i != null);
 }
 ''');
 
-    assertNoEdge(always, decoratedTypeAnnotation('int i').node);
+    // Asserts after ifs don't demonstrate non-null intent.
+    assertNoEdge(decoratedTypeAnnotation('int i').node, never);
+    // But asserts before ifs do
+    assertEdge(decoratedTypeAnnotation('int j').node, never, hard: true);
+  }
+
+  test_if_conditional_control_flow_after_normal_completion() async {
+    await analyze('''
+void f(bool b1, bool b2, int i, int j) {
+  if (b1) {}
+  assert(j != null);
+  if (b2) return;
+  assert(i != null);
+}
+''');
+
+    // Asserts after `if (...) return` s don't demonstrate non-null intent.
+    assertNoEdge(decoratedTypeAnnotation('int i').node, never);
+    // But asserts after `if (...) {}` do, since both branches of the `if`
+    // complete normally, so the assertion is unconditionally reachable.
+    assertEdge(decoratedTypeAnnotation('int j').node, never, hard: true);
   }
 
   test_if_conditional_control_flow_within() async {
-    // Asserts inside ifs don't demonstrate non-null intent.
     await analyze('''
-void f(bool b, int i) {
+void f(bool b, int i, int j) {
+  assert(j != null);
   if (b) {
     assert(i != null);
   } else {
@@ -1709,7 +1728,10 @@ void f(bool b, int i) {
 }
 ''');
 
-    assertNoEdge(always, decoratedTypeAnnotation('int i').node);
+    // Asserts inside ifs don't demonstrate non-null intent.
+    assertNoEdge(decoratedTypeAnnotation('int i').node, never);
+    // But asserts outside ifs do.
+    assertEdge(decoratedTypeAnnotation('int j').node, never, hard: true);
   }
 
   test_if_element() async {
@@ -2035,31 +2057,38 @@ library foo;
     // Passes if no exceptions are thrown.
   }
 
-  @failingTest
   test_listLiteral_noTypeArgument_noNullableElements() async {
-    // Failing because we're not yet handling collection literals without a
-    // type argument.
     await analyze('''
 List<String> f() {
   return ['a', 'b'];
 }
 ''');
     assertNoUpstreamNullability(decoratedTypeAnnotation('List').node);
-    // TODO(brianwilkerson) Add an assertion that there is an edge from the list
-    //  literal's fake type argument to the return type's type argument.
+    final returnTypeNode = decoratedTypeAnnotation('String').node;
+    final returnTypeEdges = graph.getUpstreamEdges(returnTypeNode);
+
+    expect(returnTypeEdges.length, 1);
+    final returnTypeEdge = returnTypeEdges.single;
+
+    final listArgType = returnTypeEdge.primarySource;
+    assertNoUpstreamNullability(listArgType);
   }
 
-  @failingTest
   test_listLiteral_noTypeArgument_nullableElement() async {
-    // Failing because we're not yet handling collection literals without a
-    // type argument.
     await analyze('''
 List<String> f() {
   return ['a', null, 'c'];
 }
 ''');
     assertNoUpstreamNullability(decoratedTypeAnnotation('List').node);
-    assertEdge(always, decoratedTypeAnnotation('String').node, hard: false);
+    final returnTypeNode = decoratedTypeAnnotation('String').node;
+    final returnTypeEdges = graph.getUpstreamEdges(returnTypeNode);
+
+    expect(returnTypeEdges.length, 1);
+    final returnTypeEdge = returnTypeEdges.single;
+
+    final listArgType = returnTypeEdge.primarySource;
+    assertEdge(always, listArgType, hard: false);
   }
 
   test_listLiteral_typeArgument_noNullableElements() async {
@@ -3078,6 +3107,19 @@ void test(C c1, C c2, C c3, C c4) {
 
     assertNullCheck(checkExpression('c3.m'),
         assertEdge(decoratedTypeAnnotation('C c3').node, never, hard: false));
+  }
+
+  test_postDominators_tryCatch() async {
+    await analyze('''
+void test(int i) {
+  try {} catch (_) {
+    i.isEven;
+  }
+}
+''');
+    // Edge should not be hard because the call to `i.isEven` does not
+    // post-dominate the declaration of `i`.
+    assertEdge(decoratedTypeAnnotation('int i').node, never, hard: false);
   }
 
   test_postDominators_whileStatement_unconditional() async {

@@ -29,7 +29,7 @@ class TestResult {
 /// Command runner.
 TestResult runCommand(List<String> cmd, Map<String, String> env) {
   ProcessResult res = Process.runSync(
-      'timeout', ['-s', '$sigkill', '$timeout'] + cmd,
+      'timeout', ['-s', '$sigkill', '$timeout', ...cmd],
       environment: env);
   if (debug) {
     print('\nrunning $cmd yields:\n'
@@ -146,7 +146,7 @@ class TestRunnerJIT implements TestRunner {
       this.fileName, List<String> extraFlags) {
     description = '$prefix-$tag';
     dart = '$top/out/$tag/dart';
-    cmd = [dart, "--deterministic"] + extraFlags + [fileName];
+    cmd = [dart, ...extraFlags, fileName];
   }
 
   TestResult run() {
@@ -170,11 +170,11 @@ class TestRunnerAOT implements TestRunner {
     snapshot = '$tmp/snapshot';
     env = Map<String, String>.from(e);
     env['DART_CONFIGURATION'] = tag;
-    env['OPTIONS'] = extraFlags.join(' ');
+    cmd = [precompiler, ...extraFlags, fileName, snapshot];
   }
 
   TestResult run() {
-    TestResult result = runCommand([precompiler, fileName, snapshot], env);
+    TestResult result = runCommand(cmd, env);
     if (result.exitCode != 0) {
       return result;
     }
@@ -187,6 +187,7 @@ class TestRunnerAOT implements TestRunner {
   String fileName;
   String snapshot;
   Map<String, String> env;
+  List<String> cmd;
 }
 
 /// Concrete test runner of bytecode.
@@ -196,12 +197,12 @@ class TestRunnerKBC implements TestRunner {
     description = '$prefix-$tag';
     dart = '$top/out/$tag/dart';
     if (kbcSrc) {
-      cmd = [dart] + extraFlags + [fileName];
+      cmd = [dart, ...extraFlags, fileName];
     } else {
       generate = '$top/pkg/vm/tool/gen_kernel';
       platform = '--platform=$top/out/$tag/vm_platform_strong.dill';
       dill = '$tmp/out.dill';
-      cmd = [dart] + extraFlags + [dill];
+      cmd = [dart, ...extraFlags, dill];
     }
   }
 
