@@ -15,3 +15,14 @@ void case_never_completes(bool b, int i) {
   }
   3;
 }
+
+/*member: all_cases_exit:doesNotComplete*/
+void all_cases_exit(int i) {
+  switch (i) {
+    case 1:
+      return;
+    default:
+      return;
+  }
+  /*stmt: unreachable*/ 1;
+}
