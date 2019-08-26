@@ -542,7 +542,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     breakState = _join(breakState, _current);
 
     // And, if there is an implicit fall-through default, join it to any breaks.
-    if (!hasDefault) breakState =_join(breakState, afterExpression);
+    if (!hasDefault) breakState = _join(breakState, afterExpression);
 
     _current = breakState;
   }
