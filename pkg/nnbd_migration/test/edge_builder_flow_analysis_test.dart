@@ -966,7 +966,7 @@ void f(int i, int j, int x, int y) {
     assertNoEdge(iNode, never);
     // But there is an edge from j to never, because the switch statement is not
     // guaranteed to complete by returning, so j is not promoted.
-    assertEdge(jNode, never, hard: true);
+    assertEdge(jNode, never, hard: false);
   }
 
   test_throw() async {
