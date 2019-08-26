@@ -1425,7 +1425,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
           '(${expression.toSource()}) offset=${expression.offset}');
     }
     ExpressionChecks expressionChecks;
-    if (canInsertChecks) {
+    if (canInsertChecks && !sourceType.type.isDynamic) {
       expressionChecks = ExpressionChecks(expression.end);
       _variables.recordExpressionChecks(source, expression, expressionChecks);
     }

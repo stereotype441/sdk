@@ -847,7 +847,7 @@ class C {
 }
 int? f(bool b, dynamic d) {
   if (b) return 0;
-  return d.g();
+  return d.g(null);
 }
 main() {
   f(true, null);

@@ -384,6 +384,20 @@ class C<T extends List<int>> {
         hard: false);
   }
 
+  test_assign_dynamic_to_other_type() async {
+    await analyze('''
+int f(dynamic d) => d;
+''');
+    // There is no explicit null check necessary, since `dynamic` is
+    // downcastable to any type, nullable or not.
+    expect(checkExpression('d;'), isNull);
+    // But we still create an edge, to make sure that the possibility of `null`
+    // propagates to callees.
+    assertEdge(decoratedTypeAnnotation('dynamic').node,
+        decoratedTypeAnnotation('int').node,
+        hard: true);
+  }
+
   test_assign_null_to_generic_type() async {
     await analyze('''
 main() {
