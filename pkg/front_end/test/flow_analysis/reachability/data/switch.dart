@@ -15,3 +15,11 @@ void case_never_completes(bool b, int i) {
   }
   3;
 }
+
+void case_falls_through_end(int i) {
+  switch (i) {
+    case 1:
+      1;
+  }
+  2;
+}
