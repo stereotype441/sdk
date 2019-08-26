@@ -662,11 +662,11 @@ static Dart_Isolate CreateIsolateGroupAndSetupHelper(
   }
 
   if (flags->copy_parent_code && callback_data) {
-    IsolateGroupData* parent_isolate_data =
-        reinterpret_cast<IsolateGroupData*>(callback_data);
-    parent_kernel_buffer = parent_isolate_data->kernel_buffer();
+    auto parent_isolate_group_data =
+        reinterpret_cast<IsolateData*>(callback_data)->isolate_group_data();
+    parent_kernel_buffer = parent_isolate_group_data->kernel_buffer();
     kernel_buffer = parent_kernel_buffer.get();
-    kernel_buffer_size = parent_isolate_data->kernel_buffer_size();
+    kernel_buffer_size = parent_isolate_group_data->kernel_buffer_size();
   }
 
   if (kernel_buffer == NULL && !isolate_run_app_snapshot) {
@@ -878,14 +878,6 @@ static void ReadFile(const char* filename, uint8_t** buffer, intptr_t* size) {
   file->Release();
 }
 
-static void LoadBytecode() {
-  if (Dart_IsVMFlagSet("enable_interpreter") ||
-      Dart_IsVMFlagSet("use_bytecode_compiler")) {
-    Dart_Handle result = Dart_ReadAllBytecode();
-    CHECK_RESULT(result);
-  }
-}
-
 bool RunMainIsolate(const char* script_name, CommandLineOptions* dart_options) {
   // Call CreateIsolateGroupAndSetup which creates an isolate and loads up
   // the specified application script.
@@ -949,10 +941,6 @@ bool RunMainIsolate(const char* script_name, CommandLineOptions* dart_options) {
     if (Dart_IsNull(root_lib)) {
       ErrorExit(kErrorExitCode, "Unable to find root library for '%s'\n",
                 script_name);
-    }
-
-    if (Options::gen_snapshot_kind() == kAppJIT) {
-      LoadBytecode();
     }
 
     if (Options::load_compilation_trace_filename() != NULL) {

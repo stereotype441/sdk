@@ -3503,12 +3503,12 @@ class ResolverVisitor extends ScopedVisitor {
   @override
   void visitBlockFunctionBody(BlockFunctionBody node) {
     try {
-      _flowAnalysis?.blockFunctionBody_enter(node);
+      _flowAnalysis?.functionBody_enter(node);
       inferenceContext.pushReturnContext(node);
       super.visitBlockFunctionBody(node);
     } finally {
       inferenceContext.popReturnContext(node);
-      _flowAnalysis?.blockFunctionBody_exit(node);
+      _flowAnalysis?.functionBody_exit(node);
     }
   }
 
@@ -3610,7 +3610,7 @@ class ResolverVisitor extends ScopedVisitor {
 
     if (_flowAnalysis != null) {
       if (flow != null) {
-        flow.conditional_thenBegin(node, condition);
+        flow.conditional_thenBegin(condition);
         _flowAnalysis.checkUnreachableNode(thenExpression);
       }
       thenExpression.accept(this);
@@ -3628,11 +3628,10 @@ class ResolverVisitor extends ScopedVisitor {
     InferenceContext.setTypeFromNode(elseExpression, node);
 
     if (flow != null) {
-      var isBool = thenExpression.staticType.isDartCoreBool;
-      flow.conditional_elseBegin(node, thenExpression, isBool);
+      flow.conditional_elseBegin(thenExpression);
       _flowAnalysis.checkUnreachableNode(elseExpression);
       elseExpression.accept(this);
-      flow.conditional_end(node, elseExpression, isBool);
+      flow.conditional_end(node, elseExpression);
     } else {
       elseExpression.accept(this);
     }
@@ -3744,7 +3743,7 @@ class ResolverVisitor extends ScopedVisitor {
     _flowAnalysis?.flow?.doStatement_conditionBegin();
     condition.accept(this);
 
-    _flowAnalysis?.flow?.doStatement_end(node, node.condition);
+    _flowAnalysis?.flow?.doStatement_end(node.condition);
   }
 
   @override
@@ -3789,6 +3788,7 @@ class ResolverVisitor extends ScopedVisitor {
       return;
     }
     try {
+      _flowAnalysis?.functionBody_enter(node);
       InferenceContext.setTypeFromNode(node.expression, node);
       inferenceContext.pushReturnContext(node);
       super.visitExpressionFunctionBody(node);
@@ -3802,6 +3802,7 @@ class ResolverVisitor extends ScopedVisitor {
       }
     } finally {
       inferenceContext.popReturnContext(node);
+      _flowAnalysis?.functionBody_exit(node);
     }
   }
 
@@ -3850,10 +3851,15 @@ class ResolverVisitor extends ScopedVisitor {
       } else if (forLoopParts is ForPartsWithExpression) {
         forLoopParts.initialization?.accept(this);
       }
-      InferenceContext.setType(forLoopParts.condition, typeProvider.boolType);
-      forLoopParts.condition?.accept(this);
+      var condition = forLoopParts.condition;
+      InferenceContext.setType(condition, typeProvider.boolType);
+      _flowAnalysis?.for_conditionBegin(node, condition);
+      condition?.accept(this);
+      _flowAnalysis?.for_bodyBegin(node, condition);
       node.body?.accept(this);
+      _flowAnalysis?.flow?.for_updaterBegin();
       forLoopParts.updaters.accept(this);
+      _flowAnalysis?.flow?.for_end();
     } else if (forLoopParts is ForEachParts) {
       Expression iterable = forLoopParts.iterable;
       DeclaredIdentifier loopVariable;
@@ -3885,8 +3891,12 @@ class ResolverVisitor extends ScopedVisitor {
       // variable cannot be in scope while visiting the iterator.
       //
       iterable?.accept(this);
+      _flowAnalysis?.loopVariable(loopVariable);
       loopVariable?.accept(this);
+      _flowAnalysis?.flow
+          ?.forEach_bodyBegin(_flowAnalysis?.assignedVariables[node]);
       node.body?.accept(this);
+      _flowAnalysis?.flow?.forEach_end();
 
       node.accept(elementResolver);
       node.accept(typeAnalyzer);
@@ -3908,18 +3918,18 @@ class ResolverVisitor extends ScopedVisitor {
       var condition = forLoopParts.condition;
       InferenceContext.setType(condition, typeProvider.boolType);
 
-      _flowAnalysis?.forStatement_conditionBegin(node, condition);
+      _flowAnalysis?.for_conditionBegin(node, condition);
       if (condition != null) {
         condition.accept(this);
       }
 
-      _flowAnalysis?.forStatement_bodyBegin(node, condition);
+      _flowAnalysis?.for_bodyBegin(node, condition);
       visitStatementInScope(node.body);
 
-      _flowAnalysis?.flow?.forStatement_updaterBegin();
+      _flowAnalysis?.flow?.for_updaterBegin();
       forLoopParts.updaters.accept(this);
 
-      _flowAnalysis?.flow?.forStatement_end();
+      _flowAnalysis?.flow?.for_end();
     } else if (forLoopParts is ForEachParts) {
       Expression iterable = forLoopParts.iterable;
       DeclaredIdentifier loopVariable;
@@ -3960,7 +3970,7 @@ class ResolverVisitor extends ScopedVisitor {
       _flowAnalysis?.loopVariable(loopVariable);
       loopVariable?.accept(this);
 
-      _flowAnalysis?.flow?.forEachStatement_bodyBegin(
+      _flowAnalysis?.flow?.forEach_bodyBegin(
         _flowAnalysis?.assignedVariables[node],
       );
 
@@ -3969,7 +3979,7 @@ class ResolverVisitor extends ScopedVisitor {
         visitStatementInScope(body);
       }
 
-      _flowAnalysis?.flow?.forEachStatement_end();
+      _flowAnalysis?.flow?.forEach_end();
 
       node.accept(elementResolver);
       node.accept(typeAnalyzer);
@@ -5054,7 +5064,7 @@ class ResolverVisitor extends ScopedVisitor {
     }
     if (positionalArgumentCount < requiredParameterCount && noBlankArguments) {
       ErrorCode errorCode = (reportAsError
-          ? CompileTimeErrorCode.NOT_ENOUGH_REQUIRED_ARGUMENTS
+          ? CompileTimeErrorCode.NOT_ENOUGH_POSITIONAL_ARGUMENTS
           : StaticWarningCode.NOT_ENOUGH_REQUIRED_ARGUMENTS);
       if (onError != null) {
         onError(errorCode, argumentList,

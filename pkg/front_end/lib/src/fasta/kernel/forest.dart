@@ -36,6 +36,7 @@ import 'kernel_shadow_ast.dart'
         EmptyStatementJudgment,
         ExpressionStatementJudgment,
         ForJudgment,
+        FunctionNodeJudgment,
         IfJudgment,
         IntJudgment,
         ListLiteralJudgment,
@@ -49,6 +50,7 @@ import 'kernel_shadow_ast.dart'
         TryCatchJudgment,
         TryFinallyJudgment,
         TypeLiteralJudgment,
+        VariableDeclarationJudgment,
         WhileJudgment,
         YieldJudgment;
 
@@ -56,14 +58,14 @@ import 'kernel_shadow_ast.dart'
 class Forest {
   const Forest();
 
-  Arguments createArguments(List<Expression> positional, Token token,
+  Arguments createArguments(int fileOffset, List<Expression> positional,
       {List<DartType> types, List<NamedExpression> named}) {
     return new ArgumentsJudgment(positional, types: types, named: named)
-      ..fileOffset = offsetForToken(token);
+      ..fileOffset = fileOffset ?? TreeNode.noOffset;
   }
 
-  Arguments createArgumentsEmpty(Token token) {
-    return createArguments(<Expression>[], token);
+  Arguments createArgumentsEmpty(int fileOffset) {
+    return createArguments(fileOffset, <Expression>[]);
   }
 
   List<NamedExpression> argumentsNamed(Arguments arguments) {
@@ -494,9 +496,9 @@ class Forest {
 
   /// Return a representation of a return statement.
   Statement createReturnStatement(
-      Token returnKeyword, Expression expression, Token semicolon) {
+      Token returnKeyword, Expression expression, int charOffset) {
     return new ReturnJudgment(returnKeyword?.lexeme, expression)
-      ..fileOffset = returnKeyword.charOffset;
+      ..fileOffset = charOffset;
   }
 
   Expression createStringConcatenation(
@@ -623,6 +625,68 @@ class Forest {
   bool isThisExpression(Object node) => node is ThisExpression;
 
   bool isVariablesDeclaration(Object node) => node is _VariablesDeclaration;
+
+  /// Creates [VariableDeclaration] for a variable named [name] at the given
+  /// [functionNestingLevel].
+  VariableDeclaration createVariableDeclaration(
+      String name, int functionNestingLevel,
+      {Expression initializer,
+      DartType type,
+      bool isFinal: false,
+      bool isConst: false,
+      bool isFieldFormal: false,
+      bool isCovariant: false,
+      bool isLocalFunction: false}) {
+    return VariableDeclarationJudgment(name, functionNestingLevel,
+        type: type,
+        initializer: initializer,
+        isFinal: isFinal,
+        isConst: isConst,
+        isFieldFormal: isFieldFormal,
+        isCovariant: isCovariant,
+        isLocalFunction: isLocalFunction);
+  }
+
+  FunctionNode createFunctionNode(Statement body,
+      {List<TypeParameter> typeParameters,
+      List<VariableDeclaration> positionalParameters,
+      List<VariableDeclaration> namedParameters,
+      int requiredParameterCount,
+      DartType returnType: const DynamicType(),
+      AsyncMarker asyncMarker: AsyncMarker.Sync,
+      AsyncMarker dartAsyncMarker}) {
+    return new FunctionNodeJudgment(body,
+        typeParameters: typeParameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+        requiredParameterCount: requiredParameterCount,
+        returnType: returnType,
+        asyncMarker: asyncMarker,
+        dartAsyncMarker: dartAsyncMarker);
+  }
+
+  TypeParameter createTypeParameter(String name) {
+    return new TypeParameter(name);
+  }
+
+  TypeParameterType createTypeParameterType(TypeParameter typeParameter) {
+    return new TypeParameterType(typeParameter);
+  }
+
+  FunctionExpression createFunctionExpression(
+      FunctionNode function, int fileOffset) {
+    return new FunctionExpression(function)..fileOffset = fileOffset;
+  }
+
+  NamedExpression createNamedExpression(String name, Expression expression) {
+    return new NamedExpression(name, expression);
+  }
+
+  StaticInvocation createStaticInvocation(
+      int fileOffset, Procedure procedure, Arguments arguments) {
+    return new StaticInvocation(procedure, arguments)
+      ..fileOffset = fileOffset ?? TreeNode.noOffset;
+  }
 }
 
 class _VariablesDeclaration extends Statement {

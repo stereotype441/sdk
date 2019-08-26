@@ -205,6 +205,15 @@ class TranslationHelper {
     }
     return *expression_evaluation_function_;
   }
+  void SetExpressionEvaluationRealClass(const Class& real_class) {
+    ASSERT(expression_evaluation_real_class_ == nullptr);
+    ASSERT(!real_class.IsNull());
+    expression_evaluation_real_class_ = &Class::Handle(zone_, real_class.raw());
+  }
+  RawClass* GetExpressionEvaluationRealClass() {
+    ASSERT(expression_evaluation_real_class_ != nullptr);
+    return expression_evaluation_real_class_->raw();
+  }
 
  private:
   // This will mangle [name_to_modify] if necessary and make the result a symbol
@@ -236,6 +245,7 @@ class TranslationHelper {
   Smi& name_index_handle_;
   GrowableObjectArray* potential_extension_libraries_ = nullptr;
   Function* expression_evaluation_function_ = nullptr;
+  Class* expression_evaluation_real_class_ = nullptr;
 
   DISALLOW_COPY_AND_ASSIGN(TranslationHelper);
 };
@@ -469,7 +479,7 @@ class FieldHelper {
   NameIndex canonical_name_;
   TokenPosition position_;
   TokenPosition end_position_;
-  uint8_t flags_ = 0;
+  uint32_t flags_ = 0;
   intptr_t source_uri_index_ = 0;
   intptr_t annotation_count_ = 0;
 
@@ -555,7 +565,7 @@ class ProcedureHelper {
   TokenPosition position_;
   TokenPosition end_position_;
   Kind kind_;
-  uint8_t flags_ = 0;
+  uint32_t flags_ = 0;
   intptr_t source_uri_index_ = 0;
   intptr_t annotation_count_ = 0;
 

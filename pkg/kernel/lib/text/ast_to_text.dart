@@ -1022,6 +1022,7 @@ class Printer extends Visitor<Null> {
   visitField(Field node) {
     writeAnnotationList(node.annotations);
     writeIndentation();
+    writeModifier(node.isLate, 'late');
     writeModifier(node.isStatic, 'static');
     writeModifier(node.isCovariant, 'covariant');
     writeModifier(node.isGenericCovariantImpl, 'generic-covariant-impl');
@@ -1169,6 +1170,14 @@ class Printer extends Visitor<Null> {
       }
       writeName(descriptor.name);
       writeSpaced('=');
+      Member member = descriptor.member.asMember;
+      if (member is Procedure) {
+        if (member.isGetter) {
+          writeWord('get');
+        } else if (member.isSetter) {
+          writeWord('set');
+        }
+      }
       writeMemberReferenceFromReference(descriptor.member);
       endLine(';');
     });
@@ -1912,6 +1921,8 @@ class Printer extends Visitor<Null> {
     if (showOffsets) writeWord("[${node.fileOffset}]");
     if (showMetadata) writeMetadata(node);
     writeAnnotationList(node.annotations, separateLines: false);
+    writeModifier(node.isLate, 'late');
+    writeModifier(node.isRequired, 'required');
     writeModifier(node.isCovariant, 'covariant');
     writeModifier(node.isGenericCovariantImpl, 'generic-covariant-impl');
     writeModifier(node.isFinal, 'final');
@@ -2032,6 +2043,7 @@ class Printer extends Visitor<Null> {
   }
 
   visitNamedType(NamedType node) {
+    writeModifier(node.isRequired, 'required');
     writeWord(node.name);
     writeSymbol(':');
     writeSpace();

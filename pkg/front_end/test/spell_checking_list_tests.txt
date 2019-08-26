@@ -32,6 +32,7 @@ b1x
 b2x
 ba
 backed
+bailout
 bash
 bat
 batch
@@ -108,8 +109,10 @@ dictionaries
 dictionary
 differs
 dillfile
+dills
 dirname
 disagree
+disallowed
 disconnect
 discovering
 dispatcher
@@ -225,6 +228,7 @@ lets
 lightly
 likewise
 linebreaks
+lints
 linux
 listening
 ll
@@ -284,6 +288,7 @@ prop
 propagated
 protected
 provider
+pubspec
 pure
 pv
 px
@@ -316,6 +321,8 @@ say
 scans
 screen
 scripts
+sdkroot
+sdks
 secondary
 seconds
 segment
@@ -341,6 +348,7 @@ strip
 strongest
 structures
 stub's
+stupid
 subcommand
 subscription
 subtool

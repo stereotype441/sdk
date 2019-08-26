@@ -27,6 +27,7 @@ import '../fasta_codes.dart'
         messageOperatorWithOptionalFormals,
         messageStaticConstructor,
         messageTypedefNotFunction,
+        Template,
         templateCycleInTypeVariables,
         templateDirectCycleInTypeVariables,
         templateDuplicatedParameterName,
@@ -60,7 +61,9 @@ import '../modifier.dart'
         covariantMask,
         externalMask,
         finalMask,
+        lateMask,
         mixinDeclarationMask,
+        requiredMask,
         staticMask;
 
 import '../operator.dart'
@@ -875,7 +878,7 @@ class OutlineBuilder extends StackListener {
       kind = ProcedureKind.Operator;
       int requiredArgumentCount = operatorRequiredArgumentCount(nameOrOperator);
       if ((formals?.length ?? 0) != requiredArgumentCount) {
-        var template;
+        Template<Message Function(String name)> template;
         switch (requiredArgumentCount) {
           case 0:
             template = templateOperatorParameterMismatch0;
@@ -961,6 +964,8 @@ class OutlineBuilder extends StackListener {
         // TODO(johnniwinther): Handle shadowing of extension type variables.
         List<TypeVariableBuilder> synthesizedTypeVariables = library
             .copyTypeVariables(extension.typeVariables, declarationBuilder,
+                // TODO(johnniwinther): The synthesized names show up in
+                // messages. Move synthesizing of names later to avoid this.
                 synthesizeTypeParameterNames: true);
         substitution = {};
         for (int i = 0; i < synthesizedTypeVariables.length; i++) {
@@ -1161,6 +1166,7 @@ class OutlineBuilder extends StackListener {
       reportNonNullableModifierError(requiredToken);
     }
     push((covariantToken != null ? covariantMask : 0) |
+        (requiredToken != null ? requiredMask : 0) |
         Modifier.validateVarFinalOrConst(varFinalOrConst?.lexeme));
   }
 
@@ -1417,7 +1423,7 @@ class OutlineBuilder extends StackListener {
       functionType =
           library.addFunctionType(returnType, null, formals, charOffset);
     } else {
-      var type = pop();
+      Object type = pop();
       typeVariables = pop();
       charOffset = pop();
       name = pop();
@@ -1455,7 +1461,6 @@ class OutlineBuilder extends StackListener {
       Token beginToken,
       Token endToken) {
     debugEvent("endTopLevelFields");
-    // TODO(danrubel): handle NNBD 'late' modifier
     if (!library.loader.target.enableNonNullable) {
       reportNonNullableModifierError(lateToken);
     }
@@ -1463,6 +1468,7 @@ class OutlineBuilder extends StackListener {
     TypeBuilder type = nullIfParserRecovery(pop());
     int modifiers = (staticToken != null ? staticMask : 0) |
         (covariantToken != null ? covariantMask : 0) |
+        (lateToken != null ? lateMask : 0) |
         Modifier.validateVarFinalOrConst(varFinalOrConst?.lexeme);
     List<MetadataBuilder> metadata = pop();
     checkEmpty(beginToken.charOffset);
@@ -1476,7 +1482,6 @@ class OutlineBuilder extends StackListener {
   void endFields(Token staticToken, Token covariantToken, Token lateToken,
       Token varFinalOrConst, int count, Token beginToken, Token endToken) {
     debugEvent("Fields");
-    // TODO(danrubel): handle NNBD 'late' modifier
     if (!library.loader.target.enableNonNullable) {
       reportNonNullableModifierError(lateToken);
     }
@@ -1484,6 +1489,7 @@ class OutlineBuilder extends StackListener {
     TypeBuilder type = pop();
     int modifiers = (staticToken != null ? staticMask : 0) |
         (covariantToken != null ? covariantMask : 0) |
+        (lateToken != null ? lateMask : 0) |
         Modifier.validateVarFinalOrConst(varFinalOrConst?.lexeme);
     if (staticToken == null && modifiers & constMask != 0) {
       // It is a compile-time error if an instance variable is declared to be
@@ -1818,7 +1824,7 @@ class OutlineBuilder extends StackListener {
     Token docToken = token.precedingComments;
     if (docToken == null) return null;
     bool inSlash = false;
-    var buffer = new StringBuffer();
+    StringBuffer buffer = new StringBuffer();
     while (docToken != null) {
       String lexeme = docToken.lexeme;
       if (lexeme.startsWith('/**')) {

@@ -336,6 +336,8 @@ capabilities
 capability
 capital
 capture
+captured
+captures
 capturing
 care
 careful
@@ -393,6 +395,7 @@ clean
 cleaned
 cleaning
 cleans
+cleanup
 clear
 cleared
 clearer
@@ -562,6 +565,7 @@ control
 controller
 convenience
 convenient
+conventional
 conventions
 convert
 converted
@@ -869,6 +873,7 @@ ensures
 ensuring
 entails
 enter
+entered
 entering
 entire
 entirely
@@ -978,6 +983,7 @@ extract
 extraction
 extractor
 extraneous
+face
 facilitate
 fact
 fact's
@@ -1055,12 +1061,14 @@ flux
 fold
 folded
 folder
+folders
 follow
 followed
 following
 follows
 for
 force
+forced
 forest
 forget
 fork
@@ -1495,6 +1503,7 @@ library's
 license
 licensing
 light
+lightweight
 like
 likely
 limit
@@ -1549,6 +1558,7 @@ looks
 lookup
 lookups
 loop
+loop's
 looping
 loops
 loosely
@@ -1652,6 +1662,7 @@ mixins
 mock
 mode
 model
+models
 modes
 modifiable
 modification
@@ -1789,6 +1800,7 @@ one
 ones
 only
 onto
+opaque
 open
 opener
 openers
@@ -2234,6 +2246,7 @@ responsible
 rest
 restore
 restored
+restores
 restrict
 restricted
 result
@@ -2589,6 +2602,7 @@ syntactically
 syntax
 synthesize
 synthesized
+synthesizing
 synthetic
 synthetically
 system

@@ -413,6 +413,7 @@ class Object {
   V(Bool, bool_true)                                                           \
   V(Bool, bool_false)                                                          \
   V(Smi, smi_illegal_cid)                                                      \
+  V(Smi, smi_zero)                                                             \
   V(LanguageError, snapshot_writer_error)                                      \
   V(LanguageError, branch_offset_error)                                        \
   V(LanguageError, speculative_inlining_error)                                 \
@@ -598,6 +599,29 @@ class Object {
     // Can't use Contains, as it uses tags_, which is set through this method.
     ASSERT(reinterpret_cast<uword>(addr) >= RawObject::ToAddr(raw()));
     *const_cast<FieldType*>(addr) = value;
+  }
+
+  template <typename FieldType, typename ValueType, MemoryOrder order>
+  void StoreNonPointer(const FieldType* addr, ValueType value) const {
+    // Can't use Contains, as it uses tags_, which is set through this method.
+    ASSERT(reinterpret_cast<uword>(addr) >= RawObject::ToAddr(raw()));
+
+    if (order == MemoryOrder::kRelease) {
+      AtomicOperations::StoreRelease(const_cast<FieldType*>(addr), value);
+    } else {
+      ASSERT(order == MemoryOrder::kRelaxed);
+      StoreNonPointer<FieldType, ValueType>(addr, value);
+    }
+  }
+
+  template <typename FieldType, MemoryOrder order = MemoryOrder::kRelaxed>
+  FieldType LoadNonPointer(const FieldType* addr) const {
+    if (order == MemoryOrder::kAcquire) {
+      return AtomicOperations::LoadAcquire(const_cast<FieldType*>(addr));
+    } else {
+      ASSERT(order == MemoryOrder::kRelaxed);
+      return *const_cast<FieldType*>(addr);
+    }
   }
 
   // Provides non-const access to non-pointer fields within the object. Such
@@ -873,10 +897,7 @@ class Class : public Object {
 
   TokenPosition token_pos() const { return raw_ptr()->token_pos_; }
   void set_token_pos(TokenPosition value) const;
-  TokenPosition end_token_pos() const {
-    ASSERT(is_declaration_loaded());
-    return raw_ptr()->end_token_pos_;
-  }
+  TokenPosition end_token_pos() const { return raw_ptr()->end_token_pos_; }
   void set_end_token_pos(TokenPosition value) const;
 
   int32_t SourceFingerprint() const;
@@ -1779,11 +1800,22 @@ class ICData : public Object {
   // ICData are incomplete and the MegamorphicCache needs to also be consulted
   // to list the call site's observed receiver classes and targets.
   bool is_megamorphic() const {
-    return MegamorphicBit::decode(raw_ptr()->state_bits_);
+    // Ensure any following load instructions do not get performed before this
+    // one.
+    const uint32_t bits = LoadNonPointer<uint32_t, MemoryOrder::kAcquire>(
+        &raw_ptr()->state_bits_);
+    return MegamorphicBit::decode(bits);
   }
+
   void set_is_megamorphic(bool value) const {
-    StoreNonPointer(&raw_ptr()->state_bits_,
-                    MegamorphicBit::update(value, raw_ptr()->state_bits_));
+    // We don't have concurrent RW access to [state_bits_].
+    const uint32_t updated_bits =
+        MegamorphicBit::update(value, raw_ptr()->state_bits_);
+
+    // Though we ensure that once the state bits are updated, all other previous
+    // writes to the IC are visible as well.
+    StoreNonPointer<uint32_t, uint32_t, MemoryOrder::kRelease>(
+        &raw_ptr()->state_bits_, updated_bits);
   }
 
   // The length of the array. This includes all sentinel entries including
@@ -1916,7 +1948,6 @@ class ICData : public Object {
   RawICData* AsUnaryClassChecksSortedByCount() const;
 
   RawUnlinkedCall* AsUnlinkedCall() const;
-  RawMegamorphicCache* AsMegamorphicCache() const;
 
   // Consider only used entries.
   bool HasOneTarget() const;
@@ -2065,6 +2096,7 @@ class ICData : public Object {
   friend class SnapshotWriter;
   friend class Serializer;
   friend class Deserializer;
+  friend class CallSiteResetter;
 };
 
 // Often used constants for number of free function type parameters.
@@ -2171,10 +2203,6 @@ class Function : public Object {
   bool HasInstantiatedSignature(Genericity genericity = kAny,
                                 intptr_t num_free_fun_type_params = kAllFree,
                                 TrailPtr trail = NULL) const;
-
-  // Reloading support:
-  void Reparent(const Class& new_cls) const;
-  void ZeroEdgeCounters() const;
 
   RawClass* Owner() const;
   void set_owner(const Object& value) const;
@@ -3793,6 +3821,7 @@ class Script : public Object {
   RawString* Source() const;
   bool IsPartOfDartColonLibrary() const;
 
+  void LookupSourceAndLineStarts(Zone* zone) const;
   RawGrowableObjectArray* GenerateLineNumberArray() const;
   RawScript::Kind kind() const {
     return static_cast<RawScript::Kind>(raw_ptr()->kind_);
@@ -4567,9 +4596,6 @@ class ObjectPool : public Object {
     StoreNonPointer(&EntryAddr(index)->raw_value_, raw_value);
   }
 
-  // Used during reloading (see object_reload.cc). Calls Reset on all ICDatas.
-  void ResetICDatas(Zone* zone) const;
-
   static intptr_t InstanceSize() {
     ASSERT(sizeof(RawObjectPool) ==
            OFFSET_OF_RETURNED_VALUE(RawObjectPool, data));
@@ -5292,11 +5318,6 @@ class Code : public Object {
     StorePointer(&raw_ptr()->code_source_map_, code_source_map.raw());
   }
 
-  // Used during reloading (see object_reload.cc). Calls Reset on all ICDatas
-  // that are embedded inside the Code or ObjecPool objects.
-  void ResetICDatas(Zone* zone) const;
-  void ResetSwitchableCalls(Zone* zone) const;
-
   // Array of DeoptInfo objects.
   RawArray* deopt_info_array() const {
 #if defined(DART_PRECOMPILED_RUNTIME)
@@ -5691,6 +5712,7 @@ class Code : public Object {
   // So that the RawFunction pointer visitor can determine whether code the
   // function points to is optimized.
   friend class RawFunction;
+  friend class CallSiteResetter;
 };
 
 class Bytecode : public Object {
@@ -5730,10 +5752,6 @@ class Bytecode : public Object {
     ASSERT(function.IsOld());
     StorePointer(&raw_ptr()->function_, function.raw());
   }
-
-  // Used during reloading (see object_reload.cc). Calls Reset on all ICDatas
-  // that are embedded inside the Code or ObjecPool objects.
-  void ResetICDatas(Zone* zone) const;
 
   static intptr_t InstanceSize() {
     return RoundedAllocationSize(sizeof(RawBytecode));
@@ -6036,6 +6054,8 @@ class MegamorphicCache : public Object {
     return RoundedAllocationSize(sizeof(RawMegamorphicCache));
   }
 
+  static RawMegamorphicCache* Clone(const MegamorphicCache& from);
+
  private:
   friend class Class;
   friend class MegamorphicCacheTable;
@@ -6091,6 +6111,7 @@ class SubtypeTestCache : public Object {
                 TypeArguments* instance_parent_function_type_arguments,
                 TypeArguments* instance_delayed_type_arguments,
                 Bool* test_result) const;
+  void Reset() const;
 
   static RawSubtypeTestCache* New();
 
@@ -6102,7 +6123,13 @@ class SubtypeTestCache : public Object {
     return OFFSET_OF(RawSubtypeTestCache, cache_);
   }
 
+  static void Init();
+  static void Cleanup();
+
  private:
+  // A VM heap allocated preinitialized empty subtype entry array.
+  static RawArray* cached_array_;
+
   RawArray* cache() const { return raw_ptr()->cache_; }
 
   void set_cache(const Array& value) const;
@@ -6111,6 +6138,8 @@ class SubtypeTestCache : public Object {
 
   FINAL_HEAP_OBJECT_IMPLEMENTATION(SubtypeTestCache, Object);
   friend class Class;
+  friend class Serializer;
+  friend class Deserializer;
 };
 
 class Error : public Object {
@@ -7821,6 +7850,7 @@ class String : public Instance {
   friend class ExternalTwoByteString;
   friend class RawOneByteString;
   friend class RODataSerializationCluster;  // SetHash
+  friend class Pass2Visitor;                // Stack "handle"
 };
 
 class OneByteString : public AllStatic {
