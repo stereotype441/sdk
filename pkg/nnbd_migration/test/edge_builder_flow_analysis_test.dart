@@ -230,6 +230,32 @@ void h(int k) {}
     assertEdge(iNode, jNode, hard: false);
   }
 
+  test_catch_cancels_promotions_based_on_assignments_in_body() async {
+    await analyze('''
+void f(int i) {
+  if (i == null) return;
+  try {
+    g(i);
+    i = null;
+    if (i == null) return;
+    g(i);
+  } catch (_) {
+    h(i);
+  }
+}
+void g(int j) {}
+void h(int k) {}
+''');
+    var iNode = decoratedTypeAnnotation('int i').node;
+    var jNode = decoratedTypeAnnotation('int j').node;
+    var kNode = decoratedTypeAnnotation('int k').node;
+    // No edge from i to j because i is promoted at the time of both calls to g.
+    assertNoEdge(iNode, jNode);
+    // But there is an edge from i to k, because there is no guarantee that i is
+    // promoted at all times during the execution of the try block.
+    assertEdge(iNode, kNode, hard: false);
+  }
+
   test_catch_falls_through_to_after_try() async {
     await analyze('''
 void f(int i) {
