@@ -384,11 +384,11 @@ main() {
       h.flow.switchStatement_beginCase(false, {x});
       expect(h.flow.promotedType(x).type, 'int');
       h.flow.write(x);
-      expect(h.flow.promotedType(x).type, 'int?');
+      expect(h.flow.promotedType(x), isNull);
       h.flow.switchStatement_beginCase(false, {x});
       expect(h.flow.promotedType(x).type, 'int');
       h.flow.write(x);
-      expect(h.flow.promotedType(x).type, 'int?');
+      expect(h.flow.promotedType(x), isNull);
       h.flow.switchStatement_end(false);
       h.flow.finish();
     });
@@ -401,7 +401,7 @@ main() {
       h.flow.switchStatement_beginCase(false, {x});
       expect(h.flow.promotedType(x).type, 'int');
       h.flow.write(x);
-      expect(h.flow.promotedType(x).type, 'int?');
+      expect(h.flow.promotedType(x), isNull);
       h.flow.switchStatement_end(false);
       h.flow.finish();
     });
@@ -412,9 +412,9 @@ main() {
       h.promote(x, 'int');
       h.flow.switchStatement_expressionEnd(_Statement());
       h.flow.switchStatement_beginCase(true, {x});
-      expect(h.flow.promotedType(x).type, 'int?');
+      expect(h.flow.promotedType(x), isNull);
       h.flow.write(x);
-      expect(h.flow.promotedType(x).type, 'int?');
+      expect(h.flow.promotedType(x), isNull);
       h.flow.switchStatement_end(false);
       h.flow.finish();
     });

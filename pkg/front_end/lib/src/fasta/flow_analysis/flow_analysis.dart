@@ -522,6 +522,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     if (hasLabel) {
       _current =
           _stack.last.removePromotedAll(notPromoted, _referencedVariables);
+    } else {
+      _current = _stack.last;
     }
   }
 
