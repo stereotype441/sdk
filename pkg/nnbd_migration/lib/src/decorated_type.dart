@@ -403,7 +403,7 @@ class DecoratedType {
     } else if (type is VoidType) {
       return this;
     }
-    throw '$type.substitute($substitution)'; // TODO(paulberry)
+    throw '$type.substitute($type | $substitution)'; // TODO(paulberry)
   }
 
   /// Performs the logic that is common to substitution and function type
