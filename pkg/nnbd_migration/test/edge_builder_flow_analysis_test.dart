@@ -230,6 +230,29 @@ void h(int k) {}
     assertEdge(iNode, jNode, hard: false);
   }
 
+  test_catch_resets_to_state_before_try() async {
+    await analyze('''
+void f(int i, int x, int y) {
+  try {
+    if (i == null) return;
+    g(i);
+  } catch (_) {
+    h(i);
+  }
+}
+void g(int j) {}
+void h(int k) {}
+''');
+    var iNode = decoratedTypeAnnotation('int i').node;
+    var jNode = decoratedTypeAnnotation('int j').node;
+    var kNode = decoratedTypeAnnotation('int k').node;
+    // No edge from i to j because i's type is promoted to non-nullable
+    assertNoEdge(iNode, jNode);
+    // But there is an edge from i to k, since we assume an exception might
+    // occur at any time during the body of the try.
+    assertEdge(iNode, kNode, hard: false);
+  }
+
   test_conditionalExpression() async {
     await analyze('''
 int f(int i) => i == null ? g(i) : h(i);
