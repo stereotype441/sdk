@@ -1086,7 +1086,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     node.expression.accept(this);
     _flowAnalysis.switchStatement_expressionEnd(node);
     var notPromoted = _assignedVariables[node];
-    bool hasDefault = false;
+    var hasDefault = false;
     for (var member in node.members) {
       var hasLabel = member.labels.isNotEmpty;
       _flowAnalysis.switchStatement_beginCase(hasLabel, notPromoted);
