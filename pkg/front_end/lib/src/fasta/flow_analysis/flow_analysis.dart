@@ -538,9 +538,9 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     FlowModel<Variable, Type> breakState = _stack.removeLast();
 
     if (hasDefault) {
-      // breakState should not be null because we should have joined it with
-      // something non-null when handling the default case.
-      assert(breakState != null);
+      // If breakState is null, there were no cases that ended in a break.  So
+      // we need to create a state with a reachability of `false`.
+      breakState ??= afterExpression.setReachable(false);
       _current = breakState;
     } else {
       _current = _join(breakState, afterExpression);
