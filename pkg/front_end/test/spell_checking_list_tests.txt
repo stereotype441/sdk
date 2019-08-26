@@ -103,6 +103,7 @@ def
 depended
 depfile
 deviation
+dfast
 dictionaries
 dictionary
 differs
@@ -245,6 +246,7 @@ mismatched
 miss
 misspelled
 mistake
+mistakes
 month
 mx
 mysdk

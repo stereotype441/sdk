@@ -1665,6 +1665,34 @@ void f(bool b) {
         assertEdge(decoratedTypeAnnotation('bool b').node, never, hard: true));
   }
 
+  test_if_conditional_control_flow_after() async {
+    // Asserts after ifs don't demonstrate non-null intent.
+    // TODO(paulberry): if both branches complete normally, they should.
+    await analyze('''
+void f(bool b, int i) {
+  if (b) return;
+  assert(i != null);
+}
+''');
+
+    assertNoEdge(always, decoratedTypeAnnotation('int i').node);
+  }
+
+  test_if_conditional_control_flow_within() async {
+    // Asserts inside ifs don't demonstrate non-null intent.
+    await analyze('''
+void f(bool b, int i) {
+  if (b) {
+    assert(i != null);
+  } else {
+    assert(i != null);
+  }
+}
+''');
+
+    assertNoEdge(always, decoratedTypeAnnotation('int i').node);
+  }
+
   test_if_element() async {
     await analyze('''
 void f(bool b) {
@@ -2558,9 +2586,8 @@ void test(bool b1, C _c) {
 }
 ''');
 
-    // TODO(mfairhurst): enable this check
-    //assertNullCheck(checkExpression('b1/*check*/'),
-    //    assertEdge(decoratedTypeAnnotation('bool b1').node, never, hard: true));
+    assertNullCheck(checkExpression('b1/*check*/'),
+        assertEdge(decoratedTypeAnnotation('bool b1').node, never, hard: true));
     assertNullCheck(checkExpression('b2/*check*/'),
         assertEdge(decoratedTypeAnnotation('bool b2').node, never, hard: true));
     assertNullCheck(checkExpression('c.m'),
@@ -2584,9 +2611,8 @@ void test(bool b1, C _c) {
 }
 ''');
 
-    // TODO(mfairhurst): enable this check
-    //assertNullCheck(checkExpression('b1/*check*/'),
-    //    assertEdge(decoratedTypeAnnotation('bool b1').node, never, hard: true));
+    assertNullCheck(checkExpression('b1/*check*/'),
+        assertEdge(decoratedTypeAnnotation('bool b1').node, never, hard: true));
     assertNullCheck(checkExpression('b2/*check*/'),
         assertEdge(decoratedTypeAnnotation('bool b2').node, never, hard: true));
     assertNullCheck(checkExpression('c.m'),
@@ -2639,6 +2665,47 @@ void test(bool b, C c1, C c2) {
         assertEdge(decoratedTypeAnnotation('C c3').node, never, hard: true));
   }
 
+  test_postDominators_forElement() async {
+    await analyze('''
+class C {
+  int m() => 0;
+}
+
+void test(bool _b, C c1, C c2) {
+  <int>[for (bool b1 = _b; b1/*check*/; c2.m()) c1.m()];
+}
+''');
+
+    assertNullCheck(checkExpression('b1/*check*/'),
+        assertEdge(decoratedTypeAnnotation('bool b1').node, never, hard: true));
+    assertNullCheck(checkExpression('c1.m'),
+        assertEdge(decoratedTypeAnnotation('C c1').node, never, hard: false));
+    assertNullCheck(checkExpression('c2.m'),
+        assertEdge(decoratedTypeAnnotation('C c2').node, never, hard: false));
+  }
+
+  test_postDominators_forInElement() async {
+    await analyze('''
+class C {
+  int m() => 0;
+}
+void test(List<C> l, C c1) {
+  <int>[for (C _c in l/*check*/) c1.m()];
+  <int>[for (C c2 in l) c2.m()];
+}
+''');
+
+    // TODO(mfairhurst): enable this check
+    //assertNullCheck(
+    //    checkExpression('l/*check*/'),
+    //    assertEdge(decoratedTypeAnnotation('List<C> l').node, never,
+    //        hard: true));
+    assertNullCheck(checkExpression('c1.m'),
+        assertEdge(decoratedTypeAnnotation('C c1').node, never, hard: false));
+    assertNullCheck(checkExpression('c2.m'),
+        assertEdge(decoratedTypeAnnotation('C c2').node, never, hard: false));
+  }
+
   test_postDominators_forInStatement_unconditional() async {
     await analyze('''
 class C {
@@ -2682,9 +2749,8 @@ void test(bool b1, C c1, C c2, C c3) {
 }
 ''');
 
-    //TODO(mfairhurst): enable this check
-    //assertNullCheck(checkExpression('b1/*check*/'),
-    //    assertEdge(decoratedTypeAnnotation('bool b1').node, never, hard: true));
+    assertNullCheck(checkExpression('b1/*check*/'),
+        assertEdge(decoratedTypeAnnotation('bool b1').node, never, hard: true));
     assertNullCheck(checkExpression('c4.m'),
         assertEdge(decoratedTypeAnnotation('C c4').node, never, hard: true));
     assertNullCheck(checkExpression('c2.m'),
@@ -2709,9 +2775,9 @@ void test(bool b1, C c1, C c2, C c3) {
 }
 ''');
 
-    //TODO(mfairhurst): enable this check
     assertNullCheck(checkExpression('b1/*check*/'),
         assertEdge(decoratedTypeAnnotation('bool b1').node, never, hard: true));
+    //TODO(mfairhurst): enable this check
     //assertNullCheck(checkExpression('b2/*check*/'),
     //    assertEdge(decoratedTypeAnnotation('bool b2').node, never, hard: true));
     //assertEdge(decoratedTypeAnnotation('b3 =').node, never, hard: false);
@@ -2843,9 +2909,8 @@ void test(bool b1, C _c) {
 }
 ''');
 
-    // TODO(mfairhurst): enable this check
-    //assertNullCheck(checkExpression('b1/*check*/'),
-    //    assertEdge(decoratedTypeAnnotation('bool b1').node, never, hard: true));
+    assertNullCheck(checkExpression('b1/*check*/'),
+        assertEdge(decoratedTypeAnnotation('bool b1').node, never, hard: true));
     assertNullCheck(checkExpression('b2/*check*/'),
         assertEdge(decoratedTypeAnnotation('bool b2').node, never, hard: true));
     assertNullCheck(checkExpression('c1.m'),
@@ -2952,7 +3017,6 @@ void test() {
   }
 
   test_postDominators_subFunction_ifStatement_unconditional() async {
-    // Failing because function expressions aren't implemented
     await analyze('''
 class C {
   void m() {}
@@ -3013,9 +3077,8 @@ void test(bool b, C c1, C c2) {
 }
 ''');
 
-    //TODO(mfairhurst): enable this check
-    //assertNullCheck(checkExpression('b/*check*/'),
-    //    assertEdge(decoratedTypeAnnotation('bool b').node, never, hard: true));
+    assertNullCheck(checkExpression('b/*check*/'),
+        assertEdge(decoratedTypeAnnotation('bool b').node, never, hard: true));
     assertNullCheck(checkExpression('c1.m'),
         assertEdge(decoratedTypeAnnotation('C c1').node, never, hard: false));
     assertNullCheck(checkExpression('c2.m'),
