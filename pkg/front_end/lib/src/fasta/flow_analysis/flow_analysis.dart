@@ -700,7 +700,7 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
     implements FlowAnalysis<Statement, Expression, Variable, Type> {
   FlowAnalysis<Statement, Expression, Variable, Type> _wrapped;
 
-  bool _noSuchMethodOccurred = false;
+  bool _exceptionOccurred = false;
 
   FlowAnalysisDebug(
       NodeOperations<Expression> nodeOperations,
@@ -710,29 +710,28 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
 
   @override
   void add(Variable variable, {bool assigned: false}) {
-    print('add($variable, assigned: $assigned)');
-    _wrapped.add(variable, assigned: assigned);
-    _wrapped._dumpState();
+    _wrap('add($variable, assigned: $assigned)',
+        () => _wrapped.add(variable, assigned: assigned));
   }
 
   @override
   void booleanLiteral(Expression expression, bool value) {
-    print('booleanLiteral($expression, $value)');
-    _wrapped.booleanLiteral(expression, value);
-    _wrapped._dumpState();
+    _wrap('booleanLiteral($expression, $value)',
+        () => _wrapped.booleanLiteral(expression, value));
   }
 
   @override
   void conditionEqNull(Expression binaryExpression, Variable variable,
       {bool notEqual: false}) {
-    print('conditionEqNull($binaryExpression, $variable, notEqual: $notEqual)');
-    _wrapped.conditionEqNull(binaryExpression, variable, notEqual: notEqual);
-    _wrapped._dumpState();
+    _wrap(
+        'conditionEqNull($binaryExpression, $variable, notEqual: $notEqual)',
+        () => _wrapped.conditionEqNull(binaryExpression, variable,
+            notEqual: notEqual));
   }
 
   @override
   void finish() {
-    if (_noSuchMethodOccurred) {
+    if (_exceptionOccurred) {
       print('finish() (skipped)');
     } else {
       print('finish()');
@@ -742,98 +741,99 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
 
   @override
   void handleBreak(Statement target) {
-    print('handleBreak($target)');
-    _wrapped.handleBreak(target);
-    _wrapped._dumpState();
+    _wrap('handleBreak($target)', () => _wrapped.handleBreak(target));
   }
 
   @override
   void handleContinue(Statement target) {
-    print('handleContinue($target)');
-    _wrapped.handleContinue(target);
-    _wrapped._dumpState();
+    _wrap('handleContinue($target)', () => _wrapped.handleContinue(target));
   }
 
   @override
   void handleExit() {
-    print('handleExit()');
-    _wrapped.handleExit();
-    _wrapped._dumpState();
+    _wrap('handleExit()', () => _wrapped.handleExit());
   }
 
   @override
   void ifStatement_end(bool hasElse) {
-    print('ifStatement_end($hasElse)');
-    _wrapped.ifStatement_end(hasElse);
-    _wrapped._dumpState();
+    _wrap('ifStatement_end($hasElse)', () => _wrapped.ifStatement_end(hasElse));
   }
 
   @override
   void ifStatement_thenBegin(Expression condition) {
-    print('ifStatement_thenBegin($condition)');
-    _wrapped.ifStatement_thenBegin(condition);
-    _wrapped._dumpState();
+    _wrap('ifStatement_thenBegin($condition)',
+        () => _wrapped.ifStatement_thenBegin(condition));
   }
 
   @override
   void logicalBinaryOp_end(Expression wholeExpression, Expression rightOperand,
       {@required bool isAnd}) {
-    print(
-        'logicalBinaryOp_end($wholeExpression, $rightOperand, isAnd: $isAnd)');
-    _wrapped.logicalBinaryOp_end(wholeExpression, rightOperand, isAnd: isAnd);
-    _wrapped._dumpState();
+    _wrap(
+        'logicalBinaryOp_end($wholeExpression, $rightOperand, isAnd: $isAnd)',
+        () => _wrapped.logicalBinaryOp_end(wholeExpression, rightOperand,
+            isAnd: isAnd));
   }
 
   @override
   void logicalBinaryOp_rightBegin(Expression leftOperand,
       {@required bool isAnd}) {
-    print('logicalBinaryOp_rightBegin($leftOperand, isAnd: $isAnd)');
-    _wrapped.logicalBinaryOp_rightBegin(leftOperand, isAnd: isAnd);
-    _wrapped._dumpState();
+    _wrap('logicalBinaryOp_rightBegin($leftOperand, isAnd: $isAnd)',
+        () => _wrapped.logicalBinaryOp_rightBegin(leftOperand, isAnd: isAnd));
   }
 
   @override
   noSuchMethod(Invocation invocation) {
-    _noSuchMethodOccurred = true;
+    _exceptionOccurred = true;
     return super.noSuchMethod(invocation);
   }
 
   @override
   Type promotedType(Variable variable) {
-    print('promotedType($variable)');
-    var result = _wrapped.promotedType(variable);
-    print('  => $result');
-    return result;
+    return _wrap(
+        'promotedType($variable)', () => _wrapped.promotedType(variable),
+        isQuery: true);
   }
 
   @override
   void switchStatement_beginCase(
       bool hasLabel, Iterable<Variable> notPromoted) {
     notPromoted = notPromoted.toList();
-    print('switchStatement_beginCase($hasLabel, $notPromoted)');
-    _wrapped.switchStatement_beginCase(hasLabel, notPromoted);
-    _wrapped._dumpState();
+    _wrap('switchStatement_beginCase($hasLabel, $notPromoted)',
+        () => _wrapped.switchStatement_beginCase(hasLabel, notPromoted));
   }
 
   @override
   void switchStatement_end(bool hasDefault) {
-    print('switchStatement_end($hasDefault)');
-    _wrapped.switchStatement_end(hasDefault);
-    _wrapped._dumpState();
+    _wrap('switchStatement_end($hasDefault)',
+        () => _wrapped.switchStatement_end(hasDefault));
   }
 
   @override
   void switchStatement_expressionEnd(Statement switchStatement) {
-    print('switchStatement_expressionEnd($switchStatement)');
-    _wrapped.switchStatement_expressionEnd(switchStatement);
-    _wrapped._dumpState();
+    _wrap('switchStatement_expressionEnd($switchStatement)',
+        () => _wrapped.switchStatement_expressionEnd(switchStatement));
   }
 
   @override
   void write(Variable variable) {
-    print('write($variable)');
-    _wrapped.write(variable);
-    _wrapped._dumpState();
+    _wrap('write($variable)', () => _wrapped.write(variable));
+  }
+
+  T _wrap<T>(String desc, T callback(), {bool isQuery: false}) {
+    print(desc);
+    T result;
+    try {
+      result = callback();
+    } catch (e) {
+      _exceptionOccurred = true;
+      rethrow;
+    }
+    if (isQuery) {
+      print('  => $result');
+    } else {
+      _wrapped._dumpState();
+    }
+    return result;
   }
 }
 
