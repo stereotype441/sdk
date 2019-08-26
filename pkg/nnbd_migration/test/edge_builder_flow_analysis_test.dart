@@ -230,9 +230,32 @@ void h(int k) {}
     assertEdge(iNode, jNode, hard: false);
   }
 
+  test_catch_falls_through_to_after_try() async {
+    await analyze('''
+void f(int i) {
+  try {
+    g(i);
+    return;
+  } catch (_) {
+    if (i == null) return;
+  }
+  h(i);
+}
+void g(int j) {}
+void h(int k) {}
+''');
+    var iNode = decoratedTypeAnnotation('int i').node;
+    var jNode = decoratedTypeAnnotation('int j').node;
+    var kNode = decoratedTypeAnnotation('int k').node;
+    // No edge from i to k because i's type is promoted to non-nullable
+    assertNoEdge(iNode, kNode);
+    // But there is an edge from i to j.
+    assertEdge(iNode, jNode, hard: true);
+  }
+
   test_catch_resets_to_state_before_try() async {
     await analyze('''
-void f(int i, int x, int y) {
+void f(int i) {
   try {
     if (i == null) return;
     g(i);
