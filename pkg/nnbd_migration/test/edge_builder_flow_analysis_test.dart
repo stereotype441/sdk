@@ -527,7 +527,30 @@ class C {
     // field doesn't cause flow analysis to crash.
   }
 
-  test_finally_resets_to_state_before_try() async {
+  test_finally_promotions_are_preserved() async {
+    await analyze('''
+void f(int i) {
+  try {
+    g(i);
+  } finally {
+    if (i == null) return;
+  }
+  h(i);
+}
+void g(int j) {}
+void h(int k) {}
+''');
+    var iNode = decoratedTypeAnnotation('int i').node;
+    var jNode = decoratedTypeAnnotation('int j').node;
+    var kNode = decoratedTypeAnnotation('int k').node;
+    // No edge from i to k because i's type is promoted to non-nullable in the
+    // finally block.
+    assertNoEdge(iNode, kNode);
+    // But there is an edge from i to j.
+    assertEdge(iNode, jNode, hard: true);
+  }
+
+  test_finally_temporarily_resets_to_state_before_try() async {
     await analyze('''
 void f(int i) {
   try {
@@ -543,7 +566,8 @@ void h(int k) {}
     var iNode = decoratedTypeAnnotation('int i').node;
     var jNode = decoratedTypeAnnotation('int j').node;
     var kNode = decoratedTypeAnnotation('int k').node;
-    // No edge from i to j because i's type is promoted to non-nullable
+    // No edge from i to j because i's type is promoted to non-nullable in the
+    // try-block.
     assertNoEdge(iNode, jNode);
     // But there is an edge from i to k, since we assume an exception might
     // occur at any time during the body of the try.
