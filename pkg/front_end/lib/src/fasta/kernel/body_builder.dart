@@ -1048,7 +1048,8 @@ class BodyBuilder extends ScopeListener<JumpTarget>
               forest.createNullLiteral(null)
                 ..fileOffset = invocation.fileOffset,
               errorName,
-              forest.createArguments(null, invocation.arguments.positional,
+              forest.createArguments(
+                  noLocation, invocation.arguments.positional,
                   types: invocation.arguments.types,
                   named: invocation.arguments.named),
               initialTarget.fileOffset);
@@ -2521,17 +2522,6 @@ class BodyBuilder extends ScopeListener<JumpTarget>
     Object variableOrExpression = pop();
     exitLocalScope();
 
-    if (!libraryBuilder.loader.target.enableControlFlowCollections) {
-      // TODO(danrubel): Report a more user friendly error message
-      // when an experiment is not enabled
-      handleRecoverableError(
-          fasta.templateUnexpectedToken.withArguments(forToken),
-          forToken,
-          forToken);
-      push(invalidCollectionElement);
-      return;
-    }
-
     if (constantContext != ConstantContext.none) {
       handleRecoverableError(
           fasta.templateCantUseControlFlowOrSpreadAsConstant
@@ -3004,16 +2994,9 @@ class BodyBuilder extends ScopeListener<JumpTarget>
     libraryBuilder.checkBoundsInType(
         type, typeEnvironment, uri, operator.charOffset);
     Expression expression = popForValue();
-    if (!libraryBuilder.loader.target.enableConstantUpdate2018 &&
-        constantContext != ConstantContext.none) {
-      push(desugarSyntheticExpression(buildProblem(
-          fasta.templateNotConstantExpression.withArguments('As expression'),
-          operator.charOffset,
-          operator.length)));
-    } else {
-      Expression node = forest.createAsExpression(expression, type, operator);
-      push(node);
-    }
+    Expression asExpression =
+        forest.createAsExpression(expression, type, operator);
+    push(asExpression);
   }
 
   @override
@@ -3030,15 +3013,7 @@ class BodyBuilder extends ScopeListener<JumpTarget>
       typePromoter?.handleIsCheck(isExpression, isInverted, operand.variable,
           type, functionNestingLevel);
     }
-    if (!libraryBuilder.loader.target.enableConstantUpdate2018 &&
-        constantContext != ConstantContext.none) {
-      push(desugarSyntheticExpression(buildProblem(
-          fasta.templateNotConstantExpression.withArguments('Is expression'),
-          isOperator.charOffset,
-          isOperator.length)));
-    } else {
-      push(isExpression);
-    }
+    push(isExpression);
   }
 
   @override
@@ -3997,27 +3972,6 @@ class BodyBuilder extends ScopeListener<JumpTarget>
     Token ifToken = pop();
     typePromoter?.enterElse();
     typePromoter?.exitConditional();
-    if (!libraryBuilder.loader.target.enableControlFlowCollections) {
-      // TODO(danrubel): Report a more user friendly error message
-      // when an experiment is not enabled
-      handleRecoverableError(
-          fasta.templateUnexpectedToken.withArguments(ifToken),
-          ifToken,
-          ifToken);
-      push(invalidCollectionElement);
-      return;
-    }
-
-    if (constantContext != ConstantContext.none &&
-        !libraryBuilder.loader.target.enableConstantUpdate2018) {
-      handleRecoverableError(
-          fasta.templateCantUseControlFlowOrSpreadAsConstant
-              .withArguments(ifToken),
-          ifToken,
-          ifToken);
-      push(invalidCollectionElement);
-      return;
-    }
 
     transformCollections = true;
     if (entry is MapEntry) {
@@ -4036,27 +3990,6 @@ class BodyBuilder extends ScopeListener<JumpTarget>
     Object condition = pop(); // parenthesized expression
     Token ifToken = pop();
     typePromoter?.exitConditional();
-    if (!libraryBuilder.loader.target.enableControlFlowCollections) {
-      // TODO(danrubel): Report a more user friendly error message
-      // when an experiment is not enabled
-      handleRecoverableError(
-          fasta.templateUnexpectedToken.withArguments(ifToken),
-          ifToken,
-          ifToken);
-      push(invalidCollectionElement);
-      return;
-    }
-
-    if (constantContext != ConstantContext.none &&
-        !libraryBuilder.loader.target.enableConstantUpdate2018) {
-      handleRecoverableError(
-          fasta.templateCantUseControlFlowOrSpreadAsConstant
-              .withArguments(ifToken),
-          ifToken,
-          ifToken);
-      push(invalidCollectionElement);
-      return;
-    }
 
     transformCollections = true;
     if (thenEntry is MapEntry) {
@@ -4110,26 +4043,6 @@ class BodyBuilder extends ScopeListener<JumpTarget>
   void handleSpreadExpression(Token spreadToken) {
     debugEvent("SpreadExpression");
     Object expression = pop();
-    if (!libraryBuilder.loader.target.enableSpreadCollections) {
-      handleRecoverableError(
-          fasta.templateUnexpectedToken.withArguments(spreadToken),
-          spreadToken,
-          spreadToken);
-      push(invalidCollectionElement);
-      return;
-    }
-
-    if (constantContext != ConstantContext.none &&
-        !libraryBuilder.loader.target.enableConstantUpdate2018) {
-      handleRecoverableError(
-          fasta.templateCantUseControlFlowOrSpreadAsConstant
-              .withArguments(spreadToken),
-          spreadToken,
-          spreadToken);
-      push(invalidCollectionElement);
-      return;
-    }
-
     transformCollections = true;
     push(forest.createSpreadElement(toValue(expression), spreadToken));
   }
@@ -4436,17 +4349,6 @@ class BodyBuilder extends ScopeListener<JumpTarget>
     Expression iterable = popForValue();
     Object lvalue = pop(); // lvalue
     exitLocalScope();
-
-    if (!libraryBuilder.loader.target.enableControlFlowCollections) {
-      // TODO(danrubel): Report a more user friendly error message
-      // when an experiment is not enabled
-      handleRecoverableError(
-          fasta.templateUnexpectedToken.withArguments(forToken),
-          forToken,
-          forToken);
-      push(invalidCollectionElement);
-      return;
-    }
 
     if (constantContext != ConstantContext.none) {
       handleRecoverableError(
@@ -5876,7 +5778,11 @@ class FormalParameters {
         local[parameter.name] = parameter;
       }
     }
-    return new Scope(local, null, parent, "formals", isModifiable: false);
+    return new Scope(
+        local: local,
+        parent: parent,
+        debugName: "formals",
+        isModifiable: false);
   }
 
   String toString() {

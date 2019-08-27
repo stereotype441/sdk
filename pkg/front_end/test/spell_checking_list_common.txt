@@ -387,6 +387,7 @@ chunk
 circularities
 circularity
 circumstances
+clashing
 class
 classes
 classic
@@ -1927,6 +1928,7 @@ physical
 pick
 picked
 pipeline
+piping
 pivot
 place
 placed
@@ -2395,6 +2397,7 @@ should
 shouldn't
 show
 shown
+shows
 shrink
 side
 sign
@@ -2455,6 +2458,7 @@ sort
 sorted
 sorting
 sorts
+sought
 source
 sources
 space
@@ -2763,6 +2767,7 @@ types
 typically
 typing
 unable
+unambiguous
 unary
 unbalanced
 unbind
