@@ -1712,6 +1712,9 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       for (var v in locals.sortedNamedParameters) {
         _declareLocalVariable(v, function.fileOffset);
       }
+      if (locals.hasFunctionTypeArgsVar) {
+        _declareLocalVariable(locals.functionTypeArgsVar, function.fileOffset);
+      }
     }
 
     if (locals.hasCapturedParameters) {
@@ -3518,6 +3521,9 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
 
   @override
   visitFunctionDeclaration(ast.FunctionDeclaration node) {
+    if (options.emitDebuggerStops) {
+      asm.emitDebugCheck();
+    }
     _genPushContextIfCaptured(node.variable);
     _genClosure(node, node.variable.name, node.function);
     _genStoreVar(node.variable);
