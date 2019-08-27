@@ -1097,7 +1097,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   DecoratedType visitSwitchStatement(SwitchStatement node) {
     node.expression.accept(this);
     _flowAnalysis.switchStatement_expressionEnd(node);
-    var notPromoted = _assignedVariables[node];
+    var notPromoted = _assignedVariables.writtenInNode(node);
     var hasDefault = false;
     for (var member in node.members) {
       var hasLabel = member.labels.isNotEmpty;
@@ -1158,7 +1158,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     }
     var body = node.body;
     body.accept(this);
-    var assignedInBody = _assignedVariables[body];
+    var assignedInBody = _assignedVariables.writtenInNode(body);
     if (catchClauses.isNotEmpty) {
       _flowAnalysis.tryCatchStatement_bodyEnd(assignedInBody);
       catchClauses.accept(this);
@@ -1167,7 +1167,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     if (finallyBlock != null) {
       _flowAnalysis.tryFinallyStatement_finallyBegin(assignedInBody);
       finallyBlock.accept(this);
-      _flowAnalysis.tryFinallyStatement_end(_assignedVariables[finallyBlock]);
+      _flowAnalysis.tryFinallyStatement_end(_assignedVariables.writtenInNode(finallyBlock));
     }
     return null;
   }
@@ -1612,7 +1612,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       } else if (parts is ForPartsWithExpression) {
         parts.initialization?.accept(this);
       }
-      _flowAnalysis.for_conditionBegin(_assignedVariables[node]);
+      _flowAnalysis.for_conditionBegin(_assignedVariables.writtenInNode(node));
       if (parts.condition != null) {
         _checkExpressionNotNull(parts.condition);
       }

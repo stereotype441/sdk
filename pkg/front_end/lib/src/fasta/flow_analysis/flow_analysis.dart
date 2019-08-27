@@ -89,7 +89,7 @@ class AssignedVariables<Node, Variable> {
   /// Queries the set of variables for which a potential write is captured by a
   /// local function or closure inside the [node].
   Set<Variable> capturedInNode(Node node) {
-    return _capturedInNode[node] ?? emptySet;
+    return _capturedInNode[node] ?? const {};
   }
 
   /// This method should be called during pre-traversal, to mark the end of a
@@ -125,7 +125,7 @@ class AssignedVariables<Node, Variable> {
   /// Queries the set of variables that are potentially written to inside the
   /// [node].
   Set<Variable> writtenInNode(Node node) {
-    return _writtenInNode[node] ?? emptySet;
+    return _writtenInNode[node] ?? const {};
   }
 }
 
