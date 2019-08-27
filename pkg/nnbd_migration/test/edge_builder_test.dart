@@ -1968,7 +1968,7 @@ C<int> f() => C<int>();
         hard: false);
   }
 
-    test_instanceCreation_generic_dynamic() async {
+  test_instanceCreation_generic_dynamic() async {
     await analyze('''
 class C<T> {}
 C<Object> f() => C<dynamic>();
