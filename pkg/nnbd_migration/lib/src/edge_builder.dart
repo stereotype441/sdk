@@ -186,25 +186,14 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   DecoratedType getOrComputeElementType(Element element,
       {DecoratedType targetType}) {
     Map<TypeParameterElement, DecoratedType> substitution;
-    Element baseElement;
-    if (element is Member) {
-      assert(targetType != null);
-      baseElement = element.baseElement;
-      var targetTypeType = targetType.type;
-      if (targetTypeType is InterfaceType &&
-          baseElement is ClassMemberElement) {
-        var enclosingClass = baseElement.enclosingElement as ClassElement;
-        assert(targetTypeType.element == enclosingClass, 'ttt.e=${targetTypeType.element}, ec=$enclosingClass'); // TODO(paulberry)
-        substitution = <TypeParameterElement, DecoratedType>{};
-        assert(enclosingClass.typeParameters.length ==
-            targetTypeType.typeArguments.length); // TODO(paulberry)
-        for (int i = 0; i < enclosingClass.typeParameters.length; i++) {
-          substitution[enclosingClass.typeParameters[i]] =
-              targetType.typeArguments[i];
-        }
+    Element baseElement = element is Member ? element.baseElement : element;
+    if (targetType != null) {
+      var classElement = baseElement.enclosingElement as ClassElement;
+      if (classElement.typeParameters.isNotEmpty) {
+        substitution = _decoratedClassHierarchy
+            .asInstanceOf(targetType, classElement)
+            .asSubstitution;
       }
-    } else {
-      baseElement = element;
     }
     DecoratedType decoratedBaseType;
     if (baseElement is PropertyAccessorElement &&
