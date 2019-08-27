@@ -2365,6 +2365,19 @@ void g(C c, int j) {
         assertEdge(nullable_j.node, never, hard: true));
   }
 
+  solo_test_methodInvocation_target_generic_in_base_class() async {
+    await analyze('''
+abstract class B<T> {
+  void m(T t);
+}
+abstract class C extends B<int> {}
+void f(C c, int i) {
+  c.m(i);
+}
+''');
+    fail('TODO');
+  }
+
   test_methodInvocation_resolves_to_getter() async {
     await analyze('''
 abstract class C {
