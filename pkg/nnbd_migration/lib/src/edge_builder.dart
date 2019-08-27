@@ -194,7 +194,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       if (targetTypeType is InterfaceType &&
           baseElement is ClassMemberElement) {
         var enclosingClass = baseElement.enclosingElement as ClassElement;
-        assert(targetTypeType.element == enclosingClass); // TODO(paulberry)
+        assert(targetTypeType.element == enclosingClass, 'ttt.e=${targetTypeType.element}, ec=$enclosingClass'); // TODO(paulberry)
         substitution = <TypeParameterElement, DecoratedType>{};
         assert(enclosingClass.typeParameters.length ==
             targetTypeType.typeArguments.length); // TODO(paulberry)
