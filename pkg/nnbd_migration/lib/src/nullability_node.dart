@@ -344,6 +344,12 @@ class NullabilityGraph {
 /// testing.
 @visibleForTesting
 class NullabilityGraphForTesting extends NullabilityGraph {
+  /// Prints out a representation of the graph nodes.  Useful in debugging
+  /// broken tests.
+  void debugDump() {
+    _debugDump();
+  }
+
   /// Iterates through all edges that have this node as one of their sources.
   ///
   /// There is no guarantee of uniqueness of the iterated edges.

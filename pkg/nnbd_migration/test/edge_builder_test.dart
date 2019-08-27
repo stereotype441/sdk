@@ -2365,19 +2365,6 @@ void g(C c, int j) {
         assertEdge(nullable_j.node, never, hard: true));
   }
 
-  solo_test_methodInvocation_target_generic_in_base_class() async {
-    await analyze('''
-abstract class B<T> {
-  void m(T t);
-}
-abstract class C extends B<int> {}
-void f(C c, int i) {
-  c.m(i);
-}
-''');
-    fail('TODO');
-  }
-
   test_methodInvocation_resolves_to_getter() async {
     await analyze('''
 abstract class C {
@@ -2488,6 +2475,28 @@ void test(C c) {
 ''');
 
     assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true);
+  }
+
+  test_methodInvocation_target_generic_in_base_class() async {
+    await analyze('''
+abstract class B<T> {
+  void m(T/*1*/ t);
+}
+abstract class C extends B<int/*2*/> {}
+void f(C c, int/*3*/ i) {
+  c.m(i);
+}
+''');
+    // nullable(3) -> substitute(nullable(2), nullable(1))
+    var nullable1 = decoratedTypeAnnotation('T/*1*/').node;
+    var nullable2 = decoratedTypeAnnotation('int/*2*/').node;
+    var nullable3 = decoratedTypeAnnotation('int/*3*/').node;
+    var substitution = graph
+        .getDownstreamEdges(nullable3)
+        .single
+        .destinationNode as NullabilityNodeForSubstitution;
+    expect(substitution.innerNode, same(nullable2));
+    expect(substitution.outerNode, same(nullable1));
   }
 
   test_never() async {
