@@ -13,7 +13,7 @@ import 'dartfuzz_api_table.dart';
 // Version of DartFuzz. Increase this each time changes are made
 // to preserve the property that a given version of DartFuzz yields
 // the same fuzzed program for a deterministic random seed.
-const String version = '1.23';
+const String version = '1.24';
 
 // Restriction on statements and expressions.
 const int stmtLength = 2;
@@ -33,24 +33,22 @@ class DartFuzz {
 
   void run() {
     // Initialize program variables.
-    rand = new Random(seed);
+    rand = Random(seed);
     indent = 0;
     nest = 0;
     currentClass = null;
     currentMethod = null;
     // Setup the types.
-    localVars = new List<DartType>();
-    iterVars = new List<String>();
+    localVars = <DartType>[];
+    iterVars = <String>[];
     globalVars = fillTypes1();
     globalVars.addAll(DartType.allTypes); // always one each
     globalMethods = fillTypes2();
     classFields = fillTypes2();
     classMethods = fillTypes3(classFields.length);
+    classParents = new List<int>();
     // Setup optional ffi methods and types.
-    List<bool> ffiStatus = new List<bool>();
-    for (var m in globalMethods) {
-      ffiStatus.add(false);
-    }
+    final ffiStatus = <bool>[for (final _ in globalMethods) false];
     if (ffi) {
       List<List<DartType>> globalMethodsFfi = fillTypes2(isFfi: true);
       for (var m in globalMethodsFfi) {
@@ -144,7 +142,14 @@ class DartFuzz {
   void emitClasses() {
     assert(classFields.length == classMethods.length);
     for (int i = 0; i < classFields.length; i++) {
-      emitLn('class X$i ${i == 0 ? "" : "extends X${i - 1}"} {');
+      if (i == 0) {
+        classParents.add(-1);
+        emitLn('class X0 {');
+      } else {
+        final int parentClass = rand.nextInt(i);
+        classParents.add(parentClass);
+        emitLn('class X$i extends X${parentClass} {');
+      }
       indent += 2;
       emitVarDecls('$fieldName${i}_', classFields[i]);
       currentClass = i;
@@ -467,7 +472,7 @@ class DartFuzz {
     emit(';', newline: true);
     indent += 2;
     localVars.add(tp);
-    bool b = emitStatements(depth + 1);
+    emitStatements(depth + 1);
     localVars.removeLast();
     indent -= 2;
     emitLn('}');
@@ -715,7 +720,7 @@ class DartFuzz {
 
   void emitScalarVar(DartType tp, {bool isLhs = false}) {
     // Collect all choices from globals, fields, locals, and parameters.
-    Set<String> choices = new Set<String>();
+    Set<String> choices = <String>{};
     for (int i = 0; i < globalVars.length; i++) {
       if (tp == globalVars[i]) choices.add('$varName$i');
     }
@@ -917,13 +922,30 @@ class DartFuzz {
         return;
       }
     } else {
-      // Inside a class: try to call backwards in class methods first.
-      final int m1 = currentMethod == null
-          ? classMethods[currentClass].length
-          : currentMethod;
+      int classIndex = currentClass;
+      // Chase randomly up in class hierarchy.
+      while (classParents[classIndex] > 0) {
+        if (rand.nextInt(2) == 0) {
+          break;
+        }
+        classIndex = classParents[classIndex];
+      }
+      int m1 = 0;
+      // Inside a class: try to call backwards into current or parent class
+      // methods first.
+      if (currentMethod == null || classIndex != currentClass) {
+        // If currently emitting the 'run' method or calling into a parent class
+        // pick any of the current or parent class methods respectively.
+        m1 = classMethods[classIndex].length;
+      } else {
+        // If calling into the current class from any method other than 'run'
+        // pick one of the already emitted methods
+        // (to avoid infinite recursions).
+        m1 = currentMethod;
+      }
       final int m2 = globalMethods.length;
-      if (pickedCall(depth, tp, '$methodName${currentClass}_',
-              classMethods[currentClass], m1) ||
+      if (pickedCall(depth, tp, '$methodName${classIndex}_',
+              classMethods[classIndex], m1) ||
           pickedCall(depth, tp, methodName, globalMethods, m2)) {
         return;
       }
@@ -1071,9 +1093,8 @@ class DartFuzz {
       return oneOf(DartLib.setLibs);
     } else if (tp == DartType.INT_STRING_MAP) {
       return oneOf(DartLib.mapLibs);
-    } else {
-      assert(false);
     }
+    throw ArgumentError('Invalid DartType: $tp');
   }
 
   // Emit a library argument, possibly subject to restrictions.
@@ -1112,7 +1133,7 @@ class DartFuzz {
         emitExpr(depth, DartType.INT_STRING_MAP);
         break;
       default:
-        assert(false);
+        throw ArgumentError('Invalid p value: $p');
     }
   }
 
@@ -1135,13 +1156,13 @@ class DartFuzz {
         return DartType.INT_LIST;
       case 5:
         return DartType.INT_SET;
-      case 6:
+      default:
         return DartType.INT_STRING_MAP;
     }
   }
 
   List<DartType> fillTypes1({bool isFfi = false}) {
-    List<DartType> list = new List<DartType>();
+    final list = <DartType>[];
     for (int i = 0, n = 1 + rand.nextInt(4); i < n; i++) {
       if (isFfi)
         list.add(fp ? oneOf([DartType.INT, DartType.DOUBLE]) : DartType.INT);
@@ -1152,15 +1173,15 @@ class DartFuzz {
   }
 
   List<List<DartType>> fillTypes2({bool isFfi = false}) {
-    List<List<DartType>> list = new List<List<DartType>>();
-    for (int i = 0, n = 1 + rand.nextInt(4); i < n; i++) {
+    final list = <List<DartType>>[];
+    for (int i = 0, n = 1 + rand.nextInt(8); i < n; i++) {
       list.add(fillTypes1(isFfi: isFfi));
     }
     return list;
   }
 
   List<List<List<DartType>>> fillTypes3(int n) {
-    List<List<List<DartType>>> list = new List<List<List<DartType>>>();
+    final list = <List<List<DartType>>>[];
     for (int i = 0; i < n; i++) {
       list.add(fillTypes2());
     }
@@ -1270,6 +1291,9 @@ class DartFuzz {
 
   // Prototypes of all methods over all classes (first element is return type).
   List<List<List<DartType>>> classMethods;
+
+  // Parent class indices for all classes.
+  List<int> classParents;
 }
 
 // Generate seed. By default (no user-defined nonzero seed given),
@@ -1278,7 +1302,7 @@ class DartFuzz {
 int getSeed(String userSeed) {
   int seed = int.parse(userSeed);
   if (seed == 0) {
-    Random rand = new Random();
+    Random rand = Random();
     while (seed == 0) {
       seed = rand.nextInt(1 << 32);
     }
@@ -1288,7 +1312,7 @@ int getSeed(String userSeed) {
 
 /// Main driver when dartfuzz.dart is run stand-alone.
 main(List<String> arguments) {
-  final parser = new ArgParser()
+  final parser = ArgParser()
     ..addOption('seed',
         help: 'random seed (0 forces time-based seed)', defaultsTo: '0')
     ..addFlag('fp', help: 'enables floating-point operations', defaultsTo: true)
@@ -1299,8 +1323,8 @@ main(List<String> arguments) {
     final seed = getSeed(results['seed']);
     final fp = results['fp'];
     final ffi = results['ffi'];
-    final file = new File(results.rest.single).openSync(mode: FileMode.write);
-    new DartFuzz(seed, fp, ffi, file).run();
+    final file = File(results.rest.single).openSync(mode: FileMode.write);
+    DartFuzz(seed, fp, ffi, file).run();
     file.closeSync();
   } catch (e) {
     print('Usage: dart dartfuzz.dart [OPTIONS] FILENAME\n${parser.usage}\n$e');

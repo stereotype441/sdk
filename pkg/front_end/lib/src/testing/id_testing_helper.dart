@@ -33,14 +33,9 @@ export '../fasta/messages.dart' show FormattedMessage;
 /// Test configuration used for testing CFE in its default state.
 const TestConfig defaultCfeConfig = const TestConfig(cfeMarker, 'cfe');
 
-/// Test configuration used for testing CFE with constant evaluation.
-const TestConfig cfeConstantUpdate2018Config = const TestConfig(
-    cfeMarker, 'cfe with constant-update-2018',
-    experimentalFlags: const {ExperimentalFlag.constantUpdate2018: true});
-
 /// Test configuration used for testing CFE with extension methods.
 const TestConfig cfeExtensionMethodsConfig = const TestConfig(
-    cfeMarker, 'cfe with constant-update-2018',
+    cfeMarker, 'cfe with extension methods',
     experimentalFlags: const {ExperimentalFlag.extensionMethods: true});
 
 class TestConfig {
@@ -285,7 +280,9 @@ Future<bool> runTestForConfig<T>(
   }
 
   Map<Id, ActualData<T>> actualMapFor(TreeNode node) {
-    Uri uri = node is Library ? node.fileUri : node.location.file;
+    Uri uri = node is Library
+        ? node.fileUri
+        : (node is Member ? node.fileUri : node.location.file);
     return actualMaps.putIfAbsent(uri, () => <Id, ActualData<T>>{});
   }
 

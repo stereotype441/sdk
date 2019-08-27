@@ -821,6 +821,42 @@ int f(int i) {
     await _checkSingleFileChanges(content, expected);
   }
 
+  test_dynamic_method_call() async {
+    var content = '''
+class C {
+  int g(int i) => i;
+}
+int f(bool b, dynamic d) {
+  if (b) return 0;
+  return d.g(null);
+}
+main() {
+  f(true, null);
+  f(false, C());
+}
+''';
+    // `d.g(null)` is a dynamic call, so we can't tell that it will target `C.g`
+    // at runtime.  So we can't figure out that we need to make g's argument and
+    // return types nullable.
+    //
+    // We do, however, make f's return type nullable, since there is no way of
+    // knowing whether a dynamic call will return `null`.
+    var expected = '''
+class C {
+  int g(int i) => i;
+}
+int? f(bool b, dynamic d) {
+  if (b) return 0;
+  return d.g(null);
+}
+main() {
+  f(true, null);
+  f(false, C());
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_field_formal_param_typed() async {
     var content = '''
 class C {
@@ -935,6 +971,22 @@ class C {
     await _checkSingleFileChanges(content, expected);
   }
 
+  test_field_initializer_untyped_list_literal() async {
+    var content = '''
+class C {
+  List<int> f;
+  C() : f = [null];
+}
+''';
+    var expected = '''
+class C {
+  List<int?> f;
+  C() : f = [null];
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_field_type_inferred() async {
     var content = '''
 int f() => null;
@@ -955,6 +1007,36 @@ class C {
   void g() {
     x = f()!;
   }
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_flow_analysis_complex() async {
+    var content = '''
+int f(int x) {
+  while (x == null) {
+    x = g(x);
+  }
+  return x;
+}
+int g(int x) => x == null ? 1 : null;
+main() {
+  f(null);
+}
+''';
+    // Flow analysis can tell that the loop only exits if x is non-null, so the
+    // return type of `f` can remain `int`, and no null check is needed.
+    var expected = '''
+int f(int? x) {
+  while (x == null) {
+    x = g(x);
+  }
+  return x;
+}
+int? g(int? x) => x == null ? 1 : null;
+main() {
+  f(null);
 }
 ''';
     await _checkSingleFileChanges(content, expected);

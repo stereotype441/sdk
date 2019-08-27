@@ -335,9 +335,7 @@ class CompileParsedFunctionHelper : public ValueObject {
       : parsed_function_(parsed_function),
         optimized_(optimized),
         osr_id_(osr_id),
-        thread_(Thread::Current()),
-        loading_invalidation_gen_at_start_(
-            isolate()->loading_invalidation_gen()) {}
+        thread_(Thread::Current()) {}
 
   RawCode* Compile(CompilationPipeline* pipeline);
 
@@ -347,9 +345,6 @@ class CompileParsedFunctionHelper : public ValueObject {
   intptr_t osr_id() const { return osr_id_; }
   Thread* thread() const { return thread_; }
   Isolate* isolate() const { return thread_->isolate(); }
-  intptr_t loading_invalidation_gen_at_start() const {
-    return loading_invalidation_gen_at_start_;
-  }
   RawCode* FinalizeCompilation(compiler::Assembler* assembler,
                                FlowGraphCompiler* graph_compiler,
                                FlowGraph* flow_graph);
@@ -359,7 +354,6 @@ class CompileParsedFunctionHelper : public ValueObject {
   const bool optimized_;
   const intptr_t osr_id_;
   Thread* const thread_;
-  const intptr_t loading_invalidation_gen_at_start_;
 
   DISALLOW_COPY_AND_ASSIGN(CompileParsedFunctionHelper);
 };
@@ -437,13 +431,6 @@ RawCode* CompileParsedFunctionHelper::FinalizeCompilation(
             }
             break;
           }
-        }
-      }
-      if (loading_invalidation_gen_at_start() !=
-          isolate()->loading_invalidation_gen()) {
-        code_is_valid = false;
-        if (trace_compiler) {
-          THR_Print("--> FAIL: Loading invalidation.");
         }
       }
       if (!thread()
@@ -629,7 +616,12 @@ RawCode* CompileParsedFunctionHelper::Compile(CompilationPipeline* pipeline) {
       CompilerPassState pass_state(thread(), flow_graph, &speculative_policy);
       pass_state.reorder_blocks = reorder_blocks;
 
-      if (optimized()) {
+      if (function.ForceOptimize()) {
+        ASSERT(optimized());
+        TIMELINE_DURATION(thread(), CompilerVerbose, "OptimizationPasses");
+        flow_graph = CompilerPass::RunForceOptimizedPipeline(CompilerPass::kJIT,
+                                                             &pass_state);
+      } else if (optimized()) {
         TIMELINE_DURATION(thread(), CompilerVerbose, "OptimizationPasses");
 
         pass_state.inline_id_to_function.Add(&function);
@@ -644,7 +636,7 @@ RawCode* CompileParsedFunctionHelper::Compile(CompilationPipeline* pipeline) {
         JitCallSpecializer call_specializer(flow_graph, &speculative_policy);
         pass_state.call_specializer = &call_specializer;
 
-        CompilerPass::RunPipeline(CompilerPass::kJIT, &pass_state);
+        flow_graph = CompilerPass::RunPipeline(CompilerPass::kJIT, &pass_state);
       }
 
       ASSERT(pass_state.inline_id_to_function.length() ==
@@ -743,11 +735,12 @@ static RawObject* CompileFunctionHelper(CompilationPipeline* pipeline,
                                         intptr_t osr_id) {
   ASSERT(!FLAG_precompiled_mode);
   ASSERT(!optimized || function.WasCompiled() || function.ForceOptimize());
+  ASSERT(function.is_background_optimizable() ||
+         !Compiler::IsBackgroundCompilation());
   if (function.ForceOptimize()) optimized = true;
   LongJumpScope jump;
   if (setjmp(*jump.Set()) == 0) {
     Thread* const thread = Thread::Current();
-    Isolate* const isolate = thread->isolate();
     StackZone stack_zone(thread);
     Zone* const zone = stack_zone.GetZone();
     const bool trace_compiler =
@@ -768,8 +761,6 @@ static RawObject* CompileFunctionHelper(CompilationPipeline* pipeline,
                 function.token_pos().ToCString(), token_size);
     }
     // Makes sure no classes are loaded during parsing in background.
-    const intptr_t loading_invalidation_gen_at_start =
-        isolate->loading_invalidation_gen();
     {
       HANDLESCOPE(thread);
       pipeline->ParseFunction(parsed_function);
@@ -777,17 +768,6 @@ static RawObject* CompileFunctionHelper(CompilationPipeline* pipeline,
 
     CompileParsedFunctionHelper helper(parsed_function, optimized, osr_id);
 
-    if (Compiler::IsBackgroundCompilation()) {
-      ASSERT(function.is_background_optimizable());
-      if ((loading_invalidation_gen_at_start !=
-           isolate->loading_invalidation_gen())) {
-        // Loading occured while parsing. We need to abort here because state
-        // changed while compiling.
-        Compiler::AbortBackgroundCompilation(
-            DeoptId::kNone,
-            "Invalidated state during parsing because of script loading");
-      }
-    }
 
     const Code& result = Code::Handle(helper.Compile(pipeline));
 

@@ -25,8 +25,6 @@ import 'package:meta/meta.dart';
 /// statement, try statement, loop collection element, local function, or
 /// closure.
 class AssignedVariables<Node, Variable> {
-  final emptySet = Set<Variable>();
-
   /// Mapping from a node to the set of local variables that are potentially
   /// written to within that node.
   final Map<Node, Set<Variable>> _writtenInNode = {};
@@ -343,12 +341,21 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   ///
   /// [condition] is an opaque representation of the loop condition; it is
   /// matched against expressions passed to previous calls to determine whether
-  /// the loop condition should cause any promotions to occur.
+  /// the loop condition should cause any promotions to occur.  If [condition]
+  /// is null, the condition is understood to be empty (equivalent to a
+  /// condition of `true`).
   void for_bodyBegin(Statement node, Expression condition) {
-    _conditionalEnd(condition);
-    // Tail of the stack: falseCondition, trueCondition
+    FlowModel<Variable, Type> trueCondition;
+    if (condition == null) {
+      trueCondition = _current;
+      _stack.add(_current.setReachable(false));
+    } else {
+      _conditionalEnd(condition);
+      // Tail of the stack: falseCondition, trueCondition
 
-    FlowModel<Variable, Type> trueCondition = _stack.removeLast();
+      trueCondition = _stack.removeLast();
+    }
+    // Tail of the stack: falseCondition
 
     if (node != null) {
       _statementToStackIndex[node] = _stack.length;
@@ -594,30 +601,53 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     return _current.variableInfo[variable]?.promotedType;
   }
 
-  /// The [notPromoted] set contains all variables that are potentially
-  /// assigned in other cases that might target this with `continue`, so
-  /// these variables might have different types and are "un-promoted" from
-  /// the "afterExpression" state.
-  void switchStatement_beginCase(Iterable<Variable> notPromoted) {
-    _current = _stack.last.removePromotedAll(notPromoted, _referencedVariables);
-  }
-
-  void switchStatement_end(Statement switchStatement, bool hasDefault) {
-    // Tail of the stack: break, continue, afterExpression
-    FlowModel<Variable, Type> afterExpression = _current = _stack.removeLast();
-    _stack.removeLast(); // continue
-    FlowModel<Variable, Type> breakState = _stack.removeLast();
-
-    if (hasDefault) {
-      // breakState should not be null because we should have joined it with
-      // something non-null when handling the default case.
-      assert(breakState != null);
-      _current = breakState;
+  /// Call this method just before visiting one of the cases in the body of a
+  /// switch statement.  See [switchStatement_expressionEnd] for details.
+  ///
+  /// [hasLabel] indicates whether the case has any labels.
+  ///
+  /// The [notPromoted] set contains all variables that are potentially assigned
+  /// within the body of the switch statement.
+  void switchStatement_beginCase(
+      bool hasLabel, Iterable<Variable> notPromoted) {
+    if (hasLabel) {
+      _current =
+          _stack.last.removePromotedAll(notPromoted, _referencedVariables);
     } else {
-      _current = _join(breakState, afterExpression);
+      _current = _stack.last;
     }
   }
 
+  /// Call this method just after visiting the body of a switch statement.  See
+  /// [switchStatement_expressionEnd] for details.
+  ///
+  /// [hasDefault] indicates whether the switch statement had a "default" case.
+  void switchStatement_end(bool hasDefault) {
+    // Tail of the stack: break, continue, afterExpression
+    FlowModel<Variable, Type> afterExpression = _stack.removeLast();
+    _stack.removeLast(); // continue
+    FlowModel<Variable, Type> breakState = _stack.removeLast();
+
+    // It is allowed to "fall off" the end of a switch statement, so join the
+    // current state to any breaks that were found previously.
+    breakState = _join(breakState, _current);
+
+    // And, if there is an implicit fall-through default, join it to any breaks.
+    if (!hasDefault) breakState = _join(breakState, afterExpression);
+
+    _current = breakState;
+  }
+
+  /// Call this method just after visiting the expression part of a switch
+  /// statement.
+  ///
+  /// The order of visiting a switch statement should be:
+  /// - Visit the switch expression.
+  /// - Call [switchStatement_expressionEnd].
+  /// - For each switch case (including the default case, if any):
+  ///   - Call [switchStatement_beginCase].
+  ///   - Visit the case.
+  /// - Call [switchStatement_end].
   void switchStatement_expressionEnd(Statement switchStatement) {
     _statementToStackIndex[switchStatement] = _stack.length;
     _stack.add(null); // break
