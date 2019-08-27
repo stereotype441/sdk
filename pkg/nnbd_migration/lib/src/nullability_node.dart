@@ -346,21 +346,22 @@ class NullabilityGraph {
 class NullabilityGraphForTesting extends NullabilityGraph {
   final List<NullabilityEdge> _allEdges = [];
 
-  @override
-  NullabilityEdge connect(NullabilityNode sourceNode,
-      NullabilityNode destinationNode, EdgeOrigin origin,
-      {bool hard = false, List<NullabilityNode> guards = const []}) {
-    // TODO: implement connect
-    var edge = super.connect(sourceNode, destinationNode, origin,
-        hard: hard, guards: guards);
-    _allEdges.add(edge);
-    return edge;
-  }
-
   /// Iterates through all edges in the graph.
   @visibleForTesting
   Iterable<NullabilityEdge> getAllEdges() {
     return _allEdges;
+  }
+
+  @override
+  NullabilityEdge _connect(
+      List<NullabilityNode> sources,
+      NullabilityNode destinationNode,
+      _NullabilityEdgeKind kind,
+      EdgeOrigin origin) {
+    // TODO: implement _connect
+    var edge = super._connect(sources, destinationNode, kind, origin);
+    _allEdges.add(edge);
+    return edge;
   }
 }
 
