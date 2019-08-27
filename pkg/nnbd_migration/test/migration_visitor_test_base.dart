@@ -99,12 +99,25 @@ abstract class DecoratedTypeTesterBase {
   TypeProvider get typeProvider;
 }
 
+class EdgeBuilderTestBase extends MigrationVisitorTestBase {
+  /// Analyzes the given source code, producing constraint variables and
+  /// constraints for it.
+  @override
+  Future<CompilationUnit> analyze(String code) async {
+    var unit = await super.analyze(code);
+    unit.accept(EdgeBuilder(
+        typeProvider, typeSystem, variables, graph, testSource, null));
+    return unit;
+  }
+}
+
 /// Mixin allowing unit tests to check for the presence of graph edges.
 mixin EdgeTester {
+  NodeMatcher get anyNode => const _AnyNodeMatcher();
+
   NullabilityGraphForTesting get graph;
 
-  NullabilityEdge assertEdge(
-      NullabilityNode source, NullabilityNode destination,
+  NullabilityEdge assertEdge(Object source, Object destination,
       {@required bool hard, List<NullabilityNode> guards = const []}) {
     var edges = getEdges(source, destination);
     if (edges.length == 0) {
@@ -119,14 +132,14 @@ mixin EdgeTester {
     }
   }
 
-  void assertNoEdge(NullabilityNode source, NullabilityNode destination) {
+  void assertNoEdge(Object source, Object destination) {
     var edges = getEdges(source, destination);
     if (edges.isNotEmpty) {
       fail('Expected no edge $source -> $destination, found ${edges.length}');
     }
   }
 
-  void assertUnion(NullabilityNode x, NullabilityNode y) {
+  void assertUnion(Object x, Object y) {
     var edges = getEdges(x, y);
     for (var edge in edges) {
       if (edge.isUnion) {
@@ -137,12 +150,19 @@ mixin EdgeTester {
     fail('Expected union between $x and $y, not found');
   }
 
-  List<NullabilityEdge> getEdges(
-          NullabilityNode source, NullabilityNode destination) =>
-      graph
-          .getUpstreamEdges(destination)
-          .where((e) => e.primarySource == source)
-          .toList();
+  List<NullabilityEdge> getEdges(Object source, Object destination) {
+    var sourceMatcher = NodeMatcher(source);
+    var destinationMatcher = NodeMatcher(destination);
+    return graph
+        .getAllEdges()
+        .where((e) =>
+            sourceMatcher.matches(e.primarySource) &&
+            destinationMatcher.matches(e.destinationNode))
+        .toList();
+  }
+
+  NodeMatcher substitutionNode(Object inner, Object outer) =>
+      _SubstitutionNodeMatcher(NodeMatcher(inner), NodeMatcher(outer));
 }
 
 /// Mock representation of constraint variables.
@@ -209,18 +229,6 @@ class InstrumentedVariables extends Variables {
   }
 }
 
-class EdgeBuilderTestBase extends MigrationVisitorTestBase {
-  /// Analyzes the given source code, producing constraint variables and
-  /// constraints for it.
-  @override
-  Future<CompilationUnit> analyze(String code) async {
-    var unit = await super.analyze(code);
-    unit.accept(EdgeBuilder(
-        typeProvider, typeSystem, variables, graph, testSource, null));
-    return unit;
-  }
-}
-
 class MigrationVisitorTestBase extends AbstractSingleUnitTest with EdgeTester {
   final InstrumentedVariables variables;
 
@@ -282,5 +290,46 @@ class MigrationVisitorTestBase extends AbstractSingleUnitTest with EdgeTester {
   /// whose text is [text].
   ConditionalDiscard statementDiscard(String text) {
     return variables.conditionalDiscard(findNode.statement(text));
+  }
+}
+
+abstract class NodeMatcher {
+  factory NodeMatcher(Object expectation) {
+    if (expectation is NodeMatcher) return expectation;
+    if (expectation is NullabilityNode) return _ExactNodeMatcher(expectation);
+    fail(
+        'Unclear how to match node expectation of type ${expectation.runtimeType}');
+  }
+
+  bool matches(NullabilityNode node);
+}
+
+class _AnyNodeMatcher implements NodeMatcher {
+  const _AnyNodeMatcher();
+
+  @override
+  bool matches(NullabilityNode node) => true;
+}
+
+class _ExactNodeMatcher implements NodeMatcher {
+  final NullabilityNode _expectation;
+
+  _ExactNodeMatcher(this._expectation);
+
+  @override
+  bool matches(NullabilityNode node) => node == _expectation;
+}
+
+class _SubstitutionNodeMatcher implements NodeMatcher {
+  final NodeMatcher inner;
+  final NodeMatcher outer;
+
+  _SubstitutionNodeMatcher(this.inner, this.outer);
+
+  @override
+  bool matches(NullabilityNode node) {
+    return node is NullabilityNodeForSubstitution &&
+        inner.matches(node.innerNode) &&
+        outer.matches(node.outerNode);
   }
 }
