@@ -2255,6 +2255,14 @@ class C {
     assertEdge(decoratedTypeAnnotation('int k').node, never, hard: true);
   }
 
+  solo_test_methodInvocation_object_method_on_non_interface_type() async {
+    await analyze('''
+String f(void Function() g) => g.toString();
+''');
+    var toStringReturnType = variables.decoratedElementType(typeProvider.objectType.element.getMethod('toString')).returnType;
+    assertEdge(toStringReturnType.node, decoratedTypeAnnotation('String f').node, hard: false);
+  }
+
   test_methodInvocation_dynamic() async {
     await analyze('''
 class C {
