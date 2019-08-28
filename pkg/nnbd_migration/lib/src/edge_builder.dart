@@ -219,6 +219,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         elementType = element.type;
       } else if (element is ConstructorElement) {
         elementType = element.type;
+      } else if (element is PropertyAccessorMember) {
+        elementType = element.type;
       } else {
         throw element.runtimeType; // TODO(paulberry)
       }

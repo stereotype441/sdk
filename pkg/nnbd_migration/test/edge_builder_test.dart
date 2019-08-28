@@ -2482,12 +2482,7 @@ void f(C c, int/*3*/ i) {
     var nullable1 = decoratedTypeAnnotation('T/*1*/').node;
     var nullable2 = decoratedTypeAnnotation('int/*2*/').node;
     var nullable3 = decoratedTypeAnnotation('int/*3*/').node;
-    var substitution = graph
-        .getDownstreamEdges(nullable3)
-        .single
-        .destinationNode as NullabilityNodeForSubstitution;
-    expect(substitution.innerNode, same(nullable2));
-    expect(substitution.outerNode, same(nullable1));
+    assertEdge(nullable3, substitutionNode(nullable2, nullable1), hard: true);
   }
 
   test_methodInvocation_typeParameter_inferred() async {
@@ -3334,18 +3329,6 @@ bool f(C c) => c.b;
         hard: false);
   }
 
-  solo_test_prefixedIdentifier_getter_type_in_generic() async {
-    await analyze('''
-class C<T> {
-  List<T> _x;
-  List<T> get x => _x;
-}
-List<int> f(C<int> c) => c.x;
-''');
-    graph.dump();
-    fail('TODO');
-  }
-
   test_prefixedIdentifier_getter_type() async {
     await analyze('''
 class C {
@@ -3355,6 +3338,24 @@ bool f(C c) => c.b;
 ''');
     assertEdge(decoratedTypeAnnotation('bool get').node,
         decoratedTypeAnnotation('bool f').node,
+        hard: false);
+  }
+
+  test_prefixedIdentifier_getter_type_in_generic() async {
+    await analyze('''
+class C<T> {
+  List<T> _x;
+  List<T> get x => _x;
+}
+List<int> f(C<int> c) => c.x;
+''');
+    assertEdge(decoratedTypeAnnotation('List<T> get').node,
+        decoratedTypeAnnotation('List<int> f').node,
+        hard: false);
+    assertEdge(
+        substitutionNode(decoratedTypeAnnotation('int> c').node,
+            decoratedTypeAnnotation('T> get').node),
+        decoratedTypeAnnotation('int> f').node,
         hard: false);
   }
 
