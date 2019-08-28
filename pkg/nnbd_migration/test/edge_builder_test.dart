@@ -3271,6 +3271,18 @@ bool f(C c) => c.b;
         hard: false);
   }
 
+  solo_test_prefixedIdentifier_getter_type_in_generic() async {
+    await analyze('''
+class C<T> {
+  List<T> _x;
+  List<T> get x => _x;
+}
+List<int> f(C<int> c) => c.x;
+''');
+    graph.dump();
+    fail('TODO');
+  }
+
   test_prefixedIdentifier_getter_type() async {
     await analyze('''
 class C {
