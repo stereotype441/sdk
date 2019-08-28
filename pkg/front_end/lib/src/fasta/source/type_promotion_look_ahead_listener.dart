@@ -11,7 +11,7 @@ import '../messages.dart' show LocatedMessage, Message, MessageCode;
 import '../parser.dart'
     show
         Assert,
-        ClassKind,
+        DeclarationKind,
         FormalParameterKind,
         IdentifierContext,
         Listener,
@@ -314,7 +314,7 @@ class TypePromotionLookAheadListener extends Listener {
 
   @override
   void endClassOrMixinBody(
-      ClassKind kind, int memberCount, Token beginToken, Token endToken) {
+      DeclarationKind kind, int memberCount, Token beginToken, Token endToken) {
     debugEvent("ClassOrMixinBody", beginToken);
     state.checkEmpty(endToken);
   }
@@ -545,9 +545,9 @@ class TypePromotionLookAheadListener extends Listener {
   }
 
   @override
-  void endFactoryMethod(
+  void endClassFactoryMethod(
       Token beginToken, Token factoryKeyword, Token endToken) {
-    debugEvent("FactoryMethod", beginToken);
+    debugEvent("ClassFactoryMethod", beginToken);
     state.pop(); // Name.
     state.checkEmpty(endToken);
   }

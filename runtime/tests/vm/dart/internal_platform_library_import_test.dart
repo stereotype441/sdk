@@ -2,12 +2,9 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-// .packages specifies 2.5, this library tries to go above that, which is fine.
+import 'dart:_internal';
 
-// @dart = 2.6
-
-/*library: languageVersion=2.6*/
-
-foo3() {
-  print("Hello from foo3!");
+void main(List<String> args) {
+  // Ensure we can import and use members of `dart:_internal`.
+  print(unsafeCast);
 }

@@ -344,26 +344,30 @@ class NullabilityGraph {
 /// testing.
 @visibleForTesting
 class NullabilityGraphForTesting extends NullabilityGraph {
+  final List<NullabilityEdge> _allEdges = [];
+
   /// Prints out a representation of the graph nodes.  Useful in debugging
   /// broken tests.
   void debugDump() {
     _debugDump();
   }
 
-  /// Iterates through all edges that have this node as one of their sources.
-  ///
-  /// There is no guarantee of uniqueness of the iterated edges.
+  /// Iterates through all edges in the graph.
   @visibleForTesting
-  Iterable<NullabilityEdge> getDownstreamEdges(NullabilityNode node) {
-    return node._downstreamEdges;
+  Iterable<NullabilityEdge> getAllEdges() {
+    return _allEdges;
   }
 
-  /// Iterates through all edges that have this node as their destination.
-  ///
-  /// There is no guarantee of uniqueness of the iterated nodes.
-  @visibleForTesting
-  Iterable<NullabilityEdge> getUpstreamEdges(NullabilityNode node) {
-    return node._upstreamEdges;
+  @override
+  NullabilityEdge _connect(
+      List<NullabilityNode> sources,
+      NullabilityNode destinationNode,
+      _NullabilityEdgeKind kind,
+      EdgeOrigin origin) {
+    // TODO: implement _connect
+    var edge = super._connect(sources, destinationNode, kind, origin);
+    _allEdges.add(edge);
+    return edge;
   }
 }
 

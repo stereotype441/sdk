@@ -835,7 +835,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     DecoratedType targetType;
     var target = node.realTarget;
     bool isConditional = _isConditionalExpression(node);
-    if (target != null) {
+    if (target != null && !_isPrefix(target)) {
       if (isConditional) {
         targetType = target.accept(this);
       } else {
@@ -854,8 +854,9 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     if (callee is PropertyAccessorElement) {
       calleeType = calleeType.returnType;
     }
-    var expressionType = _handleInvocationArguments(node,
-        node.argumentList.arguments, node.typeArguments, calleeType, null);
+    var expressionType = _handleInvocationArguments(
+        node, node.argumentList.arguments, node.typeArguments, calleeType, null,
+        invokeType: node.staticInvokeType);
     if (isConditional) {
       expressionType = expressionType.withNode(
           NullabilityNode.forLUB(targetType.node, expressionType.node));
@@ -1267,6 +1268,9 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     // type of the expression, since all we are doing is causing a single graph
     // edge to be built; it is sufficient to pass in any decorated type whose
     // node is `never`.
+    if (_isPrefix(expression)) {
+      throw ArgumentError('cannot check non-nullability of a prefix');
+    }
     return _handleAssignment(expression, destinationType: _notNullType);
   }
 
@@ -1638,7 +1642,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       Iterable<AstNode> arguments,
       TypeArgumentList typeArguments,
       DecoratedType calleeType,
-      List<TypeParameterElement> constructorTypeParameters) {
+      List<TypeParameterElement> constructorTypeParameters,
+      {DartType invokeType}) {
     var typeFormals = constructorTypeParameters ?? calleeType.typeFormals;
     if (typeFormals.isNotEmpty) {
       if (typeArguments != null) {
@@ -1653,7 +1658,18 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
           calleeType = calleeType.instantiate(argumentTypes);
         }
       } else {
-        _unimplemented(node, 'Inferred type parameters in invocation');
+        if (invokeType is FunctionType) {
+          var argumentTypes = invokeType.typeArguments
+              .map((argType) =>
+                  DecoratedType.forImplicitType(_typeProvider, argType, _graph))
+              .toList();
+          calleeType = calleeType.instantiate(argumentTypes);
+        } else {
+          assert(
+              false,
+              'invoke type should be a non-null function type, or '
+              'dynamic/Function, which have no type arguments.');
+        }
       }
     }
     int i = 0;
@@ -1702,16 +1718,18 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       Expression node, Expression target, SimpleIdentifier propertyName) {
     DecoratedType targetType;
     bool isConditional = _isConditionalExpression(node);
-    if (isConditional) {
-      targetType = target.accept(this);
-    } else {
-      _checkNonObjectMember(propertyName.name); // TODO(paulberry)
-      targetType = _checkExpressionNotNull(target);
+    if (!_isPrefix(target)) {
+      if (isConditional) {
+        targetType = target.accept(this);
+      } else {
+        _checkNonObjectMember(propertyName.name); // TODO(paulberry)
+        targetType = _checkExpressionNotNull(target);
+      }
     }
     var callee = propertyName.staticElement;
     if (callee == null) {
-      // TODO(paulberry)
-      _unimplemented(node, 'Unresolved property access');
+      // Dynamic dispatch.
+      return _dynamicType;
     }
     var calleeType = getOrComputeElementType(callee, targetType: targetType);
     // TODO(paulberry): substitute if necessary
@@ -1755,6 +1773,9 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
             expression, 'Conditional expression with operator ${token.lexeme}');
     }
   }
+
+  bool _isPrefix(Expression e) =>
+      e is SimpleIdentifier && e.staticElement is PrefixElement;
 
   bool _isUntypedParameter(NormalFormalParameter parameter) {
     if (parameter is SimpleFormalParameter) {

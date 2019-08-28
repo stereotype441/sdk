@@ -71,7 +71,7 @@ class ForwardingListener implements Listener {
   }
 
   @override
-  void beginClassOrMixinBody(ClassKind kind, Token token) {
+  void beginClassOrMixinBody(DeclarationKind kind, Token token) {
     listener?.beginClassOrMixinBody(kind, token);
   }
 
@@ -480,12 +480,6 @@ class ForwardingListener implements Listener {
   }
 
   @override
-  void endInvalidAwaitExpression(
-      Token beginToken, Token endToken, MessageCode errorCode) {
-    listener?.endInvalidAwaitExpression(beginToken, endToken, errorCode);
-  }
-
-  @override
   void endBinaryExpression(Token token) {
     listener?.endBinaryExpression(token);
   }
@@ -521,8 +515,14 @@ class ForwardingListener implements Listener {
   }
 
   @override
+  void endClassFactoryMethod(
+      Token beginToken, Token factoryKeyword, Token endToken) {
+    listener?.endClassFactoryMethod(beginToken, factoryKeyword, endToken);
+  }
+
+  @override
   void endClassOrMixinBody(
-      ClassKind kind, int memberCount, Token beginToken, Token endToken) {
+      DeclarationKind kind, int memberCount, Token beginToken, Token endToken) {
     listener?.endClassOrMixinBody(kind, memberCount, beginToken, endToken);
   }
 
@@ -600,9 +600,9 @@ class ForwardingListener implements Listener {
   }
 
   @override
-  void endFactoryMethod(
+  void endExtensionFactoryMethod(
       Token beginToken, Token factoryKeyword, Token endToken) {
-    listener?.endFactoryMethod(beginToken, factoryKeyword, endToken);
+    listener?.endExtensionFactoryMethod(beginToken, factoryKeyword, endToken);
   }
 
   @override
@@ -748,6 +748,12 @@ class ForwardingListener implements Listener {
   }
 
   @override
+  void endInvalidAwaitExpression(
+      Token beginToken, Token endToken, MessageCode errorCode) {
+    listener?.endInvalidAwaitExpression(beginToken, endToken, errorCode);
+  }
+
+  @override
   void endLabeledStatement(int labelCount) {
     listener?.endLabeledStatement(labelCount);
   }
@@ -797,6 +803,12 @@ class ForwardingListener implements Listener {
   @override
   void endMixinDeclaration(Token mixinKeyword, Token endToken) {
     listener?.endMixinDeclaration(mixinKeyword, endToken);
+  }
+
+  @override
+  void endMixinFactoryMethod(
+      Token beginToken, Token factoryKeyword, Token endToken) {
+    listener?.endMixinFactoryMethod(beginToken, factoryKeyword, endToken);
   }
 
   @override

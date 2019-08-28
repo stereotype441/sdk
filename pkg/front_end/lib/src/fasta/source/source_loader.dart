@@ -113,6 +113,8 @@ import '../scanner.dart'
         Token,
         scan;
 
+import '../type_inference/type_inferrer.dart';
+
 import 'diet_listener.dart' show DietListener;
 
 import 'diet_parser.dart' show DietParser;
@@ -263,6 +265,9 @@ class SourceLoader extends Loader {
 
       case "dart:_internal":
         return utf8.encode(defaultDartInternalSource);
+
+      case "dart:typed_data":
+        return utf8.encode(defaultDartTypedDataSource);
 
       default:
         return utf8.encode(message == null ? "" : "/* ${message.message} */");
@@ -1119,6 +1124,11 @@ class SourceLoader extends Loader {
   TypeBuilder computeTypeBuilder(DartType type) {
     return type.accept(new TypeBuilderComputer(this));
   }
+
+  BodyBuilder createBodyBuilderForField(
+      FieldBuilder field, TypeInferrer typeInferrer) {
+    return new BodyBuilder.forField(field, typeInferrer);
+  }
 }
 
 /// A minimal implementation of dart:core that is sufficient to create an
@@ -1259,6 +1269,16 @@ class _UnmodifiableSet {
 const String defaultDartInternalSource = """
 class Symbol {
   const Symbol(String name);
+}
+""";
+
+/// A minimal implementation of dart:typed_data that is sufficient to create an
+/// instance of [CoreTypes] and compile program.
+const String defaultDartTypedDataSource = """
+class Endian {
+  static const Endian little = null;
+  static const Endian big = null;
+  static final Endian host = null;
 }
 """;
 
