@@ -1949,11 +1949,6 @@ C f(C c) => c..[0];
     assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true);
   }
 
-  test_instanceCreation_generic_inferredParameterType() async {
-    await analyze('''''');
-    TODO;
-  }
-
   test_instanceCreation_generic() async {
     await analyze('''
 class C<T> {}
@@ -1971,6 +1966,23 @@ C<Object> f() => C<dynamic>();
 ''');
     assertEdge(decoratedTypeAnnotation('dynamic').node,
         decoratedTypeAnnotation('Object').node,
+        hard: false);
+  }
+
+  test_instanceCreation_generic_inferredParameterType() async {
+    await analyze('''
+class C<T> {
+  C(List<T> x);
+}
+C<int> f(List<int> x) => C(x);
+''');
+    var edge = assertEdge(anyNode, decoratedTypeAnnotation('int> f').node,
+        hard: false);
+    var inferredTypeArgument = edge.primarySource;
+    assertEdge(
+        decoratedTypeAnnotation('int> x').node,
+        substitutionNode(
+            inferredTypeArgument, decoratedTypeAnnotation('T> x').node),
         hard: false);
   }
 
