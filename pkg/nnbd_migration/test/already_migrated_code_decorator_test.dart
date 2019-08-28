@@ -47,7 +47,10 @@ class _AlreadyMigratedCodeDecoratorTest {
   }
 
   void checkIntQuestion(DecoratedType decoratedType) {
-    expect(decoratedType.type, typeProvider.intType);
+    expect(
+        decoratedType.type,
+        (typeProvider.intType as TypeImpl)
+            .withNullability(NullabilitySuffix.question));
     expect(decoratedType.node, same(graph.always));
   }
 
