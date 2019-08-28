@@ -80,6 +80,9 @@ class DecoratedType {
         int namedParameterCount = 0;
         for (var parameter in type.parameters) {
           if (parameter.isNamed) {
+            if (namedParameters[parameter.name] == null) {
+              throw 'No parameter ${parameter.name} in $namedParameters, but expected it due to type of $type';
+            }
             assert(namedParameters[parameter.name].type == parameter.type);
             namedParameterCount++;
           } else {
