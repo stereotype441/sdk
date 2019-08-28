@@ -29,12 +29,12 @@ class _AlreadyMigratedCodeDecoratorTest {
   final NullabilityGraphForTesting graph;
 
   factory _AlreadyMigratedCodeDecoratorTest() {
-    return _AlreadyMigratedCodeDecoratorTest._(NullabilityGraphForTesting());
+    return _AlreadyMigratedCodeDecoratorTest._(
+        NullabilityGraphForTesting(), TestTypeProvider());
   }
 
-  _AlreadyMigratedCodeDecoratorTest._(this.graph)
-      : typeProvider = TestTypeProvider(),
-        decorator = AlreadyMigratedCodeDecorator(graph);
+  _AlreadyMigratedCodeDecoratorTest._(this.graph, this.typeProvider)
+      : decorator = AlreadyMigratedCodeDecorator(graph, typeProvider);
 
   void checkDynamic(DecoratedType decoratedType) {
     expect(decoratedType.type, same(typeProvider.dynamicType));
@@ -51,6 +51,19 @@ class _AlreadyMigratedCodeDecoratorTest {
     expect(decoratedType.type, typeProvider.iterableDynamicType);
     expect(decoratedType.node, same(graph.never));
     checkArgument(decoratedType.typeArguments[0]);
+  }
+
+  void checkNum(DecoratedType decoratedType) {
+    expect(decoratedType.type, typeProvider.numType);
+    expect(decoratedType.node, same(graph.never));
+  }
+
+  void checkObjectQuestion(DecoratedType decoratedType) {
+    expect(
+        decoratedType.type,
+        (typeProvider.objectType as TypeImpl)
+            .withNullability(NullabilitySuffix.question));
+    expect(decoratedType.node, same(graph.always));
   }
 
   void checkTypeParameter(
@@ -73,6 +86,25 @@ class _AlreadyMigratedCodeDecoratorTest {
 
   test_decorate_dynamic() {
     checkDynamic(decorate(typeProvider.dynamicType));
+  }
+
+  test_decorate_functionType_generic_bounded() {
+    var typeFormal = TypeParameterElementImpl.synthetic('T')
+      ..bound = typeProvider.numType;
+    var decoratedType = decorate(FunctionTypeImpl.synthetic(
+        TypeParameterTypeImpl(typeFormal), [typeFormal], []));
+    expect(decoratedType.typeFormalBounds, hasLength(1));
+    checkNum(decoratedType.typeFormalBounds[0]);
+    checkTypeParameter(decoratedType.returnType, typeFormal);
+  }
+
+  test_decorate_functionType_generic_no_explicit_bound() {
+    var typeFormal = TypeParameterElementImpl.synthetic('T');
+    var decoratedType = decorate(FunctionTypeImpl.synthetic(
+        TypeParameterTypeImpl(typeFormal), [typeFormal], []));
+    expect(decoratedType.typeFormalBounds, hasLength(1));
+    checkObjectQuestion(decoratedType.typeFormalBounds[0]);
+    checkTypeParameter(decoratedType.returnType, typeFormal);
   }
 
   test_decorate_functionType_named_parameter() {

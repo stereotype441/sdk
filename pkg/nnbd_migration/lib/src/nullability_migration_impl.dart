@@ -18,7 +18,7 @@ import 'package:nnbd_migration/src/variables.dart';
 class NullabilityMigrationImpl implements NullabilityMigration {
   final NullabilityMigrationListener listener;
 
-  final Variables _variables;
+  Variables _variables;
 
   final NullabilityGraph _graph;
 
@@ -34,8 +34,7 @@ class NullabilityMigrationImpl implements NullabilityMigration {
       {bool permissive: false})
       : this._(listener, NullabilityGraph(), permissive);
 
-  NullabilityMigrationImpl._(this.listener, this._graph, this._permissive)
-      : _variables = Variables(_graph);
+  NullabilityMigrationImpl._(this.listener, this._graph, this._permissive);
 
   void finish() {
     _graph.propagate();
@@ -50,6 +49,7 @@ class NullabilityMigrationImpl implements NullabilityMigration {
   }
 
   void prepareInput(ResolvedUnitResult result) {
+    _variables ??= Variables(_graph, result.typeProvider);
     var unit = result.unit;
     unit.accept(NodeBuilder(_variables, unit.declaredElement.source,
         _permissive ? listener : null, _graph, result.typeProvider));
