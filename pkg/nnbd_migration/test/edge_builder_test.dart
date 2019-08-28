@@ -1949,6 +1949,11 @@ C f(C c) => c..[0];
     assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true);
   }
 
+  test_instanceCreation_generic_inferredParameterType() async {
+    await analyze('''''');
+    TODO;
+  }
+
   test_instanceCreation_generic() async {
     await analyze('''
 class C<T> {}
