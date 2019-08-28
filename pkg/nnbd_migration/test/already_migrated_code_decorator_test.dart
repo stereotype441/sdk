@@ -36,9 +36,13 @@ class _AlreadyMigratedCodeDecoratorTest {
   _AlreadyMigratedCodeDecoratorTest._(this.graph, this.typeProvider)
       : decorator = AlreadyMigratedCodeDecorator(graph, typeProvider);
 
+  NullabilityNode get always => graph.always;
+
+  NullabilityNode get never => graph.never;
+
   void checkDynamic(DecoratedType decoratedType) {
     expect(decoratedType.type, same(typeProvider.dynamicType));
-    expect(decoratedType.node, same(graph.always));
+    expect(decoratedType.node, same(always));
   }
 
   void checkInt(
@@ -80,7 +84,7 @@ class _AlreadyMigratedCodeDecoratorTest {
 
   void checkVoid(DecoratedType decoratedType) {
     expect(decoratedType.type, same(typeProvider.voidType));
-    expect(decoratedType.node, same(graph.always));
+    expect(decoratedType.node, same(always));
   }
 
   DecoratedType decorate(DartType type) {
@@ -99,8 +103,8 @@ class _AlreadyMigratedCodeDecoratorTest {
     var decoratedType = decorate(FunctionTypeImpl.synthetic(
         TypeParameterTypeImpl(typeFormal), [typeFormal], []));
     expect(decoratedType.typeFormalBounds, hasLength(1));
-    checkNum(decoratedType.typeFormalBounds[0], graph.never);
-    checkTypeParameter(decoratedType.returnType, graph.never, typeFormal);
+    checkNum(decoratedType.typeFormalBounds[0], never);
+    checkTypeParameter(decoratedType.returnType, never, typeFormal);
   }
 
   test_decorate_functionType_generic_no_explicit_bound() {
@@ -108,8 +112,8 @@ class _AlreadyMigratedCodeDecoratorTest {
     var decoratedType = decorate(FunctionTypeImpl.synthetic(
         TypeParameterTypeImpl(typeFormal), [typeFormal], []));
     expect(decoratedType.typeFormalBounds, hasLength(1));
-    checkObject(decoratedType.typeFormalBounds[0], graph.always);
-    checkTypeParameter(decoratedType.returnType, graph.never, typeFormal);
+    checkObject(decoratedType.typeFormalBounds[0], always);
+    checkTypeParameter(decoratedType.returnType, never, typeFormal);
   }
 
   test_decorate_functionType_named_parameter() {
@@ -141,7 +145,7 @@ class _AlreadyMigratedCodeDecoratorTest {
         decorate(FunctionTypeImpl.synthetic(typeProvider.voidType, [], [],
                 nullabilitySuffix: NullabilitySuffix.question))
             .node,
-        same(graph.always));
+        same(always));
   }
 
   test_decorate_functionType_returnType() {
@@ -155,26 +159,26 @@ class _AlreadyMigratedCodeDecoratorTest {
         decorate(FunctionTypeImpl.synthetic(typeProvider.voidType, [], [],
                 nullabilitySuffix: NullabilitySuffix.star))
             .node,
-        same(graph.never));
+        same(never));
   }
 
   test_decorate_interfaceType_simple_question() {
     checkInt(
         decorate(InterfaceTypeImpl(typeProvider.intType.element,
             nullabilitySuffix: NullabilitySuffix.question)),
-        graph.always);
+        always);
   }
 
   test_decorate_interfaceType_simple_star() {
     checkInt(
         decorate(InterfaceTypeImpl(typeProvider.intType.element,
             nullabilitySuffix: NullabilitySuffix.star)),
-        graph.never);
+        never);
   }
 
   test_decorate_iterable_dynamic() {
     var decorated = decorate(typeProvider.iterableDynamicType);
-    checkIterable(decorated, graph.never, checkDynamic);
+    checkIterable(decorated, never, checkDynamic);
   }
 
   test_decorate_typeParameterType_question() {
@@ -182,7 +186,7 @@ class _AlreadyMigratedCodeDecoratorTest {
     checkTypeParameter(
         decorate(TypeParameterTypeImpl(element,
             nullabilitySuffix: NullabilitySuffix.question)),
-        graph.always,
+        always,
         element);
   }
 
@@ -191,7 +195,7 @@ class _AlreadyMigratedCodeDecoratorTest {
     checkTypeParameter(
         decorate(TypeParameterTypeImpl(element,
             nullabilitySuffix: NullabilitySuffix.star)),
-        graph.never,
+        never,
         element);
   }
 
