@@ -46,6 +46,11 @@ class _AlreadyMigratedCodeDecoratorTest {
     expect(decoratedType.node, same(graph.never));
   }
 
+  void checkIntQuestion(DecoratedType decoratedType) {
+    expect(decoratedType.type, typeProvider.intType);
+    expect(decoratedType.node, same(graph.always));
+  }
+
   void checkIterable(
       DecoratedType decoratedType, void Function(DecoratedType) checkArgument) {
     expect(decoratedType.type, typeProvider.iterableDynamicType);
@@ -71,6 +76,13 @@ class _AlreadyMigratedCodeDecoratorTest {
     var type = decoratedType.type as TypeParameterTypeImpl;
     expect(type.element, same(expectedElement));
     expect(decoratedType.node, same(graph.never));
+  }
+
+  void checkTypeParameterQuestion(
+      DecoratedType decoratedType, TypeParameterElementImpl expectedElement) {
+    var type = decoratedType.type as TypeParameterTypeImpl;
+    expect(type.element, same(expectedElement));
+    expect(decoratedType.node, same(graph.always));
   }
 
   void checkVoid(DecoratedType decoratedType) {
@@ -131,6 +143,14 @@ class _AlreadyMigratedCodeDecoratorTest {
     ])).positionalParameters[0]);
   }
 
+  test_decorate_functionType_question() {
+    expect(
+        decorate(FunctionTypeImpl.synthetic(typeProvider.voidType, [], [],
+                nullabilitySuffix: NullabilitySuffix.question))
+            .node,
+        same(graph.always));
+  }
+
   test_decorate_functionType_returnType() {
     checkDynamic(
         decorate(FunctionTypeImpl.synthetic(typeProvider.dynamicType, [], []))
@@ -145,6 +165,11 @@ class _AlreadyMigratedCodeDecoratorTest {
         same(graph.never));
   }
 
+  test_decorate_interfaceType_simple_question() {
+    checkIntQuestion(decorate(InterfaceTypeImpl(typeProvider.intType.element,
+        nullabilitySuffix: NullabilitySuffix.question)));
+  }
+
   test_decorate_interfaceType_simple_star() {
     checkInt(decorate(InterfaceTypeImpl(typeProvider.intType.element,
         nullabilitySuffix: NullabilitySuffix.star)));
@@ -153,6 +178,14 @@ class _AlreadyMigratedCodeDecoratorTest {
   test_decorate_iterable_dynamic() {
     var decorated = decorate(typeProvider.iterableDynamicType);
     checkIterable(decorated, checkDynamic);
+  }
+
+  test_decorate_typeParameterType_question() {
+    var element = TypeParameterElementImpl.synthetic('T');
+    checkTypeParameterQuestion(
+        decorate(TypeParameterTypeImpl(element,
+            nullabilitySuffix: NullabilitySuffix.question)),
+        element);
   }
 
   test_decorate_typeParameterType_star() {
