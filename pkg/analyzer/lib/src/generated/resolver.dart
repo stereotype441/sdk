@@ -4509,7 +4509,7 @@ class ResolverVisitor extends ScopedVisitor {
     flow.tryCatchStatement_bodyBegin();
     body.accept(this);
     flow.tryCatchStatement_bodyEnd(
-      _flowAnalysis.assignedVariables.writtenInNode(node),
+      _flowAnalysis.assignedVariables.writtenInNode(body),
     );
 
     var catchLength = catchClauses.length;
