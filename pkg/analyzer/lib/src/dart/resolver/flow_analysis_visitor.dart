@@ -146,10 +146,13 @@ class FlowAnalysisHelper {
     if (_blockFunctionBodyLevel > 1) {
       assert(flow != null);
     } else {
+      // TODO(paulberry): test that the right thing is passed in for
+      // assignedVariables.writtenInNode(node) for top level functions, methods,
+      // initializers, and constructors.
       flow = FlowAnalysis<Statement, Expression, VariableElement, DartType>(
-        _nodeOperations,
-        _typeOperations
-      );
+          _nodeOperations,
+          _typeOperations,
+          assignedVariables.writtenInNode(node));
     }
 
     var parameters = _enclosingExecutableParameters(node);

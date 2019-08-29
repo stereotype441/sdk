@@ -4016,7 +4016,9 @@ class ResolverVisitor extends ScopedVisitor {
     ExecutableElement outerFunction = _enclosingFunction;
     try {
       if (_flowAnalysis != null) {
-        _flowAnalysis.flow?.functionExpression_begin();
+        // TODO(paulberry): test the value of _flowAnalysis.assignedVariables.capturedInNode(node)
+        _flowAnalysis.flow?.functionExpression_begin(
+            _flowAnalysis.assignedVariables.capturedInNode(node));
       } else {
         _promoteManager.enterFunctionBody(node.body);
       }

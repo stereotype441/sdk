@@ -287,7 +287,7 @@ main() {
       h.flow.finish();
     });
 
-    test('functionExpression_begin() cancels promotions',
+    test('functionExpression_begin() cancels promotions of write-captured vars',
         () {
       var h = _Harness();
       var x = h.addAssignedVar('x', 'int?');
@@ -297,11 +297,12 @@ main() {
       expect(h.flow.promotedType(x).type, 'int');
       expect(h.flow.promotedType(y).type, 'int');
       h.flow.functionExpression_begin({x});
-      // All variables are de-promoted within the local function
+      // x is de-promoted within the local function
       expect(h.flow.promotedType(x), isNull);
-      expect(h.flow.promotedType(y), isNull);
+      expect(h.flow.promotedType(y).type, 'int');
+      h.promote(x, 'int');
       h.flow.functionExpression_end();
-      // Write-captured variables are de-promoted after the local function too
+      // x is de-promoted after the local function too
       expect(h.flow.promotedType(x), isNull);
       expect(h.flow.promotedType(y).type, 'int');
       h.flow.finish();
@@ -981,7 +982,7 @@ class _Harness
   FlowAnalysis<_Statement, _Expression, _Var, _Type> flow;
 
   _Harness() {
-    flow = FlowAnalysis<_Statement, _Expression, _Var, _Type>(this, this);
+    flow = FlowAnalysis<_Statement, _Expression, _Var, _Type>(this, this, []);
   }
 
   /// Returns a [LazyExpression] representing an expression with now special

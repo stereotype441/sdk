@@ -136,6 +136,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     return result;
   }
 
+  final List<Variable> _variablesWrittenAnywhere;
+
   final _VariableSet<Variable> _emptySet;
 
   /// The [NodeOperations], used to manipulate expressions.
@@ -180,22 +182,18 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   final Set<Variable> _referencedVariables =
       _assertionsEnabled ? Set<Variable>() : null;
 
-  factory FlowAnalysis(NodeOperations<Expression> nodeOperations,
-      TypeOperations<Variable, Type> typeOperations) {
+  factory FlowAnalysis(
+      NodeOperations<Expression> nodeOperations,
+      TypeOperations<Variable, Type> typeOperations,
+      Iterable<Variable> variablesWrittenAnywhere) {
     _VariableSet<Variable> emptySet =
         FlowModel<Variable, Type>(false).notAssigned;
-    return FlowAnalysis._(
-      nodeOperations,
-      typeOperations,
-      emptySet,
-    );
+    return FlowAnalysis._(nodeOperations, typeOperations, emptySet,
+        variablesWrittenAnywhere.toList());
   }
 
-  FlowAnalysis._(
-    this.nodeOperations,
-    this.typeOperations,
-    this._emptySet,
-  ) {
+  FlowAnalysis._(this.nodeOperations, this.typeOperations, this._emptySet,
+      this._variablesWrittenAnywhere) {
     _current = FlowModel<Variable, Type>(true);
   }
 
@@ -423,25 +421,13 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   }
 
   void functionExpression_begin(Iterable<Variable> writeCaptured) {
-    _stack.add(_current.removePromotedAll(writeCaptured));
-
-    TODO;
-
+    // TODO(paulberry): test that de-promotion of write-captured variables
+    // affects both after and within the function expression.
+    _current = _current.removePromotedAll(writeCaptured, _referencedVariables);
     _stack.add(_current);
-
-    List<Variable> notPromoted = [];
-    for (MapEntry<Variable, VariableModel<Type>> entry
-        in _current.variableInfo.entries) {
-      Variable variable = entry.key;
-      Type promotedType = entry.value.promotedType;
-      if (promotedType != null) {
-        notPromoted.add(variable);
-      }
-    }
-
-    if (notPromoted.isNotEmpty) {
-      _current = _current.removePromotedAll(notPromoted, null);
-    }
+    // TODO(paulberry): test that de-promotion of variables written anywhere
+    // affects just within the function expression.
+    _current = _current.removePromotedAll(_variablesWrittenAnywhere, null);
   }
 
   void functionExpression_end() {

@@ -1313,10 +1313,13 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   void _createFlowAnalysis(AstNode node) {
     assert(_flowAnalysis == null);
     assert(_assignedVariables == null);
+    // TODO(paulberry): test the right behavior for _assignedVariables.capturedInNode(node)
+    // in constructors, initializers, methods, and top level functions.
     _flowAnalysis =
         FlowAnalysis<Statement, Expression, VariableElement, DecoratedType>(
             const AnalyzerNodeOperations(),
-            DecoratedTypeOperations(_typeSystem, _variables, _graph));
+            DecoratedTypeOperations(_typeSystem, _variables, _graph),
+            _assignedVariables.capturedInNode(node));
     _assignedVariables = FlowAnalysisHelper.computeAssignedVariables(node);
   }
 
