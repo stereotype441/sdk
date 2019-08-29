@@ -909,11 +909,19 @@ class FlowModel<Variable, Type> {
   /// be able to remove this method.
   FlowModel<Variable, Type> removePromotedAll(
       Iterable<Variable> variables, Set<Variable> referencedVariables) {
-    Map<Variable, VariableModel<Type>> newVariableInfo =
-        _removePromotedAll(variableInfo, variables, referencedVariables);
-
-    if (identical(newVariableInfo, variableInfo)) return this;
-
+    Map<Variable, VariableModel<Type>> newVariableInfo;
+    for (Variable variable in variables) {
+      assert(() {
+        referencedVariables?.add(variable);
+        return true;
+      }());
+      VariableModel<Type> info = variableInfo[variable];
+      if (info.promotedType != null) {
+        (newVariableInfo ??= Map<Variable, VariableModel<Type>>.from(variableInfo))[variable] =
+            info.withPromotedType(null);
+      }
+    }
+    if (newVariableInfo == null) return this;
     return FlowModel<Variable, Type>._(
       reachable,
       notAssigned,
@@ -1059,21 +1067,7 @@ class FlowModel<Variable, Type> {
       Map<Variable, VariableModel<Type>> map,
       Iterable<Variable> variables,
       Set<Variable> referencedVariables) {
-    if (map.isEmpty) return const {};
-    Map<Variable, VariableModel<Type>> result;
-    for (Variable variable in variables) {
-      assert(() {
-        referencedVariables?.add(variable);
-        return true;
-      }());
-      VariableModel<Type> info = map[variable];
-      if (info.promotedType != null) {
-        (result ??= Map<Variable, VariableModel<Type>>.from(map))[variable] =
-            info.withPromotedType(null);
-      }
-    }
-    if (result == null) return map;
-    return result;
+    TODO;
   }
 
   /// Returns a new [FlowModel] where the information for [variable] is replaced
