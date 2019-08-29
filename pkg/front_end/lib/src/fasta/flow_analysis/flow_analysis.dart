@@ -7,15 +7,15 @@ import 'package:meta/meta.dart';
 /// [AssignedVariables] is a helper class capable of computing the set of
 /// variables that are potentially written to, and potentially captured by
 /// closures, at various locations inside the code being analyzed.  This class
-/// is meant to be used can be used prior to running flow analysis, to compute
-/// the sets of variables to pass in to flow analysis.
+/// should be used prior to running flow analysis, to compute the sets of
+/// variables to pass in to flow analysis.
 ///
 /// This class is intended to be used in two phases.  In the first phase, the
 /// client should traverse the source code recursively, making calls to
 /// [beginNode] and [endNode] to indicate the constructs in which writes should
 /// be tracked, and calls to [write] to indicate when a write is encountered.
 /// The order of visiting is not important provided that nesting is respected.
-/// This phase is called the "pre-traversal" beause it should happen prior to
+/// This phase is called the "pre-traversal" because it should happen prior to
 /// flow analysis.
 ///
 /// Then, in the second phase, the client may make queries using
