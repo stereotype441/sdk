@@ -1100,7 +1100,7 @@ class FlowModel<Variable, Type> {
         if (p2Value != null) return false;
       } else {
         if (p2Value == null) return false;
-        if (VariableModel._variableModelsEqual<Type>(
+        if (!VariableModel._variableModelsEqual<Type>(
             typeOperations, p1Value, p2Value)) {
           return false;
         }
