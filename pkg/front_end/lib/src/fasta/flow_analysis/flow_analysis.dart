@@ -186,18 +186,10 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     TypeOperations<Variable, Type> typeOperations,
     FunctionBodyAccess<Variable> functionBody,
   ) {
-    return FlowAnalysis._(
-      nodeOperations,
-      typeOperations,
-      functionBody
-    );
+    return FlowAnalysis._(nodeOperations, typeOperations, functionBody);
   }
 
-  FlowAnalysis._(
-    this.nodeOperations,
-    this.typeOperations,
-    this.functionBody
-  ) {
+  FlowAnalysis._(this.nodeOperations, this.typeOperations, this.functionBody) {
     _current = FlowModel<Variable, Type>(true);
   }
 
@@ -691,11 +683,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   void tryFinallyStatement_end(Set<Variable> assignedInFinally) {
     _variablesReferenced(assignedInFinally);
     FlowModel<Variable, Type> afterBody = _stack.removeLast();
-    _current = _current.restrict(
-      typeOperations,
-      afterBody,
-      assignedInFinally
-    );
+    _current = _current.restrict(typeOperations, afterBody, assignedInFinally);
   }
 
   void tryFinallyStatement_finallyBegin(Iterable<Variable> assignedInBody) {
@@ -807,10 +795,7 @@ class FlowModel<Variable, Type> {
           const {},
         );
 
-  FlowModel._(
-    this.reachable,
-    this.variableInfo
-  ) {
+  FlowModel._(this.reachable, this.variableInfo) {
     assert(() {
       for (VariableModel<Type> value in variableInfo.values) {
         assert(value != null);
@@ -825,12 +810,9 @@ class FlowModel<Variable, Type> {
   FlowModel<Variable, Type> add(Variable variable, {bool assigned: false}) {
     Map<Variable, VariableModel<Type>> newVariableInfo =
         Map<Variable, VariableModel<Type>>.from(variableInfo);
-    newVariableInfo[variable] = VariableModel<Type>(null, false);
+    newVariableInfo[variable] = VariableModel<Type>(null, assigned);
 
-    return FlowModel<Variable, Type>._(
-      reachable,
-      newVariableInfo
-    );
+    return FlowModel<Variable, Type>._(reachable, newVariableInfo);
   }
 
   /// Updates the state to indicate that the given [variable] has been
@@ -903,10 +885,7 @@ class FlowModel<Variable, Type> {
 
     if (identical(newVariableInfo, variableInfo)) return this;
 
-    return FlowModel<Variable, Type>._(
-      reachable,
-      newVariableInfo
-    );
+    return FlowModel<Variable, Type>._(reachable, newVariableInfo);
   }
 
   /// Updates the state to reflect a control path that is known to have
@@ -930,10 +909,9 @@ class FlowModel<Variable, Type> {
   /// block are considered "unsafe" because the assignment might have cancelled
   /// the effect of any promotion that occurred inside the `try` block.
   FlowModel<Variable, Type> restrict(
-    TypeOperations<Variable, Type> typeOperations,
-    FlowModel<Variable, Type> other,
-    Set<Variable> unsafe
-  ) {
+      TypeOperations<Variable, Type> typeOperations,
+      FlowModel<Variable, Type> other,
+      Set<Variable> unsafe) {
     bool newReachable = reachable && other.reachable;
 
     Map<Variable, VariableModel<Type>> newVariableInfo =
@@ -962,12 +940,7 @@ class FlowModel<Variable, Type> {
       newVariableInfo = other.variableInfo;
     }
 
-    return _identicalOrNew(
-      this,
-      other,
-      newReachable,
-      newVariableInfo
-    );
+    return _identicalOrNew(this, other, newReachable, newVariableInfo);
   }
 
   /// Updates the state to indicate whether the control flow path is
@@ -975,10 +948,7 @@ class FlowModel<Variable, Type> {
   FlowModel<Variable, Type> setReachable(bool reachable) {
     if (this.reachable == reachable) return this;
 
-    return FlowModel<Variable, Type>._(
-      reachable,
-      variableInfo
-    );
+    return FlowModel<Variable, Type>._(reachable, variableInfo);
   }
 
   @override
@@ -989,12 +959,12 @@ class FlowModel<Variable, Type> {
   /// previous type promotion is removed.
   ///
   /// TODO(paulberry): allow for writes that preserve type promotions.
-  FlowModel<Variable, Type> write(TypeOperations<Variable, Type> typeOperations,
-      Variable variable) {
+  FlowModel<Variable, Type> write(
+      TypeOperations<Variable, Type> typeOperations, Variable variable) {
     var infoForVar = variableInfo[variable];
     var newInfoForVar = infoForVar.write();
     if (identical(newInfoForVar, infoForVar)) return this;
-    return _updateVariableInfo(variable, infoForVar);
+    return _updateVariableInfo(variable, newInfoForVar);
   }
 
   /// Updates a "variableInfo" [map] to indicate that a set of [variable] is no
@@ -1060,11 +1030,7 @@ class FlowModel<Variable, Type> {
             typeOperations, first.variableInfo, second.variableInfo);
 
     return FlowModel._identicalOrNew(
-      first,
-      second,
-      newReachable,
-      newVariableInfo
-    );
+        first, second, newReachable, newVariableInfo);
   }
 
   /// Joins two "variable info" maps.  See [join] for details.
@@ -1104,11 +1070,10 @@ class FlowModel<Variable, Type> {
   /// Creates a new [FlowModel] object, unless it is equivalent to either
   /// [first] or [second], in which case one of those objects is re-used.
   static FlowModel<Variable, Type> _identicalOrNew<Variable, Type>(
-    FlowModel<Variable, Type> first,
-    FlowModel<Variable, Type> second,
-    bool newReachable,
-    Map<Variable, VariableModel<Type>> newVariableInfo
-  ) {
+      FlowModel<Variable, Type> first,
+      FlowModel<Variable, Type> second,
+      bool newReachable,
+      Map<Variable, VariableModel<Type>> newVariableInfo) {
     if (first.reachable == newReachable &&
         identical(first.variableInfo, newVariableInfo)) {
       return first;
@@ -1118,10 +1083,7 @@ class FlowModel<Variable, Type> {
       return second;
     }
 
-    return FlowModel<Variable, Type>._(
-      newReachable,
-      newVariableInfo
-    );
+    return FlowModel<Variable, Type>._(newReachable, newVariableInfo);
   }
 
   /// Determines whether the given "variableInfo" maps are equivalent.
@@ -1146,6 +1108,7 @@ class FlowModel<Variable, Type> {
           if (p2Type == null) return false;
           if (!typeOperations.isSameType(p1Type, p2Type)) return false;
         }
+        if (p1Value.assigned != p2Value.assigned) return false;
       }
     }
     return true;
@@ -1205,7 +1168,8 @@ class VariableModel<Type> {
   @override
   bool operator ==(Object other) {
     return other is VariableModel<Type> &&
-        this.promotedType == other.promotedType && this.assigned == other.assigned;
+        this.promotedType == other.promotedType &&
+        this.assigned == other.assigned;
   }
 
   /// Returns an updated model reflect a control path that is known to have
@@ -1234,6 +1198,11 @@ class VariableModel<Type> {
   VariableModel<Type> withPromotedType(Type promotedType) =>
       VariableModel<Type>(promotedType, assigned);
 
+  VariableModel<Type> write() {
+    if (promotedType == null && assigned) return this;
+    return VariableModel<Type>(null, true);
+  }
+
   /// Joins two variable models.  See [FlowModel.join] for details.
   static VariableModel<Type> join<Type>(
       TypeOperations<Object, Type> typeOperations,
@@ -1261,17 +1230,14 @@ class VariableModel<Type> {
   /// [first] or [second], in which case one of those objects is re-used.
   static VariableModel<Type> _identicalOrNew<Type>(VariableModel<Type> first,
       VariableModel<Type> second, Type newPromotedType, bool newAssigned) {
-    if (identical(first.promotedType, newPromotedType) && first.assigned == newAssigned) {
+    if (identical(first.promotedType, newPromotedType) &&
+        first.assigned == newAssigned) {
       return first;
-    } else if (identical(second.promotedType, newPromotedType) && second.assigned == newAssigned) {
+    } else if (identical(second.promotedType, newPromotedType) &&
+        second.assigned == newAssigned) {
       return second;
     } else {
       return VariableModel<Type>(newPromotedType, newAssigned);
     }
-  }
-
-  VariableModel<Type> write() {
-    if (promotedType == null && assigned) return this;
-    return VariableModel<Type>(null, true);
   }
 }

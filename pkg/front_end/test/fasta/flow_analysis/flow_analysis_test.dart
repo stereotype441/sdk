@@ -673,8 +673,7 @@ main() {
         var s1 = FlowModel<_Var, _Type>(true).add(objectQVar, assigned: false);
         var s2 = s1.write(h, objectQVar);
         expect(s2.reachable, true);
-        expect(s2.variableInfo[objectQVar].assigned, true);
-        expect(s2.variableInfo, same(s1.variableInfo));
+        expect(s2.variableInfo[objectQVar], VariableModel<_Type>(null, true));
       });
 
       test('un-promotes', () {
@@ -702,7 +701,9 @@ main() {
         var s1 = FlowModel<_Var, _Type>(true).add(intQVar);
         var s2 = s1.markNonNullable(h, intQVar);
         expect(s2.reachable, true);
-        expect(s2.variableInfo[intQVar], VariableModel(_Type('int'), false));
+        _Type.allowComparisons(() {
+          expect(s2.variableInfo[intQVar], VariableModel(_Type('int'), false));
+        });
       });
 
       test('promoted -> unchanged', () {
