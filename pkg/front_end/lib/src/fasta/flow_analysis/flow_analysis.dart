@@ -892,8 +892,8 @@ class FlowModel<Variable, Type> {
       }());
       VariableModel<Type> info = variableInfo[variable];
       if (info.promotedType != null) {
-        (newVariableInfo ??= Map<Variable, VariableModel<Type>>.from(variableInfo))[variable] =
-            info.withPromotedType(null);
+        (newVariableInfo ??= Map<Variable, VariableModel<Type>>.from(
+            variableInfo))[variable] = info.withPromotedType(null);
       }
     }
     if (newVariableInfo == null) return this;
