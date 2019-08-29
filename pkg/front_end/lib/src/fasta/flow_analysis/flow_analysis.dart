@@ -1100,15 +1100,10 @@ class FlowModel<Variable, Type> {
         if (p2Value != null) return false;
       } else {
         if (p2Value == null) return false;
-        Type p1Type = p1Value.promotedType;
-        Type p2Type = p2Value.promotedType;
-        if (p1Type == null) {
-          if (p2Type != null) return false;
-        } else {
-          if (p2Type == null) return false;
-          if (!typeOperations.isSameType(p1Type, p2Type)) return false;
+        if (VariableModel._variableModelsEqual<Type>(
+            typeOperations, p1Value, p2Value)) {
+          return false;
         }
-        if (p1Value.assigned != p2Value.assigned) return false;
       }
     }
     return true;
@@ -1239,5 +1234,21 @@ class VariableModel<Type> {
     } else {
       return VariableModel<Type>(newPromotedType, newAssigned);
     }
+  }
+
+  static bool _variableModelsEqual<Type>(
+      TypeOperations<Object, Type> typeOperations,
+      VariableModel<Type> model1,
+      VariableModel<Type> model2) {
+    Type p1Type = model1.promotedType;
+    Type p2Type = model2.promotedType;
+    if (p1Type == null) {
+      if (p2Type != null) return false;
+    } else {
+      if (p2Type == null) return false;
+      if (!typeOperations.isSameType(p1Type, p2Type)) return false;
+    }
+    if (model1.assigned != model2.assigned) return false;
+    return true;
   }
 }
