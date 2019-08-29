@@ -7,50 +7,50 @@ import 'package:test/test.dart';
 
 main() {
   test('capturedAnywhere records assignments in closures', () {
-    var av = AssignedVariables<_Node, _Variable>();
+    var assignedVariables = AssignedVariables<_Node, _Variable>();
     var v1 = _Variable('v1');
     var v2 = _Variable('v2');
     var v3 = _Variable('v3');
-    av.write(v1);
-    av.beginNode(isClosure: true);
-    av.write(v2);
-    av.endNode(_Node(), isClosure: true);
-    av.write(v3);
-    expect(av.capturedAnywhere, {v2});
+    assignedVariables.write(v1);
+    assignedVariables.beginNode(isClosure: true);
+    assignedVariables.write(v2);
+    assignedVariables.endNode(_Node(), isClosure: true);
+    assignedVariables.write(v3);
+    expect(assignedVariables.capturedAnywhere, {v2});
   });
 
   test('writtenInNode ignores assignments outside the node', () {
-    var av = AssignedVariables<_Node, _Variable>();
+    var assignedVariables = AssignedVariables<_Node, _Variable>();
     var v1 = _Variable('v1');
     var v2 = _Variable('v2');
-    av.write(v1);
-    av.beginNode();
+    assignedVariables.write(v1);
+    assignedVariables.beginNode();
     var node = _Node();
-    av.endNode(node);
-    av.write(v2);
-    expect(av.writtenInNode(node), isEmpty);
+    assignedVariables.endNode(node);
+    assignedVariables.write(v2);
+    expect(assignedVariables.writtenInNode(node), isEmpty);
   });
 
   test('writtenInNode records assignments inside the node', () {
-    var av = AssignedVariables<_Node, _Variable>();
+    var assignedVariables = AssignedVariables<_Node, _Variable>();
     var v1 = _Variable('v1');
-    av.beginNode();
-    av.write(v1);
+    assignedVariables.beginNode();
+    assignedVariables.write(v1);
     var node = _Node();
-    av.endNode(node);
-    expect(av.writtenInNode(node), {v1});
+    assignedVariables.endNode(node);
+    expect(assignedVariables.writtenInNode(node), {v1});
   });
 
   test('writtenInNode records assignments in a nested node', () {
-    var av = AssignedVariables<_Node, _Variable>();
+    var assignedVariables = AssignedVariables<_Node, _Variable>();
     var v1 = _Variable('v1');
-    av.beginNode();
-    av.beginNode();
-    av.write(v1);
-    av.endNode(_Node());
+    assignedVariables.beginNode();
+    assignedVariables.beginNode();
+    assignedVariables.write(v1);
+    assignedVariables.endNode(_Node());
     var node = _Node();
-    av.endNode(node);
-    expect(av.writtenInNode(node), {v1});
+    assignedVariables.endNode(node);
+    expect(assignedVariables.writtenInNode(node), {v1});
   });
 
   test('writtenInNode records assignments in a closure', () {
@@ -64,31 +64,31 @@ main() {
   });
 
   test('capturedInNode ignores assignments in non-nested closures', () {
-    var av = AssignedVariables<_Node, _Variable>();
+    var assignedVariables = AssignedVariables<_Node, _Variable>();
     var v1 = _Variable('v1');
     var v2 = _Variable('v2');
-    av.beginNode(isClosure: true);
-    av.write(v1);
-    av.endNode(_Node(), isClosure: true);
-    av.beginNode();
+    assignedVariables.beginNode(isClosure: true);
+    assignedVariables.write(v1);
+    assignedVariables.endNode(_Node(), isClosure: true);
+    assignedVariables.beginNode();
     var node = _Node();
-    av.endNode(node);
-    av.beginNode(isClosure: true);
-    av.write(v2);
-    av.endNode(_Node(), isClosure: true);
-    expect(av.capturedInNode(node), isEmpty);
+    assignedVariables.endNode(node);
+    assignedVariables.beginNode(isClosure: true);
+    assignedVariables.write(v2);
+    assignedVariables.endNode(_Node(), isClosure: true);
+    expect(assignedVariables.capturedInNode(node), isEmpty);
   });
 
   test('capturedInNode records assignments in nested closures', () {
-    var av = AssignedVariables<_Node, _Variable>();
+    var assignedVariables = AssignedVariables<_Node, _Variable>();
     var v1 = _Variable('v1');
-    av.beginNode();
-    av.beginNode(isClosure: true);
-    av.write(v1);
-    av.endNode(_Node(), isClosure: true);
+    assignedVariables.beginNode();
+    assignedVariables.beginNode(isClosure: true);
+    assignedVariables.write(v1);
+    assignedVariables.endNode(_Node(), isClosure: true);
     var node = _Node();
-    av.endNode(node);
-    expect(av.capturedInNode(node), {v1});
+    assignedVariables.endNode(node);
+    expect(assignedVariables.capturedInNode(node), {v1});
   });
 }
 
