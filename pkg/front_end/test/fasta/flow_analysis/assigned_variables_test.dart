@@ -54,13 +54,13 @@ main() {
   });
 
   test('writtenInNode records assignments in a closure', () {
-    var av = AssignedVariables<_Node, _Variable>();
+    var assignedVariables = AssignedVariables<_Node, _Variable>();
     var v1 = _Variable('v1');
-    av.beginNode(isClosure: true);
-    av.write(v1);
+    assignedVariables.beginNode(isClosure: true);
+    assignedVariables.write(v1);
     var node = _Node();
-    av.endNode(node, isClosure: true);
-    expect(av.writtenInNode(node), {v1});
+    assignedVariables.endNode(node, isClosure: true);
+    expect(assignedVariables.writtenInNode(node), {v1});
   });
 
   test('capturedInNode ignores assignments in non-nested closures', () {
