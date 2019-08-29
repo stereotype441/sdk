@@ -1113,9 +1113,14 @@ const Object& Value::BoundConstant() const {
 
 GraphEntryInstr::GraphEntryInstr(const ParsedFunction& parsed_function,
                                  intptr_t osr_id)
-    : BlockEntryWithInitialDefs(0,
-                                kInvalidTryIndex,
-                                CompilerState::Current().GetNextDeoptId()),
+    : GraphEntryInstr(parsed_function,
+                      osr_id,
+                      CompilerState::Current().GetNextDeoptId()) {}
+
+GraphEntryInstr::GraphEntryInstr(const ParsedFunction& parsed_function,
+                                 intptr_t osr_id,
+                                 intptr_t deopt_id)
+    : BlockEntryWithInitialDefs(0, kInvalidTryIndex, deopt_id),
       parsed_function_(parsed_function),
       catch_entries_(),
       indirect_entries_(),
@@ -4237,6 +4242,30 @@ void MaterializeObjectInstr::RemapRegisters(intptr_t* cpu_reg_slots,
     locations_[i] = LocationRemapForSlowPath(
         LocationAt(i), InputAt(i)->definition(), cpu_reg_slots, fpu_reg_slots);
   }
+}
+
+const char* SpecialParameterInstr::KindToCString(SpecialParameterKind k) {
+  switch (k) {
+#define KIND_CASE(Name)                                                        \
+  case SpecialParameterKind::k##Name:                                          \
+    return #Name;
+    FOR_EACH_SPECIAL_PARAMETER_KIND(KIND_CASE)
+#undef KIND_CASE
+  }
+  return nullptr;
+}
+
+bool SpecialParameterInstr::KindFromCString(const char* str,
+                                            SpecialParameterKind* out) {
+  ASSERT(str != nullptr && out != nullptr);
+#define KIND_CASE(Name)                                                        \
+  if (strcmp(str, #Name) == 0) {                                               \
+    *out = SpecialParameterKind::k##Name;                                      \
+    return true;                                                               \
+  }
+  FOR_EACH_SPECIAL_PARAMETER_KIND(KIND_CASE)
+#undef KIND_CASE
+  return false;
 }
 
 LocationSummary* SpecialParameterInstr::MakeLocationSummary(Zone* zone,
