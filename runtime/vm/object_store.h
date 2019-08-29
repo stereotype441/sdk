@@ -29,7 +29,8 @@ class ObjectPointerVisitor;
   M(Mirrors, mirrors)                                                          \
   M(Profiler, profiler)                                                        \
   M(TypedData, typed_data)                                                     \
-  M(VMService, _vmservice)
+  M(VMService, _vmservice)                                                     \
+  M(Wasm, wasm)
 
 #define OBJECT_STORE_FIELD_LIST(R_, RW)                                        \
   RW(Class, object_class)                                                      \
@@ -101,11 +102,11 @@ class ObjectPointerVisitor;
   RW(Library, root_library)                                                    \
   RW(Library, typed_data_library)                                              \
   RW(Library, _vmservice_library)                                              \
+  RW(Library, wasm_library)                                                    \
   RW(GrowableObjectArray, libraries)                                           \
   RW(Array, libraries_map)                                                     \
   RW(GrowableObjectArray, closure_functions)                                   \
   RW(GrowableObjectArray, pending_classes)                                     \
-  RW(GrowableObjectArray, pending_unevaluated_const_fields)                    \
   R_(GrowableObjectArray, pending_deferred_loads)                              \
   R_(GrowableObjectArray, resume_capabilities)                                 \
   R_(GrowableObjectArray, exit_listeners)                                      \

@@ -7,7 +7,6 @@ import 'dart:collection';
 import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/ast_factory.dart';
-import 'package:analyzer/dart/ast/standard_resolution_map.dart';
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
@@ -133,8 +132,7 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
 
   @override
   void visitAnnotation(Annotation node) {
-    ElementAnnotation element =
-        resolutionMap.elementAnnotationForAnnotation(node);
+    ElementAnnotation element = node.elementAnnotation;
     AstNode parent = node.parent;
     if (element?.isFactory == true) {
       if (parent is MethodDeclaration) {
@@ -261,7 +259,7 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
 
   @override
   void visitConstructorDeclaration(ConstructorDeclaration node) {
-    if (resolutionMap.elementDeclaredByConstructorDeclaration(node).isFactory) {
+    if (node.declaredElement.isFactory) {
       if (node.body is BlockFunctionBody) {
         // Check the block for a return statement, if not, create the hint.
         if (!ExitDetector.exits(node.body)) {
@@ -576,8 +574,7 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
       } else if (displayName == FunctionElement.CALL_METHOD_NAME &&
           node is MethodInvocation &&
           node.staticInvokeType is InterfaceType) {
-        DartType staticInvokeType =
-            resolutionMap.staticInvokeTypeForInvocationExpression(node);
+        DartType staticInvokeType = node.staticInvokeType;
         displayName = "${staticInvokeType.displayName}.${element.displayName}";
       }
       LibraryElement library =
@@ -1089,17 +1086,25 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
     final requiredParameters =
         node.parameters.where((p) => p.declaredElement?.hasRequired == true);
     final nonNamedParamsWithRequired =
-        requiredParameters.where((p) => !p.isNamed);
+        requiredParameters.where((p) => p.isPositional);
     final namedParamsWithRequiredAndDefault = requiredParameters
         .where((p) => p.isNamed)
         .where((p) => p.declaredElement.defaultValueCode != null);
-    final paramsToHint = [
-      nonNamedParamsWithRequired,
-      namedParamsWithRequiredAndDefault
-    ].expand((e) => e);
-    for (final param in paramsToHint) {
+    for (final param in nonNamedParamsWithRequired.where((p) => p.isOptional)) {
       _errorReporter.reportErrorForNode(
-          HintCode.INVALID_REQUIRED_PARAM, param, [param.identifier.name]);
+          HintCode.INVALID_REQUIRED_OPTIONAL_POSITIONAL_PARAM,
+          param,
+          [param.identifier.name]);
+    }
+    for (final param in nonNamedParamsWithRequired.where((p) => p.isRequired)) {
+      _errorReporter.reportErrorForNode(
+          HintCode.INVALID_REQUIRED_POSITIONAL_PARAM,
+          param,
+          [param.identifier.name]);
+    }
+    for (final param in namedParamsWithRequiredAndDefault) {
+      _errorReporter.reportErrorForNode(HintCode.INVALID_REQUIRED_NAMED_PARAM,
+          param, [param.identifier.name]);
     }
   }
 
@@ -1789,8 +1794,7 @@ class DirectiveResolver extends SimpleAstVisitor {
 
   @override
   void visitCompilationUnit(CompilationUnit node) {
-    _enclosingLibrary =
-        resolutionMap.elementDeclaredByCompilationUnit(node).library;
+    _enclosingLibrary = node.declaredElement.library;
     for (Directive directive in node.directives) {
       directive.accept(this);
     }
@@ -3707,8 +3711,7 @@ class ResolverVisitor extends ScopedVisitor {
 
   @override
   void visitDefaultFormalParameter(DefaultFormalParameter node) {
-    InferenceContext.setType(node.defaultValue,
-        resolutionMap.elementDeclaredByFormalParameter(node.parameter)?.type);
+    InferenceContext.setType(node.defaultValue, node.declaredElement?.type);
     super.visitDefaultFormalParameter(node);
     ParameterElement element = node.declaredElement;
 
@@ -3736,7 +3739,7 @@ class ResolverVisitor extends ScopedVisitor {
 
     _flowAnalysis?.flow?.doStatement_bodyBegin(
       node,
-      _flowAnalysis?.assignedVariables[node],
+      _flowAnalysis.assignedVariables.writtenInNode(node),
     );
     visitStatementInScope(body);
 
@@ -3893,8 +3896,8 @@ class ResolverVisitor extends ScopedVisitor {
       iterable?.accept(this);
       _flowAnalysis?.loopVariable(loopVariable);
       loopVariable?.accept(this);
-      _flowAnalysis?.flow
-          ?.forEach_bodyBegin(_flowAnalysis?.assignedVariables[node]);
+      _flowAnalysis?.flow?.forEach_bodyBegin(
+          _flowAnalysis.assignedVariables.writtenInNode(node));
       node.body?.accept(this);
       _flowAnalysis?.flow?.forEach_end();
 
@@ -3971,7 +3974,7 @@ class ResolverVisitor extends ScopedVisitor {
       loopVariable?.accept(this);
 
       _flowAnalysis?.flow?.forEach_bodyBegin(
-        _flowAnalysis?.assignedVariables[node],
+        _flowAnalysis.assignedVariables.writtenInNode(node),
       );
 
       Statement body = node.body;
@@ -4317,8 +4320,7 @@ class ResolverVisitor extends ScopedVisitor {
     // because it needs to be visited in the context of the constructor
     // invocation.
     //
-    InferenceContext.setType(node.argumentList,
-        resolutionMap.staticElementForConstructorReference(node)?.type);
+    InferenceContext.setType(node.argumentList, node.staticElement?.type);
     node.argumentList?.accept(this);
     node.accept(elementResolver);
     node.accept(typeAnalyzer);
@@ -4426,8 +4428,7 @@ class ResolverVisitor extends ScopedVisitor {
     // because it needs to be visited in the context of the constructor
     // invocation.
     //
-    InferenceContext.setType(node.argumentList,
-        resolutionMap.staticElementForConstructorReference(node)?.type);
+    InferenceContext.setType(node.argumentList, node.staticElement?.type);
     node.argumentList?.accept(this);
     node.accept(elementResolver);
     node.accept(typeAnalyzer);
@@ -4454,7 +4455,8 @@ class ResolverVisitor extends ScopedVisitor {
 
       if (_flowAnalysis != null) {
         var flow = _flowAnalysis.flow;
-        var assignedInCases = _flowAnalysis.assignedVariables[node];
+        var assignedInCases =
+            _flowAnalysis.assignedVariables.writtenInNode(node);
 
         flow.switchStatement_expressionEnd(node);
 
@@ -4462,20 +4464,17 @@ class ResolverVisitor extends ScopedVisitor {
         var members = node.members;
         for (var member in members) {
           flow.switchStatement_beginCase(
-            member.labels.isNotEmpty
-                ? assignedInCases
-                : _flowAnalysis.assignedVariables.emptySet,
+            member.labels.isNotEmpty,
+            assignedInCases,
           );
           member.accept(this);
 
-          // Implicit `break` at the end of `default`.
           if (member is SwitchDefault) {
             hasDefault = true;
-            flow.handleBreak(node);
           }
         }
 
-        flow.switchStatement_end(node, hasDefault);
+        flow.switchStatement_end(hasDefault);
       } else {
         node.members.accept(this);
       }
@@ -4510,7 +4509,7 @@ class ResolverVisitor extends ScopedVisitor {
     flow.tryCatchStatement_bodyBegin();
     body.accept(this);
     flow.tryCatchStatement_bodyEnd(
-      _flowAnalysis.assignedVariables[body],
+      _flowAnalysis.assignedVariables.writtenInNode(body),
     );
 
     var catchLength = catchClauses.length;
@@ -4531,11 +4530,11 @@ class ResolverVisitor extends ScopedVisitor {
 
     if (finallyBlock != null) {
       flow.tryFinallyStatement_finallyBegin(
-        _flowAnalysis.assignedVariables[body],
+        _flowAnalysis.assignedVariables.writtenInNode(body),
       );
       finallyBlock.accept(this);
       flow.tryFinallyStatement_end(
-        _flowAnalysis.assignedVariables[finallyBlock],
+        _flowAnalysis.assignedVariables.writtenInNode(finallyBlock),
       );
     }
   }
@@ -4566,8 +4565,7 @@ class ResolverVisitor extends ScopedVisitor {
   void visitVariableDeclarationList(VariableDeclarationList node) {
     _flowAnalysis?.variableDeclarationList(node);
     for (VariableDeclaration decl in node.variables) {
-      VariableElement variableElement =
-          resolutionMap.elementDeclaredByVariableDeclaration(decl);
+      VariableElement variableElement = decl.declaredElement;
       InferenceContext.setType(decl, variableElement?.type);
     }
     super.visitVariableDeclarationList(node);
@@ -4587,7 +4585,7 @@ class ResolverVisitor extends ScopedVisitor {
       InferenceContext.setType(condition, typeProvider.boolType);
 
       _flowAnalysis?.flow?.whileStatement_conditionBegin(
-        _flowAnalysis?.assignedVariables[node],
+        _flowAnalysis.assignedVariables.writtenInNode(node),
       );
       condition?.accept(this);
 
@@ -4849,8 +4847,7 @@ class ResolverVisitor extends ScopedVisitor {
       return;
     }
 
-    ConstructorElement originalElement =
-        resolutionMap.staticElementForConstructorReference(constructor);
+    ConstructorElement originalElement = constructor.staticElement;
     FunctionType inferred;
     // If the constructor is generic, we'll have a ConstructorMember that
     // substitutes in type arguments (possibly `dynamic`) from earlier in

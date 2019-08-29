@@ -20,7 +20,6 @@ import 'package:analysis_server/src/utilities/flutter.dart';
 import 'package:analyzer/dart/analysis/session.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/precedence.dart';
-import 'package:analyzer/dart/ast/standard_resolution_map.dart';
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
@@ -316,7 +315,9 @@ class FixProcessor {
     if (errorCode == HintCode.INVALID_FACTORY_ANNOTATION ||
         errorCode == HintCode.INVALID_IMMUTABLE_ANNOTATION ||
         errorCode == HintCode.INVALID_LITERAL_ANNOTATION ||
-        errorCode == HintCode.INVALID_REQUIRED_PARAM ||
+        errorCode == HintCode.INVALID_REQUIRED_NAMED_PARAM ||
+        errorCode == HintCode.INVALID_REQUIRED_OPTIONAL_POSITIONAL_PARAM ||
+        errorCode == HintCode.INVALID_REQUIRED_POSITIONAL_PARAM ||
         errorCode == HintCode.INVALID_SEALED_ANNOTATION) {
       await _addFix_removeAnnotation();
     }
@@ -1234,10 +1235,8 @@ class FixProcessor {
               });
             });
             _addFixFromBuilder(
-                changeBuilder, DartFixKind.CHANGE_TYPE_ANNOTATION, args: [
-              resolutionMap.typeForTypeName(typeNode),
-              newType.displayName
-            ]);
+                changeBuilder, DartFixKind.CHANGE_TYPE_ANNOTATION,
+                args: [typeNode.type, newType.displayName]);
           }
         }
       }
@@ -3812,9 +3811,7 @@ class FixProcessor {
         }
         // maybe static
         if (target is Identifier) {
-          staticModifier =
-              resolutionMap.staticElementForIdentifier(target).kind ==
-                  ElementKind.CLASS;
+          staticModifier = target.staticElement.kind == ElementKind.CLASS;
         }
         // use different utils
         var targetPath = targetClassElement.source.fullName;

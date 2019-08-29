@@ -136,11 +136,15 @@ class StaticError implements Comparable<StaticError> {
 
     describeError(String adjective, StaticError error, String verb) {
       buffer.writeln("$adjective static error at ${error.location}:");
-      if (error.code != null) {
+      if (error.code == _unspecified) {
+        buffer.writeln("- $verb unspecified error code.");
+      } else if (error.code != null) {
         buffer.writeln("- $verb error code ${error.code}.");
       }
 
-      if (error.message != null) {
+      if (error.message == _unspecified) {
+        buffer.writeln("- $verb unspecified error message.");
+      } else if (error.message != null) {
         buffer.writeln("- $verb error message '${error.message}'.");
       }
       buffer.writeln();
@@ -916,6 +920,14 @@ class ErrorExpectationParser {
       _fail("An error expectation must specify at least an analyzer or CFE "
           "error.");
     }
+
+    // Hack: If the error is CFE-only and the length is one, treat it as no
+    // length. The CFE does not output length information, and when the update
+    // tool writes a CFE-only error, it implicitly uses a length of one. Thus,
+    // when we parse back in a length one CFE error, we ignore the length so
+    // that the error round-trips correctly.
+    // TODO(rnystrom): Stop doing this when the CFE reports error lengths.
+    if (code == null && length == 1) length = null;
 
     _errors.add(StaticError(
         line: line,

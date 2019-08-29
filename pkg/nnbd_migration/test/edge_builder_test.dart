@@ -83,7 +83,7 @@ class AssignmentCheckerTest extends Object
     var t = list(object());
     assign(bottom, t);
     assertEdge(never, t.node, hard: false);
-    expect(graph.getUpstreamEdges(t.typeArguments[0].node), isEmpty);
+    assertNoEdge(anyNode, t.typeArguments[0].node);
   }
 
   void test_bottom_to_simple() {
@@ -169,7 +169,7 @@ class AssignmentCheckerTest extends Object
     var t = list(object());
     assign(t, dynamic_);
     assertEdge(t.node, always, hard: false);
-    expect(graph.getDownstreamEdges(t.typeArguments[0].node), isEmpty);
+    assertNoEdge(t.typeArguments[0].node, anyNode);
   }
 
   test_generic_to_generic_downcast() {
@@ -185,10 +185,7 @@ class AssignmentCheckerTest extends Object
     // - the supertype of MyListOfList<T> is List<List<T?C>>
     var c = _myListOfListSupertype.typeArguments[0].typeArguments[0].node;
     // Then there should be an edge from b to substitute(a, c)
-    var substitutionNode = graph.getDownstreamEdges(b).single.destinationNode
-        as NullabilityNodeForSubstitution;
-    expect(substitutionNode.innerNode, same(a));
-    expect(substitutionNode.outerNode, same(c));
+    assertEdge(b, substitutionNode(a, c), hard: false);
   }
 
   test_generic_to_generic_same_element() {
@@ -212,10 +209,7 @@ class AssignmentCheckerTest extends Object
     // - the supertype of MyListOfList<T> is List<List<T?C>>
     var c = _myListOfListSupertype.typeArguments[0].typeArguments[0].node;
     // Then there should be an edge from substitute(a, c) to b.
-    var substitutionNode = graph.getUpstreamEdges(b).single.primarySource
-        as NullabilityNodeForSubstitution;
-    expect(substitutionNode.innerNode, same(a));
-    expect(substitutionNode.outerNode, same(c));
+    assertEdge(substitutionNode(a, c), b, hard: false);
   }
 
   test_generic_to_object() {
@@ -223,21 +217,21 @@ class AssignmentCheckerTest extends Object
     var t2 = object();
     assign(t1, t2);
     assertEdge(t1.node, t2.node, hard: false);
-    expect(graph.getDownstreamEdges(t1.typeArguments[0].node), isEmpty);
+    assertNoEdge(t1.typeArguments[0].node, anyNode);
   }
 
   test_generic_to_void() {
     var t = list(object());
     assign(t, void_);
     assertEdge(t.node, always, hard: false);
-    expect(graph.getDownstreamEdges(t.typeArguments[0].node), isEmpty);
+    assertNoEdge(t.typeArguments[0].node, anyNode);
   }
 
   void test_null_to_generic() {
     var t = list(object());
     assign(null_, t);
     assertEdge(always, t.node, hard: false);
-    expect(graph.getUpstreamEdges(t.typeArguments[0].node), isEmpty);
+    assertNoEdge(anyNode, t.typeArguments[0].node);
   }
 
   void test_null_to_simple() {
@@ -330,7 +324,7 @@ class EdgeBuilderTest extends EdgeBuilderTestBase {
     // upstream from it.
     if (node == never) return;
 
-    for (var edge in graph.getUpstreamEdges(node)) {
+    for (var edge in getEdges(anyNode, node)) {
       expect(edge.primarySource, never);
     }
   }
@@ -384,6 +378,20 @@ class C<T extends List<int>> {
         hard: false);
   }
 
+  test_assign_dynamic_to_other_type() async {
+    await analyze('''
+int f(dynamic d) => d;
+''');
+    // There is no explicit null check necessary, since `dynamic` is
+    // downcastable to any type, nullable or not.
+    expect(checkExpression('d;'), isNull);
+    // But we still create an edge, to make sure that the possibility of `null`
+    // propagates to callees.
+    assertEdge(decoratedTypeAnnotation('dynamic').node,
+        decoratedTypeAnnotation('int').node,
+        hard: true);
+  }
+
   test_assign_null_to_generic_type() async {
     await analyze('''
 main() {
@@ -421,12 +429,9 @@ void g(List<int> x) {
     var iterableInt = decoratedTypeAnnotation('Iterable<int>');
     var listInt = decoratedTypeAnnotation('List<int>');
     assertEdge(listInt.node, iterableInt.node, hard: true);
-    var substitution = graph
-        .getUpstreamEdges(iterableInt.typeArguments[0].node)
-        .single
-        .primarySource as NullabilityNodeForSubstitution;
-    expect(substitution.innerNode, same(listInt.typeArguments[0].node));
-    expect(substitution.outerNode, same(never));
+    assertEdge(substitutionNode(listInt.typeArguments[0].node, never),
+        iterableInt.typeArguments[0].node,
+        hard: false);
   }
 
   test_assignmentExpression_field() async {
@@ -1685,22 +1690,41 @@ void f(bool b) {
   }
 
   test_if_conditional_control_flow_after() async {
-    // Asserts after ifs don't demonstrate non-null intent.
-    // TODO(paulberry): if both branches complete normally, they should.
     await analyze('''
-void f(bool b, int i) {
+void f(bool b, int i, int j) {
+  assert(j != null);
   if (b) return;
   assert(i != null);
 }
 ''');
 
-    assertNoEdge(always, decoratedTypeAnnotation('int i').node);
+    // Asserts after ifs don't demonstrate non-null intent.
+    assertNoEdge(decoratedTypeAnnotation('int i').node, never);
+    // But asserts before ifs do
+    assertEdge(decoratedTypeAnnotation('int j').node, never, hard: true);
+  }
+
+  test_if_conditional_control_flow_after_normal_completion() async {
+    await analyze('''
+void f(bool b1, bool b2, int i, int j) {
+  if (b1) {}
+  assert(j != null);
+  if (b2) return;
+  assert(i != null);
+}
+''');
+
+    // Asserts after `if (...) return` s don't demonstrate non-null intent.
+    assertNoEdge(decoratedTypeAnnotation('int i').node, never);
+    // But asserts after `if (...) {}` do, since both branches of the `if`
+    // complete normally, so the assertion is unconditionally reachable.
+    assertEdge(decoratedTypeAnnotation('int j').node, never, hard: true);
   }
 
   test_if_conditional_control_flow_within() async {
-    // Asserts inside ifs don't demonstrate non-null intent.
     await analyze('''
-void f(bool b, int i) {
+void f(bool b, int i, int j) {
+  assert(j != null);
   if (b) {
     assert(i != null);
   } else {
@@ -1709,7 +1733,10 @@ void f(bool b, int i) {
 }
 ''');
 
-    assertNoEdge(always, decoratedTypeAnnotation('int i').node);
+    // Asserts inside ifs don't demonstrate non-null intent.
+    assertNoEdge(decoratedTypeAnnotation('int i').node, never);
+    // But asserts outside ifs do.
+    assertEdge(decoratedTypeAnnotation('int j').node, never, hard: true);
   }
 
   test_if_element() async {
@@ -1932,12 +1959,58 @@ C<int> f() => C<int>();
         hard: false);
   }
 
+  test_instanceCreation_generic_dynamic() async {
+    await analyze('''
+class C<T> {}
+C<Object> f() => C<dynamic>();
+''');
+    assertEdge(decoratedTypeAnnotation('dynamic').node,
+        decoratedTypeAnnotation('Object').node,
+        hard: false);
+  }
+
+  test_instanceCreation_generic_inferredParameterType() async {
+    await analyze('''
+class C<T> {
+  C(List<T> x);
+}
+C<int> f(List<int> x) => C(x);
+''');
+    var edge = assertEdge(anyNode, decoratedTypeAnnotation('int> f').node,
+        hard: false);
+    var inferredTypeArgument = edge.primarySource;
+    assertEdge(
+        decoratedTypeAnnotation('int> x').node,
+        substitutionNode(
+            inferredTypeArgument, decoratedTypeAnnotation('T> x').node),
+        hard: false);
+  }
+
   test_instanceCreation_generic_parameter() async {
     await analyze('''
 class C<T> {
   C(T t);
 }
 f(int i) => C<int>(i/*check*/);
+''');
+    var nullable_i = decoratedTypeAnnotation('int i').node;
+    var nullable_c_t = decoratedTypeAnnotation('C<int>').typeArguments[0].node;
+    var nullable_t = decoratedTypeAnnotation('T t').node;
+    var check_i = checkExpression('i/*check*/');
+    var nullable_c_t_or_nullable_t =
+        check_i.edges.single.destinationNode as NullabilityNodeForSubstitution;
+    expect(nullable_c_t_or_nullable_t.innerNode, same(nullable_c_t));
+    expect(nullable_c_t_or_nullable_t.outerNode, same(nullable_t));
+    assertNullCheck(check_i,
+        assertEdge(nullable_i, nullable_c_t_or_nullable_t, hard: true));
+  }
+
+  test_instanceCreation_generic_parameter_named() async {
+    await analyze('''
+class C<T> {
+  C({T t});
+}
+f(int i) => C<int>(t: i/*check*/);
 ''');
     var nullable_i = decoratedTypeAnnotation('int i').node;
     var nullable_c_t = decoratedTypeAnnotation('C<int>').typeArguments[0].node;
@@ -2035,31 +2108,38 @@ library foo;
     // Passes if no exceptions are thrown.
   }
 
-  @failingTest
   test_listLiteral_noTypeArgument_noNullableElements() async {
-    // Failing because we're not yet handling collection literals without a
-    // type argument.
     await analyze('''
 List<String> f() {
   return ['a', 'b'];
 }
 ''');
     assertNoUpstreamNullability(decoratedTypeAnnotation('List').node);
-    // TODO(brianwilkerson) Add an assertion that there is an edge from the list
-    //  literal's fake type argument to the return type's type argument.
+    final returnTypeNode = decoratedTypeAnnotation('String').node;
+    final returnTypeEdges = getEdges(anyNode, returnTypeNode);
+
+    expect(returnTypeEdges.length, 1);
+    final returnTypeEdge = returnTypeEdges.single;
+
+    final listArgType = returnTypeEdge.primarySource;
+    assertNoUpstreamNullability(listArgType);
   }
 
-  @failingTest
   test_listLiteral_noTypeArgument_nullableElement() async {
-    // Failing because we're not yet handling collection literals without a
-    // type argument.
     await analyze('''
 List<String> f() {
   return ['a', null, 'c'];
 }
 ''');
     assertNoUpstreamNullability(decoratedTypeAnnotation('List').node);
-    assertEdge(always, decoratedTypeAnnotation('String').node, hard: false);
+    final returnTypeNode = decoratedTypeAnnotation('String').node;
+    final returnTypeEdges = getEdges(anyNode, returnTypeNode);
+
+    expect(returnTypeEdges.length, 1);
+    final returnTypeEdge = returnTypeEdges.single;
+
+    final listArgType = returnTypeEdge.primarySource;
+    assertEdge(always, listArgType, hard: false);
   }
 
   test_listLiteral_typeArgument_noNullableElements() async {
@@ -2173,6 +2253,25 @@ class C {
     assertEdge(decoratedTypeAnnotation('int i').node, never, hard: true);
     assertNoEdge(always, decoratedTypeAnnotation('int j').node);
     assertEdge(decoratedTypeAnnotation('int k').node, never, hard: true);
+  }
+
+  test_methodInvocation_dynamic() async {
+    await analyze('''
+class C {
+  int g(int i) => i;
+}
+int f(dynamic d, int j) {
+  return d.g(j);
+}
+''');
+    // The call `d.g(j)` is dynamic, so we can't tell what method it resolves
+    // to.  There's no reason to assume it resolves to `C.g`.
+    assertNoEdge(decoratedTypeAnnotation('int j').node,
+        decoratedTypeAnnotation('int i').node);
+    assertNoEdge(decoratedTypeAnnotation('int g').node,
+        decoratedTypeAnnotation('int f').node);
+    // We do, however, assume that it might return anything, including `null`.
+    assertEdge(always, decoratedTypeAnnotation('int f').node, hard: false);
   }
 
   test_methodInvocation_parameter_contravariant() async {
@@ -2403,6 +2502,95 @@ void test(C c) {
 ''');
 
     assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true);
+  }
+
+  test_methodInvocation_target_generic_in_base_class() async {
+    await analyze('''
+abstract class B<T> {
+  void m(T/*1*/ t);
+}
+abstract class C extends B<int/*2*/> {}
+void f(C c, int/*3*/ i) {
+  c.m(i);
+}
+''');
+    // nullable(3) -> substitute(nullable(2), nullable(1))
+    var nullable1 = decoratedTypeAnnotation('T/*1*/').node;
+    var nullable2 = decoratedTypeAnnotation('int/*2*/').node;
+    var nullable3 = decoratedTypeAnnotation('int/*3*/').node;
+    assertEdge(nullable3, substitutionNode(nullable2, nullable1), hard: true);
+  }
+
+  test_methodInvocation_typeParameter_inferred() async {
+    await analyze('''
+T f<T>(T t) => t;
+void g() {
+  int y;
+  int x = f(y);
+}
+''');
+    var int_y = decoratedTypeAnnotation('int y').node;
+    var int_x = decoratedTypeAnnotation('int x').node;
+    var t_ret = decoratedTypeAnnotation('T f').node;
+    var t_param = decoratedTypeAnnotation('T t').node;
+
+    assertEdge(substitutionNode(anyNode, t_ret), int_x, hard: false);
+    assertEdge(int_y, substitutionNode(anyNode, t_param), hard: true);
+    assertEdge(t_param, t_ret, hard: true);
+  }
+
+  @failingTest
+  test_methodInvocation_typeParameter_inferred_inGenericClass() async {
+    // this creates an edge case because the typeArguments are not equal in
+    // length the the typeFormals of the calleeType, due to the enclosing
+    // generic class.
+    await analyze('''
+class C<T> {
+ void g() {
+   // use a local fn because generic methods aren't implemented.
+   T f<T>(T t) => t;
+   int y;
+   int x = f(y);
+ }
+}
+''');
+    var int_y = decoratedTypeAnnotation('int y').node;
+    var int_x = decoratedTypeAnnotation('int x').node;
+    var t_ret = decoratedTypeAnnotation('T f').node;
+    var t_param = decoratedTypeAnnotation('T t').node;
+
+    assertEdge(int_y, t_param, hard: true);
+    assertEdge(t_param, t_ret, hard: true);
+    assertEdge(t_ret, int_x, hard: false);
+  }
+
+  @failingTest
+  test_methodInvocation_typeParameter_inferred_inGenericExtreme() async {
+    // this creates an edge case because the typeArguments are not equal in
+    // length the the typeFormals of the calleeType, due to the enclosing
+    // generic class/functions.
+    await analyze('''
+class C<T> {
+ void g() {
+   // use local fns because generic methods aren't implemented.
+   void f2<R1>() {
+     void f3<R2>() {
+       T f<T>(T t) => t;
+       int y;
+       int x = f(y);
+     }
+   }
+ }
+}
+''');
+    var int_y = decoratedTypeAnnotation('int y').node;
+    var int_x = decoratedTypeAnnotation('int x').node;
+    var t_ret = decoratedTypeAnnotation('T f').node;
+    var t_param = decoratedTypeAnnotation('T t').node;
+
+    assertEdge(int_y, t_param, hard: true);
+    assertEdge(t_param, t_ret, hard: true);
+    assertEdge(t_ret, int_x, hard: false);
   }
 
   test_never() async {
@@ -2953,6 +3141,22 @@ void test() {
     assertEdge(always, decoratedTypeAnnotation('int i').node, hard: false);
   }
 
+  test_postDominators_questionQuestionOperator() async {
+    await analyze('''
+class C {
+  Object m() => null;
+}
+Object test(C x, C y) => x.m() ?? y.m();
+''');
+    // There is a hard edge from x to `never` because `x.m()` is unconditionally
+    // reachable from the top of `test`.
+    assertEdge(decoratedTypeAnnotation('C x').node, never, hard: true);
+    // However, the edge from y to `never` is soft because `y.m()` is only
+    // executed if `x.m()` returned `null`.
+    assertEdge(decoratedTypeAnnotation('C y').node, never,
+        hard: false, guards: [decoratedTypeAnnotation('Object m').node]);
+  }
+
   test_postDominators_reassign() async {
     await analyze('''
 void test(bool b, int i1, int i2) {
@@ -3080,6 +3284,19 @@ void test(C c1, C c2, C c3, C c4) {
         assertEdge(decoratedTypeAnnotation('C c3').node, never, hard: false));
   }
 
+  test_postDominators_tryCatch() async {
+    await analyze('''
+void test(int i) {
+  try {} catch (_) {
+    i.isEven;
+  }
+}
+''');
+    // Edge should not be hard because the call to `i.isEven` does not
+    // post-dominate the declaration of `i`.
+    assertEdge(decoratedTypeAnnotation('int i').node, never, hard: false);
+  }
+
   test_postDominators_whileStatement_unconditional() async {
     await analyze('''
 class C {
@@ -3157,6 +3374,24 @@ bool f(C c) => c.b;
 ''');
     assertEdge(decoratedTypeAnnotation('bool get').node,
         decoratedTypeAnnotation('bool f').node,
+        hard: false);
+  }
+
+  test_prefixedIdentifier_getter_type_in_generic() async {
+    await analyze('''
+class C<T> {
+  List<T> _x;
+  List<T> get x => _x;
+}
+List<int> f(C<int> c) => c.x;
+''');
+    assertEdge(decoratedTypeAnnotation('List<T> get').node,
+        decoratedTypeAnnotation('List<int> f').node,
+        hard: false);
+    assertEdge(
+        substitutionNode(decoratedTypeAnnotation('int> c').node,
+            decoratedTypeAnnotation('T> get').node),
+        decoratedTypeAnnotation('int> f').node,
         hard: false);
   }
 
@@ -3262,6 +3497,23 @@ int f(int i) {
     assertEdge(never, returnType, hard: false);
   }
 
+  test_propertyAccess_dynamic() async {
+    await analyze('''
+class C {
+  int get g => 0;
+}
+int f(dynamic d) {
+  return d.g;
+}
+''');
+    // The call `d.g` is dynamic, so we can't tell what method it resolves
+    // to.  There's no reason to assume it resolves to `C.g`.
+    assertNoEdge(decoratedTypeAnnotation('int get g').node,
+        decoratedTypeAnnotation('int f').node);
+    // We do, however, assume that it might return anything, including `null`.
+    assertEdge(always, decoratedTypeAnnotation('int f').node, hard: false);
+  }
+
   test_propertyAccess_return_type() async {
     await analyze('''
 class C {
@@ -3331,13 +3583,8 @@ class D<U> implements C<U> {
     var nullable_t1 = decoratedTypeAnnotation('T/*1*/').node;
     var nullable_t2 = decoratedTypeAnnotation('T/*2*/').node;
     var nullable_u3 = decoratedTypeAnnotation('U/*3*/').node;
-    var nullable_t2_or_nullable_u3 = graph
-        .getDownstreamEdges(nullable_t1)
-        .single
-        .destinationNode as NullabilityNodeForSubstitution;
-    expect(nullable_t2_or_nullable_u3.innerNode, same(nullable_t2));
-    expect(nullable_t2_or_nullable_u3.outerNode, same(nullable_u3));
-    assertEdge(nullable_t1, nullable_t2_or_nullable_u3, hard: true);
+    assertEdge(nullable_t1, substitutionNode(nullable_t2, nullable_u3),
+        hard: true);
   }
 
   test_redirecting_constructor_factory_to_generic() async {
@@ -3352,13 +3599,8 @@ class D<T> implements C {
     var nullable_i1 = decoratedTypeAnnotation('int/*1*/').node;
     var nullable_i2 = decoratedTypeAnnotation('int/*2*/').node;
     var nullable_t3 = decoratedTypeAnnotation('T/*3*/').node;
-    var nullable_i2_or_nullable_t3 = graph
-        .getDownstreamEdges(nullable_i1)
-        .single
-        .destinationNode as NullabilityNodeForSubstitution;
-    expect(nullable_i2_or_nullable_t3.innerNode, same(nullable_i2));
-    expect(nullable_i2_or_nullable_t3.outerNode, same(nullable_t3));
-    assertEdge(nullable_i1, nullable_i2_or_nullable_t3, hard: true);
+    assertEdge(nullable_i1, substitutionNode(nullable_i2, nullable_t3),
+        hard: true);
   }
 
   test_redirecting_constructor_ordinary() async {

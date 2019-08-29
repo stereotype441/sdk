@@ -4,39 +4,128 @@
 
 import 'package:meta/meta.dart';
 
-/// Sets of local variables that are potentially assigned in a loop statement,
-/// switch statement, try statement, or loop collection element.
-class AssignedVariables<StatementOrElement, Variable> {
-  final emptySet = Set<Variable>();
+/// [AssignedVariables] is a helper class capable of computing the set of
+/// variables that are potentially written to, and potentially captured by
+/// closures, at various locations inside the code being analyzed.  This class
+/// should be used prior to running flow analysis, to compute the sets of
+/// variables to pass in to flow analysis.
+///
+/// This class is intended to be used in two phases.  In the first phase, the
+/// client should traverse the source code recursively, making calls to
+/// [beginNode] and [endNode] to indicate the constructs in which writes should
+/// be tracked, and calls to [write] to indicate when a write is encountered.
+/// The order of visiting is not important provided that nesting is respected.
+/// This phase is called the "pre-traversal" because it should happen prior to
+/// flow analysis.
+///
+/// Then, in the second phase, the client may make queries using
+/// [capturedAnywhere], [writtenInNode], and [capturedInNode].
+///
+/// We use the term "node" to refer generally to a loop statement, switch
+/// statement, try statement, loop collection element, local function, or
+/// closure.
+class AssignedVariables<Node, Variable> {
+  /// Mapping from a node to the set of local variables that are potentially
+  /// written to within that node.
+  final Map<Node, Set<Variable>> _writtenInNode = {};
 
-  /// Mapping from a statement or element to the set of local variables that
-  /// are potentially assigned in that statement or element.
-  final Map<StatementOrElement, Set<Variable>> _map = {};
+  /// Mapping from a node to the set of local variables for which a potential
+  /// write is captured by a local function or closure inside that node.
+  final Map<Node, Set<Variable>> _capturedInNode = {};
 
-  /// The stack of nested statements or collection elements.
-  final List<Set<Variable>> _stack = [];
+  /// Set of local variables for which a potential write is captured by a local
+  /// function or closure anywhere in the code being analyzed.
+  final Set<Variable> _capturedAnywhere = {};
+
+  /// Stack of sets accumulating variables that are potentially written to.
+  ///
+  /// A set is pushed onto the stack when a node is entered, and popped when
+  /// a node is left.
+  final List<Set<Variable>> _writtenStack = [];
+
+  /// Stack of sets accumulating variables for which a potential write is
+  /// captured by a local function or closure.
+  ///
+  /// A set is pushed onto the stack when a node is entered, and popped when
+  /// a node is left.
+  final List<Set<Variable>> _capturedStack = [];
+
+  /// Stack of integers counting the number of entries in [_capturedStack] that
+  /// should be updated when a variable write is seen.
+  ///
+  /// When a closure is entered, the length of [_capturedStack] is pushed onto
+  /// this stack; when a node is left, it is popped.
+  ///
+  /// Each time a write occurs, we consult the top of this stack to determine
+  /// how many elements of [capturedStack] should be updated.
+  final List<int> _closureIndexStack = [];
 
   AssignedVariables();
 
-  /// Return the set of variables that are potentially assigned in the
-  /// [statementOrElement].
-  Set<Variable> operator [](StatementOrElement statementOrElement) {
-    return _map[statementOrElement] ?? emptySet;
-  }
+  /// Queries the set of variables for which a potential write is captured by a
+  /// local function or closure anywhere in the code being analyzed.
+  Set<Variable> get capturedAnywhere => _capturedAnywhere;
 
-  void beginStatementOrElement() {
-    Set<Variable> set = Set<Variable>.identity();
-    _stack.add(set);
-  }
-
-  void endStatementOrElement(StatementOrElement node) {
-    _map[node] = _stack.removeLast();
-  }
-
-  void write(Variable variable) {
-    for (int i = 0; i < _stack.length; ++i) {
-      _stack[i].add(variable);
+  /// This method should be called during pre-traversal, to mark the start of a
+  /// loop statement, switch statement, try statement, loop collection element,
+  /// local function, or closure which might need to be queried later.
+  ///
+  /// [isClosure] should be true if the node is a local function or closure.
+  ///
+  /// The span between the call to [beginNode] and [endNode] should cover any
+  /// statements and expressions that might be crossed by a backwards jump.  So
+  /// for instance, in a "for" loop, the condition, updaters, and body should be
+  /// covered, but the initializers should not.  Similarly, in a switch
+  /// statement, the body of the switch statement should be covered, but the
+  /// switch expression should not.
+  void beginNode({bool isClosure: false}) {
+    _writtenStack.add(Set<Variable>.identity());
+    if (isClosure) {
+      _closureIndexStack.add(_capturedStack.length);
     }
+    _capturedStack.add(Set<Variable>.identity());
+  }
+
+  /// Queries the set of variables for which a potential write is captured by a
+  /// local function or closure inside the [node].
+  Set<Variable> capturedInNode(Node node) {
+    return _capturedInNode[node] ?? const {};
+  }
+
+  /// This method should be called during pre-traversal, to mark the end of a
+  /// loop statement, switch statement, try statement, loop collection element,
+  /// local function, or closure which might need to be queried later.
+  ///
+  /// [isClosure] should be true if the node is a local function or closure.
+  ///
+  /// See [beginNode] for more details.
+  void endNode(Node node, {bool isClosure: false}) {
+    _writtenInNode[node] = _writtenStack.removeLast();
+    _capturedInNode[node] = _capturedStack.removeLast();
+    if (isClosure) {
+      _closureIndexStack.removeLast();
+    }
+  }
+
+  /// This method should be called during pre-traversal, to mark a write to a
+  /// variable.
+  void write(Variable variable) {
+    for (int i = 0; i < _writtenStack.length; ++i) {
+      _writtenStack[i].add(variable);
+    }
+    if (_closureIndexStack.isNotEmpty) {
+      _capturedAnywhere.add(variable);
+      int closureIndex = _closureIndexStack.last;
+      for (int i = 0; i < closureIndex; ++i) {
+        _capturedStack[i].add(variable);
+      }
+    }
+  }
+
+  /// Queries the set of variables that are potentially written to inside the
+  /// [node].
+  Set<Variable> writtenInNode(Node node) {
+    return _writtenInNode[node] ?? const {};
   }
 }
 
@@ -240,12 +329,21 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   ///
   /// [condition] is an opaque representation of the loop condition; it is
   /// matched against expressions passed to previous calls to determine whether
-  /// the loop condition should cause any promotions to occur.
+  /// the loop condition should cause any promotions to occur.  If [condition]
+  /// is null, the condition is understood to be empty (equivalent to a
+  /// condition of `true`).
   void for_bodyBegin(Statement node, Expression condition) {
-    _conditionalEnd(condition);
-    // Tail of the stack: falseCondition, trueCondition
+    FlowModel<Variable, Type> trueCondition;
+    if (condition == null) {
+      trueCondition = _current;
+      _stack.add(_current.setReachable(false));
+    } else {
+      _conditionalEnd(condition);
+      // Tail of the stack: falseCondition, trueCondition
 
-    FlowModel<Variable, Type> trueCondition = _stack.removeLast();
+      trueCondition = _stack.removeLast();
+    }
+    // Tail of the stack: falseCondition
 
     if (node != null) {
       _statementToStackIndex[node] = _stack.length;
@@ -490,30 +588,53 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     return _current.variableInfo[variable]?.promotedType;
   }
 
-  /// The [notPromoted] set contains all variables that are potentially
-  /// assigned in other cases that might target this with `continue`, so
-  /// these variables might have different types and are "un-promoted" from
-  /// the "afterExpression" state.
-  void switchStatement_beginCase(Iterable<Variable> notPromoted) {
-    _current = _stack.last.removePromotedAll(notPromoted, _referencedVariables);
-  }
-
-  void switchStatement_end(Statement switchStatement, bool hasDefault) {
-    // Tail of the stack: break, continue, afterExpression
-    FlowModel<Variable, Type> afterExpression = _current = _stack.removeLast();
-    _stack.removeLast(); // continue
-    FlowModel<Variable, Type> breakState = _stack.removeLast();
-
-    if (hasDefault) {
-      // breakState should not be null because we should have joined it with
-      // something non-null when handling the default case.
-      assert(breakState != null);
-      _current = breakState;
+  /// Call this method just before visiting one of the cases in the body of a
+  /// switch statement.  See [switchStatement_expressionEnd] for details.
+  ///
+  /// [hasLabel] indicates whether the case has any labels.
+  ///
+  /// The [notPromoted] set contains all variables that are potentially assigned
+  /// within the body of the switch statement.
+  void switchStatement_beginCase(
+      bool hasLabel, Iterable<Variable> notPromoted) {
+    if (hasLabel) {
+      _current =
+          _stack.last.removePromotedAll(notPromoted, _referencedVariables);
     } else {
-      _current = _join(breakState, afterExpression);
+      _current = _stack.last;
     }
   }
 
+  /// Call this method just after visiting the body of a switch statement.  See
+  /// [switchStatement_expressionEnd] for details.
+  ///
+  /// [hasDefault] indicates whether the switch statement had a "default" case.
+  void switchStatement_end(bool hasDefault) {
+    // Tail of the stack: break, continue, afterExpression
+    FlowModel<Variable, Type> afterExpression = _stack.removeLast();
+    _stack.removeLast(); // continue
+    FlowModel<Variable, Type> breakState = _stack.removeLast();
+
+    // It is allowed to "fall off" the end of a switch statement, so join the
+    // current state to any breaks that were found previously.
+    breakState = _join(breakState, _current);
+
+    // And, if there is an implicit fall-through default, join it to any breaks.
+    if (!hasDefault) breakState = _join(breakState, afterExpression);
+
+    _current = breakState;
+  }
+
+  /// Call this method just after visiting the expression part of a switch
+  /// statement.
+  ///
+  /// The order of visiting a switch statement should be:
+  /// - Visit the switch expression.
+  /// - Call [switchStatement_expressionEnd].
+  /// - For each switch case (including the default case, if any):
+  ///   - Call [switchStatement_beginCase].
+  ///   - Visit the case.
+  /// - Call [switchStatement_end].
   void switchStatement_expressionEnd(Statement switchStatement) {
     _statementToStackIndex[switchStatement] = _stack.length;
     _stack.add(null); // break

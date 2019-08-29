@@ -1286,24 +1286,6 @@ class CompileTimeErrorCode extends ErrorCode {
   /**
    * No parameters.
    */
-  static const CompileTimeErrorCode EXTENSION_DECLARES_CONSTRUCTOR =
-      const CompileTimeErrorCode('EXTENSION_DECLARES_CONSTRUCTOR',
-          "Extensions can't declare constructors.",
-          correction: "Try removing the constructor declaration.");
-
-  /**
-   * No parameters.
-   */
-  static const CompileTimeErrorCode EXTENSION_DECLARES_INSTANCE_FIELD =
-      const CompileTimeErrorCode('EXTENSION_DECLARES_INSTANCE_FIELD',
-          "Extensions can't declare instance fields.",
-          correction:
-              "Try removing the field declaration or making it a static "
-              "field.");
-
-  /**
-   * No parameters.
-   */
   static const CompileTimeErrorCode EXTENSION_DECLARES_MEMBER_OF_OBJECT =
       const CompileTimeErrorCode(
           'EXTENSION_DECLARES_MEMBER_OF_OBJECT',
@@ -2503,8 +2485,8 @@ class CompileTimeErrorCode extends ErrorCode {
   //
   // The analyzer produces this diagnostic when an element in a constant list
   // literal isn't a constant value. The list literal can be constant either
-  // explicitly (because it's prefixed by the keyword `const`) or implicitly
-  // (because it appears in a <a href=”#constant-context”>constant context</a>).
+  // explicitly (because it's prefixed by the `const` keyword) or implicitly
+  // (because it appears in a [constant context](#constant-context)).
   //
   // #### Example
   //
@@ -2519,8 +2501,8 @@ class CompileTimeErrorCode extends ErrorCode {
   // #### Common fixes
   //
   // If the list needs to be a constant list, then convert the element to be a
-  // constant. In the example above, you might add the keyword `const`
-  // to the declaration of `x`:
+  // constant. In the example above, you might add the `const` keyword to the
+  // declaration of `x`:
   //
   // ```dart
   // const int x = 2;
@@ -2673,6 +2655,10 @@ class CompileTimeErrorCode extends ErrorCode {
       const CompileTimeErrorCode('NOT_ENOUGH_POSITIONAL_ARGUMENTS',
           "{0} positional argument(s) expected, but {1} found.",
           correction: "Try adding the missing arguments.");
+
+  @deprecated
+  static const CompileTimeErrorCode NOT_ENOUGH_REQUIRED_ARGUMENTS =
+      NOT_ENOUGH_POSITIONAL_ARGUMENTS;
 
   /**
    * It is an error if an instance field with potentially non-nullable type has

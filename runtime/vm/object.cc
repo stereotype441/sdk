@@ -1918,6 +1918,14 @@ RawError* Object::Init(Isolate* isolate,
     pending_classes.Add(cls);
     RegisterClass(cls, Symbols::FfiDynamicLibrary(), lib);
 
+    lib = Library::LookupLibrary(thread, Symbols::DartWasm());
+    if (lib.IsNull()) {
+      lib = Library::NewLibraryHelper(Symbols::DartWasm(), true);
+      lib.SetLoadRequested();
+      lib.Register(thread);
+    }
+    object_store->set_bootstrap_library(ObjectStore::kWasm, lib);
+
     // Finish the initialization by compiling the bootstrap scripts containing
     // the base interfaces and the implementation of the internal classes.
     const Error& error = Error::Handle(
@@ -7363,6 +7371,13 @@ RawFunction* Function::New(const String& name,
     // in new space.
     ASSERT(space == Heap::kOld);
   }
+
+  // Force-optimized functions are not debuggable because they cannot
+  // deoptimize.
+  if (result.ForceOptimize()) {
+    result.set_is_debuggable(false);
+  }
+
   return result.raw();
 }
 
@@ -10225,6 +10240,14 @@ RawObject* Library::GetMetadata(const Object& obj) const {
       !obj.IsLibrary() && !obj.IsTypeParameter()) {
     UNREACHABLE();
   }
+  if (obj.IsLibrary()) {
+    // Ensure top-level class is loaded as it may contain annotations of
+    // a library.
+    const auto& cls = Class::Handle(toplevel_class());
+    if (!cls.IsNull()) {
+      cls.EnsureDeclarationLoaded();
+    }
+  }
   const String& metaname = String::Handle(MakeMetadataName(obj));
   Field& field = Field::Handle(GetMetadataField(metaname));
   if (field.IsNull()) {
@@ -11725,6 +11748,10 @@ RawLibrary* Library::TypedDataLibrary() {
 
 RawLibrary* Library::VMServiceLibrary() {
   return Isolate::Current()->object_store()->_vmservice_library();
+}
+
+RawLibrary* Library::WasmLibrary() {
+  return Isolate::Current()->object_store()->wasm_library();
 }
 
 const char* Library::ToCString() const {
