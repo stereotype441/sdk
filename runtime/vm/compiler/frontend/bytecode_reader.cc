@@ -280,16 +280,7 @@ void BytecodeReaderHelper::ReadCode(const Function& function,
   // Create object pool and read pool entries.
   const intptr_t obj_count = reader_.ReadListLength();
   const ObjectPool& pool = ObjectPool::Handle(Z, ObjectPool::New(obj_count));
-
-  {
-    // While reading pool entries, deopt_ids are allocated for
-    // ICData objects.
-    //
-    // TODO(alexmarkov): allocate deopt_ids for closures separately
-    DeoptIdScope deopt_id_scope(thread_, 0);
-
-    ReadConstantPool(function, pool, 0);
-  }
+  ReadConstantPool(function, pool, 0);
 
   // Read bytecode and attach to function.
   const Bytecode& bytecode = Bytecode::Handle(Z, ReadBytecode(pool));
@@ -562,6 +553,8 @@ void BytecodeReaderHelper::ReadClosureDeclaration(const Function& function,
                                /* has_positional_param_names = */ true));
 
   closure.SetSignatureType(signature_type);
+
+  I->AddClosureFunction(closure);
 }
 
 static bool IsNonCanonical(const AbstractType& type) {
@@ -796,18 +789,6 @@ intptr_t BytecodeReaderHelper::ReadConstantPool(const Function& function,
           simpleInstanceOf =
               &Library::PrivateCoreLibName(Symbols::_simpleInstanceOf());
         }
-        intptr_t checked_argument_count = 1;
-        if (kind == InvocationKind::method) {
-          const Token::Kind token_kind =
-              MethodTokenRecognizer::RecognizeTokenKind(name);
-          if ((token_kind != Token::kILLEGAL) ||
-              (name.raw() == simpleInstanceOf->raw())) {
-            intptr_t argument_count = ArgumentsDescriptor(array).Count();
-            ASSERT(argument_count <= 2);
-            checked_argument_count =
-                (token_kind == Token::kSET) ? 1 : argument_count;
-          }
-        }
         // Do not mangle == or call:
         //   * operator == takes an Object so its either not checked or checked
         //     at the entry because the parameter is marked covariant, neither
@@ -819,11 +800,9 @@ intptr_t BytecodeReaderHelper::ReadConstantPool(const Function& function,
             (name.raw() != Symbols::Call().raw())) {
           name = Function::CreateDynamicInvocationForwarderName(name);
         }
-        obj =
-            ICData::New(function, name,
-                        array,  // Arguments descriptor.
-                        thread_->compiler_state().GetNextDeoptId(),
-                        checked_argument_count, ICData::RebindRule::kInstance);
+        obj = UnlinkedCall::New();
+        UnlinkedCall::Cast(obj).set_target_name(name);
+        UnlinkedCall::Cast(obj).set_args_descriptor(array);
       } break;
       case ConstantPoolTag::kStaticField:
         obj = ReadObject();
@@ -1418,6 +1397,9 @@ RawObject* BytecodeReaderHelper::ReadObjectContents(uint32_t header) {
       RawClass* cls = library.LookupLocalClass(class_name);
       NoSafepointScope no_safepoint_scope(thread_);
       if (cls == Class::null()) {
+        if (IsExpressionEvaluationLibrary(library)) {
+          return H.GetExpressionEvaluationRealClass();
+        }
         FATAL2("Unable to find class %s in %s", class_name.ToCString(),
                library.ToCString());
       }
@@ -1944,6 +1926,13 @@ RawScript* BytecodeReaderHelper::ReadSourceFile(const String& uri,
     source = ReadString(/* is_canonical = */ false);
   }
 
+  if (source.IsNull() && line_starts.IsNull()) {
+    // This script provides a uri only, but no source or line_starts array.
+    // The source is set to the empty symbol, indicating that source and
+    // line_starts array are lazily looked up if needed.
+    source = Symbols::Empty().raw();  // Lookup is postponed.
+  }
+
   const Script& script = Script::Handle(
       Z, Script::New(import_uri, uri, source, RawScript::kKernelTag));
   script.set_line_starts(line_starts);
@@ -2404,6 +2393,11 @@ void BytecodeReaderHelper::ReadFunctionDeclarations(const Class& cls) {
       // or a function which are not registered and cannot be looked up.
       ASSERT(!function.is_abstract());
       ASSERT(function.bytecode_offset() != 0);
+      // Replace class of the function in scope as we're going to look for
+      // expression evaluation function in a real class.
+      if (!cls.IsTopLevel()) {
+        scoped_function_class_ = H.GetExpressionEvaluationRealClass();
+      }
       CompilerState compiler_state(thread_);
       ReadCode(function, function.bytecode_offset());
     }
@@ -2534,8 +2528,12 @@ void BytecodeReaderHelper::ReadClassDeclaration(const Class& cls) {
     cls.set_is_type_finalized();
   }
 
-  // TODO(alexmarkov): move this to class finalization.
-  ClassFinalizer::RegisterClassInHierarchy(Z, cls);
+  // Avoid registering expression evaluation class in a hierarchy, as
+  // it doesn't have cid and shouldn't be found when enumerating subclasses.
+  if (expression_evaluation_library_ == nullptr) {
+    // TODO(alexmarkov): move this to class finalization.
+    ClassFinalizer::RegisterClassInHierarchy(Z, cls);
+  }
 }
 
 void BytecodeReaderHelper::ReadLibraryDeclaration(const Library& library,
