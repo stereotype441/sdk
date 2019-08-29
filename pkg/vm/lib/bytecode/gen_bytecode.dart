@@ -2069,11 +2069,14 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
         parentFunction != null &&
         (parentFunction.dartAsyncMarker == AsyncMarker.Async ||
             parentFunction.dartAsyncMarker == AsyncMarker.AsyncStar)) {
+      final savedSourcePosition = asm.currentSourcePosition;
+      _recordSourcePosition(TreeNode.noOffset);
       _genLoadVar(locals.asyncStackTraceVar,
           currentContextLevel: locals.contextLevelAtEntry);
       _genDirectCall(
           setAsyncThreadStackTrace, objectTable.getArgDescHandle(1), 1);
       asm.emitDrop1();
+      asm.currentSourcePosition = savedSourcePosition;
     }
 
     Label continuationSwitchLabel;
@@ -2414,7 +2417,7 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
   /// the last finally block.
   void _generateNonLocalControlTransfer(
       TreeNode from, TreeNode to, GenerateContinuation continuation) {
-    if (options.emitDebuggerStops) {
+    if (options.emitDebuggerStops && from.fileOffset != TreeNode.noOffset) {
       asm.emitDebugCheck(); // Before context is unwound.
     }
     List<TryFinally> tryFinallyBlocks = _getEnclosingTryFinallyBlocks(from, to);
@@ -3171,6 +3174,10 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
   @override
   visitThrow(Throw node) {
     _generateNode(node.expression);
+
+    if (options.emitDebuggerStops) {
+      asm.emitDebugCheck();
+    }
     asm.emitThrow(0);
   }
 
@@ -3235,7 +3242,8 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       rhs is ConstantExpression ||
       rhs is StaticGet ||
       rhs is FunctionExpression ||
-      rhs is VariableGet;
+      rhs is VariableGet ||
+      rhs is AsExpression;
 
   void _genFutureNull() {
     asm.emitPushNull();
@@ -3757,7 +3765,9 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
 
     bool hasCatchAll = false;
 
+    final savedSourcePosition = asm.currentSourcePosition;
     for (Catch catchClause in node.catches) {
+      _recordSourcePosition(catchClause.fileOffset);
       tryBlock.types.add(cp.addType(catchClause.guard));
 
       Label skipCatch;
@@ -3795,6 +3805,7 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
         asm.bind(skipCatch);
       }
     }
+    asm.currentSourcePosition = savedSourcePosition;
 
     if (!hasCatchAll) {
       tryBlock.needsStackTrace = true;
@@ -3859,7 +3870,9 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
         asm.emitPushNull();
       }
 
-      if (options.emitDebuggerStops) {
+      if (options.emitDebuggerStops &&
+          (node.initializer == null ||
+              _variableSetNeedsDebugCheck(node.initializer))) {
         final savedSourcePosition = asm.currentSourcePosition;
         if (node.fileEqualsOffset != TreeNode.noOffset) {
           _recordSourcePosition(node.fileEqualsOffset);

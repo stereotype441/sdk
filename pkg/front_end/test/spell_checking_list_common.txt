@@ -80,6 +80,7 @@ algebra
 algorithm
 algorithms
 alias
+alignment
 all
 allocated
 allocating
@@ -219,6 +220,7 @@ backward
 backwards
 bad
 balanced
+bare
 base
 based
 basic
@@ -605,6 +607,7 @@ covered
 covers
 crash
 crashed
+crashes
 crashing
 create
 created
@@ -821,6 +824,7 @@ earlier
 early
 easier
 easiest
+easily
 edge
 edges
 edit
@@ -880,6 +884,7 @@ entered
 entering
 entire
 entirely
+entirety
 entities
 entity
 entity's
@@ -902,6 +907,7 @@ escaped
 escapes
 escaping
 essence
+essentials
 etc
 evaluate
 evaluated
@@ -1355,6 +1361,8 @@ instantiating
 instantiation
 instantiations
 instead
+instruction
+instructions
 instrumentation
 instrumented
 int
@@ -1405,6 +1413,7 @@ investigate
 invocation
 invocation's
 invocations
+invokable
 invoke
 invoked
 invokes
@@ -2200,6 +2209,7 @@ removed
 removes
 removing
 rename
+renamed
 renaming
 repeated
 repeatedly
@@ -2356,6 +2366,7 @@ sending
 sends
 sense
 sent
+sentence
 sentinel
 separate
 separated
@@ -2408,6 +2419,7 @@ signature
 signatures
 signed
 silent
+silently
 silly
 similar
 similarly
@@ -2616,6 +2628,7 @@ system
 systems
 tab
 table
+tables
 tabs
 tag
 tail
@@ -2757,6 +2770,7 @@ trying
 turn
 turned
 turning
+turns
 tv
 twice
 two

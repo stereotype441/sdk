@@ -32,33 +32,12 @@ import 'package:test/test.dart';
 class ForwardingTestListener extends ForwardingListener {
   final _stack = <String>[];
 
+  ForwardingTestListener([Listener listener]) : super(listener);
+
   void begin(String event) {
     expect(event, isNotNull);
     _stack.add(event);
   }
-
-  void expectEmpty() {
-    expect(_stack, isEmpty);
-  }
-
-  void expectIn(String event) {
-    if (_stack.isEmpty || _stack.last != event) {
-      fail('Expected $event, but found $_stack');
-    }
-  }
-
-  void expectInOneOf(List<String> events) {
-    if (_stack.isEmpty || !events.contains(_stack.last)) {
-      fail('Expected one of $events, but found $_stack');
-    }
-  }
-
-  void end(String event) {
-    expectIn(event);
-    _stack.removeLast();
-  }
-
-  ForwardingTestListener([Listener listener]) : super(listener);
 
   @override
   void beginArguments(Token token) {
@@ -116,7 +95,7 @@ class ForwardingTestListener extends ForwardingListener {
   }
 
   @override
-  void beginClassOrMixinBody(ClassKind kind, Token token) {
+  void beginClassOrMixinBody(DeclarationKind kind, Token token) {
     super.beginClassOrMixinBody(kind, token);
     begin('ClassOrMixinBody');
   }
@@ -558,6 +537,11 @@ class ForwardingTestListener extends ForwardingListener {
     begin('YieldStatement');
   }
 
+  void end(String event) {
+    expectIn(event);
+    _stack.removeLast();
+  }
+
   @override
   void endArguments(int count, Token beginToken, Token endToken) {
     end('Arguments');
@@ -576,13 +560,6 @@ class ForwardingTestListener extends ForwardingListener {
   void endAwaitExpression(Token beginToken, Token endToken) {
     end('AwaitExpression');
     super.endAwaitExpression(beginToken, endToken);
-  }
-
-  @override
-  void endInvalidAwaitExpression(
-      Token beginToken, Token endToken, MessageCode errorCode) {
-    end('InvalidAwaitExpression');
-    super.endInvalidAwaitExpression(beginToken, endToken, errorCode);
   }
 
   @override
@@ -623,8 +600,24 @@ class ForwardingTestListener extends ForwardingListener {
   }
 
   @override
+  void endClassFactoryMethod(
+      Token beginToken, Token factoryKeyword, Token endToken) {
+    end('FactoryMethod');
+    super.endClassFactoryMethod(beginToken, factoryKeyword, endToken);
+  }
+
+  @override
+  void endClassFields(Token staticToken, Token covariantToken, Token lateToken,
+      Token varFinalOrConst, int count, Token beginToken, Token endToken) {
+    // beginMember --> endClassFields, endMember
+    expectIn('Member');
+    super.endClassFields(staticToken, covariantToken, lateToken,
+        varFinalOrConst, count, beginToken, endToken);
+  }
+
+  @override
   void endClassOrMixinBody(
-      ClassKind kind, int memberCount, Token beginToken, Token endToken) {
+      DeclarationKind kind, int memberCount, Token beginToken, Token endToken) {
     end('ClassOrMixinBody');
     super.endClassOrMixinBody(kind, memberCount, beginToken, endToken);
   }
@@ -712,25 +705,31 @@ class ForwardingTestListener extends ForwardingListener {
   }
 
   @override
-  void endFactoryMethod(
+  void endExtensionFactoryMethod(
       Token beginToken, Token factoryKeyword, Token endToken) {
     end('FactoryMethod');
-    super.endFactoryMethod(beginToken, factoryKeyword, endToken);
+    super.endExtensionFactoryMethod(beginToken, factoryKeyword, endToken);
+  }
+
+  @override
+  void endExtensionFields(
+      Token staticToken,
+      Token covariantToken,
+      Token lateToken,
+      Token varFinalOrConst,
+      int count,
+      Token beginToken,
+      Token endToken) {
+    // beginMember --> endExtensionFields, endMember
+    expectIn('Member');
+    super.endExtensionFields(staticToken, covariantToken, lateToken,
+        varFinalOrConst, count, beginToken, endToken);
   }
 
   @override
   void endFieldInitializer(Token assignment, Token token) {
     end('FieldInitializer');
     super.endFieldInitializer(assignment, token);
-  }
-
-  @override
-  void endFields(Token staticToken, Token covariantToken, Token lateToken,
-      Token varFinalOrConst, int count, Token beginToken, Token endToken) {
-    // beginMember --> endFields, endMember
-    expectIn('Member');
-    super.endFields(staticToken, covariantToken, lateToken, varFinalOrConst,
-        count, beginToken, endToken);
   }
 
   @override
@@ -876,6 +875,13 @@ class ForwardingTestListener extends ForwardingListener {
   }
 
   @override
+  void endInvalidAwaitExpression(
+      Token beginToken, Token endToken, MessageCode errorCode) {
+    end('InvalidAwaitExpression');
+    super.endInvalidAwaitExpression(beginToken, endToken, errorCode);
+  }
+
+  @override
   void endLabeledStatement(int labelCount) {
     end('LabeledStatement');
     super.endLabeledStatement(labelCount);
@@ -936,6 +942,22 @@ class ForwardingTestListener extends ForwardingListener {
     end('MixinDeclaration');
     end('ClassOrNamedMixinApplication');
     super.endMixinDeclaration(mixinKeyword, endToken);
+  }
+
+  @override
+  void endMixinFactoryMethod(
+      Token beginToken, Token factoryKeyword, Token endToken) {
+    end('FactoryMethod');
+    super.endMixinFactoryMethod(beginToken, factoryKeyword, endToken);
+  }
+
+  @override
+  void endMixinFields(Token staticToken, Token covariantToken, Token lateToken,
+      Token varFinalOrConst, int count, Token beginToken, Token endToken) {
+    // beginMember --> endMixinFields, endMember
+    expectIn('Member');
+    super.endMixinFields(staticToken, covariantToken, lateToken,
+        varFinalOrConst, count, beginToken, endToken);
   }
 
   @override
@@ -1123,6 +1145,22 @@ class ForwardingTestListener extends ForwardingListener {
   void endYieldStatement(Token yieldToken, Token starToken, Token endToken) {
     end('YieldStatement');
     super.endYieldStatement(yieldToken, starToken, endToken);
+  }
+
+  void expectEmpty() {
+    expect(_stack, isEmpty);
+  }
+
+  void expectIn(String event) {
+    if (_stack.isEmpty || _stack.last != event) {
+      fail('Expected $event, but found $_stack');
+    }
+  }
+
+  void expectInOneOf(List<String> events) {
+    if (_stack.isEmpty || !events.contains(_stack.last)) {
+      fail('Expected one of $events, but found $_stack');
+    }
   }
 
   @override

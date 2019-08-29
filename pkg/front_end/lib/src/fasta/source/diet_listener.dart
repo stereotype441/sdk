@@ -45,7 +45,8 @@ import '../kernel/body_builder.dart' show BodyBuilder;
 import '../kernel/kernel_builder.dart'
     show FormalParameterBuilder, TypeAliasBuilder, TypeBuilder;
 
-import '../parser.dart' show Assert, ClassKind, MemberKind, Parser, optional;
+import '../parser.dart'
+    show Assert, DeclarationKind, MemberKind, Parser, optional;
 
 import '../problems.dart'
     show DebugAbort, internalProblem, unexpected, unhandled;
@@ -308,7 +309,7 @@ class DietListener extends StackListener {
   }
 
   @override
-  void endFields(Token staticToken, Token covariantToken, Token lateToken,
+  void endClassFields(Token staticToken, Token covariantToken, Token lateToken,
       Token varFinalOrConst, int count, Token beginToken, Token endToken) {
     debugEvent("Fields");
     buildFields(count, beginToken, false);
@@ -560,9 +561,9 @@ class DietListener extends StackListener {
   }
 
   @override
-  void endFactoryMethod(
+  void endClassFactoryMethod(
       Token beginToken, Token factoryKeyword, Token endToken) {
-    debugEvent("FactoryMethod");
+    debugEvent("ClassFactoryMethod");
     Token bodyToken = pop();
     Object name = pop();
     Token metadata = pop();
@@ -648,6 +649,26 @@ class DietListener extends StackListener {
     ConstantContext constantContext = builder.isConstructor && builder.isConst
         ? ConstantContext.inferred
         : ConstantContext.none;
+    return createListenerInternal(
+        builder,
+        memberScope,
+        formalParameterScope,
+        isDeclarationInstanceMember,
+        extensionThis,
+        extensionTypeParameters,
+        typeInferrer,
+        constantContext);
+  }
+
+  StackListener createListenerInternal(
+      ModifierBuilder builder,
+      Scope memberScope,
+      Scope formalParameterScope,
+      bool isDeclarationInstanceMember,
+      VariableDeclaration extensionThis,
+      List<TypeParameter> extensionTypeParameters,
+      TypeInferrer typeInferrer,
+      ConstantContext constantContext) {
     return new BodyBuilder(
         libraryBuilder: libraryBuilder,
         member: builder,
@@ -738,7 +759,7 @@ class DietListener extends StackListener {
   }
 
   @override
-  void beginClassOrMixinBody(ClassKind kind, Token token) {
+  void beginClassOrMixinBody(DeclarationKind kind, Token token) {
     assert(checkState(token, [
       ValueKind.Token,
       ValueKind.NameOrParserRecovery,
@@ -760,7 +781,7 @@ class DietListener extends StackListener {
 
   @override
   void endClassOrMixinBody(
-      ClassKind kind, int memberCount, Token beginToken, Token endToken) {
+      DeclarationKind kind, int memberCount, Token beginToken, Token endToken) {
     debugEvent("ClassOrMixinBody");
     currentDeclaration = null;
     currentClassIsParserRecovery = false;

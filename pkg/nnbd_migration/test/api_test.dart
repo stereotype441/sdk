@@ -857,6 +857,36 @@ main() {
     await _checkSingleFileChanges(content, expected);
   }
 
+  test_dynamic_property_access() async {
+    var content = '''
+class C {
+  int get g => 0;
+}
+int f(bool b, dynamic d) {
+  if (b) return 0;
+  return d.g;
+}
+main() {
+  f(true, null);
+  f(false, C());
+}
+''';
+    var expected = '''
+class C {
+  int get g => 0;
+}
+int? f(bool b, dynamic d) {
+  if (b) return 0;
+  return d.g;
+}
+main() {
+  f(true, null);
+  f(false, C());
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_field_formal_param_typed() async {
     var content = '''
 class C {
@@ -1530,6 +1560,38 @@ void main() {
     await _checkSingleFileChanges(content, expected);
   }
 
+  test_methodInvocation_typeArguments_explicit() async {
+    var content = '''
+T f<T>(T t) => t;
+void g() {
+  int x = f<int>(null);
+}
+''';
+    var expected = '''
+T f<T>(T t) => t;
+void g() {
+  int? x = f<int?>(null);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_methodInvocation_typeArguments_inferred() async {
+    var content = '''
+T f<T>(T t) => t;
+void g() {
+  int x = f(null);
+}
+''';
+    var expected = '''
+T f<T>(T t) => t;
+void g() {
+  int? x = f(null);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_multiDeclaration_innerUsage() async {
     var content = '''
 void test() {
@@ -2116,6 +2178,36 @@ class D<U> {}
 D<int?> test(C<int?/*?*/> c) => -c;
 ''';
     await _checkSingleFileChanges(content, expected);
+  }
+
+  test_prefixes() async {
+    var root = '/home/test/lib';
+    var path1 = convertPath('$root/file1.dart');
+    var file1 = '''
+import 'file2.dart';
+int x;
+int f() => null;
+''';
+    var expected1 = '''
+import 'file2.dart';
+int? x;
+int? f() => null;
+''';
+    var path2 = convertPath('$root/file2.dart');
+    var file2 = '''
+import 'file1.dart' as f1;
+void main() {
+  f1.x = f1.f();
+}
+''';
+    var expected2 = '''
+import 'file1.dart' as f1;
+void main() {
+  f1.x = f1.f();
+}
+''';
+    await _checkMultipleFileChanges(
+        {path1: file1, path2: file2}, {path1: expected1, path2: expected2});
   }
 
   test_prefixExpression_bang() async {

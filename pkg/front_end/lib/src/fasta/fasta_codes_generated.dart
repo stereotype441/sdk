@@ -3390,6 +3390,28 @@ Message _withArgumentsExtendingRestricted(String name) {
 }
 
 // DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const Code<Null> codeExtensionDeclaresConstructor =
+    messageExtensionDeclaresConstructor;
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const MessageCode messageExtensionDeclaresConstructor = const MessageCode(
+    "ExtensionDeclaresConstructor",
+    index: 92,
+    message: r"""Extensions can't declare constructors.""",
+    tip: r"""Try removing the constructor declaration.""");
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const Code<Null> codeExtensionDeclaresInstanceField =
+    messageExtensionDeclaresInstanceField;
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const MessageCode messageExtensionDeclaresInstanceField = const MessageCode(
+    "ExtensionDeclaresInstanceField",
+    index: 93,
+    message: r"""Extensions can't declare instance fields""",
+    tip: r"""Try removing the field declaration or making it a static field""");
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
 const Code<Null> codeExternalClass = messageExternalClass;
 
 // DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.

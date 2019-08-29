@@ -7,13 +7,13 @@ import 'dart:math';
 
 import 'package:args/args.dart';
 
-import 'dartfuzz_values.dart';
 import 'dartfuzz_api_table.dart';
+import 'dartfuzz_values.dart';
 
 // Version of DartFuzz. Increase this each time changes are made
 // to preserve the property that a given version of DartFuzz yields
 // the same fuzzed program for a deterministic random seed.
-const String version = '1.24';
+const String version = '1.25';
 
 // Restriction on statements and expressions.
 const int stmtLength = 2;
@@ -46,7 +46,7 @@ class DartFuzz {
     globalMethods = fillTypes2();
     classFields = fillTypes2();
     classMethods = fillTypes3(classFields.length);
-    classParents = new List<int>();
+    classParents = <int>[];
     // Setup optional ffi methods and types.
     final ffiStatus = <bool>[for (final _ in globalMethods) false];
     if (ffi) {
@@ -67,7 +67,7 @@ class DartFuzz {
     assert(currentMethod == null);
     assert(indent == 0);
     assert(nest == 0);
-    assert(localVars.length == 0);
+    assert(localVars.isEmpty);
   }
 
   //
@@ -123,11 +123,11 @@ class DartFuzz {
       emitParDecls(method);
       emit(') {', newline: true);
       indent += 2;
-      assert(localVars.length == 0);
+      assert(localVars.isEmpty);
       if (emitStatements(0)) {
         emitReturn();
       }
-      assert(localVars.length == 0);
+      assert(localVars.isEmpty);
       indent -= 2;
       emitLn('}');
       if (isFfiMethod) {
@@ -159,9 +159,9 @@ class DartFuzz {
       if (i > 0) {
         emitLn('super.run();');
       }
-      assert(localVars.length == 0);
+      assert(localVars.isEmpty);
       emitStatements(0);
-      assert(localVars.length == 0);
+      assert(localVars.isEmpty);
       indent -= 2;
       emitLn('}');
       indent -= 2;
@@ -744,13 +744,13 @@ class DartFuzz {
     if (isLhs) {
       if (rand.nextInt(10) != 0) {
         Set<String> cleanChoices = choices.difference(Set.from(iterVars));
-        if (cleanChoices.length > 0) {
+        if (cleanChoices.isNotEmpty) {
           choices = cleanChoices;
         }
       }
     }
     // Then pick one.
-    assert(choices.length > 0);
+    assert(choices.isNotEmpty);
     emit('${choices.elementAt(rand.nextInt(choices.length))}');
   }
 
@@ -1164,17 +1164,18 @@ class DartFuzz {
   List<DartType> fillTypes1({bool isFfi = false}) {
     final list = <DartType>[];
     for (int i = 0, n = 1 + rand.nextInt(4); i < n; i++) {
-      if (isFfi)
+      if (isFfi) {
         list.add(fp ? oneOf([DartType.INT, DartType.DOUBLE]) : DartType.INT);
-      else
+      } else {
         list.add(getType());
+      }
     }
     return list;
   }
 
   List<List<DartType>> fillTypes2({bool isFfi = false}) {
     final list = <List<DartType>>[];
-    for (int i = 0, n = 1 + rand.nextInt(8); i < n; i++) {
+    for (int i = 0, n = 1 + rand.nextInt(4); i < n; i++) {
       list.add(fillTypes1(isFfi: isFfi));
     }
     return list;

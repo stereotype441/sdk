@@ -19,7 +19,7 @@ import 'formal_parameter_kind.dart' show FormalParameterKind;
 
 import 'identifier_context.dart' show IdentifierContext;
 
-import 'class_kind.dart' show ClassKind;
+import 'declaration_kind.dart' show DeclarationKind;
 
 import 'member_kind.dart' show MemberKind;
 
@@ -91,14 +91,14 @@ class Listener implements UnescapeErrorListener {
   /// Handle the start of the body of a class, mixin or extension declaration
   /// beginning at [token]. The actual kind of declaration is indicated by
   /// [kind].
-  void beginClassOrMixinBody(ClassKind kind, Token token) {}
+  void beginClassOrMixinBody(DeclarationKind kind, Token token) {}
 
   /// Handle the end of the body of a class, mixin or extension declaration.
   /// The only substructures are the class, mixin or extension members.
   ///
   /// The actual kind of declaration is indicated by [kind].
   void endClassOrMixinBody(
-      ClassKind kind, int memberCount, Token beginToken, Token endToken) {
+      DeclarationKind kind, int memberCount, Token beginToken, Token endToken) {
     logEvent("ClassOrMixinBody");
   }
 
@@ -295,9 +295,21 @@ class Listener implements UnescapeErrorListener {
   void beginFactoryMethod(
       Token lastConsumed, Token externalToken, Token constToken) {}
 
-  void endFactoryMethod(
+  void endClassFactoryMethod(
       Token beginToken, Token factoryKeyword, Token endToken) {
-    logEvent("FactoryMethod");
+    logEvent("ClassFactoryMethod");
+  }
+
+  void endMixinFactoryMethod(
+      Token beginToken, Token factoryKeyword, Token endToken) {
+    // TODO(danrubel): push implementation into subclasses
+    endClassFactoryMethod(beginToken, factoryKeyword, endToken);
+  }
+
+  void endExtensionFactoryMethod(
+      Token beginToken, Token factoryKeyword, Token endToken) {
+    // TODO(danrubel): push implementation into subclasses
+    endClassFactoryMethod(beginToken, factoryKeyword, endToken);
   }
 
   void beginFormalParameter(Token token, MemberKind kind, Token requiredToken,
@@ -325,16 +337,50 @@ class Listener implements UnescapeErrorListener {
     logEvent("FormalParameters");
   }
 
-  /// Handle the end of a field declaration.  Substructures:
+  /// Handle the end of a class field declaration.  Substructures:
   /// - Metadata
   /// - Modifiers
   /// - Type
   /// - Variable declarations (count times)
   ///
   /// Doesn't have a corresponding begin event, use [beginMember] instead.
-  void endFields(Token staticToken, Token covariantToken, Token lateToken,
+  void endClassFields(Token staticToken, Token covariantToken, Token lateToken,
       Token varFinalOrConst, int count, Token beginToken, Token endToken) {
     logEvent("Fields");
+  }
+
+  /// Handle the end of a mixin field declaration.  Substructures:
+  /// - Metadata
+  /// - Modifiers
+  /// - Type
+  /// - Variable declarations (count times)
+  ///
+  /// Doesn't have a corresponding begin event, use [beginMember] instead.
+  void endMixinFields(Token staticToken, Token covariantToken, Token lateToken,
+      Token varFinalOrConst, int count, Token beginToken, Token endToken) {
+    // TODO(danrubel): push implementation into subclasses
+    endClassFields(staticToken, covariantToken, lateToken, varFinalOrConst,
+        count, beginToken, endToken);
+  }
+
+  /// Handle the end of a extension field declaration.  Substructures:
+  /// - Metadata
+  /// - Modifiers
+  /// - Type
+  /// - Variable declarations (count times)
+  ///
+  /// Doesn't have a corresponding begin event, use [beginMember] instead.
+  void endExtensionFields(
+      Token staticToken,
+      Token covariantToken,
+      Token lateToken,
+      Token varFinalOrConst,
+      int count,
+      Token beginToken,
+      Token endToken) {
+    // TODO(danrubel): push implementation into subclasses
+    endClassFields(staticToken, covariantToken, lateToken, varFinalOrConst,
+        count, beginToken, endToken);
   }
 
   /// Marks that the grammar term `forInitializerStatement` has been parsed and
@@ -749,7 +795,8 @@ class Listener implements UnescapeErrorListener {
   }
 
   /// This event is added for convenience. Normally, one should override
-  /// [endMethod] or [endFields] instead.
+  /// [endClassFields], [endMixinFields], [endExtensionFields],
+  /// or [endMethod] instead.
   void endMember() {
     logEvent("Member");
   }
