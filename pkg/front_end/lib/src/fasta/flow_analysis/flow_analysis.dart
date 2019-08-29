@@ -136,8 +136,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     return result;
   }
 
-  final _VariableSet<Variable> _emptySet;
-
   /// The [NodeOperations], used to manipulate expressions.
   final NodeOperations<Expression> nodeOperations;
 
@@ -188,21 +186,17 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     TypeOperations<Variable, Type> typeOperations,
     FunctionBodyAccess<Variable> functionBody,
   ) {
-    _VariableSet<Variable> emptySet =
-        FlowModel<Variable, Type>(false).notAssigned;
     return FlowAnalysis._(
       nodeOperations,
       typeOperations,
-      functionBody,
-      emptySet,
+      functionBody
     );
   }
 
   FlowAnalysis._(
     this.nodeOperations,
     this.typeOperations,
-    this.functionBody,
-    this._emptySet,
+    this.functionBody
   ) {
     _current = FlowModel<Variable, Type>(true);
   }
@@ -520,7 +514,12 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// Return whether the [variable] is definitely assigned in the current state.
   bool isAssigned(Variable variable) {
     _variableReferenced(variable);
-    return !_current.notAssigned.contains(variable);
+    var variableInfo = _current.variableInfo[variable];
+    if (variableInfo == null) {
+      return false;
+    } else {
+      return variableInfo.assigned;
+    }
   }
 
   void isExpression_end(
@@ -694,9 +693,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     FlowModel<Variable, Type> afterBody = _stack.removeLast();
     _current = _current.restrict(
       typeOperations,
-      _emptySet,
       afterBody,
-      assignedInFinally,
+      assignedInFinally
     );
   }
 
@@ -737,7 +735,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// Register write of the given [variable] in the current state.
   void write(Variable variable) {
     _variableReferenced(variable);
-    _current = _current.write(typeOperations, _emptySet, variable);
+    _current = _current.write(typeOperations, variable);
   }
 
   void _conditionalEnd(Expression condition) {
@@ -787,10 +785,6 @@ class FlowModel<Variable, Type> {
   /// Indicates whether this point in the control flow is reachable.
   final bool reachable;
 
-  /// The set of variables that are not yet definitely assigned at this point in
-  /// the control flow.
-  final _VariableSet<Variable> notAssigned;
-
   /// For each variable being tracked by flow analysis, the variable's model.
   ///
   /// Flow analysis has no awareness of scope, so variables that are out of
@@ -810,14 +804,12 @@ class FlowModel<Variable, Type> {
   FlowModel(bool reachable)
       : this._(
           reachable,
-          _VariableSet<Variable>._(const []),
           const {},
         );
 
   FlowModel._(
     this.reachable,
-    this.notAssigned,
-    this.variableInfo,
+    this.variableInfo
   ) {
     assert(() {
       for (VariableModel<Type> value in variableInfo.values) {
@@ -831,16 +823,13 @@ class FlowModel<Variable, Type> {
   /// optional [assigned] boolean indicates whether the variable is assigned at
   /// the point of declaration.
   FlowModel<Variable, Type> add(Variable variable, {bool assigned: false}) {
-    _VariableSet<Variable> newNotAssigned =
-        assigned ? notAssigned : notAssigned.add(variable);
     Map<Variable, VariableModel<Type>> newVariableInfo =
         Map<Variable, VariableModel<Type>>.from(variableInfo);
-    newVariableInfo[variable] = VariableModel<Type>(null);
+    newVariableInfo[variable] = VariableModel<Type>(null, false);
 
     return FlowModel<Variable, Type>._(
       reachable,
-      newNotAssigned,
-      newVariableInfo,
+      newVariableInfo
     );
   }
 
@@ -916,8 +905,7 @@ class FlowModel<Variable, Type> {
 
     return FlowModel<Variable, Type>._(
       reachable,
-      notAssigned,
-      newVariableInfo,
+      newVariableInfo
     );
   }
 
@@ -943,21 +931,10 @@ class FlowModel<Variable, Type> {
   /// the effect of any promotion that occurred inside the `try` block.
   FlowModel<Variable, Type> restrict(
     TypeOperations<Variable, Type> typeOperations,
-    _VariableSet<Variable> emptySet,
     FlowModel<Variable, Type> other,
-    Set<Variable> unsafe,
+    Set<Variable> unsafe
   ) {
     bool newReachable = reachable && other.reachable;
-    _VariableSet<Variable> newNotAssigned = notAssigned.intersect(
-      empty: emptySet,
-      other: other.notAssigned,
-    );
-    if (newNotAssigned.variables.length == notAssigned.variables.length) {
-      newNotAssigned = notAssigned;
-    } else if (newNotAssigned.variables.length ==
-        other.notAssigned.variables.length) {
-      newNotAssigned = other.notAssigned;
-    }
 
     Map<Variable, VariableModel<Type>> newVariableInfo =
         <Variable, VariableModel<Type>>{};
@@ -989,8 +966,7 @@ class FlowModel<Variable, Type> {
       this,
       other,
       newReachable,
-      newNotAssigned,
-      newVariableInfo,
+      newVariableInfo
     );
   }
 
@@ -1001,13 +977,12 @@ class FlowModel<Variable, Type> {
 
     return FlowModel<Variable, Type>._(
       reachable,
-      notAssigned,
-      variableInfo,
+      variableInfo
     );
   }
 
   @override
-  String toString() => '($reachable, $notAssigned, $variableInfo)';
+  String toString() => '($reachable, $variableInfo)';
 
   /// Updates the state to indicate that an assignment was made to the given
   /// [variable].  The variable is marked as definitely assigned, and any
@@ -1015,38 +990,11 @@ class FlowModel<Variable, Type> {
   ///
   /// TODO(paulberry): allow for writes that preserve type promotions.
   FlowModel<Variable, Type> write(TypeOperations<Variable, Type> typeOperations,
-      _VariableSet<Variable> emptySet, Variable variable) {
-    _VariableSet<Variable> newNotAssigned =
-        typeOperations.isLocalVariable(variable)
-            ? notAssigned.remove(emptySet, variable)
-            : notAssigned;
-
-    Map<Variable, VariableModel<Type>> newVariableInfo =
-        _removePromoted(variableInfo, variable);
-
-    if (identical(newNotAssigned, notAssigned) &&
-        identical(newVariableInfo, variableInfo)) {
-      return this;
-    }
-
-    return FlowModel<Variable, Type>._(
-      reachable,
-      newNotAssigned,
-      newVariableInfo,
-    );
-  }
-
-  /// Updates a "variableInfo" [map] to indicate that a [variable] is no longer
-  /// promoted, treating the map as immutable.
-  Map<Variable, VariableModel<Type>> _removePromoted(
-      Map<Variable, VariableModel<Type>> map, Variable variable) {
-    VariableModel<Type> info = map[variable];
-    if (info.promotedType == null) return map;
-
-    Map<Variable, VariableModel<Type>> result =
-        Map<Variable, VariableModel<Type>>.from(map);
-    result[variable] = info.withPromotedType(null);
-    return result;
+      Variable variable) {
+    var infoForVar = variableInfo[variable];
+    var newInfoForVar = infoForVar.write();
+    if (identical(newInfoForVar, infoForVar)) return this;
+    return _updateVariableInfo(variable, infoForVar);
   }
 
   /// Updates a "variableInfo" [map] to indicate that a set of [variable] is no
@@ -1083,7 +1031,7 @@ class FlowModel<Variable, Type> {
     Map<Variable, VariableModel<Type>> newVariableInfo =
         Map<Variable, VariableModel<Type>>.from(variableInfo);
     newVariableInfo[variable] = model;
-    return FlowModel<Variable, Type>._(reachable, notAssigned, newVariableInfo);
+    return FlowModel<Variable, Type>._(reachable, newVariableInfo);
   }
 
   /// Forms a new state to reflect a control flow path that might have come from
@@ -1107,8 +1055,6 @@ class FlowModel<Variable, Type> {
     if (!first.reachable && second.reachable) return second;
 
     bool newReachable = first.reachable || second.reachable;
-    _VariableSet<Variable> newNotAssigned =
-        first.notAssigned.union(second.notAssigned);
     Map<Variable, VariableModel<Type>> newVariableInfo =
         FlowModel.joinVariableInfo(
             typeOperations, first.variableInfo, second.variableInfo);
@@ -1117,8 +1063,7 @@ class FlowModel<Variable, Type> {
       first,
       second,
       newReachable,
-      newNotAssigned,
-      newVariableInfo,
+      newVariableInfo
     );
   }
 
@@ -1162,24 +1107,20 @@ class FlowModel<Variable, Type> {
     FlowModel<Variable, Type> first,
     FlowModel<Variable, Type> second,
     bool newReachable,
-    _VariableSet<Variable> newNotAssigned,
-    Map<Variable, VariableModel<Type>> newVariableInfo,
+    Map<Variable, VariableModel<Type>> newVariableInfo
   ) {
     if (first.reachable == newReachable &&
-        identical(first.notAssigned, newNotAssigned) &&
         identical(first.variableInfo, newVariableInfo)) {
       return first;
     }
     if (second.reachable == newReachable &&
-        identical(second.notAssigned, newNotAssigned) &&
         identical(second.variableInfo, newVariableInfo)) {
       return second;
     }
 
     return FlowModel<Variable, Type>._(
       newReachable,
-      newNotAssigned,
-      newVariableInfo,
+      newVariableInfo
     );
   }
 
@@ -1257,12 +1198,14 @@ class VariableModel<Type> {
   /// is not promoted.
   final Type promotedType;
 
-  VariableModel(this.promotedType);
+  final bool assigned;
+
+  VariableModel(this.promotedType, this.assigned);
 
   @override
   bool operator ==(Object other) {
     return other is VariableModel<Type> &&
-        this.promotedType == other.promotedType;
+        this.promotedType == other.promotedType && this.assigned == other.assigned;
   }
 
   /// Returns an updated model reflect a control path that is known to have
@@ -1272,27 +1215,24 @@ class VariableModel<Type> {
       VariableModel<Type> otherModel, bool unsafe) {
     Type thisType = promotedType;
     Type otherType = otherModel?.promotedType;
+    var newAssigned = assigned || otherModel.assigned;
     if (!unsafe) {
       if (otherType != null &&
           (thisType == null ||
               typeOperations.isSubtypeOf(otherType, thisType))) {
-        return _identicalOrNew(this, otherModel, otherType);
+        return _identicalOrNew(this, otherModel, otherType, newAssigned);
       }
     }
-    if (thisType != null) {
-      return _identicalOrNew(this, otherModel, thisType);
-    } else {
-      return _identicalOrNew(this, otherModel, null);
-    }
+    return _identicalOrNew(this, otherModel, thisType, newAssigned);
   }
 
   @override
-  String toString() => 'VariableModel($promotedType)';
+  String toString() => 'VariableModel($promotedType, $assigned)';
 
   /// Returns a new [VariableModel] where the promoted type is replaced with
   /// [promotedType].
   VariableModel<Type> withPromotedType(Type promotedType) =>
-      VariableModel<Type>(promotedType);
+      VariableModel<Type>(promotedType, assigned);
 
   /// Joins two variable models.  See [FlowModel.join] for details.
   static VariableModel<Type> join<Type>(
@@ -1313,115 +1253,25 @@ class VariableModel<Type> {
     } else {
       newPromotedType = null;
     }
-    return _identicalOrNew(first, second, newPromotedType);
+    var newAssigned = first.assigned && second.assigned;
+    return _identicalOrNew(first, second, newPromotedType, newAssigned);
   }
 
   /// Creates a new [VariableModel] object, unless it is equivalent to either
   /// [first] or [second], in which case one of those objects is re-used.
   static VariableModel<Type> _identicalOrNew<Type>(VariableModel<Type> first,
-      VariableModel<Type> second, Type newPromotedType) {
-    if (identical(first.promotedType, newPromotedType)) {
+      VariableModel<Type> second, Type newPromotedType, bool newAssigned) {
+    if (identical(first.promotedType, newPromotedType) && first.assigned == newAssigned) {
       return first;
-    } else if (identical(second.promotedType, newPromotedType)) {
+    } else if (identical(second.promotedType, newPromotedType) && second.assigned == newAssigned) {
       return second;
     } else {
-      return VariableModel<Type>(newPromotedType);
+      return VariableModel<Type>(newPromotedType, newAssigned);
     }
   }
-}
 
-/// List based immutable set of variables.
-class _VariableSet<Variable> {
-  final List<Variable> variables;
-
-  _VariableSet._(this.variables);
-
-  _VariableSet<Variable> add(Variable addedVariable) {
-    if (contains(addedVariable)) {
-      return this;
-    }
-
-    int length = variables.length;
-    List<Variable> newVariables = List<Variable>(length + 1);
-    for (int i = 0; i < length; ++i) {
-      newVariables[i] = variables[i];
-    }
-    newVariables[length] = addedVariable;
-    return _VariableSet._(newVariables);
-  }
-
-  _VariableSet<Variable> addAll(Iterable<Variable> variables) {
-    _VariableSet<Variable> result = this;
-    for (Variable variable in variables) {
-      result = result.add(variable);
-    }
-    return result;
-  }
-
-  bool contains(Variable variable) {
-    int length = variables.length;
-    for (int i = 0; i < length; ++i) {
-      if (identical(variables[i], variable)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  _VariableSet<Variable> intersect({
-    _VariableSet<Variable> empty,
-    _VariableSet<Variable> other,
-  }) {
-    if (identical(other, empty)) return empty;
-    if (identical(this, other)) return this;
-
-    // TODO(scheglov) optimize
-    List<Variable> newVariables =
-        variables.toSet().intersection(other.variables.toSet()).toList();
-
-    if (newVariables.isEmpty) return empty;
-    return _VariableSet._(newVariables);
-  }
-
-  _VariableSet<Variable> remove(
-    _VariableSet<Variable> empty,
-    Variable removedVariable,
-  ) {
-    if (!contains(removedVariable)) {
-      return this;
-    }
-
-    int length = variables.length;
-    if (length == 1) {
-      return empty;
-    }
-
-    List<Variable> newVariables = List<Variable>(length - 1);
-    int newIndex = 0;
-    for (int i = 0; i < length; ++i) {
-      Variable variable = variables[i];
-      if (!identical(variable, removedVariable)) {
-        newVariables[newIndex++] = variable;
-      }
-    }
-
-    return _VariableSet._(newVariables);
-  }
-
-  @override
-  String toString() => variables.isEmpty ? '{}' : '{ ${variables.join(', ')} }';
-
-  _VariableSet<Variable> union(_VariableSet<Variable> other) {
-    if (other.variables.isEmpty) {
-      return this;
-    }
-
-    _VariableSet<Variable> result = this;
-    List<Variable> otherVariables = other.variables;
-    for (int i = 0; i < otherVariables.length; ++i) {
-      Variable otherVariable = otherVariables[i];
-      result = result.add(otherVariable);
-    }
-    return result;
+  VariableModel<Type> write() {
+    if (promotedType == null && assigned) return this;
+    return VariableModel<Type>(null, true);
   }
 }
