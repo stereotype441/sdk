@@ -508,6 +508,10 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _variableReferenced(variable);
     var variableInfo = _current.variableInfo[variable];
     if (variableInfo == null) {
+      // In error-free code, variables should always be registered with flow
+      // analysis before they're used.  But this can't be relied on when the
+      // analyzer is doing error recovery.  So if we encounter a variable that
+      // hasn't been registered with flow analysis yet, assume it's unassigned.
       return false;
     } else {
       return variableInfo.assigned;
@@ -1156,6 +1160,7 @@ class VariableModel<Type> {
   /// is not promoted.
   final Type promotedType;
 
+  /// Indicates whether the variable has definitely been assigned.
   final bool assigned;
 
   VariableModel(this.promotedType, this.assigned);
@@ -1193,6 +1198,8 @@ class VariableModel<Type> {
   VariableModel<Type> withPromotedType(Type promotedType) =>
       VariableModel<Type>(promotedType, assigned);
 
+  /// Returns a new [VariableModel] reflecting the fact that the variable was
+  /// just written to.
   VariableModel<Type> write() {
     if (promotedType == null && assigned) return this;
     return VariableModel<Type>(null, true);
@@ -1236,6 +1243,7 @@ class VariableModel<Type> {
     }
   }
 
+  /// Determines whether the given variable models are equivalent.
   static bool _variableModelsEqual<Type>(
       TypeOperations<Object, Type> typeOperations,
       VariableModel<Type> model1,
