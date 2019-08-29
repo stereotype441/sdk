@@ -506,7 +506,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// Return whether the [variable] is definitely assigned in the current state.
   bool isAssigned(Variable variable) {
     _variableReferenced(variable);
-    var variableInfo = _current.variableInfo[variable];
+    VariableModel<Type> variableInfo = _current.variableInfo[variable];
     if (variableInfo == null) {
       // In error-free code, variables should always be registered with flow
       // analysis before they're used.  But this can't be relied on when the
@@ -965,8 +965,8 @@ class FlowModel<Variable, Type> {
   /// TODO(paulberry): allow for writes that preserve type promotions.
   FlowModel<Variable, Type> write(
       TypeOperations<Variable, Type> typeOperations, Variable variable) {
-    var infoForVar = variableInfo[variable];
-    var newInfoForVar = infoForVar.write();
+    VariableModel<Type> infoForVar = variableInfo[variable];
+    VariableModel<Type> newInfoForVar = infoForVar.write();
     if (identical(newInfoForVar, infoForVar)) return this;
     return _updateVariableInfo(variable, newInfoForVar);
   }
@@ -1179,7 +1179,7 @@ class VariableModel<Type> {
       VariableModel<Type> otherModel, bool unsafe) {
     Type thisType = promotedType;
     Type otherType = otherModel?.promotedType;
-    var newAssigned = assigned || otherModel.assigned;
+    bool newAssigned = assigned || otherModel.assigned;
     if (!unsafe) {
       if (otherType != null &&
           (thisType == null ||
@@ -1224,7 +1224,7 @@ class VariableModel<Type> {
     } else {
       newPromotedType = null;
     }
-    var newAssigned = first.assigned && second.assigned;
+    bool newAssigned = first.assigned && second.assigned;
     return _identicalOrNew(first, second, newPromotedType, newAssigned);
   }
 
