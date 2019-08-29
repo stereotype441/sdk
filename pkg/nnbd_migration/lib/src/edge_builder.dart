@@ -1167,7 +1167,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     if (finallyBlock != null) {
       _flowAnalysis.tryFinallyStatement_finallyBegin(assignedInBody);
       finallyBlock.accept(this);
-      _flowAnalysis.tryFinallyStatement_end(_assignedVariables.writtenInNode(finallyBlock));
+      _flowAnalysis.tryFinallyStatement_end(
+          _assignedVariables.writtenInNode(finallyBlock));
     }
     return null;
   }
