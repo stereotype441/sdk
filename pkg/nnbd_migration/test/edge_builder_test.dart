@@ -2255,14 +2255,6 @@ class C {
     assertEdge(decoratedTypeAnnotation('int k').node, never, hard: true);
   }
 
-  solo_test_methodInvocation_object_method_on_non_interface_type() async {
-    await analyze('''
-String f(void Function() g) => g.toString();
-''');
-    var toStringReturnType = variables.decoratedElementType(typeProvider.objectType.element.getMethod('toString')).returnType;
-    assertEdge(toStringReturnType.node, decoratedTypeAnnotation('String f').node, hard: false);
-  }
-
   test_methodInvocation_dynamic() async {
     await analyze('''
 class C {
@@ -2280,6 +2272,28 @@ int f(dynamic d, int j) {
         decoratedTypeAnnotation('int f').node);
     // We do, however, assume that it might return anything, including `null`.
     assertEdge(always, decoratedTypeAnnotation('int f').node, hard: false);
+  }
+
+  test_methodInvocation_object_method() async {
+    await analyze('''
+String f(int i) => i.toString();
+''');
+    // No edge from i to `never` because it is safe to call `toString` on
+    // `null`.
+    assertNoEdge(decoratedTypeAnnotation('int').node, never);
+  }
+
+  test_methodInvocation_object_method_on_non_interface_type() async {
+    await analyze('''
+String f(void Function() g) => g.toString();
+''');
+    var toStringReturnType = variables
+        .decoratedElementType(
+            typeProvider.objectType.element.getMethod('toString'))
+        .returnType;
+    assertEdge(
+        toStringReturnType.node, decoratedTypeAnnotation('String f').node,
+        hard: false);
   }
 
   test_methodInvocation_parameter_contravariant() async {
@@ -3520,6 +3534,15 @@ int f(dynamic d) {
         decoratedTypeAnnotation('int f').node);
     // We do, however, assume that it might return anything, including `null`.
     assertEdge(always, decoratedTypeAnnotation('int f').node, hard: false);
+  }
+
+  test_propertyAccess_object_property() async {
+    await analyze('''
+int f(int i) => i.hashCode;
+''');
+    // No edge from i to `never` because it is safe to call `hashCode` on
+    // `null`.
+    assertNoEdge(decoratedTypeAnnotation('int i').node, never);
   }
 
   test_propertyAccess_return_type() async {

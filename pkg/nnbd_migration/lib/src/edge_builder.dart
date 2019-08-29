@@ -1297,7 +1297,6 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       assert(!method.name.startsWith('_'));
       result.add(method.name);
     }
-    throw result.toString();
     return result;
   }
 
