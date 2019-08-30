@@ -56,7 +56,7 @@ class DecoratedClassHierarchy {
       return DecoratedType(superclass.type, _graph.never);
     }
     return _getGenericSupertypeDecorations(class_)[superclass] ??
-        (throw StateError('Unrelated types: $class_ and $superclass'));
+        (throw StateError('Unrelated types: $class_ and $superclass.  Looked in ${_getGenericSupertypeDecorations(class_)}'));
   }
 
   /// Computes a map whose keys are all the superclasses of [class_], and whose
@@ -93,6 +93,9 @@ class DecoratedClassHierarchy {
         // superclass.
         decorations[superclass] ??= decoratedSupertype;
       }
+      print('Computed generic supertype decorations for $class_ as $decorations');
+    } else {
+      print('Looked up generic supertype decorations for $class_ and got $decorations');
     }
     return decorations;
   }
