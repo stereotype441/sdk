@@ -337,6 +337,7 @@ canonicalize
 canonicalized
 capabilities
 capability
+capable
 capital
 capture
 captured
@@ -597,6 +598,7 @@ could
 couldn't
 count
 counter
+counting
 counts
 couple
 covariance
@@ -607,12 +609,14 @@ covered
 covers
 crash
 crashed
+crashes
 crashing
 create
 created
 creates
 creating
 creation
+crossed
 curly
 current
 currently
@@ -1412,6 +1416,7 @@ investigate
 invocation
 invocation's
 invocations
+invokable
 invoke
 invoked
 invokes
@@ -2096,6 +2101,7 @@ qualified
 qualifier
 qualifiers
 quality
+queried
 query
 question
 queue
@@ -2250,6 +2256,7 @@ resolves
 resolving
 resources
 respect
+respected
 respective
 respectively
 respects
@@ -2417,6 +2424,7 @@ signature
 signatures
 signed
 silent
+silently
 silly
 similar
 similarly

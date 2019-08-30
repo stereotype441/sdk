@@ -1918,6 +1918,14 @@ RawError* Object::Init(Isolate* isolate,
     pending_classes.Add(cls);
     RegisterClass(cls, Symbols::FfiDynamicLibrary(), lib);
 
+    lib = Library::LookupLibrary(thread, Symbols::DartWasm());
+    if (lib.IsNull()) {
+      lib = Library::NewLibraryHelper(Symbols::DartWasm(), true);
+      lib.SetLoadRequested();
+      lib.Register(thread);
+    }
+    object_store->set_bootstrap_library(ObjectStore::kWasm, lib);
+
     // Finish the initialization by compiling the bootstrap scripts containing
     // the base interfaces and the implementation of the internal classes.
     const Error& error = Error::Handle(
@@ -10256,10 +10264,16 @@ RawObject* Library::GetMetadata(const Object& obj) const {
       metadata = kernel::EvaluateMetadata(
           field, /* is_annotations_offset = */ obj.IsLibrary());
     }
-    if (metadata.IsArray()) {
-      ASSERT(Array::Cast(metadata).raw() != Object::empty_array().raw());
-      field.SetStaticValue(Array::Cast(metadata), true);
+    if (metadata.IsArray() || metadata.IsNull()) {
+      ASSERT(metadata.raw() != Object::empty_array().raw());
+      field.SetStaticValue(
+          metadata.IsNull() ? Object::null_array() : Array::Cast(metadata),
+          true);
     }
+  }
+  if (metadata.IsNull()) {
+    // Metadata field exists in order to reference extended metadata.
+    return Object::empty_array().raw();
   }
   return metadata.raw();
 #endif  // defined(DART_PRECOMPILED_RUNTIME)
@@ -10270,9 +10284,7 @@ RawArray* Library::GetExtendedMetadata(const Object& obj,
 #if defined(DART_PRECOMPILED_RUNTIME)
   return Object::empty_array().raw();
 #else
-  if (!obj.IsFunction()) {
-    UNREACHABLE();
-  }
+  RELEASE_ASSERT(obj.IsFunction() || obj.IsLibrary());
   const String& metaname = String::Handle(MakeMetadataName(obj));
   Field& field = Field::Handle(GetMetadataField(metaname));
   if (field.IsNull()) {
@@ -11740,6 +11752,10 @@ RawLibrary* Library::TypedDataLibrary() {
 
 RawLibrary* Library::VMServiceLibrary() {
   return Isolate::Current()->object_store()->_vmservice_library();
+}
+
+RawLibrary* Library::WasmLibrary() {
+  return Isolate::Current()->object_store()->wasm_library();
 }
 
 const char* Library::ToCString() const {

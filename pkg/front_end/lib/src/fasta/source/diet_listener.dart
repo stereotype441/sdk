@@ -309,7 +309,7 @@ class DietListener extends StackListener {
   }
 
   @override
-  void endFields(Token staticToken, Token covariantToken, Token lateToken,
+  void endClassFields(Token staticToken, Token covariantToken, Token lateToken,
       Token varFinalOrConst, int count, Token beginToken, Token endToken) {
     debugEvent("Fields");
     buildFields(count, beginToken, false);
@@ -606,7 +606,7 @@ class DietListener extends StackListener {
   }
 
   @override
-  void endMethod(Token getOrSet, Token beginToken, Token beginParam,
+  void endClassMethod(Token getOrSet, Token beginToken, Token beginParam,
       Token beginInitializers, Token endToken) {
     debugEvent("Method");
     // TODO(danrubel): Consider removing the beginParam parameter
@@ -911,7 +911,7 @@ class DietListener extends StackListener {
       token = parser.parseTopLevelMember(metadata ?? token);
     } else {
       // TODO(danrubel): disambiguate between class/mixin/extension members
-      token = parser.parseClassMember(metadata ?? token).next;
+      token = parser.parseClassMember(metadata ?? token, null).next;
     }
     listenerFinishFields(listener, startToken, metadata, isTopLevel);
     listener.checkEmpty(token.charOffset);

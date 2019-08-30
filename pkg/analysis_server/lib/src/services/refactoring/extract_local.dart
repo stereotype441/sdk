@@ -11,6 +11,7 @@ import 'package:analysis_server/src/services/correction/selection_analyzer.dart'
 import 'package:analysis_server/src/services/correction/status.dart';
 import 'package:analysis_server/src/services/correction/strings.dart';
 import 'package:analysis_server/src/services/correction/util.dart';
+import 'package:analysis_server/src/services/linter/lint_names.dart';
 import 'package:analysis_server/src/services/refactoring/naming_conventions.dart';
 import 'package:analysis_server/src/services/refactoring/refactoring.dart';
 import 'package:analysis_server/src/services/refactoring/refactoring_internal.dart';
@@ -72,6 +73,8 @@ class ExtractLocalRefactoringImpl extends RefactoringImpl
   String get _declarationKeyword {
     if (_isPartOfConstantExpression(rootExpression)) {
       return "const";
+    } else if (_hasLintEnabled(LintNames.prefer_final_locals)) {
+      return "final";
     } else {
       return "var";
     }
@@ -450,6 +453,11 @@ class ExtractLocalRefactoringImpl extends RefactoringImpl
       node = node.parent;
     }
     return null;
+  }
+
+  bool _hasLintEnabled(String lintName) {
+    var analysisOptions = unitElement.context.analysisOptions;
+    return analysisOptions.lintRules.any((rule) => rule.name == lintName);
   }
 
   /**

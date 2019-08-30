@@ -1194,10 +1194,25 @@ class Printer extends Visitor<Null> {
       writeIndentation();
       writeModifier(descriptor.isExternal, 'external');
       writeModifier(descriptor.isStatic, 'static');
-      if (descriptor.member.asMember is Procedure) {
-        writeWord(procedureKindToString(descriptor.kind));
-      } else {
-        writeWord('field');
+      switch (descriptor.kind) {
+        case ExtensionMemberKind.Method:
+          writeWord('method');
+          break;
+        case ExtensionMemberKind.Getter:
+          writeWord('get');
+          break;
+        case ExtensionMemberKind.Setter:
+          writeWord('set');
+          break;
+        case ExtensionMemberKind.Operator:
+          writeWord('operator');
+          break;
+        case ExtensionMemberKind.Field:
+          writeWord('field');
+          break;
+        case ExtensionMemberKind.TearOff:
+          writeWord('tearoff');
+          break;
       }
       writeName(descriptor.name);
       writeSpaced('=');
@@ -2030,19 +2045,39 @@ class Printer extends Visitor<Null> {
     endLine(': ${node.runtimeType}');
   }
 
-  writeNullability(Nullability nullability) {
+  void writeNullability(Nullability nullability, {bool inComment = false}) {
     switch (nullability) {
       case Nullability.legacy:
         writeSymbol('*');
-        state = WORD; // Disallow a word immediately after the '*'.
+        if (!inComment) {
+          state = WORD; // Disallow a word immediately after the '*'.
+        }
         break;
       case Nullability.nullable:
-        writeSymbol('?'); // Disallow a word immediately after the '?'.
+        writeSymbol('?');
+        if (!inComment) {
+          state = WORD; // Disallow a word immediately after the '?'.
+        }
         break;
       case Nullability.neither:
-      case Nullability.nonNullable:
-        // Do nothing.
+        writeSymbol('%');
+        if (!inComment) {
+          state = WORD; // Disallow a word immediately after the '%'.
+        }
         break;
+      case Nullability.nonNullable:
+        if (inComment) {
+          writeSymbol("!");
+        }
+        break;
+    }
+  }
+
+  void writeDartTypeNullability(DartType type, {bool inComment = false}) {
+    if (type is InvalidType) {
+      writeNullability(Nullability.neither);
+    } else {
+      writeNullability(type.nullability, inComment: inComment);
     }
   }
 
@@ -2083,12 +2118,18 @@ class Printer extends Visitor<Null> {
 
   visitTypeParameterType(TypeParameterType node) {
     writeTypeParameterReference(node.parameter);
-    writeNullability(node.nullability);
+    writeNullability(node.declaredNullability);
     if (node.promotedBound != null) {
-      writeSpace();
-      writeWord('extends');
-      writeSpace();
+      writeSpaced('&');
       writeType(node.promotedBound);
+
+      writeWord("/* '");
+      writeNullability(node.declaredNullability, inComment: true);
+      writeWord("' & '");
+      writeDartTypeNullability(node.promotedBound, inComment: true);
+      writeWord("' = '");
+      writeNullability(node.nullability, inComment: true);
+      writeWord("' */");
     }
   }
 

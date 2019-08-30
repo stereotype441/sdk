@@ -4274,6 +4274,7 @@ class Library : public Object {
   static RawLibrary* ProfilerLibrary();
   static RawLibrary* TypedDataLibrary();
   static RawLibrary* VMServiceLibrary();
+  static RawLibrary* WasmLibrary();
 
   // Eagerly compile all classes and functions in the library.
   static RawError* CompileAll(bool ignore_error = false);
@@ -6646,6 +6647,11 @@ class TypeArguments : public Instance {
 
   // Return true if this vector contains a recursive type argument.
   bool IsRecursive() const;
+
+  virtual RawInstance* CheckAndCanonicalize(Thread* thread,
+                                            const char** error_str) const {
+    return Canonicalize();
+  }
 
   // Canonicalize only if instantiated, otherwise returns 'this'.
   RawTypeArguments* Canonicalize(TrailPtr trail = NULL) const;

@@ -54,10 +54,14 @@ import "package:vm/target/vm.dart" show VmTarget;
 
 import "package:yaml/yaml.dart" show YamlList, YamlMap, loadYamlNode;
 
+import 'binary_md_dill_reader.dart' show DillComparer;
+
 import "incremental_utils.dart" as util;
 
 import 'package:front_end/src/fasta/fasta_codes.dart'
     show DiagnosticMessageFromJson, FormattedMessage;
+
+import 'utils/io_utils.dart' show computeRepoDir;
 
 main([List<String> arguments = const []]) =>
     runMe(arguments, createContext, configurationPath: "../testing.json");
@@ -196,7 +200,7 @@ Future<Null> basicTest(YamlMap sourceFiles, String entryPoint,
 Future<Map<String, List<int>>> createModules(
     Map module, final List<int> sdkSummaryData) async {
   final Uri base = Uri.parse("org-dartlang-test:///");
-  final Uri sdkSummary = base.resolve("vm_platform.dill");
+  final Uri sdkSummary = base.resolve("vm_platform_strong.dill");
 
   MemoryFileSystem fs = new MemoryFileSystem(base);
   fs.entityForUri(sdkSummary).writeAsBytesSync(sdkSummaryData);
@@ -263,7 +267,7 @@ Future<Map<String, List<int>>> createModules(
 Future<Null> newWorldTest(List worlds, Map modules, bool omitPlatform) async {
   final Uri sdkRoot = computePlatformBinariesLocation(forceBuildDir: true);
   final Uri base = Uri.parse("org-dartlang-test:///");
-  final Uri sdkSummary = base.resolve("vm_platform.dill");
+  final Uri sdkSummary = base.resolve("vm_platform_strong.dill");
   final Uri initializeFrom = base.resolve("initializeFrom.dill");
   Uri platformUri = sdkRoot.resolve("vm_platform_strong.dill");
   final List<int> sdkSummaryData =
@@ -768,7 +772,24 @@ void checkIsEqual(List<int> a, List<int> b) {
   }
   for (int i = 0; i < length; ++i) {
     if (a[i] != b[i]) {
-      Expect.fail("Data differs at byte ${i + 1}.");
+      print("Data differs at byte ${i + 1}.");
+
+      StringBuffer message = new StringBuffer();
+      message.writeln("Data differs at byte ${i + 1}.");
+      message.writeln("");
+      message.writeln("Will try to find more useful information:");
+
+      final String repoDir = computeRepoDir();
+      File binaryMd = new File("$repoDir/pkg/kernel/binary.md");
+      String binaryMdContent = binaryMd.readAsStringSync();
+
+      DillComparer dillComparer = new DillComparer();
+      if (dillComparer.compare(a, b, binaryMdContent, message)) {
+        message.writeln(
+            "Somehow the two different byte-lists compared to the same.");
+      }
+
+      Expect.fail(message.toString());
     }
   }
   Expect.equals(a.length, b.length);
