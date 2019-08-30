@@ -119,7 +119,6 @@ class Variables implements VariableRecorder, VariableRepository {
       }
       return true;
     }());
-    print('Recorded direct supertypes of $class_ as $decoratedDirectSupertypes');
     _decoratedDirectSupertypes[class_] = decoratedDirectSupertypes;
   }
 
