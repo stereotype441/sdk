@@ -45,7 +45,9 @@ class NullabilityMigrationImpl implements NullabilityMigration {
     // however, since every `!` we add has an unsatisfied edge associated with
     // it, we can't report on every unsatisfied edge.  We need to figure out a
     // way to report unsatisfied edges that isn't too overwhelming.
-    broadcast(_variables, listener);
+    if (_variables != null) {
+      broadcast(_variables, listener);
+    }
   }
 
   void prepareInput(ResolvedUnitResult result) {
