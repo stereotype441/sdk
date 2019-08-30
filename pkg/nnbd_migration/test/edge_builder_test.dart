@@ -418,6 +418,14 @@ class C<T extends List<int>> {
         hard: false);
   }
 
+  solo_test_assign_to_non_future_to_futureOr() async {
+    await analyze('''
+import 'dart:async';
+FutureOr<int> f(int x) => x;
+''');
+    assertEdge(decoratedTypeAnnotation('int x').node, decoratedTypeAnnotation('int>').node, hard: true);
+  }
+
   test_assign_upcast_generic() async {
     await analyze('''
 void f(Iterable<int> x) {}

@@ -1928,6 +1928,7 @@ mixin _AssignmentChecker {
         destinationType is InterfaceType) {
       if (_typeSystem.isSubtypeOf(sourceType, destinationType)) {
         // Ordinary (upcast) assignment.  No cast necessary.
+        TODO; // Handle T -> Future<T> assignment.
         var rewrittenSource = _decoratedClassHierarchy.asInstanceOf(
             source, destinationType.element);
         assert(rewrittenSource.typeArguments.length ==
