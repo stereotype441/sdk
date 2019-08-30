@@ -135,6 +135,23 @@ main() {
       });
     });
 
+    test('conditionEqNull() does not promote write-captured vars', () {
+      var h = _Harness();
+      var x = h.addVar('x', 'int?', hasWrites: true);
+      h.run((flow) {
+        h.declare(x, initialized: true);
+        h.if_(h.notNull(x), () {
+          expect(flow.promotedType(x).type, 'int');
+        });
+        h.function({x}, () {
+          flow.write(x);
+        });
+        h.if_(h.notNull(x), () {
+          expect(flow.promotedType(x), isNull);
+        });
+      });
+    });
+
     test('doStatement_bodyBegin() un-promotes', () {
       var h = _Harness();
       var x = h.addVar('x', 'int?');
@@ -469,7 +486,7 @@ main() {
 
     test('switchStatement_beginCase(false) restores previous promotions', () {
       var h = _Harness();
-      var x = h.addVar('x', 'int?');
+      var x = h.addVar('x', 'int?', hasWrites: true);
       h.run((flow) {
         h.declare(x, initialized: true);
         h.promote(x, 'int');
@@ -488,7 +505,7 @@ main() {
 
     test('switchStatement_beginCase(false) does not un-promote', () {
       var h = _Harness();
-      var x = h.addVar('x', 'int?');
+      var x = h.addVar('x', 'int?', hasWrites: true);
       h.run((flow) {
         h.declare(x, initialized: true);
         h.promote(x, 'int');
@@ -503,7 +520,7 @@ main() {
 
     test('switchStatement_beginCase(true) un-promotes', () {
       var h = _Harness();
-      var x = h.addVar('x', 'int?');
+      var x = h.addVar('x', 'int?', hasWrites: true);
       h.run((flow) {
         h.declare(x, initialized: true);
         h.promote(x, 'int');
@@ -519,7 +536,7 @@ main() {
     test('switchStatement_end(false) joins break and default', () {
       var h = _Harness();
       var x = h.addVar('x', 'int?');
-      var y = h.addVar('y', 'int?');
+      var y = h.addVar('y', 'int?', hasWrites: true);
       var z = h.addVar('z', 'int?');
       h.run((flow) {
         h.declare(x, initialized: true);
@@ -543,8 +560,8 @@ main() {
     test('switchStatement_end(true) joins breaks', () {
       var h = _Harness();
       var w = h.addVar('w', 'int?');
-      var x = h.addVar('x', 'int?');
-      var y = h.addVar('y', 'int?');
+      var x = h.addVar('x', 'int?', hasWrites: true);
+      var y = h.addVar('y', 'int?', hasWrites: true);
       var z = h.addVar('z', 'int?');
       h.run((flow) {
         h.declare(w, initialized: true);
@@ -684,20 +701,23 @@ main() {
         var s1 = FlowModel<_Var, _Type>(true);
         var s2 = s1.add(intVar);
         expect(s2.reachable, true);
-        expect(s2.variableInfo, {intVar: VariableModel<_Type>(null, false)});
+        expect(s2.variableInfo,
+            {intVar: VariableModel<_Type>(null, false, false)});
       });
 
       test('unassigned', () {
         var s1 = FlowModel<_Var, _Type>(true);
         var s2 = s1.add(intVar, assigned: false);
         expect(s2.reachable, true);
-        expect(s2.variableInfo, {intVar: VariableModel<_Type>(null, false)});
+        expect(s2.variableInfo,
+            {intVar: VariableModel<_Type>(null, false, false)});
       });
 
       test('assigned', () {
         var s1 = FlowModel<_Var, _Type>(true);
         var s2 = s1.add(intVar, assigned: true);
-        expect(s2.variableInfo, {intVar: VariableModel<_Type>(null, true)});
+        expect(
+            s2.variableInfo, {intVar: VariableModel<_Type>(null, true, false)});
       });
     });
 
@@ -730,7 +750,7 @@ main() {
         expect(s2.reachable, true);
         _Type.allowComparisons(() {
           expect(s2.variableInfo,
-              {intQVar: VariableModel<_Type>(_Type('int'), false)});
+              {intQVar: VariableModel<_Type>(_Type('int'), false, false)});
         });
       });
 
@@ -770,7 +790,7 @@ main() {
         expect(s2.reachable, true);
         _Type.allowComparisons(() {
           expect(s2.variableInfo,
-              {objectQVar: VariableModel<_Type>(_Type('int'), false)});
+              {objectQVar: VariableModel<_Type>(_Type('int'), false, false)});
         });
       });
     });
@@ -789,7 +809,8 @@ main() {
         var s1 = FlowModel<_Var, _Type>(true).add(objectQVar, assigned: false);
         var s2 = s1.write(h, objectQVar);
         expect(s2.reachable, true);
-        expect(s2.variableInfo[objectQVar], VariableModel<_Type>(null, true));
+        expect(s2.variableInfo[objectQVar],
+            VariableModel<_Type>(null, true, false));
       });
 
       test('un-promotes', () {
@@ -800,7 +821,8 @@ main() {
         expect(s1.variableInfo, contains(objectQVar));
         var s2 = s1.write(h, objectQVar);
         expect(s2.reachable, true);
-        expect(s2.variableInfo, {objectQVar: VariableModel<_Type>(null, true)});
+        expect(s2.variableInfo,
+            {objectQVar: VariableModel<_Type>(null, true, false)});
       });
     });
 
@@ -818,7 +840,8 @@ main() {
         var s2 = s1.markNonNullable(h, intQVar);
         expect(s2.reachable, true);
         _Type.allowComparisons(() {
-          expect(s2.variableInfo[intQVar], VariableModel(_Type('int'), false));
+          expect(s2.variableInfo[intQVar],
+              VariableModel(_Type('int'), false, false));
         });
       });
 
@@ -840,7 +863,7 @@ main() {
         expect(s2.reachable, true);
         _Type.allowComparisons(() {
           expect(s2.variableInfo,
-              {objectQVar: VariableModel<_Type>(_Type('int'), false)});
+              {objectQVar: VariableModel<_Type>(_Type('int'), false, false)});
         });
       });
     });
@@ -867,8 +890,8 @@ main() {
         expect(s2.reachable, true);
         _Type.allowComparisons(() {
           expect(s2.variableInfo, {
-            objectQVar: VariableModel<_Type>(_Type('int'), false),
-            intQVar: VariableModel<_Type>(null, false)
+            objectQVar: VariableModel<_Type>(_Type('int'), false, false),
+            intQVar: VariableModel<_Type>(null, false, false)
           });
         });
       });
@@ -953,7 +976,8 @@ main() {
     var stringType = _Type('String');
     const emptyMap = <Null, VariableModel<Null>>{};
 
-    VariableModel<_Type> model(_Type type) => VariableModel<_Type>(type, true);
+    VariableModel<_Type> model(_Type type) =>
+        VariableModel<_Type>(type, true, false);
 
     group('without input reuse', () {
       test('promoted with unpromoted', () {
@@ -1116,6 +1140,13 @@ class _Harness
       _flow.conditionEqNull(expr, variable, notEqual: false);
       return expr;
     };
+  }
+
+  /// Invokes flow analysis of a nested function.
+  void function(Iterable<_Var> writeCaptured, void body()) {
+    _flow.functionExpression_begin(writeCaptured);
+    body();
+    _flow.functionExpression_end();
   }
 
   /// Invokes flow analysis of an `if` statement with no `else` part.

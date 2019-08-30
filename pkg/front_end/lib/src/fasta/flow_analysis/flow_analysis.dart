@@ -184,8 +184,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
       NodeOperations<Expression> nodeOperations,
       TypeOperations<Variable, Type> typeOperations,
       Iterable<Variable> variablesWrittenAnywhere) {
-    return FlowAnalysis._(nodeOperations, typeOperations,
-        variablesWrittenAnywhere.toList());
+    return FlowAnalysis._(
+        nodeOperations, typeOperations, variablesWrittenAnywhere.toList());
   }
 
   FlowAnalysis._(this.nodeOperations, this.typeOperations,
@@ -419,7 +419,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   void functionExpression_begin(Iterable<Variable> writeCaptured) {
     // TODO(paulberry): test that de-promotion of write-captured variables
     // affects both after and within the function expression.
-    _current = _current.removePromotedAll(writeCaptured, _referencedVariables);
+    _current = _current.writeCapture(writeCaptured, _referencedVariables);
     _stack.add(_current);
     // TODO(paulberry): test that de-promotion of variables written anywhere
     // affects just within the function expression.
@@ -710,6 +710,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// Register write of the given [variable] in the current state.
   void write(Variable variable) {
     _variableReferenced(variable);
+    assert(_variablesWrittenAnywhere.contains(variable));
     _current = _current.write(typeOperations, variable);
   }
 
@@ -797,7 +798,7 @@ class FlowModel<Variable, Type> {
   FlowModel<Variable, Type> add(Variable variable, {bool assigned: false}) {
     Map<Variable, VariableModel<Type>> newVariableInfo =
         Map<Variable, VariableModel<Type>>.from(variableInfo);
-    newVariableInfo[variable] = VariableModel<Type>(null, assigned);
+    newVariableInfo[variable] = VariableModel<Type>(null, assigned, false);
 
     return FlowModel<Variable, Type>._(reachable, newVariableInfo);
   }
@@ -810,6 +811,7 @@ class FlowModel<Variable, Type> {
   FlowModel<Variable, Type> markNonNullable(
       TypeOperations<Variable, Type> typeOperations, Variable variable) {
     VariableModel<Type> info = variableInfo[variable];
+    if (info.writeCaptured) return this;
     Type previousType = info.promotedType;
     previousType ??= typeOperations.variableType(variable);
     Type type = typeOperations.promoteToNonNull(previousType);
@@ -832,6 +834,7 @@ class FlowModel<Variable, Type> {
     Type type,
   ) {
     VariableModel<Type> info = variableInfo[variable];
+    if (info.writeCaptured) return this;
     Type previousType = info.promotedType;
     previousType ??= typeOperations.variableType(variable);
 
@@ -918,8 +921,11 @@ class FlowModel<Variable, Type> {
         in variableInfo.entries) {
       Variable variable = entry.key;
       VariableModel<Type> otherModel = other.variableInfo[variable];
-      VariableModel<Type> restricted = entry.value
-          .restrict(typeOperations, otherModel, unsafe.contains(variable));
+      VariableModel<Type> restricted = entry.value;
+      if (otherModel != null) {
+        restricted = restricted.restrict(
+            typeOperations, otherModel, unsafe.contains(variable));
+      }
       newVariableInfo[variable] = restricted;
       if (!identical(restricted, entry.value)) variableInfoMatchesThis = false;
       if (!identical(restricted, otherModel)) variableInfoMatchesOther = false;
@@ -960,6 +966,30 @@ class FlowModel<Variable, Type> {
     VariableModel<Type> newInfoForVar = infoForVar.write();
     if (identical(newInfoForVar, infoForVar)) return this;
     return _updateVariableInfo(variable, newInfoForVar);
+  }
+
+  /// Updates the state to indicate that the given [variables] have been
+  /// write-captured.
+  ///
+  /// If assertions are enabled and [referencedVariables] is not `null`, all
+  /// variables in [variables] will be stored in [referencedVariables] as a side
+  /// effect of this call.
+  FlowModel<Variable, Type> writeCapture(
+      Iterable<Variable> variables, Set<Variable> referencedVariables) {
+    Map<Variable, VariableModel<Type>> newVariableInfo;
+    for (Variable variable in variables) {
+      assert(() {
+        referencedVariables?.add(variable);
+        return true;
+      }());
+      VariableModel<Type> info = variableInfo[variable];
+      if (!info.writeCaptured) {
+        (newVariableInfo ??= Map<Variable, VariableModel<Type>>.from(
+            variableInfo))[variable] = info.writeCapture();
+      }
+    }
+    if (newVariableInfo == null) return this;
+    return FlowModel<Variable, Type>._(reachable, newVariableInfo);
   }
 
   /// Returns a new [FlowModel] where the information for [variable] is replaced
@@ -1120,13 +1150,20 @@ class VariableModel<Type> {
   /// Indicates whether the variable has definitely been assigned.
   final bool assigned;
 
-  VariableModel(this.promotedType, this.assigned);
+  /// Indicates whether the variable has been write captured.
+  final bool writeCaptured;
+
+  VariableModel(this.promotedType, this.assigned, this.writeCaptured) {
+    assert(!writeCaptured || promotedType == null,
+        "Write-captured vars can't be promoted");
+  }
 
   @override
   bool operator ==(Object other) {
     return other is VariableModel<Type> &&
         this.promotedType == other.promotedType &&
-        this.assigned == other.assigned;
+        this.assigned == other.assigned &&
+        this.writeCaptured == other.writeCaptured;
   }
 
   /// Returns an updated model reflect a control path that is known to have
@@ -1135,16 +1172,19 @@ class VariableModel<Type> {
   VariableModel<Type> restrict(TypeOperations<Object, Type> typeOperations,
       VariableModel<Type> otherModel, bool unsafe) {
     Type thisType = promotedType;
-    Type otherType = otherModel?.promotedType;
+    Type otherType = otherModel.promotedType;
     bool newAssigned = assigned || otherModel.assigned;
+    bool newWriteCaptured = writeCaptured || otherModel.writeCaptured;
     if (!unsafe) {
       if (otherType != null &&
           (thisType == null ||
               typeOperations.isSubtypeOf(otherType, thisType))) {
-        return _identicalOrNew(this, otherModel, otherType, newAssigned);
+        return _identicalOrNew(
+            this, otherModel, otherType, newAssigned, newWriteCaptured);
       }
     }
-    return _identicalOrNew(this, otherModel, thisType, newAssigned);
+    return _identicalOrNew(
+        this, otherModel, thisType, newAssigned, newWriteCaptured);
   }
 
   @override
@@ -1153,13 +1193,19 @@ class VariableModel<Type> {
   /// Returns a new [VariableModel] where the promoted type is replaced with
   /// [promotedType].
   VariableModel<Type> withPromotedType(Type promotedType) =>
-      VariableModel<Type>(promotedType, assigned);
+      VariableModel<Type>(promotedType, assigned, writeCaptured);
 
   /// Returns a new [VariableModel] reflecting the fact that the variable was
   /// just written to.
   VariableModel<Type> write() {
     if (promotedType == null && assigned) return this;
-    return VariableModel<Type>(null, true);
+    return VariableModel<Type>(null, true, writeCaptured);
+  }
+
+  /// Returns a wne [VariableModel] reflecting the fact that the variable has
+  /// been write-captured.
+  VariableModel<Type> writeCapture() {
+    return VariableModel<Type>(null, assigned, true);
   }
 
   /// Joins two variable models.  See [FlowModel.join] for details.
@@ -1182,21 +1228,30 @@ class VariableModel<Type> {
       newPromotedType = null;
     }
     bool newAssigned = first.assigned && second.assigned;
-    return _identicalOrNew(first, second, newPromotedType, newAssigned);
+    bool newWriteCaptured = first.writeCaptured || second.writeCaptured;
+    return _identicalOrNew(
+        first, second, newPromotedType, newAssigned, newWriteCaptured);
   }
 
   /// Creates a new [VariableModel] object, unless it is equivalent to either
   /// [first] or [second], in which case one of those objects is re-used.
-  static VariableModel<Type> _identicalOrNew<Type>(VariableModel<Type> first,
-      VariableModel<Type> second, Type newPromotedType, bool newAssigned) {
+  static VariableModel<Type> _identicalOrNew<Type>(
+      VariableModel<Type> first,
+      VariableModel<Type> second,
+      Type newPromotedType,
+      bool newAssigned,
+      bool newWriteCaptured) {
     if (identical(first.promotedType, newPromotedType) &&
-        first.assigned == newAssigned) {
+        first.assigned == newAssigned &&
+        first.writeCaptured == newWriteCaptured) {
       return first;
     } else if (identical(second.promotedType, newPromotedType) &&
-        second.assigned == newAssigned) {
+        second.assigned == newAssigned &&
+        second.writeCaptured == newWriteCaptured) {
       return second;
     } else {
-      return VariableModel<Type>(newPromotedType, newAssigned);
+      return VariableModel<Type>(
+          newPromotedType, newAssigned, newWriteCaptured);
     }
   }
 
@@ -1214,6 +1269,7 @@ class VariableModel<Type> {
       if (!typeOperations.isSameType(p1Type, p2Type)) return false;
     }
     if (model1.assigned != model2.assigned) return false;
+    if (model1.writeCaptured != model2.writeCaptured) return false;
     return true;
   }
 }
