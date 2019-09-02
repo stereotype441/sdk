@@ -842,7 +842,7 @@ class OutlineBuilder extends StackListener {
   }
 
   @override
-  void endMethod(Token getOrSet, Token beginToken, Token beginParam,
+  void endClassMethod(Token getOrSet, Token beginToken, Token beginParam,
       Token beginInitializers, Token endToken) {
     assert(checkState(beginToken, [ValueKind.MethodBody]));
     debugEvent("Method");
@@ -1483,7 +1483,7 @@ class OutlineBuilder extends StackListener {
   }
 
   @override
-  void endFields(Token staticToken, Token covariantToken, Token lateToken,
+  void endClassFields(Token staticToken, Token covariantToken, Token lateToken,
       Token varFinalOrConst, int count, Token beginToken, Token endToken) {
     debugEvent("Fields");
     if (!library.loader.target.enableNonNullable) {
@@ -1610,6 +1610,11 @@ class OutlineBuilder extends StackListener {
                 : templateCycleInTypeVariables.withArguments(
                     builder.name, via.join("', '"));
             addProblem(message, builder.charOffset, builder.name.length);
+            builder.bound = new NamedTypeBuilder(builder.name, null)
+              ..bind(new InvalidTypeBuilder(
+                  builder.name,
+                  message.withLocation(
+                      uri, builder.charOffset, builder.name.length)));
           }
         }
       }

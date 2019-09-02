@@ -4,37 +4,128 @@
 
 import 'package:meta/meta.dart';
 
-/// Sets of local variables that are potentially assigned in a loop statement,
-/// switch statement, try statement, or loop collection element.
-class AssignedVariables<StatementOrElement, Variable> {
-  /// Mapping from a statement or element to the set of local variables that
-  /// are potentially assigned in that statement or element.
-  final Map<StatementOrElement, Set<Variable>> _map = {};
+/// [AssignedVariables] is a helper class capable of computing the set of
+/// variables that are potentially written to, and potentially captured by
+/// closures, at various locations inside the code being analyzed.  This class
+/// should be used prior to running flow analysis, to compute the sets of
+/// variables to pass in to flow analysis.
+///
+/// This class is intended to be used in two phases.  In the first phase, the
+/// client should traverse the source code recursively, making calls to
+/// [beginNode] and [endNode] to indicate the constructs in which writes should
+/// be tracked, and calls to [write] to indicate when a write is encountered.
+/// The order of visiting is not important provided that nesting is respected.
+/// This phase is called the "pre-traversal" because it should happen prior to
+/// flow analysis.
+///
+/// Then, in the second phase, the client may make queries using
+/// [capturedAnywhere], [writtenInNode], and [capturedInNode].
+///
+/// We use the term "node" to refer generally to a loop statement, switch
+/// statement, try statement, loop collection element, local function, or
+/// closure.
+class AssignedVariables<Node, Variable> {
+  /// Mapping from a node to the set of local variables that are potentially
+  /// written to within that node.
+  final Map<Node, Set<Variable>> _writtenInNode = {};
 
-  /// The stack of nested statements or collection elements.
-  final List<Set<Variable>> _stack = [];
+  /// Mapping from a node to the set of local variables for which a potential
+  /// write is captured by a local function or closure inside that node.
+  final Map<Node, Set<Variable>> _capturedInNode = {};
+
+  /// Set of local variables for which a potential write is captured by a local
+  /// function or closure anywhere in the code being analyzed.
+  final Set<Variable> _capturedAnywhere = {};
+
+  /// Stack of sets accumulating variables that are potentially written to.
+  ///
+  /// A set is pushed onto the stack when a node is entered, and popped when
+  /// a node is left.
+  final List<Set<Variable>> _writtenStack = [];
+
+  /// Stack of sets accumulating variables for which a potential write is
+  /// captured by a local function or closure.
+  ///
+  /// A set is pushed onto the stack when a node is entered, and popped when
+  /// a node is left.
+  final List<Set<Variable>> _capturedStack = [];
+
+  /// Stack of integers counting the number of entries in [_capturedStack] that
+  /// should be updated when a variable write is seen.
+  ///
+  /// When a closure is entered, the length of [_capturedStack] is pushed onto
+  /// this stack; when a node is left, it is popped.
+  ///
+  /// Each time a write occurs, we consult the top of this stack to determine
+  /// how many elements of [capturedStack] should be updated.
+  final List<int> _closureIndexStack = [];
 
   AssignedVariables();
 
-  /// Return the set of variables that are potentially assigned in the
-  /// [statementOrElement].
-  Set<Variable> operator [](StatementOrElement statementOrElement) {
-    return _map[statementOrElement] ?? const {};
-  }
+  /// Queries the set of variables for which a potential write is captured by a
+  /// local function or closure anywhere in the code being analyzed.
+  Set<Variable> get capturedAnywhere => _capturedAnywhere;
 
-  void beginStatementOrElement() {
-    Set<Variable> set = Set<Variable>.identity();
-    _stack.add(set);
-  }
-
-  void endStatementOrElement(StatementOrElement node) {
-    _map[node] = _stack.removeLast();
-  }
-
-  void write(Variable variable) {
-    for (int i = 0; i < _stack.length; ++i) {
-      _stack[i].add(variable);
+  /// This method should be called during pre-traversal, to mark the start of a
+  /// loop statement, switch statement, try statement, loop collection element,
+  /// local function, or closure which might need to be queried later.
+  ///
+  /// [isClosure] should be true if the node is a local function or closure.
+  ///
+  /// The span between the call to [beginNode] and [endNode] should cover any
+  /// statements and expressions that might be crossed by a backwards jump.  So
+  /// for instance, in a "for" loop, the condition, updaters, and body should be
+  /// covered, but the initializers should not.  Similarly, in a switch
+  /// statement, the body of the switch statement should be covered, but the
+  /// switch expression should not.
+  void beginNode({bool isClosure: false}) {
+    _writtenStack.add(new Set<Variable>.identity());
+    if (isClosure) {
+      _closureIndexStack.add(_capturedStack.length);
     }
+    _capturedStack.add(new Set<Variable>.identity());
+  }
+
+  /// Queries the set of variables for which a potential write is captured by a
+  /// local function or closure inside the [node].
+  Set<Variable> capturedInNode(Node node) {
+    return _capturedInNode[node] ?? const {};
+  }
+
+  /// This method should be called during pre-traversal, to mark the end of a
+  /// loop statement, switch statement, try statement, loop collection element,
+  /// local function, or closure which might need to be queried later.
+  ///
+  /// [isClosure] should be true if the node is a local function or closure.
+  ///
+  /// See [beginNode] for more details.
+  void endNode(Node node, {bool isClosure: false}) {
+    _writtenInNode[node] = _writtenStack.removeLast();
+    _capturedInNode[node] = _capturedStack.removeLast();
+    if (isClosure) {
+      _closureIndexStack.removeLast();
+    }
+  }
+
+  /// This method should be called during pre-traversal, to mark a write to a
+  /// variable.
+  void write(Variable variable) {
+    for (int i = 0; i < _writtenStack.length; ++i) {
+      _writtenStack[i].add(variable);
+    }
+    if (_closureIndexStack.isNotEmpty) {
+      _capturedAnywhere.add(variable);
+      int closureIndex = _closureIndexStack.last;
+      for (int i = 0; i < closureIndex; ++i) {
+        _capturedStack[i].add(variable);
+      }
+    }
+  }
+
+  /// Queries the set of variables that are potentially written to inside the
+  /// [node].
+  Set<Variable> writtenInNode(Node node) {
+    return _writtenInNode[node] ?? const {};
   }
 }
 
@@ -90,7 +181,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// erroneous code, it's possible that a variable might be used before its
   /// declaration.
   final Set<Variable> _referencedVariables =
-      _assertionsEnabled ? Set<Variable>() : null;
+      _assertionsEnabled ? new Set<Variable>() : null;
 
   factory FlowAnalysis(
     NodeOperations<Expression> nodeOperations,
@@ -98,8 +189,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     FunctionBodyAccess<Variable> functionBody,
   ) {
     _VariableSet<Variable> emptySet =
-        FlowModel<Variable, Type>(false).notAssigned;
-    return FlowAnalysis._(
+        new FlowModel<Variable, Type>(false).notAssigned;
+    return new FlowAnalysis._(
       nodeOperations,
       typeOperations,
       functionBody,
@@ -113,7 +204,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     this.functionBody,
     this._emptySet,
   ) {
-    _current = FlowModel<Variable, Type>(true);
+    _current = new FlowModel<Variable, Type>(true);
   }
 
   /// Return `true` if the current state is reachable.
@@ -232,8 +323,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   void finish() {
     assert(_stack.isEmpty);
     assert(() {
-      Set<Variable> variablesNotAdded =
-          _referencedVariables.difference(Set<Variable>.from(_addedVariables));
+      Set<Variable> variablesNotAdded = _referencedVariables
+          .difference(new Set<Variable>.from(_addedVariables));
       assert(variablesNotAdded.isEmpty,
           'Variables not passed to add: $variablesNotAdded');
       return true;
@@ -719,7 +810,7 @@ class FlowModel<Variable, Type> {
   FlowModel(bool reachable)
       : this._(
           reachable,
-          _VariableSet<Variable>._(const []),
+          new _VariableSet<Variable>._(const []),
           const {},
         );
 
@@ -743,10 +834,10 @@ class FlowModel<Variable, Type> {
     _VariableSet<Variable> newNotAssigned =
         assigned ? notAssigned : notAssigned.add(variable);
     Map<Variable, VariableModel<Type>> newVariableInfo =
-        Map<Variable, VariableModel<Type>>.from(variableInfo);
-    newVariableInfo[variable] = VariableModel<Type>(null);
+        new Map<Variable, VariableModel<Type>>.from(variableInfo);
+    newVariableInfo[variable] = new VariableModel<Type>(null);
 
-    return FlowModel<Variable, Type>._(
+    return new FlowModel<Variable, Type>._(
       reachable,
       newNotAssigned,
       newVariableInfo,
@@ -823,7 +914,7 @@ class FlowModel<Variable, Type> {
 
     if (identical(newVariableInfo, variableInfo)) return this;
 
-    return FlowModel<Variable, Type>._(
+    return new FlowModel<Variable, Type>._(
       reachable,
       notAssigned,
       newVariableInfo,
@@ -908,7 +999,7 @@ class FlowModel<Variable, Type> {
   FlowModel<Variable, Type> setReachable(bool reachable) {
     if (this.reachable == reachable) return this;
 
-    return FlowModel<Variable, Type>._(
+    return new FlowModel<Variable, Type>._(
       reachable,
       notAssigned,
       variableInfo,
@@ -938,7 +1029,7 @@ class FlowModel<Variable, Type> {
       return this;
     }
 
-    return FlowModel<Variable, Type>._(
+    return new FlowModel<Variable, Type>._(
       reachable,
       newNotAssigned,
       newVariableInfo,
@@ -953,7 +1044,7 @@ class FlowModel<Variable, Type> {
     if (info.promotedType == null) return map;
 
     Map<Variable, VariableModel<Type>> result =
-        Map<Variable, VariableModel<Type>>.from(map);
+        new Map<Variable, VariableModel<Type>>.from(map);
     result[variable] = info.withPromotedType(null);
     return result;
   }
@@ -977,7 +1068,8 @@ class FlowModel<Variable, Type> {
       }());
       VariableModel<Type> info = map[variable];
       if (info.promotedType != null) {
-        (result ??= Map<Variable, VariableModel<Type>>.from(map))[variable] =
+        (result ??=
+                new Map<Variable, VariableModel<Type>>.from(map))[variable] =
             info.withPromotedType(null);
       }
     }
@@ -990,9 +1082,10 @@ class FlowModel<Variable, Type> {
   FlowModel<Variable, Type> _updateVariableInfo(
       Variable variable, VariableModel<Type> model) {
     Map<Variable, VariableModel<Type>> newVariableInfo =
-        Map<Variable, VariableModel<Type>>.from(variableInfo);
+        new Map<Variable, VariableModel<Type>>.from(variableInfo);
     newVariableInfo[variable] = model;
-    return FlowModel<Variable, Type>._(reachable, notAssigned, newVariableInfo);
+    return new FlowModel<Variable, Type>._(
+        reachable, notAssigned, newVariableInfo);
   }
 
   /// Forms a new state to reflect a control flow path that might have come from
@@ -1085,7 +1178,7 @@ class FlowModel<Variable, Type> {
       return second;
     }
 
-    return FlowModel<Variable, Type>._(
+    return new FlowModel<Variable, Type>._(
       newReachable,
       newNotAssigned,
       newVariableInfo,
@@ -1201,7 +1294,7 @@ class VariableModel<Type> {
   /// Returns a new [VariableModel] where the promoted type is replaced with
   /// [promotedType].
   VariableModel<Type> withPromotedType(Type promotedType) =>
-      VariableModel<Type>(promotedType);
+      new VariableModel<Type>(promotedType);
 
   /// Joins two variable models.  See [FlowModel.join] for details.
   static VariableModel<Type> join<Type>(
@@ -1234,7 +1327,7 @@ class VariableModel<Type> {
     } else if (identical(second.promotedType, newPromotedType)) {
       return second;
     } else {
-      return VariableModel<Type>(newPromotedType);
+      return new VariableModel<Type>(newPromotedType);
     }
   }
 }
@@ -1251,12 +1344,12 @@ class _VariableSet<Variable> {
     }
 
     int length = variables.length;
-    List<Variable> newVariables = List<Variable>(length + 1);
+    List<Variable> newVariables = new List<Variable>(length + 1);
     for (int i = 0; i < length; ++i) {
       newVariables[i] = variables[i];
     }
     newVariables[length] = addedVariable;
-    return _VariableSet._(newVariables);
+    return new _VariableSet._(newVariables);
   }
 
   _VariableSet<Variable> addAll(Iterable<Variable> variables) {
@@ -1289,7 +1382,7 @@ class _VariableSet<Variable> {
         variables.toSet().intersection(other.variables.toSet()).toList();
 
     if (newVariables.isEmpty) return empty;
-    return _VariableSet._(newVariables);
+    return new _VariableSet._(newVariables);
   }
 
   _VariableSet<Variable> remove(
@@ -1305,7 +1398,7 @@ class _VariableSet<Variable> {
       return empty;
     }
 
-    List<Variable> newVariables = List<Variable>(length - 1);
+    List<Variable> newVariables = new List<Variable>(length - 1);
     int newIndex = 0;
     for (int i = 0; i < length; ++i) {
       Variable variable = variables[i];
@@ -1314,7 +1407,7 @@ class _VariableSet<Variable> {
       }
     }
 
-    return _VariableSet._(newVariables);
+    return new _VariableSet._(newVariables);
   }
 
   @override

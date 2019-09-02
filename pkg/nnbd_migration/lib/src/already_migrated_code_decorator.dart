@@ -44,7 +44,7 @@ class AlreadyMigratedCodeDecorator {
           return decorate((_typeProvider.objectType as TypeImpl)
               .withNullability(NullabilitySuffix.question));
         } else {
-          return decorate(bound ?? _typeProvider.dynamicType);
+          return decorate(bound);
         }
       }).toList();
       var positionalParameters = <DecoratedType>[];

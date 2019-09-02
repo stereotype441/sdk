@@ -20,6 +20,8 @@ import 'assignment_to_method_test.dart' as assignment_to_method;
 import 'assignment_to_type_test.dart' as assignment_to_type;
 import 'async_keyword_used_as_identifier_test.dart'
     as async_keyword_used_as_identifier;
+import 'builtin_identifier_as_extension_name_test.dart'
+    as builtin_as_extension_name;
 import 'can_be_null_after_null_aware_test.dart' as can_be_null_after_null_aware;
 import 'case_block_not_terminated_test.dart' as case_block_not_terminated;
 import 'cast_to_non_type_test.dart' as cast_to_non_type;
@@ -34,6 +36,7 @@ import 'const_constructor_with_mixin_with_field_test.dart'
 import 'const_eval_throws_exception_test.dart' as const_eval_throws_exception;
 import 'const_map_key_expression_type_implements_equals_test.dart'
     as const_map_key_expression_type_implements_equals;
+import 'const_not_initialized_test.dart' as const_not_initialized;
 import 'const_set_element_type_implements_equals_test.dart'
     as const_set_element_type_implements_equals;
 import 'const_spread_expected_list_or_set_test.dart'
@@ -317,6 +320,7 @@ main() {
     assignment_to_method.main();
     assignment_to_type.main();
     async_keyword_used_as_identifier.main();
+    builtin_as_extension_name.main();
     can_be_null_after_null_aware.main();
     case_block_not_terminated.main();
     cast_to_non_type.main();
@@ -326,6 +330,7 @@ main() {
     const_constructor_with_mixin_with_field.main();
     const_eval_throws_exception.main();
     const_map_key_expression_type_implements_equals.main();
+    const_not_initialized.main();
     const_set_element_type_implements_equals.main();
     const_spread_expected_list_or_set.main();
     const_spread_expected_map.main();

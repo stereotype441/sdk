@@ -32,10 +32,10 @@ class DartRunnerTarget extends VmTarget {
         // PRODUCT mode.
         'dart:mirrors',
 
-        'dart:profiler',
         'dart:typed_data',
         'dart:nativewrappers',
         'dart:io',
+        'dart:wasm',
 
         // Required for dart_runner.
         'dart:fuchsia.builtin',

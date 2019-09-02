@@ -31,34 +31,10 @@ import '../constant_context.dart' show ConstantContext;
 
 import '../builder/builder.dart' show PrefixBuilder, TypeDeclarationBuilder;
 import '../builder/declaration_builder.dart';
+import '../builder/extension_builder.dart';
+import '../builder/procedure_builder.dart';
 
-import '../fasta_codes.dart'
-    show
-        LocatedMessage,
-        Message,
-        Template,
-        messageCannotAssignToSuper,
-        messageCannotAssignToParenthesizedExpression,
-        messageCantUsePrefixAsExpression,
-        messageCantUsePrefixWithNullAware,
-        messageIllegalAssignmentToNonAssignable,
-        messageInvalidInitializer,
-        messageInvalidUseOfNullAwareAccess,
-        messageLoadLibraryTakesNoArguments,
-        messageNotAConstantExpression,
-        messageNotAnLvalue,
-        messageSuperAsExpression,
-        noLength,
-        templateCantUseDeferredPrefixAsConstant,
-        templateConstructorNotFound,
-        templateDeferredTypeAnnotation,
-        templateMissingExplicitTypeArguments,
-        templateNotConstantExpression,
-        templateNotAPrefixInTypeAnnotation,
-        templateNotAType,
-        templateSuperclassHasNoConstructor,
-        templateThisOrSuperAccessInFieldInitializer,
-        templateUnresolvedPrefixInTypeAnnotation;
+import '../fasta_codes.dart';
 
 import '../names.dart'
     show
@@ -82,7 +58,7 @@ import '../names.dart'
 
 import '../parser.dart' show lengthForToken, lengthOfSpan, offsetForToken;
 
-import '../problems.dart' show unhandled, unsupported;
+import '../problems.dart';
 
 import '../scope.dart';
 
@@ -133,7 +109,8 @@ import 'kernel_shadow_ast.dart'
         SuperPropertyGetJudgment,
         SyntheticWrapper,
         VariableDeclarationJudgment,
-        VariableGetJudgment;
+        VariableGetJudgment,
+        getExplicitTypeArguments;
 
 /// A generator represents a subexpression for which we can't yet build an
 /// expression because we don't yet know the context in which it's used.
@@ -305,8 +282,7 @@ abstract class Generator {
     complexAssignment?.isPostIncDec = true;
     VariableDeclarationJudgment dummy =
         new VariableDeclarationJudgment.forValue(
-            _makeWrite(combiner, true, complexAssignment),
-            _helper.functionNestingLevel);
+            _makeWrite(combiner, true, complexAssignment));
     return _finish(
         makeLet(value, makeLet(dummy, valueAccess())), complexAssignment);
   }
@@ -317,7 +293,7 @@ abstract class Generator {
   Expression _makeInvalidRead() {
     return _helper.wrapSyntheticExpression(
         _helper.throwNoSuchMethodError(
-            _forest.createNullLiteral(token),
+            _forest.createNullLiteral(fileOffset),
             _plainNameForRead,
             _forest.createArgumentsEmpty(noLocation),
             fileOffset,
@@ -332,7 +308,7 @@ abstract class Generator {
   Expression _makeInvalidWrite(Expression value) {
     return _helper.wrapSyntheticExpression(
         _helper.throwNoSuchMethodError(
-            _forest.createNullLiteral(token),
+            _forest.createNullLiteral(fileOffset),
             _plainNameForRead,
             _forest.createArguments(noLocation, <Expression>[value]),
             fileOffset,
@@ -483,7 +459,7 @@ abstract class Generator {
     }
     return _helper.wrapInvalidConstructorInvocation(
         _helper.throwNoSuchMethodError(
-            _forest.createNullLiteral(token),
+            _forest.createNullLiteral(fileOffset),
             _helper.constructorNameForDiagnostics(name,
                 className: _plainNameForRead),
             arguments,
@@ -1115,8 +1091,7 @@ class IndexedAccessGenerator extends Generator {
       ..fileOffset = fileOffset;
     complexAssignment?.write = write;
     VariableDeclarationJudgment dummy =
-        new VariableDeclarationJudgment.forValue(
-            write, _helper.functionNestingLevel);
+        new VariableDeclarationJudgment.forValue(write);
     return makeLet(
         valueVariable, makeLet(dummy, new VariableGet(valueVariable)));
   }
@@ -1586,33 +1561,30 @@ class StaticAccessGenerator extends Generator {
 ///   extension B on A {
 ///     get property => 0;
 ///     set property(_) {}
-///     var field;
 ///     method() {
 ///       property;     // this generator is created for `property`.
 ///       property = 0; // this generator is created for `property`.
-///       field = 0;    // this generator is created for `field`.
 ///       method;       // this generator is created for `method`.
 ///       method();     // this generator is created for `method`.
 ///     }
 ///   }
 ///
+/// These can only occur within an extension instance member.
 class ExtensionInstanceAccessGenerator extends Generator {
   /// The static [Member] generated for an instance extension member which is
-  /// used for performing a read or invocation on this subexpression.
+  /// used for performing a read on this subexpression.
   ///
   /// This can be `null` if the subexpression doesn't have a readable target.
   /// For instance if the subexpression is a setter without a corresponding
   /// getter.
   final Procedure readTarget;
 
-  /// `true` if the [readTarget] is declared as a regular method in the
-  /// extension.
+  /// The static [Member] generated for an instance extension member which is
+  /// used for performing an invocation on this subexpression.
   ///
-  /// All extension instance members are converted into to top level methods so
-  /// this field is needed to know whether a read should be a tear off, which
-  /// is the case for regular methods, or an invocation should be a read follow
-  /// by a call, which is the case for getters.
-  final bool readTargetIsRegularMethod;
+  /// This can be `null` if the subexpression doesn't have an invokable target.
+  /// For instance if the subexpression is a getter or setter.
+  final Procedure invokeTarget;
 
   /// The static [Member] generated for an instance extension member which is
   /// used for performing a write on this subexpression.
@@ -1636,7 +1608,7 @@ class ExtensionInstanceAccessGenerator extends Generator {
       ExpressionGeneratorHelper helper,
       Token token,
       this.readTarget,
-      this.readTargetIsRegularMethod,
+      this.invokeTarget,
       this.writeTarget,
       this.extensionThis,
       this.extensionTypeParameters)
@@ -1664,23 +1636,21 @@ class ExtensionInstanceAccessGenerator extends Generator {
           offsetForToken(token),
           helper.uri);
     }
-    bool readTargetIsRegularMethod = declaration.isRegularMethod;
-    Procedure getter;
-    if (declaration.isGetter || declaration.isRegularMethod) {
-      getter = declaration.target;
+    Procedure readTarget;
+    Procedure invokeTarget;
+    if (declaration.isGetter) {
+      readTarget = declaration.target;
+    } else if (declaration.isRegularMethod) {
+      ProcedureBuilder procedureBuilder = declaration;
+      readTarget = procedureBuilder.extensionTearOff;
+      invokeTarget = procedureBuilder.procedure;
     }
-    Procedure setter;
+    Procedure writeTarget;
     if (builderSetter != null && builderSetter.isSetter) {
-      setter = builderSetter.target;
+      writeTarget = builderSetter.target;
     }
-    return new ExtensionInstanceAccessGenerator(
-        helper,
-        token,
-        getter,
-        readTargetIsRegularMethod,
-        setter,
-        extensionThis,
-        extensionTypeParameters);
+    return new ExtensionInstanceAccessGenerator(helper, token, readTarget,
+        invokeTarget, writeTarget, extensionThis, extensionTypeParameters);
   }
 
   @override
@@ -1697,9 +1667,6 @@ class ExtensionInstanceAccessGenerator extends Generator {
       if (complexAssignment != null) {
         read = _helper.desugarSyntheticExpression(read);
       }
-    } else if (readTargetIsRegularMethod) {
-      read = _helper.createExtensionTearOff(
-          readTarget, extensionThis, extensionTypeParameters, token);
     } else {
       List<DartType> typeArguments;
       if (extensionTypeParameters != null) {
@@ -1713,7 +1680,7 @@ class ExtensionInstanceAccessGenerator extends Generator {
           _helper.forest.createArguments(fileOffset,
               [_helper.createVariableGet(extensionThis, fileOffset)],
               types: typeArguments),
-          charOffset: token.charOffset);
+          charOffset: fileOffset);
     }
     complexAssignment?.read = read;
     return read;
@@ -1750,7 +1717,7 @@ class ExtensionInstanceAccessGenerator extends Generator {
 
   @override
   Expression doInvocation(int offset, Arguments arguments) {
-    if (readTargetIsRegularMethod) {
+    if (invokeTarget != null) {
       List<Expression> positionalArguments = [
         _helper.createVariableGet(extensionThis, offset)
       ]..addAll(arguments.positional);
@@ -1767,7 +1734,7 @@ class ExtensionInstanceAccessGenerator extends Generator {
         typeArguments = arguments.types;
       }
       return _helper.buildStaticInvocation(
-          readTarget,
+          invokeTarget,
           _forest.createArguments(fileOffset, positionalArguments,
               named: arguments.named, types: typeArguments),
           charOffset: offset);
@@ -1792,6 +1759,294 @@ class ExtensionInstanceAccessGenerator extends Generator {
   }
 }
 
+/// A [ExplicitExtensionInstanceAccessGenerator] represents a subexpression
+/// whose prefix is a forced extension instance member access.
+///
+/// For instance
+///
+///   class A<T> {}
+///   extension B on A<int> {
+///     method() {}
+///   }
+///   extension C<T> {
+///     T get field => 0;
+///     set field(T _) {}
+///   }
+///
+///   method(A a) {
+///     B(a).method;     // this generator is created for `B(a).method`.
+///     B(a).method();   // this generator is created for `B(a).method`.
+///     C<int>(a).field; // this generator is created for `C<int>(a).field`.
+///     C(a).field = 0;  // this generator is created for `C(a).field`.
+///   }
+///
+class ExplicitExtensionInstanceAccessGenerator extends Generator {
+  /// The static [Member] generated for an instance extension member which is
+  /// used for performing a read on this subexpression.
+  ///
+  /// This can be `null` if the subexpression doesn't have a readable target.
+  /// For instance if the subexpression is a setter without a corresponding
+  /// getter.
+  final Procedure readTarget;
+
+  /// The static [Member] generated for an instance extension member which is
+  /// used for performing an invocation on this subexpression.
+  ///
+  /// This can be `null` if the subexpression doesn't have an invokable target.
+  /// For instance if the subexpression is a getter or setter.
+  final Procedure invokeTarget;
+
+  /// The static [Member] generated for an instance extension member which is
+  /// used for performing a write on this subexpression.
+  ///
+  /// This can be `null` if the subexpression doesn't have a writable target.
+  /// For instance if the subexpression is a final field, a method, or a getter
+  /// without a corresponding setter.
+  final Procedure writeTarget;
+
+  /// The expression holding the receiver value for the explicit extension
+  /// access, that is, `a` in `Extension<int>(a).method<String>()`.
+  final Expression receiver;
+
+  /// The type arguments explicitly passed to the explicit extension access,
+  /// like `<int>` in `Extension<int>(a).method<String>()`.
+  final List<DartType> explicitTypeArguments;
+
+  final int extensionTypeParameterCount;
+
+  ExplicitExtensionInstanceAccessGenerator(
+      ExpressionGeneratorHelper helper,
+      Token token,
+      this.readTarget,
+      this.invokeTarget,
+      this.writeTarget,
+      this.receiver,
+      this.explicitTypeArguments,
+      this.extensionTypeParameterCount)
+      : assert(readTarget != null || writeTarget != null),
+        assert(receiver != null),
+        super(helper, token);
+
+  factory ExplicitExtensionInstanceAccessGenerator.fromBuilder(
+      ExpressionGeneratorHelper helper,
+      Token token,
+      Builder getterBuilder,
+      Builder setterBuilder,
+      Expression receiver,
+      List<DartType> explicitTypeArguments,
+      int extensionTypeParameterCount) {
+    Procedure readTarget;
+    Procedure invokeTarget;
+    if (getterBuilder != null) {
+      if (getterBuilder is AccessErrorBuilder) {
+        AccessErrorBuilder error = getterBuilder;
+        getterBuilder = error.builder;
+        // We should only see an access error here if we've looked up a setter
+        // when not explicitly looking for a setter.
+        assert(getterBuilder.isSetter);
+      } else if (getterBuilder.isGetter) {
+        readTarget = getterBuilder.target;
+      } else if (getterBuilder.isRegularMethod) {
+        ProcedureBuilder procedureBuilder = getterBuilder;
+        readTarget = procedureBuilder.extensionTearOff;
+        invokeTarget = procedureBuilder.procedure;
+      } else {
+        return unhandled(
+            "${getterBuilder.runtimeType}",
+            "InstanceExtensionAccessGenerator.fromBuilder",
+            offsetForToken(token),
+            helper.uri);
+      }
+    }
+    Procedure writeTarget;
+    if (setterBuilder != null && setterBuilder.isSetter) {
+      writeTarget = setterBuilder.target;
+    }
+    return new ExplicitExtensionInstanceAccessGenerator(
+        helper,
+        token,
+        readTarget,
+        invokeTarget,
+        writeTarget,
+        receiver,
+        explicitTypeArguments,
+        extensionTypeParameterCount);
+  }
+
+  @override
+  String get _debugName => "InstanceExtensionAccessGenerator";
+
+  @override
+  String get _plainNameForRead => (readTarget ?? writeTarget).name.name;
+
+  @override
+  Expression _makeRead(ComplexAssignmentJudgment complexAssignment) {
+    Expression read;
+    if (readTarget == null) {
+      read = _makeInvalidRead();
+      if (complexAssignment != null) {
+        read = _helper.desugarSyntheticExpression(read);
+      }
+    } else {
+      read = _helper.buildStaticInvocation(
+          readTarget,
+          _helper.forest.createArguments(fileOffset, [receiver],
+              types: explicitTypeArguments),
+          charOffset: fileOffset);
+    }
+    complexAssignment?.read = read;
+    return read;
+  }
+
+  @override
+  Expression _makeWrite(Expression value, bool voidContext,
+      ComplexAssignmentJudgment complexAssignment) {
+    Expression write;
+    if (writeTarget == null) {
+      write = _makeInvalidWrite(value);
+      if (complexAssignment != null) {
+        write = _helper.desugarSyntheticExpression(write);
+      }
+    } else {
+      write = _helper.buildStaticInvocation(
+          writeTarget,
+          _helper.forest.createArguments(fileOffset, [receiver, value],
+              types: explicitTypeArguments),
+          charOffset: token.charOffset);
+    }
+    complexAssignment?.write = write;
+    write.fileOffset = fileOffset;
+    return write;
+  }
+
+  @override
+  Expression doInvocation(int offset, Arguments arguments) {
+    if (invokeTarget != null) {
+      List<Expression> positionalArguments = [receiver]
+        ..addAll(arguments.positional);
+      List<DartType> typeArguments;
+      if (explicitTypeArguments != null) {
+        typeArguments = []..addAll(explicitTypeArguments);
+        if (arguments.types.isNotEmpty) {
+          typeArguments.addAll(arguments.types);
+        }
+      } else if (arguments.types.isNotEmpty) {
+        typeArguments = arguments.types;
+      }
+      return _helper.buildStaticInvocation(
+          invokeTarget,
+          _forest.createArguments(fileOffset, positionalArguments,
+              named: arguments.named, types: typeArguments),
+          charOffset: offset);
+    } else {
+      return _helper.buildMethodInvocation(buildSimpleRead(), callName,
+          arguments, adjustForImplicitCall(_plainNameForRead, offset),
+          isImplicitCall: true);
+    }
+  }
+
+  @override
+  ComplexAssignmentJudgment startComplexAssignment(Expression rhs) =>
+      SyntheticWrapper.wrapStaticAssignment(rhs);
+
+  @override
+  void printOn(StringSink sink) {
+    NameSystem syntheticNames = new NameSystem();
+    sink.write(", readTarget: ");
+    printQualifiedNameOn(readTarget, sink, syntheticNames: syntheticNames);
+    sink.write(", writeTarget: ");
+    printQualifiedNameOn(writeTarget, sink, syntheticNames: syntheticNames);
+  }
+}
+
+/// A [ExplicitExtensionAccessGenerator] represents a subexpression whose
+/// prefix is a forced extension resolution.
+///
+/// For instance
+///
+///   class A<T> {}
+///   extension B on A<int> {
+///     method() {}
+///   }
+///   extension C<T> {
+///     T get field => 0;
+///     set field(T _) {}
+///   }
+///
+///   method(A a) {
+///     B(a).method;     // this generator is created for `B(a)`.
+///     B(a).method();   // this generator is created for `B(a)`.
+///     C<int>(a).field; // this generator is created for `C<int>(a)`.
+///     C(a).field = 0;  // this generator is created for `C(a)`.
+///   }
+///
+/// When an access is performed on this generator a
+/// [ExplicitExtensionInstanceAccessGenerator] is created.
+class ExplicitExtensionAccessGenerator extends Generator {
+  final ExtensionBuilder extensionBuilder;
+  final Expression receiver;
+  final List<DartType> explicitTypeArguments;
+
+  ExplicitExtensionAccessGenerator(
+      ExpressionGeneratorHelper helper,
+      Token token,
+      this.extensionBuilder,
+      this.receiver,
+      this.explicitTypeArguments)
+      : super(helper, token);
+
+  @override
+  String get _plainNameForRead {
+    return unsupported(
+        "ExplicitExtensionAccessGenerator.plainNameForRead", fileOffset, _uri);
+  }
+
+  @override
+  String get _debugName => "ExplicitExtensionAccessGenerator";
+
+  /* Expression | Generator */ buildPropertyAccess(
+      IncompleteSendGenerator send, int operatorOffset, bool isNullAware) {
+    if (_helper.constantContext != ConstantContext.none) {
+      _helper.addProblem(
+          messageNotAConstantExpression, fileOffset, token.length);
+    }
+    Builder getter = extensionBuilder.lookupLocalMember(send.name.name);
+    Builder setter =
+        extensionBuilder.lookupLocalMember(send.name.name, setter: true);
+    if (getter == null && setter == null) {
+      return new UnresolvedNameGenerator(_helper, token, send.name);
+    }
+    Generator generator =
+        new ExplicitExtensionInstanceAccessGenerator.fromBuilder(
+            _helper,
+            token,
+            getter,
+            setter,
+            receiver,
+            explicitTypeArguments,
+            extensionBuilder.typeParameters?.length ?? 0);
+    if (send.arguments != null) {
+      return generator.doInvocation(offsetForToken(send.token), send.arguments);
+    } else {
+      return generator;
+    }
+  }
+
+  @override
+  doInvocation(int offset, Arguments arguments) {
+    return unimplemented(
+        "ExplicitExtensionAccessGenerator.doInvocation", fileOffset, _uri);
+  }
+
+  @override
+  void printOn(StringSink sink) {
+    sink.write(", extensionBuilder: ");
+    sink.write(extensionBuilder);
+    sink.write(", receiver: ");
+    sink.write(receiver);
+  }
+}
+
 class LoadLibraryGenerator extends Generator {
   final LoadLibraryBuilder builder;
 
@@ -1804,6 +2059,7 @@ class LoadLibraryGenerator extends Generator {
 
   @override
   String get _debugName => "LoadLibraryGenerator";
+
   @override
   Expression _makeRead(ComplexAssignmentJudgment complexAssignment) {
     builder.importDependency.targetLibrary;
@@ -2071,7 +2327,7 @@ class TypeUseGenerator extends ReadOnlyAccessGenerator {
   Expression _makeInvalidWrite(Expression value) {
     return _helper.wrapSyntheticExpression(
         _helper.throwNoSuchMethodError(
-            _forest.createNullLiteral(token),
+            _forest.createNullLiteral(fileOffset),
             _plainNameForRead,
             _forest.createArguments(fileOffset, <Expression>[value]),
             fileOffset,
@@ -2143,9 +2399,32 @@ class TypeUseGenerator extends ReadOnlyAccessGenerator {
   }
 
   @override
-  Expression doInvocation(int offset, Arguments arguments) {
-    return _helper.buildConstructorInvocation(declaration, token, token,
-        arguments, "", null, token.charOffset, Constness.implicit);
+  doInvocation(int offset, Arguments arguments) {
+    if (declaration.isExtension) {
+      ExtensionBuilder extensionBuilder = declaration;
+      if (arguments.positional.length != 1 || arguments.named.isNotEmpty) {
+        return _helper.buildProblem(messageExplicitExtensionArgumentMismatch,
+            fileOffset, lengthForToken(token));
+      }
+      List<DartType> explicitTypeArguments =
+          getExplicitTypeArguments(arguments);
+      if (explicitTypeArguments != null) {
+        int typeParameterCount = extensionBuilder.typeParameters?.length ?? 0;
+        if (explicitTypeArguments.length != typeParameterCount) {
+          return _helper.buildProblem(
+              templateExplicitExtensionTypeArgumentMismatch.withArguments(
+                  extensionBuilder.name, typeParameterCount),
+              fileOffset,
+              lengthForToken(token));
+        }
+      }
+      // TODO(johnniwinther): Check argument and type argument count.
+      return new ExplicitExtensionAccessGenerator(_helper, token, declaration,
+          arguments.positional.single, explicitTypeArguments);
+    } else {
+      return _helper.buildConstructorInvocation(declaration, token, token,
+          arguments, "", null, token.charOffset, Constness.implicit);
+    }
   }
 }
 
@@ -2206,7 +2485,7 @@ class ReadOnlyAccessGenerator extends Generator {
       super._finish(makeLet(value, body), complexAssignment);
 
   @override
-  Expression doInvocation(int offset, Arguments arguments) {
+  doInvocation(int offset, Arguments arguments) {
     return _helper.buildMethodInvocation(buildSimpleRead(), callName, arguments,
         adjustForImplicitCall(_plainNameForRead, offset),
         isImplicitCall: true);
@@ -2708,7 +2987,7 @@ class PrefixUseGenerator extends Generator {
       int offset, Arguments arguments) {
     return _helper.wrapInLocatedProblem(
         _helper.evaluateArgumentsBefore(
-            arguments, _forest.createNullLiteral(token)),
+            arguments, _forest.createNullLiteral(fileOffset)),
         messageCantUsePrefixAsExpression.withLocation(
             _helper.uri, fileOffset, lengthForToken(token)));
   }

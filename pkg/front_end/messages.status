@@ -124,8 +124,6 @@ CovariantMember/part_wrapped_script1: Fail
 CovariantMember/part_wrapped_script2: Fail
 CovariantMember/script1: Fail
 CovariantMember/script2: Fail
-CycleInTypeVariables/part_wrapped_script1: Fail
-CycleInTypeVariables/script1: Fail # We report an error for each type variable involved in the cycle.
 CyclicClassHierarchy/part_wrapped_script1: Fail
 CyclicClassHierarchy/part_wrapped_script2: Fail
 CyclicClassHierarchy/script1: Fail # We report an error for each class involved in the cycle.
@@ -193,6 +191,10 @@ ExpectedType/example: Fail
 ExpectedUri/analyzerCode: Fail
 ExpectedUri/example: Fail
 ExperimentNotEnabled/example: Fail
+ExplicitExtensionArgumentMismatch/analyzerCode: Fail
+ExplicitExtensionArgumentMismatch/example: Fail
+ExplicitExtensionTypeArgumentMismatch/analyzerCode: Fail
+ExplicitExtensionTypeArgumentMismatch/example: Fail
 ExportAfterPart/part_wrapped_script1: Fail
 ExportAfterPart/script1: Fail
 ExpressionNotMetadata/analyzerCode: Fail
@@ -206,6 +208,7 @@ ExternalFactoryRedirection/example: Fail
 ExternalFactoryWithBody/part_wrapped_script1: Fail
 ExternalFactoryWithBody/script1: Fail
 ExtensionDeclaresConstructor/example: Fail
+ExtensionDeclaresInstanceField/example: Fail
 ExtraneousModifier/part_wrapped_script1: Fail
 ExtraneousModifier/part_wrapped_script2: Fail
 ExtraneousModifier/part_wrapped_script3: Fail

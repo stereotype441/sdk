@@ -564,7 +564,7 @@ class TypePromotionLookAheadListener extends Listener {
   }
 
   @override
-  void endFields(Token staticToken, Token covariantToken, Token lateToken,
+  void endClassFields(Token staticToken, Token covariantToken, Token lateToken,
       Token varFinalOrConst, int count, Token beginToken, Token endToken) {
     debugEvent("Fields", staticToken);
     state.discard(count); // Field names.
@@ -982,7 +982,7 @@ class TypePromotionLookAheadListener extends Listener {
   }
 
   @override
-  void endMethod(Token getOrSet, Token beginToken, Token beginParam,
+  void endClassMethod(Token getOrSet, Token beginToken, Token beginParam,
       Token beginInitializers, Token endToken) {
     debugEvent("endMethod", endToken);
     state.pop(); // Method name.
