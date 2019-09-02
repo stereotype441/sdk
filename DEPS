@@ -99,7 +99,7 @@ vars = {
   "intl_tag": "0.15.7",
   "jinja2_rev": "2222b31554f03e62600cd7e383376a7c187967a1",
   "json_rpc_2_tag": "2.0.9",
-  "linter_tag": "0.1.96",
+  "linter_tag": "0.1.97+1",
   "logging_tag": "0.11.3+2",
   "markupsafe_rev": "8f45f5cfa0009d2a70589bcda0349b8cb2b72783",
   "markdown_tag": "2.0.3",
@@ -448,6 +448,16 @@ deps = {
       "dep_type": "cipd",
   },
 
+  Var("dart_root") + "/pkg/front_end/test/fasta/types/benchmark_data": {
+    "packages": [
+      {
+        "package": "dart/cfe/benchmark_data",
+        "version": "sha1sum:4168b133ab7bce01c91311a8d4f25d4d6cb026f3",
+      }
+    ],
+    "dep_type": "cipd",
+  },
+
   # TODO(37531): Remove these cipd packages and build with sdk instead when
   # benchmark runner gets support for that.
   Var("dart_root") + "/benchmarks/FfiBoringssl/dart/native/out/": {
@@ -514,21 +524,6 @@ hooks = [
       "--extract",
       "--directory",
       Var('dart_root') + "/third_party/firefox_jsshell",
-    ],
-  },
-  {
-    "name": "front_end_benchmark_data",
-    "pattern": ".",
-    "action": [
-      "download_from_google_storage",
-      "--no_auth",
-      "--no_resume",
-      "--bucket",
-      "dart-dependencies",
-      "--recursive",
-      "--extract",
-      "--directory",
-      Var('dart_root') + "/pkg/front_end/test/fasta/types",
     ],
   },
   {

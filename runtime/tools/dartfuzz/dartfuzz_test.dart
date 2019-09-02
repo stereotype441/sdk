@@ -78,17 +78,21 @@ abstract class TestRunner {
         prefix += '-NOINTRINSIFY';
         extraFlags += ['--intrinsify=false'];
       } else if (r == 2) {
-        prefix += '-COMPACTEVERY';
-        extraFlags += ['--gc_every=1000', '--use_compactor=true'];
+        final freq = rand.nextInt(1000) + 500;
+        prefix += '-COMPACTEVERY-${freq}';
+        extraFlags += ['--gc_every=${freq}', '--use_compactor=true'];
       } else if (r == 3) {
-        prefix += '-MARKSWEEPEVERY';
-        extraFlags += ['--gc_every=1000', '--use_compactor=false'];
+        final freq = rand.nextInt(1000) + 500;
+        prefix += '-MARKSWEEPEVERY-${freq}';
+        extraFlags += ['--gc_every=${freq}', '--use_compactor=false'];
       } else if (r == 4) {
-        prefix += '-DEPOPTEVERY';
-        extraFlags += ['--deoptimize_every=100'];
+        final freq = rand.nextInt(100) + 50;
+        prefix += '-DEPOPTEVERY-${freq}';
+        extraFlags += ['--deoptimize_every=${freq}'];
       } else if (r == 5) {
-        prefix += '-STACKTRACEEVERY';
-        extraFlags += ['--stacktrace_every=100'];
+        final freq = rand.nextInt(100) + 50;
+        prefix += '-STACKTRACEEVERY-${freq}';
+        extraFlags += ['--stacktrace_every=${freq}'];
       } else if (r == 6) {
         prefix += '-OPTCOUNTER';
         extraFlags += ['--optimization_counter_threshold=1'];
@@ -296,8 +300,11 @@ class DartFuzzTest {
     rand = Random();
     tmpDir = Directory.systemTemp.createTempSync('dart_fuzz');
     fileName = '${tmpDir.path}/fuzz.dart';
+    // Testcase generation flags.
+    // Necessary To avoid false divergences between 64 and 32 bit versions.
     fp = samePrecision(mode1, mode2);
-    ffi = ffiCapable(mode1, mode2);
+    // Occasionally test FFI.
+    ffi = ffiCapable(mode1, mode2) && (rand.nextInt(5) == 0);
     runner1 =
         TestRunner.getTestRunner(mode1, top, tmpDir.path, env, fileName, rand);
     runner2 =
