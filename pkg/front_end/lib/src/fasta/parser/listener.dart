@@ -337,16 +337,50 @@ class Listener implements UnescapeErrorListener {
     logEvent("FormalParameters");
   }
 
-  /// Handle the end of a field declaration.  Substructures:
+  /// Handle the end of a class field declaration.  Substructures:
   /// - Metadata
   /// - Modifiers
   /// - Type
   /// - Variable declarations (count times)
   ///
   /// Doesn't have a corresponding begin event, use [beginMember] instead.
-  void endFields(Token staticToken, Token covariantToken, Token lateToken,
+  void endClassFields(Token staticToken, Token covariantToken, Token lateToken,
       Token varFinalOrConst, int count, Token beginToken, Token endToken) {
     logEvent("Fields");
+  }
+
+  /// Handle the end of a mixin field declaration.  Substructures:
+  /// - Metadata
+  /// - Modifiers
+  /// - Type
+  /// - Variable declarations (count times)
+  ///
+  /// Doesn't have a corresponding begin event, use [beginMember] instead.
+  void endMixinFields(Token staticToken, Token covariantToken, Token lateToken,
+      Token varFinalOrConst, int count, Token beginToken, Token endToken) {
+    // TODO(danrubel): push implementation into subclasses
+    endClassFields(staticToken, covariantToken, lateToken, varFinalOrConst,
+        count, beginToken, endToken);
+  }
+
+  /// Handle the end of a extension field declaration.  Substructures:
+  /// - Metadata
+  /// - Modifiers
+  /// - Type
+  /// - Variable declarations (count times)
+  ///
+  /// Doesn't have a corresponding begin event, use [beginMember] instead.
+  void endExtensionFields(
+      Token staticToken,
+      Token covariantToken,
+      Token lateToken,
+      Token varFinalOrConst,
+      int count,
+      Token beginToken,
+      Token endToken) {
+    // TODO(danrubel): push implementation into subclasses
+    endClassFields(staticToken, covariantToken, lateToken, varFinalOrConst,
+        count, beginToken, endToken);
   }
 
   /// Marks that the grammar term `forInitializerStatement` has been parsed and
@@ -761,7 +795,10 @@ class Listener implements UnescapeErrorListener {
   }
 
   /// This event is added for convenience. Normally, one should override
-  /// [endMethod] or [endFields] instead.
+  /// [endClassFields], [endMixinFields], [endExtensionFields],
+  /// [endClassMethod], [endMixinMethod], [endExtensionMethod],
+  /// [endClassConstructor], [endMixinConstructor],
+  /// or [endExtensionConstructor] instead.
   void endMember() {
     logEvent("Member");
   }
@@ -771,7 +808,7 @@ class Listener implements UnescapeErrorListener {
   void beginMethod(Token externalToken, Token staticToken, Token covariantToken,
       Token varFinalOrConst, Token getOrSet, Token name) {}
 
-  /// Handle the end of a method declaration.  Substructures:
+  /// Handle the end of a class method declaration.  Substructures:
   /// - metadata
   /// - return type
   /// - method name (identifier, possibly qualified)
@@ -780,9 +817,89 @@ class Listener implements UnescapeErrorListener {
   /// - initializers
   /// - async marker
   /// - body
-  void endMethod(Token getOrSet, Token beginToken, Token beginParam,
+  void endClassMethod(Token getOrSet, Token beginToken, Token beginParam,
       Token beginInitializers, Token endToken) {
-    logEvent("Method");
+    logEvent("ClassMethod");
+  }
+
+  /// Handle the end of a mixin method declaration.  Substructures:
+  /// - metadata
+  /// - return type
+  /// - method name (identifier, possibly qualified)
+  /// - type variables
+  /// - formal parameters
+  /// - initializers
+  /// - async marker
+  /// - body
+  void endMixinMethod(Token getOrSet, Token beginToken, Token beginParam,
+      Token beginInitializers, Token endToken) {
+    // TODO(danrubel): push implementation into subclasses
+    endClassMethod(
+        getOrSet, beginToken, beginParam, beginInitializers, endToken);
+  }
+
+  /// Handle the end of a extension method declaration.  Substructures:
+  /// - metadata
+  /// - return type
+  /// - method name (identifier, possibly qualified)
+  /// - type variables
+  /// - formal parameters
+  /// - initializers
+  /// - async marker
+  /// - body
+  void endExtensionMethod(Token getOrSet, Token beginToken, Token beginParam,
+      Token beginInitializers, Token endToken) {
+    // TODO(danrubel): push implementation into subclasses
+    endClassMethod(
+        getOrSet, beginToken, beginParam, beginInitializers, endToken);
+  }
+
+  /// Handle the end of a class constructor declaration.  Substructures:
+  /// - metadata
+  /// - return type
+  /// - method name (identifier, possibly qualified)
+  /// - type variables
+  /// - formal parameters
+  /// - initializers
+  /// - async marker
+  /// - body
+  void endClassConstructor(Token getOrSet, Token beginToken, Token beginParam,
+      Token beginInitializers, Token endToken) {
+    // TODO(danrubel): push implementation into subclasses
+    endClassMethod(
+        getOrSet, beginToken, beginParam, beginInitializers, endToken);
+  }
+
+  /// Handle the end of a mixin constructor declaration.  Substructures:
+  /// - metadata
+  /// - return type
+  /// - method name (identifier, possibly qualified)
+  /// - type variables
+  /// - formal parameters
+  /// - initializers
+  /// - async marker
+  /// - body
+  void endMixinConstructor(Token getOrSet, Token beginToken, Token beginParam,
+      Token beginInitializers, Token endToken) {
+    // TODO(danrubel): push implementation into subclasses
+    endClassMethod(
+        getOrSet, beginToken, beginParam, beginInitializers, endToken);
+  }
+
+  /// Handle the end of a extension constructor declaration.  Substructures:
+  /// - metadata
+  /// - return type
+  /// - method name (identifier, possibly qualified)
+  /// - type variables
+  /// - formal parameters
+  /// - initializers
+  /// - async marker
+  /// - body
+  void endExtensionConstructor(Token getOrSet, Token beginToken,
+      Token beginParam, Token beginInitializers, Token endToken) {
+    // TODO(danrubel): push implementation into subclasses
+    endClassMethod(
+        getOrSet, beginToken, beginParam, beginInitializers, endToken);
   }
 
   void beginMetadataStar(Token token) {}

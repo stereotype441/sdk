@@ -327,7 +327,7 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       flags |= ClassDeclaration.hasSourcePositionsFlag;
       position = library.fileOffset;
     }
-    Annotations annotations = getAnnotations(library.annotations);
+    Annotations annotations = getLibraryAnnotations(library);
     if (annotations.object != null) {
       flags |= ClassDeclaration.hasAnnotationsFlag;
       if (annotations.hasPragma) {
@@ -418,6 +418,66 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
     }
 
     return new Annotations(functionDecl, hasPragma);
+  }
+
+  // Insert annotations for library and its dependencies into the
+  // annotations section. Returns annotations for the library only.
+  // Bytecode reader will implicitly find library dependencies by reading
+  // an extra object after reading library annotations.
+  Annotations getLibraryAnnotations(Library library) {
+    Annotations annotations = getAnnotations(library.annotations);
+    final bool emitDependencies =
+        options.emitAnnotations && library.dependencies.isNotEmpty;
+    if (annotations.object == null && !emitDependencies) {
+      return annotations;
+    }
+
+    // We need to emit both annotations and dependencies objects, appending
+    // null if an object is missing.
+    if (annotations.object == null) {
+      final annotationsDecl = new AnnotationsDeclaration(null);
+      bytecodeComponent.annotations.add(annotationsDecl);
+      annotations = new Annotations(annotationsDecl, false);
+    }
+    if (!emitDependencies) {
+      bytecodeComponent.annotations.add(new AnnotationsDeclaration(null));
+      return annotations;
+    }
+
+    // Create a constant object representing library dependencies.
+    // These objects are used by dart:mirrors and vm-service implementation.
+    final deps = <Constant>[];
+    for (var dependency in library.dependencies) {
+      final prefix = dependency.name != null
+          ? StringConstant(dependency.name)
+          : NullConstant();
+      final showNames = dependency.combinators
+          .where((c) => c.isShow)
+          .expand((c) => c.names)
+          .map((name) => StringConstant(name))
+          .toList();
+      final hideNames = dependency.combinators
+          .where((c) => c.isHide)
+          .expand((c) => c.names)
+          .map((name) => StringConstant(name))
+          .toList();
+      final depAnnots = dependency.annotations.map(_getConstant).toList();
+      deps.add(ListConstant(const DynamicType(), <Constant>[
+        StringConstant(dependency.targetLibrary.importUri.toString()),
+        BoolConstant(dependency.isExport),
+        BoolConstant(dependency.isDeferred),
+        prefix,
+        ListConstant(const DynamicType(), showNames),
+        ListConstant(const DynamicType(), hideNames),
+        ListConstant(const DynamicType(), depAnnots),
+      ]));
+    }
+    final ObjectHandle dependenciesObject =
+        objectTable.getHandle(ListConstant(const DynamicType(), deps));
+    final dependenciesDecl = new AnnotationsDeclaration(dependenciesObject);
+    bytecodeComponent.annotations.add(dependenciesDecl);
+
+    return annotations;
   }
 
   FieldDeclaration getFieldDeclaration(Field field, Code initializer) {
@@ -1583,13 +1643,16 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
     } else {
       asm.emitEntry(locals.frameSize);
     }
-    asm.emitCheckStack(0);
 
     if (isClosure) {
       asm.emitPush(locals.closureVarIndexInFrame);
       asm.emitLoadFieldTOS(cp.addInstanceField(closureContext));
       asm.emitPopLocal(locals.contextVarIndexInFrame);
     }
+
+    // CheckStack must see a properly initialized context when stress-testing
+    // stack trace collection.
+    asm.emitCheckStack(0);
 
     if (locals.hasFunctionTypeArgsVar) {
       if (function.typeParameters.isNotEmpty) {
@@ -2417,7 +2480,7 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
   /// the last finally block.
   void _generateNonLocalControlTransfer(
       TreeNode from, TreeNode to, GenerateContinuation continuation) {
-    if (options.emitDebuggerStops) {
+    if (options.emitDebuggerStops && from.fileOffset != TreeNode.noOffset) {
       asm.emitDebugCheck(); // Before context is unwound.
     }
     List<TryFinally> tryFinallyBlocks = _getEnclosingTryFinallyBlocks(from, to);
@@ -3174,6 +3237,10 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
   @override
   visitThrow(Throw node) {
     _generateNode(node.expression);
+
+    if (options.emitDebuggerStops) {
+      asm.emitDebugCheck();
+    }
     asm.emitThrow(0);
   }
 
@@ -3761,7 +3828,9 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
 
     bool hasCatchAll = false;
 
+    final savedSourcePosition = asm.currentSourcePosition;
     for (Catch catchClause in node.catches) {
+      _recordSourcePosition(catchClause.fileOffset);
       tryBlock.types.add(cp.addType(catchClause.guard));
 
       Label skipCatch;
@@ -3799,6 +3868,7 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
         asm.bind(skipCatch);
       }
     }
+    asm.currentSourcePosition = savedSourcePosition;
 
     if (!hasCatchAll) {
       tryBlock.needsStackTrace = true;

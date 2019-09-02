@@ -69,7 +69,6 @@ class VmTarget extends Target {
         // PRODUCT mode.
         'dart:mirrors',
 
-        'dart:profiler',
         'dart:typed_data',
         'dart:vmservice_io',
         'dart:_vmservice',
@@ -77,6 +76,7 @@ class VmTarget extends Target {
         'dart:nativewrappers',
         'dart:io',
         'dart:cli',
+        'dart:wasm',
       ];
 
   void _patchVmConstants(CoreTypes coreTypes) {

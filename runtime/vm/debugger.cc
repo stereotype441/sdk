@@ -2149,7 +2149,7 @@ ActivationFrame* Debugger::CollectDartFrame(Isolate* isolate,
 RawArray* Debugger::DeoptimizeToArray(Thread* thread,
                                       StackFrame* frame,
                                       const Code& code) {
-  ASSERT(code.is_optimized());
+  ASSERT(code.is_optimized() && !code.is_force_optimized());
   Isolate* isolate = thread->isolate();
   // Create the DeoptContext for this deoptimization.
   DeoptContext* deopt_context =
@@ -2222,7 +2222,17 @@ void Debugger::AppendCodeFrames(Thread* thread,
                                 Code* inlined_code,
                                 Array* deopt_frame) {
 #if !defined(DART_PRECOMPILED_RUNTIME)
-  if (code->is_optimized() && !code->is_force_optimized()) {
+  if (code->is_optimized()) {
+    if (code->is_force_optimized()) {
+      if (FLAG_trace_debugger_stacktrace) {
+        const Function& function = Function::Handle(zone, code->function());
+        ASSERT(!function.IsNull());
+        OS::PrintErr(
+            "CollectStackTrace: skipping force-optimized function: %s\n",
+            function.ToFullyQualifiedCString());
+      }
+      return;  // Skip frame of force-optimized (and non-debuggable) function.
+    }
     // TODO(rmacnak): Use CodeSourceMap
     *deopt_frame = DeoptimizeToArray(thread, frame, *code);
     for (InlinedFunctionsIterator it(*code, frame->pc()); !it.Done();
@@ -2445,6 +2455,18 @@ DebuggerStackTrace* Debugger::CollectAwaiterReturnStackTrace() {
       } else {
         code = frame->LookupDartCode();
         if (code.is_optimized()) {
+          if (code.is_force_optimized()) {
+            if (FLAG_trace_debugger_stacktrace) {
+              function = code.function();
+              ASSERT(!function.IsNull());
+              OS::PrintErr(
+                  "CollectAwaiterReturnStackTrace: "
+                  "skipping force-optimized function: %s\n",
+                  function.ToFullyQualifiedCString());
+            }
+            // Skip frame of force-optimized (and non-debuggable) function.
+            continue;
+          }
           deopt_frame = DeoptimizeToArray(thread, frame, code);
           bool found_async_awaiter = false;
           bool abort_attempt_to_navigate_through_sync_async = false;
@@ -2469,8 +2491,8 @@ DebuggerStackTrace* Debugger::CollectAwaiterReturnStackTrace() {
             if (FLAG_trace_debugger_stacktrace) {
               ASSERT(!function.IsNull());
               OS::PrintErr(
-                  "CollectAwaiterReturnStackTrace: visiting inlined function: "
-                  "%s\n",
+                  "CollectAwaiterReturnStackTrace: "
+                  "visiting inlined function: %s\n ",
                   function.ToFullyQualifiedCString());
             }
             intptr_t deopt_frame_offset = it.GetDeoptFpOffset();
@@ -4748,6 +4770,8 @@ void Debugger::HandleCodeChange(bool bytecode_loaded, const Function& func) {
       // There is no local function within func that contains the
       // breakpoint token position. Resolve the breakpoint if necessary
       // and set the code breakpoints.
+      const bool resolved_in_bytecode =
+          !bytecode_loaded && loc->IsResolved(/* in_bytecode = */ true);
       if (!loc->IsResolved(bytecode_loaded)) {
         // Resolve source breakpoint in the newly compiled function.
         TokenPosition bp_pos = ResolveBreakpointPos(
@@ -4774,7 +4798,11 @@ void Debugger::HandleCodeChange(bool bytecode_loaded, const Function& func) {
                 func.ToFullyQualifiedCString(), requested_pos.ToCString(),
                 requested_end_pos.ToCString(), loc->requested_column_number());
           }
-          SendBreakpointEvent(ServiceEvent::kBreakpointResolved, bpt);
+          // Do not signal resolution in code if already signaled resolution
+          // in bytecode.
+          if (!resolved_in_bytecode) {
+            SendBreakpointEvent(ServiceEvent::kBreakpointResolved, bpt);
+          }
           bpt = bpt->next();
         }
       }
