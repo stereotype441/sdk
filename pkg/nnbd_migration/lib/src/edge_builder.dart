@@ -1897,6 +1897,11 @@ mixin _AssignmentChecker {
       @required DecoratedType destination,
       @required bool hard}) {
     _connect(source.node, destination.node, origin, hard: hard);
+    _checkAssignment2(origin, source: source, destination: destination);
+  }
+
+  void _checkAssignment2(EdgeOrigin origin,
+      {@required DecoratedType source, @required DecoratedType destination}) {
     var sourceType = source.type;
     var destinationType = destination.type;
     if (sourceType.isBottom || sourceType.isDartCoreNull) {
@@ -1931,7 +1936,15 @@ mixin _AssignmentChecker {
         destinationType is InterfaceType) {
       if (_typeSystem.isSubtypeOf(sourceType, destinationType)) {
         // Ordinary (upcast) assignment.  No cast necessary.
-        TODO; // Handle T -> Future<T> assignment.
+        if (destinationType.isDartAsyncFutureOr) {
+          if (_typeSystem.isSubtypeOf(
+              sourceType, destinationType.typeArguments[0])) {
+            // We are looking at T <: FutureOr<U>.  So treat this as T <: U.
+            _checkAssignment2(origin,
+                source: source, destination: destination.typeArguments[0]);
+            return;
+          }
+        }
         var rewrittenSource = _decoratedClassHierarchy.asInstanceOf(
             source, destinationType.element);
         assert(rewrittenSource.typeArguments.length ==
