@@ -613,6 +613,27 @@ main() {
       });
     });
 
+    test('tryCatchStatement_bodyEnd() restores pre-try state', () {
+      var h = _Harness();
+      var x = h.addVar('x', 'int?');
+      var y = h.addVar('y', 'int?');
+      h.run((flow) {
+        h.declare(x, initialized: true);
+        h.declare(y, initialized: true);
+        h.promote(y, 'int');
+        flow.tryCatchStatement_bodyBegin();
+        h.promote(x, 'int');
+        expect(flow.promotedType(x).type, 'int');
+        expect(flow.promotedType(y).type, 'int');
+        flow.tryCatchStatement_bodyEnd({});
+        flow.tryCatchStatement_catchBegin();
+        expect(flow.promotedType(x), isNull);
+        expect(flow.promotedType(y).type, 'int');
+        flow.tryCatchStatement_catchEnd();
+        flow.tryCatchStatement_end();
+      });
+    });
+
     test('tryCatchStatement_bodyEnd() un-promotes variables assigned in body',
         () {
       var h = _Harness();
