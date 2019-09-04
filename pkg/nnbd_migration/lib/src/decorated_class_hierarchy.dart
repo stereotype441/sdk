@@ -56,7 +56,7 @@ class DecoratedClassHierarchy {
       return DecoratedType(superclass.type, _graph.never);
     }
     return _getGenericSupertypeDecorations(class_)[superclass] ??
-        (throw StateError('Unrelated types'));
+        (throw StateError('Unrelated types: $class_ and $superclass'));
   }
 
   /// Computes a map whose keys are all the superclasses of [class_], and whose
@@ -67,7 +67,7 @@ class DecoratedClassHierarchy {
     if (decorations == null) {
       // Call ourselves recursively to compute how each of [class_]'s direct
       // superclasses relates to all of its transitive superclasses.
-      decorations = _genericSupertypeDecorations[class_] = {};
+      decorations = {};
       var decoratedDirectSupertypes =
           _variables.decoratedDirectSupertypes(class_);
       for (var entry in decoratedDirectSupertypes.entries) {
@@ -93,6 +93,7 @@ class DecoratedClassHierarchy {
         // superclass.
         decorations[superclass] ??= decoratedSupertype;
       }
+      _genericSupertypeDecorations[class_] = decorations;
     }
     return decorations;
   }
