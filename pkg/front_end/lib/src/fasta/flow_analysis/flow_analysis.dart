@@ -892,12 +892,12 @@ class FlowModel<Variable, Type> {
       }());
       VariableModel<Type> info = variableInfo[variable];
       if (info?.promotedType != null) {
-        (newVariableInfo ??= Map<Variable, VariableModel<Type>>.from(
+        (newVariableInfo ??= new Map<Variable, VariableModel<Type>>.from(
             variableInfo))[variable] = info.withPromotedType(null);
       }
     }
     if (newVariableInfo == null) return this;
-    return FlowModel<Variable, Type>._(reachable, newVariableInfo);
+    return new FlowModel<Variable, Type>._(reachable, newVariableInfo);
   }
 
   /// Updates the state to reflect a control path that is known to have
