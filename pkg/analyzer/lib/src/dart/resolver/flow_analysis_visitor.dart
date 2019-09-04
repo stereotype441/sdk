@@ -162,19 +162,24 @@ class FlowAnalysisHelper {
         flow.add(parameter.declaredElement, assigned: true);
       }
     }
+
+    if (_blockFunctionBodyLevel > 1) {
+      flow.functionExpression_begin(assignedVariables.writtenInNode(node));
+    }
   }
 
   void functionBody_exit(FunctionBody node) {
     _blockFunctionBodyLevel--;
 
+    var flow = this.flow;
     if (_blockFunctionBodyLevel > 0) {
+      flow.functionExpression_end();
       return;
     }
 
     // Set this.flow to null before doing any clean-up so that if an exception
     // is raised, the state is already updated correctly, and we don't have
     // cascading failures.
-    var flow = this.flow;
     this.flow = null;
 
     if (!flow.isReachable) {
@@ -325,6 +330,32 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
   final AssignedVariables assignedVariables;
 
   _AssignedVariablesVisitor(this.assignedVariables);
+
+  @override
+  void visitBlockFunctionBody(BlockFunctionBody node) {
+    bool isClosure;
+    var parent = node.parent;
+    if (parent is FunctionExpression) {
+      var grandParent = parent.parent;
+      if (grandParent is FunctionDeclaration) {
+        var greatGrandParent = grandParent.parent;
+        if (greatGrandParent is CompilationUnit) {
+          isClosure = false;
+        } else if (greatGrandParent is FunctionDeclarationStatement) {
+          isClosure = true;
+        } else {
+          throw UnimplementedError('TODO(paulberry)');
+        }
+      } else {
+        isClosure = true;
+      }
+    } else {
+      throw UnimplementedError('TODO(paulberry)');
+    }
+    assignedVariables.beginNode(isClosure: isClosure);
+    super.visitBlockFunctionBody(node);
+    assignedVariables.endNode(node, isClosure: isClosure);
+  }
 
   @override
   void visitAssignmentExpression(AssignmentExpression node) {
