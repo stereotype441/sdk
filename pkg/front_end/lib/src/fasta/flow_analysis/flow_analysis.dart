@@ -309,7 +309,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// This method should be called at the conclusion of flow analysis for a top
   /// level function or method.  Performs assertion checks.
   void finish() {
-    return;
     assert(_stack.isEmpty);
     assert(() {
       Set<Variable> variablesNotAdded = _referencedVariables
