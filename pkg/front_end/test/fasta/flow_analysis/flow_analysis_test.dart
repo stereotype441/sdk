@@ -742,6 +742,7 @@ main() {
         flow.ifStatement_elseBegin();
         expect(flow.promotedType(x), isNull);
         flow.ifStatement_end(true);
+        h.declare(x, initialized: true);
       });
     });
   });
