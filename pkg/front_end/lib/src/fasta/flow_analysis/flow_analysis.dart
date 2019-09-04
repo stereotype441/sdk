@@ -801,6 +801,10 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
             variablesWrittenAnywhere, variablesCapturedAnywhere);
 
   @override
+  bool get isReachable =>
+      _wrap('isReachable', () => _wrapped.isReachable, isQuery: true);
+
+  @override
   void add(Variable variable, {bool assigned: false}) {
     _wrap('add($variable, assigned: $assigned)',
         () => _wrapped.add(variable, assigned: assigned));
@@ -832,6 +836,18 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
   }
 
   @override
+  void functionExpression_begin(Iterable<Variable> writeCaptured) {
+    writeCaptured = writeCaptured.toList();
+    _wrap('functionExpression_begin($writeCaptured)',
+        () => _wrapped.functionExpression_begin(writeCaptured));
+  }
+
+  @override
+  void functionExpression_end() {
+    _wrap('functionExpression_end()', () => _wrapped.functionExpression_end());
+  }
+
+  @override
   void handleBreak(Statement target) {
     _wrap('handleBreak($target)', () => _wrapped.handleBreak(target));
   }
@@ -855,6 +871,13 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
   void ifStatement_thenBegin(Expression condition) {
     _wrap('ifStatement_thenBegin($condition)',
         () => _wrapped.ifStatement_thenBegin(condition));
+  }
+
+  @override
+  void isExpression_end(
+      Expression isExpression, Variable variable, bool isNot, Type type) {
+    _wrap('isExpression_end($isExpression, $variable, $isNot, $type)',
+        () => _wrapped.isExpression_end(isExpression, variable, isNot, type));
   }
 
   @override
