@@ -729,6 +729,44 @@ main() {
       });
     });
 
+    test('tryFinallyStatement_finallyBegin() restores pre-try state', () {
+      var h = _Harness();
+      var x = h.addVar('x', 'int?');
+      var y = h.addVar('y', 'int?');
+      h.run((flow) {
+        h.declare(x, initialized: true);
+        h.declare(y, initialized: true);
+        h.promote(y, 'int');
+        flow.tryFinallyStatement_bodyBegin();
+        h.promote(x, 'int');
+        expect(flow.promotedType(x).type, 'int');
+        expect(flow.promotedType(y).type, 'int');
+        flow.tryFinallyStatement_finallyBegin({});
+        expect(flow.promotedType(x), isNull);
+        expect(flow.promotedType(y).type, 'int');
+        flow.tryFinallyStatement_end({});
+      });
+    });
+
+    test(
+        'tryFinallyStatement_finallyBegin() un-promotes variables assigned in '
+        'body', () {
+      var h = _Harness();
+      var x = h.addVar('x', 'int?');
+      h.run((flow) {
+        h.declare(x, initialized: true);
+        h.promote(x, 'int');
+        expect(flow.promotedType(x).type, 'int');
+        flow.tryFinallyStatement_bodyBegin();
+        flow.write(x);
+        h.promote(x, 'int');
+        expect(flow.promotedType(x).type, 'int');
+        flow.tryFinallyStatement_finallyBegin({x});
+        expect(flow.promotedType(x), isNull);
+        flow.tryFinallyStatement_end({});
+      });
+    });
+
     test('whileStatement_conditionBegin() un-promotes', () {
       var h = _Harness();
       var x = h.addVar('x', 'int?');
