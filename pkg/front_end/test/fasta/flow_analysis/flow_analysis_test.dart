@@ -159,8 +159,26 @@ main() {
         h.declare(x, initialized: true);
         h.promote(x, 'int');
         expect(flow.promotedType(x).type, 'int');
-        flow.doStatement_bodyBegin(_Statement(), {x});
+        flow.doStatement_bodyBegin(_Statement(), {x}, {});
         expect(flow.promotedType(x), isNull);
+        flow.doStatement_conditionBegin();
+        flow.doStatement_end(_Expression());
+      });
+    });
+
+    test('doStatement_bodyBegin() handles write captures in the loop', () {
+      var h = _Harness();
+      var x = h.addVar('x', 'int?', hasWrites: true, isCaptured: true);
+      h.run((flow) {
+        h.declare(x, initialized: true);
+        flow.doStatement_bodyBegin(_Statement(), {x}, {x});
+        h.promote(x, 'int');
+        // The promotion should have no effect, because the second time through
+        // the loop, x has been write-captured.
+        expect(flow.promotedType(x), isNull);
+        h.function({x}, () {
+          flow.write(x);
+        });
         flow.doStatement_conditionBegin();
         flow.doStatement_end(_Expression());
       });
@@ -172,7 +190,7 @@ main() {
       h.run((flow) {
         h.declare(x, initialized: true);
         var stmt = _Statement();
-        flow.doStatement_bodyBegin(stmt, {});
+        flow.doStatement_bodyBegin(stmt, {}, {});
         h.if_(h.notNull(x), () {
           flow.handleContinue(stmt);
         });
@@ -191,7 +209,7 @@ main() {
       var x = h.addVar('x', 'int?');
       h.run((flow) {
         h.declare(x, initialized: true);
-        flow.doStatement_bodyBegin(_Statement(), {});
+        flow.doStatement_bodyBegin(_Statement(), {}, {});
         flow.doStatement_conditionBegin();
         expect(flow.promotedType(x), isNull);
         flow.doStatement_end(h.eqNull(x)());
@@ -217,13 +235,33 @@ main() {
 
     test('for_conditionBegin() un-promotes', () {
       var h = _Harness();
-      var x = h.addVar('x', 'int?');
+      var x = h.addVar('x', 'int?', hasWrites: true);
       h.run((flow) {
         h.declare(x, initialized: true);
         h.promote(x, 'int');
         expect(flow.promotedType(x).type, 'int');
-        flow.for_conditionBegin({x});
+        flow.for_conditionBegin({x}, {});
         expect(flow.promotedType(x), isNull);
+        flow.for_bodyBegin(_Statement(), _Expression());
+        flow.write(x);
+        flow.for_updaterBegin();
+        flow.for_end();
+      });
+    });
+
+    test('for_conditionBegin() handles write captures in the loop', () {
+      var h = _Harness();
+      var x = h.addVar('x', 'int?', hasWrites: true, isCaptured: true);
+      h.run((flow) {
+        h.declare(x, initialized: true);
+        h.promote(x, 'int');
+        expect(flow.promotedType(x).type, 'int');
+        flow.for_conditionBegin({x}, {x});
+        h.promote(x, 'int');
+        expect(flow.promotedType(x), isNull);
+        h.function({x}, () {
+          flow.write(x);
+        });
         flow.for_bodyBegin(_Statement(), _Expression());
         flow.for_updaterBegin();
         flow.for_end();
@@ -237,7 +275,7 @@ main() {
       h.run((flow) {
         h.declare(y, initialized: true);
         h.promote(y, 'int');
-        flow.for_conditionBegin({x});
+        flow.for_conditionBegin({x}, {});
         flow.add(x, assigned: true);
         flow.for_bodyBegin(_Statement(), _Expression());
         flow.for_updaterBegin();
@@ -248,7 +286,7 @@ main() {
     test('for_bodyBegin() handles empty condition', () {
       var h = _Harness();
       h.run((flow) {
-        flow.for_conditionBegin({});
+        flow.for_conditionBegin({}, {});
         flow.for_bodyBegin(_Statement(), null);
         flow.for_updaterBegin();
         expect(flow.isReachable, isTrue);
@@ -262,7 +300,7 @@ main() {
       var x = h.addVar('x', 'int?');
       h.run((flow) {
         h.declare(x, initialized: true);
-        flow.for_conditionBegin({});
+        flow.for_conditionBegin({}, {});
         flow.for_bodyBegin(_Statement(), h.notNull(x)());
         expect(flow.promotedType(x).type, 'int');
         flow.for_updaterBegin();
@@ -276,7 +314,7 @@ main() {
       var x = h.addVar('x', 'int?');
       h.run((flow) {
         h.declare(x, initialized: true);
-        flow.for_conditionBegin({});
+        flow.for_conditionBegin({}, {});
         flow.for_bodyBegin(null, h.notNull(x)());
         flow.for_updaterBegin();
         flow.for_end();
@@ -296,7 +334,7 @@ main() {
         h.declare(y, initialized: true);
         h.declare(z, initialized: true);
         var stmt = _Statement();
-        flow.for_conditionBegin({});
+        flow.for_conditionBegin({}, {});
         flow.for_bodyBegin(stmt, h.expr());
         h.if_(h.expr, () {
           h.promote(x, 'int');
@@ -326,7 +364,7 @@ main() {
         h.declare(y, initialized: true);
         h.declare(z, initialized: true);
         var stmt = _Statement();
-        flow.for_conditionBegin({});
+        flow.for_conditionBegin({}, {});
         flow.for_bodyBegin(stmt, h.or(h.eqNull(x), h.eqNull(z))());
         h.if_(h.expr, () {
           h.promote(x, 'int');
@@ -343,13 +381,31 @@ main() {
 
     test('forEach_bodyBegin() un-promotes', () {
       var h = _Harness();
-      var x = h.addVar('x', 'int?');
+      var x = h.addVar('x', 'int?', hasWrites: true);
       h.run((flow) {
         h.declare(x, initialized: true);
         h.promote(x, 'int');
         expect(flow.promotedType(x).type, 'int');
-        flow.forEach_bodyBegin({x});
+        flow.forEach_bodyBegin({x}, {});
         expect(flow.promotedType(x), isNull);
+        flow.write(x);
+        flow.forEach_end();
+      });
+    });
+
+    test('forEach_bodyBegin() handles write captures in the loop', () {
+      var h = _Harness();
+      var x = h.addVar('x', 'int?', hasWrites: true, isCaptured: true);
+      h.run((flow) {
+        h.declare(x, initialized: true);
+        h.promote(x, 'int');
+        expect(flow.promotedType(x).type, 'int');
+        flow.forEach_bodyBegin({x}, {x});
+        h.promote(x, 'int');
+        expect(flow.promotedType(x), isNull);
+        h.function({x}, () {
+          flow.write(x);
+        });
         flow.forEach_end();
       });
     });
@@ -359,7 +415,7 @@ main() {
       var x = h.addVar('x', 'int?');
       h.run((flow) {
         h.declare(x, initialized: true);
-        flow.forEach_bodyBegin({});
+        flow.forEach_bodyBegin({}, {});
         h.promote(x, 'int');
         expect(flow.promotedType(x).type, 'int');
         flow.forEach_end();
@@ -646,11 +702,11 @@ main() {
         h.declare(x, initialized: true);
         h.promote(x, 'int');
         flow.switchStatement_expressionEnd(_Statement());
-        flow.switchStatement_beginCase(false, {x});
+        flow.switchStatement_beginCase(false, {x}, {});
         expect(flow.promotedType(x).type, 'int');
         flow.write(x);
         expect(flow.promotedType(x), isNull);
-        flow.switchStatement_beginCase(false, {x});
+        flow.switchStatement_beginCase(false, {x}, {});
         expect(flow.promotedType(x).type, 'int');
         flow.write(x);
         expect(flow.promotedType(x), isNull);
@@ -665,9 +721,27 @@ main() {
         h.declare(x, initialized: true);
         h.promote(x, 'int');
         flow.switchStatement_expressionEnd(_Statement());
-        flow.switchStatement_beginCase(false, {x});
+        flow.switchStatement_beginCase(false, {x}, {});
         expect(flow.promotedType(x).type, 'int');
         flow.write(x);
+        expect(flow.promotedType(x), isNull);
+        flow.switchStatement_end(false);
+      });
+    });
+
+    test('switchStatement_beginCase(false) handles write captures in cases',
+        () {
+      var h = _Harness();
+      var x = h.addVar('x', 'int?', hasWrites: true, isCaptured: true);
+      h.run((flow) {
+        h.declare(x, initialized: true);
+        h.promote(x, 'int');
+        flow.switchStatement_expressionEnd(_Statement());
+        flow.switchStatement_beginCase(false, {x}, {x});
+        expect(flow.promotedType(x).type, 'int');
+        h.function({x}, () {
+          flow.write(x);
+        });
         expect(flow.promotedType(x), isNull);
         flow.switchStatement_end(false);
       });
@@ -680,9 +754,27 @@ main() {
         h.declare(x, initialized: true);
         h.promote(x, 'int');
         flow.switchStatement_expressionEnd(_Statement());
-        flow.switchStatement_beginCase(true, {x});
+        flow.switchStatement_beginCase(true, {x}, {});
         expect(flow.promotedType(x), isNull);
         flow.write(x);
+        expect(flow.promotedType(x), isNull);
+        flow.switchStatement_end(false);
+      });
+    });
+
+    test('switchStatement_beginCase(true) handles write captures in cases', () {
+      var h = _Harness();
+      var x = h.addVar('x', 'int?', hasWrites: true, isCaptured: true);
+      h.run((flow) {
+        h.declare(x, initialized: true);
+        h.promote(x, 'int');
+        flow.switchStatement_expressionEnd(_Statement());
+        flow.switchStatement_beginCase(true, {x}, {x});
+        h.promote(x, 'int');
+        expect(flow.promotedType(x), isNull);
+        h.function({x}, () {
+          flow.write(x);
+        });
         expect(flow.promotedType(x), isNull);
         flow.switchStatement_end(false);
       });
@@ -701,7 +793,7 @@ main() {
         h.promote(z, 'int');
         var stmt = _Statement();
         flow.switchStatement_expressionEnd(stmt);
-        flow.switchStatement_beginCase(false, {y});
+        flow.switchStatement_beginCase(false, {y}, {});
         h.promote(x, 'int');
         flow.write(y);
         flow.handleBreak(stmt);
@@ -728,12 +820,12 @@ main() {
         h.promote(z, 'int');
         var stmt = _Statement();
         flow.switchStatement_expressionEnd(stmt);
-        flow.switchStatement_beginCase(false, {x, y});
+        flow.switchStatement_beginCase(false, {x, y}, {});
         h.promote(w, 'int');
         h.promote(y, 'int');
         flow.write(x);
         flow.handleBreak(stmt);
-        flow.switchStatement_beginCase(false, {x, y});
+        flow.switchStatement_beginCase(false, {x, y}, {});
         h.promote(w, 'int');
         h.promote(x, 'int');
         flow.write(y);
@@ -753,10 +845,10 @@ main() {
         h.declare(x, initialized: true);
         var stmt = _Statement();
         flow.switchStatement_expressionEnd(stmt);
-        flow.switchStatement_beginCase(false, {});
+        flow.switchStatement_beginCase(false, {}, {});
         h.promote(x, 'int');
         flow.handleBreak(stmt);
-        flow.switchStatement_beginCase(false, {});
+        flow.switchStatement_beginCase(false, {}, {});
         flow.switchStatement_end(true);
         expect(flow.promotedType(x), isNull);
       });
@@ -768,7 +860,7 @@ main() {
       h.run((flow) {
         h.declare(x, initialized: false);
         var trueCondition = _Expression();
-        flow.whileStatement_conditionBegin({x});
+        flow.whileStatement_conditionBegin({x}, {});
         flow.booleanLiteral(trueCondition, true);
         flow.whileStatement_bodyBegin(_Statement(), trueCondition);
         flow.whileStatement_end();
@@ -1035,23 +1127,40 @@ main() {
             .add(h, objectQVar)
             .add(h, intQVar)
             .promote(h, objectQVar, _Type('int'));
-        var s2 = s1.removePromotedAll([intQVar], null);
+        var s2 = s1.removePromotedAll([intQVar], [], null);
         expect(s2, same(s1));
       });
 
-      test('changed', () {
+      test('written', () {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
             .add(h, objectQVar)
             .add(h, intQVar)
             .promote(h, objectQVar, _Type('int'))
             .promote(h, intQVar, _Type('int'));
-        var s2 = s1.removePromotedAll([intQVar], null);
+        var s2 = s1.removePromotedAll([intQVar], [], null);
         expect(s2.reachable, true);
         _Type.allowComparisons(() {
           expect(s2.variableInfo, {
             objectQVar: VariableModel<_Type>(_Type('int'), false, false),
             intQVar: VariableModel<_Type>(null, false, false)
+          });
+        });
+      });
+
+      test('write captured', () {
+        var h = _Harness();
+        var s1 = FlowModel<_Var, _Type>(true)
+            .add(h, objectQVar)
+            .add(h, intQVar)
+            .promote(h, objectQVar, _Type('int'))
+            .promote(h, intQVar, _Type('int'));
+        var s2 = s1.removePromotedAll([], [intQVar], null);
+        expect(s2.reachable, true);
+        _Type.allowComparisons(() {
+          expect(s2.variableInfo, {
+            objectQVar: VariableModel<_Type>(_Type('int'), false, false),
+            intQVar: VariableModel<_Type>(null, false, true)
           });
         });
       });

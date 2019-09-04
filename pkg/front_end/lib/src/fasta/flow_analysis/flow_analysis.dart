@@ -278,9 +278,10 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     }
   }
 
-  void doStatement_bodyBegin(
-      Statement doStatement, Iterable<Variable> loopAssigned) {
-    _current = _current.removePromotedAll(loopAssigned, _referencedVariables);
+  void doStatement_bodyBegin(Statement doStatement,
+      Iterable<Variable> loopAssigned, Iterable<Variable> loopCaptured) {
+    _current = _current.removePromotedAll(
+        loopAssigned, loopCaptured, _referencedVariables);
 
     _statementToStackIndex[doStatement] = _stack.length;
     _stack.add(null); // break
@@ -373,8 +374,10 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   ///
   /// [loopAssigned] should be the set of variables that are assigned anywhere
   /// in the loop's condition, updaters, or body.
-  void for_conditionBegin(Set<Variable> loopAssigned) {
-    _current = _current.removePromotedAll(loopAssigned, _referencedVariables);
+  void for_conditionBegin(
+      Set<Variable> loopAssigned, Set<Variable> loopCaptured) {
+    _current = _current.removePromotedAll(
+        loopAssigned, loopCaptured, _referencedVariables);
   }
 
   /// Call this method just after visiting the updaters of a conventional "for"
@@ -409,9 +412,11 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   ///
   /// [loopAssigned] should be the set of variables that are assigned anywhere
   /// in the loop's body.
-  void forEach_bodyBegin(Set<Variable> loopAssigned) {
+  void forEach_bodyBegin(
+      Iterable<Variable> loopAssigned, Iterable<Variable> loopCaptured) {
     _stack.add(_current);
-    _current = _current.removePromotedAll(loopAssigned, _referencedVariables);
+    _current = _current.removePromotedAll(
+        loopAssigned, loopCaptured, _referencedVariables);
   }
 
   /// Call this method just before visiting the body of a "for-in" statement or
@@ -425,8 +430,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     ++_functionNestingLevel;
     _current = _current.writeCapture(writeCaptured, _referencedVariables);
     _stack.add(_current);
-    _current = _current.removePromotedAll(_variablesWrittenAnywhere, null);
-    _current = _current.writeCaptureAll(_variablesCapturedAnywhere);
+    _current = _current.removePromotedAll(
+        _variablesWrittenAnywhere, _variablesCapturedAnywhere, null);
   }
 
   void functionExpression_end() {
@@ -591,11 +596,11 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   ///
   /// The [notPromoted] set contains all variables that are potentially assigned
   /// within the body of the switch statement.
-  void switchStatement_beginCase(
-      bool hasLabel, Iterable<Variable> notPromoted) {
+  void switchStatement_beginCase(bool hasLabel, Iterable<Variable> notPromoted,
+      Iterable<Variable> captured) {
     if (hasLabel) {
-      _current =
-          _stack.last.removePromotedAll(notPromoted, _referencedVariables);
+      _current = _stack.last
+          .removePromotedAll(notPromoted, captured, _referencedVariables);
     } else {
       _current = _stack.last;
     }
@@ -643,10 +648,11 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     // Tail of the stack: beforeBody
   }
 
-  void tryCatchStatement_bodyEnd(Iterable<Variable> assignedInBody) {
+  void tryCatchStatement_bodyEnd(
+      Iterable<Variable> assignedInBody, Iterable<Variable> capturedInBody) {
     FlowModel<Variable, Type> beforeBody = _stack.removeLast();
-    FlowModel<Variable, Type> beforeCatch =
-        beforeBody.removePromotedAll(assignedInBody, _referencedVariables);
+    FlowModel<Variable, Type> beforeCatch = beforeBody.removePromotedAll(
+        assignedInBody, capturedInBody, _referencedVariables);
     _stack.add(beforeCatch);
     _stack.add(_current); // afterBodyAndCatches
     // Tail of the stack: beforeCatch, afterBodyAndCatches
@@ -678,12 +684,15 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _current = _current.restrict(typeOperations, afterBody, assignedInFinally);
   }
 
-  void tryFinallyStatement_finallyBegin(Iterable<Variable> assignedInBody) {
+  void tryFinallyStatement_finallyBegin(
+      Iterable<Variable> assignedInBody, Iterable<Variable> capturedInBody) {
     FlowModel<Variable, Type> beforeTry = _stack.removeLast();
     FlowModel<Variable, Type> afterBody = _current;
     _stack.add(afterBody);
-    _current = _join(afterBody,
-        beforeTry.removePromotedAll(assignedInBody, _referencedVariables));
+    _current = _join(
+        afterBody,
+        beforeTry.removePromotedAll(
+            assignedInBody, capturedInBody, _referencedVariables));
   }
 
   void whileStatement_bodyBegin(
@@ -700,8 +709,10 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _current = trueCondition;
   }
 
-  void whileStatement_conditionBegin(Iterable<Variable> loopAssigned) {
-    _current = _current.removePromotedAll(loopAssigned, _referencedVariables);
+  void whileStatement_conditionBegin(
+      Iterable<Variable> loopAssigned, Iterable<Variable> loopCaptured) {
+    _current = _current.removePromotedAll(
+        loopAssigned, loopCaptured, _referencedVariables);
   }
 
   void whileStatement_end() {
@@ -715,9 +726,15 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// Register write of the given [variable] in the current state.
   void write(Variable variable) {
     _variableReferenced(variable);
-    assert(_variablesWrittenAnywhere.contains(variable));
-    assert(_functionNestingLevel == 0 ||
-        _variablesCapturedAnywhere.contains(variable));
+    assert(
+        _variablesWrittenAnywhere.contains(variable),
+        "Variable is written to, but was not included in "
+        "_variablesWrittenAnywhere");
+    assert(
+        _functionNestingLevel == 0 ||
+            _variablesCapturedAnywhere.contains(variable),
+        "Variable is captured by a local function, but was not included in "
+        "_variablesCapturedAnywhere");
     _current = _current.write(typeOperations, variable);
   }
 
@@ -865,12 +882,12 @@ class FlowModel<Variable, Type> {
     return _updateVariableInfo(variable, info.withPromotedType(type));
   }
 
-  /// Updates the state to indicate that the given [variables] are no longer
-  /// promoted; they are presumed to have their declared types.
+  /// Updates the state to indicate that the given [writtenVariables] are no
+  /// longer promoted; they are presumed to have their declared types.
   ///
   /// If assertions are enabled and [referencedVariables] is not `null`, all
-  /// variables in [variables] will be stored in [referencedVariables] as a side
-  /// effect of this call.
+  /// variables in [writtenVariables] will be stored in [referencedVariables] as
+  /// a side effect of this call.
   ///
   /// This is used at the top of loops to conservatively cancel the promotion of
   /// variables that are modified within the loop, so that we correctly analyze
@@ -889,9 +906,11 @@ class FlowModel<Variable, Type> {
   /// later in the loop body.  If we switch to a fixed point analysis, we should
   /// be able to remove this method.
   FlowModel<Variable, Type> removePromotedAll(
-      Iterable<Variable> variables, Set<Variable> referencedVariables) {
+      Iterable<Variable> writtenVariables,
+      Iterable<Variable> capturedVariables,
+      Set<Variable> referencedVariables) {
     Map<Variable, VariableModel<Type>> newVariableInfo;
-    for (Variable variable in variables) {
+    for (Variable variable in writtenVariables) {
       assert(() {
         referencedVariables?.add(variable);
         return true;
@@ -900,6 +919,16 @@ class FlowModel<Variable, Type> {
       if (info?.promotedType != null) {
         (newVariableInfo ??= new Map<Variable, VariableModel<Type>>.from(
             variableInfo))[variable] = info.withPromotedType(null);
+      }
+    }
+    for (Variable variable in capturedVariables) {
+      VariableModel<Type> info = variableInfo[variable];
+      if (info == null) {
+        (newVariableInfo ??= new Map<Variable, VariableModel<Type>>.from(
+            variableInfo))[variable] = VariableModel<Type>(null, false, true);
+      } else if (!info.writeCaptured) {
+        (newVariableInfo ??= new Map<Variable, VariableModel<Type>>.from(
+            variableInfo))[variable] = info.writeCapture();
       }
     }
     if (newVariableInfo == null) return this;
@@ -1014,40 +1043,6 @@ class FlowModel<Variable, Type> {
     }
     if (newVariableInfo == null) return this;
     return FlowModel<Variable, Type>._(reachable, newVariableInfo);
-  }
-
-  /// Updates the state to indicate that the given [variables] are
-  /// write-captured.
-  ///
-  /// This is used at the top of local functions to prohibit the promotion of
-  /// variables that might be promoted in other local functions, so that we
-  /// correctly analyze code like the following:
-  ///
-  ///     f(Object x) {
-  ///       void Function() h;
-  ///       var g = () {
-  ///         if (x is int) {
-  ///           h();
-  ///           x.isEven; // ERROR: unsafe to promote
-  ///         }
-  ///       };
-  ///       h = () { x = "hello"; }
-  ///       g();
-  ///     }
-  FlowModel<Variable, Type> writeCaptureAll(Iterable<Variable> variables) {
-    Map<Variable, VariableModel<Type>> newVariableInfo;
-    for (Variable variable in variables) {
-      VariableModel<Type> info = variableInfo[variable];
-      if (info == null) {
-        (newVariableInfo ??= new Map<Variable, VariableModel<Type>>.from(
-            variableInfo))[variable] = VariableModel<Type>(null, false, true);
-      } else if (!info.writeCaptured) {
-        (newVariableInfo ??= new Map<Variable, VariableModel<Type>>.from(
-            variableInfo))[variable] = info.writeCapture();
-      }
-    }
-    if (newVariableInfo == null) return this;
-    return new FlowModel<Variable, Type>._(reachable, newVariableInfo);
   }
 
   /// Returns a new [FlowModel] where the information for [variable] is replaced

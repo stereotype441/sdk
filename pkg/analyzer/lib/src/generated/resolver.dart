@@ -3707,7 +3707,7 @@ class ResolverVisitor extends ScopedVisitor {
 
     _flowAnalysis?.flow?.doStatement_bodyBegin(
       node,
-      _flowAnalysis.assignedVariables.writtenInNode(node),
+      _flowAnalysis.assignedVariables.writtenInNode(node), _flowAnalysis.assignedVariables.capturedInNode(node)
     );
     visitStatementInScope(body);
 
@@ -3865,7 +3865,7 @@ class ResolverVisitor extends ScopedVisitor {
       _flowAnalysis?.loopVariable(loopVariable);
       loopVariable?.accept(this);
       _flowAnalysis?.flow?.forEach_bodyBegin(
-          _flowAnalysis.assignedVariables.writtenInNode(node));
+          _flowAnalysis.assignedVariables.writtenInNode(node), _flowAnalysis.assignedVariables.capturedInNode(node));
       node.body?.accept(this);
       _flowAnalysis?.flow?.forEach_end();
 
@@ -3943,6 +3943,7 @@ class ResolverVisitor extends ScopedVisitor {
 
       _flowAnalysis?.flow?.forEach_bodyBegin(
         _flowAnalysis.assignedVariables.writtenInNode(node),
+        _flowAnalysis.assignedVariables.capturedInNode(node)
       );
 
       Statement body = node.body;
@@ -4427,6 +4428,7 @@ class ResolverVisitor extends ScopedVisitor {
         var flow = _flowAnalysis.flow;
         var assignedInCases =
             _flowAnalysis.assignedVariables.writtenInNode(node);
+        var capturedInCases = _flowAnalysis.assignedVariables.capturedInNode(node);
 
         flow.switchStatement_expressionEnd(node);
 
@@ -4436,6 +4438,7 @@ class ResolverVisitor extends ScopedVisitor {
           flow.switchStatement_beginCase(
             member.labels.isNotEmpty,
             assignedInCases,
+            capturedInCases
           );
           member.accept(this);
 
@@ -4480,6 +4483,7 @@ class ResolverVisitor extends ScopedVisitor {
     body.accept(this);
     flow.tryCatchStatement_bodyEnd(
       _flowAnalysis.assignedVariables.writtenInNode(body),
+      _flowAnalysis.assignedVariables.capturedInNode(body)
     );
 
     var catchLength = catchClauses.length;
@@ -4501,6 +4505,7 @@ class ResolverVisitor extends ScopedVisitor {
     if (finallyBlock != null) {
       flow.tryFinallyStatement_finallyBegin(
         _flowAnalysis.assignedVariables.writtenInNode(body),
+        _flowAnalysis.assignedVariables.capturedInNode(body)
       );
       finallyBlock.accept(this);
       flow.tryFinallyStatement_end(
@@ -4556,6 +4561,7 @@ class ResolverVisitor extends ScopedVisitor {
 
       _flowAnalysis?.flow?.whileStatement_conditionBegin(
         _flowAnalysis.assignedVariables.writtenInNode(node),
+        _flowAnalysis.assignedVariables.capturedInNode(node)
       );
       condition?.accept(this);
 
