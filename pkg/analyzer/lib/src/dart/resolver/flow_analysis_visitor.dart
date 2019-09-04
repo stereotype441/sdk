@@ -136,7 +136,8 @@ class FlowAnalysisHelper {
   }
 
   void for_conditionBegin(AstNode node, Expression condition) {
-    flow.for_conditionBegin(assignedVariables.writtenInNode(node), assignedVariables.capturedInNode(node));
+    flow.for_conditionBegin(assignedVariables.writtenInNode(node),
+        assignedVariables.capturedInNode(node));
   }
 
   void functionBody_enter(FunctionBody node) {
@@ -151,7 +152,8 @@ class FlowAnalysisHelper {
       flow = FlowAnalysis<Statement, Expression, VariableElement, DartType>(
           _nodeOperations,
           _typeOperations,
-          assignedVariables.writtenInNode(node), assignedVariables.capturedInNode(node));
+          assignedVariables.writtenInNode(node),
+          assignedVariables.capturedInNode(node));
     }
 
     var parameters = _enclosingExecutableParameters(node);
