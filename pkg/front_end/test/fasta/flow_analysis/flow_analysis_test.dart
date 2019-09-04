@@ -8,6 +8,16 @@ import 'package:test/test.dart';
 
 main() {
   group('API', () {
+    test('add handles already-added variable', () {
+      var h = _Harness();
+      var x = h.addVar('x', 'int?', hasWrites: true);
+      h.run((flow) {
+        flow.write(x);
+        flow.add(x);
+        expect(flow.isAssigned(x), isTrue);
+      });
+    });
+
     test('conditional_thenBegin promotes true branch', () {
       var h = _Harness();
       var x = h.addVar('x', 'int?');
@@ -597,6 +607,34 @@ main() {
 
     test('isExpression_end does not promote to an unrelated type', () {
       _checkIs('int', 'String', null);
+    });
+
+    test('isExpression_end() does not promote write-captured vars', () {
+      var h = _Harness();
+      var x = h.addVar('x', 'int?', hasWrites: true, isCaptured: true);
+      h.run((flow) {
+        h.declare(x, initialized: true);
+        h.if_(h.isType(x, 'int'), () {
+          expect(flow.promotedType(x).type, 'int');
+        });
+        h.function({x}, () {
+          flow.write(x);
+        });
+        h.if_(h.isType(x, 'int'), () {
+          expect(flow.promotedType(x), isNull);
+        });
+      });
+    });
+
+    test('isExpression_end() handles not-yet-seen variables', () {
+      var h = _Harness();
+      var x = h.addVar('x', 'int?', hasWrites: true, isCaptured: true);
+      h.run((flow) {
+        h.if_(h.isType(x, 'int'), () {
+          expect(flow.promotedType(x).type, 'int');
+        });
+        h.declare(x, initialized: true);
+      });
     });
 
     test('logicalBinaryOp_rightBegin(isAnd: true) promotes in RHS', () {
@@ -1570,6 +1608,16 @@ class _Harness
     if (leftType.type == rightType.type) return true;
     var query = '$leftType <: $rightType';
     return _subtypes[query] ?? fail('Unknown subtype query: $query');
+  }
+
+  /// Creates a [LazyExpression] representing an `is` check, checking whether
+  /// [variable] has the given [type].
+  LazyExpression isType(_Var variable, String type) {
+    return () {
+      var expr = _Expression();
+      _flow.isExpression_end(expr, variable, false, _Type(type));
+      return expr;
+    };
   }
 
   /// Creates a [LazyExpression] representing a `!= null` check performed on

@@ -349,6 +349,8 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
       } else {
         isClosure = true;
       }
+    } else if (parent is MethodDeclaration || parent is ConstructorDeclaration) {
+      isClosure = false;
     } else {
       throw UnimplementedError('TODO(paulberry)');
     }

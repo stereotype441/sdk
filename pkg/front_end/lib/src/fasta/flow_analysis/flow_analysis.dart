@@ -428,7 +428,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   void functionExpression_begin(Iterable<Variable> writeCaptured) {
     ++_functionNestingLevel;
-    _current = _current.writeCapture(writeCaptured, _referencedVariables);
+    _current = _current
+        .removePromotedAll(const [], writeCaptured, _referencedVariables);
     _stack.add(_current);
     _current = _current.removePromotedAll(
         _variablesWrittenAnywhere, _variablesCapturedAnywhere, null);
@@ -1012,37 +1013,12 @@ class FlowModel<Variable, Type> {
   FlowModel<Variable, Type> write(
       TypeOperations<Variable, Type> typeOperations, Variable variable) {
     VariableModel<Type> infoForVar = variableInfo[variable];
+    if (infoForVar == null) {
+      return add(typeOperations, variable, assigned: true);
+    }
     VariableModel<Type> newInfoForVar = infoForVar.write();
     if (identical(newInfoForVar, infoForVar)) return this;
     return _updateVariableInfo(variable, newInfoForVar);
-  }
-
-  /// Updates the state to indicate that the given [variables] have been
-  /// write-captured.
-  ///
-  /// If assertions are enabled and [referencedVariables] is not `null`, all
-  /// variables in [variables] will be stored in [referencedVariables] as a side
-  /// effect of this call.
-  FlowModel<Variable, Type> writeCapture(
-      Iterable<Variable> variables, Set<Variable> referencedVariables) {
-    Map<Variable, VariableModel<Type>> newVariableInfo;
-    for (Variable variable in variables) {
-      assert(() {
-        referencedVariables?.add(variable);
-        return true;
-      }());
-      VariableModel<Type> info = variableInfo[variable];
-      if (info == null) {
-        (newVariableInfo ??= Map<Variable, VariableModel<Type>>.from(
-                variableInfo))[variable] =
-            new VariableModel<Type>(null, false, true);
-      } else if (!info.writeCaptured) {
-        (newVariableInfo ??= Map<Variable, VariableModel<Type>>.from(
-            variableInfo))[variable] = info.writeCapture();
-      }
-    }
-    if (newVariableInfo == null) return this;
-    return FlowModel<Variable, Type>._(reachable, newVariableInfo);
   }
 
   /// Returns a new [FlowModel] where the information for [variable] is replaced
