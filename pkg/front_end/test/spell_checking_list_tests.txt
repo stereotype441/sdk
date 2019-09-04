@@ -38,6 +38,7 @@ benchmark
 besides
 beta
 bigger
+blacklist
 blah
 blindly
 blocked
@@ -71,6 +72,7 @@ codepath
 collisions
 commit
 companion
+comparer
 comparisons
 compilations
 compiler's
@@ -269,6 +271,7 @@ pubspec
 pv
 px
 py
+python
 quot
 r"\s
 rd
@@ -319,6 +322,7 @@ strongest
 stub's
 stupid
 subcommand
+subdir
 subtool
 subtools
 suite

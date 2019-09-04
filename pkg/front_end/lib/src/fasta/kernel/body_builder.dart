@@ -1785,105 +1785,6 @@ class BodyBuilder extends ScopeListener<JumpTarget>
         this, token, createVariableGet(variable, charOffset), name);
   }
 
-  @override
-  Expression createExtensionTearOff(
-      int fileOffset,
-      Procedure procedure,
-      VariableDeclaration extensionThis,
-      List<TypeParameter> extensionTypeParameters) {
-    FunctionNode function = procedure.function;
-    List<TypeParameter> typeParameters = [];
-    List<DartType> typeArguments = [];
-    int extensionTypeParameterCount = extensionTypeParameters?.length ?? 0;
-    for (int index = 0; index < extensionTypeParameterCount; index++) {
-      typeArguments
-          .add(forest.createTypeParameterType(extensionTypeParameters[index]));
-    }
-    for (int index = extensionTypeParameterCount;
-        index < function.typeParameters.length;
-        index++) {
-      TypeParameter typeParameter = function.typeParameters[index];
-      TypeParameter newTypeParameter =
-          forest.createTypeParameter(typeParameter.name);
-      typeParameters.add(newTypeParameter);
-      typeArguments.add(forest.createTypeParameterType(newTypeParameter));
-    }
-    Substitution substitution =
-        Substitution.fromPairs(function.typeParameters, typeArguments);
-    for (int index = extensionTypeParameterCount;
-        index < function.typeParameters.length;
-        index++) {
-      TypeParameter oldTypeParameter = function.typeParameters[index];
-      TypeParameter newTypeParameter =
-          typeParameters[index - extensionTypeParameterCount];
-      newTypeParameter.bound =
-          substitution.substituteType(oldTypeParameter.bound);
-      newTypeParameter.defaultType = oldTypeParameter.defaultType;
-    }
-
-    DartType returnType = substitution.substituteType(function.returnType);
-
-    List<VariableDeclaration> positionalParameters = [];
-    List<Expression> positionalArguments = [];
-    functionNestingLevel++;
-
-    VariableDeclaration copyParameter(VariableDeclaration parameter,
-        {bool isOptional}) {
-      // TODO(johnniwinther): Handle default values.
-      return forest.createVariableDeclaration(
-          parameter.name, functionNestingLevel,
-          type: substitution.substituteType(parameter.type),
-          initializer:
-              isOptional ? forest.createNullLiteral(fileOffset) : null);
-    }
-
-    for (int position = 0;
-        position < function.positionalParameters.length;
-        position++) {
-      VariableDeclaration parameter = function.positionalParameters[position];
-      if (position == 0) {
-        /// Pass `this` as a captured variable.
-        positionalArguments.add(createVariableGet(extensionThis, fileOffset));
-      } else {
-        VariableDeclaration newParameter = copyParameter(parameter,
-            isOptional: position >= function.requiredParameterCount);
-        positionalParameters.add(newParameter);
-        positionalArguments.add(createVariableGet(newParameter, fileOffset));
-      }
-    }
-    List<VariableDeclaration> namedParameters = [];
-    List<NamedExpression> namedArguments = [];
-    for (VariableDeclaration parameter in function.namedParameters) {
-      VariableDeclaration newParameter =
-          copyParameter(parameter, isOptional: true);
-      namedParameters.add(newParameter);
-      namedArguments.add(forest.createNamedExpression(
-          parameter.name, createVariableGet(newParameter, fileOffset)));
-    }
-
-    Statement body = forest.createReturnStatement(
-        fileOffset,
-        buildStaticInvocation(
-            procedure,
-            forest.createArguments(fileOffset, positionalArguments,
-                types: typeArguments, named: namedArguments),
-            charOffset: fileOffset));
-
-    FunctionExpression expression = forest.createFunctionExpression(
-        fileOffset,
-        forest.createFunctionNode(body,
-            typeParameters: typeParameters,
-            positionalParameters: positionalParameters,
-            namedParameters: namedParameters,
-            requiredParameterCount:
-                procedure.function.requiredParameterCount - 1,
-            returnType: returnType,
-            asyncMarker: procedure.function.asyncMarker,
-            dartAsyncMarker: procedure.function.dartAsyncMarker));
-    functionNestingLevel--;
-    return expression;
-  }
-
   /// Look up [name] in [scope] using [token] as location information (both to
   /// report problems and as the file offset in the generated kernel code).
   /// [isQualified] should be true if [name] is a qualified access (which
@@ -3606,7 +3507,7 @@ class BodyBuilder extends ScopeListener<JumpTarget>
               arguments,
               charOffset);
         }
-        StaticInvocation node = FactoryConstructorInvocationJudgment(
+        StaticInvocation node = new FactoryConstructorInvocationJudgment(
             target, arguments,
             isConst: isConst)
           ..fileOffset = charOffset;
@@ -3622,6 +3523,31 @@ class BodyBuilder extends ScopeListener<JumpTarget>
         return node;
       }
     }
+  }
+
+  Expression buildExtensionMethodInvocation(
+      int fileOffset, Procedure target, Arguments arguments) {
+    // TODO(johnniwinther): Check type argument count.
+    List<TypeParameter> typeParameters = target.function.typeParameters;
+    LocatedMessage argMessage = checkArgumentsForFunction(
+        target.function, arguments, fileOffset, typeParameters);
+    if (argMessage != null) {
+      return wrapSyntheticExpression(
+          throwNoSuchMethodError(
+              forest.createNullLiteral(null)..fileOffset = fileOffset,
+              target.name.name,
+              arguments,
+              fileOffset,
+              candidate: target,
+              message: argMessage),
+          fileOffset);
+    }
+
+    StaticInvocation node = new StaticInvocation(target, arguments)
+      ..fileOffset = fileOffset;
+    // TODO(johnniwinther): Check type argument bounds.
+    //libraryBuilder.checkBoundsInStaticInvocation(node, typeEnvironment, uri);
+    return node;
   }
 
   @override

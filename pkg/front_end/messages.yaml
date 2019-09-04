@@ -82,6 +82,9 @@ AsciiControlCharacter:
   analyzerCode: ILLEGAL_CHARACTER
   expression: "\x1b 1"
 
+ConstEvalStartingPoint:
+  template: "Constant evaluation error:"
+
 ConstEvalContext:
   template: "While analyzing:"
 
@@ -3652,3 +3655,9 @@ LanguageVersionMismatchInPart:
       // @dart = 2.3
 
       part of 'main.dart';
+
+ExplicitExtensionArgumentMismatch:
+  template: "Explicit extension application requires exactly 1 positional argument."
+
+ExplicitExtensionTypeArgumentMismatch:
+  template: "Explicit extension application of extension '#name' takes '#count' type argument(s)."

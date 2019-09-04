@@ -79,11 +79,11 @@ class AssignedVariables<Node, Variable> {
   /// statement, the body of the switch statement should be covered, but the
   /// switch expression should not.
   void beginNode({bool isClosure: false}) {
-    _writtenStack.add(Set<Variable>.identity());
+    _writtenStack.add(new Set<Variable>.identity());
     if (isClosure) {
       _closureIndexStack.add(_capturedStack.length);
     }
-    _capturedStack.add(Set<Variable>.identity());
+    _capturedStack.add(new Set<Variable>.identity());
   }
 
   /// Queries the set of variables for which a potential write is captured by a
@@ -179,18 +179,18 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// erroneous code, it's possible that a variable might be used before its
   /// declaration.
   final Set<Variable> _referencedVariables =
-      _assertionsEnabled ? Set<Variable>() : null;
+      _assertionsEnabled ? new Set<Variable>() : null;
 
   factory FlowAnalysis(
     NodeOperations<Expression> nodeOperations,
     TypeOperations<Variable, Type> typeOperations,
     FunctionBodyAccess<Variable> functionBody,
   ) {
-    return FlowAnalysis._(nodeOperations, typeOperations, functionBody);
+    return new FlowAnalysis._(nodeOperations, typeOperations, functionBody);
   }
 
   FlowAnalysis._(this.nodeOperations, this.typeOperations, this.functionBody) {
-    _current = FlowModel<Variable, Type>(true);
+    _current = new FlowModel<Variable, Type>(true);
   }
 
   /// Return `true` if the current state is reachable.
@@ -309,8 +309,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   void finish() {
     assert(_stack.isEmpty);
     assert(() {
-      Set<Variable> variablesNotAdded =
-          _referencedVariables.difference(Set<Variable>.from(_addedVariables));
+      Set<Variable> variablesNotAdded = _referencedVariables
+          .difference(new Set<Variable>.from(_addedVariables));
       assert(variablesNotAdded.isEmpty,
           'Variables not passed to add: $variablesNotAdded');
       return true;
@@ -813,10 +813,10 @@ class FlowModel<Variable, Type> {
   /// the point of declaration.
   FlowModel<Variable, Type> add(Variable variable, {bool assigned: false}) {
     Map<Variable, VariableModel<Type>> newVariableInfo =
-        Map<Variable, VariableModel<Type>>.from(variableInfo);
-    newVariableInfo[variable] = VariableModel<Type>(null, assigned);
+        new Map<Variable, VariableModel<Type>>.from(variableInfo);
+    newVariableInfo[variable] = new VariableModel<Type>(null, assigned);
 
-    return FlowModel<Variable, Type>._(reachable, newVariableInfo);
+    return new FlowModel<Variable, Type>._(reachable, newVariableInfo);
   }
 
   /// Updates the state to indicate that the given [variable] has been
@@ -960,7 +960,7 @@ class FlowModel<Variable, Type> {
   FlowModel<Variable, Type> setReachable(bool reachable) {
     if (this.reachable == reachable) return this;
 
-    return FlowModel<Variable, Type>._(reachable, variableInfo);
+    return new FlowModel<Variable, Type>._(reachable, variableInfo);
   }
 
   @override
@@ -984,9 +984,9 @@ class FlowModel<Variable, Type> {
   FlowModel<Variable, Type> _updateVariableInfo(
       Variable variable, VariableModel<Type> model) {
     Map<Variable, VariableModel<Type>> newVariableInfo =
-        Map<Variable, VariableModel<Type>>.from(variableInfo);
+        new Map<Variable, VariableModel<Type>>.from(variableInfo);
     newVariableInfo[variable] = model;
-    return FlowModel<Variable, Type>._(reachable, newVariableInfo);
+    return new FlowModel<Variable, Type>._(reachable, newVariableInfo);
   }
 
   /// Forms a new state to reflect a control flow path that might have come from
@@ -1068,7 +1068,7 @@ class FlowModel<Variable, Type> {
       return second;
     }
 
-    return FlowModel<Variable, Type>._(newReachable, newVariableInfo);
+    return new FlowModel<Variable, Type>._(newReachable, newVariableInfo);
   }
 
   /// Determines whether the given "variableInfo" maps are equivalent.
@@ -1177,13 +1177,13 @@ class VariableModel<Type> {
   /// Returns a new [VariableModel] where the promoted type is replaced with
   /// [promotedType].
   VariableModel<Type> withPromotedType(Type promotedType) =>
-      VariableModel<Type>(promotedType, assigned);
+      new VariableModel<Type>(promotedType, assigned);
 
   /// Returns a new [VariableModel] reflecting the fact that the variable was
   /// just written to.
   VariableModel<Type> write() {
     if (promotedType == null && assigned) return this;
-    return VariableModel<Type>(null, true);
+    return new VariableModel<Type>(null, true);
   }
 
   /// Joins two variable models.  See [FlowModel.join] for details.
@@ -1220,7 +1220,7 @@ class VariableModel<Type> {
         second.assigned == newAssigned) {
       return second;
     } else {
-      return VariableModel<Type>(newPromotedType, newAssigned);
+      return new VariableModel<Type>(newPromotedType, newAssigned);
     }
   }
 

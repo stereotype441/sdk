@@ -10264,10 +10264,16 @@ RawObject* Library::GetMetadata(const Object& obj) const {
       metadata = kernel::EvaluateMetadata(
           field, /* is_annotations_offset = */ obj.IsLibrary());
     }
-    if (metadata.IsArray()) {
-      ASSERT(Array::Cast(metadata).raw() != Object::empty_array().raw());
-      field.SetStaticValue(Array::Cast(metadata), true);
+    if (metadata.IsArray() || metadata.IsNull()) {
+      ASSERT(metadata.raw() != Object::empty_array().raw());
+      field.SetStaticValue(
+          metadata.IsNull() ? Object::null_array() : Array::Cast(metadata),
+          true);
     }
+  }
+  if (metadata.IsNull()) {
+    // Metadata field exists in order to reference extended metadata.
+    return Object::empty_array().raw();
   }
   return metadata.raw();
 #endif  // defined(DART_PRECOMPILED_RUNTIME)
@@ -10278,9 +10284,7 @@ RawArray* Library::GetExtendedMetadata(const Object& obj,
 #if defined(DART_PRECOMPILED_RUNTIME)
   return Object::empty_array().raw();
 #else
-  if (!obj.IsFunction()) {
-    UNREACHABLE();
-  }
+  RELEASE_ASSERT(obj.IsFunction() || obj.IsLibrary());
   const String& metaname = String::Handle(MakeMetadataName(obj));
   Field& field = Field::Handle(GetMetadataField(metaname));
   if (field.IsNull()) {
@@ -13618,6 +13622,29 @@ void ICData::AddDeoptReason(DeoptReasonId reason) const {
   if (reason <= kLastRecordedDeoptReason) {
     SetDeoptReasons(DeoptReasons() | (1 << reason));
   }
+}
+
+const char* ICData::RebindRuleToCString(RebindRule r) {
+  switch (r) {
+#define RULE_CASE(Name)                                                        \
+  case RebindRule::k##Name:                                                    \
+    return #Name;
+    FOR_EACH_REBIND_RULE(RULE_CASE)
+#undef RULE_CASE
+    default:
+      return nullptr;
+  }
+}
+
+bool ICData::RebindRuleFromCString(const char* str, RebindRule* out) {
+#define RULE_CASE(Name)                                                        \
+  if (strcmp(str, #Name) == 0) {                                               \
+    *out = RebindRule::k##Name;                                                \
+    return true;                                                               \
+  }
+  FOR_EACH_REBIND_RULE(RULE_CASE)
+#undef RULE_CASE
+  return false;
 }
 
 ICData::RebindRule ICData::rebind_rule() const {

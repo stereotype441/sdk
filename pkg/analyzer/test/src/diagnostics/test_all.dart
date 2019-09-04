@@ -20,6 +20,8 @@ import 'assignment_to_method_test.dart' as assignment_to_method;
 import 'assignment_to_type_test.dart' as assignment_to_type;
 import 'async_keyword_used_as_identifier_test.dart'
     as async_keyword_used_as_identifier;
+import 'builtin_identifier_as_extension_name_test.dart'
+    as builtin_as_extension_name;
 import 'can_be_null_after_null_aware_test.dart' as can_be_null_after_null_aware;
 import 'case_block_not_terminated_test.dart' as case_block_not_terminated;
 import 'cast_to_non_type_test.dart' as cast_to_non_type;
@@ -194,8 +196,8 @@ import 'non_void_return_for_setter_test.dart' as non_void_return_for_setter;
 import 'not_a_type_test.dart' as not_a_type;
 import 'not_assigned_potentially_non_nullable_local_variable_test.dart'
     as not_assigned_potentially_non_nullable_local_variable;
-import 'not_enough_required_arguments_test.dart'
-    as not_enough_required_arguments;
+import 'not_enough_positional_arguments_test.dart'
+    as not_enough_positional_arguments;
 import 'not_initialized_non_nullable_instance_field_test.dart'
     as not_initialized_non_nullable_instance_field;
 import 'not_initialized_non_nullable_variable_test.dart'
@@ -318,6 +320,7 @@ main() {
     assignment_to_method.main();
     assignment_to_type.main();
     async_keyword_used_as_identifier.main();
+    builtin_as_extension_name.main();
     can_be_null_after_null_aware.main();
     case_block_not_terminated.main();
     cast_to_non_type.main();
@@ -439,7 +442,7 @@ main() {
     non_void_return_for_setter.main();
     not_a_type.main();
     not_assigned_potentially_non_nullable_local_variable.main();
-    not_enough_required_arguments.main();
+    not_enough_positional_arguments.main();
     not_initialized_non_nullable_instance_field.main();
     not_initialized_non_nullable_variable.main();
     not_iterable_spread.main();

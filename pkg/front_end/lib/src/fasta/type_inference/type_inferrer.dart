@@ -2,6 +2,7 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE.md file.
 
+import 'package:front_end/src/fasta/kernel/kernel_shadow_ast.dart';
 import 'package:kernel/ast.dart' as kernel;
 
 import 'package:kernel/ast.dart'
@@ -16,6 +17,7 @@ import 'package:kernel/ast.dart'
         DartType,
         DynamicType,
         Expression,
+        Extension,
         Field,
         FunctionExpression,
         FunctionNode,
@@ -49,7 +51,8 @@ import 'package:kernel/ast.dart'
         TypeParameterType,
         VariableDeclaration,
         VariableGet,
-        VoidType;
+        VoidType,
+        setParents;
 
 import 'package:kernel/class_hierarchy.dart' show ClassHierarchy;
 
@@ -108,7 +111,8 @@ import '../kernel/kernel_shadow_ast.dart'
         ShadowTypeInferenceEngine,
         ShadowTypeInferrer,
         VariableDeclarationJudgment,
-        getExplicitTypeArguments;
+        getExplicitTypeArguments,
+        getExtensionTypeParameterCount;
 
 import '../kernel/type_algorithms.dart' show hasAnyTypeVariables;
 
@@ -730,6 +734,17 @@ abstract class TypeInferrerImpl extends TypeInferrer {
     return type is InterfaceType && type.classNode == coreTypes.nullClass;
   }
 
+  List<DartType> _inferExtensionTypeArguments(
+      List<TypeParameter> typeParameters,
+      DartType onType,
+      DartType receiverType) {
+    List<DartType> inferredTypes =
+        new List<DartType>.filled(typeParameters.length, const UnknownType());
+    typeSchemaEnvironment.inferGenericFunctionOrType(
+        null, typeParameters, [onType], [receiverType], null, inferredTypes);
+    return inferredTypes;
+  }
+
   /// Finds a member of [receiverType] called [name], and if it is found,
   /// reports it through instrumentation using [fileOffset].
   ///
@@ -773,24 +788,89 @@ abstract class TypeInferrerImpl extends TypeInferrer {
     }
 
     if (target.isUnresolved && includeExtensionMethods) {
-      // TODO(johnniwinther): Find the most specific method.
+      ExtensionAccessCandidate bestSoFar;
+      List<ExtensionAccessCandidate> noneMoreSpecific = [];
       library.scope.forEachExtension((ExtensionBuilder extensionBuilder) {
         MemberBuilder memberBuilder =
             extensionBuilder.lookupLocalMember(name.name, setter: setter);
         if (memberBuilder != null && !memberBuilder.isStatic) {
           ProcedureBuilder procedureBuilder = memberBuilder;
           if (procedureBuilder != null) {
-            DartType onType = extensionBuilder.extension.onType;
-            // TODO(johnniwinther): Handle generic extensions.
+            Extension extension = extensionBuilder.extension;
+            List<TypeParameter> typeParameters =
+                extensionBuilder.extension.typeParameters;
+            List<DartType> inferredTypeArguments = _inferExtensionTypeArguments(
+                extensionBuilder.extension.typeParameters,
+                extensionBuilder.extension.onType,
+                receiverType);
+            Substitution inferredSubstitution =
+                Substitution.fromPairs(typeParameters, inferredTypeArguments);
+
+            for (int index = 0; index < typeParameters.length; index++) {
+              TypeParameter typeParameter = typeParameters[index];
+              DartType typeArgument = inferredTypeArguments[index];
+              DartType bound =
+                  inferredSubstitution.substituteType(typeParameter.bound);
+              if (!typeSchemaEnvironment.isSubtypeOf(typeArgument, bound)) {
+                return;
+              }
+            }
+            DartType onType = inferredSubstitution
+                .substituteType(extensionBuilder.extension.onType);
+            List<DartType> instantiateToBoundTypeArguments =
+                calculateBounds(typeParameters, coreTypes.objectClass);
+            Substitution instantiateToBoundsSubstitution =
+                Substitution.fromPairs(
+                    typeParameters, instantiateToBoundTypeArguments);
+            DartType onTypeInstantiateToBounds = instantiateToBoundsSubstitution
+                .substituteType(extensionBuilder.extension.onType);
+
             if (typeSchemaEnvironment.isSubtypeOf(receiverType, onType)) {
-              target = new ObjectAccessTarget.extensionMember(
-                  procedureBuilder.target,
-                  procedureBuilder.kind,
-                  extensionBuilder.typeParameters?.length ?? 0);
+              ExtensionAccessCandidate candidate = new ExtensionAccessCandidate(
+                  extension,
+                  onType,
+                  onTypeInstantiateToBounds,
+                  new ObjectAccessTarget.extensionMember(
+                      procedureBuilder.procedure,
+                      procedureBuilder.extensionTearOff,
+                      procedureBuilder.kind,
+                      inferredTypeArguments));
+              if (noneMoreSpecific.isNotEmpty) {
+                bool isMostSpecific = true;
+                for (ExtensionAccessCandidate other in noneMoreSpecific) {
+                  bool isMoreSpecific = candidate.isMoreSpecificThan(
+                      typeSchemaEnvironment, other);
+                  if (isMoreSpecific != true) {
+                    isMostSpecific = false;
+                    break;
+                  }
+                }
+                if (isMostSpecific) {
+                  bestSoFar = candidate;
+                  noneMoreSpecific.clear();
+                } else {
+                  noneMoreSpecific.add(candidate);
+                }
+              } else if (bestSoFar == null) {
+                bestSoFar = candidate;
+              } else {
+                bool isMoreSpecific = candidate.isMoreSpecificThan(
+                    typeSchemaEnvironment, bestSoFar);
+                if (isMoreSpecific == true) {
+                  bestSoFar = candidate;
+                } else if (isMoreSpecific == null) {
+                  noneMoreSpecific.add(bestSoFar);
+                  noneMoreSpecific.add(candidate);
+                  bestSoFar = null;
+                }
+              }
             }
           }
         }
       });
+      if (bestSoFar != null) {
+        target = bestSoFar.target;
+      }
     }
 
     if (!isTopLevel &&
@@ -973,18 +1053,30 @@ abstract class TypeInferrerImpl extends TypeInferrer {
         switch (target.extensionMethodKind) {
           case ProcedureKind.Method:
             FunctionType functionType = target.member.function.functionType;
-            // TODO(johnniwinther): Handle tear off of generic extensions.
-            return new FunctionType(
+            List<TypeParameter> extensionTypeParameters = functionType
+                .typeParameters
+                .take(target.inferredExtensionTypeArguments.length)
+                .toList();
+            Substitution substitution = Substitution.fromPairs(
+                extensionTypeParameters, target.inferredExtensionTypeArguments);
+            return substitution.substituteType(new FunctionType(
                 functionType.positionalParameters.skip(1).toList(),
                 functionType.returnType,
                 namedParameters: functionType.namedParameters,
                 typeParameters: functionType.typeParameters
-                    .skip(target.extensionTypeParameterCount)
+                    .skip(target.inferredExtensionTypeArguments.length)
                     .toList(),
                 requiredParameterCount:
-                    functionType.requiredParameterCount - 1);
+                    functionType.requiredParameterCount - 1));
           case ProcedureKind.Getter:
-            return target.member.function.returnType;
+            FunctionType functionType = target.member.function.functionType;
+            List<TypeParameter> extensionTypeParameters = functionType
+                .typeParameters
+                .take(target.inferredExtensionTypeArguments.length)
+                .toList();
+            Substitution substitution = Substitution.fromPairs(
+                extensionTypeParameters, target.inferredExtensionTypeArguments);
+            return substitution.substituteType(functionType.returnType);
           case ProcedureKind.Setter:
           case ProcedureKind.Factory:
           case ProcedureKind.Operator:
@@ -1145,8 +1237,15 @@ abstract class TypeInferrerImpl extends TypeInferrer {
       case ObjectAccessTargetKind.extensionMember:
         switch (target.extensionMethodKind) {
           case ProcedureKind.Setter:
-            // TODO(johnniwinther): Is this valid if the method is generic?
-            return target.member.function.positionalParameters[1].type;
+            FunctionType functionType = target.member.function.functionType;
+            List<TypeParameter> extensionTypeParameters = functionType
+                .typeParameters
+                .take(target.inferredExtensionTypeArguments.length)
+                .toList();
+            Substitution substitution = Substitution.fromPairs(
+                extensionTypeParameters, target.inferredExtensionTypeArguments);
+            return substitution
+                .substituteType(functionType.positionalParameters[1]);
           case ProcedureKind.Method:
           case ProcedureKind.Getter:
           case ProcedureKind.Factory:
@@ -1319,14 +1418,105 @@ abstract class TypeInferrerImpl extends TypeInferrer {
     this.helper = null;
   }
 
-  /// Performs the type inference steps that are shared by all kinds of
-  /// invocations (constructors, instance methods, and static methods).
   DartType inferInvocation(DartType typeContext, int offset,
       FunctionType calleeType, DartType returnType, Arguments arguments,
       {bool isOverloadedArithmeticOperator: false,
       DartType receiverType,
       bool skipTypeArgumentInference: false,
-      bool isConst: false}) {
+      bool isConst: false,
+      bool isImplicitExtensionMember: false}) {
+    int extensionTypeParameterCount = getExtensionTypeParameterCount(arguments);
+    if (extensionTypeParameterCount != 0) {
+      return _inferGenericExtensionMethodInvocation(extensionTypeParameterCount,
+          typeContext, offset, calleeType, returnType, arguments,
+          isOverloadedArithmeticOperator: isOverloadedArithmeticOperator,
+          receiverType: receiverType,
+          skipTypeArgumentInference: skipTypeArgumentInference,
+          isConst: isConst,
+          isImplicitExtensionMember: isImplicitExtensionMember);
+    }
+    return _inferInvocation(
+        typeContext, offset, calleeType, returnType, arguments,
+        isOverloadedArithmeticOperator: isOverloadedArithmeticOperator,
+        receiverType: receiverType,
+        skipTypeArgumentInference: skipTypeArgumentInference,
+        isConst: isConst,
+        isImplicitExtensionMember: isImplicitExtensionMember);
+  }
+
+  DartType _inferGenericExtensionMethodInvocation(
+      int extensionTypeParameterCount,
+      DartType typeContext,
+      int offset,
+      FunctionType calleeType,
+      DartType returnType,
+      Arguments arguments,
+      {bool isOverloadedArithmeticOperator: false,
+      DartType receiverType,
+      bool skipTypeArgumentInference: false,
+      bool isConst: false,
+      bool isImplicitExtensionMember: false}) {
+    FunctionType extensionFunctionType = new FunctionType(
+        [calleeType.positionalParameters.first], const DynamicType(),
+        requiredParameterCount: 1,
+        typeParameters: calleeType.typeParameters
+            .take(extensionTypeParameterCount)
+            .toList());
+    Arguments extensionArguments = helper.forest.createArguments(
+        arguments.fileOffset, [arguments.positional.first],
+        types: getExplicitExtensionTypeArguments(arguments));
+    _inferInvocation(const UnknownType(), offset, extensionFunctionType,
+        extensionFunctionType.returnType, extensionArguments,
+        skipTypeArgumentInference: skipTypeArgumentInference,
+        receiverType: receiverType,
+        isImplicitExtensionMember: isImplicitExtensionMember);
+    Substitution extensionSubstitution = Substitution.fromPairs(
+        extensionFunctionType.typeParameters, extensionArguments.types);
+
+    List<TypeParameter> targetTypeParameters = const <TypeParameter>[];
+    if (calleeType.typeParameters.length > extensionTypeParameterCount) {
+      targetTypeParameters =
+          calleeType.typeParameters.skip(extensionTypeParameterCount).toList();
+    }
+    FunctionType targetFunctionType = new FunctionType(
+        calleeType.positionalParameters.skip(1).toList(), calleeType.returnType,
+        requiredParameterCount: calleeType.requiredParameterCount - 1,
+        namedParameters: calleeType.namedParameters,
+        typeParameters: targetTypeParameters);
+    targetFunctionType =
+        extensionSubstitution.substituteType(targetFunctionType);
+    DartType targetReturnType =
+        extensionSubstitution.substituteType(returnType);
+    Arguments targetArguments = helper.forest.createArguments(
+        arguments.fileOffset, arguments.positional.skip(1).toList(),
+        named: arguments.named, types: getExplicitTypeArguments(arguments));
+    DartType inferredType = _inferInvocation(typeContext, offset,
+        targetFunctionType, targetReturnType, targetArguments,
+        isOverloadedArithmeticOperator: isOverloadedArithmeticOperator,
+        skipTypeArgumentInference: skipTypeArgumentInference,
+        isConst: isConst);
+    arguments.positional.clear();
+    arguments.positional.addAll(extensionArguments.positional);
+    arguments.positional.addAll(targetArguments.positional);
+    setParents(arguments.positional, arguments);
+    // The `targetArguments.named` is the same list as `arguments.named` so
+    // we just need to ensure that parent relations are realigned.
+    setParents(arguments.named, arguments);
+    arguments.types.clear();
+    arguments.types.addAll(extensionArguments.types);
+    arguments.types.addAll(targetArguments.types);
+    return inferredType;
+  }
+
+  /// Performs the type inference steps that are shared by all kinds of
+  /// invocations (constructors, instance methods, and static methods).
+  DartType _inferInvocation(DartType typeContext, int offset,
+      FunctionType calleeType, DartType returnType, Arguments arguments,
+      {bool isOverloadedArithmeticOperator: false,
+      DartType receiverType,
+      bool skipTypeArgumentInference: false,
+      bool isConst: false,
+      bool isImplicitExtensionMember: false}) {
     lastInferredSubstitution = null;
     lastCalleeType = null;
     List<TypeParameter> calleeTypeParameters = calleeType.typeParameters;
@@ -1389,19 +1579,29 @@ abstract class TypeInferrerImpl extends TypeInferrer {
       DartType inferredFormalType = substitution != null
           ? substitution.substituteType(formalType)
           : formalType;
-      ExpressionInferenceResult result = inferExpression(
-          expression,
-          inferredFormalType,
-          inferenceNeeded ||
-              isOverloadedArithmeticOperator ||
-              typeChecksNeeded);
+      DartType inferredType;
+      if (isImplicitExtensionMember && i == 1) {
+        assert(
+            receiverType != null,
+            "No receiver type provided for implicit extension member "
+            "invocation.");
+        inferredType = receiverType;
+      } else {
+        ExpressionInferenceResult result = inferExpression(
+            expression,
+            inferredFormalType,
+            inferenceNeeded ||
+                isOverloadedArithmeticOperator ||
+                typeChecksNeeded);
+        inferredType = result.inferredType;
+      }
       if (inferenceNeeded || typeChecksNeeded) {
         formalTypes.add(formalType);
-        actualTypes.add(result.inferredType);
+        actualTypes.add(inferredType);
       }
       if (isOverloadedArithmeticOperator) {
         returnType = typeSchemaEnvironment.getTypeOfOverloadedArithmetic(
-            receiverType, result.inferredType);
+            receiverType, inferredType);
       }
     });
 
@@ -1723,20 +1923,28 @@ abstract class TypeInferrerImpl extends TypeInferrer {
         expression);
     Expression replacement;
     if (target.isExtensionMember) {
+      Procedure procedure = target.member;
       expression.parent.replaceChild(
           expression,
           replacement = helper.forest.createStaticInvocation(
               expression.fileOffset,
               target.member,
-              arguments = helper.forest.createArguments(
-                  arguments.fileOffset, [receiver, ...arguments.positional],
-                  named: arguments.named,
-                  types: getExplicitTypeArguments(arguments))));
+              arguments = helper.forest.createArgumentsForExtensionMethod(
+                  arguments.fileOffset,
+                  target.inferredExtensionTypeArguments.length,
+                  procedure.function.typeParameters.length -
+                      target.inferredExtensionTypeArguments.length,
+                  receiver,
+                  extensionTypeArguments: target.inferredExtensionTypeArguments,
+                  positionalArguments: arguments.positional,
+                  namedArguments: arguments.named,
+                  typeArguments: arguments.types)));
     }
     DartType inferredType = inferInvocation(typeContext, fileOffset,
         functionType, functionType.returnType, arguments,
         isOverloadedArithmeticOperator: isOverloadedArithmeticOperator,
-        receiverType: receiverType);
+        receiverType: receiverType,
+        isImplicitExtensionMember: target.isExtensionMember);
     if (methodName.name == '==') {
       inferredType = coreTypes.boolClass.rawType;
     }
@@ -1860,77 +2068,27 @@ abstract class TypeInferrerImpl extends TypeInferrer {
               replacement = expression = helper.forest.createStaticInvocation(
                   fileOffset,
                   readTarget.member,
-                  helper.forest.createArguments(fileOffset, [receiver])));
+                  helper.forest.createArgumentsForExtensionMethod(
+                      fileOffset,
+                      readTarget.inferredExtensionTypeArguments.length,
+                      0,
+                      receiver,
+                      extensionTypeArguments:
+                          readTarget.inferredExtensionTypeArguments)));
           break;
         case kernel.ProcedureKind.Method:
-
-          // Create instance method tear off by converting
-          //
-          //    extension E on A {
-          //      method() {}
-          //    }
-          //    A a = ...
-          //    a.method;
-          //
-          // into
-          //
-          //    E|method(A #this) {}
-          //    A a ...
-          //    let #1 = a in () => E|method(#1);
-          //
-
-          //VariableDeclaration variable = helper.forest
-          //    .createVariableDeclarationForValue(fileOffset, receiver,
-          //        type: receiverType);
-          //expression.parent.replaceChild(
-          //    expression,
-          //    replacement = expression = helper.forest.createLet(
-          //        variable,
-          //        helper.createExtensionTearOff(
-          //            expression.fileOffset,
-          //            readTarget.member,
-          //            variable,
-          //            // TODO(johnniwinther): Support generic extensions.
-          //            [],
-          //            receiver)));
-
-          // TODO(johnniwinther): The encoding above doesn't work on the VM
-          // (silently stops execution!) and dart2js (crashes due to invalid
-          // closure scope result). We use this instead:
-
-          // Create instance method tear off by converting
-          //
-          //    extension E on A {
-          //      method() {}
-          //    }
-          //    A a = ...
-          //    a.method;
-          //
-          // into
-          //
-          //    E|method(A #this) {}
-          //    A a ...
-          //    ((#1) => () => E|method(#1))(a);
-          //
-
-          VariableDeclaration variable = helper.forest
-              .createVariableDeclaration("#", 0,
-                  isFinal: true, type: receiverType);
           expression.parent.replaceChild(
               expression,
-              replacement = expression = helper.forest.createFunctionInvocation(
+              replacement = expression = helper.forest.createStaticInvocation(
                   fileOffset,
-                  helper.forest.createFunctionExpression(
+                  readTarget.tearoffTarget,
+                  helper.forest.createArgumentsForExtensionMethod(
                       fileOffset,
-                      helper.forest.createFunctionNode(
-                        helper.forest.createReturnStatement(
-                            fileOffset,
-                            helper.createExtensionTearOff(
-                                fileOffset, readTarget.member, variable, [])),
-                        positionalParameters: [variable],
-                        requiredParameterCount: 1,
-                      )),
-                  helper.forest.createArguments(fileOffset, [receiver])));
+                      readTarget.inferredExtensionTypeArguments.length,
+                      0,
+                      receiver,
+                      extensionTypeArguments:
+                          readTarget.inferredExtensionTypeArguments)));
           break;
         case kernel.ProcedureKind.Setter:
         case kernel.ProcedureKind.Factory:
@@ -2363,8 +2521,10 @@ class ObjectAccessTarget {
 
   /// Creates an access to the extension [member].
   factory ObjectAccessTarget.extensionMember(
-          Member member, ProcedureKind kind, int typeParameters) =
-      ExtensionAccessTarget;
+      Member member,
+      Member tearoffTarget,
+      ProcedureKind kind,
+      List<DartType> inferredTypeArguments) = ExtensionAccessTarget;
 
   /// Creates an access to a 'call' method on a function, i.e. a function
   /// invocation.
@@ -2399,24 +2559,83 @@ class ObjectAccessTarget {
   ProcedureKind get extensionMethodKind =>
       throw new UnsupportedError('ObjectAccessTarget.extensionMethodKind');
 
-  /// Returns the number of type parameters of an extension method that comes
-  /// from the extension declaration.
-  int get extensionTypeParameterCount => throw new UnsupportedError(
-      'ObjectAccessTarget.extensionTypeParameterCount');
+  /// Returns inferred type arguments for the type parameters of an extension
+  /// method that comes from the extension declaration.
+  List<DartType> get inferredExtensionTypeArguments =>
+      throw new UnsupportedError(
+          'ObjectAccessTarget.inferredExtensionTypeArguments');
+
+  /// Returns the member to use for a tearoff.
+  ///
+  /// This is currently used for extension methods.
+  // TODO(johnniwinther): Normalize use by having `readTarget` and
+  //  `invokeTarget`?
+  Member get tearoffTarget =>
+      throw new UnsupportedError('ObjectAccessTarget.tearoffTarget');
 
   @override
   String toString() => 'ObjectAccessTarget($kind,$member)';
 }
 
 class ExtensionAccessTarget extends ObjectAccessTarget {
+  final Member tearoffTarget;
   final ProcedureKind extensionMethodKind;
-  final int extensionTypeParameterCount;
+  final List<DartType> inferredExtensionTypeArguments;
 
-  ExtensionAccessTarget(
-      Member member, this.extensionMethodKind, this.extensionTypeParameterCount)
+  ExtensionAccessTarget(Member member, this.tearoffTarget,
+      this.extensionMethodKind, this.inferredExtensionTypeArguments)
       : super.internal(ObjectAccessTargetKind.extensionMember, member);
 
   @override
   String toString() =>
       'ExtensionAccessTarget($kind,$member,$extensionMethodKind)';
+}
+
+class ExtensionAccessCandidate {
+  final bool isPlatform;
+  final DartType onType;
+  final DartType onTypeInstantiateToBounds;
+  final ExtensionAccessTarget target;
+
+  ExtensionAccessCandidate(Extension extension, this.onType,
+      this.onTypeInstantiateToBounds, this.target)
+      : isPlatform = extension.enclosingLibrary.importUri.scheme == 'dart';
+
+  bool isMoreSpecificThan(TypeSchemaEnvironment typeSchemaEnvironment,
+      ExtensionAccessCandidate other) {
+    if (this.isPlatform == other.isPlatform) {
+      // Both are platform or not platform.
+      bool thisIsSubtype =
+          typeSchemaEnvironment.isSubtypeOf(this.onType, other.onType);
+      bool thisIsSupertype =
+          typeSchemaEnvironment.isSubtypeOf(other.onType, this.onType);
+      if (thisIsSubtype && !thisIsSupertype) {
+        // This is subtype of other and not vice-versa.
+        return true;
+      } else if (thisIsSupertype && !thisIsSubtype) {
+        // [other] is subtype of this and not vice-versa.
+        return false;
+      } else if (thisIsSubtype || thisIsSupertype) {
+        thisIsSubtype = typeSchemaEnvironment.isSubtypeOf(
+            this.onTypeInstantiateToBounds, other.onTypeInstantiateToBounds);
+        thisIsSupertype = typeSchemaEnvironment.isSubtypeOf(
+            other.onTypeInstantiateToBounds, this.onTypeInstantiateToBounds);
+        if (thisIsSubtype && !thisIsSupertype) {
+          // This is subtype of other and not vice-versa.
+          return true;
+        } else if (thisIsSupertype && !thisIsSubtype) {
+          // [other] is subtype of this and not vice-versa.
+          return false;
+        }
+      }
+    } else if (other.isPlatform) {
+      // This is not platform, [other] is: this  is more specific.
+      return true;
+    } else {
+      // This is platform, [other] is not: other is more specific.
+      return false;
+    }
+    // Neither is more specific than the other.
+    return null;
+  }
 }

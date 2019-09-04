@@ -3,7 +3,6 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'package:analyzer/dart/analysis/features.dart';
-import 'package:analyzer/src/dart/analysis/driver.dart';
 import 'package:analyzer/src/error/codes.dart';
 import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/test_utilities/mock_sdk.dart';
@@ -234,7 +233,6 @@ f(Object o, A a, B b) {
 ''');
   }
 
-  @failingTest
   test_visibility_withPrefix() async {
     newFile('/test/lib/lib.dart', content: '''
 class C {}
@@ -287,22 +285,11 @@ extension E on A {}
   }
 
   test_named_onFunctionType() async {
-    try {
-      await assertNoErrorsInCode('''
+    await assertNoErrorsInCode('''
 extension E on int Function(int) {}
 ''');
-      var extendedType = findNode.typeAnnotation('Function');
-      assertType(extendedType, 'int Function(int)');
-      if (!AnalysisDriver.useSummary2) {
-        throw 'Test passed - expected to fail.';
-      }
-    } on String {
-      rethrow;
-    } catch (e) {
-      if (AnalysisDriver.useSummary2) {
-        rethrow;
-      }
-    }
+    var extendedType = findNode.typeAnnotation('Function');
+    assertType(extendedType, 'int Function(int)');
   }
 
   test_named_onInterface() async {
@@ -354,13 +341,16 @@ extension on A {}
     assertType(extendedType, 'A');
   }
 
-  @failingTest
   test_unnamed_onFunctionType() async {
     await assertNoErrorsInCode('''
-extension on int Function(int) {}
+extension on int Function(String) {}
 ''');
-    var extendedType = findNode.typeAnnotation('int ');
-    assertType(extendedType, 'int Function(int)');
+    var extendedType = findNode.typeAnnotation('Function');
+    assertType(extendedType, 'int Function(String)');
+    var returnType = findNode.typeAnnotation('int');
+    assertType(returnType, 'int');
+    var parameterType = findNode.typeAnnotation('String');
+    assertType(parameterType, 'String');
   }
 
   test_unnamed_onInterface() async {

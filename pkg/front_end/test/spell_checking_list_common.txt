@@ -621,6 +621,7 @@ curly
 current
 currently
 custom
+customize
 cyan
 cycle
 cycles
@@ -1624,6 +1625,7 @@ mathematical
 matter
 maturity
 max
+maximum
 may
 maybe
 mean
@@ -1923,6 +1925,7 @@ patching
 paths
 pattern
 peek
+pending
 percent
 perform
 performance
@@ -2128,6 +2131,7 @@ reading
 reads
 ready
 real
+realigned
 realized
 really
 reason
@@ -2193,6 +2197,7 @@ relate
 related
 relation
 relational
+relations
 relationship
 relationships
 relative
@@ -2831,6 +2836,7 @@ unmodified
 unnamed
 unnecessarily
 unnecessary
+unparsable
 unpromoted
 unread
 unrecognized
@@ -2904,6 +2910,7 @@ verifies
 verify
 verifying
 version
+versioning
 versions
 vertex
 vertical
