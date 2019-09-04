@@ -199,7 +199,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// Add a new [variable], which might be already [assigned].
   void add(Variable variable, {bool assigned: false}) {
     _addedVariables.add(variable);
-    _current = _current.add(variable, assigned: assigned);
+    _current = _current.add(typeOperations, variable, assigned: assigned);
   }
 
   void booleanLiteral(Expression expression, bool value) {
@@ -795,12 +795,20 @@ class FlowModel<Variable, Type> {
   /// Updates the state to track a newly declared local [variable].  The
   /// optional [assigned] boolean indicates whether the variable is assigned at
   /// the point of declaration.
-  FlowModel<Variable, Type> add(Variable variable, {bool assigned: false}) {
-    Map<Variable, VariableModel<Type>> newVariableInfo =
-        Map<Variable, VariableModel<Type>>.from(variableInfo);
-    newVariableInfo[variable] = VariableModel<Type>(null, assigned, false);
-
-    return new FlowModel<Variable, Type>._(reachable, newVariableInfo);
+  FlowModel<Variable, Type> add(
+      TypeOperations<Variable, Type> typeOperations, Variable variable,
+      {bool assigned: false}) {
+    var prevInfo = variableInfo[variable];
+    if (prevInfo == null) {
+      Map<Variable, VariableModel<Type>> newVariableInfo =
+          Map<Variable, VariableModel<Type>>.from(variableInfo);
+      newVariableInfo[variable] = VariableModel<Type>(null, assigned, false);
+      return new FlowModel<Variable, Type>._(reachable, newVariableInfo);
+    } else if (assigned) {
+      return write(typeOperations, variable);
+    } else {
+      return this;
+    }
   }
 
   /// Updates the state to indicate that the given [variable] has been
@@ -834,6 +842,11 @@ class FlowModel<Variable, Type> {
     Type type,
   ) {
     VariableModel<Type> info = variableInfo[variable];
+    if (info == null) {
+      return this
+          .add(typeOperations, variable, assigned: false)
+          .promote(typeOperations, variable, type);
+    }
     if (info.writeCaptured) return this;
     Type previousType = info.promotedType;
     previousType ??= typeOperations.variableType(variable);
@@ -983,7 +996,11 @@ class FlowModel<Variable, Type> {
         return true;
       }());
       VariableModel<Type> info = variableInfo[variable];
-      if (!info.writeCaptured) {
+      if (info == null) {
+        (newVariableInfo ??= Map<Variable, VariableModel<Type>>.from(
+                variableInfo))[variable] =
+            new VariableModel<Type>(null, false, true);
+      } else if (!info.writeCaptured) {
         (newVariableInfo ??= Map<Variable, VariableModel<Type>>.from(
             variableInfo))[variable] = info.writeCapture();
       }
@@ -1188,7 +1205,8 @@ class VariableModel<Type> {
   }
 
   @override
-  String toString() => 'VariableModel($promotedType, $assigned)';
+  String toString() =>
+      'VariableModel($promotedType, $assigned, $writeCaptured)';
 
   /// Returns a new [VariableModel] where the promoted type is replaced with
   /// [promotedType].
