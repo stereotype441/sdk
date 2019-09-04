@@ -795,8 +795,10 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
   FlowAnalysisDebug(
       NodeOperations<Expression> nodeOperations,
       TypeOperations<Variable, Type> typeOperations,
-      FunctionBodyAccess<Variable> functionBody)
-      : _wrapped = FlowAnalysis(nodeOperations, typeOperations, functionBody);
+      Iterable<Variable> variablesWrittenAnywhere,
+      Iterable<Variable> variablesCapturedAnywhere)
+      : _wrapped = FlowAnalysis(nodeOperations, typeOperations,
+            variablesWrittenAnywhere, variablesCapturedAnywhere);
 
   @override
   void add(Variable variable, {bool assigned: false}) {
@@ -885,11 +887,13 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
   }
 
   @override
-  void switchStatement_beginCase(
-      bool hasLabel, Iterable<Variable> notPromoted) {
+  void switchStatement_beginCase(bool hasLabel, Iterable<Variable> notPromoted,
+      Iterable<Variable> captured) {
     notPromoted = notPromoted.toList();
-    _wrap('switchStatement_beginCase($hasLabel, $notPromoted)',
-        () => _wrapped.switchStatement_beginCase(hasLabel, notPromoted));
+    _wrap(
+        'switchStatement_beginCase($hasLabel, $notPromoted, $captured)',
+        () => _wrapped.switchStatement_beginCase(
+            hasLabel, notPromoted, captured));
   }
 
   @override
