@@ -12,23 +12,6 @@ import 'package:analyzer/src/generated/variable_type_provider.dart';
 import 'package:front_end/src/fasta/flow_analysis/flow_analysis.dart';
 import 'package:meta/meta.dart';
 
-class AnalyzerFunctionBodyAccess
-    implements FunctionBodyAccess<VariableElement> {
-  final FunctionBody node;
-
-  AnalyzerFunctionBodyAccess(this.node);
-
-  @override
-  bool isPotentiallyMutatedInClosure(VariableElement variable) {
-    return node.isPotentiallyMutatedInClosure(variable);
-  }
-
-  @override
-  bool isPotentiallyMutatedInScope(VariableElement variable) {
-    return node.isPotentiallyMutatedInScope(variable);
-  }
-}
-
 class AnalyzerNodeOperations implements NodeOperations<Expression> {
   const AnalyzerNodeOperations();
 
@@ -153,8 +136,8 @@ class FlowAnalysisHelper {
   }
 
   void for_conditionBegin(AstNode node, Expression condition) {
-    var assigned = assignedVariables[node];
-    flow.for_conditionBegin(assigned);
+    flow.for_conditionBegin(assignedVariables.writtenInNode(node),
+        assignedVariables.capturedInNode(node));
   }
 
   void functionBody_enter(FunctionBody node) {
@@ -163,11 +146,14 @@ class FlowAnalysisHelper {
     if (_blockFunctionBodyLevel > 1) {
       assert(flow != null);
     } else {
+      // TODO(paulberry): test that the right thing is passed in for
+      // assignedVariables.writtenInNode(node) for top level functions, methods,
+      // initializers, and constructors.
       flow = FlowAnalysis<Statement, Expression, VariableElement, DartType>(
-        _nodeOperations,
-        _typeOperations,
-        AnalyzerFunctionBodyAccess(node),
-      );
+          _nodeOperations,
+          _typeOperations,
+          assignedVariables.writtenInNode(node),
+          assignedVariables.capturedInNode(node));
     }
 
     var parameters = _enclosingExecutableParameters(node);
@@ -176,19 +162,24 @@ class FlowAnalysisHelper {
         flow.add(parameter.declaredElement, assigned: true);
       }
     }
+
+    if (_blockFunctionBodyLevel > 1) {
+      flow.functionExpression_begin(assignedVariables.writtenInNode(node));
+    }
   }
 
   void functionBody_exit(FunctionBody node) {
     _blockFunctionBodyLevel--;
 
+    var flow = this.flow;
     if (_blockFunctionBodyLevel > 0) {
+      flow.functionExpression_end();
       return;
     }
 
     // Set this.flow to null before doing any clean-up so that if an exception
     // is raised, the state is already updated correctly, and we don't have
     // cascading failures.
-    var flow = this.flow;
     this.flow = null;
 
     if (!flow.isReachable) {
@@ -341,6 +332,32 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
   _AssignedVariablesVisitor(this.assignedVariables);
 
   @override
+  void visitBlockFunctionBody(BlockFunctionBody node) {
+    bool isClosure;
+    var parent = node.parent;
+    if (parent is FunctionExpression) {
+      var grandParent = parent.parent;
+      if (grandParent is FunctionDeclaration) {
+        var greatGrandParent = grandParent.parent;
+        if (greatGrandParent is CompilationUnit) {
+          isClosure = false;
+        } else if (greatGrandParent is FunctionDeclarationStatement) {
+          isClosure = true;
+        } else {
+          throw UnimplementedError('TODO(paulberry)');
+        }
+      } else {
+        isClosure = true;
+      }
+    } else {
+      throw UnimplementedError('TODO(paulberry)');
+    }
+    assignedVariables.beginNode(isClosure: isClosure);
+    super.visitBlockFunctionBody(node);
+    assignedVariables.endNode(node, isClosure: isClosure);
+  }
+
+  @override
   void visitAssignmentExpression(AssignmentExpression node) {
     var left = node.leftHandSide;
 
@@ -356,9 +373,9 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitDoStatement(DoStatement node) {
-    assignedVariables.beginStatementOrElement();
+    assignedVariables.beginNode();
     super.visitDoStatement(node);
-    assignedVariables.endStatementOrElement(node);
+    assignedVariables.endNode(node);
   }
 
   @override
@@ -378,32 +395,32 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
 
     expression.accept(this);
 
-    assignedVariables.beginStatementOrElement();
+    assignedVariables.beginNode();
     members.accept(this);
-    assignedVariables.endStatementOrElement(node);
+    assignedVariables.endNode(node);
   }
 
   @override
   void visitTryStatement(TryStatement node) {
-    assignedVariables.beginStatementOrElement();
+    assignedVariables.beginNode();
     node.body.accept(this);
-    assignedVariables.endStatementOrElement(node.body);
+    assignedVariables.endNode(node.body);
 
     node.catchClauses.accept(this);
 
     var finallyBlock = node.finallyBlock;
     if (finallyBlock != null) {
-      assignedVariables.beginStatementOrElement();
+      assignedVariables.beginNode();
       finallyBlock.accept(this);
-      assignedVariables.endStatementOrElement(finallyBlock);
+      assignedVariables.endNode(finallyBlock);
     }
   }
 
   @override
   void visitWhileStatement(WhileStatement node) {
-    assignedVariables.beginStatementOrElement();
+    assignedVariables.beginNode();
     super.visitWhileStatement(node);
-    assignedVariables.endStatementOrElement(node);
+    assignedVariables.endNode(node);
   }
 
   void _handleFor(AstNode node, ForLoopParts forLoopParts, AstNode body) {
@@ -416,19 +433,19 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
         throw new StateError('Unrecognized for loop parts');
       }
 
-      assignedVariables.beginStatementOrElement();
+      assignedVariables.beginNode();
       forLoopParts.condition?.accept(this);
       body.accept(this);
       forLoopParts.updaters?.accept(this);
-      assignedVariables.endStatementOrElement(node);
+      assignedVariables.endNode(node);
     } else if (forLoopParts is ForEachParts) {
       var iterable = forLoopParts.iterable;
 
       iterable.accept(this);
 
-      assignedVariables.beginStatementOrElement();
+      assignedVariables.beginNode();
       body.accept(this);
-      assignedVariables.endStatementOrElement(node);
+      assignedVariables.endNode(node);
     } else {
       throw new StateError('Unrecognized for loop parts');
     }

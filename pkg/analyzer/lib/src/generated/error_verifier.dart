@@ -6,7 +6,6 @@ import 'dart:collection';
 
 import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/dart/ast/ast.dart';
-import 'package:analyzer/dart/ast/standard_resolution_map.dart';
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
@@ -733,7 +732,13 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
   void visitExtensionDeclaration(ExtensionDeclaration node) {
     _enclosingExtension = node.declaredElement;
     _duplicateDefinitionVerifier.checkExtension(node);
+    _checkForFinalNotInitializedInClass(node.members);
     _checkForMismatchedAccessorTypesInExtension(node);
+    final name = node.name;
+    if (name != null) {
+      _checkForBuiltInIdentifierAsName(
+          name, CompileTimeErrorCode.BUILT_IN_IDENTIFIER_AS_EXTENSION_NAME);
+    }
     super.visitExtensionDeclaration(node);
     _enclosingExtension = null;
   }
@@ -926,8 +931,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
       // we can get the function element via `node?.element?.type?.element` but
       // it doesn't have hasImplicitReturnType set correctly.
       if (!_options.implicitDynamic && node.returnType == null) {
-        DartType parameterType =
-            resolutionMap.elementDeclaredByFormalParameter(node).type;
+        DartType parameterType = node.declaredElement.type;
         if (parameterType is FunctionType &&
             parameterType.returnType.isDynamic) {
           _errorReporter.reportErrorForNode(
@@ -1757,10 +1761,6 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
 
   /**
    * Check for errors related to the redirected constructors.
-   *
-   * See [StaticWarningCode.REDIRECT_TO_INVALID_RETURN_TYPE],
-   * [StaticWarningCode.REDIRECT_TO_INVALID_FUNCTION_TYPE], and
-   * [StaticWarningCode.REDIRECT_TO_MISSING_CONSTRUCTOR].
    */
   void _checkForAllRedirectConstructorErrorCodes(
       ConstructorDeclaration declaration) {
@@ -1785,10 +1785,9 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
         if (redirectedConstructor.name != null) {
           constructorStrName += ".${redirectedConstructor.name.name}";
         }
-        ErrorCode errorCode = (declaration.constKeyword != null
-            ? CompileTimeErrorCode.REDIRECT_TO_MISSING_CONSTRUCTOR
-            : StaticWarningCode.REDIRECT_TO_MISSING_CONSTRUCTOR);
-        _errorReporter.reportErrorForNode(errorCode, redirectedConstructor,
+        _errorReporter.reportErrorForNode(
+            CompileTimeErrorCode.REDIRECT_TO_MISSING_CONSTRUCTOR,
+            redirectedConstructor,
             [constructorStrName, redirectedType.displayName]);
       }
       return;
@@ -1797,8 +1796,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
     DartType redirectedReturnType = redirectedType.returnType;
 
     // Report specific problem when return type is incompatible
-    FunctionType constructorType =
-        resolutionMap.elementDeclaredByConstructorDeclaration(declaration).type;
+    FunctionType constructorType = declaration.declaredElement.type;
     DartType constructorReturnType = constructorType.returnType;
     if (!_typeSystem.isAssignableTo(redirectedReturnType, constructorReturnType,
         featureSet: _featureSet)) {
@@ -2088,7 +2086,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
       if (element.isConst) {
         _errorReporter.reportErrorForNode(
             StaticWarningCode.ASSIGNMENT_TO_CONST, expression);
-      } else if (element.isFinal) {
+      } else if (element.isFinal && !element.isLate) {
         if (element is FieldElementImpl) {
           if (element.setter == null && element.isSynthetic) {
             _errorReporter.reportErrorForNode(
@@ -2159,7 +2157,8 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
    * Verify that the given [identifier] is not a keyword, and generates the
    * given [errorCode] on the identifier if it is a keyword.
    *
-   * See [CompileTimeErrorCode.BUILT_IN_IDENTIFIER_AS_TYPE_NAME],
+   * See [CompileTimeErrorCode.BUILT_IN_IDENTIFIER_AS_EXTENSION_NAME],
+   * [CompileTimeErrorCode.BUILT_IN_IDENTIFIER_AS_TYPE_NAME],
    * [CompileTimeErrorCode.BUILT_IN_IDENTIFIER_AS_TYPE_PARAMETER_NAME], and
    * [CompileTimeErrorCode.BUILT_IN_IDENTIFIER_AS_TYPEDEF_NAME].
    */
@@ -3794,7 +3793,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
   }
 
   void _checkForMissingJSLibAnnotation(Annotation node) {
-    if (resolutionMap.elementAnnotationForAnnotation(node)?.isJS ?? false) {
+    if (node.elementAnnotation?.isJS ?? false) {
       if (_currentLibrary.hasJS != true) {
         _errorReporter.reportErrorForNode(
             HintCode.MISSING_JS_LIB_ANNOTATION, node);
@@ -4318,6 +4317,10 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
 
     // Const and final checked separately.
     if (node.isConst || node.isFinal) {
+      return;
+    }
+
+    if (node.isLate) {
       return;
     }
 

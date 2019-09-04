@@ -82,6 +82,9 @@ AsciiControlCharacter:
   analyzerCode: ILLEGAL_CHARACTER
   expression: "\x1b 1"
 
+ConstEvalStartingPoint:
+  template: "Constant evaluation error:"
+
 ConstEvalContext:
   template: "While analyzing:"
 
@@ -1865,6 +1868,18 @@ IllegalMixinDueToConstructorsCause:
   template: "This constructor prevents using '#name' as a mixin."
   severity: CONTEXT
 
+ExtensionDeclaresConstructor:
+  index: 92
+  template: "Extensions can't declare constructors."
+  tip: "Try removing the constructor declaration."
+  analyzerCode: ParserErrorCode.EXTENSION_DECLARES_CONSTRUCTOR
+
+ExtensionDeclaresInstanceField:
+  index: 93
+  template: "Extensions can't declare instance fields"
+  tip: "Try removing the field declaration or making it a static field"
+  analyzerCode: ParserErrorCode.EXTENSION_DECLARES_INSTANCE_FIELD
+
 ConflictsWithConstructor:
   template: "Conflicts with constructor '#name'."
   analyzerCode: CONFLICTS_WITH_CONSTRUCTOR
@@ -3640,3 +3655,9 @@ LanguageVersionMismatchInPart:
       // @dart = 2.3
 
       part of 'main.dart';
+
+ExplicitExtensionArgumentMismatch:
+  template: "Explicit extension application requires exactly 1 positional argument."
+
+ExplicitExtensionTypeArgumentMismatch:
+  template: "Explicit extension application of extension '#name' takes '#count' type argument(s)."

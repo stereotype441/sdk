@@ -334,7 +334,7 @@ class VMTestSuite extends TestSuite {
       doTest = null;
       if (onDone != null) onDone();
     } catch (error, s) {
-      print("Fatal error occured: $error");
+      print("Fatal error occurred: $error");
       print(s);
       exit(1);
     }
@@ -378,7 +378,7 @@ class VMTestSuite extends TestSuite {
 
     args.add(test.name);
 
-    var command = Command.process(
+    var command = ProcessCommand(
         'run_vm_unittest', targetRunnerPath, args, environmentOverrides);
     enqueueNewTestCase(testFile, fullName, [command], expectations);
   }

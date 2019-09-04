@@ -6,6 +6,7 @@ import 'package:test_reflective_loader/test_reflective_loader.dart';
 
 import 'add_async_test.dart' as add_async;
 import 'add_await_test.dart' as add_await;
+import 'add_const_test.dart' as add_const;
 import 'add_explicit_cast_test.dart' as add_explicit_cast;
 import 'add_field_formal_parameters_test.dart' as add_field_formal_parameters;
 import 'add_missing_enum_case_clauses_test.dart'
@@ -58,6 +59,7 @@ import 'insert_semicolon_test.dart' as insert_semicolon;
 import 'make_class_abstract_test.dart' as make_class_abstract;
 import 'make_field_not_final_test.dart' as make_field_not_final;
 import 'make_final_test.dart' as make_final;
+import 'make_variable_not_final_test.dart' as make_variable_not_final;
 import 'move_type_arguments_to_class_test.dart' as move_type_arguments_to_class;
 import 'remove_annotation_test.dart' as remove_annotation;
 import 'remove_await_test.dart' as remove_await;
@@ -89,6 +91,7 @@ import 'rename_to_camel_case_test.dart' as rename_to_camel_case;
 import 'replace_boolean_with_bool_test.dart' as replace_boolean_with_bool;
 import 'replace_colon_with_equals_test.dart' as replace_colon_with_equals;
 import 'replace_final_with_const_test.dart' as replace_final_with_const;
+import 'replace_new_with_const_test.dart' as replace_new_with_const;
 import 'replace_null_with_closure_test.dart' as replace_null_with_closure;
 import 'replace_return_type_future_test.dart' as replace_return_type_future;
 import 'replace_var_with_dynamic_test.dart' as replace_var_with_dynamic;
@@ -113,6 +116,7 @@ main() {
   defineReflectiveSuite(() {
     add_async.main();
     add_await.main();
+    add_const.main();
     add_explicit_cast.main();
     add_field_formal_parameters.main();
     add_missing_enum_case_clauses.main();
@@ -158,6 +162,7 @@ main() {
     make_class_abstract.main();
     make_field_not_final.main();
     make_final.main();
+    make_variable_not_final.main();
     move_type_arguments_to_class.main();
     remove_annotation.main();
     remove_await.main();
@@ -186,6 +191,7 @@ main() {
     replace_boolean_with_bool.main();
     replace_colon_with_equals.main();
     replace_final_with_const.main();
+    replace_new_with_const.main();
     replace_null_with_closure.main();
     replace_return_type_future.main();
     replace_var_with_dynamic.main();

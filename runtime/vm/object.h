@@ -1783,29 +1783,24 @@ class ICData : public Object {
 
   // Call site classification that is helpful for hot-reload. Call sites with
   // different `RebindRule` have to be rebound differently.
+#define FOR_EACH_REBIND_RULE(V)                                                \
+  V(Instance)                                                                  \
+  V(NoRebind)                                                                  \
+  V(NSMDispatch)                                                               \
+  V(Optimized)                                                                 \
+  V(Static)                                                                    \
+  V(Super)
+
   enum RebindRule {
-    kInstance,
-    kNoRebind,
-    kNSMDispatch,
-    kOptimized,
-    kStatic,
-    kSuper,
-    kNumRebindRules,
+#define REBIND_ENUM_DEF(name) k##name,
+    FOR_EACH_REBIND_RULE(REBIND_ENUM_DEF)
+#undef REBIND_ENUM_DEF
+        kNumRebindRules,
   };
+  static const char* RebindRuleToCString(RebindRule r);
+  static bool RebindRuleFromCString(const char* str, RebindRule* out);
   RebindRule rebind_rule() const;
   void set_rebind_rule(uint32_t rebind_rule) const;
-
-  // This bit is set when a call site becomes megamorphic and starts using a
-  // MegamorphicCache instead of ICData. It means that the entries in the
-  // ICData are incomplete and the MegamorphicCache needs to also be consulted
-  // to list the call site's observed receiver classes and targets.
-  bool is_megamorphic() const {
-    // Ensure any following load instructions do not get performed before this
-    // one.
-    const uint32_t bits = LoadNonPointer<uint32_t, MemoryOrder::kAcquire>(
-        &raw_ptr()->state_bits_);
-    return MegamorphicBit::decode(bits);
-  }
 
   void set_is_megamorphic(bool value) const {
     // We don't have concurrent RW access to [state_bits_].
@@ -1949,8 +1944,6 @@ class ICData : public Object {
 
   RawUnlinkedCall* AsUnlinkedCall() const;
 
-  // Consider only used entries.
-  bool HasOneTarget() const;
   bool HasReceiverClassId(intptr_t class_id) const;
 
   // Note: passing non-null receiver_type enables exactness tracking for
@@ -1982,9 +1975,6 @@ class ICData : public Object {
   static intptr_t ExactnessIndexFor(intptr_t num_args) { return num_args + 2; }
 
   bool IsUsedAt(intptr_t i) const;
-
-  void GetUsedCidsForTwoArgs(GrowableArray<intptr_t>* first,
-                             GrowableArray<intptr_t>* second) const;
 
   void PrintToJSONArray(const JSONArray& jsarray,
                         TokenPosition token_pos) const;
@@ -2028,6 +2018,20 @@ class ICData : public Object {
   void SetNumArgsTested(intptr_t value) const;
   void set_entries(const Array& value) const;
   void set_state_bits(uint32_t bits) const;
+
+  // This bit is set when a call site becomes megamorphic and starts using a
+  // MegamorphicCache instead of ICData. It means that the entries in the
+  // ICData are incomplete and the MegamorphicCache needs to also be consulted
+  // to list the call site's observed receiver classes and targets.
+  // In the compiler, this should only be read once by CallTargets to avoid the
+  // compiler seeing an unstable set of feedback.
+  bool is_megamorphic() const {
+    // Ensure any following load instructions do not get performed before this
+    // one.
+    const uint32_t bits = LoadNonPointer<uint32_t, MemoryOrder::kAcquire>(
+        &raw_ptr()->state_bits_);
+    return MegamorphicBit::decode(bits);
+  }
 
   bool ValidateInterceptor(const Function& target) const;
 
@@ -2090,13 +2094,14 @@ class ICData : public Object {
   static RawArray* cached_icdata_arrays_[kCachedICDataArrayCount];
 
   FINAL_HEAP_OBJECT_IMPLEMENTATION(ICData, Object);
+  friend class CallSiteResetter;
+  friend class CallTargets;
   friend class Class;
+  friend class Deserializer;
   friend class ICDataTestTask;
   friend class Interpreter;
-  friend class SnapshotWriter;
   friend class Serializer;
-  friend class Deserializer;
-  friend class CallSiteResetter;
+  friend class SnapshotWriter;
 };
 
 // Often used constants for number of free function type parameters.
@@ -4274,6 +4279,7 @@ class Library : public Object {
   static RawLibrary* ProfilerLibrary();
   static RawLibrary* TypedDataLibrary();
   static RawLibrary* VMServiceLibrary();
+  static RawLibrary* WasmLibrary();
 
   // Eagerly compile all classes and functions in the library.
   static RawError* CompileAll(bool ignore_error = false);
@@ -6646,6 +6652,11 @@ class TypeArguments : public Instance {
 
   // Return true if this vector contains a recursive type argument.
   bool IsRecursive() const;
+
+  virtual RawInstance* CheckAndCanonicalize(Thread* thread,
+                                            const char** error_str) const {
+    return Canonicalize();
+  }
 
   // Canonicalize only if instantiated, otherwise returns 'this'.
   RawTypeArguments* Canonicalize(TrailPtr trail = NULL) const;

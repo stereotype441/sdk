@@ -76,7 +76,6 @@ import 'transformations/flags.dart';
 import 'text/ast_to_text.dart';
 import 'type_algebra.dart';
 import 'type_environment.dart';
-import 'coq_annot.dart';
 
 /// Any type of node in the IR.
 abstract class Node {
@@ -174,9 +173,7 @@ abstract class TreeNode extends Node {
 ///
 /// There is a single [reference] belonging to this node, providing a level of
 /// indirection that is needed during serialization.
-@coq
 abstract class NamedNode extends TreeNode {
-  @coqdef
   final Reference reference;
 
   NamedNode(Reference reference)
@@ -200,11 +197,9 @@ abstract class Annotatable {
 /// Indirection between a reference and its definition.
 ///
 /// There is only one reference object per [NamedNode].
-@coqref
 class Reference {
   CanonicalName canonicalName;
 
-  @nocoq
   NamedNode node;
 
   String toString() {
@@ -271,7 +266,6 @@ class Reference {
 //                      LIBRARIES and CLASSES
 // ------------------------------------------------------------------------
 
-@coq
 class Library extends NamedNode
     implements Annotatable, Comparable<Library>, FileUriNode {
   /// An import path to this library.
@@ -285,15 +279,15 @@ class Library extends NamedNode
   Uri fileUri;
 
   // TODO(jensj): Do we have a better option than this?
-  static int defaultLangaugeVersionMajor = 2;
-  static int defaultLangaugeVersionMinor = 4;
+  static int defaultLanguageVersionMajor = 2;
+  static int defaultLanguageVersionMinor = 6;
 
   int _languageVersionMajor;
   int _languageVersionMinor;
   int get languageVersionMajor =>
-      _languageVersionMajor ?? defaultLangaugeVersionMajor;
+      _languageVersionMajor ?? defaultLanguageVersionMajor;
   int get languageVersionMinor =>
-      _languageVersionMinor ?? defaultLangaugeVersionMinor;
+      _languageVersionMinor ?? defaultLanguageVersionMinor;
   void setLanguageVersion(int languageVersionMajor, int languageVersionMinor) {
     if (languageVersionMajor == null || languageVersionMinor == null) {
       throw new StateError("Trying to set langauge version 'null'");
@@ -336,7 +330,6 @@ class Library extends NamedNode
   /// list is empty.
   List<String> problemsAsJson;
 
-  @nocoq
   final List<Expression> annotations;
 
   final List<LibraryDependency> dependencies;
@@ -344,7 +337,6 @@ class Library extends NamedNode
   /// References to nodes exported by `export` declarations that:
   /// - aren't ambiguous, or
   /// - aren't hidden by local declarations.
-  @nocoq
   final List<Reference> additionalExports = <Reference>[];
 
   @informative
@@ -753,7 +745,6 @@ enum ClassLevel {
 /// use those from its mixed-in type.  However, the IR does not enforce this
 /// rule directly, as doing so can obstruct transformations.  It is possible to
 /// transform a mixin application to become a regular class, and vice versa.
-@coq
 class Class extends NamedNode implements Annotatable, FileUriNode {
   /// Start offset of the class in the source file it comes from.
   ///
@@ -776,7 +767,6 @@ class Class extends NamedNode implements Annotatable, FileUriNode {
   ///
   /// This defaults to an immutable empty list. Use [addAnnotation] to add
   /// annotations if needed.
-  @nocoq
   List<Expression> annotations = const <Expression>[];
 
   /// Name of the class.
@@ -786,7 +776,6 @@ class Class extends NamedNode implements Annotatable, FileUriNode {
   /// The name may contain characters that are not valid in a Dart identifier,
   /// in particular, the symbol '&' is used in class names generated for mixin
   /// applications.
-  @coq
   String name;
 
   // Must match serialized bit positions.
@@ -1059,18 +1048,15 @@ class Class extends NamedNode implements Annotatable, FileUriNode {
     return new Supertype(this, _getAsTypeArguments(typeParameters));
   }
 
-  @nocoq
   InterfaceType _rawType;
   InterfaceType get rawType => _rawType ??= new InterfaceType(this);
 
-  @nocoq
   InterfaceType _thisType;
   InterfaceType get thisType {
     return _thisType ??=
         new InterfaceType(this, _getAsTypeArguments(typeParameters));
   }
 
-  @nocoq
   InterfaceType _bottomType;
   InterfaceType get bottomType {
     return _bottomType ??= new InterfaceType(this,
@@ -1169,6 +1155,15 @@ class Extension extends NamedNode implements FileUriNode {
   transformChildren(Transformer v) => v.visitExtension(this);
 }
 
+enum ExtensionMemberKind {
+  Field,
+  Method,
+  Getter,
+  Setter,
+  Operator,
+  TearOff,
+}
+
 /// Information about an member declaration in an extension.
 class ExtensionMemberDescriptor {
   /// The name of the extension member.
@@ -1178,10 +1173,7 @@ class ExtensionMemberDescriptor {
   /// extension itself.
   Name name;
 
-  /// [ProcedureKind] kind of the original member, if the extension is a
-  /// [Procedure] and `null` otherwise.
-  ///
-  /// This can be either `Method`, `Getter`, `Setter`, or `Operator`.
+  /// [ExtensionMemberKind] kind of the original member.
   ///
   /// An extension method is converted into a regular top-level method. For
   /// instance:
@@ -1201,7 +1193,7 @@ class ExtensionMemberDescriptor {
   /// where `B|get#bar` is the synthesized name of the top-level method and
   /// `#this` is the synthesized parameter that holds represents `this`.
   ///
-  ProcedureKind kind;
+  ExtensionMemberKind kind;
 
   int flags = 0;
 
@@ -1241,7 +1233,6 @@ class ExtensionMemberDescriptor {
 //                            MEMBERS
 // ------------------------------------------------------------------------
 
-@coq
 abstract class Member extends NamedNode implements Annotatable, FileUriNode {
   /// End offset in the source file it comes from.
   ///
@@ -1254,7 +1245,6 @@ abstract class Member extends NamedNode implements Annotatable, FileUriNode {
   ///
   /// This defaults to an immutable empty list. Use [addAnnotation] to add
   /// annotations if needed.
-  @nocoq
   List<Expression> annotations = const <Expression>[];
 
   Name name;
@@ -1770,7 +1760,6 @@ class RedirectingFactoryConstructor extends Member {
 /// For index-getters/setters, this is `[]` and `[]=`.
 /// For operators, this is the token for the operator, e.g. `+` or `==`,
 /// except for the unary minus operator, whose name is `unary-`.
-@coq
 class Procedure extends Member {
   /// Start offset of the function in the source file it comes from.
   ///
@@ -2221,7 +2210,6 @@ class AssertInitializer extends Initializer {
 ///
 /// This may occur in a procedure, constructor, function expression, or local
 /// function declaration.
-@coq
 class FunctionNode extends TreeNode {
   /// End offset in the source file it comes from. Valid values are from 0 and
   /// up, or -1 ([TreeNode.noOffset]) if the file end offset is not available
@@ -2246,9 +2234,7 @@ class FunctionNode extends TreeNode {
 
   List<TypeParameter> typeParameters;
   int requiredParameterCount;
-  @coqsingledef
   List<VariableDeclaration> positionalParameters;
-  @nocoq
   List<VariableDeclaration> namedParameters;
   DartType returnType; // Not null.
   Statement _body;
@@ -2390,7 +2376,6 @@ enum AsyncMarker {
 //                                EXPRESSIONS
 // ------------------------------------------------------------------------
 
-@coq
 abstract class Expression extends TreeNode {
   /// Returns the static type of the expression.
   ///
@@ -2457,10 +2442,8 @@ class InvalidExpression extends Expression {
 }
 
 /// Read a local variable, a local function, or a function parameter.
-@coq
 class VariableGet extends Expression {
   VariableDeclaration variable;
-  @nocoq
   DartType promotedType; // Null if not promoted.
 
   VariableGet(this.variable, [this.promotedType]);
@@ -2514,13 +2497,10 @@ class VariableSet extends Expression {
 /// Expression of form `x.field`.
 ///
 /// This may invoke a getter, read a field, or tear off a method.
-@coq
 class PropertyGet extends Expression {
   Expression receiver;
-  @coq
   Name name;
 
-  @nocoq
   Reference interfaceTargetReference;
 
   PropertyGet(Expression receiver, Name name, [Member interfaceTarget])
@@ -2920,11 +2900,8 @@ class StaticSet extends Expression {
 
 /// The arguments to a function call, divided into type arguments,
 /// positional arguments, and named arguments.
-@coq
 class Arguments extends TreeNode {
-  @nocoq
   final List<DartType> types;
-  @coqsingle
   final List<Expression> positional;
   List<NamedExpression> named;
 
@@ -2992,7 +2969,6 @@ class NamedExpression extends TreeNode {
 
 /// Common super class for [DirectMethodInvocation], [MethodInvocation],
 /// [SuperMethodInvocation], [StaticInvocation], and [ConstructorInvocation].
-@coq
 abstract class InvocationExpression extends Expression {
   Arguments get arguments;
   set arguments(Arguments value);
@@ -3004,7 +2980,6 @@ abstract class InvocationExpression extends Expression {
 }
 
 /// Expression of form `x.foo(y)`.
-@coq
 class MethodInvocation extends InvocationExpression {
   Expression receiver;
   Name name;
@@ -3197,10 +3172,8 @@ class StaticInvocation extends InvocationExpression {
 // DESIGN TODO: Should we pass type arguments in a separate field
 // `classTypeArguments`? They are quite different from type arguments to
 // generic functions.
-@coq
 class ConstructorInvocation extends InvocationExpression {
   Reference targetReference;
-  @nocoq
   Arguments arguments;
   bool isConst;
 
@@ -4111,13 +4084,11 @@ class CheckLibraryIsLoaded extends Expression {
 //                              STATEMENTS
 // ------------------------------------------------------------------------
 
-@coq
 abstract class Statement extends TreeNode {
   accept(StatementVisitor v);
   accept1(StatementVisitor1 v, arg);
 }
 
-@coq
 class ExpressionStatement extends Statement {
   Expression expression;
 
@@ -4140,7 +4111,6 @@ class ExpressionStatement extends Statement {
   }
 }
 
-@coq
 class Block extends Statement {
   final List<Statement> statements;
 
@@ -4566,7 +4536,6 @@ class IfStatement extends Statement {
   }
 }
 
-@coq
 class ReturnStatement extends Statement {
   Expression expression; // May be null.
 
@@ -4736,7 +4705,6 @@ class YieldStatement extends Statement {
 /// When this occurs as a statement, it must be a direct child of a [Block].
 //
 // DESIGN TODO: Should we remove the 'final' modifier from variables?
-@coqref
 class VariableDeclaration extends Statement {
   /// Offset of the equals sign in the source file it comes from.
   ///
@@ -4767,7 +4735,6 @@ class VariableDeclaration extends Statement {
   /// For parameters, this is the default value.
   ///
   /// Should be null in other cases.
-  @coqopt
   Expression initializer; // May be null.
 
   VariableDeclaration(this.name,
@@ -4958,14 +4925,10 @@ class FunctionDeclaration extends Statement implements LocalFunction {
 ///
 /// The [toString] method returns a human-readable string that includes the
 /// library name for private names; uniqueness is not guaranteed.
-@coq
 abstract class Name implements Node {
   final int hashCode;
-  @coq
   final String name;
-  @nocoq
   Reference get libraryName;
-  @nocoq
   Library get library;
   bool get isPrivate;
 
@@ -5075,7 +5038,6 @@ enum Nullability {
 ///
 /// The `==` operator on [DartType]s compare based on type equality, not
 /// object identity.
-@coq
 abstract class DartType extends Node {
   const DartType();
 
@@ -5112,7 +5074,7 @@ class InvalidType extends DartType {
 
   bool operator ==(Object other) => other is InvalidType;
 
-  Nullability get nullability => throw "InvalidType doesn't have nullabiliity";
+  Nullability get nullability => throw "InvalidType doesn't have nullability";
 }
 
 class DynamicType extends DartType {
@@ -5157,13 +5119,11 @@ class BottomType extends DartType {
   Nullability get nullability => Nullability.nonNullable;
 }
 
-@coq
 class InterfaceType extends DartType {
   Reference className;
 
   final Nullability nullability;
 
-  @nocoq
   final List<DartType> typeArguments;
 
   /// The [typeArguments] list must not be modified after this call. If the
@@ -5221,11 +5181,9 @@ class InterfaceType extends DartType {
 }
 
 /// A possibly generic function type.
-@coq
 class FunctionType extends DartType {
   final List<TypeParameter> typeParameters;
   final int requiredParameterCount;
-  @coqsingle
   final List<DartType> positionalParameters;
   final List<NamedType> namedParameters; // Must be sorted.
   final Nullability nullability;
@@ -5246,7 +5204,6 @@ class FunctionType extends DartType {
         this.requiredParameterCount =
             requiredParameterCount ?? positionalParameters.length;
 
-  @nocoq
   Reference get typedefReference => typedefType?.typedefReference;
 
   Typedef get typedef => typedefReference?.asTypedef;
@@ -5458,8 +5415,37 @@ final Map<TypeParameter, int> _temporaryHashCodeTable = <TypeParameter, int>{};
 /// is the same as the [TypeParameter]'s bound.  This allows one to detect
 /// whether the bound has been promoted.
 class TypeParameterType extends DartType {
-  /// Declared by the programmer on the type.
-  final Nullability declaredNullability;
+  /// The nullability declared on the type.
+  ///
+  /// Declarations of type-parameter types can set it to [Nullability.nullable]
+  /// or [Nullability.legacy].  Otherwise, it's computed from the nullability
+  /// of the type parameter bound.
+  Nullability declaredNullability;
+
+  TypeParameter parameter;
+
+  /// An optional promoted bound on the type parameter.
+  ///
+  /// 'null' indicates that the type parameter's bound has not been promoted and
+  /// is therefore the same as the bound of [parameter].
+  DartType promotedBound;
+
+  TypeParameterType(this.parameter,
+      [this.promotedBound, this.declaredNullability = Nullability.legacy]);
+
+  accept(DartTypeVisitor v) => v.visitTypeParameterType(this);
+  accept1(DartTypeVisitor1 v, arg) => v.visitTypeParameterType(this, arg);
+
+  visitChildren(Visitor v) {}
+
+  bool operator ==(Object other) {
+    return other is TypeParameterType && parameter == other.parameter;
+  }
+
+  int get hashCode => _temporaryHashCodeTable[parameter] ?? parameter.hashCode;
+
+  /// Returns the bound of the type parameter, accounting for promotions.
+  DartType get bound => promotedBound ?? parameter.bound;
 
   /// Actual nullability of the type, calculated from its parts.
   ///
@@ -5480,34 +5466,24 @@ class TypeParameterType extends DartType {
   ///         }
   ///       }
   ///     }
-  final Nullability nullability;
+  Nullability get nullability =>
+      getNullability(parameter, promotedBound, declaredNullability);
 
-  TypeParameter parameter;
-
-  /// An optional promoted bound on the type parameter.
-  ///
-  /// 'null' indicates that the type parameter's bound has not been promoted and
-  /// is therefore the same as the bound of [parameter].
-  DartType promotedBound;
-
-  TypeParameterType(this.parameter,
-      [this.promotedBound, this.declaredNullability = Nullability.legacy])
-      : this.nullability =
-            getNullability(parameter, promotedBound, declaredNullability);
-
-  accept(DartTypeVisitor v) => v.visitTypeParameterType(this);
-  accept1(DartTypeVisitor1 v, arg) => v.visitTypeParameterType(this, arg);
-
-  visitChildren(Visitor v) {}
-
-  bool operator ==(Object other) {
-    return other is TypeParameterType && parameter == other.parameter;
+  static Nullability computeNullabilityFromBound(TypeParameter typeParameter) {
+    // If the bound is nullable, both nullable and non-nullable types can be
+    // passed in for the type parameter, making the corresponding type
+    // parameter types 'neither.'  Otherwise, the nullability matches that of
+    // the bound.
+    DartType bound = typeParameter.bound;
+    if (bound == null) {
+      throw new StateError("Can't compute nullability from absent bound.");
+    }
+    Nullability boundNullability =
+        bound is InvalidType ? Nullability.neither : bound.nullability;
+    return boundNullability == Nullability.nullable
+        ? Nullability.neither
+        : boundNullability;
   }
-
-  int get hashCode => _temporaryHashCodeTable[parameter] ?? parameter.hashCode;
-
-  /// Returns the bound of the type parameter, accounting for promotions.
-  DartType get bound => promotedBound ?? parameter.bound;
 
   /// Get nullability of [TypeParameterType] from arguments to its constructor.
   ///
@@ -5521,7 +5497,7 @@ class TypeParameterType extends DartType {
     // by nullability.
 
     // If promotedBound isn't null, getNullability returns the nullability of an
-    // instesection of the left-hand side (referred to as LHS below) and the
+    // intersection of the left-hand side (referred to as LHS below) and the
     // right-hand side (referred to as RHS below).  LHS is parameter followed by
     // nullability, and RHS is promotedBound.  That is, getNullability returns
     // the nullability of either T & P or T? & P where T is parameter, P is
@@ -5530,22 +5506,12 @@ class TypeParameterType extends DartType {
 
     Nullability lhsNullability;
 
-    // If the nullability is explicitly nullable, that is, if the type parameter
-    // type is followed by '?' in the code, the nullability of the type is
-    // 'nullable.'
-    if (declaredNullability == Nullability.nullable) {
-      lhsNullability = Nullability.nullable;
+    // If the nullability is declared explicitly, use it as the nullability of
+    // the LHS of the intersection.  Otherwise, compute it from the bound.
+    if (declaredNullability != null) {
+      lhsNullability = declaredNullability;
     } else {
-      // If the bound is nullable, both nullable and non-nullable types can be
-      // passed in for the type parameter, making the corresponding type
-      // parameter types 'neither.'  Otherwise, the nullability matches that of
-      // the bound.
-      DartType bound = parameter.bound ?? const DynamicType();
-      Nullability boundNullability =
-          bound is InvalidType ? Nullability.neither : bound.nullability;
-      lhsNullability = boundNullability == Nullability.nullable
-          ? Nullability.neither
-          : boundNullability;
+      lhsNullability = computeNullabilityFromBound(parameter);
     }
     if (promotedBound == null) {
       return lhsNullability;
@@ -6113,10 +6079,11 @@ class TearOffConstant extends Constant {
     return '${runtimeType}(${procedure})';
   }
 
-  int get hashCode => procedure.hashCode;
+  int get hashCode => procedureReference.hashCode;
 
   bool operator ==(Object other) {
-    return other is TearOffConstant && other.procedure == procedure;
+    return other is TearOffConstant &&
+        other.procedureReference == procedureReference;
   }
 
   FunctionType getType(TypeEnvironment types) =>

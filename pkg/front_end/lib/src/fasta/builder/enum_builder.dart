@@ -218,7 +218,7 @@ class EnumBuilder extends SourceClassBuilder {
             enumConstantInfo.charOffset,
             enumConstantInfo.charOffset);
         metadataCollector?.setDocumentationComment(
-            fieldBuilder.target, documentationComment);
+            fieldBuilder.field, documentationComment);
         members[name] = fieldBuilder..next = existing;
       }
     }
@@ -227,9 +227,12 @@ class EnumBuilder extends SourceClassBuilder {
     EnumBuilder enumBuilder = new EnumBuilder.internal(
         metadata,
         name,
-        new Scope(members, null, parent.scope, "enum $name",
+        new Scope(
+            local: members,
+            parent: parent.scope,
+            debugName: "enum $name",
             isModifiable: false),
-        new Scope(constructors, null, null, name, isModifiable: false),
+        new Scope(local: constructors, debugName: name, isModifiable: false),
         cls,
         enumConstantInfos,
         intType,
@@ -316,7 +319,7 @@ class EnumBuilder extends SourceClassBuilder {
           objectClass.charOffset, objectClass.name.length, objectClass.fileUri);
     } else {
       constructor.initializers.add(
-          new SuperInitializer(superConstructor.target, new Arguments.empty())
+          new SuperInitializer(superConstructor.member, new Arguments.empty())
             ..parent = constructor);
     }
     int index = 0;

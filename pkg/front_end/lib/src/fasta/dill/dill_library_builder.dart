@@ -33,6 +33,12 @@ import '../fasta_codes.dart'
 
 import '../problems.dart' show internalProblem, unhandled, unimplemented;
 
+import '../builder/class_builder.dart';
+
+import '../builder/member_builder.dart';
+
+import '../builder/type_alias_builder.dart';
+
 import '../kernel/kernel_builder.dart'
     show Builder, DynamicTypeBuilder, InvalidTypeBuilder, LibraryBuilder, Scope;
 
@@ -50,9 +56,13 @@ class LazyLibraryScope extends Scope {
   DillLibraryBuilder libraryBuilder;
 
   LazyLibraryScope(Map<String, Builder> local, Map<String, Builder> setters,
-      Scope parent, String debugName,
-      {bool isModifiable: true})
-      : super(local, setters, parent, debugName, isModifiable: isModifiable);
+      Scope parent, String debugName, {bool isModifiable: true})
+      : super(
+            local: local,
+            setters: setters,
+            parent: parent,
+            debugName: debugName,
+            isModifiable: isModifiable);
 
   LazyLibraryScope.top({bool isModifiable: false})
       : this(<String, Builder>{}, <String, Builder>{}, null, "top",
@@ -72,6 +82,7 @@ class LazyLibraryScope extends Scope {
 }
 
 class DillLibraryBuilder extends LibraryBuilder {
+  @override
   final Library library;
 
   DillLoader loader;
@@ -130,9 +141,6 @@ class DillLibraryBuilder extends LibraryBuilder {
 
   @override
   String get name => library.name;
-
-  @override
-  Library get target => library;
 
   void addSyntheticDeclarationOfDynamic() {
     addBuilder(
@@ -298,7 +306,9 @@ class DillLibraryBuilder extends LibraryBuilder {
             -1,
             fileUri);
       }
-      assert(node == declaration.target);
+      assert((declaration is ClassBuilder && node == declaration.cls) ||
+          (declaration is TypeAliasBuilder && node == declaration.typedef) ||
+          (declaration is MemberBuilder && node == declaration.member));
     }
   }
 }

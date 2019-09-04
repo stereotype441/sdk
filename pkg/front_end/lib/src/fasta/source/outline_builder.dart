@@ -76,7 +76,7 @@ import '../operator.dart'
 import '../parser.dart'
     show
         Assert,
-        ClassKind,
+        DeclarationKind,
         FormalParameterKind,
         IdentifierContext,
         lengthOfSpan,
@@ -481,12 +481,16 @@ class OutlineBuilder extends StackListener {
   }
 
   @override
-  void beginClassOrMixinBody(ClassKind kind, Token token) {
-    if (kind == ClassKind.Extension) {
-      assert(checkState(token, [ValueKind.TypeBuilder]));
-      TypeBuilder extensionThisType = peek();
-      library.currentTypeParameterScopeBuilder
-          .registerExtensionThisType(extensionThisType);
+  void beginClassOrMixinBody(DeclarationKind kind, Token token) {
+    if (kind == DeclarationKind.Extension) {
+      assert(checkState(token, [
+        unionOfKinds([ValueKind.ParserRecovery, ValueKind.TypeBuilder])
+      ]));
+      Object extensionThisType = peek();
+      if (extensionThisType is TypeBuilder) {
+        library.currentTypeParameterScopeBuilder
+            .registerExtensionThisType(extensionThisType);
+      }
     }
     debugEvent("beginClassOrMixinBody");
     // Resolve unresolved types from the class header (i.e., superclass, mixins,
@@ -639,7 +643,7 @@ class OutlineBuilder extends StackListener {
     int offset = nameToken?.charOffset ?? extensionKeyword.charOffset;
     String name = nameToken?.lexeme ??
         // Synthesized name used internally.
-        'extension#${unnamedExtensionCounter++}';
+        '_extension#${unnamedExtensionCounter++}';
     push(name);
     push(offset);
     push(typeVariables ?? NullValue.TypeVariables);
@@ -651,7 +655,7 @@ class OutlineBuilder extends StackListener {
   void endExtensionDeclaration(
       Token extensionKeyword, Token onKeyword, Token endToken) {
     assert(checkState(extensionKeyword, [
-      ValueKind.TypeBuilder,
+      unionOfKinds([ValueKind.ParserRecovery, ValueKind.TypeBuilder]),
       ValueKind.TypeVariableListOrNull,
       ValueKind.Integer,
       ValueKind.NameOrNull,
@@ -838,7 +842,7 @@ class OutlineBuilder extends StackListener {
   }
 
   @override
-  void endMethod(Token getOrSet, Token beginToken, Token beginParam,
+  void endClassMethod(Token getOrSet, Token beginToken, Token beginParam,
       Token beginInitializers, Token endToken) {
     assert(checkState(beginToken, [ValueKind.MethodBody]));
     debugEvent("Method");
@@ -1479,7 +1483,7 @@ class OutlineBuilder extends StackListener {
   }
 
   @override
-  void endFields(Token staticToken, Token covariantToken, Token lateToken,
+  void endClassFields(Token staticToken, Token covariantToken, Token lateToken,
       Token varFinalOrConst, int count, Token beginToken, Token endToken) {
     debugEvent("Fields");
     if (!library.loader.target.enableNonNullable) {
@@ -1606,6 +1610,11 @@ class OutlineBuilder extends StackListener {
                 : templateCycleInTypeVariables.withArguments(
                     builder.name, via.join("', '"));
             addProblem(message, builder.charOffset, builder.name.length);
+            builder.bound = new NamedTypeBuilder(builder.name, null)
+              ..bind(new InvalidTypeBuilder(
+                  builder.name,
+                  message.withLocation(
+                      uri, builder.charOffset, builder.name.length)));
           }
         }
       }
@@ -1662,9 +1671,9 @@ class OutlineBuilder extends StackListener {
   }
 
   @override
-  void endFactoryMethod(
+  void endClassFactoryMethod(
       Token beginToken, Token factoryKeyword, Token endToken) {
-    debugEvent("FactoryMethod");
+    debugEvent("ClassFactoryMethod");
     MethodBody kind = pop();
     ConstructorReferenceBuilder redirectionTarget;
     if (kind == MethodBody.RedirectingFactoryBody) {
@@ -1797,7 +1806,7 @@ class OutlineBuilder extends StackListener {
 
   @override
   void endClassOrMixinBody(
-      ClassKind kind, int memberCount, Token beginToken, Token endToken) {
+      DeclarationKind kind, int memberCount, Token beginToken, Token endToken) {
     debugEvent("ClassOrMixinBody");
   }
 

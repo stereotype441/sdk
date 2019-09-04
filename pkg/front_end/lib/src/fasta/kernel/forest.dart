@@ -8,6 +8,8 @@ import 'dart:core' hide MapEntry;
 
 import 'package:kernel/ast.dart';
 
+import '../names.dart';
+
 import '../parser.dart' show offsetForToken, optional;
 
 import '../problems.dart' show unsupported;
@@ -42,6 +44,7 @@ import 'kernel_shadow_ast.dart'
         ListLiteralJudgment,
         LoadLibraryJudgment,
         MapLiteralJudgment,
+        MethodInvocationJudgment,
         ReturnJudgment,
         SetLiteralJudgment,
         ShadowLargeIntLiteral,
@@ -61,6 +64,24 @@ class Forest {
   Arguments createArguments(int fileOffset, List<Expression> positional,
       {List<DartType> types, List<NamedExpression> named}) {
     return new ArgumentsJudgment(positional, types: types, named: named)
+      ..fileOffset = fileOffset ?? TreeNode.noOffset;
+  }
+
+  Arguments createArgumentsForExtensionMethod(
+      int fileOffset,
+      int extensionTypeParameterCount,
+      int typeParameterCount,
+      Expression receiver,
+      {List<DartType> extensionTypeArguments = const <DartType>[],
+      List<DartType> typeArguments = const <DartType>[],
+      List<Expression> positionalArguments = const <Expression>[],
+      List<NamedExpression> namedArguments = const <NamedExpression>[]}) {
+    return new ArgumentsJudgment.forExtensionMethod(
+        extensionTypeParameterCount, typeParameterCount, receiver,
+        extensionTypeArguments: extensionTypeArguments,
+        typeArguments: typeArguments,
+        positionalArguments: positionalArguments,
+        namedArguments: namedArguments)
       ..fileOffset = fileOffset ?? TreeNode.noOffset;
   }
 
@@ -190,9 +211,9 @@ class Forest {
       ..fileOffset = offsetForToken(constKeyword ?? leftBrace);
   }
 
-  /// Return a representation of a null literal at the given [location].
-  NullLiteral createNullLiteral(Token token) {
-    return new NullLiteral()..fileOffset = offsetForToken(token);
+  /// Return a representation of a null literal at the given [fileOffset].
+  NullLiteral createNullLiteral(int fileOffset) {
+    return new NullLiteral()..fileOffset = fileOffset ?? TreeNode.noOffset;
   }
 
   /// Return a representation of a simple string literal at the given
@@ -495,10 +516,10 @@ class Forest {
   }
 
   /// Return a representation of a return statement.
-  Statement createReturnStatement(
-      Token returnKeyword, Expression expression, int charOffset) {
-    return new ReturnJudgment(returnKeyword?.lexeme, expression)
-      ..fileOffset = charOffset;
+  Statement createReturnStatement(int fileOffset, Expression expression,
+      {bool isArrow: true}) {
+    return new ReturnJudgment(isArrow, expression)
+      ..fileOffset = fileOffset ?? TreeNode.noOffset;
   }
 
   Expression createStringConcatenation(
@@ -637,7 +658,7 @@ class Forest {
       bool isFieldFormal: false,
       bool isCovariant: false,
       bool isLocalFunction: false}) {
-    return VariableDeclarationJudgment(name, functionNestingLevel,
+    return new VariableDeclarationJudgment(name, functionNestingLevel,
         type: type,
         initializer: initializer,
         isFinal: isFinal,
@@ -645,6 +666,18 @@ class Forest {
         isFieldFormal: isFieldFormal,
         isCovariant: isCovariant,
         isLocalFunction: isLocalFunction);
+  }
+
+  VariableDeclaration createVariableDeclarationForValue(
+      int fileOffset, Expression initializer,
+      {DartType type = const DynamicType()}) {
+    return new VariableDeclarationJudgment.forValue(initializer)
+      ..type = type
+      ..fileOffset = fileOffset ?? TreeNode.noOffset;
+  }
+
+  Let createLet(VariableDeclaration variable, Expression body) {
+    return new Let(variable, body);
   }
 
   FunctionNode createFunctionNode(Statement body,
@@ -674,8 +707,15 @@ class Forest {
   }
 
   FunctionExpression createFunctionExpression(
-      FunctionNode function, int fileOffset) {
-    return new FunctionExpression(function)..fileOffset = fileOffset;
+      int fileOffset, FunctionNode function) {
+    return new FunctionExpression(function)
+      ..fileOffset = fileOffset ?? TreeNode.noOffset;
+  }
+
+  MethodInvocation createFunctionInvocation(
+      int fileOffset, Expression expression, Arguments arguments) {
+    return new MethodInvocationJudgment(expression, callName, arguments)
+      ..fileOffset = fileOffset ?? TreeNode.noOffset;
   }
 
   NamedExpression createNamedExpression(String name, Expression expression) {

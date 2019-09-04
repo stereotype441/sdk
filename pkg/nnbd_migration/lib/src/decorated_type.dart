@@ -70,7 +70,7 @@ class DecoratedType {
         for (int i = 0; i < typeFormalBounds.length; i++) {
           var declaredBound = type.typeFormals[i].bound;
           if (declaredBound == null) {
-            assert(typeFormalBounds[i].type.isDartCoreObject);
+            assert(typeFormalBounds[i].type.toString() == 'Object');
           } else {
             assert(typeFormalBounds[i].type == declaredBound);
           }
@@ -290,6 +290,7 @@ class DecoratedType {
   DecoratedType instantiate(List<DecoratedType> argumentTypes) {
     var type = this.type as FunctionType;
     var typeFormals = type.typeFormals;
+    assert(argumentTypes.length == typeFormals.length);
     List<DartType> undecoratedArgumentTypes = [];
     Map<TypeParameterElement, DecoratedType> substitution = {};
     for (int i = 0; i < argumentTypes.length; i++) {
@@ -400,10 +401,10 @@ class DecoratedType {
         return inner
             .withNode(NullabilityNode.forSubstitution(inner.node, node));
       }
-    } else if (type is VoidType) {
+    } else if (type.isVoid || type.isDynamic) {
       return this;
     }
-    throw '$type.substitute($substitution)'; // TODO(paulberry)
+    throw '$type.substitute($type | $substitution)'; // TODO(paulberry)
   }
 
   /// Performs the logic that is common to substitution and function type
@@ -413,18 +414,27 @@ class DecoratedType {
   DecoratedType _substituteFunctionAfterFormals(FunctionType undecoratedResult,
       Map<TypeParameterElement, DecoratedType> substitution) {
     var newPositionalParameters = <DecoratedType>[];
+    var numRequiredParameters = undecoratedResult.normalParameterTypes.length;
     for (int i = 0; i < positionalParameters.length; i++) {
-      var numRequiredParameters = undecoratedResult.normalParameterTypes.length;
       var undecoratedParameterType = i < numRequiredParameters
           ? undecoratedResult.normalParameterTypes[i]
           : undecoratedResult.optionalParameterTypes[i - numRequiredParameters];
       newPositionalParameters.add(positionalParameters[i]
           ._substitute(substitution, undecoratedParameterType));
     }
+    var newNamedParameters = <String, DecoratedType>{};
+    for (var entry in namedParameters.entries) {
+      var name = entry.key;
+      var undecoratedParameterType =
+          undecoratedResult.namedParameterTypes[name];
+      newNamedParameters[name] =
+          (entry.value._substitute(substitution, undecoratedParameterType));
+    }
     return DecoratedType(undecoratedResult, node,
         returnType:
             returnType._substitute(substitution, undecoratedResult.returnType),
-        positionalParameters: newPositionalParameters);
+        positionalParameters: newPositionalParameters,
+        namedParameters: newNamedParameters);
   }
 
   List<DecoratedType> _substituteList(List<DecoratedType> list,

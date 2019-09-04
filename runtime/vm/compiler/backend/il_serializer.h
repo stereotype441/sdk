@@ -20,11 +20,38 @@ namespace dart {
 // Flow graph serialization.
 class FlowGraphSerializer : ValueObject {
  public:
+#define FOR_EACH_BLOCK_ENTRY_KIND(M)                                           \
+  M(Target)                                                                    \
+  M(Join)                                                                      \
+  M(Graph)                                                                     \
+  M(Normal)                                                                    \
+  M(Unchecked)                                                                 \
+  M(OSR)                                                                       \
+  M(Catch)                                                                     \
+  M(Indirect)
+
+  enum BlockEntryKind {
+#define KIND_DECL(name) k##name,
+    FOR_EACH_BLOCK_ENTRY_KIND(KIND_DECL)
+#undef KIND_DECL
+    // clang-format off
+    kNumEntryKinds,
+    kInvalid = -1,
+    // clang-format on
+  };
+
+  // Special case: returns kTarget for a nullptr input.
+  static BlockEntryKind BlockEntryTagToKind(SExpSymbol* tag);
+  SExpSymbol* BlockEntryKindToTag(BlockEntryKind k);
+  static bool BlockEntryKindHasInitialDefs(BlockEntryKind kind);
+
   static void SerializeToBuffer(const FlowGraph* flow_graph,
                                 TextBuffer* buffer);
   static void SerializeToBuffer(Zone* zone,
                                 const FlowGraph* flow_graph,
                                 TextBuffer* buffer);
+  static SExpression* SerializeToSExp(const FlowGraph* flow_graph);
+  static SExpression* SerializeToSExp(Zone* zone, const FlowGraph* flow_graph);
 
   const FlowGraph* flow_graph() const { return flow_graph_; }
   Zone* zone() const { return zone_; }
@@ -94,7 +121,11 @@ class FlowGraphSerializer : ValueObject {
         serialize_parent_(Function::Handle(zone_)),
         type_arguments_elem_(AbstractType::Handle(zone_)),
         type_class_(Class::Handle(zone_)),
-        type_ref_type_(AbstractType::Handle(zone_)) {}
+        type_ref_type_(AbstractType::Handle(zone_)) {
+    // Double-check that the zone in the flow graph is a parent of the
+    // zone we'll be using for serialization.
+    ASSERT(flow_graph->zone()->ContainsNestedZone(zone));
+  }
 
   static const char* const initial_indent;
 

@@ -7,7 +7,6 @@ import 'dart:collection';
 import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/ast_factory.dart';
-import 'package:analyzer/dart/ast/standard_resolution_map.dart';
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
@@ -133,8 +132,7 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
 
   @override
   void visitAnnotation(Annotation node) {
-    ElementAnnotation element =
-        resolutionMap.elementAnnotationForAnnotation(node);
+    ElementAnnotation element = node.elementAnnotation;
     AstNode parent = node.parent;
     if (element?.isFactory == true) {
       if (parent is MethodDeclaration) {
@@ -261,7 +259,7 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
 
   @override
   void visitConstructorDeclaration(ConstructorDeclaration node) {
-    if (resolutionMap.elementDeclaredByConstructorDeclaration(node).isFactory) {
+    if (node.declaredElement.isFactory) {
       if (node.body is BlockFunctionBody) {
         // Check the block for a return statement, if not, create the hint.
         if (!ExitDetector.exits(node.body)) {
@@ -576,8 +574,7 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
       } else if (displayName == FunctionElement.CALL_METHOD_NAME &&
           node is MethodInvocation &&
           node.staticInvokeType is InterfaceType) {
-        DartType staticInvokeType =
-            resolutionMap.staticInvokeTypeForInvocationExpression(node);
+        DartType staticInvokeType = node.staticInvokeType;
         displayName = "${staticInvokeType.displayName}.${element.displayName}";
       }
       LibraryElement library =
@@ -1089,17 +1086,25 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
     final requiredParameters =
         node.parameters.where((p) => p.declaredElement?.hasRequired == true);
     final nonNamedParamsWithRequired =
-        requiredParameters.where((p) => !p.isNamed);
+        requiredParameters.where((p) => p.isPositional);
     final namedParamsWithRequiredAndDefault = requiredParameters
         .where((p) => p.isNamed)
         .where((p) => p.declaredElement.defaultValueCode != null);
-    final paramsToHint = [
-      nonNamedParamsWithRequired,
-      namedParamsWithRequiredAndDefault
-    ].expand((e) => e);
-    for (final param in paramsToHint) {
+    for (final param in nonNamedParamsWithRequired.where((p) => p.isOptional)) {
       _errorReporter.reportErrorForNode(
-          HintCode.INVALID_REQUIRED_PARAM, param, [param.identifier.name]);
+          HintCode.INVALID_REQUIRED_OPTIONAL_POSITIONAL_PARAM,
+          param,
+          [param.identifier.name]);
+    }
+    for (final param in nonNamedParamsWithRequired.where((p) => p.isRequired)) {
+      _errorReporter.reportErrorForNode(
+          HintCode.INVALID_REQUIRED_POSITIONAL_PARAM,
+          param,
+          [param.identifier.name]);
+    }
+    for (final param in namedParamsWithRequiredAndDefault) {
+      _errorReporter.reportErrorForNode(HintCode.INVALID_REQUIRED_NAMED_PARAM,
+          param, [param.identifier.name]);
     }
   }
 
@@ -1789,8 +1794,7 @@ class DirectiveResolver extends SimpleAstVisitor {
 
   @override
   void visitCompilationUnit(CompilationUnit node) {
-    _enclosingLibrary =
-        resolutionMap.elementDeclaredByCompilationUnit(node).library;
+    _enclosingLibrary = node.declaredElement.library;
     for (Directive directive in node.directives) {
       directive.accept(this);
     }
@@ -1839,14 +1843,11 @@ class DirectiveResolver extends SimpleAstVisitor {
           if (importedTime >= 0 &&
               importSourceKindMap[importedSource] != SourceKind.LIBRARY) {
             StringLiteral uriLiteral = node.uri;
-            ErrorCode errorCode = element.isDeferred
-                ? StaticWarningCode.IMPORT_OF_NON_LIBRARY
-                : CompileTimeErrorCode.IMPORT_OF_NON_LIBRARY;
             errors.add(new AnalysisError(
                 _enclosingLibrary.source,
                 uriLiteral.offset,
                 uriLiteral.length,
-                errorCode,
+                CompileTimeErrorCode.IMPORT_OF_NON_LIBRARY,
                 [uriLiteral.toSource()]));
           }
         }
@@ -2965,35 +2966,6 @@ class PartialResolverVisitor extends ResolverVisitor {
   }
 }
 
-/// Kind of the redirecting constructor.
-class RedirectingConstructorKind
-    implements Comparable<RedirectingConstructorKind> {
-  static const RedirectingConstructorKind CONST =
-      const RedirectingConstructorKind('CONST', 0);
-
-  static const RedirectingConstructorKind NORMAL =
-      const RedirectingConstructorKind('NORMAL', 1);
-
-  static const List<RedirectingConstructorKind> values = const [CONST, NORMAL];
-
-  /// The name of this redirecting constructor kind.
-  final String name;
-
-  /// The ordinal value of the redirecting constructor kind.
-  final int ordinal;
-
-  const RedirectingConstructorKind(this.name, this.ordinal);
-
-  @override
-  int get hashCode => ordinal;
-
-  @override
-  int compareTo(RedirectingConstructorKind other) => ordinal - other.ordinal;
-
-  @override
-  String toString() => name;
-}
-
 /// The enumeration `ResolverErrorCode` defines the error codes used for errors
 /// detected by the resolver. The convention for this class is for the name of
 /// the error code to indicate the problem that caused the error to be generated
@@ -3707,8 +3679,7 @@ class ResolverVisitor extends ScopedVisitor {
 
   @override
   void visitDefaultFormalParameter(DefaultFormalParameter node) {
-    InferenceContext.setType(node.defaultValue,
-        resolutionMap.elementDeclaredByFormalParameter(node.parameter)?.type);
+    InferenceContext.setType(node.defaultValue, node.declaredElement?.type);
     super.visitDefaultFormalParameter(node);
     ParameterElement element = node.declaredElement;
 
@@ -3736,7 +3707,7 @@ class ResolverVisitor extends ScopedVisitor {
 
     _flowAnalysis?.flow?.doStatement_bodyBegin(
       node,
-      _flowAnalysis?.assignedVariables[node],
+      _flowAnalysis.assignedVariables.writtenInNode(node), _flowAnalysis.assignedVariables.capturedInNode(node)
     );
     visitStatementInScope(body);
 
@@ -3893,8 +3864,8 @@ class ResolverVisitor extends ScopedVisitor {
       iterable?.accept(this);
       _flowAnalysis?.loopVariable(loopVariable);
       loopVariable?.accept(this);
-      _flowAnalysis?.flow
-          ?.forEach_bodyBegin(_flowAnalysis?.assignedVariables[node]);
+      _flowAnalysis?.flow?.forEach_bodyBegin(
+          _flowAnalysis.assignedVariables.writtenInNode(node), _flowAnalysis.assignedVariables.capturedInNode(node));
       node.body?.accept(this);
       _flowAnalysis?.flow?.forEach_end();
 
@@ -3971,7 +3942,8 @@ class ResolverVisitor extends ScopedVisitor {
       loopVariable?.accept(this);
 
       _flowAnalysis?.flow?.forEach_bodyBegin(
-        _flowAnalysis?.assignedVariables[node],
+        _flowAnalysis.assignedVariables.writtenInNode(node),
+        _flowAnalysis.assignedVariables.capturedInNode(node)
       );
 
       Statement body = node.body;
@@ -4013,7 +3985,9 @@ class ResolverVisitor extends ScopedVisitor {
     ExecutableElement outerFunction = _enclosingFunction;
     try {
       if (_flowAnalysis != null) {
-        _flowAnalysis.flow?.functionExpression_begin();
+        // TODO(paulberry): test the value of _flowAnalysis.assignedVariables.capturedInNode(node)
+        _flowAnalysis.flow?.functionExpression_begin(
+            _flowAnalysis.assignedVariables.capturedInNode(node));
       } else {
         _promoteManager.enterFunctionBody(node.body);
       }
@@ -4317,8 +4291,7 @@ class ResolverVisitor extends ScopedVisitor {
     // because it needs to be visited in the context of the constructor
     // invocation.
     //
-    InferenceContext.setType(node.argumentList,
-        resolutionMap.staticElementForConstructorReference(node)?.type);
+    InferenceContext.setType(node.argumentList, node.staticElement?.type);
     node.argumentList?.accept(this);
     node.accept(elementResolver);
     node.accept(typeAnalyzer);
@@ -4426,8 +4399,7 @@ class ResolverVisitor extends ScopedVisitor {
     // because it needs to be visited in the context of the constructor
     // invocation.
     //
-    InferenceContext.setType(node.argumentList,
-        resolutionMap.staticElementForConstructorReference(node)?.type);
+    InferenceContext.setType(node.argumentList, node.staticElement?.type);
     node.argumentList?.accept(this);
     node.accept(elementResolver);
     node.accept(typeAnalyzer);
@@ -4454,7 +4426,9 @@ class ResolverVisitor extends ScopedVisitor {
 
       if (_flowAnalysis != null) {
         var flow = _flowAnalysis.flow;
-        var assignedInCases = _flowAnalysis.assignedVariables[node];
+        var assignedInCases =
+            _flowAnalysis.assignedVariables.writtenInNode(node);
+        var capturedInCases = _flowAnalysis.assignedVariables.capturedInNode(node);
 
         flow.switchStatement_expressionEnd(node);
 
@@ -4464,13 +4438,12 @@ class ResolverVisitor extends ScopedVisitor {
           flow.switchStatement_beginCase(
             member.labels.isNotEmpty,
             assignedInCases,
+            capturedInCases
           );
           member.accept(this);
 
-          // Implicit `break` at the end of `default`.
           if (member is SwitchDefault) {
             hasDefault = true;
-            flow.handleBreak(node);
           }
         }
 
@@ -4509,7 +4482,8 @@ class ResolverVisitor extends ScopedVisitor {
     flow.tryCatchStatement_bodyBegin();
     body.accept(this);
     flow.tryCatchStatement_bodyEnd(
-      _flowAnalysis.assignedVariables[body],
+      _flowAnalysis.assignedVariables.writtenInNode(body),
+      _flowAnalysis.assignedVariables.capturedInNode(body)
     );
 
     var catchLength = catchClauses.length;
@@ -4530,11 +4504,12 @@ class ResolverVisitor extends ScopedVisitor {
 
     if (finallyBlock != null) {
       flow.tryFinallyStatement_finallyBegin(
-        _flowAnalysis.assignedVariables[body],
+        _flowAnalysis.assignedVariables.writtenInNode(body),
+        _flowAnalysis.assignedVariables.capturedInNode(body)
       );
       finallyBlock.accept(this);
       flow.tryFinallyStatement_end(
-        _flowAnalysis.assignedVariables[finallyBlock],
+        _flowAnalysis.assignedVariables.writtenInNode(finallyBlock),
       );
     }
   }
@@ -4565,8 +4540,7 @@ class ResolverVisitor extends ScopedVisitor {
   void visitVariableDeclarationList(VariableDeclarationList node) {
     _flowAnalysis?.variableDeclarationList(node);
     for (VariableDeclaration decl in node.variables) {
-      VariableElement variableElement =
-          resolutionMap.elementDeclaredByVariableDeclaration(decl);
+      VariableElement variableElement = decl.declaredElement;
       InferenceContext.setType(decl, variableElement?.type);
     }
     super.visitVariableDeclarationList(node);
@@ -4586,7 +4560,8 @@ class ResolverVisitor extends ScopedVisitor {
       InferenceContext.setType(condition, typeProvider.boolType);
 
       _flowAnalysis?.flow?.whileStatement_conditionBegin(
-        _flowAnalysis?.assignedVariables[node],
+        _flowAnalysis.assignedVariables.writtenInNode(node),
+        _flowAnalysis.assignedVariables.capturedInNode(node)
       );
       condition?.accept(this);
 
@@ -4848,8 +4823,7 @@ class ResolverVisitor extends ScopedVisitor {
       return;
     }
 
-    ConstructorElement originalElement =
-        resolutionMap.staticElementForConstructorReference(constructor);
+    ConstructorElement originalElement = constructor.staticElement;
     FunctionType inferred;
     // If the constructor is generic, we'll have a ConstructorMember that
     // substitutes in type arguments (possibly `dynamic`) from earlier in
@@ -4986,16 +4960,13 @@ class ResolverVisitor extends ScopedVisitor {
   /// An error will be reported to [onError] if any of the arguments cannot be
   /// matched to a parameter. onError can be null to ignore the error.
   ///
-  /// The flag [reportAsError] should be `true` if a compile-time error should
-  /// be reported; or `false` if a compile-time warning should be reported.
-  ///
   /// Returns the parameters that correspond to the arguments. If no parameter
   /// matched an argument, that position will be `null` in the list.
   static List<ParameterElement> resolveArgumentsToParameters(
       ArgumentList argumentList,
       List<ParameterElement> parameters,
-      void onError(ErrorCode errorCode, AstNode node, [List<Object> arguments]),
-      {bool reportAsError: false}) {
+      void onError(ErrorCode errorCode, AstNode node,
+          [List<Object> arguments])) {
     if (parameters.isEmpty && argumentList.arguments.isEmpty) {
       return const <ParameterElement>[];
     }
@@ -5034,11 +5005,9 @@ class ResolverVisitor extends ScopedVisitor {
         ParameterElement element =
             namedParameters != null ? namedParameters[name] : null;
         if (element == null) {
-          ErrorCode errorCode = (reportAsError
-              ? CompileTimeErrorCode.UNDEFINED_NAMED_PARAMETER
-              : StaticWarningCode.UNDEFINED_NAMED_PARAMETER);
           if (onError != null) {
-            onError(errorCode, nameNode, [name]);
+            onError(CompileTimeErrorCode.UNDEFINED_NAMED_PARAMETER, nameNode,
+                [name]);
           }
         } else {
           resolvedParameters[i] = element;
@@ -5062,12 +5031,9 @@ class ResolverVisitor extends ScopedVisitor {
       }
     }
     if (positionalArgumentCount < requiredParameterCount && noBlankArguments) {
-      ErrorCode errorCode = (reportAsError
-          ? CompileTimeErrorCode.NOT_ENOUGH_POSITIONAL_ARGUMENTS
-          : StaticWarningCode.NOT_ENOUGH_REQUIRED_ARGUMENTS);
       if (onError != null) {
-        onError(errorCode, argumentList,
-            [requiredParameterCount, positionalArgumentCount]);
+        onError(CompileTimeErrorCode.NOT_ENOUGH_POSITIONAL_ARGUMENTS,
+            argumentList, [requiredParameterCount, positionalArgumentCount]);
       }
     } else if (positionalArgumentCount > unnamedParameterCount &&
         noBlankArguments) {
@@ -5075,13 +5041,10 @@ class ResolverVisitor extends ScopedVisitor {
       int namedParameterCount = namedParameters?.length ?? 0;
       int namedArgumentCount = usedNames?.length ?? 0;
       if (namedParameterCount > namedArgumentCount) {
-        errorCode = (reportAsError
-            ? CompileTimeErrorCode.EXTRA_POSITIONAL_ARGUMENTS_COULD_BE_NAMED
-            : StaticWarningCode.EXTRA_POSITIONAL_ARGUMENTS_COULD_BE_NAMED);
+        errorCode =
+            CompileTimeErrorCode.EXTRA_POSITIONAL_ARGUMENTS_COULD_BE_NAMED;
       } else {
-        errorCode = (reportAsError
-            ? CompileTimeErrorCode.EXTRA_POSITIONAL_ARGUMENTS
-            : StaticWarningCode.EXTRA_POSITIONAL_ARGUMENTS);
+        errorCode = CompileTimeErrorCode.EXTRA_POSITIONAL_ARGUMENTS;
       }
       if (onError != null) {
         onError(errorCode, argumentList,
@@ -6039,7 +6002,6 @@ class TypeNameResolver {
       // identifier being used as a class name.
       // See CompileTimeErrorCodeTest.test_builtInIdentifierAsType().
       SimpleIdentifier typeNameSimple = _getTypeSimpleIdentifier(typeName);
-      RedirectingConstructorKind redirectingConstructorKind;
       if (_isBuiltInIdentifier(node) && _isTypeAnnotation(node)) {
         reportErrorForNode(CompileTimeErrorCode.BUILT_IN_IDENTIFIER_AS_TYPE,
             typeName, [typeName.name]);
@@ -6055,14 +6017,9 @@ class TypeNameResolver {
       } else if (_isTypeNameInIsExpression(node)) {
         reportErrorForNode(StaticWarningCode.TYPE_TEST_WITH_UNDEFINED_NAME,
             typeName, [typeName.name]);
-      } else if ((redirectingConstructorKind =
-              _getRedirectingConstructorKind(node)) !=
-          null) {
-        ErrorCode errorCode =
-            (redirectingConstructorKind == RedirectingConstructorKind.CONST
-                ? CompileTimeErrorCode.REDIRECT_TO_NON_CLASS
-                : StaticWarningCode.REDIRECT_TO_NON_CLASS);
-        reportErrorForNode(errorCode, typeName, [typeName.name]);
+      } else if (_isRedirectingConstructor(node)) {
+        reportErrorForNode(CompileTimeErrorCode.REDIRECT_TO_NON_CLASS, typeName,
+            [typeName.name]);
       } else if (_isTypeNameInTypeArgumentList(node)) {
         reportErrorForNode(StaticTypeWarningCode.NON_TYPE_AS_TYPE_ARGUMENT,
             typeName, [typeName.name]);
@@ -6113,11 +6070,11 @@ class TypeNameResolver {
           }
         } else {
           reportErrorForNode(
-              StaticWarningCode.UNDEFINED_CLASS, typeName, [typeName.name]);
+              CompileTimeErrorCode.UNDEFINED_CLASS, typeName, [typeName.name]);
         }
       } else {
         reportErrorForNode(
-            StaticWarningCode.UNDEFINED_CLASS, typeName, [typeName.name]);
+            CompileTimeErrorCode.UNDEFINED_CLASS, typeName, [typeName.name]);
       }
     }
     if (!elementValid) {
@@ -6152,7 +6109,6 @@ class TypeNameResolver {
       type = _getTypeWhenMultiplyDefined(elements) as TypeImpl;
     } else {
       // The name does not represent a type.
-      RedirectingConstructorKind redirectingConstructorKind;
       if (_isTypeNameInCatchClause(node)) {
         reportErrorForNode(StaticWarningCode.NON_TYPE_IN_CATCH_CLAUSE, typeName,
             [typeName.name]);
@@ -6162,14 +6118,9 @@ class TypeNameResolver {
       } else if (_isTypeNameInIsExpression(node)) {
         reportErrorForNode(StaticWarningCode.TYPE_TEST_WITH_NON_TYPE, typeName,
             [typeName.name]);
-      } else if ((redirectingConstructorKind =
-              _getRedirectingConstructorKind(node)) !=
-          null) {
-        ErrorCode errorCode =
-            (redirectingConstructorKind == RedirectingConstructorKind.CONST
-                ? CompileTimeErrorCode.REDIRECT_TO_NON_CLASS
-                : StaticWarningCode.REDIRECT_TO_NON_CLASS);
-        reportErrorForNode(errorCode, typeName, [typeName.name]);
+      } else if (_isRedirectingConstructor(node)) {
+        reportErrorForNode(CompileTimeErrorCode.REDIRECT_TO_NON_CLASS, typeName,
+            [typeName.name]);
       } else if (_isTypeNameInTypeArgumentList(node)) {
         reportErrorForNode(StaticTypeWarningCode.NON_TYPE_AS_TYPE_ARGUMENT,
             typeName, [typeName.name]);
@@ -6281,23 +6232,6 @@ class TypeNameResolver {
     return nullability;
   }
 
-  /// Checks if the given [typeName] is the target in a redirected constructor.
-  RedirectingConstructorKind _getRedirectingConstructorKind(TypeName typeName) {
-    AstNode parent = typeName.parent;
-    if (parent is ConstructorName) {
-      AstNode grandParent = parent.parent;
-      if (grandParent is ConstructorDeclaration) {
-        if (identical(grandParent.redirectedConstructor, parent)) {
-          if (grandParent.constKeyword != null) {
-            return RedirectingConstructorKind.CONST;
-          }
-          return RedirectingConstructorKind.NORMAL;
-        }
-      }
-    }
-    return null;
-  }
-
   /// Return the type represented by the given type [annotation].
   DartType _getType(TypeAnnotation annotation) {
     DartType type = annotation.type;
@@ -6375,6 +6309,21 @@ class TypeNameResolver {
       }
     }
     return null;
+  }
+
+  /// Return `true` if the given [typeName] is the target in a redirected
+  /// constructor.
+  bool _isRedirectingConstructor(TypeName typeName) {
+    AstNode parent = typeName.parent;
+    if (parent is ConstructorName) {
+      AstNode grandParent = parent.parent;
+      if (grandParent is ConstructorDeclaration) {
+        if (identical(grandParent.redirectedConstructor, parent)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   /// Checks if the given [typeName] is used as the type in an as expression.

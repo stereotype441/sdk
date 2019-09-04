@@ -7,7 +7,6 @@ import 'dart:async';
 import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
-import 'package:analyzer/dart/ast/standard_resolution_map.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
@@ -245,8 +244,8 @@ class ResolutionVerifier extends RecursiveAstVisitor<void> {
     if (node.name == "void") {
       return;
     }
-    if (resolutionMap.staticTypeForExpression(node) != null &&
-        resolutionMap.staticTypeForExpression(node).isDynamic &&
+    if (node.staticType != null &&
+        node.staticType.isDynamic &&
         node.staticElement == null) {
       return;
     }
@@ -285,10 +284,7 @@ class ResolutionVerifier extends RecursiveAstVisitor<void> {
       if (root is CompilationUnit) {
         CompilationUnit rootCU = root;
         if (rootCU.declaredElement != null) {
-          return resolutionMap
-              .elementDeclaredByCompilationUnit(rootCU)
-              .source
-              .fullName;
+          return rootCU.declaredElement.source.fullName;
         } else {
           return "<unknown file- CompilationUnit.getElement() returned null>";
         }

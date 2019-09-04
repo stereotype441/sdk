@@ -2,7 +2,6 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:math';
@@ -44,7 +43,7 @@ abstract class TestRunner {
   String description;
 
   // Factory.
-  static TestRunner getTestRunner(String mode, bool ffi, String top, String tmp,
+  static TestRunner getTestRunner(String mode, String top, String tmp,
       Map<String, String> env, String fileName, Random rand) {
     String prefix = mode.substring(0, 3).toUpperCase();
     String tag = getTag(mode);
@@ -79,18 +78,21 @@ abstract class TestRunner {
         prefix += '-NOINTRINSIFY';
         extraFlags += ['--intrinsify=false'];
       } else if (r == 2) {
-        prefix += '-COMPACTEVERY';
-        extraFlags += ['--gc_every=1000', '--use_compactor=true'];
+        final freq = rand.nextInt(1000) + 500;
+        prefix += '-COMPACTEVERY-${freq}';
+        extraFlags += ['--gc_every=${freq}', '--use_compactor=true'];
       } else if (r == 3) {
-        prefix += '-MARKSWEEPEVERY';
-        extraFlags += ['--gc_every=1000', '--use_compactor=false'];
+        final freq = rand.nextInt(1000) + 500;
+        prefix += '-MARKSWEEPEVERY-${freq}';
+        extraFlags += ['--gc_every=${freq}', '--use_compactor=false'];
       } else if (r == 4) {
-        prefix += '-DEPOPTEVERY';
-        extraFlags += ['--deoptimize_every=100'];
-      } else if (r == 5 && !ffi) {
-        // TODO: https://github.com/dart-lang/sdk/issues/37606
-        prefix += '-STACKTRACEEVERY';
-        extraFlags += ['--stacktrace_every=100'];
+        final freq = rand.nextInt(100) + 50;
+        prefix += '-DEPOPTEVERY-${freq}';
+        extraFlags += ['--deoptimize_every=${freq}'];
+      } else if (r == 5) {
+        final freq = rand.nextInt(100) + 50;
+        prefix += '-STACKTRACEEVERY-${freq}';
+        extraFlags += ['--stacktrace_every=${freq}'];
       } else if (r == 6) {
         prefix += '-OPTCOUNTER';
         extraFlags += ['--optimization_counter_threshold=1'];
@@ -106,18 +108,26 @@ abstract class TestRunner {
       prefix += '-O3';
       extraFlags += ['--optimization_level=3'];
     }
+    // Every once in a while, use the slowpath flag.
+    if (!mode.startsWith('djs') && rand.nextInt(4) == 0) {
+      prefix += '-SLOWPATH';
+      extraFlags += ['--use-slow-path'];
+    }
+    // Every once in a while, use the deterministic flag.
+    if (!mode.startsWith('djs') && rand.nextInt(4) == 0) {
+      prefix += '-DET';
+      extraFlags += ['--deterministic'];
+    }
     // Construct runner.
     if (mode.startsWith('jit')) {
-      return new TestRunnerJIT(
-          prefix, tag, top, tmp, env, fileName, extraFlags);
+      return TestRunnerJIT(prefix, tag, top, tmp, env, fileName, extraFlags);
     } else if (mode.startsWith('aot')) {
-      return new TestRunnerAOT(
-          prefix, tag, top, tmp, env, fileName, extraFlags);
+      return TestRunnerAOT(prefix, tag, top, tmp, env, fileName, extraFlags);
     } else if (mode.startsWith('kbc')) {
-      return new TestRunnerKBC(
+      return TestRunnerKBC(
           prefix, tag, top, tmp, env, fileName, extraFlags, kbcSrc);
     } else if (mode.startsWith('djs')) {
-      return new TestRunnerDJS(prefix, tag, top, tmp, env, fileName);
+      return TestRunnerDJS(prefix, tag, top, tmp, env, fileName);
     }
     throw ('unknown runner in mode: $mode');
   }
@@ -287,20 +297,23 @@ class DartFuzzTest {
   }
 
   void setup() {
-    rand = new Random();
+    rand = Random();
     tmpDir = Directory.systemTemp.createTempSync('dart_fuzz');
     fileName = '${tmpDir.path}/fuzz.dart';
+    // Testcase generation flags.
+    // Necessary To avoid false divergences between 64 and 32 bit versions.
     fp = samePrecision(mode1, mode2);
-    ffi = ffiCapable(mode1, mode2);
-    runner1 = TestRunner.getTestRunner(
-        mode1, ffi, top, tmpDir.path, env, fileName, rand);
-    runner2 = TestRunner.getTestRunner(
-        mode2, ffi, top, tmpDir.path, env, fileName, rand);
+    // Occasionally test FFI.
+    ffi = ffiCapable(mode1, mode2) && (rand.nextInt(5) == 0);
+    runner1 =
+        TestRunner.getTestRunner(mode1, top, tmpDir.path, env, fileName, rand);
+    runner2 =
+        TestRunner.getTestRunner(mode2, top, tmpDir.path, env, fileName, rand);
     isolate =
         'Isolate (${tmpDir.path}) ${ffi ? "" : "NO-"}FFI ${fp ? "" : "NO-"}FP : '
         '${runner1.description} - ${runner2.description}';
 
-    start_time = new DateTime.now().millisecondsSinceEpoch;
+    start_time = DateTime.now().millisecondsSinceEpoch;
     current_time = start_time;
     report_time = start_time;
     end_time = start_time + max(0, time - timeout) * 1000;
@@ -322,7 +335,7 @@ class DartFuzzTest {
 
   bool timeIsUp() {
     if (time > 0) {
-      current_time = new DateTime.now().millisecondsSinceEpoch;
+      current_time = DateTime.now().millisecondsSinceEpoch;
       if (current_time > end_time) {
         return true;
       }
@@ -346,8 +359,8 @@ class DartFuzzTest {
   }
 
   void generateTest() {
-    final file = new File(fileName).openSync(mode: FileMode.write);
-    new DartFuzz(seed, fp, ffi, file).run();
+    final file = File(fileName).openSync(mode: FileMode.write);
+    DartFuzz(seed, fp, ffi, file).run();
     file.closeSync();
   }
 
@@ -487,7 +500,7 @@ class DartFuzzTestSession {
       this.mode1,
       this.mode2,
       this.rerun)
-      : top = getTop(tp) {}
+      : top = getTop(tp);
 
   start() async {
     print('\n**\n**** Dart Fuzz Testing Session\n**\n');
@@ -503,9 +516,9 @@ class DartFuzzTestSession {
     print('Show Stats      : ${showStats}');
     print('Dart Dev        : ${top}');
     // Fork.
-    List<ReceivePort> ports = new List();
+    List<ReceivePort> ports = List();
     for (int i = 0; i < isolates; i++) {
-      ReceivePort r = new ReceivePort();
+      ReceivePort r = ReceivePort();
       ports.add(r);
       port = r.sendPort;
       await Isolate.spawn(run, this);
@@ -529,7 +542,7 @@ class DartFuzzTestSession {
     try {
       final m1 = getMode(session.mode1, null);
       final m2 = getMode(session.mode2, m1);
-      final fuzz = new DartFuzzTest(
+      final fuzz = DartFuzzTest(
           Platform.environment,
           session.repeat,
           session.time,
@@ -562,7 +575,7 @@ class DartFuzzTestSession {
     // Random when not set.
     if (mode == null || mode == '') {
       // Pick a mode at random (cluster), different from other.
-      Random rand = new Random();
+      Random rand = Random();
       do {
         mode = clusterModes[rand.nextInt(clusterModes.length)];
       } while (mode == other);
@@ -649,7 +662,7 @@ class DartFuzzTestSession {
 /// Main driver for a fuzz testing session.
 main(List<String> arguments) {
   // Set up argument parser.
-  final parser = new ArgParser()
+  final parser = ArgParser()
     ..addOption('isolates', help: 'number of isolates to use', defaultsTo: '1')
     ..addOption('repeat', help: 'number of tests to run', defaultsTo: '1000')
     ..addOption('time', help: 'time limit in seconds', defaultsTo: '0')
@@ -681,7 +694,7 @@ main(List<String> arguments) {
     if (shards > 1) {
       print('\nSHARD $shard OF $shards');
     }
-    new DartFuzzTestSession(
+    DartFuzzTestSession(
             int.parse(results['isolates']),
             int.parse(results['repeat']),
             int.parse(results['time']),

@@ -1918,6 +1918,14 @@ RawError* Object::Init(Isolate* isolate,
     pending_classes.Add(cls);
     RegisterClass(cls, Symbols::FfiDynamicLibrary(), lib);
 
+    lib = Library::LookupLibrary(thread, Symbols::DartWasm());
+    if (lib.IsNull()) {
+      lib = Library::NewLibraryHelper(Symbols::DartWasm(), true);
+      lib.SetLoadRequested();
+      lib.Register(thread);
+    }
+    object_store->set_bootstrap_library(ObjectStore::kWasm, lib);
+
     // Finish the initialization by compiling the bootstrap scripts containing
     // the base interfaces and the implementation of the internal classes.
     const Error& error = Error::Handle(
@@ -7363,6 +7371,13 @@ RawFunction* Function::New(const String& name,
     // in new space.
     ASSERT(space == Heap::kOld);
   }
+
+  // Force-optimized functions are not debuggable because they cannot
+  // deoptimize.
+  if (result.ForceOptimize()) {
+    result.set_is_debuggable(false);
+  }
+
   return result.raw();
 }
 
@@ -10225,6 +10240,14 @@ RawObject* Library::GetMetadata(const Object& obj) const {
       !obj.IsLibrary() && !obj.IsTypeParameter()) {
     UNREACHABLE();
   }
+  if (obj.IsLibrary()) {
+    // Ensure top-level class is loaded as it may contain annotations of
+    // a library.
+    const auto& cls = Class::Handle(toplevel_class());
+    if (!cls.IsNull()) {
+      cls.EnsureDeclarationLoaded();
+    }
+  }
   const String& metaname = String::Handle(MakeMetadataName(obj));
   Field& field = Field::Handle(GetMetadataField(metaname));
   if (field.IsNull()) {
@@ -10241,10 +10264,16 @@ RawObject* Library::GetMetadata(const Object& obj) const {
       metadata = kernel::EvaluateMetadata(
           field, /* is_annotations_offset = */ obj.IsLibrary());
     }
-    if (metadata.IsArray()) {
-      ASSERT(Array::Cast(metadata).raw() != Object::empty_array().raw());
-      field.SetStaticValue(Array::Cast(metadata), true);
+    if (metadata.IsArray() || metadata.IsNull()) {
+      ASSERT(metadata.raw() != Object::empty_array().raw());
+      field.SetStaticValue(
+          metadata.IsNull() ? Object::null_array() : Array::Cast(metadata),
+          true);
     }
+  }
+  if (metadata.IsNull()) {
+    // Metadata field exists in order to reference extended metadata.
+    return Object::empty_array().raw();
   }
   return metadata.raw();
 #endif  // defined(DART_PRECOMPILED_RUNTIME)
@@ -10255,9 +10284,7 @@ RawArray* Library::GetExtendedMetadata(const Object& obj,
 #if defined(DART_PRECOMPILED_RUNTIME)
   return Object::empty_array().raw();
 #else
-  if (!obj.IsFunction()) {
-    UNREACHABLE();
-  }
+  RELEASE_ASSERT(obj.IsFunction() || obj.IsLibrary());
   const String& metaname = String::Handle(MakeMetadataName(obj));
   Field& field = Field::Handle(GetMetadataField(metaname));
   if (field.IsNull()) {
@@ -11725,6 +11752,10 @@ RawLibrary* Library::TypedDataLibrary() {
 
 RawLibrary* Library::VMServiceLibrary() {
   return Isolate::Current()->object_store()->_vmservice_library();
+}
+
+RawLibrary* Library::WasmLibrary() {
+  return Isolate::Current()->object_store()->wasm_library();
 }
 
 const char* Library::ToCString() const {
@@ -13593,6 +13624,29 @@ void ICData::AddDeoptReason(DeoptReasonId reason) const {
   }
 }
 
+const char* ICData::RebindRuleToCString(RebindRule r) {
+  switch (r) {
+#define RULE_CASE(Name)                                                        \
+  case RebindRule::k##Name:                                                    \
+    return #Name;
+    FOR_EACH_REBIND_RULE(RULE_CASE)
+#undef RULE_CASE
+    default:
+      return nullptr;
+  }
+}
+
+bool ICData::RebindRuleFromCString(const char* str, RebindRule* out) {
+#define RULE_CASE(Name)                                                        \
+  if (strcmp(str, #Name) == 0) {                                               \
+    *out = RebindRule::k##Name;                                                \
+    return true;                                                               \
+  }
+  FOR_EACH_REBIND_RULE(RULE_CASE)
+#undef RULE_CASE
+  return false;
+}
+
 ICData::RebindRule ICData::rebind_rule() const {
   return (ICData::RebindRule)RebindRuleBits::decode(raw_ptr()->state_bits_);
 }
@@ -14333,59 +14387,6 @@ bool ICData::HasReceiverClassId(intptr_t class_id) const {
     }
   }
   return false;
-}
-
-// Returns true if all targets are the same.
-// TODO(srdjan): if targets are native use their C_function to compare.
-// TODO(rmacnak): this question should only be asked against a CallTargets,
-// not an ICData.
-bool ICData::HasOneTarget() const {
-  ASSERT(!NumberOfChecksIs(0));
-  const Function& first_target = Function::Handle(GetTargetAt(0));
-  const intptr_t len = NumberOfChecks();
-  for (intptr_t i = 1; i < len; i++) {
-    if (IsUsedAt(i) && (GetTargetAt(i) != first_target.raw())) {
-      return false;
-    }
-  }
-  if (is_megamorphic()) {
-    Thread* thread = Thread::Current();
-    Zone* zone = thread->zone();
-    const String& name = String::Handle(zone, target_name());
-    const Array& descriptor = Array::Handle(zone, arguments_descriptor());
-    const MegamorphicCache& cache = MegamorphicCache::Handle(
-        zone, MegamorphicCacheTable::LookupClone(thread, name, descriptor));
-    MegamorphicCacheEntries entries(Array::Handle(cache.buckets()));
-    for (intptr_t i = 0; i < entries.Length(); i++) {
-      const intptr_t id =
-          Smi::Value(entries[i].Get<MegamorphicCache::kClassIdIndex>());
-      if (id == kIllegalCid) {
-        continue;
-      }
-      if (entries[i].Get<MegamorphicCache::kTargetFunctionIndex>() !=
-          first_target.raw()) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
-void ICData::GetUsedCidsForTwoArgs(GrowableArray<intptr_t>* first,
-                                   GrowableArray<intptr_t>* second) const {
-  ASSERT(NumArgsTested() == 2);
-  first->Clear();
-  second->Clear();
-  GrowableArray<intptr_t> class_ids;
-  const intptr_t len = NumberOfChecks();
-  for (intptr_t i = 0; i < len; i++) {
-    if (GetCountAt(i) > 0) {
-      GetClassIdsAt(i, &class_ids);
-      ASSERT(class_ids.length() == 2);
-      first->Add(class_ids[0]);
-      second->Add(class_ids[1]);
-    }
-  }
 }
 #endif
 
@@ -15988,37 +15989,6 @@ void MegamorphicCache::SwitchToBareInstructions() {
       ASSERT(cid == kSmiCid);
     }
   }
-}
-
-RawMegamorphicCache* MegamorphicCache::Clone(const MegamorphicCache& from) {
-  Thread* thread = Thread::Current();
-  Zone* zone = thread->zone();
-  MegamorphicCache& result = MegamorphicCache::Handle(zone);
-  {
-    RawObject* raw =
-        Object::Allocate(MegamorphicCache::kClassId,
-                         MegamorphicCache::InstanceSize(), Heap::kNew);
-    NoSafepointScope no_safepoint;
-    result ^= raw;
-  }
-
-  SafepointMutexLocker ml(thread->isolate()->megamorphic_mutex());
-  const Array& from_buckets = Array::Handle(zone, from.buckets());
-  const intptr_t len = from_buckets.Length();
-  const Array& cloned_buckets =
-      Array::Handle(zone, Array::New(len, Heap::kNew));
-  Object& obj = Object::Handle(zone);
-  for (intptr_t i = 0; i < len; i++) {
-    obj = from_buckets.At(i);
-    cloned_buckets.SetAt(i, obj);
-  }
-  result.set_buckets(cloned_buckets);
-  result.set_mask(from.mask());
-  result.set_target_name(String::Handle(zone, from.target_name()));
-  result.set_arguments_descriptor(
-      Array::Handle(zone, from.arguments_descriptor()));
-  result.set_filled_entry_count(from.filled_entry_count());
-  return result.raw();
 }
 
 void SubtypeTestCache::Init() {

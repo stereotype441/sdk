@@ -32,6 +32,7 @@ accessible
 accessing
 accessor
 accessors
+accidental
 accidentally
 accordance
 according
@@ -79,6 +80,7 @@ algebra
 algorithm
 algorithms
 alias
+alignment
 all
 allocated
 allocating
@@ -218,6 +220,7 @@ backward
 backwards
 bad
 balanced
+bare
 base
 based
 basic
@@ -334,6 +337,7 @@ canonicalize
 canonicalized
 capabilities
 capability
+capable
 capital
 capture
 captured
@@ -386,6 +390,7 @@ chunk
 circularities
 circularity
 circumstances
+clashing
 class
 classes
 classic
@@ -593,6 +598,7 @@ could
 couldn't
 count
 counter
+counting
 counts
 couple
 covariance
@@ -603,16 +609,19 @@ covered
 covers
 crash
 crashed
+crashes
 crashing
 create
 created
 creates
 creating
 creation
+crossed
 curly
 current
 currently
 custom
+customize
 cyan
 cycle
 cycles
@@ -819,6 +828,7 @@ earlier
 early
 easier
 easiest
+easily
 edge
 edges
 edit
@@ -855,10 +865,12 @@ encoded
 encoder
 encodes
 encoding
+encounter
 encountered
 encounters
 end
 ended
+endian
 ending
 endings
 ends
@@ -877,6 +889,7 @@ entered
 entering
 entire
 entirely
+entirety
 entities
 entity
 entity's
@@ -899,6 +912,7 @@ escaped
 escapes
 escaping
 essence
+essentials
 etc
 evaluate
 evaluated
@@ -1352,6 +1366,8 @@ instantiating
 instantiation
 instantiations
 instead
+instruction
+instructions
 instrumentation
 instrumented
 int
@@ -1402,6 +1418,7 @@ investigate
 invocation
 invocation's
 invocations
+invokable
 invoke
 invoked
 invokes
@@ -1608,6 +1625,7 @@ mathematical
 matter
 maturity
 max
+maximum
 may
 maybe
 mean
@@ -1907,6 +1925,7 @@ patching
 paths
 pattern
 peek
+pending
 percent
 perform
 performance
@@ -1926,6 +1945,7 @@ physical
 pick
 picked
 pipeline
+piping
 pivot
 place
 placed
@@ -2085,6 +2105,7 @@ qualified
 qualifier
 qualifiers
 quality
+queried
 query
 question
 queue
@@ -2110,6 +2131,7 @@ reading
 reads
 ready
 real
+realigned
 realized
 really
 reason
@@ -2157,6 +2179,7 @@ referred
 refers
 refine
 refinement
+reflecting
 regardless
 region
 regions
@@ -2174,11 +2197,13 @@ relate
 related
 relation
 relational
+relations
 relationship
 relationships
 relative
 release
 relevant
+relied
 relies
 reloads
 rely
@@ -2196,6 +2221,7 @@ removed
 removes
 removing
 rename
+renamed
 renaming
 repeated
 repeatedly
@@ -2238,6 +2264,7 @@ resolves
 resolving
 resources
 respect
+respected
 respective
 respectively
 respects
@@ -2257,6 +2284,7 @@ resynthesize
 retain
 retained
 rethrow
+retired
 retrieve
 retrieved
 retrieves
@@ -2351,6 +2379,7 @@ sending
 sends
 sense
 sent
+sentence
 sentinel
 separate
 separated
@@ -2393,6 +2422,7 @@ should
 shouldn't
 show
 shown
+shows
 shrink
 side
 sign
@@ -2402,6 +2432,7 @@ signature
 signatures
 signed
 silent
+silently
 silly
 similar
 similarly
@@ -2453,6 +2484,7 @@ sort
 sorted
 sorting
 sorts
+sought
 source
 sources
 space
@@ -2609,6 +2641,7 @@ system
 systems
 tab
 table
+tables
 tabs
 tag
 tail
@@ -2750,6 +2783,7 @@ trying
 turn
 turned
 turning
+turns
 tv
 twice
 two
@@ -2761,6 +2795,7 @@ types
 typically
 typing
 unable
+unambiguous
 unary
 unbalanced
 unbind
@@ -2801,6 +2836,7 @@ unmodified
 unnamed
 unnecessarily
 unnecessary
+unparsable
 unpromoted
 unread
 unrecognized
@@ -2874,6 +2910,7 @@ verifies
 verify
 verifying
 version
+versioning
 versions
 vertex
 vertical
