@@ -792,13 +792,20 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
 
   bool _exceptionOccurred = false;
 
-  FlowAnalysisDebug(
+  factory FlowAnalysisDebug(
       NodeOperations<Expression> nodeOperations,
       TypeOperations<Variable, Type> typeOperations,
       Iterable<Variable> variablesWrittenAnywhere,
-      Iterable<Variable> variablesCapturedAnywhere)
-      : _wrapped = FlowAnalysis(nodeOperations, typeOperations,
-            variablesWrittenAnywhere, variablesCapturedAnywhere);
+      Iterable<Variable> variablesCapturedAnywhere) {
+    variablesWrittenAnywhere = variablesWrittenAnywhere.toList();
+    variablesCapturedAnywhere = variablesCapturedAnywhere.toList();
+    print('FlowAnalysisDebug($variablesWrittenAnywhere, '
+        '$variablesCapturedAnywhere)');
+    return FlowAnalysisDebug._(FlowAnalysis(nodeOperations, typeOperations,
+        variablesWrittenAnywhere, variablesCapturedAnywhere));
+  }
+
+  FlowAnalysisDebug._(this._wrapped);
 
   @override
   bool get isReachable =>
