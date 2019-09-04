@@ -813,7 +813,7 @@ class FlowModel<Variable, Type> {
   /// the point of declaration.
   FlowModel<Variable, Type> add(Variable variable, {bool assigned: false}) {
     Map<Variable, VariableModel<Type>> newVariableInfo =
-        Map<Variable, VariableModel<Type>>.from(variableInfo);
+    new Map<Variable, VariableModel<Type>>.from(variableInfo);
     newVariableInfo[variable] = new VariableModel<Type>(null, assigned);
 
     return new FlowModel<Variable, Type>._(reachable, newVariableInfo);
