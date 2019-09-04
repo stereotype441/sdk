@@ -492,7 +492,7 @@ main() {
 
     test('switchStatement_beginCase(false) restores previous promotions', () {
       var h = _Harness();
-      var x = h.addVar('x', 'int?', hasWrites: true);
+      var x = h.addVar('x', 'int?');
       h.run((flow) {
         h.declare(x, initialized: true);
         h.promote(x, 'int');
@@ -511,7 +511,7 @@ main() {
 
     test('switchStatement_beginCase(false) does not un-promote', () {
       var h = _Harness();
-      var x = h.addVar('x', 'int?', hasWrites: true);
+      var x = h.addVar('x', 'int?');
       h.run((flow) {
         h.declare(x, initialized: true);
         h.promote(x, 'int');
@@ -526,7 +526,7 @@ main() {
 
     test('switchStatement_beginCase(true) un-promotes', () {
       var h = _Harness();
-      var x = h.addVar('x', 'int?', hasWrites: true);
+      var x = h.addVar('x', 'int?');
       h.run((flow) {
         h.declare(x, initialized: true);
         h.promote(x, 'int');
@@ -542,7 +542,7 @@ main() {
     test('switchStatement_end(false) joins break and default', () {
       var h = _Harness();
       var x = h.addVar('x', 'int?');
-      var y = h.addVar('y', 'int?', hasWrites: true);
+      var y = h.addVar('y', 'int?');
       var z = h.addVar('z', 'int?');
       h.run((flow) {
         h.declare(x, initialized: true);
@@ -566,8 +566,8 @@ main() {
     test('switchStatement_end(true) joins breaks', () {
       var h = _Harness();
       var w = h.addVar('w', 'int?');
-      var x = h.addVar('x', 'int?', hasWrites: true);
-      var y = h.addVar('y', 'int?', hasWrites: true);
+      var x = h.addVar('x', 'int?');
+      var y = h.addVar('y', 'int?');
       var z = h.addVar('z', 'int?');
       h.run((flow) {
         h.declare(w, initialized: true);
@@ -1055,19 +1055,13 @@ class _Harness
         FunctionBodyAccess<_Var> {
   FlowAnalysis<_Statement, _Expression, _Var, _Type> _flow;
 
-  final List<_Var> _variablesWrittenAnywhere = [];
-
   /// Returns a [LazyExpression] representing an expression with now special
   /// flow analysis semantics.
   LazyExpression get expr => () => _Expression();
 
-  _Var addVar(String name, String type, {bool hasWrites: false}) {
+  _Var addVar(String name, String type) {
     assert(_flow == null);
-    var v = _Var(name, _Type(type));
-    if (hasWrites) {
-      _variablesWrittenAnywhere.add(v);
-    }
-    return v;
+    return _Var(name, _Type(type));
   }
 
   /// Given two [LazyExpression]s, produces a new [LazyExpression] representing
