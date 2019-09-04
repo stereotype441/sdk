@@ -79,11 +79,11 @@ class AssignedVariables<Node, Variable> {
   /// statement, the body of the switch statement should be covered, but the
   /// switch expression should not.
   void beginNode({bool isClosure: false}) {
-    _writtenStack.add(Set<Variable>.identity());
+    _writtenStack.add(new Set<Variable>.identity());
     if (isClosure) {
       _closureIndexStack.add(_capturedStack.length);
     }
-    _capturedStack.add(Set<Variable>.identity());
+    _capturedStack.add(new Set<Variable>.identity());
   }
 
   /// Queries the set of variables for which a potential write is captured by a
@@ -179,7 +179,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// erroneous code, it's possible that a variable might be used before its
   /// declaration.
   final Set<Variable> _referencedVariables =
-      _assertionsEnabled ? Set<Variable>() : null;
+      _assertionsEnabled ? new Set<Variable>() : null;
 
   factory FlowAnalysis(
     NodeOperations<Expression> nodeOperations,
@@ -309,8 +309,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   void finish() {
     assert(_stack.isEmpty);
     assert(() {
-      Set<Variable> variablesNotAdded =
-          _referencedVariables.difference(Set<Variable>.from(_addedVariables));
+      Set<Variable> variablesNotAdded = _referencedVariables
+          .difference(new Set<Variable>.from(_addedVariables));
       assert(variablesNotAdded.isEmpty,
           'Variables not passed to add: $variablesNotAdded');
       return true;
@@ -989,8 +989,9 @@ class FlowModel<Variable, Type> {
         return true;
       }());
       VariableModel<Type> info = map[variable];
-      if (info.promotedType != null) {
-        (result ??= Map<Variable, VariableModel<Type>>.from(map))[variable] =
+      if (info?.promotedType != null) {
+        (result ??=
+                new Map<Variable, VariableModel<Type>>.from(map))[variable] =
             info.withPromotedType(null);
       }
     }
@@ -1003,7 +1004,7 @@ class FlowModel<Variable, Type> {
   FlowModel<Variable, Type> _updateVariableInfo(
       Variable variable, VariableModel<Type> model) {
     Map<Variable, VariableModel<Type>> newVariableInfo =
-        Map<Variable, VariableModel<Type>>.from(variableInfo);
+        new Map<Variable, VariableModel<Type>>.from(variableInfo);
     newVariableInfo[variable] = model;
     return FlowModel<Variable, Type>._(reachable, newVariableInfo);
   }
