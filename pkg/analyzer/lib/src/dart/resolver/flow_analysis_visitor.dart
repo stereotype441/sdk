@@ -152,7 +152,7 @@ class FlowAnalysisHelper {
       flow = FlowAnalysis<Statement, Expression, VariableElement, DartType>(
           _nodeOperations,
           _typeOperations,
-          assignedVariables.writtenInNode(node));
+          assignedVariables.writtenInNode(node), assignedVariables.capturedInNode(node));
     }
 
     var parameters = _enclosingExecutableParameters(node);

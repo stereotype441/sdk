@@ -137,7 +137,7 @@ main() {
 
     test('conditionEqNull() does not promote write-captured vars', () {
       var h = _Harness();
-      var x = h.addVar('x', 'int?', hasWrites: true);
+      var x = h.addVar('x', 'int?', hasWrites: true, isCaptured: true);
       h.run((flow) {
         h.declare(x, initialized: true);
         h.if_(h.notNull(x), () {
@@ -370,7 +370,7 @@ main() {
     test('functionExpression_begin() cancels promotions of self-captured vars',
         () {
       var h = _Harness();
-      var x = h.addVar('x', 'int?', hasWrites: true);
+      var x = h.addVar('x', 'int?', hasWrites: true, isCaptured: true);
       var y = h.addVar('y', 'int?');
       h.run((flow) {
         h.declare(x, initialized: true);
@@ -395,7 +395,7 @@ main() {
     test('functionExpression_begin() cancels promotions of other-captured vars',
         () {
       var h = _Harness();
-      var x = h.addVar('x', 'int?', hasWrites: true);
+      var x = h.addVar('x', 'int?', hasWrites: true, isCaptured: true);
       var y = h.addVar('y', 'int?');
       h.run((flow) {
         h.declare(x, initialized: true);
@@ -406,7 +406,12 @@ main() {
         expect(flow.promotedType(y).type, 'int');
         flow.functionExpression_begin({});
         // x is de-promoted within the local function, because the write
-        // might have happened by the time the local function executes.
+        // might have been captured by the time the local function executes.
+        expect(flow.promotedType(x), isNull);
+        expect(flow.promotedType(y).type, 'int');
+        // And any effort to promote x fails, because there is no way of knowing
+        // when the captured write might occur.
+        h.promote(x, 'int');
         expect(flow.promotedType(x), isNull);
         expect(flow.promotedType(y).type, 'int');
         flow.functionExpression_end();
@@ -443,6 +448,10 @@ main() {
         // might have happened by the time the local function executes.
         expect(flow.promotedType(x), isNull);
         expect(flow.promotedType(y).type, 'int');
+        // But it can be re-promoted because the write isn't captured.
+        h.promote(x, 'int');
+        expect(flow.promotedType(x).type, 'int');
+        expect(flow.promotedType(y).type, 'int');
         flow.functionExpression_end();
         // x is still promoted after the local function, though, because the
         // write hasn't occurred yet.
@@ -467,6 +476,26 @@ main() {
         h.declare(x, initialized: true);
         h.promote(x, 'int');
         expect(flow.promotedType(x), isNull);
+      });
+    });
+
+    test('functionExpression_begin() handles not-yet-seen write-captured vars',
+        () {
+      var h = _Harness();
+      var x = h.addVar('x', 'int?', hasWrites: true, isCaptured: true);
+      var y = h.addVar('y', 'int?');
+      h.run((flow) {
+        h.declare(y, initialized: true);
+        h.promote(y, 'int');
+        flow.functionExpression_begin({});
+        h.promote(x, 'int');
+        // Promotion should not occur, because x might be write-captured by the
+        // time this code is reached.
+        expect(flow.promotedType(x), isNull);
+        flow.functionExpression_end();
+        flow.functionExpression_begin({x});
+        h.declare(x, initialized: true);
+        flow.functionExpression_end();
       });
     });
 
@@ -1222,15 +1251,22 @@ class _Harness
 
   final List<_Var> _variablesWrittenAnywhere = [];
 
+  final List<_Var> _variablesCapturedAnywhere = [];
+
   /// Returns a [LazyExpression] representing an expression with now special
   /// flow analysis semantics.
   LazyExpression get expr => () => _Expression();
 
-  _Var addVar(String name, String type, {bool hasWrites: false}) {
+  _Var addVar(String name, String type,
+      {bool hasWrites: false, bool isCaptured: false}) {
     assert(_flow == null);
     var v = _Var(name, _Type(type));
     if (hasWrites) {
       _variablesWrittenAnywhere.add(v);
+    }
+    if (isCaptured) {
+      assert(hasWrites);
+      _variablesCapturedAnywhere.add(v);
     }
     return v;
   }
@@ -1261,7 +1297,7 @@ class _Harness
 
   FlowAnalysis<_Statement, _Expression, _Var, _Type> createFlow() =>
       FlowAnalysis<_Statement, _Expression, _Var, _Type>(
-          this, this, _variablesWrittenAnywhere);
+          this, this, _variablesWrittenAnywhere, _variablesCapturedAnywhere);
 
   void declare(_Var v, {@required bool initialized}) {
     _flow.add(v, assigned: initialized);

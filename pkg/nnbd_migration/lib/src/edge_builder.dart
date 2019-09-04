@@ -1332,7 +1332,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         FlowAnalysis<Statement, Expression, VariableElement, DecoratedType>(
             const AnalyzerNodeOperations(),
             DecoratedTypeOperations(_typeSystem, _variables, _graph),
-            _assignedVariables.capturedInNode(node));
+            _assignedVariables.capturedInNode(node), _assignedVariables.capturedInNode(node));
     _assignedVariables = FlowAnalysisHelper.computeAssignedVariables(node);
   }
 

@@ -138,6 +138,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   final List<Variable> _variablesWrittenAnywhere;
 
+  final List<Variable> _variablesCapturedAnywhere;
+
   /// The [NodeOperations], used to manipulate expressions.
   final NodeOperations<Expression> nodeOperations;
 
@@ -180,16 +182,19 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   final Set<Variable> _referencedVariables =
       _assertionsEnabled ? new Set<Variable>() : null;
 
+  int _functionNestingLevel = 0;
+
   factory FlowAnalysis(
       NodeOperations<Expression> nodeOperations,
       TypeOperations<Variable, Type> typeOperations,
-      Iterable<Variable> variablesWrittenAnywhere) {
-    return FlowAnalysis._(
-        nodeOperations, typeOperations, variablesWrittenAnywhere.toList());
+      Iterable<Variable> variablesWrittenAnywhere,
+      Iterable<Variable> variablesCapturedAnywhere) {
+    return FlowAnalysis._(nodeOperations, typeOperations,
+        variablesWrittenAnywhere.toList(), variablesCapturedAnywhere.toList());
   }
 
   FlowAnalysis._(this.nodeOperations, this.typeOperations,
-      this._variablesWrittenAnywhere) {
+      this._variablesWrittenAnywhere, this._variablesCapturedAnywhere) {
     _current = FlowModel<Variable, Type>(true);
   }
 
@@ -417,16 +422,16 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   }
 
   void functionExpression_begin(Iterable<Variable> writeCaptured) {
-    // TODO(paulberry): test that de-promotion of write-captured variables
-    // affects both after and within the function expression.
+    ++_functionNestingLevel;
     _current = _current.writeCapture(writeCaptured, _referencedVariables);
     _stack.add(_current);
-    // TODO(paulberry): test that de-promotion of variables written anywhere
-    // affects just within the function expression.
     _current = _current.removePromotedAll(_variablesWrittenAnywhere, null);
+    _current = _current.writeCaptureAll(_variablesCapturedAnywhere);
   }
 
   void functionExpression_end() {
+    --_functionNestingLevel;
+    assert(_functionNestingLevel >= 0);
     _current = _stack.removeLast();
   }
 
@@ -711,6 +716,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   void write(Variable variable) {
     _variableReferenced(variable);
     assert(_variablesWrittenAnywhere.contains(variable));
+    assert(_functionNestingLevel == 0 ||
+        _variablesCapturedAnywhere.contains(variable));
     _current = _current.write(typeOperations, variable);
   }
 
@@ -1007,6 +1014,40 @@ class FlowModel<Variable, Type> {
     }
     if (newVariableInfo == null) return this;
     return FlowModel<Variable, Type>._(reachable, newVariableInfo);
+  }
+
+  /// Updates the state to indicate that the given [variables] are
+  /// write-captured.
+  ///
+  /// This is used at the top of local functions to prohibit the promotion of
+  /// variables that might be promoted in other local functions, so that we
+  /// correctly analyze code like the following:
+  ///
+  ///     f(Object x) {
+  ///       void Function() h;
+  ///       var g = () {
+  ///         if (x is int) {
+  ///           h();
+  ///           x.isEven; // ERROR: unsafe to promote
+  ///         }
+  ///       };
+  ///       h = () { x = "hello"; }
+  ///       g();
+  ///     }
+  FlowModel<Variable, Type> writeCaptureAll(Iterable<Variable> variables) {
+    Map<Variable, VariableModel<Type>> newVariableInfo;
+    for (Variable variable in variables) {
+      VariableModel<Type> info = variableInfo[variable];
+      if (info == null) {
+        (newVariableInfo ??= new Map<Variable, VariableModel<Type>>.from(
+            variableInfo))[variable] = VariableModel<Type>(null, false, true);
+      } else if (!info.writeCaptured) {
+        (newVariableInfo ??= new Map<Variable, VariableModel<Type>>.from(
+            variableInfo))[variable] = info.writeCapture();
+      }
+    }
+    if (newVariableInfo == null) return this;
+    return new FlowModel<Variable, Type>._(reachable, newVariableInfo);
   }
 
   /// Returns a new [FlowModel] where the information for [variable] is replaced
