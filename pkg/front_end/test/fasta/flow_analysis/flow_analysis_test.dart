@@ -418,6 +418,38 @@ main() {
       });
     });
 
+    void _checkIs(String declaredType, String tryPromoteType,
+        String expectedPromotedType) {
+      var h = _Harness();
+      var x = h.addVar('x', 'int?');
+      h.run((flow) {
+        h.declare(x, initialized: true);
+        var expr = _Expression();
+        flow.isExpression_end(expr, x, false, _Type(tryPromoteType));
+        flow.ifStatement_thenBegin(expr);
+        if (expectedPromotedType == null) {
+          expect(flow.promotedType(x), isNull);
+        } else {
+          expect(flow.promotedType(x).type, expectedPromotedType);
+        }
+        flow.ifStatement_elseBegin();
+        expect(flow.promotedType(x), isNull);
+        flow.ifStatement_end(true);
+      });
+    }
+
+    test('isExpression_end promotes to a subtype', () {
+      _checkIs('int?', 'int', 'int');
+    });
+
+    test('isExpression_end does not promote to a supertype', () {
+      _checkIs('int', 'int?', null);
+    });
+
+    test('isExpression_end does not promote to an unrelated type', () {
+      _checkIs('int', 'String', null);
+    });
+
     test('logicalBinaryOp_rightBegin(isAnd: true) promotes in RHS', () {
       var h = _Harness();
       var x = h.addVar('x', 'int?');
@@ -696,53 +728,6 @@ main() {
         // And further attempts to promote should fail due to the write capture.
         h.promote(x, 'int');
         expect(flow.promotedType(x), isNull);
-      });
-    });
-
-    void _checkIs(String declaredType, String tryPromoteType,
-        String expectedPromotedType) {
-      var h = _Harness();
-      var x = h.addVar('x', 'int?');
-      h.run((flow) {
-        h.declare(x, initialized: true);
-        var expr = _Expression();
-        flow.isExpression_end(expr, x, false, _Type(tryPromoteType));
-        flow.ifStatement_thenBegin(expr);
-        if (expectedPromotedType == null) {
-          expect(flow.promotedType(x), isNull);
-        } else {
-          expect(flow.promotedType(x).type, expectedPromotedType);
-        }
-        flow.ifStatement_elseBegin();
-        expect(flow.promotedType(x), isNull);
-        flow.ifStatement_end(true);
-      });
-    }
-
-    test('isExpression_end promotes to a subtype', () {
-      _checkIs('int?', 'int', 'int');
-    });
-
-    test('isExpression_end does not promote to a supertype', () {
-      _checkIs('int', 'int?', null);
-    });
-
-    test('isExpression_end does not promote to an unrelated type', () {
-      _checkIs('int', 'String', null);
-    });
-
-    test('isExpression_end handles not-yet-seen variables', () {
-      var h = _Harness();
-      var x = h.addVar('x', 'Object');
-      h.run((flow) {
-        var expr = _Expression();
-        flow.isExpression_end(expr, x, false, _Type('int'));
-        flow.ifStatement_thenBegin(expr);
-        expect(flow.promotedType(x).type, 'int');
-        flow.ifStatement_elseBegin();
-        expect(flow.promotedType(x), isNull);
-        flow.ifStatement_end(true);
-        h.declare(x, initialized: true);
       });
     });
   });
