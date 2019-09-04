@@ -1719,6 +1719,14 @@ const MessageCode messageConstEvalNullValue = const MessageCode(
     message: r"""Null value during constant evaluation.""");
 
 // DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const Code<Null> codeConstEvalStartingPoint = messageConstEvalStartingPoint;
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const MessageCode messageConstEvalStartingPoint = const MessageCode(
+    "ConstEvalStartingPoint",
+    message: r"""Constant evaluation error:""");
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
 const Code<Null> codeConstEvalUnevaluated = messageConstEvalUnevaluated;
 
 // DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
@@ -3297,6 +3305,47 @@ Message _withArgumentsExperimentNotEnabled(String string) {
       tip:
           """Try enabling this experiment by adding it to the command line when compiling and running.""",
       arguments: {'string': string});
+}
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const Code<Null> codeExplicitExtensionArgumentMismatch =
+    messageExplicitExtensionArgumentMismatch;
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const MessageCode messageExplicitExtensionArgumentMismatch = const MessageCode(
+    "ExplicitExtensionArgumentMismatch",
+    message:
+        r"""Explicit extension application requires exactly 1 positional argument.""");
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const Template<
+    Message Function(
+        String name,
+        int
+            count)> templateExplicitExtensionTypeArgumentMismatch = const Template<
+        Message Function(String name, int count)>(
+    messageTemplate:
+        r"""Explicit extension application of extension '#name' takes '#count' type argument(s).""",
+    withArguments: _withArgumentsExplicitExtensionTypeArgumentMismatch);
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const Code<Message Function(String name, int count)>
+    codeExplicitExtensionTypeArgumentMismatch =
+    const Code<Message Function(String name, int count)>(
+  "ExplicitExtensionTypeArgumentMismatch",
+  templateExplicitExtensionTypeArgumentMismatch,
+);
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+Message _withArgumentsExplicitExtensionTypeArgumentMismatch(
+    String name, int count) {
+  if (name.isEmpty) throw 'No name provided';
+  name = demangleMixinApplicationName(name);
+  if (count == null) throw 'No count provided';
+  return new Message(codeExplicitExtensionTypeArgumentMismatch,
+      message:
+          """Explicit extension application of extension '${name}' takes '${count}' type argument(s).""",
+      arguments: {'name': name, 'count': count});
 }
 
 // DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.

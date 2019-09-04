@@ -7,13 +7,14 @@ import 'dart:math';
 
 import 'package:args/args.dart';
 
-import 'dartfuzz_api_table.dart';
 import 'dartfuzz_values.dart';
+import 'dartfuzz_api_table.dart';
+import 'dartfuzz_ffiapi.dart';
 
 // Version of DartFuzz. Increase this each time changes are made
 // to preserve the property that a given version of DartFuzz yields
 // the same fuzzed program for a deterministic random seed.
-const String version = '1.25';
+const String version = '1.36';
 
 // Restriction on statements and expressions.
 const int stmtLength = 2;
@@ -27,6 +28,59 @@ const localName = 'loc';
 const fieldName = 'fld';
 const methodName = 'foo';
 
+/// Class that specifies the api for calling library and ffi functions (if
+/// enabled).
+class DartApi {
+  DartApi(bool ffi)
+      : intLibs = [
+          if (ffi) ...[
+            DartLib('intComputation', 'VIIII'),
+            DartLib('takeMaxUint16', 'VI'),
+            DartLib('sumPlus42', 'VII'),
+            DartLib('returnMaxUint8', 'VV'),
+            DartLib('returnMaxUint16', 'VV'),
+            DartLib('returnMaxUint32', 'VV'),
+            DartLib('returnMinInt8', 'VV'),
+            DartLib('returnMinInt16', 'VV'),
+            DartLib('returnMinInt32', 'VV'),
+            DartLib('takeMinInt16', 'VI'),
+            DartLib('takeMinInt32', 'VI'),
+            DartLib('uintComputation', 'VIIII'),
+            DartLib('sumSmallNumbers', 'VIIIIII'),
+            DartLib('takeMinInt8', 'VI'),
+            DartLib('takeMaxUint32', 'VI'),
+            DartLib('takeMaxUint8', 'VI'),
+            DartLib('minInt64', 'VV'),
+            DartLib('minInt32', 'VV'),
+            // Use small int to avoid overflow divergences due to size
+            // differences in intptr_t on 32-bit and 64-bit platforms.
+            DartLib('sumManyIntsOdd', 'Viiiiiiiiiii'),
+            DartLib('sumManyInts', 'Viiiiiiiiii'),
+            DartLib('regress37069', 'Viiiiiiiiiii'),
+          ],
+          ...DartLib.intLibs,
+        ],
+        doubleLibs = [
+          if (ffi) ...[
+            DartLib('times1_337Float', 'VD'),
+            DartLib('sumManyDoubles', 'VDDDDDDDDDD'),
+            DartLib('times1_337Double', 'VD'),
+            DartLib('sumManyNumbers', 'VIDIDIDIDIDIDIDIDIDID'),
+            DartLib('inventFloatValue', 'VV'),
+            DartLib('smallDouble', 'VV'),
+          ],
+          ...DartLib.doubleLibs,
+        ];
+
+  final boolLibs = DartLib.boolLibs;
+  final stringLibs = DartLib.stringLibs;
+  final listLibs = DartLib.listLibs;
+  final setLibs = DartLib.setLibs;
+  final mapLibs = DartLib.mapLibs;
+  final List<DartLib> intLibs;
+  final List<DartLib> doubleLibs;
+}
+
 /// Class that generates a random, but runnable Dart program for fuzz testing.
 class DartFuzz {
   DartFuzz(this.seed, this.fp, this.ffi, this.file);
@@ -38,13 +92,15 @@ class DartFuzz {
     nest = 0;
     currentClass = null;
     currentMethod = null;
+    // Setup the library and ffi api.
+    api = DartApi(ffi);
     // Setup the types.
     localVars = <DartType>[];
     iterVars = <String>[];
     globalVars = fillTypes1();
     globalVars.addAll(DartType.allTypes); // always one each
     globalMethods = fillTypes2();
-    classFields = fillTypes2();
+    classFields = fillTypes2(limit: 8);
     classMethods = fillTypes3(classFields.length);
     classParents = <int>[];
     // Setup optional ffi methods and types.
@@ -89,7 +145,10 @@ class DartFuzz {
     emitLn("import 'dart:isolate';");
     emitLn("import 'dart:math';");
     emitLn("import 'dart:typed_data';");
-    if (ffi) emitLn("import 'dart:ffi' as ffi;");
+    if (ffi) {
+      emitLn("import 'dart:ffi' as ffi;");
+      emitLn(DartFuzzFfiApi.ffiapi);
+    }
   }
 
   void emitFfiCast(String dartFuncName, String ffiFuncName, String typeName,
@@ -121,6 +180,14 @@ class DartFuzz {
         emitLn('${method[0].name} $name$i(', newline: false);
       }
       emitParDecls(method);
+      if (!isFfiMethod && rand.nextInt(10) == 0) {
+        // Emit a method using "=>" syntax.
+        emit(') => ');
+        emitExpr(0, method[0]);
+        emit(';', newline: true);
+        currentMethod = null;
+        continue;
+      }
       emit(') {', newline: true);
       indent += 2;
       assert(localVars.isEmpty);
@@ -148,7 +215,18 @@ class DartFuzz {
       } else {
         final int parentClass = rand.nextInt(i);
         classParents.add(parentClass);
-        emitLn('class X$i extends X${parentClass} {');
+        if (rand.nextInt(2) != 0) {
+          // Inheritance
+          emitLn('class X$i extends X${parentClass} {');
+        } else {
+          // Mixin
+          if (classParents[parentClass] >= 0) {
+            emitLn(
+                'class X$i extends X${classParents[parentClass]} with X${parentClass} {');
+          } else {
+            emitLn('class X$i with X${parentClass} {');
+          }
+        }
       }
       indent += 2;
       emitVarDecls('$fieldName${i}_', classFields[i]);
@@ -171,16 +249,69 @@ class DartFuzz {
     }
   }
 
+  void emitLoadFfiLib() {
+    if (ffi) {
+      emitLn(
+          '// The following throws an uncaught exception if the ffi library ' +
+              'is not found.');
+      emitLn(
+          '// By not catching this exception, we terminate the program with ' +
+              'a full stack trace');
+      emitLn('// which, in turn, flags the problem prominently');
+      emitLn('if (ffiTestFunctions == null) {');
+      indent += 2;
+      emitLn('print(\'Did not load ffi test functions\');');
+      indent -= 2;
+      emitLn('}');
+    }
+  }
+
   void emitMain() {
     emitLn('main() {');
     indent += 2;
+
+    emitLoadFfiLib();
+
+    // Call each global method once.
+    for (int i = 0; i < globalMethods.length; i++) {
+      emitLn('try {');
+      indent += 2;
+      emitLn("", newline: false);
+      emitCall(1, "$methodName${i}", globalMethods[i]);
+      emit(";", newline: true);
+      indent -= 2;
+      emitLn('} catch (exception, stackTrace) {');
+      indent += 2;
+      emitLn("print('$methodName$i throws');");
+      indent -= 2;
+      emitLn('}');
+    }
+
+    // Call each class method once.
+    for (int i = 0; i < classMethods.length; i++) {
+      emitLn("X${i} x${i} = new X${i}();");
+      for (int j = 0; j < classMethods[i].length; j++) {
+        emitLn('try {');
+        indent += 2;
+        emitLn("", newline: false);
+        emitCall(1, "x${i}.$methodName${i}_${j}", classMethods[i][j]);
+        emit(";", newline: true);
+        indent -= 2;
+        emitLn('} catch (exception, stackTrace) {');
+        indent += 2;
+        emitLn("print('x${i}.$methodName${i}_${j} throws');");
+        indent -= 2;
+        emitLn('}');
+      }
+    }
+
     emitLn('try {');
     indent += 2;
     emitLn('new X${classFields.length - 1}().run();');
     indent -= 2;
     emitLn('} catch (exception, stackTrace) {');
     indent += 2;
-    emitLn("print('throws');");
+    emitLn("print('new X${classFields.length - 1}().run() throws');");
     indent -= 2;
     emitLn('} finally {');
     indent += 2;
@@ -361,7 +492,8 @@ class DartFuzz {
   bool emitForEach(int depth) {
     final int i = localVars.length;
     emitLn("", newline: false);
-    emitScalarVar(DartType.INT_STRING_MAP, isLhs: true);
+    final emittedVar = emitScalarVar(DartType.INT_STRING_MAP, isLhs: false);
+    iterVars.add(emittedVar);
     emit('.forEach(($localName$i, $localName${i + 1}) {\n');
     indent += 2;
     final int nestTmp = nest;
@@ -718,7 +850,7 @@ class DartFuzz {
     }
   }
 
-  void emitScalarVar(DartType tp, {bool isLhs = false}) {
+  String emitScalarVar(DartType tp, {bool isLhs = false}) {
     // Collect all choices from globals, fields, locals, and parameters.
     Set<String> choices = <String>{};
     for (int i = 0; i < globalVars.length; i++) {
@@ -739,10 +871,10 @@ class DartFuzz {
         if (tp == proto[i]) choices.add('$paramName$i');
       }
     }
-    // Remove possible modification of the iteration variable from the loop
-    // body.
+    // Make modification of the iteration variable from the loop
+    // body less likely.
     if (isLhs) {
-      if (rand.nextInt(10) != 0) {
+      if (rand.nextInt(100) != 0) {
         Set<String> cleanChoices = choices.difference(Set.from(iterVars));
         if (cleanChoices.isNotEmpty) {
           choices = cleanChoices;
@@ -751,7 +883,9 @@ class DartFuzz {
     }
     // Then pick one.
     assert(choices.isNotEmpty);
-    emit('${choices.elementAt(rand.nextInt(choices.length))}');
+    final emittedVar = '${choices.elementAt(rand.nextInt(choices.length))}';
+    emit(emittedVar);
+    return emittedVar;
   }
 
   void emitSubscriptedVar(int depth, DartType tp, {bool isLhs = false}) {
@@ -899,13 +1033,18 @@ class DartFuzz {
     }
   }
 
+  // Emit call to a specific method.
+  void emitCall(int depth, String name, List<DartType> proto) {
+    emit(name);
+    emitExprList(depth + 1, proto);
+  }
+
   // Helper for a method call.
   bool pickedCall(
       int depth, DartType tp, String name, List<List<DartType>> protos, int m) {
     for (int i = m - 1; i >= 0; i--) {
       if (tp == protos[i][0]) {
-        emit('$name$i');
-        emitExprList(depth + 1, protos[i]);
+        emitCall(depth + 1, "$name$i", protos[i]);
         return true;
       }
     }
@@ -1080,19 +1219,19 @@ class DartFuzz {
   // Get a library method that returns given type.
   DartLib getLibraryMethod(DartType tp) {
     if (tp == DartType.BOOL) {
-      return oneOf(DartLib.boolLibs);
+      return oneOf(api.boolLibs);
     } else if (tp == DartType.INT) {
-      return oneOf(DartLib.intLibs);
+      return oneOf(api.intLibs);
     } else if (tp == DartType.DOUBLE) {
-      return oneOf(DartLib.doubleLibs);
+      return oneOf(api.doubleLibs);
     } else if (tp == DartType.STRING) {
-      return oneOf(DartLib.stringLibs);
+      return oneOf(api.stringLibs);
     } else if (tp == DartType.INT_LIST) {
-      return oneOf(DartLib.listLibs);
+      return oneOf(api.listLibs);
     } else if (tp == DartType.INT_SET) {
-      return oneOf(DartLib.setLibs);
+      return oneOf(api.setLibs);
     } else if (tp == DartType.INT_STRING_MAP) {
-      return oneOf(DartLib.mapLibs);
+      return oneOf(api.mapLibs);
     }
     throw ArgumentError('Invalid DartType: $tp');
   }
@@ -1173,9 +1312,9 @@ class DartFuzz {
     return list;
   }
 
-  List<List<DartType>> fillTypes2({bool isFfi = false}) {
+  List<List<DartType>> fillTypes2({bool isFfi = false, int limit = 4}) {
     final list = <List<DartType>>[];
-    for (int i = 0, n = 1 + rand.nextInt(4); i < n; i++) {
+    for (int i = 0, n = 1 + rand.nextInt(limit); i < n; i++) {
       list.add(fillTypes1(isFfi: isFfi));
     }
     return list;
@@ -1265,6 +1404,9 @@ class DartFuzz {
 
   // File used for output.
   final RandomAccessFile file;
+
+  // Library and ffi api.
+  DartApi api;
 
   // Program variables.
   Random rand;

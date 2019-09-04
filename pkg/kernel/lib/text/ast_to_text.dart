@@ -8,8 +8,6 @@ import 'dart:core' as core show MapEntry;
 
 import 'dart:convert' show json;
 
-import 'package:kernel/type_environment.dart' show TypeEnvironment;
-
 import '../ast.dart';
 import '../import_table.dart';
 
@@ -27,48 +25,47 @@ class NormalNamer<T> extends Namer<T> {
   NormalNamer(this.prefix);
 }
 
-class FakePrintingConstant extends Constant {
-  final String id;
-  FakePrintingConstant(this.id);
-
-  @override
-  accept(ConstantVisitor v) {}
-
-  @override
-  acceptReference(Visitor v) {}
-
-  @override
-  DartType getType(TypeEnvironment types) => null;
-
-  @override
-  void visitChildren(Visitor v) {}
-
-  @override
-  String toString() {
-    return "FakePrintingConstant[$id]";
-  }
-}
-
 class ConstantNamer extends RecursiveVisitor<Null> with Namer<Constant> {
   final String prefix;
   ConstantNamer(this.prefix);
 
   String getName(Constant constant) {
-    try {
-      if (!map.containsKey(constant)) {
+    if (!map.containsKey(constant)) {
+      // When printing a non-fully linked kernel AST (i.e. some [Reference]s
+      // are not bound) to text, we need to avoid dereferencing any
+      // references.
+      //
+      // The normal visitor API causes references to be dereferenced in order
+      // to call the `visit<name>(<name>)` / `visit<name>Reference(<name>)`.
+      //
+      // We therefore handle any subclass of [Constant] which has [Reference]s
+      // specially here.
+      //
+      if (constant is InstanceConstant) {
+        // Avoid visiting `InstanceConstant.classReference`.
+        for (final value in constant.fieldValues.values) {
+          // Name everything in post-order visit of DAG.
+          getName(value);
+        }
+      } else if (constant is TearOffConstant) {
+        // We only care about naming the constants themselves. [TearOffConstant]
+        // has no Constant children.
+        // Avoid visiting `TearOffConstant.procedureReference`.
+      } else {
         // Name everything in post-order visit of DAG.
         constant.visitChildren(this);
       }
-      return super.getName(constant);
-    } catch (e) {
-      // Partial dill. Name anyway.
-      String id = "${constant.runtimeType.toString()}";
-      return super.getName(new FakePrintingConstant(id));
     }
+    return super.getName(constant);
   }
 
   defaultConstantReference(Constant constant) {
     getName(constant);
+  }
+
+  defaultDartType(DartType type) {
+    // No need to recurse into dart types, we only care about naming the
+    // constants themselves.
   }
 }
 
@@ -2045,19 +2042,39 @@ class Printer extends Visitor<Null> {
     endLine(': ${node.runtimeType}');
   }
 
-  writeNullability(Nullability nullability) {
+  void writeNullability(Nullability nullability, {bool inComment = false}) {
     switch (nullability) {
       case Nullability.legacy:
         writeSymbol('*');
-        state = WORD; // Disallow a word immediately after the '*'.
+        if (!inComment) {
+          state = WORD; // Disallow a word immediately after the '*'.
+        }
         break;
       case Nullability.nullable:
-        writeSymbol('?'); // Disallow a word immediately after the '?'.
+        writeSymbol('?');
+        if (!inComment) {
+          state = WORD; // Disallow a word immediately after the '?'.
+        }
         break;
       case Nullability.neither:
-      case Nullability.nonNullable:
-        // Do nothing.
+        writeSymbol('%');
+        if (!inComment) {
+          state = WORD; // Disallow a word immediately after the '%'.
+        }
         break;
+      case Nullability.nonNullable:
+        if (inComment) {
+          writeSymbol("!");
+        }
+        break;
+    }
+  }
+
+  void writeDartTypeNullability(DartType type, {bool inComment = false}) {
+    if (type is InvalidType) {
+      writeNullability(Nullability.neither);
+    } else {
+      writeNullability(type.nullability, inComment: inComment);
     }
   }
 
@@ -2098,12 +2115,18 @@ class Printer extends Visitor<Null> {
 
   visitTypeParameterType(TypeParameterType node) {
     writeTypeParameterReference(node.parameter);
-    writeNullability(node.nullability);
+    writeNullability(node.declaredNullability);
     if (node.promotedBound != null) {
-      writeSpace();
-      writeWord('extends');
-      writeSpace();
+      writeSpaced('&');
       writeType(node.promotedBound);
+
+      writeWord("/* '");
+      writeNullability(node.declaredNullability, inComment: true);
+      writeWord("' & '");
+      writeDartTypeNullability(node.promotedBound, inComment: true);
+      writeWord("' = '");
+      writeNullability(node.nullability, inComment: true);
+      writeWord("' */");
     }
   }
 

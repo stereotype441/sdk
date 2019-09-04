@@ -1758,7 +1758,7 @@ class Parser {
       return parseNamedMixinApplication(token, begin, classKeyword);
     } else {
       listener.beginClassDeclaration(begin, abstractToken, name);
-      return parseClass(token, begin, classKeyword);
+      return parseClass(token, begin, classKeyword, name.lexeme);
     }
   }
 
@@ -1790,7 +1790,8 @@ class Parser {
   ///   metadata abstract? 'class' mixinApplicationClass
   /// ;
   /// ```
-  Token parseClass(Token token, Token begin, Token classKeyword) {
+  Token parseClass(
+      Token token, Token begin, Token classKeyword, String className) {
     Token start = token;
     token = parseClassHeaderOpt(token, begin, classKeyword);
     if (!optional('{', token.next)) {
@@ -1798,7 +1799,8 @@ class Parser {
       token = parseClassHeaderRecovery(start, begin, classKeyword);
       ensureBlock(token, null, 'class declaration');
     }
-    token = parseClassOrMixinOrExtensionBody(token, DeclarationKind.Class);
+    token = parseClassOrMixinOrExtensionBody(
+        token, DeclarationKind.Class, className);
     listener.endClassDeclaration(begin, token);
     return token;
   }
@@ -1965,7 +1967,8 @@ class Parser {
       token = parseMixinHeaderRecovery(token, mixinKeyword, headerStart);
       ensureBlock(token, null, 'mixin declaration');
     }
-    token = parseClassOrMixinOrExtensionBody(token, DeclarationKind.Mixin);
+    token = parseClassOrMixinOrExtensionBody(
+        token, DeclarationKind.Mixin, name.lexeme);
     listener.endMixinDeclaration(mixinKeyword, token);
     return token;
   }
@@ -2134,8 +2137,8 @@ class Parser {
       }
       ensureBlock(token, null, 'extension declaration');
     }
-    // TODO(danrubel): Do not allow fields or constructors
-    token = parseClassOrMixinOrExtensionBody(token, DeclarationKind.Extension);
+    token = parseClassOrMixinOrExtensionBody(
+        token, DeclarationKind.Extension, name?.lexeme);
     listener.endExtensionDeclaration(extensionKeyword, onKeyword, token);
     return token;
   }
@@ -2927,13 +2930,15 @@ class Parser {
   ///   '{' classMember* '}'
   /// ;
   /// ```
-  Token parseClassOrMixinOrExtensionBody(Token token, DeclarationKind kind) {
+  Token parseClassOrMixinOrExtensionBody(
+      Token token, DeclarationKind kind, String enclosingDeclarationName) {
     Token begin = token = token.next;
     assert(optional('{', token));
     listener.beginClassOrMixinBody(kind, token);
     int count = 0;
     while (notEofOrValue('}', token.next)) {
-      token = parseClassOrMixinOrExtensionMemberImpl(kind, token);
+      token = parseClassOrMixinOrExtensionMemberImpl(
+          token, kind, enclosingDeclarationName);
       ++count;
     }
     token = token.next;
@@ -2953,9 +2958,9 @@ class Parser {
   /// method takes the next token to be consumed rather than the last consumed
   /// token and returns the token after the last consumed token rather than the
   /// last consumed token.
-  Token parseClassMember(Token token) {
+  Token parseClassMember(Token token, String className) {
     return parseClassOrMixinOrExtensionMemberImpl(
-            DeclarationKind.Class, syntheticPreviousToken(token))
+            syntheticPreviousToken(token), DeclarationKind.Class, className)
         .next;
   }
 
@@ -2965,9 +2970,9 @@ class Parser {
   /// method takes the next token to be consumed rather than the last consumed
   /// token and returns the token after the last consumed token rather than the
   /// last consumed token.
-  Token parseMixinMember(Token token) {
+  Token parseMixinMember(Token token, String mixinName) {
     return parseClassOrMixinOrExtensionMemberImpl(
-            DeclarationKind.Mixin, syntheticPreviousToken(token))
+            syntheticPreviousToken(token), DeclarationKind.Mixin, mixinName)
         .next;
   }
 
@@ -2977,9 +2982,9 @@ class Parser {
   /// method takes the next token to be consumed rather than the last consumed
   /// token and returns the token after the last consumed token rather than the
   /// last consumed token.
-  Token parseExtensionMember(Token token) {
-    return parseClassOrMixinOrExtensionMemberImpl(
-            DeclarationKind.Extension, syntheticPreviousToken(token))
+  Token parseExtensionMember(Token token, String extensionName) {
+    return parseClassOrMixinOrExtensionMemberImpl(syntheticPreviousToken(token),
+            DeclarationKind.Extension, extensionName)
         .next;
   }
 
@@ -3001,7 +3006,7 @@ class Parser {
   /// ;
   /// ```
   Token parseClassOrMixinOrExtensionMemberImpl(
-      DeclarationKind kind, Token token) {
+      Token token, DeclarationKind kind, String enclosingDeclarationName) {
     Token beforeStart = token = parseMetadataStar(token);
 
     Token covariantToken;
@@ -3109,7 +3114,9 @@ class Parser {
               beforeType,
               typeInfo,
               getOrSet,
-              token.next);
+              token.next,
+              kind,
+              enclosingDeclarationName);
           listener.endMember();
           return token;
         } else if (optional('===', next2) ||
@@ -3125,7 +3132,8 @@ class Parser {
               covariantToken,
               lateToken,
               varFinalOrConst,
-              beforeType);
+              beforeType,
+              kind);
         } else if (isUnaryMinus(next2)) {
           // Recovery
           token = parseMethod(
@@ -3138,7 +3146,9 @@ class Parser {
               beforeType,
               typeInfo,
               getOrSet,
-              token.next);
+              token.next,
+              kind,
+              enclosingDeclarationName);
           listener.endMember();
           return token;
         }
@@ -3159,7 +3169,8 @@ class Parser {
             beforeType,
             typeInfo,
             getOrSet,
-            kind);
+            kind,
+            enclosingDeclarationName);
       }
     } else if (typeInfo == noType && varFinalOrConst == null) {
       Token next2 = next.next;
@@ -3176,7 +3187,8 @@ class Parser {
               covariantToken,
               lateToken,
               varFinalOrConst,
-              beforeType);
+              beforeType,
+              kind);
         }
       }
     }
@@ -3200,7 +3212,9 @@ class Parser {
           beforeType,
           typeInfo,
           getOrSet,
-          token.next);
+          token.next,
+          kind,
+          enclosingDeclarationName);
     } else {
       if (getOrSet != null) {
         reportRecoverableErrorWithToken(
@@ -3232,7 +3246,9 @@ class Parser {
       Token beforeType,
       TypeInfo typeInfo,
       Token getOrSet,
-      Token name) {
+      Token name,
+      DeclarationKind kind,
+      String enclosingDeclarationName) {
     if (lateToken != null) {
       reportRecoverableErrorWithToken(
           lateToken, fasta.templateExtraneousModifier);
@@ -3304,12 +3320,14 @@ class Parser {
       listener.handleNoTypeVariables(token.next);
     }
 
-    MemberKind kind = staticToken != null
-        ? MemberKind.StaticMethod
-        : MemberKind.NonStaticMethod;
     Token beforeParam = token;
-    Token beforeInitializers =
-        parseGetterOrFormalParameters(token, name, isGetter, kind);
+    Token beforeInitializers = parseGetterOrFormalParameters(
+        token,
+        name,
+        isGetter,
+        staticToken != null
+            ? MemberKind.StaticMethod
+            : MemberKind.NonStaticMethod);
     token = parseInitializersOpt(beforeInitializers);
     if (token == beforeInitializers) beforeInitializers = null;
 
@@ -3333,8 +3351,69 @@ class Parser {
           (staticToken == null || externalToken != null) && inPlainSync);
     }
     asyncState = savedAsyncModifier;
-    listener.endMethod(getOrSet, beforeStart.next, beforeParam.next,
-        beforeInitializers?.next, token);
+    bool isConstructor = name.lexeme == enclosingDeclarationName;
+    if (!isConstructor &&
+        (optional('.', name.next) || beforeInitializers != null)) {
+      // Recovery: The name does not match,
+      // but the name is prefixed or the declaration contains initializers.
+      isConstructor = true;
+      // TODO(danrubel): report invalid constructor name
+      // Currently multiple listeners report this error, but that logic should
+      // be removed and the error reported here instead.
+    }
+    if (isConstructor) {
+      //
+      // constructor
+      //
+      if (getOrSet != null) {
+        // TODO(danrubel): report an error on get/set token
+        // This is currently reported by listeners other than AstBuilder.
+        // It should be reported here rather than in the listeners.
+      }
+      switch (kind) {
+        case DeclarationKind.Class:
+          listener.endClassConstructor(getOrSet, beforeStart.next,
+              beforeParam.next, beforeInitializers?.next, token);
+          break;
+        case DeclarationKind.Mixin:
+          // TODO(danrubel): Mixin constructors are invalid. Currently multiple
+          // listeners report this error, but that logic should be removed
+          // and the error reported here instead.
+          listener.endMixinConstructor(getOrSet, beforeStart.next,
+              beforeParam.next, beforeInitializers?.next, token);
+          break;
+        case DeclarationKind.Extension:
+          reportRecoverableError(
+              name, fasta.messageExtensionDeclaresConstructor);
+          listener.endExtensionConstructor(getOrSet, beforeStart.next,
+              beforeParam.next, beforeInitializers?.next, token);
+          break;
+        case DeclarationKind.TopLevel:
+          throw "Internal error: TopLevel method/constructor.";
+          break;
+      }
+    } else {
+      //
+      // method
+      //
+      switch (kind) {
+        case DeclarationKind.Class:
+          listener.endClassMethod(getOrSet, beforeStart.next, beforeParam.next,
+              beforeInitializers?.next, token);
+          break;
+        case DeclarationKind.Mixin:
+          listener.endMixinMethod(getOrSet, beforeStart.next, beforeParam.next,
+              beforeInitializers?.next, token);
+          break;
+        case DeclarationKind.Extension:
+          listener.endExtensionMethod(getOrSet, beforeStart.next,
+              beforeParam.next, beforeInitializers?.next, token);
+          break;
+        case DeclarationKind.TopLevel:
+          throw "Internal error: TopLevel method/constructor.";
+          break;
+      }
+    }
     return token;
   }
 
@@ -6328,7 +6407,8 @@ class Parser {
       Token covariantToken,
       Token lateToken,
       Token varFinalOrConst,
-      Token beforeType) {
+      Token beforeType,
+      DeclarationKind kind) {
     TypeInfo typeInfo = computeType(beforeType, true, true);
 
     Token beforeName = typeInfo.skipType(beforeType);
@@ -6355,7 +6435,9 @@ class Parser {
         beforeType,
         typeInfo,
         null,
-        beforeName.next);
+        beforeName.next,
+        kind,
+        null);
     listener.endMember();
     return token;
   }
@@ -6374,7 +6456,8 @@ class Parser {
       Token beforeType,
       TypeInfo typeInfo,
       Token getOrSet,
-      DeclarationKind kind) {
+      DeclarationKind kind,
+      String enclosingDeclarationName) {
     Token next = token.next;
     String value = next.stringValue;
 
@@ -6385,8 +6468,15 @@ class Parser {
     } else if (identical(value, 'typedef')) {
       return reportAndSkipTypedefInClass(next);
     } else if (next.isOperator && next.endGroup == null) {
-      return parseInvalidOperatorDeclaration(beforeStart, externalToken,
-          staticToken, covariantToken, lateToken, varFinalOrConst, beforeType);
+      return parseInvalidOperatorDeclaration(
+          beforeStart,
+          externalToken,
+          staticToken,
+          covariantToken,
+          lateToken,
+          varFinalOrConst,
+          beforeType,
+          kind);
     }
 
     if (getOrSet != null ||
@@ -6403,7 +6493,9 @@ class Parser {
           beforeType,
           typeInfo,
           getOrSet,
-          token.next);
+          token.next,
+          kind,
+          enclosingDeclarationName);
     } else if (token == beforeStart) {
       // TODO(danrubel): Provide a more specific error message for extra ';'.
       reportRecoverableErrorWithToken(next, fasta.templateExpectedClassMember);

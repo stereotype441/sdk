@@ -208,6 +208,8 @@ demands
 demangle
 demangled
 deps
+dereferenced
+dereferencing
 descent
 deserializer
 deserializers
@@ -709,6 +711,7 @@ server
 service
 setaf
 sh
+sha1hash
 shadowed
 shallow
 shas

@@ -4,7 +4,7 @@
 
 import 'package:analysis_server/plugin/edit/fix/fix_dart.dart';
 import 'package:analysis_server/src/services/correction/fix/dart/top_level_declarations.dart';
-import 'package:analysis_server/src/services/correction/fix_internal.dart';
+import 'package:analysis_server/src/services/linter/lint_names.dart';
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/error/error.dart';
 import 'package:analyzer/src/error/codes.dart';
@@ -16,8 +16,6 @@ import 'package:analyzer_plugin/utilities/fixes/fixes.dart';
 bool hasFix(ErrorCode errorCode) =>
     errorCode == StaticWarningCode.UNDEFINED_CLASS_BOOLEAN ||
     errorCode == StaticWarningCode.CONCRETE_CLASS_WITH_ABSTRACT_MEMBER ||
-    errorCode == StaticWarningCode.EXTRA_POSITIONAL_ARGUMENTS ||
-    errorCode == StaticWarningCode.EXTRA_POSITIONAL_ARGUMENTS_COULD_BE_NAMED ||
     errorCode == StaticWarningCode.NEW_WITH_UNDEFINED_CONSTRUCTOR ||
     errorCode ==
         StaticWarningCode.NON_ABSTRACT_CLASS_INHERITS_ABSTRACT_MEMBER_ONE ||
@@ -32,7 +30,6 @@ bool hasFix(ErrorCode errorCode) =>
             .NON_ABSTRACT_CLASS_INHERITS_ABSTRACT_MEMBER_FIVE_PLUS ||
     errorCode == StaticWarningCode.CAST_TO_NON_TYPE ||
     errorCode == StaticWarningCode.TYPE_TEST_WITH_UNDEFINED_NAME ||
-    errorCode == StaticWarningCode.UNDEFINED_CLASS ||
     errorCode == StaticWarningCode.FINAL_NOT_INITIALIZED ||
     errorCode == StaticWarningCode.FINAL_NOT_INITIALIZED_CONSTRUCTOR_1 ||
     errorCode == StaticWarningCode.FINAL_NOT_INITIALIZED_CONSTRUCTOR_2 ||
@@ -141,6 +138,8 @@ class DartFixKind {
   static const ADD_EXPLICIT_CAST = const FixKind(
       'ADD_EXPLICIT_CAST', 50, "Add cast",
       appliedTogetherMessage: "Add all casts in file");
+  static const ADD_CONST =
+      const FixKind('ADD_CONST', 50, "Add 'const' modifier");
   static const ADD_FIELD_FORMAL_PARAMETERS = const FixKind(
       'ADD_FIELD_FORMAL_PARAMETERS', 70, "Add final field formal parameters");
   static const ADD_MISSING_ENUM_CASE_CLAUSES = const FixKind(
@@ -301,6 +300,8 @@ class DartFixKind {
       const FixKind('REPLACE_COLON_WITH_EQUALS', 50, "Replace ':' with '='");
   static const REPLACE_FINAL_WITH_CONST = const FixKind(
       'REPLACE_FINAL_WITH_CONST', 50, "Replace 'final' with 'const'");
+  static const REPLACE_NEW_WITH_CONST =
+      const FixKind('REPLACE_NEW_WITH_CONST', 50, "Replace 'new' with 'const'");
   static const REPLACE_NULL_WITH_CLOSURE = const FixKind(
       'REPLACE_NULL_WITH_CLOSURE', 50, "Replace 'null' with a closure");
   static const REPLACE_RETURN_TYPE_FUTURE = const FixKind(
