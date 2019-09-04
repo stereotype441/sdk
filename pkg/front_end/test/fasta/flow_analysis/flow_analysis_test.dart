@@ -861,8 +861,27 @@ main() {
         h.declare(x, initialized: true);
         h.promote(x, 'int');
         expect(flow.promotedType(x).type, 'int');
-        flow.whileStatement_conditionBegin({x});
+        flow.whileStatement_conditionBegin({x}, {});
         expect(flow.promotedType(x), isNull);
+        flow.whileStatement_bodyBegin(_Statement(), _Expression());
+        flow.whileStatement_end();
+      });
+    });
+
+    test('whileStatement_conditionBegin() handles write captures in the loop',
+        () {
+      var h = _Harness();
+      var x = h.addVar('x', 'int?', hasWrites: true, isCaptured: true);
+      h.run((flow) {
+        h.declare(x, initialized: true);
+        h.promote(x, 'int');
+        expect(flow.promotedType(x).type, 'int');
+        flow.whileStatement_conditionBegin({x}, {x});
+        h.promote(x, 'int');
+        expect(flow.promotedType(x), isNull);
+        h.function({x}, () {
+          flow.write(x);
+        });
         flow.whileStatement_bodyBegin(_Statement(), _Expression());
         flow.whileStatement_end();
       });
@@ -875,7 +894,7 @@ main() {
       h.run((flow) {
         h.declare(y, initialized: true);
         h.promote(y, 'int');
-        flow.whileStatement_conditionBegin({x});
+        flow.whileStatement_conditionBegin({x}, {});
         flow.add(x, assigned: true);
         flow.whileStatement_bodyBegin(_Statement(), _Expression());
         flow.whileStatement_end();
@@ -887,7 +906,7 @@ main() {
       var x = h.addVar('x', 'int?');
       h.run((flow) {
         h.declare(x, initialized: true);
-        flow.whileStatement_conditionBegin({});
+        flow.whileStatement_conditionBegin({}, {});
         flow.whileStatement_bodyBegin(_Statement(), h.notNull(x)());
         expect(flow.promotedType(x).type, 'int');
         flow.whileStatement_end();
@@ -907,7 +926,7 @@ main() {
         h.declare(y, initialized: true);
         h.declare(z, initialized: true);
         var stmt = _Statement();
-        flow.whileStatement_conditionBegin({});
+        flow.whileStatement_conditionBegin({}, {});
         flow.whileStatement_bodyBegin(stmt, h.or(h.eqNull(x), h.eqNull(z))());
         h.if_(h.expr, () {
           h.promote(x, 'int');
