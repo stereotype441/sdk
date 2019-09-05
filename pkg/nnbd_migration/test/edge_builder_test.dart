@@ -1757,7 +1757,6 @@ class Base {
 class Derived extends Base {}
 int bar(Derived d, int i) => d.foo(i);
 ''');
-    graph.debugDump();
     var implicitTypeArgumentMatcher = anyNode;
     assertEdge(
         decoratedTypeAnnotation('int i').node,
