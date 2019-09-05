@@ -904,7 +904,7 @@ main() {
         h.promote(x, 'int');
         expect(flow.promotedType(x).type, 'int');
         expect(flow.promotedType(y).type, 'int');
-        flow.tryCatchStatement_bodyEnd({});
+        flow.tryCatchStatement_bodyEnd({}, {});
         flow.tryCatchStatement_catchBegin();
         expect(flow.promotedType(x), isNull);
         expect(flow.promotedType(y).type, 'int');
@@ -925,7 +925,7 @@ main() {
         flow.write(x);
         h.promote(x, 'int');
         expect(flow.promotedType(x).type, 'int');
-        flow.tryCatchStatement_bodyEnd({x});
+        flow.tryCatchStatement_bodyEnd({x}, {});
         flow.tryCatchStatement_catchBegin();
         expect(flow.promotedType(x), isNull);
         flow.tryCatchStatement_catchEnd();
@@ -948,7 +948,7 @@ main() {
           flow.write(x);
         });
         flow.handleExit();
-        flow.tryCatchStatement_bodyEnd({x});
+        flow.tryCatchStatement_bodyEnd({x}, {x});
         flow.tryCatchStatement_catchBegin();
         h.promote(x, 'int');
         expect(flow.promotedType(x), isNull);
@@ -964,7 +964,7 @@ main() {
       h.run((flow) {
         h.declare(x, initialized: true);
         flow.tryCatchStatement_bodyBegin();
-        flow.tryCatchStatement_bodyEnd({});
+        flow.tryCatchStatement_bodyEnd({}, {});
         flow.tryCatchStatement_catchBegin();
         h.promote(x, 'int');
         expect(flow.promotedType(x).type, 'int');
@@ -989,7 +989,7 @@ main() {
         flow.tryCatchStatement_bodyBegin();
         h.promote(x, 'int');
         h.promote(y, 'int');
-        flow.tryCatchStatement_bodyEnd({});
+        flow.tryCatchStatement_bodyEnd({}, {});
         flow.tryCatchStatement_catchBegin();
         h.promote(x, 'int');
         h.promote(z, 'int');
@@ -1014,7 +1014,7 @@ main() {
         h.declare(z, initialized: true);
         flow.tryCatchStatement_bodyBegin();
         flow.handleExit();
-        flow.tryCatchStatement_bodyEnd({});
+        flow.tryCatchStatement_bodyEnd({}, {});
         flow.tryCatchStatement_catchBegin();
         h.promote(x, 'int');
         h.promote(y, 'int');
@@ -1044,7 +1044,7 @@ main() {
         h.promote(x, 'int');
         expect(flow.promotedType(x).type, 'int');
         expect(flow.promotedType(y).type, 'int');
-        flow.tryFinallyStatement_finallyBegin({});
+        flow.tryFinallyStatement_finallyBegin({}, {});
         expect(flow.promotedType(x), isNull);
         expect(flow.promotedType(y).type, 'int');
         flow.tryFinallyStatement_end({});
@@ -1064,7 +1064,7 @@ main() {
         flow.write(x);
         h.promote(x, 'int');
         expect(flow.promotedType(x).type, 'int');
-        flow.tryFinallyStatement_finallyBegin({x});
+        flow.tryFinallyStatement_finallyBegin({x}, {});
         expect(flow.promotedType(x), isNull);
         flow.tryFinallyStatement_end({});
       });
@@ -1084,7 +1084,7 @@ main() {
           flow.write(x);
         });
         flow.handleExit();
-        flow.tryFinallyStatement_finallyBegin({x});
+        flow.tryFinallyStatement_finallyBegin({x}, {x});
         h.promote(x, 'int');
         expect(flow.promotedType(x), isNull);
         flow.tryFinallyStatement_end({});
@@ -1101,7 +1101,7 @@ main() {
         flow.tryFinallyStatement_bodyBegin();
         h.promote(x, 'int');
         expect(flow.promotedType(x).type, 'int');
-        flow.tryFinallyStatement_finallyBegin({});
+        flow.tryFinallyStatement_finallyBegin({}, {});
         expect(flow.promotedType(x), isNull);
         h.promote(y, 'int');
         expect(flow.promotedType(y).type, 'int');
@@ -1124,7 +1124,7 @@ main() {
         flow.tryFinallyStatement_bodyBegin();
         h.promote(x, 'int');
         expect(flow.promotedType(x).type, 'int');
-        flow.tryFinallyStatement_finallyBegin({});
+        flow.tryFinallyStatement_finallyBegin({}, {});
         expect(flow.promotedType(x), isNull);
         flow.write(x);
         flow.write(y);
