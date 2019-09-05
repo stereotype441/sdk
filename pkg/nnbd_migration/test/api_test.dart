@@ -822,7 +822,7 @@ int f(int i) {
   }
 
   solo_test_foo() async {
-    var content = r'''
+    var content = '''
 f(List<int> x) => x.map((y) => g(y));
 g(int x) => x + 1;
 main() {
