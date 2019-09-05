@@ -396,7 +396,7 @@ int f(dynamic d) => d;
     await analyze('''
 Function f(void Function() x) => x;
 ''');
-    assertEdge(decoratedTypeAnnotation('void Function()').node,
+    assertEdge(decoratedGenericFunctionTypeAnnotation('void Function()').node,
         decoratedTypeAnnotation('Function f').node,
         hard: true);
   }
