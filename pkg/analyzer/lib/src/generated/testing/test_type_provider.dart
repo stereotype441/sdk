@@ -616,7 +616,7 @@ class TestTypeProvider extends TypeProviderBase {
       asyncSource = _context.sourceFactory.forUri(DartSdk.DART_ASYNC);
       _context.setContents(asyncSource, "");
     } else {
-      asyncSource = null;
+      asyncSource = StringSource('', '/dart_async.dart', uri: Uri.parse(DartSdk.DART_ASYNC));
     }
     CompilationUnitElementImpl asyncUnit = new CompilationUnitElementImpl();
     LibraryElementImpl asyncLibrary = new LibraryElementImpl.forNode(
