@@ -228,7 +228,7 @@ class _AlreadyMigratedCodeDecoratorTest {
         (t) => checkTypeParameter(t, never, typeParam));
   }
 
-  test_getImmediateSupertypes_supertype() {
+  test_getImmediateSupertypes_generic() {
     var t = ElementFactory.typeParameterElement('T');
     var class_ = ElementFactory.classElement3(
         name: 'C',
@@ -238,5 +238,38 @@ class _AlreadyMigratedCodeDecoratorTest {
     expect(decoratedSupertypes, hasLength(1));
     checkIterable(decoratedSupertypes[0], never,
         (type) => checkTypeParameter(type, never, t));
+  }
+
+  test_getImmediateSupertypes_interface() {
+    var class_ = ElementFactory.classElement('C', typeProvider.objectType);
+    class_.interfaces = [typeProvider.numType];
+    var decoratedSupertypes = decorator.getImmediateSupertypes(class_).toList();
+    expect(decoratedSupertypes, hasLength(2));
+    checkObject(decoratedSupertypes[0], never);
+    checkNum(decoratedSupertypes[1], never);
+  }
+
+  test_getImmediateSupertypes_mixin() {
+    var class_ = ElementFactory.classElement('C', typeProvider.objectType);
+    class_.mixins = [typeProvider.numType];
+    var decoratedSupertypes = decorator.getImmediateSupertypes(class_).toList();
+    expect(decoratedSupertypes, hasLength(2));
+    checkObject(decoratedSupertypes[0], never);
+    checkNum(decoratedSupertypes[1], never);
+  }
+
+  test_getImmediateSupertypes_superclassConstraint() {
+    var class_ = ElementFactory.mixinElement(
+        name: 'C', constraints: [typeProvider.numType]);
+    var decoratedSupertypes = decorator.getImmediateSupertypes(class_).toList();
+    expect(decoratedSupertypes, hasLength(1));
+    checkNum(decoratedSupertypes[0], never);
+  }
+
+  test_getImmediateSupertypes_supertype() {
+    var class_ = ElementFactory.classElement('C', typeProvider.objectType);
+    var decoratedSupertypes = decorator.getImmediateSupertypes(class_).toList();
+    expect(decoratedSupertypes, hasLength(1));
+    checkObject(decoratedSupertypes[0], never);
   }
 }
