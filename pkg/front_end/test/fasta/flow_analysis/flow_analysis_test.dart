@@ -1568,6 +1568,27 @@ main() {
         expect(result.variableInfo[d].assigned, false);
       });
 
+      test('write captured', () {
+        var h = _Harness();
+        var a = _Var('a', _Type('int'));
+        var b = _Var('b', _Type('int'));
+        var c = _Var('c', _Type('int'));
+        var d = _Var('d', _Type('int'));
+        var s0 = FlowModel<_Var, _Type>(true)
+            .add(h, a)
+            .add(h, b)
+            .add(h, c)
+            .add(h, d);
+        // In s1, a and b are write captured.  In s2, a and c are.
+        var s1 = s0.removePromotedAll([a, b], [a, b], null);
+        var s2 = s0.removePromotedAll([a, c], [a, c], null);
+        var result = s1.restrict(h, s2, Set());
+        expect(result.variableInfo[a].writeCaptured, true);
+        expect(result.variableInfo[b].writeCaptured, true);
+        expect(result.variableInfo[c].writeCaptured, true);
+        expect(result.variableInfo[d].writeCaptured, false);
+      });
+
       test('promotion', () {
         void _check(String thisType, String otherType, bool unsafe,
             String expectedType) {
@@ -1615,6 +1636,8 @@ main() {
   group('join', () {
     var x = _Var('x', null);
     var y = _Var('y', null);
+    var z = _Var('y', null);
+    var w = _Var('y', null);
     var intType = _Type('int');
     var intQType = _Type('int?');
     var stringType = _Type('String');
@@ -1696,6 +1719,52 @@ main() {
         _Type.allowComparisons(() => expect(join12, {x: model(intQType)}));
         var join21 = FlowModel.joinVariableInfo(h, p2, p1);
         _Type.allowComparisons(() => expect(join21, {x: model(intQType)}));
+      });
+
+      test('assigned', () {
+        var h = _Harness();
+        var p1 = {
+          x: model(intQType).write(),
+          y: model(intQType).write(),
+          z: model(intQType),
+          w: model(intQType)
+        };
+        var p2 = {
+          x: model(intQType).write(),
+          y: model(intQType),
+          z: model(intQType).write(),
+          w: model(intQType)
+        };
+        var joined = FlowModel.joinVariableInfo(h, p1, p2);
+        _Type.allowComparisons(() => expect(joined, {
+              x: model(intQType).write(),
+              y: model(intQType).write(),
+              z: model(intQType).write(),
+              w: model(intQType)
+            }));
+      });
+
+      test('write captured', () {
+        var h = _Harness();
+        var p1 = {
+          x: model(intQType).writeCapture(),
+          y: model(intQType).writeCapture(),
+          z: model(intQType),
+          w: model(intQType)
+        };
+        var p2 = {
+          x: model(intQType).writeCapture(),
+          y: model(intQType),
+          z: model(intQType).writeCapture(),
+          w: model(intQType)
+        };
+        var joined = FlowModel.joinVariableInfo(h, p1, p2);
+        _Type.allowComparisons(() => expect(joined, {
+              x: model(intQType).writeCapture(),
+              y: model(intQType).writeCapture(),
+              z: model(intQType).writeCapture(),
+              w: model(intQType)
+            }));
       });
     });
   });
