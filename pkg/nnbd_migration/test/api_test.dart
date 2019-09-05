@@ -821,6 +821,18 @@ int f(int i) {
     await _checkSingleFileChanges(content, expected);
   }
 
+  solo_test_foo() async {
+    var content = r'''
+f(List<int> x) => x.map((y) => g(y));
+g(int x) => x + 1;
+main() {
+  f([null]);
+}
+''';
+    var expected = 'TODO(paulberry)';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_dynamic_method_call() async {
     var content = '''
 class C {
