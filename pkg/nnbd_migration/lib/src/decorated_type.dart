@@ -390,18 +390,19 @@ class DecoratedType {
         // substitutions, so we need to reflect that in our decorations by
         // substituting to use the type variables the analyzer used.
         substitution =
-        Map<TypeParameterElement, DecoratedType>.from(substitution);
+            Map<TypeParameterElement, DecoratedType>.from(substitution);
         for (int i = 0; i < typeFormals.length; i++) {
           substitution[typeFormals[i]] =
               DecoratedType._forTypeParameterSubstitution(
                   undecoratedResult.typeFormals[i]);
         }
         for (int i = 0; i < typeFormalBounds.length; i++) {
-          newTypeFormalBounds.add(typeFormalBounds[i]
-              ._substitute(substitution, typeFormals[i].bound ?? typeFormalBounds[i].type));
+          newTypeFormalBounds.add(typeFormalBounds[i]._substitute(
+              substitution, typeFormals[i].bound ?? typeFormalBounds[i].type));
         }
       }
-      return _substituteFunctionAfterFormals(undecoratedResult, substitution, newTypeFormalBounds: newTypeFormalBounds);
+      return _substituteFunctionAfterFormals(undecoratedResult, substitution,
+          newTypeFormalBounds: newTypeFormalBounds);
     } else if (type is InterfaceType && undecoratedResult is InterfaceType) {
       List<DecoratedType> newTypeArguments = [];
       for (int i = 0; i < typeArguments.length; i++) {
@@ -429,7 +430,8 @@ class DecoratedType {
   /// is [undecoratedResult], and whose return type, positional parameters, and
   /// named parameters are formed by performing the given [substitution].
   DecoratedType _substituteFunctionAfterFormals(FunctionType undecoratedResult,
-      Map<TypeParameterElement, DecoratedType> substitution, {List<DecoratedType> newTypeFormalBounds = const []}) {
+      Map<TypeParameterElement, DecoratedType> substitution,
+      {List<DecoratedType> newTypeFormalBounds = const []}) {
     var newPositionalParameters = <DecoratedType>[];
     var numRequiredParameters = undecoratedResult.normalParameterTypes.length;
     for (int i = 0; i < positionalParameters.length; i++) {
