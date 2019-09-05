@@ -998,7 +998,10 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
   @override
   void visitIndexExpression(IndexExpression node) {
     _checkForArgumentTypeNotAssignableForArgument(node.index);
-    _checkForNullableDereference(node.target);
+    if (node.leftBracket.type !=
+        TokenType.QUESTION_PERIOD_OPEN_SQUARE_BRACKET) {
+      _checkForNullableDereference(node.target);
+    }
     super.visitIndexExpression(node);
   }
 
@@ -4361,13 +4364,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
     StaticWarningCode code = expression.staticType == _typeProvider.nullType
         ? StaticWarningCode.INVALID_USE_OF_NULL_VALUE
         : StaticWarningCode.UNCHECKED_USE_OF_NULLABLE_VALUE;
-
-    if (expression is MethodInvocation) {
-      SimpleIdentifier methodName = expression.methodName;
-      _errorReporter.reportErrorForNode(code, methodName, []);
-    } else {
-      _errorReporter.reportErrorForNode(code, expression, []);
-    }
+    _errorReporter.reportErrorForNode(code, expression, []);
 
     return true;
   }

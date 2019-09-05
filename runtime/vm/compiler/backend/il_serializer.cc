@@ -490,8 +490,9 @@ SExpression* FlowGraphSerializer::FunctionToSExp(const Function& func) {
       AddExtraSymbol(sexp, "native_name", tmp_string_.ToCString());
     }
   }
-  if (FLAG_verbose_flow_graph_serialization) {
-    AddExtraSymbol(sexp, "kind", Function::KindToCString(func.kind()));
+  if (func.kind() != RawFunction::Kind::kRegularFunction ||
+      FLAG_verbose_flow_graph_serialization) {
+    AddExtraSymbol(sexp, "kind", RawFunction::KindToCString(func.kind()));
   }
   function_type_args_ = func.type_parameters();
   if (auto const ta_sexp = NonEmptyTypeArgumentsToSExp(function_type_args_)) {
@@ -514,6 +515,10 @@ SExpression* FlowGraphSerializer::ArrayToSExp(const Array& arr) {
     array_elem = arr.At(i);
     sexp->Add(DartValueToSExp(array_elem));
   }
+  array_type_args_ = arr.GetTypeArguments();
+  if (auto const type_args_sexp = TypeArgumentsToSExp(array_type_args_)) {
+    sexp->AddExtra("type_args", type_args_sexp);
+  }
   return sexp;
 }
 
@@ -524,6 +529,10 @@ SExpression* FlowGraphSerializer::ClosureToSExp(const Closure& c) {
   closure_function_ = c.function();
   if (auto const func = FunctionToSExp(closure_function_)) {
     sexp->Add(func);
+  }
+  closure_context_ = c.context();
+  if (auto const context = ContextToSExp(closure_context_)) {
+    sexp->AddExtra("context", context);
   }
   closure_type_args_ = c.function_type_arguments();
   if (auto const type_args = NonEmptyTypeArgumentsToSExp(closure_type_args_)) {
@@ -536,6 +545,23 @@ SExpression* FlowGraphSerializer::ClosureToSExp(const Closure& c) {
   closure_type_args_ = c.delayed_type_arguments();
   if (auto const type_args = NonEmptyTypeArgumentsToSExp(closure_type_args_)) {
     sexp->AddExtra("delayed_type_args", type_args);
+  }
+  return sexp;
+}
+
+SExpression* FlowGraphSerializer::ContextToSExp(const Context& c) {
+  if (c.IsNull()) return nullptr;
+  auto sexp = new (zone()) SExpList(zone());
+  AddSymbol(sexp, "Context");
+  for (intptr_t i = 0; i < c.num_variables(); i++) {
+    context_elem_ = c.At(i);
+    auto const elem_sexp = DartValueToSExp(context_elem_);
+    if (elem_sexp == nullptr) return nullptr;
+    sexp->Add(elem_sexp);
+  }
+  context_parent_ = c.parent();
+  if (auto const parent_sexp = ContextToSExp(context_parent_)) {
+    sexp->AddExtra("parent", parent_sexp);
   }
   return sexp;
 }
@@ -757,30 +783,13 @@ void StoreLocalInstr::AddOperandsToSExpression(SExpList* sexp,
   sexp->Add(s->LocalVariableToSExp(local()));
 }
 
-static const char* SlotKindToCString(Slot::Kind kind) {
-  switch (kind) {
-    case Slot::Kind::kDartField:
-      return "DartField";
-    case Slot::Kind::kCapturedVariable:
-      return "CapturedVariable";
-    case Slot::Kind::kTypeArguments:
-      return "TypeArguments";
-    default:
-      return "NativeSlot";
-  }
-}
-
 SExpression* FlowGraphSerializer::SlotToSExp(const Slot& slot) {
   auto sexp = new (zone()) SExpList(zone());
   AddSymbol(sexp, "Slot");
   AddInteger(sexp, slot.offset_in_bytes());
-  if (FLAG_verbose_flow_graph_serialization) {
-    AddExtraSymbol(sexp, "kind", SlotKindToCString(slot.kind()));
-    if (slot.IsDartField()) {
-      sexp->AddExtra("field", DartValueToSExp(slot.field()));
-    } else {
-      AddExtraString(sexp, "name", slot.Name());
-    }
+  AddExtraSymbol(sexp, "kind", Slot::KindToCString(slot.kind()));
+  if (slot.IsDartField()) {
+    sexp->AddExtra("field", DartValueToSExp(slot.field()));
   }
   return sexp;
 }
@@ -797,6 +806,23 @@ void StoreInstanceFieldInstr::AddOperandsToSExpression(
   sexp->Add(instance()->ToSExpression(s));
   sexp->Add(s->SlotToSExp(slot()));
   sexp->Add(value()->ToSExpression(s));
+}
+
+void StoreInstanceFieldInstr::AddExtraInfoToSExpression(
+    SExpList* sexp,
+    FlowGraphSerializer* s) const {
+  if (is_initialization_ || FLAG_verbose_flow_graph_serialization) {
+    s->AddExtraBool(sexp, "is_init", is_initialization_);
+  }
+  if (emit_store_barrier_ != kNoStoreBarrier ||
+      FLAG_verbose_flow_graph_serialization) {
+    // Make sure that we aren't seeing a new value added to the StoreBarrierType
+    // enum that isn't handled by the serializer.
+    ASSERT(emit_store_barrier_ == kNoStoreBarrier ||
+           emit_store_barrier_ == kEmitStoreBarrier);
+    s->AddExtraBool(sexp, "emit_barrier",
+                    emit_store_barrier_ != kNoStoreBarrier);
+  }
 }
 
 void LoadIndexedUnsafeInstr::AddExtraInfoToSExpression(
@@ -823,6 +849,15 @@ void ComparisonInstr::AddOperandsToSExpression(SExpList* sexp,
   Instruction::AddOperandsToSExpression(sexp, s);
 }
 
+void StrictCompareInstr::AddExtraInfoToSExpression(
+    SExpList* sexp,
+    FlowGraphSerializer* s) const {
+  Instruction::AddExtraInfoToSExpression(sexp, s);
+  if (needs_number_check_ || FLAG_verbose_flow_graph_serialization) {
+    s->AddExtraBool(sexp, "needs_check", needs_number_check_);
+  }
+}
+
 void DoubleTestOpInstr::AddOperandsToSExpression(SExpList* sexp,
                                                  FlowGraphSerializer* s) const {
   const bool negated = kind() != Token::kEQ;
@@ -842,6 +877,17 @@ void DoubleTestOpInstr::AddOperandsToSExpression(SExpList* sexp,
 void GotoInstr::AddOperandsToSExpression(SExpList* sexp,
                                          FlowGraphSerializer* s) const {
   sexp->Add(s->BlockIdToSExp(successor()->block_id()));
+}
+
+void DebugStepCheckInstr::AddExtraInfoToSExpression(
+    SExpList* sexp,
+    FlowGraphSerializer* s) const {
+  if (stub_kind_ != RawPcDescriptors::kAnyKind ||
+      FLAG_verbose_flow_graph_serialization) {
+    auto const stub_kind_name = RawPcDescriptors::KindToCString(stub_kind_);
+    ASSERT(stub_kind_name != nullptr);
+    s->AddExtraSymbol(sexp, "stub_kind", stub_kind_name);
+  }
 }
 
 void TailCallInstr::AddOperandsToSExpression(SExpList* sexp,
@@ -1050,6 +1096,14 @@ void CheckStackOverflowInstr::AddExtraInfoToSExpression(
   if (kind_ != kOsrAndPreemption) {
     ASSERT(kind_ == kOsrOnly);
     s->AddExtraSymbol(sexp, "kind", "OsrOnly");
+  }
+}
+
+void CheckNullInstr::AddExtraInfoToSExpression(SExpList* sexp,
+                                               FlowGraphSerializer* s) const {
+  Instruction::AddExtraInfoToSExpression(sexp, s);
+  if (!function_name_.IsNull()) {
+    s->AddExtraString(sexp, "function_name", function_name_.ToCString());
   }
 }
 

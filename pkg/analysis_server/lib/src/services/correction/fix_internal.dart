@@ -9,6 +9,7 @@ import 'dart:core';
 import 'package:analysis_server/plugin/edit/fix/fix_core.dart';
 import 'package:analysis_server/plugin/edit/fix/fix_dart.dart';
 import 'package:analysis_server/src/services/completion/dart/utilities.dart';
+import 'package:analysis_server/src/services/correction/base_processor.dart';
 import 'package:analysis_server/src/services/correction/fix.dart';
 import 'package:analysis_server/src/services/correction/fix/dart/top_level_declarations.dart';
 import 'package:analysis_server/src/services/correction/levenshtein.dart';
@@ -161,7 +162,7 @@ class DartFixContributor implements FixContributor {
 /**
  * The computer for Dart fixes.
  */
-class FixProcessor {
+class FixProcessor extends BaseProcessor {
   static const int MAX_LEVENSHTEIN_DISTANCE = 3;
 
   final DartFixContext context;
@@ -171,10 +172,8 @@ class FixProcessor {
   final TypeProvider typeProvider;
   final TypeSystem typeSystem;
 
-  final String file;
   final LibraryElement unitLibraryElement;
   final CompilationUnit unit;
-  final CorrectionUtils utils;
   final Flutter flutter;
 
   final AnalysisError error;
@@ -183,7 +182,6 @@ class FixProcessor {
 
   final List<Fix> fixes = <Fix>[];
 
-  AstNode node;
   AstNode coveredNode;
 
   FixProcessor(this.context)
@@ -192,21 +190,18 @@ class FixProcessor {
         sessionHelper = AnalysisSessionHelper(context.resolveResult.session),
         typeProvider = context.resolveResult.typeProvider,
         typeSystem = context.resolveResult.typeSystem,
-        file = context.resolveResult.path,
         unitLibraryElement = context.resolveResult.libraryElement,
         unit = context.resolveResult.unit,
-        utils = CorrectionUtils(context.resolveResult),
         flutter = Flutter.of(context.resolveResult),
         error = context.error,
         errorOffset = context.error.offset,
-        errorLength = context.error.length;
+        errorLength = context.error.length,
+        super(
+          resolvedResult: context.resolveResult,
+          workspace: context.workspace,
+        );
 
   DartType get coreTypeBool => _getCoreType('bool');
-
-  /**
-   * Returns the EOL to use for this [CompilationUnit].
-   */
-  String get eol => utils.endOfLine;
 
   Future<List<Fix>> compute() async {
     node = new NodeLocator2(errorOffset).searchWithin(unit);
@@ -477,6 +472,7 @@ class FixProcessor {
       await _addFix_createFunction_forFunctionType();
       await _addFix_createMixin();
       await _addFix_importLibrary_withType();
+      await _addFix_importLibrary_withExtension();
       await _addFix_importLibrary_withFunction();
       await _addFix_importLibrary_withTopLevelVariable();
       await _addFix_createLocalVariable();
@@ -526,6 +522,9 @@ class FixProcessor {
       await _addFix_createLocalVariable();
       await _addFix_importLibrary_withTopLevelVariable();
       await _addFix_importLibrary_withType();
+    }
+    if (errorCode == CompileTimeErrorCode.UNDEFINED_EXTENSION_GETTER) {
+      await _addFix_createGetter();
     }
     if (errorCode == StaticTypeWarningCode.UNDEFINED_METHOD) {
       await _addFix_createClass();
@@ -588,6 +587,9 @@ class FixProcessor {
       }
       if (name == LintNames.await_only_futures) {
         await _addFix_removeAwait();
+      }
+      if (name == LintNames.curly_braces_in_flow_control_structures) {
+        await _addFix_addCurlyBraces();
       }
       if (name == LintNames.empty_catches) {
         await _addFix_removeEmptyCatch();
@@ -704,6 +706,11 @@ class FixProcessor {
         _addFixFromBuilder(changeBuilder, DartFixKind.ADD_CONST);
       }
     }
+  }
+
+  Future<void> _addFix_addCurlyBraces() async {
+    final changeBuilder = await createBuilder_useCurlyBraces();
+    _addFixFromBuilder(changeBuilder, DartFixKind.ADD_CURLY_BRACES);
   }
 
   Future<void> _addFix_addExplicitCast() async {
@@ -1948,7 +1955,7 @@ class FixProcessor {
     if (!nameNode.inGetterContext()) {
       return;
     }
-    // prepare target Expression
+    // prepare target
     Expression target;
     {
       AstNode nameParent = nameNode.parent;
@@ -1958,46 +1965,53 @@ class FixProcessor {
         target = nameParent.realTarget;
       }
     }
-    // prepare target ClassElement
+    // prepare target element
     bool staticModifier = false;
-    ClassElement targetClassElement;
-    if (target != null) {
-      // prepare target interface type
-      DartType targetType = target.staticType;
-      if (targetType is! InterfaceType) {
-        return;
-      }
-      targetClassElement = targetType.element;
-      // maybe static
-      if (target is Identifier) {
-        Identifier targetIdentifier = target;
-        Element targetElement = targetIdentifier.staticElement;
-        staticModifier = targetElement?.kind == ElementKind.CLASS;
+    Element targetElement;
+    if (target is ExtensionOverride) {
+      targetElement = target.staticElement;
+    } else if (target != null) {
+      if (target is Identifier && target.staticElement is ExtensionElement) {
+        targetElement = target.staticElement;
+        staticModifier = true;
+      } else {
+        // prepare target interface type
+        DartType targetType = target.staticType;
+        if (targetType is! InterfaceType) {
+          return;
+        }
+        targetElement = targetType.element;
+        // maybe static
+        if (target is Identifier) {
+          Identifier targetIdentifier = target;
+          Element targetElement = targetIdentifier.staticElement;
+          staticModifier = targetElement?.kind == ElementKind.CLASS;
+        }
       }
     } else {
-      targetClassElement = getEnclosingClassElement(node);
-      if (targetClassElement == null) {
+      targetElement = getEnclosingClassElement(node);
+      if (targetElement == null) {
         return;
       }
       staticModifier = _inStaticContext();
     }
-    if (targetClassElement.librarySource.isInSystemLibrary) {
+    if (targetElement.librarySource.isInSystemLibrary) {
       return;
     }
-    utils.targetClassElement = targetClassElement;
-    // prepare target ClassOrMixinDeclaration
+    // prepare target declaration
     var targetDeclarationResult =
-        await sessionHelper.getElementDeclaration(targetClassElement);
-    if (targetDeclarationResult.node is! ClassOrMixinDeclaration) {
+        await sessionHelper.getElementDeclaration(targetElement);
+    if (targetDeclarationResult.node is! ClassOrMixinDeclaration &&
+        targetDeclarationResult.node is! ExtensionDeclaration) {
       return;
     }
-    ClassOrMixinDeclaration targetNode = targetDeclarationResult.node;
+    CompilationUnitMember targetNode = targetDeclarationResult.node;
     // prepare location
     ClassMemberLocation targetLocation =
         CorrectionUtils(targetDeclarationResult.resolvedUnit)
             .prepareNewGetterLocation(targetNode);
     // build method source
-    Source targetSource = targetClassElement.source;
+    Source targetSource = targetElement.source;
     String targetFile = targetSource.fullName;
     var changeBuilder = _newDartChangeBuilder();
     await changeBuilder.addFileEdit(targetFile, (DartFileEditBuilder builder) {
@@ -2456,6 +2470,14 @@ class FixProcessor {
         await _addFix_importLibrary(fixKind, declaration.uri, relativeURI);
       }
     }
+  }
+
+  Future<void> _addFix_importLibrary_withExtension() async {
+    String extensionName = (node as SimpleIdentifier).name;
+    await _addFix_importLibrary_withElement(
+        extensionName,
+        const [ElementKind.EXTENSION],
+        const [TopLevelDeclarationKind.extension]);
   }
 
   Future<void> _addFix_importLibrary_withFunction() async {
