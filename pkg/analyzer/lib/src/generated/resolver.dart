@@ -3706,9 +3706,9 @@ class ResolverVisitor extends ScopedVisitor {
     InferenceContext.setType(node.condition, typeProvider.boolType);
 
     _flowAnalysis?.flow?.doStatement_bodyBegin(
-      node,
-      _flowAnalysis.assignedVariables.writtenInNode(node), _flowAnalysis.assignedVariables.capturedInNode(node)
-    );
+        node,
+        _flowAnalysis.assignedVariables.writtenInNode(node),
+        _flowAnalysis.assignedVariables.capturedInNode(node));
     visitStatementInScope(body);
 
     _flowAnalysis?.flow?.doStatement_conditionBegin();
@@ -3865,7 +3865,8 @@ class ResolverVisitor extends ScopedVisitor {
       _flowAnalysis?.loopVariable(loopVariable);
       loopVariable?.accept(this);
       _flowAnalysis?.flow?.forEach_bodyBegin(
-          _flowAnalysis.assignedVariables.writtenInNode(node), _flowAnalysis.assignedVariables.capturedInNode(node));
+          _flowAnalysis.assignedVariables.writtenInNode(node),
+          _flowAnalysis.assignedVariables.capturedInNode(node));
       node.body?.accept(this);
       _flowAnalysis?.flow?.forEach_end();
 
@@ -3942,9 +3943,8 @@ class ResolverVisitor extends ScopedVisitor {
       loopVariable?.accept(this);
 
       _flowAnalysis?.flow?.forEach_bodyBegin(
-        _flowAnalysis.assignedVariables.writtenInNode(node),
-        _flowAnalysis.assignedVariables.capturedInNode(node)
-      );
+          _flowAnalysis.assignedVariables.writtenInNode(node),
+          _flowAnalysis.assignedVariables.capturedInNode(node));
 
       Statement body = node.body;
       if (body != null) {
@@ -4428,7 +4428,8 @@ class ResolverVisitor extends ScopedVisitor {
         var flow = _flowAnalysis.flow;
         var assignedInCases =
             _flowAnalysis.assignedVariables.writtenInNode(node);
-        var capturedInCases = _flowAnalysis.assignedVariables.capturedInNode(node);
+        var capturedInCases =
+            _flowAnalysis.assignedVariables.capturedInNode(node);
 
         flow.switchStatement_expressionEnd(node);
 
@@ -4436,10 +4437,7 @@ class ResolverVisitor extends ScopedVisitor {
         var members = node.members;
         for (var member in members) {
           flow.switchStatement_beginCase(
-            member.labels.isNotEmpty,
-            assignedInCases,
-            capturedInCases
-          );
+              member.labels.isNotEmpty, assignedInCases, capturedInCases);
           member.accept(this);
 
           if (member is SwitchDefault) {
@@ -4560,9 +4558,8 @@ class ResolverVisitor extends ScopedVisitor {
       InferenceContext.setType(condition, typeProvider.boolType);
 
       _flowAnalysis?.flow?.whileStatement_conditionBegin(
-        _flowAnalysis.assignedVariables.writtenInNode(node),
-        _flowAnalysis.assignedVariables.capturedInNode(node)
-      );
+          _flowAnalysis.assignedVariables.writtenInNode(node),
+          _flowAnalysis.assignedVariables.capturedInNode(node));
       condition?.accept(this);
 
       Statement body = node.body;

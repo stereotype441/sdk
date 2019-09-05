@@ -916,7 +916,7 @@ main() {
     test('tryCatchStatement_bodyEnd() un-promotes variables assigned in body',
         () {
       var h = _Harness();
-      var x = h.addVar('x', 'int?');
+      var x = h.addVar('x', 'int?', hasWrites: true);
       h.run((flow) {
         h.declare(x, initialized: true);
         h.promote(x, 'int');
@@ -927,6 +927,30 @@ main() {
         expect(flow.promotedType(x).type, 'int');
         flow.tryCatchStatement_bodyEnd({x});
         flow.tryCatchStatement_catchBegin();
+        expect(flow.promotedType(x), isNull);
+        flow.tryCatchStatement_catchEnd();
+        flow.tryCatchStatement_end();
+      });
+    });
+
+    test('tryCatchStatement_bodyEnd() preserves write captures in body', () {
+      // Note: it's not necessary for the write capture to survive to the end of
+      // the try body, because an exception could occur at any time.  We check
+      // this by putting an exit in the try body.
+      var h = _Harness();
+      var x = h.addVar('x', 'int?', hasWrites: true, isCaptured: true);
+      h.run((flow) {
+        h.declare(x, initialized: true);
+        h.promote(x, 'int');
+        expect(flow.promotedType(x).type, 'int');
+        flow.tryCatchStatement_bodyBegin();
+        h.function({x}, () {
+          flow.write(x);
+        });
+        flow.handleExit();
+        flow.tryCatchStatement_bodyEnd({x});
+        flow.tryCatchStatement_catchBegin();
+        h.promote(x, 'int');
         expect(flow.promotedType(x), isNull);
         flow.tryCatchStatement_catchEnd();
         flow.tryCatchStatement_end();
@@ -1031,7 +1055,7 @@ main() {
         'tryFinallyStatement_finallyBegin() un-promotes variables assigned in '
         'body', () {
       var h = _Harness();
-      var x = h.addVar('x', 'int?');
+      var x = h.addVar('x', 'int?', hasWrites: true);
       h.run((flow) {
         h.declare(x, initialized: true);
         h.promote(x, 'int');
@@ -1041,6 +1065,27 @@ main() {
         h.promote(x, 'int');
         expect(flow.promotedType(x).type, 'int');
         flow.tryFinallyStatement_finallyBegin({x});
+        expect(flow.promotedType(x), isNull);
+        flow.tryFinallyStatement_end({});
+      });
+    });
+
+    test('tryFinallyStatement_finallyBegin() preserves write captures in body',
+        () {
+      // Note: it's not necessary for the write capture to survive to the end of
+      // the try body, because an exception could occur at any time.  We check
+      // this by putting an exit in the try body.
+      var h = _Harness();
+      var x = h.addVar('x', 'int?', hasWrites: true, isCaptured: true);
+      h.run((flow) {
+        h.declare(x, initialized: true);
+        flow.tryFinallyStatement_bodyBegin();
+        h.function({x}, () {
+          flow.write(x);
+        });
+        flow.handleExit();
+        flow.tryFinallyStatement_finallyBegin({x});
+        h.promote(x, 'int');
         expect(flow.promotedType(x), isNull);
         flow.tryFinallyStatement_end({});
       });
@@ -1071,8 +1116,8 @@ main() {
         'tryFinallyStatement_end() does not restore try body promotions for '
         'variables assigned in finally', () {
       var h = _Harness();
-      var x = h.addVar('x', 'int?');
-      var y = h.addVar('y', 'int?');
+      var x = h.addVar('x', 'int?', hasWrites: true);
+      var y = h.addVar('y', 'int?', hasWrites: true);
       h.run((flow) {
         h.declare(x, initialized: true);
         h.declare(y, initialized: true);
