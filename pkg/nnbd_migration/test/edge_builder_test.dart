@@ -424,7 +424,7 @@ FutureOr<int> f(Future<int> x) => x;
         decoratedTypeAnnotation('int> f').node);
     // If `x` is `Future<int?>`, then the only way to migrate is to make the
     // return type `FutureOr<int?>`.
-    assertEdge(decoratedTypeAnnotation('int> x').node,
+    assertEdge(substitutionNode(decoratedTypeAnnotation('int> x').node, never),
         decoratedTypeAnnotation('int> f').node,
         hard: false);
     assertNoEdge(decoratedTypeAnnotation('int> x').node,
