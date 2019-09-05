@@ -1772,7 +1772,7 @@ int bar(Derived d, int i) => d.foo(i);
         hard: false);
   }
 
-  solo_test_genericMethodInvocation_withBoundSubstitution() async {
+  test_genericMethodInvocation_withBoundSubstitution() async {
     await analyze('''
 class Base<T> {
   U foo<U extends T>(U x) => x;
@@ -1780,8 +1780,8 @@ class Base<T> {
 class Derived<V> extends Base<Iterable<V>> {}
 bar(Derived<int> d, List<int> x) => d.foo(x);
 ''');
-    graph.debugDump();
-    fail('TODO(paulberry)');
+    // Don't bother checking any edges; the assertions in the DecoratedType
+    // constructor verify that we've substituted the bound correctly.
   }
 
   test_genericMethodInvocation_withSubstitution() async {
