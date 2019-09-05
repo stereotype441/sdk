@@ -120,7 +120,7 @@ tryFinally(Object a, Object b, Object c) {
   f(0, () { c = ''; });
 }
 
-whileLoop(Object a) {
+whileLoop(Object a, Object b, Object c) {
   while (f(true, () { a = ''; })) {
     if (a is int) a;
     if (b is int) b;
@@ -130,7 +130,7 @@ whileLoop(Object a) {
   f(0, () { c = ''; });
 }
 
-localFunction(Object a) {
+localFunction(Object a, Object b, Object c) {
   if (a is! int) return;
   if (b is! int) return;
   if (c is! int) return;
@@ -164,7 +164,7 @@ localFunction(Object a) {
   if (c is int) c;
 }
 
-closure(Object a) {
+closure(Object a, Object b, Object c) {
   if (a is! int) return;
   if (b is! int) return;
   if (c is! int) return;
