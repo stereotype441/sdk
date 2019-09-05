@@ -206,7 +206,6 @@ void main() {
               "csp": true,
               "host-checked": true,
               "minified": true,
-              "preview-dart-2": true,
               "hot-reload": true,
               "hot-reload-rollback": true,
               "use-sdk": true,
@@ -226,7 +225,6 @@ void main() {
               isCsp: true,
               isHostChecked: true,
               isMinified: true,
-              previewDart2: true,
               useHotReload: true,
               useHotReloadRollback: true,
               useSdk: true,
@@ -238,7 +236,7 @@ void main() {
             "debug",
             {},
             'Must specify at least one of compiler or runtime in options or '
-            'configuration name.');
+                'configuration name.');
       });
 
       test("empty string", () {
@@ -255,7 +253,7 @@ void main() {
             "dart2js-debug",
             {"mode": "release"},
             'Found mode "release" in options and "debug" in configuration '
-            'name.');
+                'name.');
       });
 
       test("multiple values for same option in name", () {
@@ -263,7 +261,7 @@ void main() {
             "dart2js-debug-release",
             {},
             'Found multiple values for mode ("debug" and "release"), in '
-            'configuration name.');
+                'configuration name.');
       });
 
       test("null bool option", () {

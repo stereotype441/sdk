@@ -72,7 +72,6 @@ import '../../base/instrumentation.dart'
 
 import '../builder/extension_builder.dart';
 import '../builder/member_builder.dart';
-import '../builder/procedure_builder.dart';
 
 import '../fasta_codes.dart'
     show
@@ -794,12 +793,18 @@ abstract class TypeInferrerImpl extends TypeInferrer {
         MemberBuilder memberBuilder =
             extensionBuilder.lookupLocalMember(name.name, setter: setter);
         if (memberBuilder != null && !memberBuilder.isStatic) {
-          ProcedureBuilder procedureBuilder = memberBuilder;
-          if (procedureBuilder != null) {
-            Extension extension = extensionBuilder.extension;
+          Extension extension = extensionBuilder.extension;
+          DartType onType;
+          DartType onTypeInstantiateToBounds;
+          List<DartType> inferredTypeArguments;
+          if (extensionBuilder.extension.typeParameters.isEmpty) {
+            onTypeInstantiateToBounds =
+                onType = extensionBuilder.extension.onType;
+            inferredTypeArguments = const <DartType>[];
+          } else {
             List<TypeParameter> typeParameters =
                 extensionBuilder.extension.typeParameters;
-            List<DartType> inferredTypeArguments = _inferExtensionTypeArguments(
+            inferredTypeArguments = _inferExtensionTypeArguments(
                 extensionBuilder.extension.typeParameters,
                 extensionBuilder.extension.onType,
                 receiverType);
@@ -815,54 +820,54 @@ abstract class TypeInferrerImpl extends TypeInferrer {
                 return;
               }
             }
-            DartType onType = inferredSubstitution
+            onType = inferredSubstitution
                 .substituteType(extensionBuilder.extension.onType);
             List<DartType> instantiateToBoundTypeArguments =
                 calculateBounds(typeParameters, coreTypes.objectClass);
             Substitution instantiateToBoundsSubstitution =
                 Substitution.fromPairs(
                     typeParameters, instantiateToBoundTypeArguments);
-            DartType onTypeInstantiateToBounds = instantiateToBoundsSubstitution
+            onTypeInstantiateToBounds = instantiateToBoundsSubstitution
                 .substituteType(extensionBuilder.extension.onType);
+          }
 
-            if (typeSchemaEnvironment.isSubtypeOf(receiverType, onType)) {
-              ExtensionAccessCandidate candidate = new ExtensionAccessCandidate(
-                  extension,
-                  onType,
-                  onTypeInstantiateToBounds,
-                  new ObjectAccessTarget.extensionMember(
-                      procedureBuilder.procedure,
-                      procedureBuilder.extensionTearOff,
-                      procedureBuilder.kind,
-                      inferredTypeArguments));
-              if (noneMoreSpecific.isNotEmpty) {
-                bool isMostSpecific = true;
-                for (ExtensionAccessCandidate other in noneMoreSpecific) {
-                  bool isMoreSpecific = candidate.isMoreSpecificThan(
-                      typeSchemaEnvironment, other);
-                  if (isMoreSpecific != true) {
-                    isMostSpecific = false;
-                    break;
-                  }
+          if (typeSchemaEnvironment.isSubtypeOf(receiverType, onType)) {
+            ExtensionAccessCandidate candidate = new ExtensionAccessCandidate(
+                extension,
+                onType,
+                onTypeInstantiateToBounds,
+                new ObjectAccessTarget.extensionMember(
+                    memberBuilder.procedure,
+                    memberBuilder.extensionTearOff,
+                    memberBuilder.kind,
+                    inferredTypeArguments));
+            if (noneMoreSpecific.isNotEmpty) {
+              bool isMostSpecific = true;
+              for (ExtensionAccessCandidate other in noneMoreSpecific) {
+                bool isMoreSpecific =
+                    candidate.isMoreSpecificThan(typeSchemaEnvironment, other);
+                if (isMoreSpecific != true) {
+                  isMostSpecific = false;
+                  break;
                 }
-                if (isMostSpecific) {
-                  bestSoFar = candidate;
-                  noneMoreSpecific.clear();
-                } else {
-                  noneMoreSpecific.add(candidate);
-                }
-              } else if (bestSoFar == null) {
+              }
+              if (isMostSpecific) {
                 bestSoFar = candidate;
+                noneMoreSpecific.clear();
               } else {
-                bool isMoreSpecific = candidate.isMoreSpecificThan(
-                    typeSchemaEnvironment, bestSoFar);
-                if (isMoreSpecific == true) {
-                  bestSoFar = candidate;
-                } else if (isMoreSpecific == null) {
-                  noneMoreSpecific.add(bestSoFar);
-                  noneMoreSpecific.add(candidate);
-                  bestSoFar = null;
-                }
+                noneMoreSpecific.add(candidate);
+              }
+            } else if (bestSoFar == null) {
+              bestSoFar = candidate;
+            } else {
+              bool isMoreSpecific = candidate.isMoreSpecificThan(
+                  typeSchemaEnvironment, bestSoFar);
+              if (isMoreSpecific == true) {
+                bestSoFar = candidate;
+              } else if (isMoreSpecific == null) {
+                noneMoreSpecific.add(bestSoFar);
+                noneMoreSpecific.add(candidate);
+                bestSoFar = null;
               }
             }
           }
@@ -870,6 +875,9 @@ abstract class TypeInferrerImpl extends TypeInferrer {
       });
       if (bestSoFar != null) {
         target = bestSoFar.target;
+      } else {
+        // TODO(johnniwinther): Report a better error message when more than
+        // one potential targets were found.
       }
     }
 

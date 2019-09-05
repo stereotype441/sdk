@@ -902,6 +902,7 @@ environment
 equal
 equality
 equals
+equivalence
 equivalent
 equivalents
 erroneous
@@ -1997,6 +1998,7 @@ precisely
 precision
 preclude
 precondition
+predefined
 predicate
 preemptively
 prefer
@@ -2006,6 +2008,7 @@ preferred
 prefix
 prefixed
 prefixes
+prelude
 prepare
 prepared
 preparing
@@ -2516,6 +2519,7 @@ stage
 stamps
 standalone
 standard
+stands
 star
 start
 started
