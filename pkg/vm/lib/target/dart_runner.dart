@@ -43,4 +43,9 @@ class DartRunnerTarget extends VmTarget {
         'dart:fuchsia',
         'dart:vmservice_io',
       ];
+
+  @override
+  List<String> get extraRequiredLibrariesPlatform => const <String>[
+        'dart:profiler',
+      ];
 }

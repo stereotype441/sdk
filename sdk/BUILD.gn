@@ -214,6 +214,7 @@ _full_sdk_libraries = [
   "js_util",
   "math",
   "mirrors",
+  "profiler",
   "svg",
   "typed_data",
   "wasm",
@@ -240,6 +241,7 @@ _full_sdk_libraries = [
 #   "isolate",
 #   "math",
 #   "mirrors",
+#   "profiler",
 #   "typed_data",
 # ]
 _platform_sdk_libraries = _full_sdk_libraries
@@ -420,9 +422,6 @@ copy("copy_gen_snapshot") {
     sources = [
       "$gen_snapshot_out/$gen_snapshot_stripped_binary",
     ]
-  }
-  if (is_win) {
-    sources += [ "$gen_snapshot_out/gen_snapshot.lib" ]
   }
   outputs = [
     "$root_out_dir/dart-sdk/bin/utils/{{source_file_part}}",

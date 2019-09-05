@@ -621,6 +621,7 @@ curly
 current
 currently
 custom
+customize
 cyan
 cycle
 cycles
@@ -864,6 +865,7 @@ encoded
 encoder
 encodes
 encoding
+encounter
 encountered
 encounters
 end
@@ -1623,6 +1625,7 @@ mathematical
 matter
 maturity
 max
+maximum
 may
 maybe
 mean
@@ -1922,6 +1925,7 @@ patching
 paths
 pattern
 peek
+pending
 percent
 perform
 performance
@@ -2127,6 +2131,7 @@ reading
 reads
 ready
 real
+realigned
 realized
 really
 reason
@@ -2174,6 +2179,7 @@ referred
 refers
 refine
 refinement
+reflecting
 regardless
 region
 regions
@@ -2191,11 +2197,13 @@ relate
 related
 relation
 relational
+relations
 relationship
 relationships
 relative
 release
 relevant
+relied
 relies
 reloads
 rely
@@ -2828,6 +2836,7 @@ unmodified
 unnamed
 unnecessarily
 unnecessary
+unparsable
 unpromoted
 unread
 unrecognized
@@ -2901,6 +2910,7 @@ verifies
 verify
 verifying
 version
+versioning
 versions
 vertex
 vertical

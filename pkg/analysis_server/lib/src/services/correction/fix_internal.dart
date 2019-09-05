@@ -412,15 +412,15 @@ class FixProcessor {
     if (errorCode == StaticWarningCode.ASSIGNMENT_TO_FINAL) {
       await _addFix_makeFieldNotFinal();
     }
+    if (errorCode == StaticWarningCode.ASSIGNMENT_TO_FINAL_LOCAL) {
+      await _addFix_makeVariableNotFinal();
+    }
     if (errorCode == StaticWarningCode.CONCRETE_CLASS_WITH_ABSTRACT_MEMBER) {
       await _addFix_makeEnclosingClassAbstract();
     }
     if (errorCode == CompileTimeErrorCode.EXTRA_POSITIONAL_ARGUMENTS ||
-        errorCode == StaticWarningCode.EXTRA_POSITIONAL_ARGUMENTS ||
         errorCode ==
-            CompileTimeErrorCode.EXTRA_POSITIONAL_ARGUMENTS_COULD_BE_NAMED ||
-        errorCode ==
-            StaticWarningCode.EXTRA_POSITIONAL_ARGUMENTS_COULD_BE_NAMED) {
+            CompileTimeErrorCode.EXTRA_POSITIONAL_ARGUMENTS_COULD_BE_NAMED) {
       await _addFix_createConstructor_insteadOfSyntheticDefault();
       await _addFix_addMissingParameter();
     }
@@ -450,17 +450,14 @@ class FixProcessor {
     if (errorCode == CompileTimeErrorCode.UNDEFINED_CLASS ||
         errorCode == StaticWarningCode.CAST_TO_NON_TYPE ||
         errorCode == StaticWarningCode.NOT_A_TYPE ||
-        errorCode == StaticWarningCode.TYPE_TEST_WITH_UNDEFINED_NAME ||
-        errorCode == StaticWarningCode.UNDEFINED_CLASS) {
+        errorCode == StaticWarningCode.TYPE_TEST_WITH_UNDEFINED_NAME) {
       await _addFix_importLibrary_withType();
       await _addFix_createClass();
       await _addFix_createMixin();
       await _addFix_undefinedClass_useSimilar();
     }
     if (errorCode ==
-            CompileTimeErrorCode.EXTRA_POSITIONAL_ARGUMENTS_COULD_BE_NAMED ||
-        errorCode ==
-            StaticWarningCode.EXTRA_POSITIONAL_ARGUMENTS_COULD_BE_NAMED) {
+        CompileTimeErrorCode.EXTRA_POSITIONAL_ARGUMENTS_COULD_BE_NAMED) {
       await _addFix_convertToNamedArgument();
     }
     if (errorCode == StaticWarningCode.FINAL_NOT_INITIALIZED) {
@@ -484,8 +481,7 @@ class FixProcessor {
       await _addFix_importLibrary_withTopLevelVariable();
       await _addFix_createLocalVariable();
     }
-    if (errorCode == CompileTimeErrorCode.UNDEFINED_NAMED_PARAMETER ||
-        errorCode == StaticWarningCode.UNDEFINED_NAMED_PARAMETER) {
+    if (errorCode == CompileTimeErrorCode.UNDEFINED_NAMED_PARAMETER) {
       await _addFix_addMissingParameterNamed();
       await _addFix_changeArgumentName();
     }
@@ -543,8 +539,7 @@ class FixProcessor {
       await _addFix_undefinedClassAccessor_useSimilar();
       await _addFix_createField();
     }
-    if (errorCode == CompileTimeErrorCode.UNDEFINED_NAMED_PARAMETER ||
-        errorCode == StaticWarningCode.UNDEFINED_NAMED_PARAMETER) {
+    if (errorCode == CompileTimeErrorCode.UNDEFINED_NAMED_PARAMETER) {
       await _addFix_convertFlutterChild();
       await _addFix_convertFlutterChildren();
     }
@@ -633,6 +628,10 @@ class FixProcessor {
       if (name == LintNames.prefer_is_not_empty) {
         await _addFix_isNotEmpty();
       }
+      if (errorCode.name == LintNames.prefer_const_constructors) {
+        await _addFix_addConst();
+        await _addFix_replaceNewWithConst();
+      }
       if (name == LintNames.type_init_formals) {
         await _addFix_removeTypeAnnotation();
       }
@@ -689,6 +688,22 @@ class FixProcessor {
       builder.addSimpleInsertion(node.offset, 'await ');
     });
     _addFixFromBuilder(changeBuilder, DartFixKind.ADD_AWAIT);
+  }
+
+  Future<void> _addFix_addConst() async {
+    var node = coveredNode;
+    if (node is ConstructorName) {
+      node = node.parent;
+    }
+    if (node is InstanceCreationExpression) {
+      if ((node as InstanceCreationExpression).keyword == null) {
+        final changeBuilder = _newDartChangeBuilder();
+        await changeBuilder.addFileEdit(file, (DartFileEditBuilder builder) {
+          builder.addSimpleInsertion(node.offset, 'const ');
+        });
+        _addFixFromBuilder(changeBuilder, DartFixKind.ADD_CONST);
+      }
+    }
   }
 
   Future<void> _addFix_addExplicitCast() async {
@@ -1289,22 +1304,25 @@ class FixProcessor {
   Future<void> _addFix_convertToNamedArgument() async {
     var argumentList = this.node;
     if (argumentList is ArgumentList) {
-      // Prepare ExecutableElement.
-      ExecutableElement executable;
+      // Prepare parameters.
+      List<ParameterElement> parameters;
       var parent = argumentList.parent;
       if (parent is InstanceCreationExpression) {
-        executable = parent.staticElement;
+        parameters = parent.staticElement?.parameters;
       } else if (parent is MethodInvocation) {
-        executable = parent.methodName.staticElement;
+        var invokeType = parent.staticInvokeType;
+        if (invokeType is FunctionType) {
+          parameters = invokeType.parameters;
+        }
       }
-      if (executable == null) {
+      if (parameters == null) {
         return;
       }
 
       // Prepare named parameters.
       int numberOfPositionalParameters = 0;
       var namedParameters = <ParameterElement>[];
-      for (var parameter in executable.parameters) {
+      for (var parameter in parameters) {
         if (parameter.isNamed) {
           namedParameters.add(parameter);
         } else {
@@ -2632,6 +2650,37 @@ class FixProcessor {
     }
   }
 
+  Future<void> _addFix_makeVariableNotFinal() async {
+    AstNode node = this.node;
+    if (node is SimpleIdentifier &&
+        node.staticElement is LocalVariableElement) {
+      LocalVariableElement variable = node.staticElement;
+      var id = NodeLocator(variable.nameOffset).searchWithin(unit);
+      var decl = id?.parent;
+      if (decl is VariableDeclaration &&
+          decl.parent is VariableDeclarationList) {
+        VariableDeclarationList declarationList = decl.parent;
+        var keywordToken = declarationList.keyword;
+        if (declarationList.variables.length == 1 &&
+            keywordToken.keyword == Keyword.FINAL) {
+          var changeBuilder = _newDartChangeBuilder();
+          await changeBuilder.addFileEdit(file, (DartFileEditBuilder builder) {
+            if (declarationList.type != null) {
+              builder.addDeletion(
+                  range.startStart(keywordToken, declarationList.type));
+            } else {
+              builder.addSimpleReplacement(range.token(keywordToken), 'var');
+            }
+          });
+          declarationList.variables[0].name.name;
+          var varName = declarationList.variables[0].name.name;
+          _addFixFromBuilder(changeBuilder, DartFixKind.MAKE_VARIABLE_NOT_FINAL,
+              args: [varName]);
+        }
+      }
+    }
+  }
+
   Future<void> _addFix_moveTypeArgumentsToClass() async {
     if (coveredNode is TypeArgumentList) {
       TypeArgumentList typeArguments = coveredNode;
@@ -3169,6 +3218,23 @@ class FixProcessor {
             range.token((node as VariableDeclarationList).keyword), 'const');
       });
       _addFixFromBuilder(changeBuilder, DartFixKind.REPLACE_FINAL_WITH_CONST);
+    }
+  }
+
+  Future<void> _addFix_replaceNewWithConst() async {
+    var node = coveredNode;
+    if (node is ConstructorName) {
+      node = node.parent;
+    }
+    if (node is InstanceCreationExpression) {
+      final keyword = node.keyword;
+      if (keyword != null) {
+        final changeBuilder = _newDartChangeBuilder();
+        await changeBuilder.addFileEdit(file, (DartFileEditBuilder builder) {
+          builder.addSimpleReplacement(range.token(keyword), 'const');
+        });
+        _addFixFromBuilder(changeBuilder, DartFixKind.REPLACE_NEW_WITH_CONST);
+      }
     }
   }
 

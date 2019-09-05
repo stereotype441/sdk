@@ -290,7 +290,12 @@ Future<Null> newWorldTest(List worlds, Map modules, bool omitPlatform) async {
         .readComponent(newestWholeComponent);
   }
 
+  int worldNum = 0;
   for (YamlMap world in worlds) {
+    worldNum++;
+    print("----------------");
+    print("World #$worldNum");
+    print("----------------");
     List<Component> modulesToUse;
     if (world["modules"] != null) {
       moduleComponents ??= new Map<String, Component>();
@@ -827,12 +832,19 @@ Future<bool> normalCompile(Uri input, Uri output,
 
 Future<List<int>> normalCompileToBytes(Uri input,
     {CompilerOptions options, IncrementalCompiler compiler}) async {
+  Component component = await normalCompileToComponent(input,
+      options: options, compiler: compiler);
+  return util.postProcess(component);
+}
+
+Future<Component> normalCompileToComponent(Uri input,
+    {CompilerOptions options, IncrementalCompiler compiler}) async {
   options ??= getOptions();
   compiler ??= new TestIncrementalCompiler(options, input);
   Component component = await compiler.computeDelta();
   util.throwOnEmptyMixinBodies(component);
   util.throwOnInsufficientUriToSource(component);
-  return util.postProcess(component);
+  return component;
 }
 
 Future<bool> initializedCompile(

@@ -48,6 +48,11 @@ class FlutterTarget extends VmTarget {
       ];
 
   @override
+  List<String> get extraRequiredLibrariesPlatform => const <String>[
+        'dart:profiler',
+      ];
+
+  @override
   void performPreConstantEvaluationTransformations(
       Component component,
       CoreTypes coreTypes,

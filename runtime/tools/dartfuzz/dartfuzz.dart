@@ -14,7 +14,7 @@ import 'dartfuzz_ffiapi.dart';
 // Version of DartFuzz. Increase this each time changes are made
 // to preserve the property that a given version of DartFuzz yields
 // the same fuzzed program for a deterministic random seed.
-const String version = '1.31';
+const String version = '1.36';
 
 // Restriction on statements and expressions.
 const int stmtLength = 2;
@@ -100,7 +100,7 @@ class DartFuzz {
     globalVars = fillTypes1();
     globalVars.addAll(DartType.allTypes); // always one each
     globalMethods = fillTypes2();
-    classFields = fillTypes2();
+    classFields = fillTypes2(limit: 8);
     classMethods = fillTypes3(classFields.length);
     classParents = <int>[];
     // Setup optional ffi methods and types.
@@ -215,7 +215,18 @@ class DartFuzz {
       } else {
         final int parentClass = rand.nextInt(i);
         classParents.add(parentClass);
-        emitLn('class X$i extends X${parentClass} {');
+        if (rand.nextInt(2) != 0) {
+          // Inheritance
+          emitLn('class X$i extends X${parentClass} {');
+        } else {
+          // Mixin
+          if (classParents[parentClass] >= 0) {
+            emitLn(
+                'class X$i extends X${classParents[parentClass]} with X${parentClass} {');
+          } else {
+            emitLn('class X$i with X${parentClass} {');
+          }
+        }
       }
       indent += 2;
       emitVarDecls('$fieldName${i}_', classFields[i]);
@@ -238,9 +249,28 @@ class DartFuzz {
     }
   }
 
+  void emitLoadFfiLib() {
+    if (ffi) {
+      emitLn(
+          '// The following throws an uncaught exception if the ffi library ' +
+              'is not found.');
+      emitLn(
+          '// By not catching this exception, we terminate the program with ' +
+              'a full stack trace');
+      emitLn('// which, in turn, flags the problem prominently');
+      emitLn('if (ffiTestFunctions == null) {');
+      indent += 2;
+      emitLn('print(\'Did not load ffi test functions\');');
+      indent -= 2;
+      emitLn('}');
+    }
+  }
+
   void emitMain() {
     emitLn('main() {');
     indent += 2;
+
+    emitLoadFfiLib();
 
     // Call each global method once.
     for (int i = 0; i < globalMethods.length; i++) {
@@ -462,7 +492,8 @@ class DartFuzz {
   bool emitForEach(int depth) {
     final int i = localVars.length;
     emitLn("", newline: false);
-    emitScalarVar(DartType.INT_STRING_MAP, isLhs: true);
+    final emittedVar = emitScalarVar(DartType.INT_STRING_MAP, isLhs: false);
+    iterVars.add(emittedVar);
     emit('.forEach(($localName$i, $localName${i + 1}) {\n');
     indent += 2;
     final int nestTmp = nest;
@@ -819,7 +850,7 @@ class DartFuzz {
     }
   }
 
-  void emitScalarVar(DartType tp, {bool isLhs = false}) {
+  String emitScalarVar(DartType tp, {bool isLhs = false}) {
     // Collect all choices from globals, fields, locals, and parameters.
     Set<String> choices = <String>{};
     for (int i = 0; i < globalVars.length; i++) {
@@ -852,7 +883,9 @@ class DartFuzz {
     }
     // Then pick one.
     assert(choices.isNotEmpty);
-    emit('${choices.elementAt(rand.nextInt(choices.length))}');
+    final emittedVar = '${choices.elementAt(rand.nextInt(choices.length))}';
+    emit(emittedVar);
+    return emittedVar;
   }
 
   void emitSubscriptedVar(int depth, DartType tp, {bool isLhs = false}) {
@@ -1279,9 +1312,9 @@ class DartFuzz {
     return list;
   }
 
-  List<List<DartType>> fillTypes2({bool isFfi = false}) {
+  List<List<DartType>> fillTypes2({bool isFfi = false, int limit = 4}) {
     final list = <List<DartType>>[];
-    for (int i = 0, n = 1 + rand.nextInt(4); i < n; i++) {
+    for (int i = 0, n = 1 + rand.nextInt(limit); i < n; i++) {
       list.add(fillTypes1(isFfi: isFfi));
     }
     return list;

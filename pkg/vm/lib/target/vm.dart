@@ -79,6 +79,11 @@ class VmTarget extends Target {
         'dart:wasm',
       ];
 
+  @override
+  List<String> get extraRequiredLibrariesPlatform => const <String>[
+        'dart:profiler',
+      ];
+
   void _patchVmConstants(CoreTypes coreTypes) {
     // Fix Endian.host to be a const field equal to Endian.little instead of
     // a final field. VM does not support big-endian architectures at the

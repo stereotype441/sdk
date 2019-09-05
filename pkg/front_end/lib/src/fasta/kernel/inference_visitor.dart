@@ -1709,8 +1709,14 @@ class InferenceVisitor
           replacement = inferrer.helper.forest.createStaticInvocation(
               node.fileOffset,
               writeTarget.member,
-              inferrer.helper.forest.createArguments(
-                  node.fileOffset, [node.receiver, node.rhs])));
+              inferrer.helper.forest.createArgumentsForExtensionMethod(
+                  node.fileOffset,
+                  writeTarget.inferredExtensionTypeArguments.length,
+                  0,
+                  node.receiver,
+                  extensionTypeArguments:
+                      writeTarget.inferredExtensionTypeArguments,
+                  positionalArguments: [node.rhs])));
       inferrer.storeInferredType(replacement, inferredType);
     } else {
       node._replaceWithDesugared();

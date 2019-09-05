@@ -44,4 +44,9 @@ class FlutterRunnerTarget extends VmTarget {
         'dart:vmservice_io',
         'dart:ui',
       ];
+
+  @override
+  List<String> get extraRequiredLibrariesPlatform => const <String>[
+        'dart:profiler',
+      ];
 }

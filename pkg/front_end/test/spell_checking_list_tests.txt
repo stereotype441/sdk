@@ -38,6 +38,7 @@ benchmark
 besides
 beta
 bigger
+blacklist
 blah
 blindly
 blocked
@@ -203,6 +204,7 @@ isolate
 isolates
 iter
 jumped
+kernels
 ko
 la
 lc
@@ -222,6 +224,7 @@ mac
 maker
 matters
 mc
+mds
 measured
 met
 metric
@@ -270,8 +273,11 @@ pubspec
 pv
 px
 py
+python
 quot
+r"
 r"\s
+r"k
 rd
 reachability
 reality
@@ -320,6 +326,7 @@ strongest
 stub's
 stupid
 subcommand
+subdir
 subtool
 subtools
 suite
@@ -357,6 +364,7 @@ untransformed
 untrimmed
 uppercase
 upward
+uses8
 usual
 val
 vars

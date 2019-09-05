@@ -1910,10 +1910,7 @@ class Definition : public Instruction {
   explicit Definition(intptr_t deopt_id = DeoptId::kNone);
 
   // Overridden by definitions that have call counts.
-  virtual intptr_t CallCount() const {
-    UNREACHABLE();
-    return -1;
-  }
+  virtual intptr_t CallCount() const { return -1; }
 
   intptr_t temp_index() const { return temp_index_; }
   void set_temp_index(intptr_t index) { temp_index_ = index; }
@@ -3441,6 +3438,7 @@ class ClosureCallInstr : public TemplateDartCall<1> {
   Code::EntryKind entry_kind() const { return entry_kind_; }
 
   PRINT_OPERANDS_TO_SUPPORT
+  ADD_EXTRA_INFO_TO_S_EXPRESSION_SUPPORT
 
  private:
   const Code::EntryKind entry_kind_;
@@ -4110,6 +4108,7 @@ class StaticCallInstr : public TemplateDartCall<0> {
 
   PRINT_OPERANDS_TO_SUPPORT
   ADD_OPERANDS_TO_S_EXPRESSION_SUPPORT
+  ADD_EXTRA_INFO_TO_S_EXPRESSION_SUPPORT
 
  private:
   const ICData* ic_data_;
@@ -4191,10 +4190,7 @@ class DropTempsInstr : public Definition {
     return false;
   }
 
-  virtual bool MayThrow() const {
-    UNREACHABLE();
-    return false;
-  }
+  virtual bool MayThrow() const { return false; }
 
   virtual TokenPosition token_pos() const { return TokenPosition::kTempMove; }
 
@@ -4239,10 +4235,7 @@ class MakeTempInstr : public TemplateDefinition<0, NoThrow, Pure> {
     return false;
   }
 
-  virtual bool MayThrow() const {
-    UNREACHABLE();
-    return false;
-  }
+  virtual bool MayThrow() const { return false; }
 
   virtual TokenPosition token_pos() const { return TokenPosition::kTempMove; }
 
@@ -7642,8 +7635,9 @@ class CheckNullInstr : public TemplateDefinition<1, Throws, Pure> {
   virtual bool RecomputeType();
 
   // CheckNull can implicitly call Dart code (NoSuchMethodError constructor),
-  // so it can lazily deopt.
+  // so it needs a deopt ID in optimized and unoptimized code.
   virtual bool ComputeCanDeoptimize() const { return true; }
+  virtual bool CanBecomeDeoptimizationTarget() const { return true; }
 
   virtual Definition* Canonicalize(FlowGraph* flow_graph);
 
