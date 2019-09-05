@@ -12,75 +12,139 @@ doLoop(Object a, Object b, Object c) {
     if (a is int) a;
     if (b is int) b;
     if (c is int) /*int*/ c;
-    f(0, () { a = ''; });
-  } while (f(true, () { b = ''; }));
-  f(0, () { c = ''; });
+    f(0, () {
+      a = '';
+    });
+  } while (f(true, () {
+    b = '';
+  }));
+  f(0, () {
+    c = '';
+  });
 }
 
 forLoop(Object a, Object b, Object c, Object d, Object e) {
-  for(var x = f(0, () { a = ''; }); f(true, () { b = ''; }); f(0, () { c = ''; })) {
+  for (var x = f(0, () {
+    a = '';
+  });
+      f(true, () {
+    b = '';
+  });
+      f(0, () {
+    c = '';
+  })) {
     if (a is int) a;
     if (b is int) b;
     if (c is int) c;
     if (d is int) d;
     if (e is int) /*int*/ e;
-    f(0, () { d = ''; });
+    f(0, () {
+      d = '';
+    });
   }
-  f(0, () { e = ''; });
+  f(0, () {
+    e = '';
+  });
 }
 
 forEachLoop(Object a, Object b, Object c) {
-  for(var x in f([], () { a = ''; })) {
+  for (var x in f([], () {
+    a = '';
+  })) {
     if (a is int) a;
     if (b is int) b;
     if (c is int) /*int*/ c;
-    f(0, () { b = ''; });
+    f(0, () {
+      b = '';
+    });
   }
-  f(0, () { c = ''; });
+  f(0, () {
+    c = '';
+  });
 }
 
 forElement(Object a, Object b, Object c, Object d, Object e) {
-  [for(var x = f(0, () { a = ''; }); f(true, () { b = ''; }); f(0, () { c = ''; })) [
-    a is int ? a : null,
-    b is int ? b : null,
-    c is int ? c : null,
-    d is int ? d : null,
-    e is int ? /*int*/ e : null,
-    f(0, () { d = ''; })]];
-  f(0, () { e = ''; });
+  [
+    for (var x = f(0, () {
+      a = '';
+    });
+        f(true, () {
+      b = '';
+    });
+        f(0, () {
+      c = '';
+    }))
+      [
+        a is int ? a : null,
+        b is int ? b : null,
+        c is int ? c : null,
+        d is int ? d : null,
+        e is int ? /*int*/ e : null,
+        f(0, () {
+          d = '';
+        })
+      ]
+  ];
+  f(0, () {
+    e = '';
+  });
 }
 
 forEachElement(Object a, Object b, Object c) {
-  [for(var x in () { a = ''; return []; }()) [
-    a is int ? a : null,
-    b is int ? b : null,
-    c is int ? /*int*/ c : null,
-    f(0, () { b = ''; })]];
-  f(0, () { c = ''; });
+  [
+    for (var x in () {
+      a = '';
+      return [];
+    }())
+      [
+        a is int ? a : null,
+        b is int ? b : null,
+        c is int ? /*int*/ c : null,
+        f(0, () {
+          b = '';
+        })
+      ]
+  ];
+  f(0, () {
+    c = '';
+  });
 }
 
 switchWithoutLabels(Object a, Object b, Object c) {
-  switch (f(0, () { a = ''; })) {
+  switch (f(0, () {
+    a = '';
+  })) {
     case 0:
       if (a is int) a;
       if (b is int) /*int*/ b;
       if (c is int) /*int*/ c;
-      f(0, () { b = ''; });
+      f(0, () {
+        b = '';
+      });
       break;
   }
-  f(0, () { c = ''; });
+  f(0, () {
+    c = '';
+  });
 }
 
 switchWithLabels(Object a, Object b, Object c) {
-  switch (f(0, () { a = ''; })) {
-    L: case 0:
+  switch (f(0, () {
+    a = '';
+  })) {
+    L:
+    case 0:
       if (a is int) a;
       if (b is int) b;
       if (c is int) /*int*/ c;
-      f(0, () { b = ''; });
+      f(0, () {
+        b = '';
+      });
       break;
   }
-  f(0, () { c = ''; });
+  f(0, () {
+    c = '';
+  });
 }
 
 tryCatch(Object a, Object b, Object c) {
@@ -88,18 +152,24 @@ tryCatch(Object a, Object b, Object c) {
     if (a is int) /*int*/ a;
     if (b is int) /*int*/ b;
     if (c is int) /*int*/ c;
-    f(0, () { a = ''; });
+    f(0, () {
+      a = '';
+    });
     return;
   } catch (_) {
     if (a is int) a;
     if (b is int) /*int*/ b;
     if (c is int) /*int*/ c;
-    f(0, () { b = ''; });
+    f(0, () {
+      b = '';
+    });
   }
   if (a is int) a;
   if (b is int) b;
   if (c is int) /*int*/ c;
-  f(0, () { c = ''; });
+  f(0, () {
+    c = '';
+  });
 }
 
 tryFinally(Object a, Object b, Object c) {
@@ -107,27 +177,39 @@ tryFinally(Object a, Object b, Object c) {
     if (a is int) /*int*/ a;
     if (b is int) /*int*/ b;
     if (c is int) /*int*/ c;
-    f(0, () { a = ''; });
+    f(0, () {
+      a = '';
+    });
   } finally {
     if (a is int) a;
     if (b is int) /*int*/ b;
     if (c is int) /*int*/ c;
-    f(0, () { b = ''; });
+    f(0, () {
+      b = '';
+    });
   }
   if (a is int) a;
   if (b is int) b;
   if (c is int) /*int*/ c;
-  f(0, () { c = ''; });
+  f(0, () {
+    c = '';
+  });
 }
 
 whileLoop(Object a, Object b, Object c) {
-  while (f(true, () { a = ''; })) {
+  while (f(true, () {
+    a = '';
+  })) {
     if (a is int) a;
     if (b is int) b;
     if (c is int) /*int*/ c;
-    f(0, () { b = ''; });
+    f(0, () {
+      b = '';
+    });
   }
-  f(0, () { c = ''; });
+  f(0, () {
+    c = '';
+  });
 }
 
 localFunction(Object a, Object b, Object c) {
@@ -144,6 +226,7 @@ localFunction(Object a, Object b, Object c) {
     if (b is int) /*int*/ b;
     if (c is int) c;
   }
+
   b = '';
   /*int*/ a;
   b;
@@ -157,6 +240,7 @@ localFunction(Object a, Object b, Object c) {
     if (c is int) c;
     c = '';
   }
+
   /*int*/ a;
   b;
   c;
