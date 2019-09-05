@@ -78,12 +78,20 @@ class AlreadyMigratedCodeDecorator {
     }
   }
 
-  Iterable<DecoratedType> getAllSupertypes(ClassElement class_) {
-    var allSupertypes = class_.allSupertypes;
+  /// Get all the decorated immediate supertypes of the non-migrated class
+  /// [class_].
+  Iterable<DecoratedType> getImmediateSupertypes(ClassElement class_) {
+    var allSupertypes = <DartType>[];
+    var supertype = class_.supertype;
+    if (supertype != null) {
+      allSupertypes.add(supertype);
+    }
+    allSupertypes.addAll(class_.superclassConstraints);
+    allSupertypes.addAll(class_.interfaces);
+    allSupertypes.addAll(class_.mixins);
     var type = class_.type;
     if (type.isDartAsyncFuture) {
       // Add FutureOr<T> as a supertype of Future<T>.
-      allSupertypes = allSupertypes.toList();
       allSupertypes
           .add(_typeProvider.futureOrType.instantiate(type.typeArguments));
     }

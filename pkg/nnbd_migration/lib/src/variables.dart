@@ -248,7 +248,7 @@ class Variables implements VariableRecorder, VariableRepository {
   Map<ClassElement, DecoratedType> _decorateDirectSupertypes(
       ClassElement class_) {
     var result = <ClassElement, DecoratedType>{};
-    for (var decoratedSupertype in _alreadyMigratedCodeDecorator.getAllSupertypes(class_)) {
+    for (var decoratedSupertype in _alreadyMigratedCodeDecorator.getImmediateSupertypes(class_)) {
       assert(identical(decoratedSupertype.node, _graph.never));
       var class_ = (decoratedSupertype.type as InterfaceType).element;
       if (class_ is ClassElementHandle) {
