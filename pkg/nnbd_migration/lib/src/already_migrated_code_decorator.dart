@@ -2,6 +2,7 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/generated/resolver.dart';
@@ -75,5 +76,17 @@ class AlreadyMigratedCodeDecorator {
       throw UnimplementedError(
           'Unable to decorate already-migrated type $type');
     }
+  }
+
+  Iterable<DecoratedType> getAllSupertypes(ClassElement class_) {
+    var allSupertypes = class_.allSupertypes;
+    var type = class_.type;
+    if (type.isDartAsyncFuture) {
+      // Add FutureOr<T> as a supertype of Future<T>.
+      allSupertypes = allSupertypes.toList();
+      allSupertypes
+          .add(_typeProvider.futureOrType.instantiate(type.typeArguments));
+    }
+    return allSupertypes.map(decorate);
   }
 }
