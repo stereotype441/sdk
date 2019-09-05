@@ -1749,6 +1749,18 @@ int/*2*/ g() {
             hard: false));
   }
 
+  test_genericMethodInvocation_withSubstitution() async {
+    await analyze('''
+class Base<T> {
+  U foo<U>(U x, T y) => x;
+}
+class Derived<V> extends Base<List<V>> {}
+int bar(Derived<String> d, int i, List<String> j) => d.foo(i, j);
+''');
+    graph.debugDump();
+    fail('TODO(paulberry)');
+  }
+
   test_genericMethodInvocation() async {
     await analyze('''
 class Base {
