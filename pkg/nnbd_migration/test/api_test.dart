@@ -821,18 +821,6 @@ int f(int i) {
     await _checkSingleFileChanges(content, expected);
   }
 
-  solo_test_foo() async {
-    var content = '''
-f(List<int> x) => x.map((y) => g(y));
-g(int x) => x + 1;
-main() {
-  f([null]);
-}
-''';
-    var expected = 'TODO(paulberry)';
-    await _checkSingleFileChanges(content, expected);
-  }
-
   test_dynamic_method_call() async {
     var content = '''
 class C {
@@ -1567,6 +1555,42 @@ int? f() => null;
 void main() {
   var x = 1;
   x = f()!;
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_map_nullable_input() async {
+    var content = '''
+Iterable<int> f(List<int> x) => x.map((y) => g(y));
+int g(int x) => x + 1;
+main() {
+  f([null]);
+}
+''';
+    var expected = '''
+Iterable<int> f(List<int?> x) => x.map((y) => g(y)!);
+int g(int x) => x + 1;
+main() {
+  f([null]);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_map_nullable_output() async {
+    var content = '''
+Iterable<int> f(List<int> x) => x.map((y) => g(y));
+int g(int x) => null;
+main() {
+  f([1]);
+}
+''';
+    var expected = '''
+Iterable<int?> f(List<int> x) => x.map((y) => g(y));
+int? g(int x) => null;
+main() {
+  f([1]);
 }
 ''';
     await _checkSingleFileChanges(content, expected);
