@@ -34,7 +34,6 @@ void f() {
   try {} on String catch (ex, st) {}
 }
 ''');
-    // TODO(paulberry): test this in api_test.dart to make sure no ? is added
     var exceptionType =
         variables.decoratedElementType(findNode.simple('ex').staticElement);
     expect(exceptionType.node, TypeMatcher<NullabilityNodeMutable>());
@@ -65,7 +64,6 @@ void f() {
 ''');
     // No assertions, since no variables are declared; we just want to make sure
     // we don't crash.
-    // TODO(paulberry): test this in api_test.dart to make sure no ? is added
   }
 
   test_catch_clause_without_stacktrace_with_on() async {
@@ -74,7 +72,6 @@ void f() {
   try {} on String catch (ex) {}
 }
 ''');
-    // TODO(paulberry): test this in api_test.dart to make sure no ? is added
     var exceptionType =
         variables.decoratedElementType(findNode.simple('ex').staticElement);
     expect(exceptionType.node, TypeMatcher<NullabilityNodeMutable>());
