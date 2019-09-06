@@ -269,17 +269,17 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   DecoratedType visitAssignmentExpression(AssignmentExpression node) {
-    MethodElement compoundOperator;
+    _CompoundOperatorInfo compoundOperatorInfo;
     if (node.operator.type == TokenType.QUESTION_QUESTION_EQ) {
       _unimplemented(node, 'Assignment with operator ??=');
-    }
-    else if (node.operator.type != TokenType.EQ) {
-      compoundOperator = node.staticElement;
+    } else if (node.operator.type != TokenType.EQ) {
+      compoundOperatorInfo = _CompoundOperatorInfo(
+          node.staticElement, node.operator.offset, node.staticType);
     }
     _postDominatedLocals.removeReferenceFromAllScopes(node.leftHandSide);
     var expressionType = _handleAssignment(node.rightHandSide,
-        destinationExpression: node.leftHandSide, compoundOperator: compoundOperator,
-    compoundAssignmentOffset: node.operator.offset);
+        destinationExpression: node.leftHandSide,
+        compoundOperatorInfo: compoundOperatorInfo);
     var conditionalNode = _conditionalNodes[node.leftHandSide];
     if (conditionalNode != null) {
       expressionType = expressionType.withNode(
@@ -1484,7 +1484,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   DecoratedType _handleAssignment(Expression expression,
       {DecoratedType destinationType,
       Expression destinationExpression,
-        MethodElement compoundOperator, int compoundAssignmentOffset,
+      _CompoundOperatorInfo compoundOperatorInfo,
       bool canInsertChecks = true}) {
     assert(
         (destinationExpression == null) != (destinationType == null),
@@ -1514,24 +1514,46 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       expressionChecks = ExpressionChecks(expression.end);
       _variables.recordExpressionChecks(source, expression, expressionChecks);
     }
-    if (destinationExpression != null && compoundOperator != null) {
-      // TODO(paulberry): test hardness
-      _checkAssignment(CompoundAssignmentOrigin(source, compoundAssignmentOffset), source: destinationType, destination: _notNullType, hard: _postDominatedLocals.isReferenceInScope(destinationExpression));
-      assert(!(compoundOperator is ClassMemberElement &&
-          (compoundOperator.enclosingElement as ClassElement)
-              .typeParameters
-              .isNotEmpty)); // TODO(paulberry)
-      var calleeType = getOrComputeElementType(compoundOperator);
-      // TODO(paulberry): test substitution
-      assert(calleeType.positionalParameters.length > 0);
-      _checkAssignment(expressionChecks, source: sourceType,
-          destination: calleeType.positionalParameters[0]);
-      sourceType = _fixNumericTypes(calleeType.returnType, node.staticType);
+    DecoratedType compoundOperatorType;
+    if (destinationExpression != null && compoundOperatorInfo != null) {
+      var compoundOperatorMethod = compoundOperatorInfo.method;
+      if (compoundOperatorMethod != null) {
+        // TODO(paulberry): test hardness
+        _checkAssignment(
+            CompoundAssignmentOrigin(source, compoundOperatorInfo.offset),
+            source: destinationType,
+            destination: _notNullType,
+            hard:
+                _postDominatedLocals.isReferenceInScope(destinationExpression));
+        assert(!(compoundOperatorInfo.method is ClassMemberElement &&
+            (compoundOperatorInfo.method.enclosingElement as ClassElement)
+                .typeParameters
+                .isNotEmpty)); // TODO(paulberry)
+        compoundOperatorType = getOrComputeElementType(compoundOperatorMethod);
+        // TODO(paulberry): test substitution
+        assert(compoundOperatorType.positionalParameters.length > 0);
+      }
+      _checkAssignment(expressionChecks,
+          source: sourceType,
+          destination: compoundOperatorType.positionalParameters[0],
+          hard: _postDominatedLocals.isReferenceInScope(expression));
+      if (compoundOperatorType != null) {
+        sourceType = _fixNumericTypes(compoundOperatorType.returnType,
+            compoundOperatorInfo.undecoratedType);
+        _checkAssignment(
+            CompoundAssignmentOrigin(source, compoundOperatorInfo.offset),
+            source: sourceType,
+            destination: compoundOperatorType.positionalParameters[0],
+            hard: false);
+      } else {
+        sourceType = _dynamicType;
+      }
+    } else {
+      _checkAssignment(expressionChecks,
+          source: sourceType,
+          destination: destinationType,
+          hard: _postDominatedLocals.isReferenceInScope(expression));
     }
-    _checkAssignment(expressionChecks,
-        source: sourceType,
-        destination: destinationType,
-        hard: _postDominatedLocals.isReferenceInScope(expression));
     if (destinationLocalVariable != null) {
       _flowAnalysis.write(destinationLocalVariable);
     }
@@ -2083,6 +2105,14 @@ mixin _AssignmentChecker {
 
   /// Given a [type] representing a type parameter, retrieves the type's bound.
   DecoratedType _getTypeParameterTypeBound(DecoratedType type);
+}
+
+class _CompoundOperatorInfo {
+  final MethodElement method;
+  final int offset;
+  final DartType undecoratedType;
+
+  _CompoundOperatorInfo(this.method, this.offset, this.undecoratedType);
 }
 
 /// Information about a binary expression whose boolean value could possibly
