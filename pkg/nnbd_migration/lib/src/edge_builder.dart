@@ -2,6 +2,7 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
@@ -118,6 +119,9 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   /// For convenience, a [DecoratedType] representing non-nullable `bool`.
   final DecoratedType _nonNullableBoolType;
 
+  /// For convenience, a [DecoratedType] representing non-nullable `int`.
+  final DecoratedType _nonNullableIntType;
+
   /// For convenience, a [DecoratedType] representing non-nullable `Type`.
   final DecoratedType _nonNullableTypeType;
 
@@ -185,6 +189,9 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   List<String> _objectGetNames;
 
+  /// The feature set of the current compilation unit.
+  FeatureSet _featureSet;
+
   EdgeBuilder(this._typeProvider, this._typeSystem, this._variables,
       this._graph, this.source, this.listener)
       : _decoratedClassHierarchy = DecoratedClassHierarchy(_variables, _graph),
@@ -192,6 +199,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         _notNullType = DecoratedType(_typeProvider.objectType, _graph.never),
         _nonNullableBoolType =
             DecoratedType(_typeProvider.boolType, _graph.never),
+        _nonNullableIntType =
+            DecoratedType(_typeProvider.intType, _graph.never),
         _nonNullableTypeType =
             DecoratedType(_typeProvider.typeType, _graph.never),
         _nullType = DecoratedType(_typeProvider.nullType, _graph.always),
@@ -356,7 +365,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       _variables.recordDecoratedExpressionType(node, expressionType);
       return expressionType;
     } else if (operatorType.isUserDefinableOperator) {
-      _checkExpressionNotNull(node.leftOperand);
+      var leftType = _checkExpressionNotNull(node.leftOperand);
       var callee = node.staticElement;
       assert(!(callee is ClassMemberElement &&
           (callee.enclosingElement as ClassElement)
@@ -366,9 +375,10 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       var calleeType = getOrComputeElementType(callee);
       // TODO(paulberry): substitute if necessary
       assert(calleeType.positionalParameters.length > 0); // TODO(paulberry)
-      _handleAssignment(node.rightOperand,
+      var rightType = _handleAssignment(node.rightOperand,
           destinationType: calleeType.positionalParameters[0]);
-      return _fixNumericTypes(calleeType.returnType, node.staticType);
+      return _fixNumericTypes(
+          leftType, operatorType, rightType, calleeType.returnType);
     } else {
       // TODO(paulberry)
       node.leftOperand.accept(this);
@@ -459,6 +469,12 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   DecoratedType visitComment(Comment node) {
     // Ignore comments.
     return null;
+  }
+
+  @override
+  DecoratedType visitCompilationUnit(CompilationUnit node) {
+    _featureSet = node.featureSet;
+    return super.visitCompilationUnit(node);
   }
 
   @override
@@ -934,7 +950,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     var operatorType = node.operator.type;
     if (operatorType == TokenType.PLUS_PLUS ||
         operatorType == TokenType.MINUS_MINUS) {
-      _checkExpressionNotNull(node.operand);
+      var operandType = _checkExpressionNotNull(node.operand);
       var callee = node.staticElement;
       if (callee is ClassMemberElement &&
           (callee.enclosingElement as ClassElement).typeParameters.isNotEmpty) {
@@ -948,7 +964,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       }
       var calleeType = getOrComputeElementType(callee);
       // TODO(paulberry): substitute if necessary
-      return _fixNumericTypes(calleeType.returnType, node.staticType);
+      return _fixNumericTypes(operandType, operatorType, _nonNullableIntType,
+          calleeType.returnType);
     }
     _unimplemented(
         node, 'Postfix expression with operator ${node.operator.lexeme}');
@@ -986,7 +1003,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       }
       var calleeType = getOrComputeElementType(callee);
       // TODO(paulberry): substitute if necessary
-      return _fixNumericTypes(calleeType.returnType, node.staticType);
+      return _fixNumericTypes(
+          targetType, operatorType, _nonNullableIntType, calleeType.returnType);
     } else {
       var callee = node.staticElement;
       var calleeType = getOrComputeElementType(callee, targetType: targetType);
@@ -1450,15 +1468,19 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     _unimplemented(astNode, '_decorateUpperOrLowerBound');
   }
 
-  DecoratedType _fixNumericTypes(
-      DecoratedType decoratedType, DartType undecoratedType) {
-    if (decoratedType.type.isDartCoreNum && undecoratedType.isDartCoreInt) {
-      // In a few cases the type computed by normal method lookup is `num`,
-      // but special rules kick in to cause the type to be `int` instead.  If
-      // that is the case, we need to fix up the decorated type.
-      return DecoratedType(undecoratedType, decoratedType.node);
+  DecoratedType _fixNumericTypes(DecoratedType leftType, TokenType operator,
+      DecoratedType rightType, DecoratedType currentType) {
+    if (operator == TokenType.PLUS_PLUS) {
+      operator = TokenType.PLUS;
+    } else if (operator == TokenType.MINUS_MINUS) {
+      operator = TokenType.MINUS;
+    }
+    var refinedType = _typeSystem.refineBinaryExpressionType(
+        leftType.type, operator, rightType.type, currentType.type, _featureSet);
+    if (refinedType == currentType.type) {
+      return currentType;
     } else {
-      return decoratedType;
+      return DecoratedType(refinedType, currentType.node);
     }
   }
 
