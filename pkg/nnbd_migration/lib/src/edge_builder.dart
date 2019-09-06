@@ -276,7 +276,6 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       compoundOperatorInfo = _CompoundOperatorInfo(
           node.staticElement, node.operator.offset, node.staticType);
     }
-    _postDominatedLocals.removeReferenceFromAllScopes(node.leftHandSide);
     var expressionType = _handleAssignment(node.rightHandSide,
         destinationExpression: node.leftHandSide,
         compoundOperatorInfo: compoundOperatorInfo);
@@ -1553,6 +1552,9 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
           source: sourceType,
           destination: destinationType,
           hard: _postDominatedLocals.isReferenceInScope(expression));
+    }
+    if (destinationExpression != null) {
+      _postDominatedLocals.removeReferenceFromAllScopes(destinationExpression);
     }
     if (destinationLocalVariable != null) {
       _flowAnalysis.write(destinationLocalVariable);
