@@ -1520,6 +1520,66 @@ class C {
         decoratedTypeAnnotation('int i').node);
   }
 
+  test_for_element_list() async {
+    await analyze('''
+void f(List<int> ints) {
+  <int>[for(int i in ints) i];
+}
+''');
+
+    assertNullCheck(
+        checkExpression('ints) i'),
+        assertEdge(decoratedTypeAnnotation('List<int> ints').node, never,
+            hard: true));
+    assertEdge(decoratedTypeAnnotation('int i').node,
+        decoratedTypeAnnotation('int>[').node,
+        hard: false);
+  }
+
+  test_for_element_map() async {
+    await analyze('''
+void f(List<String> strs, List<int> ints) {
+  <String, int>{
+    for (String s in strs)
+      for (int i in ints)
+        s: i,
+  };
+}
+''');
+
+    assertNullCheck(
+        checkExpression('strs)\n'),
+        assertEdge(decoratedTypeAnnotation('List<String> strs').node, never,
+            hard: true));
+    assertNullCheck(
+        checkExpression('ints)\n'),
+        assertEdge(decoratedTypeAnnotation('List<int> ints').node, never,
+            hard: false));
+
+    var keyTypeNode = decoratedTypeAnnotation('String, int>{').node;
+    var valueTypeNode = decoratedTypeAnnotation('int>{').node;
+    assertEdge(decoratedTypeAnnotation('String s').node, keyTypeNode,
+        hard: false);
+    assertEdge(decoratedTypeAnnotation('int i').node, valueTypeNode,
+        hard: false);
+  }
+
+  test_for_element_set() async {
+    await analyze('''
+void f(List<int> ints) {
+  <int>{for(int i in ints) i};
+}
+''');
+
+    assertNullCheck(
+        checkExpression('ints) i'),
+        assertEdge(decoratedTypeAnnotation('List<int> ints').node, never,
+            hard: true));
+    assertEdge(decoratedTypeAnnotation('int i').node,
+        decoratedTypeAnnotation('int>{').node,
+        hard: false);
+  }
+
   test_for_with_declaration() async {
     await analyze('''
 main() {
@@ -1887,25 +1947,6 @@ void f(bool b, int i, int j) {
     assertEdge(decoratedTypeAnnotation('int j').node, never, hard: true);
   }
 
-  test_if_element() async {
-    await analyze('''
-void f(bool b) {
-  int i1 = null;
-  int i2 = null;
-  <int>[if (b) i1 else i2];
-}
-''');
-
-    assertNullCheck(checkExpression('b) i1'),
-        assertEdge(decoratedTypeAnnotation('bool b').node, never, hard: true));
-    assertEdge(decoratedTypeAnnotation('int i1').node,
-        decoratedTypeAnnotation('int>[').node,
-        hard: false);
-    assertEdge(decoratedTypeAnnotation('int i2').node,
-        decoratedTypeAnnotation('int>[').node,
-        hard: false);
-  }
-
   @failingTest
   test_if_element_guard_equals_null() async {
     // failing because of an unimplemented exception in conditional modification
@@ -1928,6 +1969,51 @@ dynamic f(int i, int j, int k) {
     expect(discard.trueGuard, same(nullable_i));
     expect(discard.falseGuard, null);
     expect(discard.pureCondition, true);
+  }
+
+  test_if_element_list() async {
+    await analyze('''
+void f(bool b) {
+  int i1 = null;
+  int i2 = null;
+  <int>[if (b) i1 else i2];
+}
+''');
+
+    assertNullCheck(checkExpression('b) i1'),
+        assertEdge(decoratedTypeAnnotation('bool b').node, never, hard: true));
+    assertEdge(decoratedTypeAnnotation('int i1').node,
+        decoratedTypeAnnotation('int>[').node,
+        hard: false);
+    assertEdge(decoratedTypeAnnotation('int i2').node,
+        decoratedTypeAnnotation('int>[').node,
+        hard: false);
+  }
+
+  test_if_element_map() async {
+    await analyze('''
+void f(bool b) {
+  int i1 = null;
+  int i2 = null;
+  String s1 = null;
+  String s2 = null;
+  <String, int>{if (b) s1: i1 else s2: i2};
+}
+''');
+
+    assertNullCheck(checkExpression('b) s1'),
+        assertEdge(decoratedTypeAnnotation('bool b').node, never, hard: true));
+
+    var keyTypeNode = decoratedTypeAnnotation('String, int>{').node;
+    var valueTypeNode = decoratedTypeAnnotation('int>{').node;
+    assertEdge(decoratedTypeAnnotation('String s1').node, keyTypeNode,
+        hard: false);
+    assertEdge(decoratedTypeAnnotation('String s2').node, keyTypeNode,
+        hard: false);
+    assertEdge(decoratedTypeAnnotation('int i1').node, valueTypeNode,
+        hard: false);
+    assertEdge(decoratedTypeAnnotation('int i2').node, valueTypeNode,
+        hard: false);
   }
 
   test_if_element_nested() async {
@@ -1954,6 +2040,25 @@ void f(bool b1, bool b2) {
         hard: false);
     assertEdge(decoratedTypeAnnotation('int i3').node,
         decoratedTypeAnnotation('int>[').node,
+        hard: false);
+  }
+
+  test_if_element_set() async {
+    await analyze('''
+void f(bool b) {
+  int i1 = null;
+  int i2 = null;
+  <int>{if (b) i1 else i2};
+}
+''');
+
+    assertNullCheck(checkExpression('b) i1'),
+        assertEdge(decoratedTypeAnnotation('bool b').node, never, hard: true));
+    assertEdge(decoratedTypeAnnotation('int i1').node,
+        decoratedTypeAnnotation('int>{').node,
+        hard: false);
+    assertEdge(decoratedTypeAnnotation('int i2').node,
+        decoratedTypeAnnotation('int>{').node,
         hard: false);
   }
 
@@ -4155,6 +4260,16 @@ int f() => null;
     assertEdge(always, decoratedTypeAnnotation('int').node, hard: false);
   }
 
+  test_static_method_call_prefixed() async {
+    await analyze('''
+import 'dart:async' as a;
+void f(void Function() callback) {
+  a.Timer.run(callback);
+}
+''');
+    // No assertions.  Just making sure this doesn't crash.
+  }
+
   test_stringLiteral() async {
     // TODO(paulberry): also test string interpolations
     await analyze('''
@@ -4308,6 +4423,14 @@ Type f() {
 }
 ''');
     assertNoUpstreamNullability(decoratedTypeAnnotation('Type').node);
+  }
+
+  test_typeName_prefixed() async {
+    await analyze('''
+import 'dart:async' as a;
+Type f() => a.Future;
+''');
+    assertEdge(never, decoratedTypeAnnotation('Type').node, hard: false);
   }
 
   test_typeName_union_with_bound() async {
