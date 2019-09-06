@@ -1592,7 +1592,10 @@ void main() {
     await _checkSingleFileChanges(content, expected);
   }
 
+  @failingTest
   test_map_nullable_input() async {
+    // TODO(paulberry): we're currently migrating this example incorrectly.
+    // See discussion at https://dart-review.googlesource.com/c/sdk/+/115766
     var content = '''
 Iterable<int> f(List<int> x) => x.map((y) => g(y));
 int g(int x) => x + 1;
@@ -1601,7 +1604,7 @@ main() {
 }
 ''';
     var expected = '''
-Iterable<int> f(List<int?> x) => x.map((y) => g(y)!);
+Iterable<int> f(List<int?> x) => x.map((y) => g(y!));
 int g(int x) => x + 1;
 main() {
   f([null]);
