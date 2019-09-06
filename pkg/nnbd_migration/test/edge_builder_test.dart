@@ -352,35 +352,6 @@ class EdgeBuilderTest extends EdgeBuilderTestBase {
     return variables.decoratedExpressionType(findNode.expression(text));
   }
 
-  solo_test_assignmentExpression_compound_simple() async {
-    var code = '''
-abstract class C {
-  C operator+(C x);
-}
-void f(C y, C z) {
-  y += z;
-}
-''';
-    await analyze(code);
-    var targetEdge =
-        assertEdge(decoratedTypeAnnotation('C y').node, never, hard: true);
-    expect((targetEdge.origin as CompoundAssignmentOrigin).offset,
-        code.indexOf('+='));
-    assertNullCheck(
-        checkExpression('z;'),
-        assertEdge(decoratedTypeAnnotation('C z').node,
-            decoratedTypeAnnotation('C x').node,
-            hard: true));
-    var returnEdge = assertEdge(decoratedTypeAnnotation('C operator').node,
-        decoratedTypeAnnotation('C y').node,
-        hard: false);
-    expect((returnEdge.origin as CompoundAssignmentOrigin).offset,
-        code.indexOf('+='));
-    // TODO(paulberry): test in api_test that no stray ! gets generated for y
-    // TODO(paulberry): test a complex example involving a return type with a
-    // nullable type param
-  }
-
   test_assert_demonstrates_non_null_intent() async {
     await analyze('''
 void f(int i) {
@@ -541,6 +512,58 @@ void g(List<int> x) {
     assertEdge(substitutionNode(listInt.typeArguments[0].node, never),
         iterableInt.typeArguments[0].node,
         hard: false);
+  }
+
+  test_assignmentExpression_compound_simple() async {
+    var code = '''
+abstract class C {
+  C operator+(C x);
+}
+void f(C y, C z) {
+  y += z;
+}
+''';
+    await analyze(code);
+    var targetEdge =
+        assertEdge(decoratedTypeAnnotation('C y').node, never, hard: true);
+    expect((targetEdge.origin as CompoundAssignmentOrigin).offset,
+        code.indexOf('+='));
+    assertNullCheck(
+        checkExpression('z;'),
+        assertEdge(decoratedTypeAnnotation('C z').node,
+            decoratedTypeAnnotation('C x').node,
+            hard: true));
+    var returnEdge = assertEdge(decoratedTypeAnnotation('C operator').node,
+        decoratedTypeAnnotation('C y').node,
+        hard: false);
+    expect((returnEdge.origin as CompoundAssignmentOrigin).offset,
+        code.indexOf('+='));
+  }
+
+  test_assignmentExpression_compound_withSubstitution() async {
+    var code = '''
+abstract class C<T> {
+  C<T> operator+(C<T> x);
+}
+void f(C<int> y, C<int> z) {
+  y += z;
+}
+''';
+    await analyze(code);
+    var targetEdge =
+        assertEdge(decoratedTypeAnnotation('C<int> y').node, never, hard: true);
+    expect((targetEdge.origin as CompoundAssignmentOrigin).offset,
+        code.indexOf('+='));
+    assertNullCheck(
+        checkExpression('z;'),
+        assertEdge(decoratedTypeAnnotation('C<int> z').node,
+            decoratedTypeAnnotation('C<T> x').node,
+            hard: true));
+    var returnEdge = assertEdge(decoratedTypeAnnotation('C<T> operator').node,
+        decoratedTypeAnnotation('C<int> y').node,
+        hard: false);
+    expect((returnEdge.origin as CompoundAssignmentOrigin).offset,
+        code.indexOf('+='));
   }
 
   test_assignmentExpression_field() async {

@@ -1517,19 +1517,13 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     if (compoundOperatorInfo != null) {
       var compoundOperatorMethod = compoundOperatorInfo.method;
       if (compoundOperatorMethod != null) {
-        // TODO(paulberry): test hardness
         _checkAssignment(
             CompoundAssignmentOrigin(source, compoundOperatorInfo.offset),
             source: destinationType,
             destination: _notNullType,
             hard:
                 _postDominatedLocals.isReferenceInScope(destinationExpression));
-        assert(!(compoundOperatorInfo.method is ClassMemberElement &&
-            (compoundOperatorInfo.method.enclosingElement as ClassElement)
-                .typeParameters
-                .isNotEmpty)); // TODO(paulberry)
         compoundOperatorType = getOrComputeElementType(compoundOperatorMethod);
-        // TODO(paulberry): test substitution
         assert(compoundOperatorType.positionalParameters.length > 0);
       }
       _checkAssignment(expressionChecks,
