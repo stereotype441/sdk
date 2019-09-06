@@ -1088,6 +1088,18 @@ void f() {
     expect(decoratedType.node, same(never));
   }
 
+  solo_test_foo() async {
+    await analyze('''
+void f() {
+  try {} catch (ex, st) {}
+}
+''');
+    var exceptionType = variables.decoratedElementType(findNode.simple('ex').staticElement);
+    expect(exceptionType.node, TypeMatcher<NullabilityNodeMutable>());
+    var stackTraceType = variables.decoratedElementType(findNode.simple('st').staticElement);
+    expect(stackTraceType.node, TypeMatcher<NullabilityNodeMutable>());
+  }
+
   test_localVariable_type_implicit_dynamic() async {
     await analyze('''
 main() {

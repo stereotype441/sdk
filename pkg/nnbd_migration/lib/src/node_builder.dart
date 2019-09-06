@@ -72,7 +72,8 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
   DecoratedType visitCatchClause(CatchClause node) {
     DecoratedType exceptionType = node.exceptionType?.accept(this);
     if (node.exceptionParameter != null) {
-      exceptionType ??= DecoratedType(_typeProvider.objectType, _graph.never);
+      exceptionType ??= DecoratedType.forImplicitType(
+          _typeProvider, functionType.returnType, _graph)DecoratedType(_typeProvider.objectType, _graph.never);
       _variables.recordDecoratedElementType(
           node.exceptionParameter.staticElement, exceptionType);
     }
