@@ -1513,7 +1513,6 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       expressionChecks = ExpressionChecks(expression.end);
       _variables.recordExpressionChecks(source, expression, expressionChecks);
     }
-    DecoratedType compoundOperatorType;
     if (compoundOperatorInfo != null) {
       var compoundOperatorMethod = compoundOperatorInfo.method;
       if (compoundOperatorMethod != null) {
@@ -1523,14 +1522,13 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
             destination: _notNullType,
             hard:
                 _postDominatedLocals.isReferenceInScope(destinationExpression));
-        compoundOperatorType = getOrComputeElementType(compoundOperatorMethod);
+        DecoratedType compoundOperatorType =
+            getOrComputeElementType(compoundOperatorMethod);
         assert(compoundOperatorType.positionalParameters.length > 0);
-      }
-      _checkAssignment(expressionChecks,
-          source: sourceType,
-          destination: compoundOperatorType.positionalParameters[0],
-          hard: _postDominatedLocals.isReferenceInScope(expression));
-      if (compoundOperatorType != null) {
+        _checkAssignment(expressionChecks,
+            source: sourceType,
+            destination: compoundOperatorType.positionalParameters[0],
+            hard: _postDominatedLocals.isReferenceInScope(expression));
         sourceType = _fixNumericTypes(compoundOperatorType.returnType,
             compoundOperatorInfo.undecoratedType);
         _checkAssignment(

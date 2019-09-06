@@ -536,7 +536,7 @@ C f(C y, C z) => (y += z);
     expect((targetEdge.origin as CompoundAssignmentOrigin).offset,
         code.indexOf('+='));
     assertNullCheck(
-        checkExpression('z;'),
+        checkExpression('z)'),
         assertEdge(decoratedTypeAnnotation('C z').node,
             decoratedTypeAnnotation('C x').node,
             hard: true));
@@ -565,7 +565,7 @@ C<int> f(C<int> y, C<int> z) => (y += z);
     expect((targetEdge.origin as CompoundAssignmentOrigin).offset,
         code.indexOf('+='));
     assertNullCheck(
-        checkExpression('z;'),
+        checkExpression('z)'),
         assertEdge(decoratedTypeAnnotation('C<int> z').node,
             decoratedTypeAnnotation('C<T> x').node,
             hard: true));
