@@ -15,21 +15,15 @@ import 'package:analysis_server/src/services/correction/statement_analyzer.dart'
 import 'package:analysis_server/src/services/correction/util.dart';
 import 'package:analysis_server/src/services/linter/lint_names.dart';
 import 'package:analysis_server/src/services/search/hierarchy.dart';
-import 'package:analysis_server/src/utilities/flutter.dart';
-import 'package:analyzer/dart/analysis/session.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/precedence.dart';
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
-import 'package:analyzer/src/dart/analysis/experiments.dart';
-import 'package:analyzer/src/dart/analysis/session_helper.dart';
 import 'package:analyzer/src/dart/ast/token.dart';
 import 'package:analyzer/src/dart/ast/utilities.dart';
-import 'package:analyzer/src/generated/engine.dart' show AnalysisOptionsImpl;
 import 'package:analyzer/src/generated/java_core.dart';
-import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart' hide Element;
 import 'package:analyzer_plugin/src/utilities/change_builder/change_builder_dart.dart';
@@ -47,45 +41,34 @@ typedef _SimpleIdentifierVisitor(SimpleIdentifier node);
  */
 class AssistProcessor extends BaseProcessor {
   final DartAssistContext context;
-
-  final AnalysisSession session;
-  final AnalysisSessionHelper sessionHelper;
-  final TypeProvider typeProvider;
-  final Flutter flutter;
-
   final List<Assist> assists = <Assist>[];
 
   AssistProcessor(this.context)
-      : session = context.resolveResult.session,
-        sessionHelper = AnalysisSessionHelper(context.resolveResult.session),
-        typeProvider = context.resolveResult.typeProvider,
-        flutter = Flutter.of(context.resolveResult),
-        super(
+      : super(
           selectionOffset: context.selectionOffset,
           selectionLength: context.selectionLength,
           resolvedResult: context.resolveResult,
           workspace: context.workspace,
         );
 
-  /**
-   * Return the status of the known experiments.
-   */
-  ExperimentStatus get experimentStatus =>
-      (session.analysisContext.analysisOptions as AnalysisOptionsImpl)
-          .experimentStatus;
-
   Future<List<Assist>> compute() async {
     if (!setupCompute()) {
       return assists;
     }
+    if (!_containsErrorCode(
+      {LintNames.always_specify_types, LintNames.type_annotate_public_apis},
+    )) {
+      await _addProposals_addTypeAnnotation();
+    }
 
-    await _addProposal_addTypeAnnotation_DeclaredIdentifier();
-    await _addProposal_addTypeAnnotation_SimpleFormalParameter();
-    await _addProposal_addTypeAnnotation_VariableDeclaration();
     await _addProposal_assignToLocalVariable();
     await _addProposal_convertClassToMixin();
     await _addProposal_convertDocumentationIntoBlock();
-    await _addProposal_convertDocumentationIntoLine();
+    if (!_containsErrorCode(
+      {LintNames.slash_for_doc_comments},
+    )) {
+      await _addProposal_convertDocumentationIntoLine();
+    }
     await _addProposal_convertIntoFinalField();
     await _addProposal_convertIntoGetter();
     await _addProposal_convertListConstructorToListLiteral();
@@ -138,8 +121,8 @@ class AssistProcessor extends BaseProcessor {
     await _addProposal_splitAndCondition();
     await _addProposal_splitVariableDeclaration();
     await _addProposal_surroundWith();
-    if (!_containsDiagnostic(
-      LintNames.curly_braces_in_flow_control_structures,
+    if (!_containsErrorCode(
+      {LintNames.curly_braces_in_flow_control_structures},
     )) {
       await _addProposal_useCurlyBraces();
     }
@@ -227,160 +210,6 @@ class AssistProcessor extends BaseProcessor {
     change.id = kind.id;
     change.message = formatList(kind.message, args);
     assists.add(new Assist(kind, change));
-  }
-
-  Future<void> _addProposal_addTypeAnnotation_DeclaredIdentifier() async {
-    DeclaredIdentifier declaredIdentifier =
-        node.thisOrAncestorOfType<DeclaredIdentifier>();
-    if (declaredIdentifier == null) {
-      ForStatement forEach = node.thisOrAncestorMatching(
-          (node) => node is ForStatement && node.forLoopParts is ForEachParts);
-      ForEachParts forEachParts = forEach?.forLoopParts;
-      int offset = node.offset;
-      if (forEach != null &&
-          forEachParts.iterable != null &&
-          offset < forEachParts.iterable.offset) {
-        declaredIdentifier = forEachParts is ForEachPartsWithDeclaration
-            ? forEachParts.loopVariable
-            : null;
-      }
-    }
-    if (declaredIdentifier == null) {
-      _coverageMarker();
-      return;
-    }
-    // Ensure that there isn't already a type annotation.
-    if (declaredIdentifier.type != null) {
-      _coverageMarker();
-      return;
-    }
-    DartType type = declaredIdentifier.identifier.staticType;
-    if (type is! InterfaceType && type is! FunctionType) {
-      _coverageMarker();
-      return;
-    }
-    _configureTargetLocation(node);
-
-    var changeBuilder = _newDartChangeBuilder();
-    bool validChange = true;
-    await changeBuilder.addFileEdit(file, (DartFileEditBuilder builder) {
-      Token keyword = declaredIdentifier.keyword;
-      if (keyword.keyword == Keyword.VAR) {
-        builder.addReplacement(range.token(keyword), (DartEditBuilder builder) {
-          validChange = builder.writeType(type);
-        });
-      } else {
-        builder.addInsertion(declaredIdentifier.identifier.offset,
-            (DartEditBuilder builder) {
-          validChange = builder.writeType(type);
-          builder.write(' ');
-        });
-      }
-    });
-    if (validChange) {
-      _addAssistFromBuilder(changeBuilder, DartAssistKind.ADD_TYPE_ANNOTATION);
-    }
-  }
-
-  Future<void> _addProposal_addTypeAnnotation_SimpleFormalParameter() async {
-    AstNode node = this.node;
-    // should be the name of a simple parameter
-    if (node is! SimpleIdentifier || node.parent is! SimpleFormalParameter) {
-      _coverageMarker();
-      return;
-    }
-    SimpleIdentifier name = node;
-    SimpleFormalParameter parameter = node.parent;
-    // the parameter should not have a type
-    if (parameter.type != null) {
-      _coverageMarker();
-      return;
-    }
-    // prepare the type
-    DartType type = parameter.declaredElement.type;
-    // TODO(scheglov) If the parameter is in a method declaration, and if the
-    // method overrides a method that has a type for the corresponding
-    // parameter, it would be nice to copy down the type from the overridden
-    // method.
-    if (type is! InterfaceType) {
-      _coverageMarker();
-      return;
-    }
-    // prepare type source
-    _configureTargetLocation(node);
-
-    var changeBuilder = _newDartChangeBuilder();
-    bool validChange = true;
-    await changeBuilder.addFileEdit(file, (DartFileEditBuilder builder) {
-      builder.addInsertion(name.offset, (DartEditBuilder builder) {
-        validChange = builder.writeType(type);
-        builder.write(' ');
-      });
-    });
-    if (validChange) {
-      _addAssistFromBuilder(changeBuilder, DartAssistKind.ADD_TYPE_ANNOTATION);
-    }
-  }
-
-  Future<void> _addProposal_addTypeAnnotation_VariableDeclaration() async {
-    AstNode node = this.node;
-    // prepare VariableDeclarationList
-    VariableDeclarationList declarationList =
-        node.thisOrAncestorOfType<VariableDeclarationList>();
-    if (declarationList == null) {
-      _coverageMarker();
-      return;
-    }
-    // may be has type annotation already
-    if (declarationList.type != null) {
-      _coverageMarker();
-      return;
-    }
-    // prepare single VariableDeclaration
-    List<VariableDeclaration> variables = declarationList.variables;
-    if (variables.length != 1) {
-      _coverageMarker();
-      return;
-    }
-    VariableDeclaration variable = variables[0];
-    // must be not after the name of the variable
-    if (selectionOffset > variable.name.end) {
-      _coverageMarker();
-      return;
-    }
-    // we need an initializer to get the type from
-    Expression initializer = variable.initializer;
-    if (initializer == null) {
-      _coverageMarker();
-      return;
-    }
-    DartType type = initializer.staticType;
-    // prepare type source
-    if ((type is! InterfaceType || type.isDartCoreNull) &&
-        type is! FunctionType) {
-      _coverageMarker();
-      return;
-    }
-    _configureTargetLocation(node);
-
-    var changeBuilder = _newDartChangeBuilder();
-    bool validChange = true;
-    await changeBuilder.addFileEdit(file, (DartFileEditBuilder builder) {
-      Token keyword = declarationList.keyword;
-      if (keyword?.keyword == Keyword.VAR) {
-        builder.addReplacement(range.token(keyword), (DartEditBuilder builder) {
-          validChange = builder.writeType(type);
-        });
-      } else {
-        builder.addInsertion(variable.offset, (DartEditBuilder builder) {
-          validChange = builder.writeType(type);
-          builder.write(' ');
-        });
-      }
-    });
-    if (validChange) {
-      _addAssistFromBuilder(changeBuilder, DartAssistKind.ADD_TYPE_ANNOTATION);
-    }
   }
 
   Future<void> _addProposal_assignToLocalVariable() async {
@@ -639,64 +468,7 @@ class AssistProcessor extends BaseProcessor {
   }
 
   Future<void> _addProposal_convertDocumentationIntoLine() async {
-    Comment comment = node.thisOrAncestorOfType<Comment>();
-    if (comment == null ||
-        !comment.isDocumentation ||
-        comment.tokens.length != 1) {
-      _coverageMarker();
-      return;
-    }
-    Token token = comment.tokens.first;
-    if (token.type != TokenType.MULTI_LINE_COMMENT) {
-      _coverageMarker();
-      return;
-    }
-    String text = token.lexeme;
-    List<String> lines = text.split('\n');
-    String prefix = utils.getNodePrefix(comment);
-    List<String> newLines = <String>[];
-    bool firstLine = true;
-    String linePrefix = '';
-    for (String line in lines) {
-      if (firstLine) {
-        firstLine = false;
-        String expectedPrefix = '/**';
-        if (!line.startsWith(expectedPrefix)) {
-          _coverageMarker();
-          return;
-        }
-        line = line.substring(expectedPrefix.length).trim();
-        if (line.isNotEmpty) {
-          newLines.add('/// $line');
-          linePrefix = eol + prefix;
-        }
-      } else {
-        if (line.startsWith(prefix + ' */')) {
-          break;
-        }
-        String expectedPrefix = prefix + ' *';
-        if (!line.startsWith(expectedPrefix)) {
-          _coverageMarker();
-          return;
-        }
-        line = line.substring(expectedPrefix.length);
-        if (line.isEmpty) {
-          newLines.add('$linePrefix///');
-        } else {
-          newLines.add('$linePrefix///$line');
-        }
-        linePrefix = eol + prefix;
-      }
-    }
-
-    var changeBuilder = _newDartChangeBuilder();
-    await changeBuilder.addFileEdit(file, (DartFileEditBuilder builder) {
-      builder.addReplacement(range.node(comment), (DartEditBuilder builder) {
-        for (String newLine in newLines) {
-          builder.write(newLine);
-        }
-      });
-    });
+    final changeBuilder = await createBuilder_convertDocumentationIntoLine();
     _addAssistFromBuilder(
         changeBuilder, DartAssistKind.CONVERT_DOCUMENTATION_INTO_LINE);
   }
@@ -3857,6 +3629,19 @@ class AssistProcessor extends BaseProcessor {
     _addAssistFromBuilder(changeBuilder, DartAssistKind.USE_CURLY_BRACES);
   }
 
+  Future<void> _addProposals_addTypeAnnotation() async {
+    var changeBuilder =
+        await createBuilder_addTypeAnnotation_DeclaredIdentifier();
+    _addAssistFromBuilder(changeBuilder, DartAssistKind.ADD_TYPE_ANNOTATION);
+
+    changeBuilder =
+        await createBuilder_addTypeAnnotation_SimpleFormalParameter();
+    _addAssistFromBuilder(changeBuilder, DartAssistKind.ADD_TYPE_ANNOTATION);
+
+    changeBuilder = await createBuilder_addTypeAnnotation_VariableDeclaration();
+    _addAssistFromBuilder(changeBuilder, DartAssistKind.ADD_TYPE_ANNOTATION);
+  }
+
   /**
    * Return `true` if all of the parameters in the given list of [parameters]
    * have an explicit type annotation.
@@ -3877,28 +3662,14 @@ class AssistProcessor extends BaseProcessor {
     return true;
   }
 
-  /**
-   * Configures [utils] using given [target].
-   */
-  void _configureTargetLocation(Object target) {
-    utils.targetClassElement = null;
-    if (target is AstNode) {
-      ClassDeclaration targetClassDeclaration =
-          target.thisOrAncestorOfType<ClassDeclaration>();
-      if (targetClassDeclaration != null) {
-        utils.targetClassElement = targetClassDeclaration.declaredElement;
-      }
-    }
-  }
-
-  bool _containsDiagnostic(String diagnosticCode) {
+  bool _containsErrorCode(Set<String> errorCodes) {
     final fileOffset = node.offset;
     for (var error in context.resolveResult.errors) {
       final errorSource = error.source;
       if (file == errorSource.fullName) {
         if (fileOffset >= error.offset &&
             fileOffset <= error.offset + error.length) {
-          if (error.errorCode.name == diagnosticCode) {
+          if (errorCodes.contains(error.errorCode.name)) {
             return true;
           }
         }

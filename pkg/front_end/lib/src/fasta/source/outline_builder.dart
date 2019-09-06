@@ -978,7 +978,8 @@ class OutlineBuilder extends StackListener {
         for (int i = 0; i < synthesizedTypeVariables.length; i++) {
           substitution[extension.typeVariables[i]] =
               new NamedTypeBuilder.fromTypeDeclarationBuilder(
-                  synthesizedTypeVariables[i]);
+                  synthesizedTypeVariables[i],
+                  const NullabilityBuilder.pendingImplementation());
         }
         if (typeVariables != null) {
           typeVariables = synthesizedTypeVariables..addAll(typeVariables);
@@ -989,8 +990,11 @@ class OutlineBuilder extends StackListener {
       List<FormalParameterBuilder> synthesizedFormals = [];
       TypeBuilder thisType = extension.extensionThisType;
       if (substitution != null) {
-        thisType = thisType.subst(substitution);
-        declarationBuilder.addType(new UnresolvedType(thisType, -1, null));
+        List<NamedTypeBuilder> unboundTypes = [];
+        thisType = thisType.subst(substitution, unboundTypes);
+        for (NamedTypeBuilder unboundType in unboundTypes) {
+          extension.addType(new UnresolvedType(unboundType, -1, null));
+        }
       }
       synthesizedFormals.add(new FormalParameterBuilder(
           null, finalMask, thisType, "#this", null, charOffset));
@@ -1136,13 +1140,18 @@ class OutlineBuilder extends StackListener {
     if (!library.loader.target.enableNonNullable) {
       reportErrorIfNullableType(questionMark);
     }
+    bool isMarkedAsNullable = questionMark != null;
     List<TypeBuilder> arguments = pop();
     int charOffset = pop();
     Object name = pop();
     if (name is ParserRecovery) {
       push(name);
     } else {
-      push(library.addNamedType(name, arguments, charOffset));
+      push(library.addNamedType(
+          name,
+          library.computeNullabilityFromToken(isMarkedAsNullable),
+          arguments,
+          charOffset));
     }
   }
 
@@ -1613,7 +1622,8 @@ class OutlineBuilder extends StackListener {
                 : templateCycleInTypeVariables.withArguments(
                     builder.name, via.join("', '"));
             addProblem(message, builder.charOffset, builder.name.length);
-            builder.bound = new NamedTypeBuilder(builder.name, null)
+            builder.bound = new NamedTypeBuilder(builder.name,
+                const NullabilityBuilder.pendingImplementation(), null)
               ..bind(new InvalidTypeBuilder(
                   builder.name,
                   message.withLocation(

@@ -144,13 +144,6 @@ m(B b) {
     assertType(assignment2, 'int');
   }
 
-  @FailingTest(reason: r'''
-This test fails because verifier checks that the type of `b.a?.x += 1`, which
-is the type of `+` invocation, is assignable to `b.a?.x` type. But with NNBD
-it is not. The type of `b.a?.x += 1` is `int?`, because of shortening. But
-because of the same shortening the assignment is performed only when `b.a` is
-not null, and the type to check should be `int`.
-''')
   test_assignment_plusEq_propertyAccess3_short1() async {
     await assertErrorsInCode(r'''
 class A {
@@ -812,8 +805,6 @@ m(B? b) {
   b.a.x; // 2
 }
 ''', [
-      // TODO(scheglov) Remove HintCode.CAN_BE_NULL_AFTER_NULL_AWARE
-      error(HintCode.CAN_BE_NULL_AFTER_NULL_AWARE, 86, 4),
       error(StaticWarningCode.UNCHECKED_USE_OF_NULLABLE_VALUE, 101, 1),
     ]);
     var propertyAccess1 = findNode.propertyAccess('x; // 1');
@@ -886,8 +877,6 @@ m(C c) {
   c.b.a.x; // 2
 }
 ''', [
-      // TODO(scheglov) Remove HintCode.CAN_BE_NULL_AFTER_NULL_AWARE
-      error(HintCode.CAN_BE_NULL_AFTER_NULL_AWARE, 131, 6),
       error(StaticWarningCode.UNCHECKED_USE_OF_NULLABLE_VALUE, 148, 3),
     ]);
     var propertyAccess1 = findNode.propertyAccess('x; // 1');

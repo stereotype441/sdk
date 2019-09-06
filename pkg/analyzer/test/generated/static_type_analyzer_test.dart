@@ -428,26 +428,6 @@ class StaticTypeAnalyzerTest extends EngineTestCase with ResourceProviderMixin {
     _listener.assertNoErrors();
   }
 
-  void test_visitAssignmentExpression_compound_II() {
-    validate(TokenType operator) {
-      InterfaceType numType = _typeProvider.numType;
-      InterfaceType intType = _typeProvider.intType;
-      SimpleIdentifier identifier = _resolvedVariable(intType, "i");
-      AssignmentExpression node = AstTestFactory.assignmentExpression(
-          identifier, operator, _resolvedInteger(1));
-      MethodElement plusMethod = getMethod(numType, "+");
-      node.staticElement = plusMethod;
-      expect(_analyze(node), same(intType));
-      _listener.assertNoErrors();
-    }
-
-    validate(TokenType.MINUS_EQ);
-    validate(TokenType.PERCENT_EQ);
-    validate(TokenType.PLUS_EQ);
-    validate(TokenType.STAR_EQ);
-    validate(TokenType.TILDE_SLASH_EQ);
-  }
-
   void test_visitAssignmentExpression_compound_lazy() {
     validate(TokenType operator) {
       InterfaceType boolType = _typeProvider.boolType;
@@ -460,46 +440,6 @@ class StaticTypeAnalyzerTest extends EngineTestCase with ResourceProviderMixin {
 
     validate(TokenType.AMPERSAND_AMPERSAND_EQ);
     validate(TokenType.BAR_BAR_EQ);
-  }
-
-  void test_visitAssignmentExpression_compound_plusID() {
-    validate(TokenType operator) {
-      InterfaceType numType = _typeProvider.numType;
-      InterfaceType intType = _typeProvider.intType;
-      InterfaceType doubleType = _typeProvider.doubleType;
-      SimpleIdentifier identifier = _resolvedVariable(intType, "i");
-      AssignmentExpression node = AstTestFactory.assignmentExpression(
-          identifier, operator, _resolvedDouble(1.0));
-      MethodElement plusMethod = getMethod(numType, "+");
-      node.staticElement = plusMethod;
-      expect(_analyze(node), same(doubleType));
-      _listener.assertNoErrors();
-    }
-
-    validate(TokenType.MINUS_EQ);
-    validate(TokenType.PERCENT_EQ);
-    validate(TokenType.PLUS_EQ);
-    validate(TokenType.STAR_EQ);
-  }
-
-  void test_visitAssignmentExpression_compoundIfNull_differentTypes() {
-    // double d; d ??= 0
-    Expression node = AstTestFactory.assignmentExpression(
-        _resolvedVariable(_typeProvider.doubleType, 'd'),
-        TokenType.QUESTION_QUESTION_EQ,
-        _resolvedInteger(0));
-    expect(_analyze(node), _typeProvider.numType);
-    _listener.assertNoErrors();
-  }
-
-  void test_visitAssignmentExpression_compoundIfNull_sameTypes() {
-    // int i; i ??= 0
-    Expression node = AstTestFactory.assignmentExpression(
-        _resolvedVariable(_typeProvider.intType, 'i'),
-        TokenType.QUESTION_QUESTION_EQ,
-        _resolvedInteger(0));
-    expect(_analyze(node), same(_typeProvider.intType));
-    _listener.assertNoErrors();
   }
 
   void test_visitAssignmentExpression_simple() {
@@ -603,7 +543,7 @@ class StaticTypeAnalyzerTest extends EngineTestCase with ResourceProviderMixin {
         _resolvedInteger(2), TokenType.SLASH, _resolvedInteger(2));
     node.staticElement = getMethod(_typeProvider.numType, "/");
     node.staticInvokeType = node.staticElement.type;
-    expect(_analyze(node), same(_typeProvider.doubleType));
+    expect(_analyze(node), _typeProvider.doubleType);
     _listener.assertNoErrors();
   }
 
@@ -1214,7 +1154,7 @@ class StaticTypeAnalyzerTest extends EngineTestCase with ResourceProviderMixin {
         AstTestFactory.prefixExpression(TokenType.MINUS, _resolvedInteger(0));
     MethodElement minusMethod = getMethod(_typeProvider.numType, "-");
     node.staticElement = minusMethod;
-    expect(_analyze(node), same(_typeProvider.numType));
+    expect(_analyze(node), _typeProvider.numType);
     _listener.assertNoErrors();
   }
 
@@ -1252,7 +1192,7 @@ class StaticTypeAnalyzerTest extends EngineTestCase with ResourceProviderMixin {
         AstTestFactory.prefixExpression(TokenType.TILDE, _resolvedInteger(0));
     MethodElement tildeMethod = getMethod(_typeProvider.intType, "~");
     node.staticElement = tildeMethod;
-    expect(_analyze(node), same(_typeProvider.intType));
+    expect(_analyze(node), _typeProvider.intType);
     _listener.assertNoErrors();
   }
 

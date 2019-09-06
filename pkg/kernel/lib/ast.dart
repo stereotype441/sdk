@@ -469,6 +469,7 @@ class Library extends NamedNode
     visitList(parts, v);
     visitList(typedefs, v);
     visitList(classes, v);
+    visitList(extensions, v);
     visitList(procedures, v);
     visitList(fields, v);
   }
@@ -479,6 +480,7 @@ class Library extends NamedNode
     transformList(parts, v, this);
     transformList(typedefs, v, this);
     transformList(classes, v, this);
+    transformList(extensions, v, this);
     transformList(procedures, v, this);
     transformList(fields, v, this);
   }
@@ -1145,7 +1147,9 @@ class Extension extends NamedNode implements FileUriNode {
       Reference reference})
       : this.typeParameters = typeParameters ?? <TypeParameter>[],
         this.members = members ?? <ExtensionMemberDescriptor>[],
-        super(reference);
+        super(reference) {
+    setParents(this.typeParameters, this);
+  }
 
   Library get enclosingLibrary => parent;
 
@@ -1153,10 +1157,18 @@ class Extension extends NamedNode implements FileUriNode {
   R accept<R>(TreeVisitor<R> v) => v.visitExtension(this);
 
   @override
-  visitChildren(Visitor v) {}
+  visitChildren(Visitor v) {
+    visitList(typeParameters, v);
+    onType?.accept(v);
+  }
 
   @override
-  transformChildren(Transformer v) => v.visitExtension(this);
+  transformChildren(Transformer v) {
+    transformList(typeParameters, v, this);
+    if (onType != null) {
+      onType = v.visitDartType(onType);
+    }
+  }
 }
 
 enum ExtensionMemberKind {
@@ -2430,6 +2442,9 @@ abstract class Expression extends TreeNode {
 /// An expression containing compile-time errors.
 ///
 /// Should throw a runtime error when evaluated.
+///
+/// The [fileOffset] of an [InvalidExpression] indicates the location in the
+/// tree where the expression occurs, rather than the location of the error.
 class InvalidExpression extends Expression {
   String message;
 
@@ -3528,7 +3543,7 @@ class MapConcatenation extends Expression {
 
 /// Create an instance directly from the field values.
 ///
-/// This expression arises from const constructor calls when one or more field
+/// These expressions arise from const constructor calls when one or more field
 /// initializing expressions, field initializers, assert initializers or unused
 /// arguments contain unevaluated expressions. They only ever occur within
 /// unevaluated constants in constant expressions.
@@ -3577,6 +3592,43 @@ class InstanceCreation extends Expression {
     });
     transformList(asserts, v, this);
     transformList(unusedArguments, v, this);
+  }
+}
+
+/// A marker indicating that a subexpression originates in a different source
+/// file than the surrounding context.
+///
+/// These expressions arise from inlining of const variables during constant
+/// evaluation. They only ever occur within unevaluated constants in constant
+/// expressions.
+class FileUriExpression extends Expression implements FileUriNode {
+  /// The URI of the source file in which the subexpression is located.
+  /// Can be different from the file containing the [FileUriExpression].
+  Uri fileUri;
+
+  Expression expression;
+
+  FileUriExpression(this.expression, this.fileUri) {
+    expression.parent = this;
+  }
+
+  DartType getStaticType(TypeEnvironment types) =>
+      expression.getStaticType(types);
+
+  R accept<R>(ExpressionVisitor<R> v) => v.visitFileUriExpression(this);
+  R accept1<R, A>(ExpressionVisitor1<R, A> v, A arg) =>
+      v.visitFileUriExpression(this, arg);
+
+  visitChildren(Visitor v) {
+    expression.accept(v);
+  }
+
+  transformChildren(Transformer v) {
+    expression = expression.accept<TreeNode>(v)..parent = this;
+  }
+
+  Location _getLocationInEnclosingFile(int offset) {
+    return _getLocationInComponent(enclosingComponent, fileUri, offset);
   }
 }
 

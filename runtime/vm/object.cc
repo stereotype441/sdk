@@ -2986,7 +2986,7 @@ RawFunction* Function::CreateMethodExtractor(const String& getter_name) const {
   // Initialize signature: receiver is a single fixed parameter.
   const intptr_t kNumParameters = 1;
   extractor.set_num_fixed_parameters(kNumParameters);
-  extractor.SetNumOptionalParameters(0, 0);
+  extractor.SetNumOptionalParameters(0, false);
   extractor.set_parameter_types(Object::extractor_parameter_types());
   extractor.set_parameter_names(Object::extractor_parameter_names());
   extractor.set_result_type(Object::dynamic_type());
@@ -12608,8 +12608,8 @@ RawInstructions* Instructions::New(intptr_t size,
     result ^= raw;
     result.SetSize(size);
     result.SetHasSingleEntryPoint(has_single_entry_point);
-    result.set_stats(nullptr);
     result.set_unchecked_entrypoint_pc_offset(unchecked_entrypoint_pc_offset);
+    result.set_stats(nullptr);
   }
   return result.raw();
 }
@@ -12812,6 +12812,8 @@ const char* PcDescriptors::KindAsStr(RawPcDescriptors::Kind kind) {
       return "osr-entry    ";
     case RawPcDescriptors::kRewind:
       return "rewind       ";
+    case RawPcDescriptors::kBSSRelocation:
+      return "bss reloc    ";
     case RawPcDescriptors::kOther:
       return "other        ";
     case RawPcDescriptors::kAnyKind:
@@ -12936,7 +12938,7 @@ bool StackMap::GetBit(intptr_t bit_index) const {
   int bit_remainder = bit_index & (kBitsPerByte - 1);
   uint8_t byte_mask = 1U << bit_remainder;
   uint8_t byte = raw_ptr()->data()[byte_index];
-  return (byte & byte_mask);
+  return (byte & byte_mask) != 0;
 }
 
 void StackMap::SetBit(intptr_t bit_index, bool value) const {
@@ -13200,9 +13202,9 @@ void ExceptionHandlers::SetHandlerInfo(intptr_t try_index,
   ASSERT((handler_pc_offset == static_cast<uword>(kMaxUint32)) ||
          (handler_pc_offset < static_cast<uword>(kMaxUint32)));
   info->handler_pc_offset = handler_pc_offset;
-  info->needs_stacktrace = needs_stacktrace;
-  info->has_catch_all = has_catch_all;
-  info->is_generated = is_generated;
+  info->needs_stacktrace = static_cast<int8_t>(needs_stacktrace);
+  info->has_catch_all = static_cast<int8_t>(has_catch_all);
+  info->is_generated = static_cast<int8_t>(is_generated);
 }
 
 void ExceptionHandlers::GetHandlerInfo(intptr_t try_index,
@@ -13224,17 +13226,17 @@ intptr_t ExceptionHandlers::OuterTryIndex(intptr_t try_index) const {
 
 bool ExceptionHandlers::NeedsStackTrace(intptr_t try_index) const {
   ASSERT((try_index >= 0) && (try_index < num_entries()));
-  return raw_ptr()->data()[try_index].needs_stacktrace;
+  return raw_ptr()->data()[try_index].needs_stacktrace != 0;
 }
 
 bool ExceptionHandlers::IsGenerated(intptr_t try_index) const {
   ASSERT((try_index >= 0) && (try_index < num_entries()));
-  return raw_ptr()->data()[try_index].is_generated;
+  return raw_ptr()->data()[try_index].is_generated != 0;
 }
 
 bool ExceptionHandlers::HasCatchAll(intptr_t try_index) const {
   ASSERT((try_index >= 0) && (try_index < num_entries()));
-  return raw_ptr()->data()[try_index].has_catch_all;
+  return raw_ptr()->data()[try_index].has_catch_all != 0;
 }
 
 void ExceptionHandlers::SetHandledTypes(intptr_t try_index,
@@ -13321,7 +13323,7 @@ const char* ExceptionHandlers::ToCString() const {
         handled_types.IsNull() ? 0 : handled_types.Length();
     len += Utils::SNPrint(NULL, 0, FORMAT1, i, info.handler_pc_offset,
                           num_types, info.outer_try_index,
-                          info.is_generated ? "(generated)" : "");
+                          info.is_generated != 0 ? "(generated)" : "");
     for (int k = 0; k < num_types; k++) {
       type ^= handled_types.At(k);
       ASSERT(!type.IsNull());
@@ -13340,7 +13342,7 @@ const char* ExceptionHandlers::ToCString() const {
     num_chars +=
         Utils::SNPrint((buffer + num_chars), (len - num_chars), FORMAT1, i,
                        info.handler_pc_offset, num_types, info.outer_try_index,
-                       info.is_generated ? "(generated)" : "");
+                       info.is_generated != 0 ? "(generated)" : "");
     for (int k = 0; k < num_types; k++) {
       type ^= handled_types.At(k);
       num_chars += Utils::SNPrint((buffer + num_chars), (len - num_chars),
@@ -15335,6 +15337,25 @@ void Code::DumpSourcePositions() const {
   const Function& root = Function::Handle(function());
   CodeSourceMapReader reader(map, id_map, root);
   reader.DumpSourcePositions(PayloadStart());
+}
+
+bool Code::VerifyBSSRelocations() const {
+  const auto& descriptors = PcDescriptors::Handle(pc_descriptors());
+  const auto& insns = Instructions::Handle(instructions());
+  PcDescriptors::Iterator iterator(descriptors,
+                                   RawPcDescriptors::kBSSRelocation);
+  while (iterator.MoveNext()) {
+    const uword reloc = insns.PayloadStart() + iterator.PcOffset();
+    const word target = *reinterpret_cast<word*>(reloc);
+    // The relocation is in its original unpatched form -- the addend
+    // representing the target symbol itself.
+    if (target >= 0 &&
+        target <
+            BSS::RelocationIndex(BSS::Relocation::NumRelocations) * kWordSize) {
+      return false;
+    }
+  }
+  return true;
 }
 
 void Bytecode::Disassemble(DisassemblyFormatter* formatter) const {

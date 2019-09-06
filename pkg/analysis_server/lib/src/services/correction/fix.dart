@@ -168,6 +168,8 @@ class DartFixKind {
       'ADD_SUPER_CONSTRUCTOR_INVOCATION',
       50,
       "Add super constructor {0} invocation");
+  static const ADD_TYPE_ANNOTATION =
+      const FixKind('ADD_TYPE_ANNOTATION', 50, "Add type annotation");
   static const CHANGE_ARGUMENT_NAME =
       const FixKind('CHANGE_ARGUMENT_NAME', 60, "Change to '{0}'");
   static const CHANGE_TO = const FixKind('CHANGE_TO', 51, "Change to '{0}'");
@@ -183,6 +185,8 @@ class DartFixKind {
       const FixKind('CONVERT_FLUTTER_CHILD', 50, "Convert to children:");
   static const CONVERT_FLUTTER_CHILDREN =
       const FixKind('CONVERT_FLUTTER_CHILDREN', 50, "Convert to child:");
+  static const CONVERT_TO_LINE_COMMENT = const FixKind(
+      'CONVERT_TO_LINE_COMMENT', 50, "Convert to line documentation comment");
   static const CONVERT_TO_NAMED_ARGUMENTS = const FixKind(
       'CONVERT_TO_NAMED_ARGUMENTS', 50, "Convert to named arguments");
   static const CREATE_CLASS =

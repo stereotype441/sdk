@@ -517,6 +517,7 @@ connected
 connection
 consequence
 consequently
+conservative
 conservatively
 consider
 considered
@@ -939,6 +940,7 @@ examples
 exceeded
 except
 exception
+exceptional
 exceptions
 exclamation
 exclude
@@ -1252,6 +1254,7 @@ ignored
 ignores
 ignoring
 illegal
+imaginary
 imitation
 immediate
 immediately
@@ -1832,6 +1835,7 @@ operations
 operator
 operators
 opposed
+opted
 optimistically
 optimization
 optimize
@@ -1850,6 +1854,7 @@ original
 originally
 originate
 originated
+originates
 originating
 origins
 orphan
@@ -1949,6 +1954,7 @@ pipeline
 piping
 pivot
 place
+places
 placed
 placeholder
 placeholders
@@ -2218,6 +2224,7 @@ remains
 remember
 remembered
 remembers
+reminder
 remote
 remove
 removed
@@ -2330,6 +2337,7 @@ runs
 runtime
 safe
 safely
+safety
 said
 sake
 same
@@ -2597,6 +2605,7 @@ suffice
 sufficient
 sufficiently
 suffix
+suffixes
 suggested
 suitable
 summaries
@@ -2803,6 +2812,7 @@ unambiguous
 unary
 unbalanced
 unbind
+uncertain
 unchanged
 unclaimed
 unclear

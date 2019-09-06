@@ -322,15 +322,26 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
         operator == TokenType.BAR_BAR_EQ) {
       _recordStaticType(node, _nonNullable(_typeProvider.boolType));
     } else {
-      ExecutableElement staticMethodElement = node.staticElement;
-      DartType staticType = _computeStaticReturnType(staticMethodElement);
-      staticType = _typeSystem.refineBinaryExpressionType(
-          _getStaticType(node.leftHandSide, read: true),
-          operator,
-          node.rightHandSide.staticType,
-          staticType,
-          _featureSet);
-      _recordStaticType(node, staticType);
+      var operatorElement = node.staticElement;
+      var type = operatorElement?.returnType ?? _dynamicType;
+      type = _typeSystem.refineBinaryExpressionType(
+        _getStaticType(node.leftHandSide, read: true),
+        operator,
+        node.rightHandSide.staticType,
+        type,
+        _featureSet,
+      );
+      _recordStaticType(node, type);
+
+      var leftWriteType = _getStaticType(node.leftHandSide);
+      if (!_typeSystem.isAssignableTo(type, leftWriteType,
+          featureSet: _featureSet)) {
+        _resolver.errorReporter.reportTypeErrorForNode(
+          StaticTypeWarningCode.INVALID_ASSIGNMENT,
+          node.rightHandSide,
+          [type, leftWriteType],
+        );
+      }
     }
     _nullShortingTermination(node);
   }
@@ -605,14 +616,9 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
     }
 
     type ??= _dynamicType;
-    if (_nonNullableEnabled) {
-      if (node.leftBracket.type ==
-          TokenType.QUESTION_PERIOD_OPEN_SQUARE_BRACKET) {
-        type = _typeSystem.makeNullable(type);
-      }
-    }
 
     _recordStaticType(node, type);
+    _nullShortingTermination(node);
   }
 
   /**
@@ -2142,6 +2148,11 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
   static bool _hasNullShorting(Expression node) {
     if (node is AssignmentExpression) {
       return _hasNullShorting(node.leftHandSide);
+    }
+    if (node is IndexExpression) {
+      return node.leftBracket.type ==
+              TokenType.QUESTION_PERIOD_OPEN_SQUARE_BRACKET ||
+          _hasNullShorting(node.target);
     }
     if (node is PropertyAccess) {
       return node.operator.type == TokenType.QUESTION_PERIOD ||
