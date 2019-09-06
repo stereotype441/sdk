@@ -269,13 +269,17 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   DecoratedType visitAssignmentExpression(AssignmentExpression node) {
-    if (node.operator.type != TokenType.EQ) {
-      // TODO(paulberry)
-      _unimplemented(node, 'Assignment with operator ${node.operator.lexeme}');
+    MethodElement compoundOperator;
+    if (node.operator.type == TokenType.QUESTION_QUESTION_EQ) {
+      _unimplemented(node, 'Assignment with operator ??=');
+    }
+    else if (node.operator.type != TokenType.EQ) {
+      compoundOperator = node.staticElement;
     }
     _postDominatedLocals.removeReferenceFromAllScopes(node.leftHandSide);
     var expressionType = _handleAssignment(node.rightHandSide,
-        destinationExpression: node.leftHandSide);
+        destinationExpression: node.leftHandSide, compoundOperator: compoundOperator,
+    compoundAssignmentOffset: node.operator.offset);
     var conditionalNode = _conditionalNodes[node.leftHandSide];
     if (conditionalNode != null) {
       expressionType = expressionType.withNode(
@@ -1480,6 +1484,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   DecoratedType _handleAssignment(Expression expression,
       {DecoratedType destinationType,
       Expression destinationExpression,
+        MethodElement compoundOperator, int compoundAssignmentOffset,
       bool canInsertChecks = true}) {
     assert(
         (destinationExpression == null) != (destinationType == null),
@@ -1508,6 +1513,20 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     if (canInsertChecks && !sourceType.type.isDynamic) {
       expressionChecks = ExpressionChecks(expression.end);
       _variables.recordExpressionChecks(source, expression, expressionChecks);
+    }
+    if (destinationExpression != null && compoundOperator != null) {
+      // TODO(paulberry): test hardness
+      _checkAssignment(CompoundAssignmentOrigin(source, compoundAssignmentOffset), source: destinationType, destination: _notNullType, hard: _postDominatedLocals.isReferenceInScope(destinationExpression));
+      assert(!(compoundOperator is ClassMemberElement &&
+          (compoundOperator.enclosingElement as ClassElement)
+              .typeParameters
+              .isNotEmpty)); // TODO(paulberry)
+      var calleeType = getOrComputeElementType(compoundOperator);
+      // TODO(paulberry): test substitution
+      assert(calleeType.positionalParameters.length > 0);
+      _checkAssignment(expressionChecks, source: sourceType,
+          destination: calleeType.positionalParameters[0]);
+      sourceType = _fixNumericTypes(calleeType.returnType, node.staticType);
     }
     _checkAssignment(expressionChecks,
         source: sourceType,

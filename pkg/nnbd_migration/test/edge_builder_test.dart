@@ -514,6 +514,24 @@ void g(List<int> x) {
         hard: false);
   }
 
+  solo_test_assignmentExpression_compound_simple() async {
+    var code = '''
+abstract class C {
+  C operator+(C x);
+}
+void f(C y, C z) {
+  y += z;
+}
+''';
+    await analyze(code);
+    var lhsEdge = assertEdge(decoratedTypeAnnotation('C y').node, never, hard: true) as CompoundAssignmentOrigin;
+    expect(lhsEdge.offset, code.indexOf('+='));
+    assertNullCheck(checkExpression('z;'), assertEdge(decoratedTypeAnnotation('C z').node, decoratedTypeAnnotation('C x').node, hard: true));
+    // TODO(paulberry): test in api_test that no stray ! gets generated for y
+    // TODO(paulberry): test a complex example involving a return type with a
+    // nullable type param
+  }
+
   test_assignmentExpression_field() async {
     await analyze('''
 class C {
