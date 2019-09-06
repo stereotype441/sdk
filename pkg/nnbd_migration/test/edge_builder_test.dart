@@ -524,9 +524,11 @@ void f(C y, C z) {
 }
 ''';
     await analyze(code);
-    var lhsEdge = assertEdge(decoratedTypeAnnotation('C y').node, never, hard: true) as CompoundAssignmentOrigin;
-    expect(lhsEdge.offset, code.indexOf('+='));
+    var targetEdge = assertEdge(decoratedTypeAnnotation('C y').node, never, hard: true) as CompoundAssignmentOrigin;
+    expect(targetEdge.offset, code.indexOf('+='));
     assertNullCheck(checkExpression('z;'), assertEdge(decoratedTypeAnnotation('C z').node, decoratedTypeAnnotation('C x').node, hard: true));
+    var returnEdge = assertEdge(decoratedTypeAnnotation('C operator').node, decoratedTypeAnnotation('C y').node, hard: false) as CompoundAssignmentOrigin;
+    expect(returnEdge.offset, code.indexOf('+='));
     // TODO(paulberry): test in api_test that no stray ! gets generated for y
     // TODO(paulberry): test a complex example involving a return type with a
     // nullable type param

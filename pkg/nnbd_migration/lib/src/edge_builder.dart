@@ -1515,7 +1515,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       _variables.recordExpressionChecks(source, expression, expressionChecks);
     }
     DecoratedType compoundOperatorType;
-    if (destinationExpression != null && compoundOperatorInfo != null) {
+    if (compoundOperatorInfo != null) {
       var compoundOperatorMethod = compoundOperatorInfo.method;
       if (compoundOperatorMethod != null) {
         // TODO(paulberry): test hardness
@@ -1543,7 +1543,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         _checkAssignment(
             CompoundAssignmentOrigin(source, compoundOperatorInfo.offset),
             source: sourceType,
-            destination: compoundOperatorType.positionalParameters[0],
+            destination: destinationType,
             hard: false);
       } else {
         sourceType = _dynamicType;
