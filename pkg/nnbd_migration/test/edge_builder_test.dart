@@ -4530,18 +4530,26 @@ Type f() => a.Future;
     assertEdge(never, decoratedTypeAnnotation('Type').node, hard: false);
   }
 
-  test_typeName_mixin() async {
+  test_typeName_functionTypeAlias() async {
     await analyze('''
-mixin M {}
-Type f() => M;
+typedef void F();
+Type f() => F;
 ''');
     assertNoUpstreamNullability(decoratedTypeAnnotation('Type').node);
   }
 
-  test_typeName_typedef() async {
+  test_typeName_genericTypeAlias() async {
     await analyze('''
-typedef void F();
+typedef F = void Function();
 Type f() => F;
+''');
+    assertNoUpstreamNullability(decoratedTypeAnnotation('Type').node);
+  }
+
+  test_typeName_mixin() async {
+    await analyze('''
+mixin M {}
+Type f() => M;
 ''');
     assertNoUpstreamNullability(decoratedTypeAnnotation('Type').node);
   }
