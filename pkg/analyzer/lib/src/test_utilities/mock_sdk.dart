@@ -27,7 +27,7 @@ import 'dart:math';
 part 'stream.dart';
 
 class Future<T> {
-  factory Future(computation()) => null;
+  factory Future(FutureOr<T> computation()) => null;
   factory Future.delayed(Duration duration, [T computation()]) => null;
   factory Future.microtask(FutureOr<T> computation()) => null;
   factory Future.value([FutureOr<T> result]) => null;

@@ -2201,6 +2201,20 @@ int f(bool b, int i) {
         assertEdge(nullable_i, nullable_return, hard: false));
   }
 
+  solo_test_foo() async {
+    await analyze('''
+import 'dart:async';
+void f() {
+  g(() {
+    return Future(() => print('y'));
+  });
+}
+void g(callback()) {}
+''');
+    graph.debugDump();
+    fail('TODO(paulberry)');
+  }
+
   test_indexExpression_dynamic() async {
     await analyze('''
 int f(dynamic d, int i) {
