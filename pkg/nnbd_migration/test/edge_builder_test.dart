@@ -2204,10 +2204,20 @@ int f(bool b, int i) {
   solo_test_foo() async {
     await analyze('''
 import 'dart:async';
+void f() => 1;
+void g() {
+  FutureOr<void> Function() x = f;
+}
+''');
+    graph.debugDump();
+    fail('TODO(paulberry)');
+  }
+
+  test_foo() async {
+    await analyze('''
+import 'dart:async';
 void f() {
-  g(() {
-    return Future(() => print('y'));
-  });
+  g(() => Future(() => print('y')));
 }
 void g(callback()) {}
 ''');

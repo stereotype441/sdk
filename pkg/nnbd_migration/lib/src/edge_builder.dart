@@ -2080,7 +2080,7 @@ mixin _AssignmentChecker {
             destination: source.namedParameters[entry.key],
             hard: false);
       }
-    } else if (destinationType.isDynamic || sourceType.isDynamic) {
+    } else if (destinationType.isDynamic || sourceType.isDynamic || sourceType.isVoid) {
       // ok; nothing further to do.
     } else if (destinationType is InterfaceType && sourceType is FunctionType) {
       // Either this is an upcast to Function or Object, or it is erroneous
