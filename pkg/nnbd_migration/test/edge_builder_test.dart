@@ -165,6 +165,14 @@ class AssignmentCheckerTest extends Object
     assertEdge(t1.returnType.node, t2.returnType.node, hard: false);
   }
 
+  void test_future_int_to_future_or_int() {
+    var t1 = future(int_());
+    var t2 = futureOr(int_());
+    assign(t1, t2, hard: true);
+    assertEdge(t1.node, t2.node, hard: true);
+    assertEdge(t1.typeArguments[0].node, t2.typeArguments[0].node, hard: false);
+  }
+
   test_generic_to_dynamic() {
     var t = list(object());
     assign(t, dynamic_);
@@ -4623,6 +4631,11 @@ class _DecoratedClassHierarchyForTesting implements DecoratedClassHierarchy {
     if (class_.name == 'MyListOfList' && superclass.name == 'List') {
       return assignmentCheckerTest._myListOfListSupertype
           .substitute({class_.typeParameters[0]: type.typeArguments[0]});
+    }
+    if (class_.name == 'Future' && superclass.name == 'FutureOr') {
+      return DecoratedType(
+          superclass.type.instantiate([type.typeArguments[0].type]), type.node,
+          typeArguments: [type.typeArguments[0]]);
     }
     throw UnimplementedError(
         'TODO(paulberry): asInstanceOf($type, $superclass)');
