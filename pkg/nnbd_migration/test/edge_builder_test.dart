@@ -1540,6 +1540,15 @@ double f() {
     assertNoUpstreamNullability(decoratedTypeAnnotation('double').node);
   }
 
+  test_export_metadata() async {
+    await analyze('''
+@deprecated
+export 'dart:async';
+''');
+    // No assertions needed; the AnnotationTracker mixin verifies that the
+    // metadata was visited.
+  }
+
   test_field_metadata() async {
     await analyze('''
 class A {
@@ -2217,6 +2226,15 @@ int f(bool b, int i) {
         assertEdge(nullable_i, nullable_return, hard: false));
   }
 
+  test_import_metadata() async {
+    await analyze('''
+@deprecated
+import 'dart:async';
+''');
+    // No assertions needed; the AnnotationTracker mixin verifies that the
+    // metadata was visited.
+  }
+
   test_indexExpression_dynamic() async {
     await analyze('''
 int f(dynamic d, int i) {
@@ -2456,6 +2474,15 @@ bool f(a) => a is String;
 bool f(a) => a is List<int>;
 ''');
     assertNoUpstreamNullability(decoratedTypeAnnotation('bool').node);
+  }
+
+  test_library_metadata() async {
+    await analyze('''
+@deprecated
+library foo;
+''');
+    // No assertions needed; the AnnotationTracker mixin verifies that the
+    // metadata was visited.
   }
 
   test_libraryDirective() async {
@@ -3152,6 +3179,62 @@ int f() {
 
     assertNullCheck(checkExpression('(null)'),
         assertEdge(always, decoratedTypeAnnotation('int').node, hard: false));
+  }
+
+  test_part_metadata() async {
+    var pathContext = resourceProvider.pathContext;
+    addSource(pathContext.join(pathContext.dirname(testFile), 'part.dart'), '''
+part of test;
+''');
+    await analyze('''
+library test;
+@deprecated
+part 'part.dart';
+''');
+    // No assertions needed; the AnnotationTracker mixin verifies that the
+    // metadata was visited.
+  }
+
+  test_part_of_identifier() async {
+    var pathContext = resourceProvider.pathContext;
+    var testFileName = pathContext.basename(testFile);
+    addSource(pathContext.join(pathContext.dirname(testFile), 'lib.dart'), '''
+library test;
+part '$testFileName';
+''');
+    await analyze('''
+part of test;
+''');
+    // No assertions needed; the AnnotationTracker mixin verifies that the
+    // metadata was visited.
+  }
+
+  test_part_of_metadata() async {
+    var pathContext = resourceProvider.pathContext;
+    var testFileName = pathContext.basename(testFile);
+    addSource(pathContext.join(pathContext.dirname(testFile), 'lib.dart'), '''
+library test;
+part '$testFileName';
+''');
+    await analyze('''
+@deprecated
+part of test;
+''');
+    // No assertions needed; the AnnotationTracker mixin verifies that the
+    // metadata was visited.
+  }
+
+  test_part_of_path() async {
+    var pathContext = resourceProvider.pathContext;
+    var testFileName = pathContext.basename(testFile);
+    addSource(pathContext.join(pathContext.dirname(testFile), 'lib.dart'), '''
+part '$testFileName';
+''');
+    await analyze('''
+part of 'lib.dart';
+''');
+    // No assertions needed; the AnnotationTracker mixin verifies that the
+    // metadata was visited.
   }
 
   test_postDominators_assert() async {
