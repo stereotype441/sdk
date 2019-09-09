@@ -374,6 +374,7 @@ MissingMain/analyzerCode: Fail
 MissingMain/example: Fail
 MissingPartOf/part_wrapped_script: Fail # Using 'part' in the (now) part.
 MissingPrefixInDeferredImport/example: Fail
+MixinDeclaresConstructor/example: Fail
 MixinInferenceNoMatchingClass/example: Fail
 ModifierOutOfOrder/part_wrapped_script1: Fail
 ModifierOutOfOrder/script1: Fail
@@ -418,6 +419,7 @@ OverrideMismatchNamedParameter/example: Fail
 OverrideMoreRequiredArguments/example: Fail
 OverrideTypeMismatchParameter/example: Fail
 OverrideTypeMismatchReturnType/example: Fail
+OverrideTypeMismatchSetter/example: Fail
 OverrideTypeVariablesMismatch/example: Fail
 PackageNotFound/analyzerCode: Fail
 PackageNotFound/example: Fail

@@ -33,10 +33,13 @@ class LintNames {
   static const String prefer_const_declarations = 'prefer_const_declarations';
   static const String prefer_equal_for_default_values =
       'prefer_equal_for_default_values';
+  static const String prefer_expression_function_bodies =
+      'prefer_expression_function_bodies';
   static const String prefer_final_fields = 'prefer_final_fields';
   static const String prefer_final_locals = 'prefer_final_locals';
   static const String prefer_for_elements_to_map_fromIterable =
       'prefer_for_elements_to_map_fromIterable';
+  static const String prefer_int_literals = 'prefer_int_literals';
   static const String prefer_if_elements_to_conditional_expressions =
       'prefer_if_elements_to_conditional_expressions';
   static const String prefer_is_empty = 'prefer_is_empty';

@@ -185,10 +185,14 @@ class DartFixKind {
       const FixKind('CONVERT_FLUTTER_CHILD', 50, "Convert to children:");
   static const CONVERT_FLUTTER_CHILDREN =
       const FixKind('CONVERT_FLUTTER_CHILDREN', 50, "Convert to child:");
+  static const CONVERT_INTO_EXPRESSION_BODY = const FixKind(
+      'CONVERT_INTO_EXPRESSION_BODY', 50, "Convert to expression body");
   static const CONVERT_TO_FOR_ELEMENT =
       const FixKind('CONVERT_TO_FOR_ELEMENT', 50, "Convert to a 'for' element");
   static const CONVERT_TO_IF_ELEMENT =
       const FixKind('CONVERT_TO_IF_ELEMENT', 50, "Convert to an 'if' element");
+  static const CONVERT_TO_INT_LITERAL =
+      const FixKind('CONVERT_TO_INT_LITERAL', 50, "Convert to an int literal");
   static const CONVERT_TO_LINE_COMMENT = const FixKind(
       'CONVERT_TO_LINE_COMMENT', 50, "Convert to line documentation comment");
   static const CONVERT_TO_NAMED_ARGUMENTS = const FixKind(

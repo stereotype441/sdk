@@ -83,8 +83,6 @@ import '../fasta_codes.dart'
         noLength,
         templateDuplicatedDeclarationUse,
         templateGenericFunctionTypeInferredAsActualTypeArgument,
-        templateIllegalMixinDueToConstructors,
-        templateIllegalMixinDueToConstructorsCause,
         templateImplementsRepeated,
         templateImplementsSuperClass,
         templateImplicitMixinOverrideContext,
@@ -103,6 +101,7 @@ import '../fasta_codes.dart'
         templateOverrideMoreRequiredArguments,
         templateOverrideTypeMismatchParameter,
         templateOverrideTypeMismatchReturnType,
+        templateOverrideTypeMismatchSetter,
         templateOverrideTypeVariablesMismatch,
         templateRedirectingFactoryIncompatibleTypeArgument,
         templateRedirectionTargetNotFound,
@@ -1140,11 +1139,20 @@ abstract class ClassBuilder extends DeclarationBuilder {
       Message message;
       int fileOffset;
       if (declaredParameter == null) {
-        message = templateOverrideTypeMismatchReturnType.withArguments(
-            declaredMemberName,
-            declaredType,
-            interfaceType,
-            interfaceMemberName);
+        if (asIfDeclaredParameter) {
+          // Setter overridden by field
+          message = templateOverrideTypeMismatchSetter.withArguments(
+              declaredMemberName,
+              declaredType,
+              interfaceType,
+              interfaceMemberName);
+        } else {
+          message = templateOverrideTypeMismatchReturnType.withArguments(
+              declaredMemberName,
+              declaredType,
+              interfaceType,
+              interfaceMemberName);
+        }
         fileOffset = declaredMember.fileOffset;
       } else {
         message = templateOverrideTypeMismatchParameter.withArguments(
@@ -1432,26 +1440,6 @@ abstract class ClassBuilder extends DeclarationBuilder {
     return isMixinApplication && !isNamedMixinApplication
         ? "${supertype.fullNameForErrors} with ${mixedInType.fullNameForErrors}"
         : name;
-  }
-
-  void checkMixinDeclaration() {
-    assert(cls.isMixinDeclaration);
-    for (Builder constructor in constructors.local.values) {
-      if (!constructor.isSynthetic &&
-          (constructor.isFactory || constructor.isConstructor)) {
-        addProblem(
-            templateIllegalMixinDueToConstructors
-                .withArguments(fullNameForErrors),
-            charOffset,
-            noLength,
-            context: [
-              templateIllegalMixinDueToConstructorsCause
-                  .withArguments(fullNameForErrors)
-                  .withLocation(
-                      constructor.fileUri, constructor.charOffset, noLength)
-            ]);
-      }
-    }
   }
 
   void checkMixinApplication(ClassHierarchy hierarchy) {
