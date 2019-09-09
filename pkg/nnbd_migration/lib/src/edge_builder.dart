@@ -1974,7 +1974,85 @@ mixin _AssignmentChecker {
       {@required DecoratedType source,
       @required DecoratedType destination,
       @required bool hard}) {
+    // The algorithm parallels the algorithm for subtype checking - see
+    // https://github.com/dart-lang/language/blob/master/resources/type-system/subtyping.md
+    // - Reflexivity: if T0 and T1 are the same type then T0 <: T1
+    if (identical(source, destination)) return;
+    // - Right Top: if T1 is a top type (i.e. dynamic, or void, or Object?) then
+    //   T0 <: T1
+    var destinationType = destination.type;
+    if (destinationType.isDynamic || destinationType.isVoid) return;
+    // - Left Top: if T0 is dynamic or void then T0 <: T1 if Object? <: T1
+    var sourceType = source.type;
+    if (sourceType.isDynamic || sourceType.isVoid) {
+      _connect(source.node, destination.node, origin, hard: hard);
+      return;
+    }
+    // - Left Bottom: if T0 is Never then T0 <: T1
+    if (sourceType.isBottom) return;
+    // - Right Object: if T1 is Object then:
+    if (destinationType.isDartCoreObject) {
+      // - if T0 is an unpromoted type variable with bound B then T0 <: T1 iff
+      //   B <: Object
+      // - if T0 is a promoted type variable X & S then T0 <: T1 iff S <: Object
+      if (sourceType is TypeParameterType) {
+        throw UnimplementedError('TODO(paulberry)');
+      }
+      // - if T0 is FutureOr<S> for some S, then T0 <: T1 iff S <: Object.
+      if (sourceType.isDartAsyncFutureOr) {
+        throw UnimplementedError('TODO(paulberry)');
+      }
+      // - if T0 is Null, dynamic, void, or S? for any S, then the subtyping
+      //   does not hold (per above, the result of the subtyping query is
+      //   false).
+      // - Otherwise T0 <: T1 is true.
+      _connect(source.node, destination.node, origin, hard: hard);
+      return;
+    }
+    // - Left Null: if T0 is Null then:
+    if (sourceType.isDartCoreNull) {
+      // - if T1 is a type variable (promoted or not) the query is false
+      if (destinationType is TypeParameterType) {
+        throw UnimplementedError('TODO(paulberry)');
+      }
+      // - If T1 is FutureOr<S> for some S, then the query is true iff
+      //   Null <: S.
+      if (destinationType.isDartAsyncFutureOr) {
+        throw UnimplementedError('TODO(paulberry)');
+      }
+      // - If T1 is Null, S? or S* for some S, then the query is true.
+      // - Otherwise, the query is false
+      _connect(source.node, destination.node, origin, hard: hard);
+      return;
+    }
+    // - Left FutureOr: if T0 is FutureOr<S0> then:
+    if (sourceType.isDartAsyncFutureOr) {
+      // - T0 <: T1 iff Future<S0> <: T1 and S0 <: T1
+      throw UnimplementedError('TODO(paulberry)');
+    }
+    // - Left Nullable: if T0 is S0? then:
+    //   - T0 <: T1 iff S0 <: T1 and Null <: T1
     _connect(source.node, destination.node, origin, hard: hard);
+    // - Right Promoted Variable: if T1 is a promoted type variable X1 & S1
+    //   then:
+    if (destinationType is TypeParameterType) {
+      // - T0 <: T1 iff T0 <: X1 and T0 <: S1
+      throw UnimplementedError('TODO(paulberry)');
+    }
+    // - Right FutureOr: if T1 is FutureOr<S1> then:
+    if (destinationType.isDartAsyncFutureOr) {
+      // - T0 <: T1 iff any of the following hold:
+      //   - either T0 <: Future<S1>
+      TODO;
+      // - or T0 <: S1
+      TODO; // Not sure if I need the if-test below
+      if (_typeSystem.isSubtypeOf(
+          sourceType, destination.typeArguments[0].type)) {
+        _checkAssignment_recursion(origin,
+            source: source, destination: destination.typeArguments[0]);
+        return;
+      }
+    }
     _checkAssignment_recursion(origin,
         source: source, destination: destination);
   }
@@ -1986,14 +2064,7 @@ mixin _AssignmentChecker {
       {@required DecoratedType source, @required DecoratedType destination}) {
     var sourceType = source.type;
     var destinationType = destination.type;
-    if (sourceType.isBottom || sourceType.isDartCoreNull) {
-      // No further edges need to be created, since all types are trivially
-      // supertypes of bottom (and of Null, in the pre-migration world).
-    } else if (destinationType.isDynamic || destinationType.isVoid) {
-      // No further edges need to be created, since all types are trivially
-      // subtypes of dynamic (and of void, since void is treated as equivalent
-      // to dynamic for subtyping purposes).
-    } else if (sourceType is TypeParameterType) {
+    if (sourceType is TypeParameterType) {
       if (destinationType is TypeParameterType) {
         // No further edges need to be created, since type parameter types
         // aren't made up of other types.
@@ -2080,8 +2151,6 @@ mixin _AssignmentChecker {
             destination: source.namedParameters[entry.key],
             hard: false);
       }
-    } else if (destinationType.isDynamic || sourceType.isDynamic) {
-      // ok; nothing further to do.
     } else if (destinationType is InterfaceType && sourceType is FunctionType) {
       // Either this is an upcast to Function or Object, or it is erroneous
       // code.  In either case we don't need to create any additional edges.
