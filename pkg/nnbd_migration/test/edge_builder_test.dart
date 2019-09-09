@@ -4481,12 +4481,36 @@ String f() {
 
   test_superExpression() async {
     await analyze('''
-class C {
-  C f() => super;
+class B {
+  void f(int/*1*/ i, int/*2*/ j) {}
+}
+class C extends B {
+  void f(int/*3*/ i, int/*4*/ j) => super.f(j, i);
 }
 ''');
+    assertEdge(decoratedTypeAnnotation('int/*3*/').node,
+        decoratedTypeAnnotation('int/*2*/').node,
+        hard: true);
+    assertEdge(decoratedTypeAnnotation('int/*4*/').node,
+        decoratedTypeAnnotation('int/*1*/').node,
+        hard: true);
+  }
 
-    assertNoUpstreamNullability(decoratedTypeAnnotation('C f').node);
+  test_superExpression_generic() async {
+    await analyze('''
+class B<U> {
+  U g() => null;
+}
+class C<T> extends B<T> {
+  T f() => super.g();
+}
+''');
+    assertEdge(
+        substitutionNode(
+            substitutionNode(never, decoratedTypeAnnotation('T> {').node),
+            decoratedTypeAnnotation('U g').node),
+        decoratedTypeAnnotation('T f').node,
+        hard: false);
   }
 
   test_symbolLiteral() async {
@@ -4504,8 +4528,17 @@ class C {
   C f() => this;
 }
 ''');
-
     assertNoUpstreamNullability(decoratedTypeAnnotation('C f').node);
+  }
+
+  test_thisExpression_generic() async {
+    await analyze('''
+class C<T> {
+  C<T> f() => this;
+}
+''');
+    assertNoUpstreamNullability(decoratedTypeAnnotation('C<T> f').node);
+    assertNoUpstreamNullability(decoratedTypeAnnotation('T> f').node);
   }
 
   test_throwExpression() async {

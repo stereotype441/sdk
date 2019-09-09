@@ -1147,7 +1147,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   DecoratedType visitSuperExpression(SuperExpression node) {
-    return DecoratedType(node.staticType, _graph.never);
+    return _handleThisOrSuper(node);
   }
 
   @override
@@ -1177,7 +1177,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   DecoratedType visitThisExpression(ThisExpression node) {
-    return DecoratedType(node.staticType, _graph.never);
+    return _handleThisOrSuper(node);
   }
 
   @override
@@ -1874,6 +1874,14 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     } else {
       return _checkExpressionNotNull(target);
     }
+  }
+
+  DecoratedType _handleThisOrSuper(Expression node) {
+    var type = node.staticType as InterfaceType;
+    return DecoratedType(type, _graph.never,
+        typeArguments: type.typeArguments
+            .map((t) => DecoratedType(t, _graph.never))
+            .toList());
   }
 
   bool _isConditionalExpression(Expression expression) {
