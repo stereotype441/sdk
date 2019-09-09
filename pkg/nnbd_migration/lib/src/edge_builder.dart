@@ -1997,16 +1997,17 @@ mixin _AssignmentChecker {
       // - either T0 <: Future<S1>
       var s1 = destination.typeArguments[0];
       if (_typeSystem.isSubtypeOf(
-          sourceType, _typeProvider.futureOrType.instantiate([s1.type]))) {
+          sourceType, _typeProvider.futureType.instantiate([s1.type]))) {
         // E.g. FutureOr<int> = (... as Future<int>)
         // This is handled by the InterfaceType logic below, since we treat
         // FutureOr as a supertype of Future.
+        throw 'HACK'; // TODO(paulberry): test
       }
       // - or T0 <: S1
       else if (_typeSystem.isSubtypeOf(sourceType, s1.type)) {
         // E.g. FutureOr<int> = (... as int)
-        throw 'HACK'; // TODO(paulberry): test
         _checkAssignment_recursion(origin, source: source, destination: s1);
+        return;
       }
       // - or T0 is X0 and X0 has bound S0 and S0 <: T1
       // - or T0 is X0 & S0 and S0 <: T1
