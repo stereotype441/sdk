@@ -2001,7 +2001,6 @@ mixin _AssignmentChecker {
         // E.g. FutureOr<int> = (... as Future<int>)
         // This is handled by the InterfaceType logic below, since we treat
         // FutureOr as a supertype of Future.
-        throw 'HACK'; // TODO(paulberry): test
       }
       // - or T0 <: S1
       else if (_typeSystem.isSubtypeOf(sourceType, s1.type)) {
