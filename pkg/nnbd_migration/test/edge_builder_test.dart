@@ -235,6 +235,14 @@ class AssignmentCheckerTest extends Object
     assertNoEdge(t.typeArguments[0].node, anyNode);
   }
 
+  void test_int_to_future_or_int() {
+    var t1 = int_();
+    var t2 = futureOr(int_());
+    assign(t1, t2, hard: true);
+    assertEdge(t1.node, t2.node, hard: true);
+    assertNoEdge(t1.node, t2.typeArguments[0].node);
+  }
+
   void test_null_to_generic() {
     var t = list(object());
     assign(null_, t);
