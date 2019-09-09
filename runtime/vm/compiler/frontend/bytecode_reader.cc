@@ -47,20 +47,6 @@ void BytecodeMetadataHelper::ParseBytecodeFunction(
   const Function& function = parsed_function->function();
   ASSERT(function.is_declared_in_bytecode());
 
-  // No parsing is needed if function has bytecode attached.
-  // With one exception: implicit functions with artificial are still handled
-  // by shared flow graph builder which requires scopes/parsing.
-  if (function.HasBytecode() &&
-      (function.kind() != RawFunction::kImplicitGetter) &&
-      (function.kind() != RawFunction::kImplicitSetter) &&
-      (function.kind() != RawFunction::kImplicitStaticGetter) &&
-      (function.kind() != RawFunction::kMethodExtractor) &&
-      (function.kind() != RawFunction::kInvokeFieldDispatcher) &&
-      (function.kind() != RawFunction::kDynamicInvocationForwarder) &&
-      (function.kind() != RawFunction::kNoSuchMethodDispatcher)) {
-    return;
-  }
-
   BytecodeComponentData bytecode_component(
       &Array::Handle(helper_->zone_, GetBytecodeComponent()));
   BytecodeReaderHelper bytecode_reader(&H, active_class_, &bytecode_component);
@@ -231,7 +217,11 @@ void BytecodeReaderHelper::ReadCode(const Function& function,
   ASSERT(Thread::Current()->IsMutatorThread());
   ASSERT(!function.IsImplicitGetterFunction() &&
          !function.IsImplicitSetterFunction());
-  ASSERT(code_offset > 0);
+  if (code_offset == 0) {
+    FATAL2("Function %s (kind %s) doesn't have bytecode",
+           function.ToFullyQualifiedCString(),
+           Function::KindToCString(function.kind()));
+  }
 
   AlternativeReadingScope alt(&reader_, code_offset);
   // This scope is needed to set active_class_->enclosing_ which is used to
@@ -729,7 +719,7 @@ intptr_t BytecodeReaderHelper::ReadConstantPool(const Function& function,
     kUnused4,
     kUnused5,
     kUnused6,
-    kICData,
+    kICData,  // Obsolete in bytecode v20.
     kUnused7,
     kStaticField,
     kInstanceField,
@@ -753,6 +743,7 @@ intptr_t BytecodeReaderHelper::ReadConstantPool(const Function& function,
     kDirectCall,
     kInterfaceCall,
     kInstantiatedInterfaceCall,
+    kDynamicCall,
   };
 
   enum InvocationKind {
@@ -770,7 +761,6 @@ intptr_t BytecodeReaderHelper::ReadConstantPool(const Function& function,
   Field& field = Field::Handle(Z);
   Class& cls = Class::Handle(Z);
   String& name = String::Handle(Z);
-  const String* simpleInstanceOf = nullptr;
   const intptr_t obj_count = pool.Length();
   for (intptr_t i = start_index; i < obj_count; ++i) {
     const intptr_t tag = reader_.ReadTag();
@@ -778,6 +768,8 @@ intptr_t BytecodeReaderHelper::ReadConstantPool(const Function& function,
       case ConstantPoolTag::kInvalid:
         UNREACHABLE();
       case ConstantPoolTag::kICData: {
+        static_assert(KernelBytecode::kMinSupportedBytecodeFormatVersion < 20,
+                      "Cleanup ICData constant pool entry");
         intptr_t flags = reader_.ReadByte();
         InvocationKind kind =
             static_cast<InvocationKind>(flags & kInvocationKindMask);
@@ -787,10 +779,6 @@ intptr_t BytecodeReaderHelper::ReadConstantPool(const Function& function,
         intptr_t arg_desc_index = reader_.ReadUInt();
         ASSERT(arg_desc_index < i);
         array ^= pool.ObjectAt(arg_desc_index);
-        if (simpleInstanceOf == nullptr) {
-          simpleInstanceOf =
-              &Library::PrivateCoreLibName(Symbols::_simpleInstanceOf());
-        }
         // Do not mangle == or call:
         //   * operator == takes an Object so its either not checked or checked
         //     at the entry because the parameter is marked covariant, neither
@@ -925,6 +913,37 @@ intptr_t BytecodeReaderHelper::ReadConstantPool(const Function& function,
         ASSERT(i < obj_count);
         // 3) Static receiver type.
         obj = ReadObject();
+      } break;
+      case ConstantPoolTag::kDynamicCall: {
+        name ^= ReadObject();
+        ASSERT(name.IsSymbol());
+        array ^= ReadObject();
+        // Do not mangle == or call:
+        //   * operator == takes an Object so it is either not checked or
+        //     checked at the entry because the parameter is marked covariant,
+        //     neither of those cases require a dynamic invocation forwarder;
+        //   * we assume that all closures are entered in a checked way.
+        if (!Field::IsGetterName(name) && !FLAG_precompiled_mode &&
+            I->should_emit_strong_mode_checks() &&
+            (name.raw() != Symbols::EqualOperator().raw()) &&
+            (name.raw() != Symbols::Call().raw())) {
+          name = Function::CreateDynamicInvocationForwarderName(name);
+        }
+        static_assert(KernelBytecode::kMinSupportedBytecodeFormatVersion < 20,
+                      "Can use 2 slots in object pool");
+        // DynamicCall constant occupies 2 entries: selector and arguments
+        // descriptor. For backwards compatibility with ICData constants
+        // selector and arguments descriptor are packaged into UnlinkedCall
+        // object. The 2nd slot is filled with null.
+        obj = UnlinkedCall::New();
+        UnlinkedCall::Cast(obj).set_target_name(name);
+        UnlinkedCall::Cast(obj).set_args_descriptor(array);
+        pool.SetTypeAt(i, ObjectPool::EntryType::kTaggedObject,
+                       ObjectPool::Patchability::kNotPatchable);
+        pool.SetObjectAt(i, obj);
+        ++i;
+        ASSERT(i < obj_count);
+        obj = Object::null();
       } break;
       default:
         UNREACHABLE();
@@ -2908,41 +2927,37 @@ RawObject* BytecodeReaderHelper::BuildParameterDescriptor(
 void BytecodeReaderHelper::ParseBytecodeFunction(
     ParsedFunction* parsed_function,
     const Function& function) {
+  // Handle function kinds which don't have a user-defined body first.
   switch (function.kind()) {
     case RawFunction::kImplicitClosureFunction:
       ParseForwarderFunction(parsed_function, function,
                              Function::Handle(Z, function.parent_function()));
-      break;
+      return;
     case RawFunction::kDynamicInvocationForwarder:
       ParseForwarderFunction(
           parsed_function, function,
           Function::Handle(Z,
                            function.GetTargetOfDynamicInvocationForwarder()));
-      break;
+      return;
     case RawFunction::kImplicitGetter:
     case RawFunction::kImplicitSetter:
-      BytecodeScopeBuilder(parsed_function).BuildScopes();
-      break;
-    case RawFunction::kImplicitStaticGetter: {
-      if (IsStaticFieldGetterGeneratedAsInitializer(function, Z)) {
-        ReadCode(function, function.bytecode_offset());
-      } else {
-        BytecodeScopeBuilder(parsed_function).BuildScopes();
-      }
-      break;
-    }
-    case RawFunction::kFieldInitializer:
-      ReadCode(function, function.bytecode_offset());
-      break;
     case RawFunction::kMethodExtractor:
       BytecodeScopeBuilder(parsed_function).BuildScopes();
-      break;
+      return;
+    case RawFunction::kImplicitStaticGetter: {
+      if (IsStaticFieldGetterGeneratedAsInitializer(function, Z)) {
+        break;
+      } else {
+        BytecodeScopeBuilder(parsed_function).BuildScopes();
+        return;
+      }
+    }
     case RawFunction::kRegularFunction:
     case RawFunction::kGetterFunction:
     case RawFunction::kSetterFunction:
     case RawFunction::kClosureFunction:
     case RawFunction::kConstructor:
-      ReadCode(function, function.bytecode_offset());
+    case RawFunction::kFieldInitializer:
       break;
     case RawFunction::kNoSuchMethodDispatcher:
     case RawFunction::kInvokeFieldDispatcher:
@@ -2951,6 +2966,28 @@ void BytecodeReaderHelper::ParseBytecodeFunction(
     case RawFunction::kFfiTrampoline:
       UNREACHABLE();
       break;
+  }
+
+  // We only reach here if function has a bytecode body. Make sure it is
+  // loaded and collect information about covariant parameters.
+
+  if (!function.HasBytecode()) {
+    ReadCode(function, function.bytecode_offset());
+    ASSERT(function.HasBytecode());
+  }
+
+  // TODO(alexmarkov): simplify access to covariant / generic_covariant_impl
+  //  flags of parameters so we won't need to read them separately.
+  if (!parsed_function->HasCovariantParametersInfo()) {
+    const intptr_t num_params = function.NumParameters();
+    BitVector* covariant_parameters = new (Z) BitVector(Z, num_params);
+    BitVector* generic_covariant_impl_parameters =
+        new (Z) BitVector(Z, num_params);
+    ReadParameterCovariance(function, covariant_parameters,
+                            generic_covariant_impl_parameters);
+    parsed_function->SetCovariantParameters(covariant_parameters);
+    parsed_function->SetGenericCovariantImplParameters(
+        generic_covariant_impl_parameters);
   }
 }
 

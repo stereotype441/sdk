@@ -1354,7 +1354,7 @@ class Class : public Object {
 
   // Allocate a class used for VM internal objects.
   template <class FakeObject>
-  static RawClass* New();
+  static RawClass* New(Isolate* isolate, bool register_class = true);
 
   // Allocate instance classes.
   static RawClass* New(const Library& lib,
@@ -1367,19 +1367,20 @@ class Class : public Object {
                                     int num_fields);
 
   // Allocate the raw string classes.
-  static RawClass* NewStringClass(intptr_t class_id);
+  static RawClass* NewStringClass(intptr_t class_id, Isolate* isolate);
 
   // Allocate the raw TypedData classes.
-  static RawClass* NewTypedDataClass(intptr_t class_id);
+  static RawClass* NewTypedDataClass(intptr_t class_id, Isolate* isolate);
 
   // Allocate the raw TypedDataView/ByteDataView classes.
-  static RawClass* NewTypedDataViewClass(intptr_t class_id);
+  static RawClass* NewTypedDataViewClass(intptr_t class_id, Isolate* isolate);
 
   // Allocate the raw ExternalTypedData classes.
-  static RawClass* NewExternalTypedDataClass(intptr_t class_id);
+  static RawClass* NewExternalTypedDataClass(intptr_t class_id,
+                                             Isolate* isolate);
 
   // Allocate the raw Pointer classes.
-  static RawClass* NewPointerClass(intptr_t class_id);
+  static RawClass* NewPointerClass(intptr_t class_id, Isolate* isolate);
 
   // Register code that has used CHA for optimization.
   // TODO(srdjan): Also register kind of CHA optimization (e.g.: leaf class,
@@ -1534,7 +1535,9 @@ class Class : public Object {
 
   // Allocate an instance class which has a VM implementation.
   template <class FakeInstance>
-  static RawClass* New(intptr_t id);
+  static RawClass* New(intptr_t id,
+                       Isolate* isolate,
+                       bool register_class = true);
 
   // Helper that calls 'Class::New<Instance>(kIllegalCid)'.
   static RawClass* NewInstanceClass();
@@ -4009,12 +4012,6 @@ class Library : public Object {
   void SetLoadInProgress() const;
   bool Loaded() const { return raw_ptr()->load_state_ == RawLibrary::kLoaded; }
   void SetLoaded() const;
-  bool LoadFailed() const {
-    return raw_ptr()->load_state_ == RawLibrary::kLoadError;
-  }
-  RawInstance* LoadError() const { return raw_ptr()->load_error_; }
-  void SetLoadError(const Instance& error) const;
-  RawInstance* TransitiveLoadError() const;
 
   static intptr_t InstanceSize() {
     return RoundedAllocationSize(sizeof(RawLibrary));
@@ -6512,27 +6509,12 @@ class LibraryPrefix : public Instance {
   intptr_t num_imports() const { return raw_ptr()->num_imports_; }
   RawLibrary* importer() const { return raw_ptr()->importer_; }
 
-  RawInstance* LoadError() const;
-
-  bool ContainsLibrary(const Library& library) const;
   RawLibrary* GetLibrary(int index) const;
   void AddImport(const Namespace& import) const;
   RawObject* LookupObject(const String& name) const;
   RawClass* LookupClass(const String& class_name) const;
 
   bool is_deferred_load() const { return raw_ptr()->is_deferred_load_; }
-  bool is_loaded() const { return raw_ptr()->is_loaded_; }
-  bool LoadLibrary() const;
-
-  // Return the list of code objects that were compiled when this
-  // prefix was not yet loaded. These code objects will be invalidated
-  // when the prefix is loaded.
-  RawArray* dependent_code() const;
-  void set_dependent_code(const Array& array) const;
-
-  // Add the given code object to the list of dependent ones.
-  void RegisterDependentCode(const Code& code) const;
-  void InvalidateDependentCode() const;
 
   static intptr_t InstanceSize() {
     return RoundedAllocationSize(sizeof(RawLibraryPrefix));
@@ -6551,7 +6533,6 @@ class LibraryPrefix : public Instance {
   void set_imports(const Array& value) const;
   void set_num_imports(intptr_t value) const;
   void set_importer(const Library& value) const;
-  void set_is_loaded() const;
 
   static RawLibraryPrefix* New();
 
