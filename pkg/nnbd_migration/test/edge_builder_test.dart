@@ -573,18 +573,6 @@ void g(List<int> x) {
         hard: false);
   }
 
-  solo_test_assignmentExpression_nullAware_simple() async {
-    await analyze('''
-int f(int x, int y) => x ??= y;
-''');
-    var yNullable = decoratedTypeAnnotation('int y').node;
-    var xNullable = decoratedTypeAnnotation('int x').node;
-    var returnNullable = decoratedTypeAnnotation('int f').node;
-    assertEdge(yNullable, xNullable, hard: true,
-    guards: [xNullable]);
-    assertEdge(yNullable, returnNullable, hard: true, guards: [xNullable]);
-  }
-
   test_assignmentExpression_compound_dynamic() async {
     await analyze('''
 void f(dynamic x, int y) {
@@ -757,6 +745,33 @@ void f(C c, int i, int j) {
     assertEdge(decoratedTypeAnnotation('int j').node,
         decoratedTypeAnnotation('int b').node,
         hard: true);
+  }
+
+  test_assignmentExpression_nullAware_complex() async {
+    await analyze('''
+List<int> f(List<int> x, List<int> y) => x ??= y;
+''');
+    var xNullable = decoratedTypeAnnotation('List<int> x').node;
+    var xElementNullable = decoratedTypeAnnotation('int> x').node;
+    var yElementNullable = decoratedTypeAnnotation('int> y').node;
+    var returnElementNullable = decoratedTypeAnnotation('int> f').node;
+    assertEdge(yElementNullable, xElementNullable,
+        hard: false, guards: [xNullable]);
+  }
+
+  test_assignmentExpression_nullAware_simple() async {
+    await analyze('''
+int f(int x, int y) => (x ??= y);
+''');
+    var yNullable = decoratedTypeAnnotation('int y').node;
+    var xNullable = decoratedTypeAnnotation('int x').node;
+    var returnNullable = decoratedTypeAnnotation('int f').node;
+    var glbNode = decoratedExpressionType('(x ??= y)').node;
+    assertEdge(yNullable, xNullable, hard: true, guards: [xNullable]);
+    assertEdge(yNullable, glbNode, hard: false, guards: [xNullable]);
+    assertEdge(glbNode, xNullable, hard: false);
+    assertEdge(glbNode, yNullable, hard: false);
+    assertEdge(glbNode, returnNullable, hard: false);
   }
 
   test_assignmentExpression_operands() async {

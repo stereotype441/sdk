@@ -274,9 +274,9 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   @override
   DecoratedType visitAssignmentExpression(AssignmentExpression node) {
     _CompoundOperatorInfo compoundOperatorInfo;
-    bool guarded = false;
+    bool isQuestionAssign = false;
     if (node.operator.type == TokenType.QUESTION_QUESTION_EQ) {
-      guarded = true;
+      isQuestionAssign = true;
     } else if (node.operator.type != TokenType.EQ) {
       compoundOperatorInfo = _CompoundOperatorInfo(
           node.staticElement, node.operator.offset, node.staticType);
@@ -284,7 +284,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     var expressionType = _handleAssignment(node.rightHandSide,
         destinationExpression: node.leftHandSide,
         compoundOperatorInfo: compoundOperatorInfo,
-        guarded: guarded);
+        questionAssignNode: isQuestionAssign ? node : null);
     var conditionalNode = _conditionalNodes[node.leftHandSide];
     if (conditionalNode != null) {
       expressionType = expressionType.withNode(
@@ -1501,7 +1501,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       {DecoratedType destinationType,
       Expression destinationExpression,
       _CompoundOperatorInfo compoundOperatorInfo,
-      bool guarded = false,
+      Expression questionAssignNode,
       bool canInsertChecks = true}) {
     assert(
         (destinationExpression == null) != (destinationType == null),
@@ -1521,7 +1521,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         destinationType = destinationExpression.accept(this);
       }
     }
-    if (guarded) {
+    if (questionAssignNode != null) {
       _guards.add(destinationType.node);
     }
     DecoratedType sourceType;
@@ -1568,9 +1568,13 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
             destination: destinationType,
             hard: _postDominatedLocals.isReferenceInScope(expression));
       }
-      TODO; // See notes
+      if (questionAssignNode != null) {
+        // a ??= b is only nullable if both a and b are nullable.
+        sourceType = sourceType.withNode(_nullabilityNodeForGLB(questionAssignNode, sourceType.node, destinationType.node));
+        _variables.recordDecoratedExpressionType(questionAssignNode, sourceType);
+      }
     } finally {
-      if (guarded) {
+      if (questionAssignNode != null) {
         _guards.removeLast();
       }
     }
