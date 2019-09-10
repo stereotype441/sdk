@@ -352,10 +352,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         _postDominatedLocals.doScoped(action: () {
           rightType = node.rightOperand.accept(this);
         });
-        var ifNullNode = NullabilityNode.forIfNotNull();
-        expressionType = DecoratedType(node.staticType, ifNullNode);
-        _connect(rightType.node, expressionType.node,
-            IfNullOrigin(source, node.offset));
+        expressionType = _decorateUpperOrLowerBound(
+            node, node.staticType, leftType, rightType, true);
       } finally {
         _flowAnalysis.ifNullExpression_end();
         _guards.removeLast();

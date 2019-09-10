@@ -1077,7 +1077,7 @@ Int f(Int i, Int j) => i + j/*check*/;
             hard: true));
   }
 
-  test_binaryExpression_questionQuestion() async {
+  solo_test_binaryExpression_questionQuestion() async {
     await analyze('''
 int f(int i, int j) => i ?? j;
 ''');
