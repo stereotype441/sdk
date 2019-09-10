@@ -239,6 +239,13 @@ class AssignmentCheckerTest extends Object
     var t1 = int_();
     var t2 = futureOr(int_());
     assign(t1, t2, hard: true);
+    // Note: given code like:
+    //   int x = null;
+    //   FutureOr<int> y = x;
+    // There are two possible migrations for `FutureOr<int>`: we could change it
+    // to either `FutureOr<int?>` or `FutureOr<int>?`.  We choose to do
+    // `FutureOr<int>?` because it is a narrower type, so it is less likely to
+    // cause a proliferation of nullable types in the user's program.
     assertEdge(t1.node, t2.node, hard: true);
     assertNoEdge(t1.node, t2.typeArguments[0].node);
   }
@@ -366,6 +373,32 @@ class EdgeBuilderTest extends EdgeBuilderTestBase {
   /// [DecoratedType] associated with it.
   DecoratedType decoratedExpressionType(String text) {
     return variables.decoratedExpressionType(findNode.expression(text));
+  }
+
+  test_as_dynamic() async {
+    await analyze('''
+void f(Object o) {
+  (o as dynamic).gcd(1);
+}
+''');
+    assertEdge(decoratedTypeAnnotation('Object o').node,
+        decoratedTypeAnnotation('dynamic').node,
+        hard: true);
+    // TODO(mfairhurst): these should probably be hard edges.
+    assertEdge(decoratedTypeAnnotation('dynamic').node, never, hard: false);
+  }
+
+  test_as_int() async {
+    await analyze('''
+void f(Object o) {
+  (o as int).gcd(1);
+}
+''');
+    assertEdge(decoratedTypeAnnotation('Object o').node,
+        decoratedTypeAnnotation('int').node,
+        hard: true);
+    // TODO(mfairhurst): these should probably be hard edges.
+    assertEdge(decoratedTypeAnnotation('int').node, never, hard: false);
   }
 
   test_already_migrated_field() async {
