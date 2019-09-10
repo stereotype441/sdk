@@ -1570,7 +1570,9 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       }
       TODO; // See notes
     } finally {
-      _guards.removeLast();
+      if (guarded) {
+        _guards.removeLast();
+      }
     }
     if (destinationExpression != null) {
       _postDominatedLocals.removeReferenceFromAllScopes(destinationExpression);
