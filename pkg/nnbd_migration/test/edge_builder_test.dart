@@ -108,6 +108,10 @@ class AssignmentCheckerTest extends Object
     // Note: no assertions to do; just need to make sure there wasn't a crash.
   }
 
+  void solo_test_future_or_to_future_or() {
+    assign(futureOr(int_()), futureOr(int_()));
+  }
+
   void test_function_type_named_parameter() {
     var t1 = function(dynamic_, named: {'x': object()});
     var t2 = function(dynamic_, named: {'x': object()});
