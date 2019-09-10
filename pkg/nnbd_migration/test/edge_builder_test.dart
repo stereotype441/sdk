@@ -747,6 +747,20 @@ void f(C c, int i, int j) {
         hard: true);
   }
 
+  test_assignmentExpression_nullAware_complex_contravariant() async {
+    await analyze('''
+void Function(int) f(void Function(int) x, void Function(int) y) => x ??= y;
+''');
+    var xNullable =
+        decoratedGenericFunctionTypeAnnotation('void Function(int) x').node;
+    var xParamNullable = decoratedTypeAnnotation('int) x').node;
+    var yParamNullable = decoratedTypeAnnotation('int) y').node;
+    var returnParamNullable = decoratedTypeAnnotation('int) f').node;
+    assertEdge(xParamNullable, yParamNullable,
+        hard: false, guards: [xNullable]);
+    assertEdge(returnParamNullable, xParamNullable, hard: false);
+  }
+
   test_assignmentExpression_nullAware_complex_covariant() async {
     await analyze('''
 List<int> f(List<int> x, List<int> y) => x ??= y;
