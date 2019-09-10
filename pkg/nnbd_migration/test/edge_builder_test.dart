@@ -375,6 +375,16 @@ class EdgeBuilderTest extends EdgeBuilderTestBase {
     return variables.decoratedExpressionType(findNode.expression(text));
   }
 
+  test_already_migrated_field() async {
+    await analyze('''
+double f() => double.NAN;
+''');
+    var nanElement = typeProvider.doubleType.element.getField('NAN');
+    assertEdge(variables.decoratedElementType(nanElement).node,
+        decoratedTypeAnnotation('double f').node,
+        hard: false);
+  }
+
   test_as_dynamic() async {
     await analyze('''
 void f(Object o) {
@@ -399,16 +409,6 @@ void f(Object o) {
         hard: true);
     // TODO(mfairhurst): these should probably be hard edges.
     assertEdge(decoratedTypeAnnotation('int').node, never, hard: false);
-  }
-
-  test_already_migrated_field() async {
-    await analyze('''
-double f() => double.NAN;
-''');
-    var nanElement = typeProvider.doubleType.element.getField('NAN');
-    assertEdge(variables.decoratedElementType(nanElement).node,
-        decoratedTypeAnnotation('double f').node,
-        hard: false);
   }
 
   test_assert_demonstrates_non_null_intent() async {
