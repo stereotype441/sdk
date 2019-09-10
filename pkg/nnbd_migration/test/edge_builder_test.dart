@@ -747,7 +747,7 @@ void f(C c, int i, int j) {
         hard: true);
   }
 
-  test_assignmentExpression_nullAware_complex() async {
+  test_assignmentExpression_nullAware_complex_covariant() async {
     await analyze('''
 List<int> f(List<int> x, List<int> y) => x ??= y;
 ''');
@@ -757,6 +757,7 @@ List<int> f(List<int> x, List<int> y) => x ??= y;
     var returnElementNullable = decoratedTypeAnnotation('int> f').node;
     assertEdge(yElementNullable, xElementNullable,
         hard: false, guards: [xNullable]);
+    assertEdge(xElementNullable, returnElementNullable, hard: false);
   }
 
   test_assignmentExpression_nullAware_simple() async {
