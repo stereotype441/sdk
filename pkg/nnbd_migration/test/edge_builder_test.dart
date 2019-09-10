@@ -573,6 +573,18 @@ void g(List<int> x) {
         hard: false);
   }
 
+  solo_test_assignmentExpression_nullAware_simple() async {
+    await analyze('''
+int f(int x, int y) => x ??= y;
+''');
+    var yNullable = decoratedTypeAnnotation('int y').node;
+    var xNullable = decoratedTypeAnnotation('int x').node;
+    var returnNullable = decoratedTypeAnnotation('int f').node;
+    assertEdge(yNullable, xNullable, hard: true,
+    guards: [xNullable]);
+    assertEdge(yNullable, returnNullable, hard: true, guards: [xNullable]);
+  }
+
   test_assignmentExpression_compound_dynamic() async {
     await analyze('''
 void f(dynamic x, int y) {
