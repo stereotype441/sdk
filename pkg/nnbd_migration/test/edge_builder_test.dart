@@ -2723,6 +2723,36 @@ class C {
     assertEdge(decoratedTypeAnnotation('int k').node, never, hard: true);
   }
 
+  test_invocation_dynamic() async {
+    await analyze('''
+int f(dynamic g) => g();
+''');
+    assertEdge(always, decoratedTypeAnnotation('int f').node, hard: false);
+  }
+
+  test_invocation_function() async {
+    await analyze('''
+int f(Function g) => g();
+''');
+    assertEdge(always, decoratedTypeAnnotation('int f').node, hard: false);
+    assertNullCheck(checkExpression('g('), assertEdge(decoratedTypeAnnotation('Function g').node, never, hard: true));
+  }
+
+  test_invocation_dynamic_parenthesized() async {
+    await analyze('''
+int f(dynamic g) => (g)();
+''');
+    assertEdge(always, decoratedTypeAnnotation('int f').node, hard: false);
+  }
+
+  solo_test_invocation_function_parenthesized() async {
+    await analyze('''
+int f(Function g) => (g)();
+''');
+    assertEdge(always, decoratedTypeAnnotation('int f').node, hard: false);
+    assertNullCheck(checkExpression('g)'), assertEdge(decoratedTypeAnnotation('Function g').node, never, hard: true));
+  }
+
   test_methodInvocation_dynamic() async {
     await analyze('''
 class C {
