@@ -239,6 +239,13 @@ class AssignmentCheckerTest extends Object
     var t1 = int_();
     var t2 = futureOr(int_());
     assign(t1, t2, hard: true);
+    // Note: given code like:
+    //   int x = null;
+    //   FutureOr<int> y = x;
+    // There are two possible migrations for `FutureOr<int>`: we could change it
+    // to either `FutureOr<int?>` or `FutureOr<int>?`.  We choose to do
+    // `FutureOr<int>?` because it is a narrower type, so it is less likely to
+    // cause a proliferation of nullable types in the user's program.
     assertEdge(t1.node, t2.node, hard: true);
     assertNoEdge(t1.node, t2.typeArguments[0].node);
   }
