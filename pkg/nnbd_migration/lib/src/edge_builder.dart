@@ -1570,8 +1570,10 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       }
       if (questionAssignNode != null) {
         // a ??= b is only nullable if both a and b are nullable.
-        sourceType = destinationType.withNode(_nullabilityNodeForGLB(questionAssignNode, sourceType.node, destinationType.node));
-        _variables.recordDecoratedExpressionType(questionAssignNode, sourceType);
+        sourceType = destinationType.withNode(_nullabilityNodeForGLB(
+            questionAssignNode, sourceType.node, destinationType.node));
+        _variables.recordDecoratedExpressionType(
+            questionAssignNode, sourceType);
       }
     } finally {
       if (questionAssignNode != null) {
