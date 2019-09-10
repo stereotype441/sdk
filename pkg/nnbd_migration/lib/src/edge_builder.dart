@@ -2114,7 +2114,7 @@ mixin _AssignmentChecker {
       } else {
         // Not a subtype.  This should never happen, since we handle the
         // implicit downcast case above.
-        assert(false, 'not a subtype');
+        assert(false, 'not a subtype: $sourceType <: $destinationType');
       }
     }
     if (sourceType.isBottom || sourceType.isDartCoreNull) {
