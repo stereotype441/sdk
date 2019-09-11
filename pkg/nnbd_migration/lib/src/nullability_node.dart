@@ -195,21 +195,17 @@ class NullabilityGraph {
 
   void _debugDump() {
     for (var source in _allSourceNodes) {
-      var edges = source._downstreamEdges;
-      var destinations =
-          edges.where((edge) => edge.primarySource == source).map((edge) {
-        var suffixes = <Object>[];
-        if (edge.isUnion) {
-          suffixes.add('union');
-        } else if (edge.hard) {
-          suffixes.add('hard');
-        }
-        suffixes.addAll(edge.guards);
-        var suffix = suffixes.isNotEmpty ? ' (${suffixes.join(', ')})' : '';
-        return '${edge.destinationNode}$suffix';
-      });
       var state = source._state;
-      print('$source ($state) -> ${destinations.join(', ')}');
+      var edges = source._downstreamEdges;
+      for (var edge in edges) {
+        if (edge.primarySource != source) continue;
+        var kind = edge.isUnion ? 'union' : edge.hard ? 'hard' : 'soft';
+        var destination = edge.destinationNode;
+        var suffix =
+            edge.guards.isNotEmpty ? ' (${edge.guards.join(', ')})' : '';
+        var origin = edge.origin;
+        print('$kind: $source ($state) -> $destination$suffix // $origin');
+      }
     }
   }
 
