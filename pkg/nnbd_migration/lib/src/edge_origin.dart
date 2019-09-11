@@ -40,6 +40,9 @@ abstract class EdgeOriginWithLocation extends EdgeOrigin {
   final int offset;
 
   EdgeOriginWithLocation(this.source, this.offset);
+
+  @override
+  String toString() => '$runtimeType @ $source ($offset)';
 }
 
 /// Edge origin resulting from the relationship between a field formal parameter
