@@ -1578,7 +1578,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       }
       ExpressionChecks expressionChecks;
       if (canInsertChecks && !sourceType.type.isDynamic) {
-        expressionChecks = ExpressionChecks(expression.end);
+        expressionChecks = ExpressionChecks(source, expression.end);
         _variables.recordExpressionChecks(source, expression, expressionChecks);
       }
       if (compoundOperatorInfo != null) {
