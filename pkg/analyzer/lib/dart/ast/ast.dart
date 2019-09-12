@@ -825,7 +825,8 @@ abstract class BreakStatement implements Statement {
 ///        [Expression] cascadeSection*
 ///
 ///    cascadeSection ::=
-///        '..'  (cascadeSelector arguments*) (assignableSelector arguments*)*
+///        ('..' | '?..') (cascadeSelector arguments*)
+///        (assignableSelector arguments*)*
 ///        (assignmentOperator expressionWithoutCascade)?
 ///
 ///    cascadeSelector ::=
@@ -4787,6 +4788,9 @@ abstract class SpreadElement implements CollectionElement {
 
   /// The spread operator, either '...' or '...?'.
   Token get spreadOperator;
+
+  /// Whether this is a null-aware spread, as opposed to a non-null spread.
+  bool get isNullAware;
 }
 
 /// A node that represents a statement.
