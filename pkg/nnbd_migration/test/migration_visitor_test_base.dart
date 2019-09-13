@@ -10,6 +10,7 @@ import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/generated/utilities_dart.dart';
 import 'package:meta/meta.dart';
+import 'package:nnbd_migration/nullability_node.dart';
 import 'package:nnbd_migration/src/conditional_discard.dart';
 import 'package:nnbd_migration/src/decorated_type.dart';
 import 'package:nnbd_migration/src/edge_builder.dart';
@@ -41,13 +42,13 @@ mixin DecoratedTypeTester implements DecoratedTypeTesterBase {
   Map<TypeParameterElement, DecoratedType> _decoratedTypeParameterBounds =
       Map.identity();
 
-  NullabilityNode get always => graph.always;
+  NullabilityNodeImpl get always => graph.always;
 
   DecoratedType get bottom => DecoratedType(typeProvider.bottomType, never);
 
   DecoratedType get dynamic_ => DecoratedType(typeProvider.dynamicType, always);
 
-  NullabilityNode get never => graph.never;
+  NullabilityNodeImpl get never => graph.never;
 
   DecoratedType get null_ => DecoratedType(typeProvider.nullType, always);
 
@@ -58,7 +59,7 @@ mixin DecoratedTypeTester implements DecoratedTypeTesterBase {
       List<DecoratedType> positional = const [],
       Map<String, DecoratedType> named = const {},
       List<TypeParameterElement> typeFormals = const [],
-      NullabilityNode node}) {
+      NullabilityNodeImpl node}) {
     int i = 0;
     var parameters = required
         .map((t) => ParameterElementImpl.synthetic(
@@ -79,30 +80,31 @@ mixin DecoratedTypeTester implements DecoratedTypeTesterBase {
         namedParameters: named);
   }
 
-  DecoratedType future(DecoratedType parameter, {NullabilityNode node}) {
+  DecoratedType future(DecoratedType parameter, {NullabilityNodeImpl node}) {
     return DecoratedType(typeProvider.futureType.instantiate([parameter.type]),
         node ?? newNode(),
         typeArguments: [parameter]);
   }
 
-  DecoratedType futureOr(DecoratedType parameter, {NullabilityNode node}) {
+  DecoratedType futureOr(DecoratedType parameter, {NullabilityNodeImpl node}) {
     return DecoratedType(
         typeProvider.futureOrType.instantiate([parameter.type]),
         node ?? newNode(),
         typeArguments: [parameter]);
   }
 
-  DecoratedType int_({NullabilityNode node}) =>
+  DecoratedType int_({NullabilityNodeImpl node}) =>
       DecoratedType(typeProvider.intType, node ?? newNode());
 
-  DecoratedType list(DecoratedType elementType, {NullabilityNode node}) =>
+  DecoratedType list(DecoratedType elementType, {NullabilityNodeImpl node}) =>
       DecoratedType(typeProvider.listType.instantiate([elementType.type]),
           node ?? newNode(),
           typeArguments: [elementType]);
 
-  NullabilityNode newNode() => NullabilityNode.forTypeAnnotation(_offset++);
+  NullabilityNodeImpl newNode() =>
+      NullabilityNodeImpl.forTypeAnnotation(_offset++);
 
-  DecoratedType object({NullabilityNode node}) =>
+  DecoratedType object({NullabilityNodeImpl node}) =>
       DecoratedType(typeProvider.objectType, node ?? newNode());
 
   TypeParameterElement typeParameter(String name, DecoratedType bound) {
@@ -113,7 +115,7 @@ mixin DecoratedTypeTester implements DecoratedTypeTesterBase {
   }
 
   DecoratedType typeParameterType(TypeParameterElement typeParameter,
-          {NullabilityNode node}) =>
+          {NullabilityNodeImpl node}) =>
       DecoratedType(typeParameter.type, node ?? newNode());
 }
 

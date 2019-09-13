@@ -91,6 +91,37 @@ main() {
     await _checkSingleFileChanges(content, expected);
   }
 
+  @FailingTest(issue: 'https://github.com/dart-lang/sdk/issues/38341')
+  test_back_propagation_stops_at_implicitly_typed_variables() async {
+    var content = '''
+class C {
+  int v;
+  C(this.v);
+}
+f(C c) {
+  var x = c.v;
+  print(x + 1);
+}
+main() {
+  C(null);
+}
+''';
+    var expected = '''
+class C {
+  int? v;
+  C(this.v);
+}
+f(C c) {
+  var x = c.v!;
+  print(x + 1);
+}
+main() {
+  C(null);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_catch_simple() async {
     var content = '''
 void f() {
@@ -874,6 +905,32 @@ int g(int i) => f(i);
     var expected = '''
 f(int i) => null; // TODO(danrubel): suggest type
 int? g(int i) => f(i);
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_definitely_assigned_value() async {
+    var content = '''
+String f(bool b) {
+  String s;
+  if (b) {
+    s = 'true';
+  } else {
+    s = 'false';
+  }
+  return s;
+}
+''';
+    var expected = '''
+String f(bool b) {
+  String s;
+  if (b) {
+    s = 'true';
+  } else {
+    s = 'false';
+  }
+  return s;
+}
 ''';
     await _checkSingleFileChanges(content, expected);
   }
@@ -2033,6 +2090,29 @@ int f(int i, [int j]) {
 int f(int i, [int? j]) {
   if (i == 0) return i;
   return i + j!;
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  @FailingTest(issue: 'https://github.com/dart-lang/sdk/issues/38344')
+  test_not_definitely_assigned_value() async {
+    var content = '''
+String f(bool b) {
+  String s;
+  if (b) {
+    s = 'true';
+  }
+  return s;
+}
+''';
+    var expected = '''
+String? f(bool b) {
+  String? s;
+  if (b) {
+    s = 'true';
+  }
+  return s;
 }
 ''';
     await _checkSingleFileChanges(content, expected);

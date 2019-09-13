@@ -14,6 +14,7 @@ import 'package:front_end/src/scanner/token.dart';
 import 'package:meta/meta.dart';
 import 'package:nnbd_migration/instrumentation.dart';
 import 'package:nnbd_migration/nnbd_migration.dart';
+import 'package:nnbd_migration/nullability_node.dart';
 import 'package:nnbd_migration/src/conditional_discard.dart';
 import 'package:nnbd_migration/src/decorated_type.dart';
 import 'package:nnbd_migration/src/expression_checks.dart';
@@ -324,7 +325,7 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
     assert(node != null); // TODO(paulberry)
     var type = node.type;
     if (type.isVoid || type.isDynamic) {
-      var nullabilityNode = NullabilityNode.forTypeAnnotation(node.end);
+      var nullabilityNode = NullabilityNodeImpl.forTypeAnnotation(node.end);
       _graph.connect(_graph.always, nullabilityNode,
           AlwaysNullableTypeOrigin(source, node.offset));
       var decoratedType = DecoratedType(type, nullabilityNode);
@@ -376,7 +377,7 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
         _typeFormalBounds = previousTypeFormalBounds;
       }
     }
-    NullabilityNode nullabilityNode;
+    NullabilityNodeImpl nullabilityNode;
     var parent = node.parent;
     if (parent is ExtendsClause ||
         parent is ImplementsClause ||
@@ -385,7 +386,7 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
         parent is ClassTypeAlias) {
       nullabilityNode = _graph.never;
     } else {
-      nullabilityNode = NullabilityNode.forTypeAnnotation(node.end);
+      nullabilityNode = NullabilityNodeImpl.forTypeAnnotation(node.end);
     }
     DecoratedType decoratedType;
     if (type is FunctionType && node is! GenericFunctionType) {
@@ -436,7 +437,7 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
     if (bound != null) {
       decoratedBound = bound.accept(this);
     } else {
-      var nullabilityNode = NullabilityNode.forInferredType();
+      var nullabilityNode = NullabilityNodeImpl.forInferredType();
       _graph.union(_graph.always, nullabilityNode,
           AlwaysNullableTypeOrigin(source, node.offset));
       decoratedBound = DecoratedType(_typeProvider.objectType, nullabilityNode);
@@ -569,7 +570,7 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
         _namedParameters = previousNamedParameters;
       }
       decoratedType = DecoratedType(
-          declaredElement.type, NullabilityNode.forTypeAnnotation(node.end),
+          declaredElement.type, NullabilityNodeImpl.forTypeAnnotation(node.end),
           returnType: decoratedReturnType,
           positionalParameters: positionalParameters,
           namedParameters: namedParameters);

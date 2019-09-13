@@ -5,8 +5,8 @@
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart' show SourceEdit;
+import 'package:nnbd_migration/nullability_node.dart';
 import 'package:nnbd_migration/src/conditional_discard.dart';
-import 'package:nnbd_migration/src/nullability_node.dart';
 
 /// Records information about how a conditional expression or statement might
 /// need to be modified.
