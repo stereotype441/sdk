@@ -34,6 +34,8 @@ class _InstrumentationClient implements NullabilityMigrationInstrumentation {
 
   final Map<String, Map<AstNode, DecoratedTypeInfo>> _implicitReturnType = {};
 
+  final Map<String, Map<AstNode, DecoratedTypeInfo>> _implicitType = {};
+
   @override
   void explicitTypeNullability(
       Source source, TypeAnnotation typeAnnotation, NullabilityNodeInfo node) {
@@ -59,7 +61,7 @@ class _InstrumentationClient implements NullabilityMigrationInstrumentation {
   @override
   void implicitType(
       Source source, AstNode node, DecoratedTypeInfo decoratedType) {
-    // TODO: implement implicitDeclarationType
+    (_implicitType[source.fullName] ??= {})[node] = decoratedType;
   }
 
   @override
@@ -102,6 +104,9 @@ class _InstrumentationTest extends _ProvisionalApiTestBase {
 
   DecoratedTypeInfo implicitReturnType(String path, AstNode node) =>
       (_instrumentationClient._implicitReturnType[path] ?? {})[node];
+
+  DecoratedTypeInfo implicitType(String path, AstNode node) =>
+      (_instrumentationClient._implicitType[path] ?? {})[node];
 
   test_explicitTypeNullability() async {
     var content = '''
@@ -187,6 +192,36 @@ abstract class Derived extends Base {
         getEdges((e) =>
             e.primarySource == derivedReturnNode &&
             e.destinationNode == baseReturnNode),
+        hasLength(1));
+  }
+
+  test_implicitType() async {
+    var content = '''
+abstract class Base {
+  void f(int i);
+}
+abstract class Derived extends Base {
+  void f(i); /*derived*/
+}
+''';
+    var expected = '''
+abstract class Base {
+  void f(int i);
+}
+abstract class Derived extends Base {
+  void f(i); /*derived*/
+}
+''';
+    var sourcePath = await _checkSingleFileChanges(content, expected);
+    var find = findNodes[sourcePath];
+    var baseParamNode =
+        explicitTypeNullability(sourcePath, find.typeAnnotation('int i'));
+    var derivedParamNode =
+        implicitType(sourcePath, find.simpleParameter('i); /*derived*/')).node;
+    expect(
+        getEdges((e) =>
+            e.primarySource == baseParamNode &&
+            e.destinationNode == derivedParamNode),
         hasLength(1));
   }
 }
