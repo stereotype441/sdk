@@ -113,7 +113,7 @@ int? y = null;
         explicitTypeNullability(sourcePath, find.typeAnnotation('int x'));
     expect(xAnnotation.isNullable, false);
     var yAnnotation =
-        explicitTypeNullability(sourcePath, find.typeAnnotation('int x'));
+        explicitTypeNullability(sourcePath, find.typeAnnotation('int y'));
     expect(yAnnotation.isNullable, true);
   }
 
