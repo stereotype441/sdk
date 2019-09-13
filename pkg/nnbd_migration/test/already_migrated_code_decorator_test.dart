@@ -38,9 +38,9 @@ class _AlreadyMigratedCodeDecoratorTest {
   _AlreadyMigratedCodeDecoratorTest._(this.graph, this.typeProvider)
       : decorator = AlreadyMigratedCodeDecorator(graph, typeProvider);
 
-  NullabilityNodeImpl get always => graph.always;
+  NullabilityNode get always => graph.always;
 
-  NullabilityNodeImpl get never => graph.never;
+  NullabilityNode get never => graph.never;
 
   void checkDynamic(DecoratedType decoratedType) {
     expect(decoratedType.type, same(typeProvider.dynamicType));
@@ -49,7 +49,7 @@ class _AlreadyMigratedCodeDecoratorTest {
 
   void checkFutureOr(
       DecoratedType decoratedType,
-      NullabilityNodeImpl expectedNullability,
+      NullabilityNode expectedNullability,
       void Function(DecoratedType) checkArgument) {
     expect(decoratedType.type.element, typeProvider.futureOrType.element);
     expect(decoratedType.node, expectedNullability);
@@ -57,14 +57,14 @@ class _AlreadyMigratedCodeDecoratorTest {
   }
 
   void checkInt(
-      DecoratedType decoratedType, NullabilityNodeImpl expectedNullability) {
+      DecoratedType decoratedType, NullabilityNode expectedNullability) {
     expect(decoratedType.type.element, typeProvider.intType.element);
     expect(decoratedType.node, expectedNullability);
   }
 
   void checkIterable(
       DecoratedType decoratedType,
-      NullabilityNodeImpl expectedNullability,
+      NullabilityNode expectedNullability,
       void Function(DecoratedType) checkArgument) {
     expect(
         decoratedType.type.element, typeProvider.iterableDynamicType.element);
@@ -73,20 +73,20 @@ class _AlreadyMigratedCodeDecoratorTest {
   }
 
   void checkNum(
-      DecoratedType decoratedType, NullabilityNodeImpl expectedNullability) {
+      DecoratedType decoratedType, NullabilityNode expectedNullability) {
     expect(decoratedType.type.element, typeProvider.numType.element);
     expect(decoratedType.node, expectedNullability);
   }
 
   void checkObject(
-      DecoratedType decoratedType, NullabilityNodeImpl expectedNullability) {
+      DecoratedType decoratedType, NullabilityNode expectedNullability) {
     expect(decoratedType.type.element, typeProvider.objectType.element);
     expect(decoratedType.node, expectedNullability);
   }
 
   void checkTypeParameter(
       DecoratedType decoratedType,
-      NullabilityNodeImpl expectedNullability,
+      NullabilityNode expectedNullability,
       TypeParameterElement expectedElement) {
     var type = decoratedType.type as TypeParameterTypeImpl;
     expect(type.element, same(expectedElement));

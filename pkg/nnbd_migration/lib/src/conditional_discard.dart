@@ -17,7 +17,7 @@ class ConditionalDiscard {
   ///
   /// `null` if the code path should be kept regardless of the outcome of
   /// migration.
-  final NullabilityNodeImpl trueGuard;
+  final NullabilityNode trueGuard;
 
   /// Nullability node that will be `nullable` if the code path that results
   /// from the condition evaluating to `false` will be reachable after
@@ -25,7 +25,7 @@ class ConditionalDiscard {
   ///
   /// `null` if the code path should be kept regardless of the outcome of
   /// migration.
-  final NullabilityNodeImpl falseGuard;
+  final NullabilityNode falseGuard;
 
   /// Indicates whether the condition is pure (free from side effects).
   ///

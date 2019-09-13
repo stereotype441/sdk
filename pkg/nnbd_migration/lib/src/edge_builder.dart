@@ -61,7 +61,7 @@ class AssignmentCheckerForTesting extends Object with _AssignmentChecker {
   }
 
   @override
-  void _connect(NullabilityNodeImpl source, NullabilityNodeImpl destination,
+  void _connect(NullabilityNode source, NullabilityNode destination,
       EdgeOrigin origin,
       {bool hard = false}) {
     _graph.connect(source, destination, origin, hard: hard);
@@ -168,7 +168,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   /// Guard variables are attached to the left hand side of any generated
   /// constraints, so that constraints do not take effect if they come from
   /// code that can be proven unreachable by the migration tool.
-  final _guards = <NullabilityNodeImpl>[];
+  final _guards = <NullabilityNode>[];
 
   /// The scope of locals (parameters, variables) that are post-dominated by the
   /// current node as we walk the AST. We use a [_ScopedLocalSet] so that outer
@@ -184,7 +184,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   /// analyze expressions like `a?.b += c`, since the type of the compound
   /// assignment is nullable if the type of the expression preceding `?.` is
   /// nullable.
-  final Map<Expression, NullabilityNodeImpl> _conditionalNodes = {};
+  final Map<Expression, NullabilityNode> _conditionalNodes = {};
 
   List<String> _objectGetNames;
 
@@ -288,7 +288,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     var conditionalNode = _conditionalNodes[node.leftHandSide];
     if (conditionalNode != null) {
       expressionType = expressionType.withNode(
-          NullabilityNodeImpl.forLUB(conditionalNode, expressionType.node));
+          NullabilityNode.forLUB(conditionalNode, expressionType.node));
       _variables.recordDecoratedExpressionType(node, expressionType);
     }
     return expressionType;
@@ -354,7 +354,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         _postDominatedLocals.doScoped(action: () {
           rightType = node.rightOperand.accept(this);
         });
-        var ifNullNode = NullabilityNodeImpl.forIfNotNull();
+        var ifNullNode = NullabilityNode.forIfNotNull();
         expressionType = DecoratedType(node.staticType, ifNullNode);
         _connect(rightType.node, expressionType.node,
             IfNullOrigin(source, node.offset));
@@ -675,8 +675,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   @override
   DecoratedType visitIfElement(IfElement node) {
     _checkExpressionNotNull(node.condition);
-    NullabilityNodeImpl trueGuard;
-    NullabilityNodeImpl falseGuard;
+    NullabilityNode trueGuard;
+    NullabilityNode falseGuard;
     if (identical(_conditionInfo?.condition, node.condition)) {
       trueGuard = _conditionInfo.trueGuard;
       falseGuard = _conditionInfo.falseGuard;
@@ -713,8 +713,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   @override
   DecoratedType visitIfStatement(IfStatement node) {
     _checkExpressionNotNull(node.condition);
-    NullabilityNodeImpl trueGuard;
-    NullabilityNodeImpl falseGuard;
+    NullabilityNode trueGuard;
+    NullabilityNode falseGuard;
     if (identical(_conditionInfo?.condition, node.condition)) {
       trueGuard = _conditionInfo.trueGuard;
       falseGuard = _conditionInfo.falseGuard;
@@ -928,7 +928,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         invokeType: node.staticInvokeType);
     if (isConditional) {
       expressionType = expressionType.withNode(
-          NullabilityNodeImpl.forLUB(targetType.node, expressionType.node));
+          NullabilityNode.forLUB(targetType.node, expressionType.node));
       _variables.recordDecoratedExpressionType(node, expressionType);
     }
     return expressionType;
@@ -1408,7 +1408,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   }
 
   @override
-  void _connect(NullabilityNodeImpl source, NullabilityNodeImpl destination,
+  void _connect(NullabilityNode source, NullabilityNode destination,
       EdgeOrigin origin,
       {bool hard = false}) {
     var edge = _graph.connect(source, destination, origin,
@@ -1431,7 +1431,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   DecoratedType _decorateUpperOrLowerBound(AstNode astNode, DartType type,
       DecoratedType left, DecoratedType right, bool isLUB,
-      {NullabilityNodeImpl node}) {
+      {NullabilityNode node}) {
     if (type.isDynamic || type.isVoid) {
       if (type.isDynamic) {
         _unimplemented(astNode, 'LUB/GLB with dynamic');
@@ -1439,7 +1439,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       return DecoratedType(type, _graph.always);
     }
     node ??= isLUB
-        ? NullabilityNodeImpl.forLUB(left.node, right.node)
+        ? NullabilityNode.forLUB(left.node, right.node)
         : _nullabilityNodeForGLB(astNode, left.node, right.node);
     if (type is InterfaceType) {
       if (type.typeArguments.isEmpty) {
@@ -1945,7 +1945,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
           : calleeType;
       if (isConditional) {
         expressionType = expressionType.withNode(
-            NullabilityNodeImpl.forLUB(targetType.node, expressionType.node));
+            NullabilityNode.forLUB(targetType.node, expressionType.node));
         _variables.recordDecoratedExpressionType(node, expressionType);
       }
       return expressionType;
@@ -2009,9 +2009,9 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     }
   }
 
-  NullabilityNodeImpl _nullabilityNodeForGLB(AstNode astNode,
-      NullabilityNodeImpl leftNode, NullabilityNodeImpl rightNode) {
-    var node = NullabilityNodeImpl.forGLB();
+  NullabilityNode _nullabilityNodeForGLB(AstNode astNode,
+      NullabilityNode leftNode, NullabilityNode rightNode) {
+    var node = NullabilityNode.forGLB();
     var origin = GreatestLowerBoundOrigin(source, astNode.offset);
     _graph.connect(leftNode, node, origin, guards: [rightNode]);
     _graph.connect(node, leftNode, origin);
@@ -2221,7 +2221,7 @@ mixin _AssignmentChecker {
     }
   }
 
-  void _connect(NullabilityNodeImpl source, NullabilityNodeImpl destination,
+  void _connect(NullabilityNode source, NullabilityNode destination,
       EdgeOrigin origin,
       {bool hard = false});
 
@@ -2255,19 +2255,19 @@ class _ConditionInfo {
 
   /// If not `null`, the [NullabilityNode] that would need to be nullable in
   /// order for [condition] to evaluate to `true`.
-  final NullabilityNodeImpl trueGuard;
+  final NullabilityNode trueGuard;
 
   /// If not `null`, the [NullabilityNode] that would need to be nullable in
   /// order for [condition] to evaluate to `false`.
-  final NullabilityNodeImpl falseGuard;
+  final NullabilityNode falseGuard;
 
   /// If not `null`, the [NullabilityNode] that should be asserted to have
   /// non-null intent if [condition] is asserted to be `true`.
-  final NullabilityNodeImpl trueDemonstratesNonNullIntent;
+  final NullabilityNode trueDemonstratesNonNullIntent;
 
   /// If not `null`, the [NullabilityNode] that should be asserted to have
   /// non-null intent if [condition] is asserted to be `false`.
-  final NullabilityNodeImpl falseDemonstratesNonNullIntent;
+  final NullabilityNode falseDemonstratesNonNullIntent;
 
   _ConditionInfo(this.condition,
       {@required this.isPure,

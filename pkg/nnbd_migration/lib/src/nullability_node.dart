@@ -14,12 +14,12 @@ import 'edge_origin.dart';
 /// to be nullable, or null checks will have to be added).
 class NullabilityEdge {
   /// The node that is downstream.
-  final NullabilityNodeImpl destinationNode;
+  final NullabilityNode destinationNode;
 
   /// A set of source nodes.  By convention, the first node is the primary
   /// source and the other nodes are "guards".  The destination node will only
   /// need to be made nullable if all the source nodes are nullable.
-  final List<NullabilityNodeImpl> sources;
+  final List<NullabilityNode> sources;
 
   final _NullabilityEdgeKind _kind;
 
@@ -30,7 +30,7 @@ class NullabilityEdge {
   NullabilityEdge._(
       this.destinationNode, this.sources, this._kind, this.origin);
 
-  Iterable<NullabilityNodeImpl> get guards => sources.skip(1);
+  Iterable<NullabilityNode> get guards => sources.skip(1);
 
   bool get hard => _kind != _NullabilityEdgeKind.soft;
 
@@ -43,7 +43,7 @@ class NullabilityEdge {
 
   bool get isUnion => _kind == _NullabilityEdgeKind.union;
 
-  NullabilityNodeImpl get primarySource => sources.first;
+  NullabilityNode get primarySource => sources.first;
 
   /// Indicates whether all the sources of this edge are nullable (and thus
   /// downstream nullability propagation should try to make the destination node
@@ -88,26 +88,26 @@ class NullabilityGraph {
 
   /// Set containing all [NullabilityNode]s that have been passed as the
   /// `sourceNode` argument to [connect].
-  final _allSourceNodes = Set<NullabilityNodeImpl>.identity();
+  final _allSourceNodes = Set<NullabilityNode>.identity();
 
   /// Returns a [NullabilityNode] that is a priori nullable.
   ///
   /// Propagation of nullability always proceeds downstream starting at this
   /// node.
-  final NullabilityNodeImpl always = _NullabilityNodeImmutable('always', true);
+  final NullabilityNode always = _NullabilityNodeImmutable('always', true);
 
   /// Returns a [NullabilityNode] that is a priori non-nullable.
   ///
   /// Propagation of nullability always proceeds upstream starting at this
   /// node.
-  final NullabilityNodeImpl never = _NullabilityNodeImmutable('never', false);
+  final NullabilityNode never = _NullabilityNodeImmutable('never', false);
 
   /// Set containing all sources being migrated.
   final _sourcesBeingMigrated = <Source>{};
 
   /// After execution of [_propagateAlways], a list of all nodes reachable from
   /// [always] via zero or more edges of kind [_NullabilityEdgeKind.union].
-  final List<NullabilityNodeImpl> _unionedWithAlways = [];
+  final List<NullabilityNode> _unionedWithAlways = [];
 
   /// During any given stage of nullability propagation, a list of all the edges
   /// that need to be examined before the stage is complete.
@@ -137,9 +137,9 @@ class NullabilityGraph {
   /// Records that [sourceNode] is immediately upstream from [destinationNode].
   ///
   /// Returns the edge created by the connection.
-  NullabilityEdge connect(NullabilityNodeImpl sourceNode,
-      NullabilityNodeImpl destinationNode, EdgeOrigin origin,
-      {bool hard: false, List<NullabilityNodeImpl> guards: const []}) {
+  NullabilityEdge connect(NullabilityNode sourceNode,
+      NullabilityNode destinationNode, EdgeOrigin origin,
+      {bool hard: false, List<NullabilityNode> guards: const []}) {
     var sources = [sourceNode]..addAll(guards);
     var kind = hard ? _NullabilityEdgeKind.hard : _NullabilityEdgeKind.soft;
     return _connect(sources, destinationNode, kind, origin);
@@ -166,14 +166,14 @@ class NullabilityGraph {
   }
 
   /// Records that nodes [x] and [y] should have exactly the same nullability.
-  void union(NullabilityNodeImpl x, NullabilityNodeImpl y, EdgeOrigin origin) {
+  void union(NullabilityNode x, NullabilityNode y, EdgeOrigin origin) {
     _connect([x], y, _NullabilityEdgeKind.union, origin);
     _connect([y], x, _NullabilityEdgeKind.union, origin);
   }
 
   NullabilityEdge _connect(
-      List<NullabilityNodeImpl> sources,
-      NullabilityNodeImpl destinationNode,
+      List<NullabilityNode> sources,
+      NullabilityNode destinationNode,
       _NullabilityEdgeKind kind,
       EdgeOrigin origin) {
     var edge = NullabilityEdge._(destinationNode, sources, kind, origin);
@@ -184,7 +184,7 @@ class NullabilityGraph {
     return edge;
   }
 
-  void _connectDownstream(NullabilityNodeImpl source, NullabilityEdge edge) {
+  void _connectDownstream(NullabilityNode source, NullabilityEdge edge) {
     _allSourceNodes.add(source);
     source._downstreamEdges.add(edge);
     if (source is _NullabilityNodeCompound) {
@@ -366,8 +366,8 @@ class NullabilityGraphForTesting extends NullabilityGraph {
 
   @override
   NullabilityEdge _connect(
-      List<NullabilityNodeImpl> sources,
-      NullabilityNodeImpl destinationNode,
+      List<NullabilityNode> sources,
+      NullabilityNode destinationNode,
       _NullabilityEdgeKind kind,
       EdgeOrigin origin) {
     var edge = super._connect(sources, destinationNode, kind, origin);
@@ -379,14 +379,14 @@ class NullabilityGraphForTesting extends NullabilityGraph {
 /// Derived class for nullability nodes that arise from the least-upper-bound
 /// implied by a conditional expression.
 class NullabilityNodeForLUB extends _NullabilityNodeCompound {
-  final NullabilityNodeImpl left;
+  final NullabilityNode left;
 
-  final NullabilityNodeImpl right;
+  final NullabilityNode right;
 
   NullabilityNodeForLUB._(this.left, this.right);
 
   @override
-  Iterable<NullabilityNodeImpl> get _components => [left, right];
+  Iterable<NullabilityNode> get _components => [left, right];
 
   @override
   String get _debugPrefix => 'LUB($left, $right)';
@@ -400,19 +400,19 @@ class NullabilityNodeForSubstitution extends _NullabilityNodeCompound {
   /// For example, if this NullabilityNode arose from substituting `int*` for
   /// `T` in the type `T*`, [innerNode] is the nullability corresponding to the
   /// `*` in `int*`.
-  final NullabilityNodeImpl innerNode;
+  final NullabilityNode innerNode;
 
   /// Nullability node representing the outer type of the substitution.
   ///
   /// For example, if this NullabilityNode arose from substituting `int*` for
   /// `T` in the type `T*`, [innerNode] is the nullability corresponding to the
   /// `*` in `T*`.
-  final NullabilityNodeImpl outerNode;
+  final NullabilityNode outerNode;
 
   NullabilityNodeForSubstitution._(this.innerNode, this.outerNode);
 
   @override
-  Iterable<NullabilityNodeImpl> get _components => [innerNode, outerNode];
+  Iterable<NullabilityNode> get _components => [innerNode, outerNode];
 
   @override
   String get _debugPrefix => 'Substituted($innerNode, $outerNode)';
@@ -424,7 +424,7 @@ class NullabilityNodeForSubstitution extends _NullabilityNodeCompound {
 /// nullability inference graph is encoded into the wrapped constraint
 /// variables.  Over time this will be replaced by a first class representation
 /// of the nullability inference graph.
-abstract class NullabilityNodeImpl implements NullabilityNodeInfo {
+abstract class NullabilityNode implements NullabilityNodeInfo {
   static final _debugNamesInUse = Set<String>();
 
   bool _isPossiblyOptional = false;
@@ -445,22 +445,22 @@ abstract class NullabilityNodeImpl implements NullabilityNodeInfo {
   ///
   /// The caller is required to create the appropriate graph edges to ensure
   /// that the appropriate relationship between the nodes' nullabilities holds.
-  factory NullabilityNodeImpl.forGLB() => _NullabilityNodeSimple('GLB');
+  factory NullabilityNode.forGLB() => _NullabilityNodeSimple('GLB');
 
   /// Creates a [NullabilityNode] representing the nullability of a variable
   /// whose type is determined by the `??` operator.
-  factory NullabilityNodeImpl.forIfNotNull() =>
+  factory NullabilityNode.forIfNotNull() =>
       _NullabilityNodeSimple('?? operator');
 
   /// Creates a [NullabilityNode] representing the nullability of a variable
   /// whose type is determined by type inference.
-  factory NullabilityNodeImpl.forInferredType() =>
+  factory NullabilityNode.forInferredType() =>
       _NullabilityNodeSimple('inferred');
 
   /// Creates a [NullabilityNode] representing the nullability of an
   /// expression which is nullable iff either [a] or [b] is nullable.
-  factory NullabilityNodeImpl.forLUB(
-          NullabilityNodeImpl left, NullabilityNodeImpl right) =
+  factory NullabilityNode.forLUB(
+          NullabilityNode left, NullabilityNode right) =
       NullabilityNodeForLUB._;
 
   /// Creates a [NullabilityNode] representing the nullability of a type
@@ -470,8 +470,8 @@ abstract class NullabilityNodeImpl implements NullabilityNodeInfo {
   ///
   /// If either [innerNode] or [outerNode] is `null`, then the other node is
   /// returned.
-  factory NullabilityNodeImpl.forSubstitution(
-      NullabilityNodeImpl innerNode, NullabilityNodeImpl outerNode) {
+  factory NullabilityNode.forSubstitution(
+      NullabilityNode innerNode, NullabilityNode outerNode) {
     if (innerNode == null) return outerNode;
     if (outerNode == null) return innerNode;
     return NullabilityNodeForSubstitution._(innerNode, outerNode);
@@ -479,10 +479,10 @@ abstract class NullabilityNodeImpl implements NullabilityNodeInfo {
 
   /// Creates a [NullabilityNode] representing the nullability of a type
   /// annotation appearing explicitly in the user's program.
-  factory NullabilityNodeImpl.forTypeAnnotation(int endOffset) =>
+  factory NullabilityNode.forTypeAnnotation(int endOffset) =>
       _NullabilityNodeSimple('type($endOffset)');
 
-  NullabilityNodeImpl._();
+  NullabilityNode._();
 
   /// Gets a string that can be appended to a type name during debugging to help
   /// annotate the nullability of that type.
@@ -504,7 +504,7 @@ abstract class NullabilityNodeImpl implements NullabilityNodeInfo {
   /// Records the fact that an invocation was made to a function with named
   /// parameters, and the named parameter associated with this node was not
   /// supplied.
-  void recordNamedParameterNotSupplied(List<NullabilityNodeImpl> guards,
+  void recordNamedParameterNotSupplied(List<NullabilityNode> guards,
       NullabilityGraph graph, NamedParameterNotSuppliedOrigin origin) {
     if (isPossiblyOptional) {
       graph.connect(graph.always, this, origin, guards: guards);
@@ -546,7 +546,7 @@ abstract class NullabilityNodeImpl implements NullabilityNodeInfo {
 ///
 /// Nearly all nullability nodes derive from this class; the only exceptions are
 /// the fixed nodes "always "never".
-abstract class NullabilityNodeMutable extends NullabilityNodeImpl {
+abstract class NullabilityNodeMutable extends NullabilityNode {
   _NullabilityState _state;
 
   NullabilityNodeMutable._(
@@ -584,10 +584,10 @@ abstract class _NullabilityNodeCompound extends NullabilityNodeMutable {
   @override
   bool get isNullable => _components.any((c) => c.isNullable);
 
-  Iterable<NullabilityNodeImpl> get _components;
+  Iterable<NullabilityNode> get _components;
 }
 
-class _NullabilityNodeImmutable extends NullabilityNodeImpl {
+class _NullabilityNodeImmutable extends NullabilityNode {
   @override
   final String _debugPrefix;
 

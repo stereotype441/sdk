@@ -23,12 +23,12 @@ import 'abstract_single_unit.dart';
 
 /// A [NodeMatcher] that matches any node, and records what node it matched to.
 class AnyNodeMatcher implements NodeMatcher {
-  final List<NullabilityNodeImpl> _matchingNodes = [];
+  final List<NullabilityNode> _matchingNodes = [];
 
-  NullabilityNodeImpl get matchingNode => _matchingNodes.single;
+  NullabilityNode get matchingNode => _matchingNodes.single;
 
   @override
-  bool matches(NullabilityNodeImpl node) {
+  bool matches(NullabilityNode node) {
     _matchingNodes.add(node);
     return true;
   }
@@ -41,13 +41,13 @@ mixin DecoratedTypeTester implements DecoratedTypeTesterBase {
   Map<TypeParameterElement, DecoratedType> _decoratedTypeParameterBounds =
       Map.identity();
 
-  NullabilityNodeImpl get always => graph.always;
+  NullabilityNode get always => graph.always;
 
   DecoratedType get bottom => DecoratedType(typeProvider.bottomType, never);
 
   DecoratedType get dynamic_ => DecoratedType(typeProvider.dynamicType, always);
 
-  NullabilityNodeImpl get never => graph.never;
+  NullabilityNode get never => graph.never;
 
   DecoratedType get null_ => DecoratedType(typeProvider.nullType, always);
 
@@ -58,7 +58,7 @@ mixin DecoratedTypeTester implements DecoratedTypeTesterBase {
       List<DecoratedType> positional = const [],
       Map<String, DecoratedType> named = const {},
       List<TypeParameterElement> typeFormals = const [],
-      NullabilityNodeImpl node}) {
+      NullabilityNode node}) {
     int i = 0;
     var parameters = required
         .map((t) => ParameterElementImpl.synthetic(
@@ -79,31 +79,31 @@ mixin DecoratedTypeTester implements DecoratedTypeTesterBase {
         namedParameters: named);
   }
 
-  DecoratedType future(DecoratedType parameter, {NullabilityNodeImpl node}) {
+  DecoratedType future(DecoratedType parameter, {NullabilityNode node}) {
     return DecoratedType(typeProvider.futureType.instantiate([parameter.type]),
         node ?? newNode(),
         typeArguments: [parameter]);
   }
 
-  DecoratedType futureOr(DecoratedType parameter, {NullabilityNodeImpl node}) {
+  DecoratedType futureOr(DecoratedType parameter, {NullabilityNode node}) {
     return DecoratedType(
         typeProvider.futureOrType.instantiate([parameter.type]),
         node ?? newNode(),
         typeArguments: [parameter]);
   }
 
-  DecoratedType int_({NullabilityNodeImpl node}) =>
+  DecoratedType int_({NullabilityNode node}) =>
       DecoratedType(typeProvider.intType, node ?? newNode());
 
-  DecoratedType list(DecoratedType elementType, {NullabilityNodeImpl node}) =>
+  DecoratedType list(DecoratedType elementType, {NullabilityNode node}) =>
       DecoratedType(typeProvider.listType.instantiate([elementType.type]),
           node ?? newNode(),
           typeArguments: [elementType]);
 
-  NullabilityNodeImpl newNode() =>
-      NullabilityNodeImpl.forTypeAnnotation(_offset++);
+  NullabilityNode newNode() =>
+      NullabilityNode.forTypeAnnotation(_offset++);
 
-  DecoratedType object({NullabilityNodeImpl node}) =>
+  DecoratedType object({NullabilityNode node}) =>
       DecoratedType(typeProvider.objectType, node ?? newNode());
 
   TypeParameterElement typeParameter(String name, DecoratedType bound) {
@@ -114,7 +114,7 @@ mixin DecoratedTypeTester implements DecoratedTypeTesterBase {
   }
 
   DecoratedType typeParameterType(TypeParameterElement typeParameter,
-          {NullabilityNodeImpl node}) =>
+          {NullabilityNode node}) =>
       DecoratedType(typeParameter.type, node ?? newNode());
 }
 
@@ -152,7 +152,7 @@ mixin EdgeTester {
   /// aren't already.  In practice this means that the caller can pass in either
   //  /// a [NodeMatcher] or a [NullabilityNode].
   NullabilityEdge assertEdge(Object source, Object destination,
-      {@required bool hard, List<NullabilityNodeImpl> guards = const []}) {
+      {@required bool hard, List<NullabilityNode> guards = const []}) {
     var edges = getEdges(source, destination);
     if (edges.length == 0) {
       fail('Expected edge $source -> $destination, found none');
@@ -230,7 +230,7 @@ class InstrumentedVariables extends Variables {
 
   final _expressionChecks = <Expression, ExpressionChecks>{};
 
-  final _possiblyOptional = <DefaultFormalParameter, NullabilityNodeImpl>{};
+  final _possiblyOptional = <DefaultFormalParameter, NullabilityNode>{};
 
   InstrumentedVariables(NullabilityGraph graph, TypeProvider typeProvider)
       : super(graph, typeProvider);
@@ -249,7 +249,7 @@ class InstrumentedVariables extends Variables {
 
   /// Gets the [NullabilityNode] associated with the possibility that
   /// [parameter] may be optional.
-  NullabilityNodeImpl possiblyOptionalParameter(DefaultFormalParameter parameter) =>
+  NullabilityNode possiblyOptionalParameter(DefaultFormalParameter parameter) =>
       _possiblyOptional[parameter];
 
   @override
@@ -273,7 +273,7 @@ class InstrumentedVariables extends Variables {
 
   @override
   void recordPossiblyOptional(
-      Source source, DefaultFormalParameter parameter, NullabilityNodeImpl node) {
+      Source source, DefaultFormalParameter parameter, NullabilityNode node) {
     _possiblyOptional[parameter] = node;
     super.recordPossiblyOptional(source, parameter, node);
   }
@@ -296,9 +296,9 @@ class MigrationVisitorTestBase extends AbstractSingleUnitTest with EdgeTester {
 
   MigrationVisitorTestBase._(this.graph);
 
-  NullabilityNodeImpl get always => graph.always;
+  NullabilityNode get always => graph.always;
 
-  NullabilityNodeImpl get never => graph.never;
+  NullabilityNode get never => graph.never;
 
   TypeProvider get typeProvider => testAnalysisResult.typeProvider;
 
@@ -340,7 +340,7 @@ class MigrationVisitorTestBase extends AbstractSingleUnitTest with EdgeTester {
         testSource, findNode.typeAnnotation(text));
   }
 
-  NullabilityNodeImpl possiblyOptionalParameter(String text) {
+  NullabilityNode possiblyOptionalParameter(String text) {
     return variables.possiblyOptionalParameter(findNode.defaultParameter(text));
   }
 
@@ -356,22 +356,22 @@ class MigrationVisitorTestBase extends AbstractSingleUnitTest with EdgeTester {
 abstract class NodeMatcher {
   factory NodeMatcher(Object expectation) {
     if (expectation is NodeMatcher) return expectation;
-    if (expectation is NullabilityNodeImpl) return _ExactNodeMatcher(expectation);
+    if (expectation is NullabilityNode) return _ExactNodeMatcher(expectation);
     fail(
         'Unclear how to match node expectation of type ${expectation.runtimeType}');
   }
 
-  bool matches(NullabilityNodeImpl node);
+  bool matches(NullabilityNode node);
 }
 
 /// A [NodeMatcher] that matches exactly one node.
 class _ExactNodeMatcher implements NodeMatcher {
-  final NullabilityNodeImpl _expectation;
+  final NullabilityNode _expectation;
 
   _ExactNodeMatcher(this._expectation);
 
   @override
-  bool matches(NullabilityNodeImpl node) => node == _expectation;
+  bool matches(NullabilityNode node) => node == _expectation;
 }
 
 /// A [NodeMatcher] that matches a substitution node with the given inner and
@@ -383,7 +383,7 @@ class _SubstitutionNodeMatcher implements NodeMatcher {
   _SubstitutionNodeMatcher(this.inner, this.outer);
 
   @override
-  bool matches(NullabilityNodeImpl node) {
+  bool matches(NullabilityNode node) {
     return node is NullabilityNodeForSubstitution &&
         inner.matches(node.innerNode) &&
         outer.matches(node.outerNode);

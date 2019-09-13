@@ -123,7 +123,7 @@ class PotentiallyAddImport extends PotentialModification {
 /// Records information about the possible addition of a `?` suffix to a type in
 /// the source code.
 class PotentiallyAddQuestionSuffix extends PotentialModification {
-  final NullabilityNodeImpl node;
+  final NullabilityNode node;
   final DartType type;
   final int _offset;
 
@@ -140,7 +140,7 @@ class PotentiallyAddQuestionSuffix extends PotentialModification {
 /// Records information about the possible addition of a `@required` annotation
 /// to the source code.
 class PotentiallyAddRequired extends PotentialModification {
-  final NullabilityNodeImpl _node;
+  final NullabilityNode _node;
 
   final int _offset;
   final String className;
@@ -148,7 +148,7 @@ class PotentiallyAddRequired extends PotentialModification {
   final String parameterName;
 
   factory PotentiallyAddRequired(
-      DefaultFormalParameter parameter, NullabilityNodeImpl node) {
+      DefaultFormalParameter parameter, NullabilityNode node) {
     final element = parameter.declaredElement;
     final method = element.enclosingElement;
     final cls = method.enclosingElement;

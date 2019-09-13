@@ -166,7 +166,7 @@ class Variables implements VariableRecorder, VariableRepository {
 
   @override
   void recordPossiblyOptional(
-      Source source, DefaultFormalParameter parameter, NullabilityNodeImpl node) {
+      Source source, DefaultFormalParameter parameter, NullabilityNode node) {
     var modification = PotentiallyAddRequired(parameter, node);
     _addPotentialModification(source, modification);
     _addPotentialImport(

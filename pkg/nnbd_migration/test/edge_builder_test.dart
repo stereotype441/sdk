@@ -326,7 +326,7 @@ class AssignmentCheckerTest extends Object
 @reflectiveTest
 class EdgeBuilderTest extends EdgeBuilderTestBase {
   void assertGLB(
-      NullabilityNodeImpl node, NullabilityNodeImpl left, NullabilityNodeImpl right) {
+      NullabilityNode node, NullabilityNode left, NullabilityNode right) {
     expect(node, isNot(TypeMatcher<NullabilityNodeForLUB>()));
     assertEdge(left, node, hard: false, guards: [right]);
     assertEdge(node, left, hard: false);
@@ -334,7 +334,7 @@ class EdgeBuilderTest extends EdgeBuilderTestBase {
   }
 
   void assertLUB(
-      NullabilityNodeImpl node, NullabilityNodeImpl left, NullabilityNodeImpl right) {
+      NullabilityNode node, NullabilityNode left, NullabilityNode right) {
     var conditionalNode = node as NullabilityNodeForLUB;
     expect(conditionalNode.left, same(left));
     expect(conditionalNode.right, same(right));
@@ -342,7 +342,7 @@ class EdgeBuilderTest extends EdgeBuilderTestBase {
 
   /// Checks that there are no nullability nodes upstream from [node] that could
   /// cause it to become nullable.
-  void assertNoUpstreamNullability(NullabilityNodeImpl node) {
+  void assertNoUpstreamNullability(NullabilityNode node) {
     // never can never become nullable, even if it has nodes
     // upstream from it.
     if (node == never) return;

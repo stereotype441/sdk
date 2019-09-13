@@ -25,7 +25,7 @@ class AlreadyMigratedCodeDecorator {
     if (type.isVoid || type.isDynamic) {
       return DecoratedType(type, _graph.always);
     }
-    NullabilityNodeImpl node;
+    NullabilityNode node;
     var nullabilitySuffix = (type as TypeImpl).nullabilitySuffix;
     if (nullabilitySuffix == NullabilitySuffix.question) {
       node = _graph.always;
