@@ -108,10 +108,6 @@ class AssignmentCheckerTest extends Object
     // Note: no assertions to do; just need to make sure there wasn't a crash.
   }
 
-  void solo_test_future_or_to_future_or() {
-    assign(futureOr(int_()), futureOr(int_()));
-  }
-
   void test_function_type_named_parameter() {
     var t1 = function(dynamic_, named: {'x': object()});
     var t2 = function(dynamic_, named: {'x': object()});
@@ -171,6 +167,14 @@ class AssignmentCheckerTest extends Object
 
   void test_future_int_to_future_or_int() {
     var t1 = future(int_());
+    var t2 = futureOr(int_());
+    assign(t1, t2, hard: true);
+    assertEdge(t1.node, t2.node, hard: true);
+    assertEdge(t1.typeArguments[0].node, t2.typeArguments[0].node, hard: false);
+  }
+
+  void test_future_or_to_future_or() {
+    var t1 = futureOr(int_());
     var t2 = futureOr(int_());
     assign(t1, t2, hard: true);
     assertEdge(t1.node, t2.node, hard: true);
