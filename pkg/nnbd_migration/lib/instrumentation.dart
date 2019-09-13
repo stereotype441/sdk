@@ -4,10 +4,20 @@
 
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/src/generated/source.dart';
-import 'package:nnbd_migration/nullability_node.dart';
 
 abstract class NullabilityMigrationInstrumentation {
-  void explicitTypeNullability(Source source, TypeAnnotation typeAnnotation, NullabilityNode node);
+  void explicitTypeNullability(Source source, TypeAnnotation typeAnnotation, NullabilityNodeInfo node);
 
-  void implicitInvocationType(Source source, AstNode node, DecoratedType type);
+  void implicitTypeArguments(Source source, AstNode node, Iterable<DecoratedTypeInfo> type);
+
+  void implicitDeclarationReturnType(Source source, AstNode node, DecoratedTypeInfo decoratedReturnType);
+
+  void implicitDeclarationType(Source source, AstNode node, DecoratedTypeInfo decoratedType) {}
 }
+
+/// Information about a single node in the nullability inference graph.
+abstract class NullabilityNodeInfo {}
+
+/// Information about the set of nullability nodes decorating a type in the
+/// program being migrated.
+abstract class DecoratedTypeInfo {}

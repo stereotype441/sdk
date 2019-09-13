@@ -4,7 +4,7 @@
 
 import 'package:analyzer/src/generated/source.dart';
 import 'package:meta/meta.dart';
-import 'package:nnbd_migration/nullability_node_info.dart';
+import 'package:nnbd_migration/instrumentation.dart';
 
 import 'edge_origin.dart';
 
