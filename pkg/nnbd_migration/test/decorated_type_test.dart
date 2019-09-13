@@ -34,12 +34,12 @@ class DecoratedTypeTest extends Object
 
   DecoratedTypeTest._(this.typeProvider);
 
-  NullabilityNodeImpl get always => graph.always;
+  NullabilityNode get always => graph.always;
 
   ClassElement get listElement => typeProvider.listType.element;
 
   void setUp() {
-    NullabilityNodeImpl.clearDebugNames();
+    NullabilityNode.clearDebugNames();
   }
 
   test_equal_dynamic_and_void() {

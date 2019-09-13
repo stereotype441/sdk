@@ -21,27 +21,26 @@ class NullabilityNodeTest {
 
   List<NullabilityNodeForSubstitution> unsatisfiedSubstitutions;
 
-  NullabilityNodeImpl get always => graph.always;
+  NullabilityNode get always => graph.always;
 
-  NullabilityNodeImpl get never => graph.never;
+  NullabilityNode get never => graph.never;
 
   void assertUnsatisfied(List<NullabilityEdge> expectedUnsatisfiedEdges) {
     expect(unsatisfiedEdges, unorderedEquals(expectedUnsatisfiedEdges));
   }
 
-  NullabilityEdge connect(
-      NullabilityNodeImpl source, NullabilityNodeImpl destination,
-      {bool hard = false, List<NullabilityNodeImpl> guards = const []}) {
+  NullabilityEdge connect(NullabilityNode source, NullabilityNode destination,
+      {bool hard = false, List<NullabilityNode> guards = const []}) {
     return graph.connect(source, destination, _TestEdgeOrigin(),
         hard: hard, guards: guards);
   }
 
-  NullabilityNodeImpl lub(NullabilityNodeImpl left, NullabilityNodeImpl right) {
-    return NullabilityNodeImpl.forLUB(left, right);
+  NullabilityNode lub(NullabilityNode left, NullabilityNode right) {
+    return NullabilityNode.forLUB(left, right);
   }
 
-  NullabilityNodeImpl newNode(int offset) =>
-      NullabilityNodeImpl.forTypeAnnotation(offset);
+  NullabilityNode newNode(int offset) =>
+      NullabilityNode.forTypeAnnotation(offset);
 
   void propagate() {
     graph.propagate();
@@ -49,9 +48,8 @@ class NullabilityNodeTest {
     unsatisfiedSubstitutions = graph.unsatisfiedSubstitutions.toList();
   }
 
-  NullabilityNodeImpl subst(
-      NullabilityNodeImpl inner, NullabilityNodeImpl outer) {
-    return NullabilityNodeImpl.forSubstitution(inner, outer);
+  NullabilityNode subst(NullabilityNode inner, NullabilityNode outer) {
+    return NullabilityNode.forSubstitution(inner, outer);
   }
 
   test_always_and_never_state() {
@@ -625,7 +623,7 @@ class NullabilityNodeTest {
     expect(edge.isSatisfied, false);
   }
 
-  void union(NullabilityNodeImpl x, NullabilityNodeImpl y) {
+  void union(NullabilityNode x, NullabilityNode y) {
     graph.union(x, y, _TestEdgeOrigin());
   }
 }
