@@ -37,7 +37,7 @@ abstract class NullabilityMigrationInstrumentation {
       Source source, AstNode node, DecoratedTypeInfo decoratedType);
 
   void implicitTypeArguments(
-      Source source, AstNode node, Iterable<DecoratedTypeInfo> type);
+      Source source, AstNode node, Iterable<DecoratedTypeInfo> types);
 
   void propagationInfo(NullabilityNodeInfo node, NullabilityState state,
       StateChangeReason reason,
@@ -49,6 +49,8 @@ abstract class NullabilityNodeInfo {
   /// After migration is complete, this getter can be used to query whether
   /// the type associated with this node was determined to be nullable.
   bool get isNullable;
+
+  bool get isImmutable;
 }
 
 enum StateChangeReason {

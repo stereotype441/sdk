@@ -233,16 +233,13 @@ class NullabilityGraph {
       var node = edge.destinationNode;
       if (node is NullabilityNodeMutable && !node.isNullable) {
         _unionedWithAlways.add(node);
-        _setState(node, NullabilityState.ordinaryNullable, StateChangeReason.union, edge: edge);
+        _setState(
+            node, NullabilityState.ordinaryNullable, StateChangeReason.union,
+            edge: edge);
         // Was not previously nullable, so we need to propagate.
         _pendingEdges.addAll(node._downstreamEdges);
       }
     }
-  }
-
-  void _setState(NullabilityNodeMutable node, NullabilityState state, StateChangeReason reason, {NullabilityEdge edge, NullabilityNodeForSubstitution substitutionNode}) {
-    node._state = state;
-    instrumentation?.propagationInfo(node, state, reason, edge: edge, substitutionNode: substitutionNode);
   }
 
   /// Propagates nullability downstream.
@@ -286,7 +283,9 @@ class NullabilityGraph {
       var node = edge.primarySource;
       if (node is NullabilityNodeMutable &&
           node._state == NullabilityState.undetermined) {
-        _setState(node, NullabilityState.nonNullable, StateChangeReason.upstream, edge: edge);
+        _setState(
+            node, NullabilityState.nonNullable, StateChangeReason.upstream,
+            edge: edge);
         // Was not previously in the set of non-null intent nodes, so we need to
         // propagate.
         _pendingEdges.addAll(node._upstreamEdges);
@@ -315,7 +314,9 @@ class NullabilityGraph {
     // Otherwise, if the inner node is in the non-nullable state, then we set
     // the outer node to the ordinary nullable state.
     if (substitutionNode.innerNode._state == NullabilityState.nonNullable) {
-      _setNullable(substitutionNode.outerNode as NullabilityNodeMutable, StateChangeReason.substituteOuter, substitutionNode: substitutionNode);
+      _setNullable(substitutionNode.outerNode as NullabilityNodeMutable,
+          StateChangeReason.substituteOuter,
+          substitutionNode: substitutionNode);
       return;
     }
 
@@ -327,8 +328,9 @@ class NullabilityGraph {
     var pendingEdges = <NullabilityEdge>[];
     var node = substitutionNode.innerNode;
     if (node is NullabilityNodeMutable) {
-      var oldState =
-      _setNullable(node, StateChangeReason.substituteInner, newState: NullabilityState.exactNullable, substitutionNode: substitutionNode);
+      var oldState = _setNullable(node, StateChangeReason.substituteInner,
+          newState: NullabilityState.exactNullable,
+          substitutionNode: substitutionNode);
       if (oldState != NullabilityState.exactNullable) {
         // Was not previously in the "exact nullable" state.  Need to
         // propagate.
@@ -341,8 +343,8 @@ class NullabilityGraph {
       var edge = pendingEdges.removeLast();
       var node = edge.primarySource;
       if (node is NullabilityNodeMutable) {
-        var oldState =
-            _setNullable(node, StateChangeReason.exactUpstream, newState: NullabilityState.exactNullable, edge: edge);
+        var oldState = _setNullable(node, StateChangeReason.exactUpstream,
+            newState: NullabilityState.exactNullable, edge: edge);
         if (oldState != NullabilityState.exactNullable) {
           // Was not previously in the "exact nullable" state.  Need to
           // propagate.
@@ -354,10 +356,14 @@ class NullabilityGraph {
     }
   }
 
-  NullabilityState _setNullable(NullabilityNodeMutable node, StateChangeReason reason,
-      {NullabilityState newState = NullabilityState.ordinaryNullable, NullabilityEdge edge, NullabilityNodeForSubstitution substitutionNode}) {
+  NullabilityState _setNullable(
+      NullabilityNodeMutable node, StateChangeReason reason,
+      {NullabilityState newState = NullabilityState.ordinaryNullable,
+      NullabilityEdge edge,
+      NullabilityNodeForSubstitution substitutionNode}) {
     assert(() {
-      if (reason == StateChangeReason.substituteInner || reason == StateChangeReason.substituteOuter) {
+      if (reason == StateChangeReason.substituteInner ||
+          reason == StateChangeReason.substituteOuter) {
         assert(substitutionNode != null);
         assert(edge == null);
       } else {
@@ -368,7 +374,8 @@ class NullabilityGraph {
     }());
     assert(newState.isNullable);
     var oldState = node._state;
-    _setState(node, newState, reason, edge: edge, substitutionNode: substitutionNode);
+    _setState(node, newState, reason,
+        edge: edge, substitutionNode: substitutionNode);
     if (!oldState.isNullable) {
       // Was not previously nullable, so we need to propagate.
       _pendingEdges.addAll(node._downstreamEdges);
@@ -377,6 +384,14 @@ class NullabilityGraph {
       }
     }
     return oldState;
+  }
+
+  void _setState(NullabilityNodeMutable node, NullabilityState state,
+      StateChangeReason reason,
+      {NullabilityEdge edge, NullabilityNodeForSubstitution substitutionNode}) {
+    node._state = state;
+    instrumentation?.propagationInfo(node, state, reason,
+        edge: edge, substitutionNode: substitutionNode);
   }
 }
 
@@ -555,7 +570,8 @@ class NullabilityNodeForLUB extends _NullabilityNodeCompound {
 
 /// Derived class for nullability nodes that arise from type variable
 /// substitution.
-class NullabilityNodeForSubstitution extends _NullabilityNodeCompound implements SubstitutionNodeInfo {
+class NullabilityNodeForSubstitution extends _NullabilityNodeCompound
+    implements SubstitutionNodeInfo {
   /// Nullability node representing the inner type of the substitution.
   ///
   /// For example, if this NullabilityNode arose from substituting `int*` for
@@ -593,6 +609,9 @@ abstract class NullabilityNodeMutable extends NullabilityNode {
 
   @override
   bool get isExactNullable => _state == NullabilityState.exactNullable;
+
+  @override
+  bool get isImmutable => false;
 
   @override
   bool get isNullable => _state.isNullable;
@@ -638,6 +657,9 @@ class _NullabilityNodeImmutable extends NullabilityNode {
 
   @override
   bool get isExactNullable => isNullable;
+
+  @override
+  bool get isImmutable => true;
 
   @override
   NullabilityState get _state => isNullable
