@@ -5,26 +5,46 @@
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/src/generated/source.dart';
-
-abstract class NullabilityMigrationInstrumentation {
-  void explicitTypeNullability(Source source, TypeAnnotation typeAnnotation, NullabilityNodeInfo node);
-
-  void implicitTypeArguments(Source source, AstNode node, Iterable<DecoratedTypeInfo> type);
-
-  void implicitDeclarationReturnType(Source source, AstNode node, DecoratedTypeInfo decoratedReturnType);
-
-  void implicitDeclarationType(Source source, AstNode node, DecoratedTypeInfo decoratedType);
-
-  void externalDecoratedType(Element element, DecoratedTypeInfo decoratedType);
-
-  void graphEdge(EdgeInfo edge) {}
-}
-
-/// Information about a single node in the nullability inference graph.
-abstract class NullabilityNodeInfo {}
+import 'package:nnbd_migration/nullability_state.dart';
 
 /// Information about the set of nullability nodes decorating a type in the
 /// program being migrated.
 abstract class DecoratedTypeInfo {}
 
 abstract class EdgeInfo {}
+
+abstract class NullabilityMigrationInstrumentation {
+  void explicitTypeNullability(
+      Source source, TypeAnnotation typeAnnotation, NullabilityNodeInfo node);
+
+  void externalDecoratedType(Element element, DecoratedTypeInfo decoratedType);
+
+  void graphEdge(EdgeInfo edge);
+
+  void implicitDeclarationReturnType(
+      Source source, AstNode node, DecoratedTypeInfo decoratedReturnType);
+
+  void implicitDeclarationType(
+      Source source, AstNode node, DecoratedTypeInfo decoratedType);
+
+  void implicitTypeArguments(
+      Source source, AstNode node, Iterable<DecoratedTypeInfo> type);
+
+  void propagationInfo(NullabilityNodeInfo node, NullabilityState state,
+      StateChangeReason reason,
+      {EdgeInfo edge, SubstitutionNodeInfo substitutionNode});
+}
+
+/// Information about a single node in the nullability inference graph.
+abstract class NullabilityNodeInfo {}
+
+enum StateChangeReason {
+  union,
+  upstream,
+  downstream,
+  exactUpstream,
+  substituteInner,
+  substituteOuter,
+}
+
+abstract class SubstitutionNodeInfo extends NullabilityNodeInfo {}
