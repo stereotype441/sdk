@@ -59,7 +59,7 @@ class NullabilityMigrationImpl implements NullabilityMigration {
     _variables ??= Variables(_graph, result.typeProvider, instrumentation: _instrumentation);
     var unit = result.unit;
     unit.accept(NodeBuilder(_variables, unit.declaredElement.source,
-        _permissive ? listener : null, _graph, result.typeProvider));
+        _permissive ? listener : null, _graph, result.typeProvider, instrumentation: _instrumentation));
   }
 
   void processInput(ResolvedUnitResult result) {

@@ -174,7 +174,7 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
       if (type == null) {
         type = DecoratedType.forImplicitType(
             _typeProvider, node.declaredElement.type, _graph);
-        instrumentation?.implicitDeclarationType(source, node, type);
+        instrumentation?.implicitType(source, node, type);
       }
       _variables.recordDecoratedElementType(
           node.identifier.staticElement,
@@ -241,7 +241,7 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
       // Inferred return type.
       decoratedReturnType = DecoratedType.forImplicitType(
           _typeProvider, functionType.returnType, _graph);
-      instrumentation?.implicitDeclarationReturnType(source, node, decoratedReturnType);
+      instrumentation?.implicitReturnType(source, node, decoratedReturnType);
     }
     var previousPositionalParameters = _positionalParameters;
     var previousNamedParameters = _namedParameters;
@@ -365,7 +365,7 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
       if (returnType == null) {
         decoratedReturnType = DecoratedType.forImplicitType(
               _typeProvider, DynamicTypeImpl.instance, _graph);
-        instrumentation?.implicitDeclarationReturnType(source, node, decoratedReturnType);
+        instrumentation?.implicitReturnType(source, node, decoratedReturnType);
       } else {
         decoratedReturnType = returnType.accept(this);
       }
@@ -468,7 +468,7 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
       if (type == null) {
         type = DecoratedType.forImplicitType(
                   _typeProvider, declaredElement.type, _graph);
-        instrumentation?.implicitDeclarationType(source, node, type);
+        instrumentation?.implicitType(source, node, type);
       }
       _variables.recordDecoratedElementType(
           declaredElement,
@@ -520,7 +520,7 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
       // Inferred return type.
       decoratedReturnType = DecoratedType.forImplicitType(
           _typeProvider, functionType.returnType, _graph);
-      instrumentation?.implicitDeclarationReturnType(source, node, decoratedReturnType);
+      instrumentation?.implicitReturnType(source, node, decoratedReturnType);
     }
     var previousPositionalParameters = _positionalParameters;
     var previousNamedParameters = _namedParameters;
@@ -563,14 +563,14 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
       } else {
         decoratedType = DecoratedType.forImplicitType(
               _typeProvider, declaredElement.type, _graph);
-        instrumentation?.implicitDeclarationType(source, node, decoratedType);
+        instrumentation?.implicitType(source, node, decoratedType);
       }
     } else {
       DecoratedType decoratedReturnType;
       if (type == null) {
         decoratedReturnType = DecoratedType.forImplicitType(
               _typeProvider, DynamicTypeImpl.instance, _graph);
-        instrumentation?.implicitDeclarationReturnType(source, node, decoratedReturnType);
+        instrumentation?.implicitReturnType(source, node, decoratedReturnType);
       } else {
         decoratedReturnType = type.accept(this);
       }

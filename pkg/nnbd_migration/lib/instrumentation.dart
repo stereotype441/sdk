@@ -12,6 +12,8 @@ import 'package:nnbd_migration/nullability_state.dart';
 /// program being migrated.
 abstract class DecoratedTypeInfo {
   DartType get type;
+
+  NullabilityNodeInfo get node;
 }
 
 abstract class EdgeInfo {
@@ -28,10 +30,10 @@ abstract class NullabilityMigrationInstrumentation {
 
   void graphEdge(EdgeInfo edge);
 
-  void implicitDeclarationReturnType(
+  void implicitReturnType(
       Source source, AstNode node, DecoratedTypeInfo decoratedReturnType);
 
-  void implicitDeclarationType(
+  void implicitType(
       Source source, AstNode node, DecoratedTypeInfo decoratedType);
 
   void implicitTypeArguments(

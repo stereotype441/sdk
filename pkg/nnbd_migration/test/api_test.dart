@@ -32,6 +32,8 @@ class _InstrumentationClient implements NullabilityMigrationInstrumentation {
 
   final List<EdgeInfo> _edges = [];
 
+  final Map<String, Map<AstNode, DecoratedTypeInfo>> _implicitReturnType = {};
+
   @override
   void explicitTypeNullability(
       Source source, TypeAnnotation typeAnnotation, NullabilityNodeInfo node) {
@@ -49,13 +51,13 @@ class _InstrumentationClient implements NullabilityMigrationInstrumentation {
   }
 
   @override
-  void implicitDeclarationReturnType(
+  void implicitReturnType(
       Source source, AstNode node, DecoratedTypeInfo decoratedReturnType) {
-    // TODO: implement implicitDeclarationReturnType
+    (_implicitReturnType[source.fullName] ??= {})[node] = decoratedReturnType;
   }
 
   @override
-  void implicitDeclarationType(
+  void implicitType(
       Source source, AstNode node, DecoratedTypeInfo decoratedType) {
     // TODO: implement implicitDeclarationType
   }
@@ -97,6 +99,9 @@ class _InstrumentationTest extends _ProvisionalApiTestBase {
         for (var edge in _instrumentationClient._edges)
           if (predicate(edge)) edge
       ];
+
+  DecoratedTypeInfo implicitReturnType(String path, AstNode node) =>
+      (_instrumentationClient._implicitReturnType[path] ?? {})[node];
 
   test_explicitTypeNullability() async {
     var content = '''
@@ -154,29 +159,30 @@ int f(int x) => x;
         hasLength(1));
   }
 
-  test_implicitDeclarationReturnType() async {
+  test_implicitReturnType() async {
     var content = '''
 abstract class Base {
-  int /*base*/ f();
+  int f();
 }
 abstract class Derived extends Base {
-  int /*derived*/ f();
+  f /*derived*/();
 }
 ''';
     var expected = '''
 abstract class Base {
-  int /*base*/ f();
+  int f();
 }
 abstract class Derived extends Base {
-  int /*derived*/ f();
+  f /*derived*/();
 }
 ''';
     var sourcePath = await _checkSingleFileChanges(content, expected);
     var find = findNodes[sourcePath];
-    var baseReturnNode = explicitTypeNullability(
-        sourcePath, find.typeAnnotation('int /*base*/'));
-    var derivedReturnNode = explicitTypeNullability(
-        sourcePath, find.typeAnnotation('int /*derived*/'));
+    var baseReturnNode =
+        explicitTypeNullability(sourcePath, find.typeAnnotation('int'));
+    var derivedReturnNode =
+        implicitReturnType(sourcePath, find.methodDeclaration('f /*derived*/'))
+            .node;
     expect(
         getEdges((e) =>
             e.primarySource == derivedReturnNode &&
