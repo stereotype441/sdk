@@ -2,9 +2,5 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-/// Representation of a single node in the nullability inference graph.
-abstract class NullabilityNodeInfo {
-  /// After nullability propagation, this getter can be used to query whether
-  /// the type associated with this node should be considered nullable.
-  bool get isNullable;
-}
+/// Information about a single node in the nullability inference graph.
+abstract class NullabilityNodeInfo {}

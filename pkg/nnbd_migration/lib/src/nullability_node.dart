@@ -376,48 +376,6 @@ class NullabilityGraphForTesting extends NullabilityGraph {
   }
 }
 
-/// Derived class for nullability nodes that arise from the least-upper-bound
-/// implied by a conditional expression.
-class NullabilityNodeForLUB extends _NullabilityNodeCompound {
-  final NullabilityNode left;
-
-  final NullabilityNode right;
-
-  NullabilityNodeForLUB._(this.left, this.right);
-
-  @override
-  Iterable<NullabilityNode> get _components => [left, right];
-
-  @override
-  String get _debugPrefix => 'LUB($left, $right)';
-}
-
-/// Derived class for nullability nodes that arise from type variable
-/// substitution.
-class NullabilityNodeForSubstitution extends _NullabilityNodeCompound {
-  /// Nullability node representing the inner type of the substitution.
-  ///
-  /// For example, if this NullabilityNode arose from substituting `int*` for
-  /// `T` in the type `T*`, [innerNode] is the nullability corresponding to the
-  /// `*` in `int*`.
-  final NullabilityNode innerNode;
-
-  /// Nullability node representing the outer type of the substitution.
-  ///
-  /// For example, if this NullabilityNode arose from substituting `int*` for
-  /// `T` in the type `T*`, [innerNode] is the nullability corresponding to the
-  /// `*` in `T*`.
-  final NullabilityNode outerNode;
-
-  NullabilityNodeForSubstitution._(this.innerNode, this.outerNode);
-
-  @override
-  Iterable<NullabilityNode> get _components => [innerNode, outerNode];
-
-  @override
-  String get _debugPrefix => 'Substituted($innerNode, $outerNode)';
-}
-
 /// Representation of a single node in the nullability inference graph.
 ///
 /// Initially, this is just a wrapper over constraint variables, and the
@@ -459,8 +417,7 @@ abstract class NullabilityNode implements NullabilityNodeInfo {
 
   /// Creates a [NullabilityNode] representing the nullability of an
   /// expression which is nullable iff either [a] or [b] is nullable.
-  factory NullabilityNode.forLUB(
-          NullabilityNode left, NullabilityNode right) =
+  factory NullabilityNode.forLUB(NullabilityNode left, NullabilityNode right) =
       NullabilityNodeForLUB._;
 
   /// Creates a [NullabilityNode] representing the nullability of a type
@@ -492,6 +449,10 @@ abstract class NullabilityNode implements NullabilityNodeInfo {
   /// the type associated with this node should be considered "exact nullable".
   @visibleForTesting
   bool get isExactNullable;
+
+  /// After nullability propagation, this getter can be used to query whether
+  /// the type associated with this node should be considered nullable.
+  bool get isNullable;
 
   /// Indicates whether this node is associated with a named parameter for which
   /// nullability migration needs to decide whether it is optional or required.
@@ -540,6 +501,48 @@ abstract class NullabilityNode implements NullabilityNodeInfo {
   static void clearDebugNames() {
     _debugNamesInUse.clear();
   }
+}
+
+/// Derived class for nullability nodes that arise from the least-upper-bound
+/// implied by a conditional expression.
+class NullabilityNodeForLUB extends _NullabilityNodeCompound {
+  final NullabilityNode left;
+
+  final NullabilityNode right;
+
+  NullabilityNodeForLUB._(this.left, this.right);
+
+  @override
+  Iterable<NullabilityNode> get _components => [left, right];
+
+  @override
+  String get _debugPrefix => 'LUB($left, $right)';
+}
+
+/// Derived class for nullability nodes that arise from type variable
+/// substitution.
+class NullabilityNodeForSubstitution extends _NullabilityNodeCompound {
+  /// Nullability node representing the inner type of the substitution.
+  ///
+  /// For example, if this NullabilityNode arose from substituting `int*` for
+  /// `T` in the type `T*`, [innerNode] is the nullability corresponding to the
+  /// `*` in `int*`.
+  final NullabilityNode innerNode;
+
+  /// Nullability node representing the outer type of the substitution.
+  ///
+  /// For example, if this NullabilityNode arose from substituting `int*` for
+  /// `T` in the type `T*`, [innerNode] is the nullability corresponding to the
+  /// `*` in `T*`.
+  final NullabilityNode outerNode;
+
+  NullabilityNodeForSubstitution._(this.innerNode, this.outerNode);
+
+  @override
+  Iterable<NullabilityNode> get _components => [innerNode, outerNode];
+
+  @override
+  String get _debugPrefix => 'Substituted($innerNode, $outerNode)';
 }
 
 /// Base class for nullability nodes whose state can be mutated safely.

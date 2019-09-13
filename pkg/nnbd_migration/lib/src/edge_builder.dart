@@ -61,8 +61,8 @@ class AssignmentCheckerForTesting extends Object with _AssignmentChecker {
   }
 
   @override
-  void _connect(NullabilityNode source, NullabilityNode destination,
-      EdgeOrigin origin,
+  void _connect(
+      NullabilityNode source, NullabilityNode destination, EdgeOrigin origin,
       {bool hard = false}) {
     _graph.connect(source, destination, origin, hard: hard);
   }
@@ -1408,8 +1408,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   }
 
   @override
-  void _connect(NullabilityNode source, NullabilityNode destination,
-      EdgeOrigin origin,
+  void _connect(
+      NullabilityNode source, NullabilityNode destination, EdgeOrigin origin,
       {bool hard = false}) {
     var edge = _graph.connect(source, destination, origin,
         hard: hard, guards: _guards);
@@ -2009,8 +2009,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     }
   }
 
-  NullabilityNode _nullabilityNodeForGLB(AstNode astNode,
-      NullabilityNode leftNode, NullabilityNode rightNode) {
+  NullabilityNode _nullabilityNodeForGLB(
+      AstNode astNode, NullabilityNode leftNode, NullabilityNode rightNode) {
     var node = NullabilityNode.forGLB();
     var origin = GreatestLowerBoundOrigin(source, astNode.offset);
     _graph.connect(leftNode, node, origin, guards: [rightNode]);
@@ -2221,8 +2221,8 @@ mixin _AssignmentChecker {
     }
   }
 
-  void _connect(NullabilityNode source, NullabilityNode destination,
-      EdgeOrigin origin,
+  void _connect(
+      NullabilityNode source, NullabilityNode destination, EdgeOrigin origin,
       {bool hard = false});
 
   /// Given a [type] representing a type parameter, retrieves the type's bound.
