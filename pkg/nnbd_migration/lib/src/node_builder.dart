@@ -13,7 +13,6 @@ import 'package:analyzer/src/generated/source.dart';
 import 'package:front_end/src/scanner/token.dart';
 import 'package:meta/meta.dart';
 import 'package:nnbd_migration/nnbd_migration.dart';
-import 'package:nnbd_migration/nullability_node.dart';
 import 'package:nnbd_migration/src/conditional_discard.dart';
 import 'package:nnbd_migration/src/decorated_type.dart';
 import 'package:nnbd_migration/src/expression_checks.dart';
@@ -661,7 +660,7 @@ abstract class VariableRecorder {
   /// [parameter] should be optional (should not have a `required`
   /// annotation added to it).
   void recordPossiblyOptional(
-      Source source, DefaultFormalParameter parameter, NullabilityNode node);
+      Source source, DefaultFormalParameter parameter, NullabilityNodeImpl node);
 }
 
 /// Repository of constraint variables and decorated types corresponding to the

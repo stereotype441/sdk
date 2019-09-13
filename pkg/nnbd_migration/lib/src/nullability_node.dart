@@ -4,7 +4,7 @@
 
 import 'package:analyzer/src/generated/source.dart';
 import 'package:meta/meta.dart';
-import 'package:nnbd_migration/nullability_node.dart';
+import 'package:nnbd_migration/nullability_node_info.dart';
 
 import 'edge_origin.dart';
 
@@ -30,7 +30,7 @@ class NullabilityEdge {
   NullabilityEdge._(
       this.destinationNode, this.sources, this._kind, this.origin);
 
-  Iterable<NullabilityNode> get guards => sources.skip(1);
+  Iterable<NullabilityNodeImpl> get guards => sources.skip(1);
 
   bool get hard => _kind != _NullabilityEdgeKind.soft;
 
@@ -424,7 +424,7 @@ class NullabilityNodeForSubstitution extends _NullabilityNodeCompound {
 /// nullability inference graph is encoded into the wrapped constraint
 /// variables.  Over time this will be replaced by a first class representation
 /// of the nullability inference graph.
-abstract class NullabilityNodeImpl extends NullabilityNode {
+abstract class NullabilityNodeImpl implements NullabilityNodeInfo {
   static final _debugNamesInUse = Set<String>();
 
   bool _isPossiblyOptional = false;

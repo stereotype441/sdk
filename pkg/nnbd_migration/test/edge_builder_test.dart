@@ -9,7 +9,6 @@ import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/testing/test_type_provider.dart';
-import 'package:nnbd_migration/nullability_node.dart';
 import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
 import 'package:nnbd_migration/src/decorated_type.dart';
 import 'package:nnbd_migration/src/edge_builder.dart';
@@ -327,7 +326,7 @@ class AssignmentCheckerTest extends Object
 @reflectiveTest
 class EdgeBuilderTest extends EdgeBuilderTestBase {
   void assertGLB(
-      NullabilityNode node, NullabilityNode left, NullabilityNode right) {
+      NullabilityNodeImpl node, NullabilityNodeImpl left, NullabilityNodeImpl right) {
     expect(node, isNot(TypeMatcher<NullabilityNodeForLUB>()));
     assertEdge(left, node, hard: false, guards: [right]);
     assertEdge(node, left, hard: false);
@@ -335,7 +334,7 @@ class EdgeBuilderTest extends EdgeBuilderTestBase {
   }
 
   void assertLUB(
-      NullabilityNode node, NullabilityNode left, NullabilityNode right) {
+      NullabilityNodeImpl node, NullabilityNodeImpl left, NullabilityNodeImpl right) {
     var conditionalNode = node as NullabilityNodeForLUB;
     expect(conditionalNode.left, same(left));
     expect(conditionalNode.right, same(right));
@@ -343,7 +342,7 @@ class EdgeBuilderTest extends EdgeBuilderTestBase {
 
   /// Checks that there are no nullability nodes upstream from [node] that could
   /// cause it to become nullable.
-  void assertNoUpstreamNullability(NullabilityNode node) {
+  void assertNoUpstreamNullability(NullabilityNodeImpl node) {
     // never can never become nullable, even if it has nodes
     // upstream from it.
     if (node == never) return;

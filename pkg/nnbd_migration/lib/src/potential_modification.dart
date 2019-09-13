@@ -5,8 +5,8 @@
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart' show SourceEdit;
-import 'package:nnbd_migration/nullability_node.dart';
 import 'package:nnbd_migration/src/conditional_discard.dart';
+import 'package:nnbd_migration/src/nullability_node.dart';
 
 /// Records information about how a conditional expression or statement might
 /// need to be modified.
@@ -123,7 +123,7 @@ class PotentiallyAddImport extends PotentialModification {
 /// Records information about the possible addition of a `?` suffix to a type in
 /// the source code.
 class PotentiallyAddQuestionSuffix extends PotentialModification {
-  final NullabilityNode node;
+  final NullabilityNodeImpl node;
   final DartType type;
   final int _offset;
 
@@ -140,7 +140,7 @@ class PotentiallyAddQuestionSuffix extends PotentialModification {
 /// Records information about the possible addition of a `@required` annotation
 /// to the source code.
 class PotentiallyAddRequired extends PotentialModification {
-  final NullabilityNode _node;
+  final NullabilityNodeImpl _node;
 
   final int _offset;
   final String className;
@@ -148,7 +148,7 @@ class PotentiallyAddRequired extends PotentialModification {
   final String parameterName;
 
   factory PotentiallyAddRequired(
-      DefaultFormalParameter parameter, NullabilityNode node) {
+      DefaultFormalParameter parameter, NullabilityNodeImpl node) {
     final element = parameter.declaredElement;
     final method = element.enclosingElement;
     final cls = method.enclosingElement;

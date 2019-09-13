@@ -9,7 +9,6 @@ import 'package:analyzer/src/dart/element/handle.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/source.dart';
-import 'package:nnbd_migration/nullability_node.dart';
 import 'package:nnbd_migration/src/already_migrated_code_decorator.dart';
 import 'package:nnbd_migration/src/conditional_discard.dart';
 import 'package:nnbd_migration/src/decorated_type.dart';
@@ -167,7 +166,7 @@ class Variables implements VariableRecorder, VariableRepository {
 
   @override
   void recordPossiblyOptional(
-      Source source, DefaultFormalParameter parameter, NullabilityNode node) {
+      Source source, DefaultFormalParameter parameter, NullabilityNodeImpl node) {
     var modification = PotentiallyAddRequired(parameter, node);
     _addPotentialModification(source, modification);
     _addPotentialImport(

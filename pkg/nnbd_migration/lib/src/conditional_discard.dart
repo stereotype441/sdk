@@ -2,7 +2,7 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'package:nnbd_migration/nullability_node.dart';
+import 'package:nnbd_migration/src/nullability_node.dart';
 
 /// Container for information gathered during nullability migration about a
 /// conditional check that might need to be discarded.
@@ -17,7 +17,7 @@ class ConditionalDiscard {
   ///
   /// `null` if the code path should be kept regardless of the outcome of
   /// migration.
-  final NullabilityNode trueGuard;
+  final NullabilityNodeImpl trueGuard;
 
   /// Nullability node that will be `nullable` if the code path that results
   /// from the condition evaluating to `false` will be reachable after
@@ -25,7 +25,7 @@ class ConditionalDiscard {
   ///
   /// `null` if the code path should be kept regardless of the outcome of
   /// migration.
-  final NullabilityNode falseGuard;
+  final NullabilityNodeImpl falseGuard;
 
   /// Indicates whether the condition is pure (free from side effects).
   ///

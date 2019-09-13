@@ -10,7 +10,6 @@ import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/generated/utilities_dart.dart';
 import 'package:meta/meta.dart';
-import 'package:nnbd_migration/nullability_node.dart';
 import 'package:nnbd_migration/src/conditional_discard.dart';
 import 'package:nnbd_migration/src/decorated_type.dart';
 import 'package:nnbd_migration/src/edge_builder.dart';
@@ -24,12 +23,12 @@ import 'abstract_single_unit.dart';
 
 /// A [NodeMatcher] that matches any node, and records what node it matched to.
 class AnyNodeMatcher implements NodeMatcher {
-  final List<NullabilityNode> _matchingNodes = [];
+  final List<NullabilityNodeImpl> _matchingNodes = [];
 
-  NullabilityNode get matchingNode => _matchingNodes.single;
+  NullabilityNodeImpl get matchingNode => _matchingNodes.single;
 
   @override
-  bool matches(NullabilityNode node) {
+  bool matches(NullabilityNodeImpl node) {
     _matchingNodes.add(node);
     return true;
   }
@@ -153,7 +152,7 @@ mixin EdgeTester {
   /// aren't already.  In practice this means that the caller can pass in either
   //  /// a [NodeMatcher] or a [NullabilityNode].
   NullabilityEdge assertEdge(Object source, Object destination,
-      {@required bool hard, List<NullabilityNode> guards = const []}) {
+      {@required bool hard, List<NullabilityNodeImpl> guards = const []}) {
     var edges = getEdges(source, destination);
     if (edges.length == 0) {
       fail('Expected edge $source -> $destination, found none');
@@ -231,7 +230,7 @@ class InstrumentedVariables extends Variables {
 
   final _expressionChecks = <Expression, ExpressionChecks>{};
 
-  final _possiblyOptional = <DefaultFormalParameter, NullabilityNode>{};
+  final _possiblyOptional = <DefaultFormalParameter, NullabilityNodeImpl>{};
 
   InstrumentedVariables(NullabilityGraph graph, TypeProvider typeProvider)
       : super(graph, typeProvider);
@@ -250,7 +249,7 @@ class InstrumentedVariables extends Variables {
 
   /// Gets the [NullabilityNode] associated with the possibility that
   /// [parameter] may be optional.
-  NullabilityNode possiblyOptionalParameter(DefaultFormalParameter parameter) =>
+  NullabilityNodeImpl possiblyOptionalParameter(DefaultFormalParameter parameter) =>
       _possiblyOptional[parameter];
 
   @override
@@ -274,7 +273,7 @@ class InstrumentedVariables extends Variables {
 
   @override
   void recordPossiblyOptional(
-      Source source, DefaultFormalParameter parameter, NullabilityNode node) {
+      Source source, DefaultFormalParameter parameter, NullabilityNodeImpl node) {
     _possiblyOptional[parameter] = node;
     super.recordPossiblyOptional(source, parameter, node);
   }
@@ -297,9 +296,9 @@ class MigrationVisitorTestBase extends AbstractSingleUnitTest with EdgeTester {
 
   MigrationVisitorTestBase._(this.graph);
 
-  NullabilityNode get always => graph.always;
+  NullabilityNodeImpl get always => graph.always;
 
-  NullabilityNode get never => graph.never;
+  NullabilityNodeImpl get never => graph.never;
 
   TypeProvider get typeProvider => testAnalysisResult.typeProvider;
 
@@ -341,7 +340,7 @@ class MigrationVisitorTestBase extends AbstractSingleUnitTest with EdgeTester {
         testSource, findNode.typeAnnotation(text));
   }
 
-  NullabilityNode possiblyOptionalParameter(String text) {
+  NullabilityNodeImpl possiblyOptionalParameter(String text) {
     return variables.possiblyOptionalParameter(findNode.defaultParameter(text));
   }
 
@@ -357,22 +356,22 @@ class MigrationVisitorTestBase extends AbstractSingleUnitTest with EdgeTester {
 abstract class NodeMatcher {
   factory NodeMatcher(Object expectation) {
     if (expectation is NodeMatcher) return expectation;
-    if (expectation is NullabilityNode) return _ExactNodeMatcher(expectation);
+    if (expectation is NullabilityNodeImpl) return _ExactNodeMatcher(expectation);
     fail(
         'Unclear how to match node expectation of type ${expectation.runtimeType}');
   }
 
-  bool matches(NullabilityNode node);
+  bool matches(NullabilityNodeImpl node);
 }
 
 /// A [NodeMatcher] that matches exactly one node.
 class _ExactNodeMatcher implements NodeMatcher {
-  final NullabilityNode _expectation;
+  final NullabilityNodeImpl _expectation;
 
   _ExactNodeMatcher(this._expectation);
 
   @override
-  bool matches(NullabilityNode node) => node == _expectation;
+  bool matches(NullabilityNodeImpl node) => node == _expectation;
 }
 
 /// A [NodeMatcher] that matches a substitution node with the given inner and
@@ -384,7 +383,7 @@ class _SubstitutionNodeMatcher implements NodeMatcher {
   _SubstitutionNodeMatcher(this.inner, this.outer);
 
   @override
-  bool matches(NullabilityNode node) {
+  bool matches(NullabilityNodeImpl node) {
     return node is NullabilityNodeForSubstitution &&
         inner.matches(node.innerNode) &&
         outer.matches(node.outerNode);

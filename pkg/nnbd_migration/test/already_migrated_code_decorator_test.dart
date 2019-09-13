@@ -10,7 +10,6 @@ import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/testing/element_factory.dart';
 import 'package:analyzer/src/generated/testing/test_type_provider.dart';
 import 'package:analyzer/src/generated/utilities_dart.dart';
-import 'package:nnbd_migration/nullability_node.dart';
 import 'package:nnbd_migration/src/already_migrated_code_decorator.dart';
 import 'package:nnbd_migration/src/decorated_type.dart';
 import 'package:nnbd_migration/src/nullability_node.dart';
@@ -39,9 +38,9 @@ class _AlreadyMigratedCodeDecoratorTest {
   _AlreadyMigratedCodeDecoratorTest._(this.graph, this.typeProvider)
       : decorator = AlreadyMigratedCodeDecorator(graph, typeProvider);
 
-  NullabilityNode get always => graph.always;
+  NullabilityNodeImpl get always => graph.always;
 
-  NullabilityNode get never => graph.never;
+  NullabilityNodeImpl get never => graph.never;
 
   void checkDynamic(DecoratedType decoratedType) {
     expect(decoratedType.type, same(typeProvider.dynamicType));
@@ -50,7 +49,7 @@ class _AlreadyMigratedCodeDecoratorTest {
 
   void checkFutureOr(
       DecoratedType decoratedType,
-      NullabilityNode expectedNullability,
+      NullabilityNodeImpl expectedNullability,
       void Function(DecoratedType) checkArgument) {
     expect(decoratedType.type.element, typeProvider.futureOrType.element);
     expect(decoratedType.node, expectedNullability);
@@ -58,14 +57,14 @@ class _AlreadyMigratedCodeDecoratorTest {
   }
 
   void checkInt(
-      DecoratedType decoratedType, NullabilityNode expectedNullability) {
+      DecoratedType decoratedType, NullabilityNodeImpl expectedNullability) {
     expect(decoratedType.type.element, typeProvider.intType.element);
     expect(decoratedType.node, expectedNullability);
   }
 
   void checkIterable(
       DecoratedType decoratedType,
-      NullabilityNode expectedNullability,
+      NullabilityNodeImpl expectedNullability,
       void Function(DecoratedType) checkArgument) {
     expect(
         decoratedType.type.element, typeProvider.iterableDynamicType.element);
@@ -74,20 +73,20 @@ class _AlreadyMigratedCodeDecoratorTest {
   }
 
   void checkNum(
-      DecoratedType decoratedType, NullabilityNode expectedNullability) {
+      DecoratedType decoratedType, NullabilityNodeImpl expectedNullability) {
     expect(decoratedType.type.element, typeProvider.numType.element);
     expect(decoratedType.node, expectedNullability);
   }
 
   void checkObject(
-      DecoratedType decoratedType, NullabilityNode expectedNullability) {
+      DecoratedType decoratedType, NullabilityNodeImpl expectedNullability) {
     expect(decoratedType.type.element, typeProvider.objectType.element);
     expect(decoratedType.node, expectedNullability);
   }
 
   void checkTypeParameter(
       DecoratedType decoratedType,
-      NullabilityNode expectedNullability,
+      NullabilityNodeImpl expectedNullability,
       TypeParameterElement expectedElement) {
     var type = decoratedType.type as TypeParameterTypeImpl;
     expect(type.element, same(expectedElement));
