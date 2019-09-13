@@ -4,9 +4,10 @@
 
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/src/generated/source.dart';
+import 'package:nnbd_migration/nullability_node.dart';
 
 abstract class NullabilityMigrationInstrumentation {
-  void explicitTypeNullability(Source source, TypeAnnotation node, NullabilityNode node);
+  void explicitTypeNullability(Source source, TypeAnnotation typeAnnotation, NullabilityNode node);
 
-  void implicitTypeNullability()
+  void implicitInvocationType(Source source, AstNode node, DecoratedType type);
 }

@@ -12,7 +12,6 @@ import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:front_end/src/scanner/token.dart';
 import 'package:meta/meta.dart';
-import 'package:nnbd_migration/instrumentation.dart';
 import 'package:nnbd_migration/nnbd_migration.dart';
 import 'package:nnbd_migration/nullability_node.dart';
 import 'package:nnbd_migration/src/conditional_discard.dart';
@@ -72,7 +71,7 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
   final DecoratedType _nonNullableStackTraceType;
 
   NodeBuilder(this._variables, this.source, this.listener, this._graph,
-      this._typeProvider, {this.instrumentation})
+      this._typeProvider)
       : _dynamicType = DecoratedType(_typeProvider.dynamicType, _graph.always),
         _nonNullableObjectType =
             DecoratedType(_typeProvider.objectType, _graph.never),

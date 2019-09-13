@@ -35,7 +35,7 @@ class Variables implements VariableRecorder, VariableRepository {
 
   final AlreadyMigratedCodeDecorator _alreadyMigratedCodeDecorator;
 
-  Variables(this._graph, TypeProvider typeProvider)
+  Variables(this._graph, TypeProvider typeProvider, {this.instrumentation})
       : _alreadyMigratedCodeDecorator =
             AlreadyMigratedCodeDecorator(_graph, typeProvider);
 
