@@ -2127,6 +2127,15 @@ mixin _AssignmentChecker {
       return;
     }
     if (destinationType.isDartAsyncFutureOr) {
+      if (sourceType.isDartAsyncFutureOr) {
+        // This is a special case not in the subtyping spec.  The subtyping spec
+        // covers this case by expanding the LHS first, which is fine but
+        // leads to redundant edges (which might be confusing for users)
+        // if T0 is FutureOr<S0> then:
+        // - T0 <: T1 iff Future<S0> <: T1 and S0 <: T1
+        var s0 = source.typeArguments[0];
+        _checkAssignment_recursion()
+      }
       // (From the subtyping spec):
       // if T1 is FutureOr<S1> then T0 <: T1 iff any of the following hold:
       // - either T0 <: Future<S1>
