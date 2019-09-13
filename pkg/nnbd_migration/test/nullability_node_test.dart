@@ -29,8 +29,7 @@ class NullabilityNodeTest {
     expect(unsatisfiedEdges, unorderedEquals(expectedUnsatisfiedEdges));
   }
 
-  NullabilityEdge connect(
-      NullabilityNode source, NullabilityNode destination,
+  NullabilityEdge connect(NullabilityNode source, NullabilityNode destination,
       {bool hard = false, List<NullabilityNode> guards = const []}) {
     return graph.connect(source, destination, _TestEdgeOrigin(),
         hard: hard, guards: guards);
@@ -49,8 +48,7 @@ class NullabilityNodeTest {
     unsatisfiedSubstitutions = graph.unsatisfiedSubstitutions.toList();
   }
 
-  NullabilityNode subst(
-      NullabilityNode inner, NullabilityNode outer) {
+  NullabilityNode subst(NullabilityNode inner, NullabilityNode outer) {
     return NullabilityNode.forSubstitution(inner, outer);
   }
 
