@@ -3,9 +3,13 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/src/generated/source.dart';
-import 'package:analyzer_plugin/protocol/protocol_common.dart';
+import 'package:analyzer/src/test_utilities/find_node.dart';
+import 'package:analyzer_plugin/protocol/protocol_common.dart' hide Element;
+import 'package:nnbd_migration/instrumentation.dart';
 import 'package:nnbd_migration/nnbd_migration.dart';
+import 'package:nnbd_migration/nullability_state.dart';
 import 'package:test/test.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
 
@@ -16,7 +20,139 @@ main() {
     defineReflectiveTests(_ProvisionalApiTest);
     defineReflectiveTests(_ProvisionalApiTestPermissive);
     defineReflectiveTests(_ProvisionalApiTestWithReset);
+    defineReflectiveTests(_InstrumentationTest);
   });
+}
+
+class _InstrumentationClient implements NullabilityMigrationInstrumentation {
+  final Map<String, Map<TypeAnnotation, NullabilityNodeInfo>>
+      _explicitTypeNullability = {};
+
+  final Map<Element, DecoratedTypeInfo> _externalDecoratedType = {};
+
+  final List<EdgeInfo> _edges = [];
+
+  @override
+  void explicitTypeNullability(
+      Source source, TypeAnnotation typeAnnotation, NullabilityNodeInfo node) {
+    (_explicitTypeNullability[source.fullName] ??= {})[typeAnnotation] = node;
+  }
+
+  @override
+  void externalDecoratedType(Element element, DecoratedTypeInfo decoratedType) {
+    _externalDecoratedType[element] = decoratedType;
+  }
+
+  @override
+  void graphEdge(EdgeInfo edge) {
+    _edges.add(edge);
+  }
+
+  @override
+  void implicitDeclarationReturnType(
+      Source source, AstNode node, DecoratedTypeInfo decoratedReturnType) {
+    // TODO: implement implicitDeclarationReturnType
+  }
+
+  @override
+  void implicitDeclarationType(
+      Source source, AstNode node, DecoratedTypeInfo decoratedType) {
+    // TODO: implement implicitDeclarationType
+  }
+
+  @override
+  void implicitTypeArguments(
+      Source source, AstNode node, Iterable<DecoratedTypeInfo> type) {
+    // TODO: implement implicitTypeArguments
+  }
+
+  @override
+  void propagationInfo(NullabilityNodeInfo node, NullabilityState state,
+      StateChangeReason reason,
+      {EdgeInfo edge, SubstitutionNodeInfo substitutionNode}) {
+    // TODO: implement propagationInfo
+  }
+}
+
+@reflectiveTest
+class _InstrumentationTest extends _ProvisionalApiTestBase {
+  final _instrumentationClient = _InstrumentationClient();
+
+  @override
+  NullabilityMigrationInstrumentation get instrumentation =>
+      _instrumentationClient;
+
+  @override
+  bool get _usePermissiveMode => false;
+
+  NullabilityNodeInfo explicitTypeNullability(
+          String path, TypeAnnotation typeAnnotation) =>
+      (_instrumentationClient._explicitTypeNullability[path] ??
+          {})[typeAnnotation];
+
+  DecoratedTypeInfo externalDecoratedType(Element element) =>
+      _instrumentationClient._externalDecoratedType[element];
+
+  List<EdgeInfo> getEdges(bool Function(EdgeInfo) predicate) => [
+        for (var edge in _instrumentationClient._edges)
+          if (predicate(edge)) edge
+      ];
+
+  test_explicitTypeNullability() async {
+    var content = '''
+int x = 1;
+int y = null;
+''';
+    var expected = '''
+int x = 1;
+int? y = null;
+''';
+    var sourcePath = await _checkSingleFileChanges(content, expected);
+    var find = findNodes[sourcePath];
+    var xAnnotation =
+        explicitTypeNullability(sourcePath, find.typeAnnotation('int x'));
+    expect(xAnnotation.isNullable, false);
+    var yAnnotation =
+        explicitTypeNullability(sourcePath, find.typeAnnotation('int x'));
+    expect(yAnnotation.isNullable, true);
+  }
+
+  test_externalDecoratedType() async {
+    var content = '''
+main() {
+  print(1);
+}
+''';
+    var expected = '''
+main() {
+  print(1);
+}
+''';
+    var sourcePath = await _checkSingleFileChanges(content, expected);
+    var printElement = findNodes[sourcePath].simple('print').staticElement;
+    var printDecoratedType = externalDecoratedType(printElement);
+    expect(printDecoratedType.type.toString(), 'void Function(Object)');
+  }
+
+  test_graphEdge() async {
+    var content = '''
+int f(int x) => x;
+''';
+    var expected = '''
+int f(int x) => x;
+''';
+    var sourcePath = await _checkSingleFileChanges(content, expected);
+    var find = findNodes[sourcePath];
+    var xAnnotation =
+        explicitTypeNullability(sourcePath, find.typeAnnotation('int x'));
+    var returnAnnotation =
+        explicitTypeNullability(sourcePath, find.typeAnnotation('int f'));
+    expect(
+        getEdges((e) =>
+            e.primarySource == xAnnotation &&
+            e.destinationNode == returnAnnotation),
+        hasLength(1));
+  }
 }
 
 /// Tests of the provisional API.
@@ -29,6 +165,10 @@ class _ProvisionalApiTest extends _ProvisionalApiTestBase
 
 /// Base class for provisional API tests.
 abstract class _ProvisionalApiTestBase extends AbstractContextTest {
+  final Map<String, FindNode> findNodes = {};
+
+  NullabilityMigrationInstrumentation get instrumentation => null;
+
   bool get _usePermissiveMode;
 
   /// Hook invoked after calling `prepareInput` on each input.
@@ -42,10 +182,12 @@ abstract class _ProvisionalApiTestBase extends AbstractContextTest {
       newFile(path, content: input[path]);
     }
     var listener = new _TestMigrationListener();
-    var migration =
-        NullabilityMigration(listener, permissive: _usePermissiveMode);
+    var migration = NullabilityMigration(listener,
+        permissive: _usePermissiveMode, instrumentation: instrumentation);
     for (var path in input.keys) {
-      migration.prepareInput(await session.getResolvedUnit(path));
+      var result = await session.getResolvedUnit(path);
+      findNodes[path] = FindNode(input[path], result.unit);
+      migration.prepareInput(result);
     }
     _afterPrepare();
     for (var path in input.keys) {
@@ -68,10 +210,12 @@ abstract class _ProvisionalApiTestBase extends AbstractContextTest {
 
   /// Verifies that migraiton of the single file with the given [content]
   /// produces the [expected] output.
-  Future<void> _checkSingleFileChanges(String content, String expected) async {
+  Future<String> _checkSingleFileChanges(
+      String content, String expected) async {
     var sourcePath = convertPath('/home/test/lib/test.dart');
     await _checkMultipleFileChanges(
         {sourcePath: content}, {sourcePath: expected});
+    return sourcePath;
   }
 }
 
