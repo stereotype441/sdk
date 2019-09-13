@@ -34,7 +34,8 @@ class _InstrumentationClient implements NullabilityMigrationInstrumentation {
 
   final Map<String, Map<AstNode, DecoratedTypeInfo>> _implicitReturnType = {};
 
-  final Map<String, Map<AstNode, List<DecoratedTypeInfo>>> _implicitTypeArguments = {};
+  final Map<String, Map<AstNode, List<DecoratedTypeInfo>>>
+      _implicitTypeArguments = {};
 
   final Map<String, Map<AstNode, DecoratedTypeInfo>> _implicitType = {};
 
@@ -104,14 +105,42 @@ class _InstrumentationTest extends _ProvisionalApiTestBase {
           if (predicate(edge)) edge
       ];
 
-  List<DecoratedTypeInfo> implicitTypeArguments(String path, AstNode node) =>
-      (_instrumentationClient._implicitTypeArguments[path] ?? {})[node];
-
   DecoratedTypeInfo implicitReturnType(String path, AstNode node) =>
       (_instrumentationClient._implicitReturnType[path] ?? {})[node];
 
   DecoratedTypeInfo implicitType(String path, AstNode node) =>
       (_instrumentationClient._implicitType[path] ?? {})[node];
+
+  List<DecoratedTypeInfo> implicitTypeArguments(String path, AstNode node) =>
+      (_instrumentationClient._implicitTypeArguments[path] ?? {})[node];
+
+  solo_test_implicitTypeArguments() async {
+    var content = '''
+List<int> f() => [null];
+''';
+    var expected = '''
+List<int?> f() => [null];
+''';
+    var sourcePath = await _checkSingleFileChanges(content, expected);
+    var find = findNodes[sourcePath];
+    var implicitListLiteralElementNode =
+        implicitTypeArguments(sourcePath, find.listLiteral('[null]'))
+            .single
+            .node;
+    var returnElementNode =
+        explicitTypeNullability(sourcePath, find.typeAnnotation('int'));
+    expect(
+        getEdges((e) =>
+            e.primarySource.isImmutable &&
+            e.primarySource.isNullable &&
+            e.destinationNode == implicitListLiteralElementNode),
+        hasLength(1));
+    expect(
+        getEdges((e) =>
+            e.primarySource == implicitListLiteralElementNode &&
+            e.destinationNode == returnElementNode),
+        hasLength(1));
+  }
 
   test_explicitTypeNullability() async {
     var content = '''
@@ -167,22 +196,6 @@ int f(int x) => x;
             e.primarySource == xAnnotation &&
             e.destinationNode == returnAnnotation),
         hasLength(1));
-  }
-  
-  test_implicitTypeArguments() async {
-    var content = '''
-List<int> f() => [null];
-''';
-    var expected = '''
-List<int?> f() => [null];
-''';
-    var sourcePath = await _checkSingleFileChanges(content, expected);
-    var find = findNodes[sourcePath];
-    var implicitListLiteralElementNode = implicitTypeArguments(sourcePath, find.listLiteral('[null]')).single.node;
-    var returnElementNode = explicitTypeNullability(sourcePath, find.typeAnnotation('int'));
-    expect(getEdges((e) => e.primarySource.isImmutable && e.primarySource.isNullable &&
-    e.destinationNode == implicitListLiteralElementNode), hasLength(1));
-    expect(getEdges((e) => e.primarySource == implicitListLiteralElementNode && e.destinationNode == returnElementNode), hasLength(1));
   }
 
   test_implicitReturnType() async {

@@ -34,10 +34,13 @@ class NullabilityMigrationImpl implements NullabilityMigration {
   /// complete.  TODO(paulberry): remove this mode once the migration algorithm
   /// is fully implemented.
   NullabilityMigrationImpl(NullabilityMigrationListener listener,
-      {bool permissive: false, NullabilityMigrationInstrumentation instrumentation})
-      : this._(listener, NullabilityGraph(instrumentation: instrumentation), permissive, instrumentation);
+      {bool permissive: false,
+      NullabilityMigrationInstrumentation instrumentation})
+      : this._(listener, NullabilityGraph(instrumentation: instrumentation),
+            permissive, instrumentation);
 
-  NullabilityMigrationImpl._(this.listener, this._graph, this._permissive, this._instrumentation);
+  NullabilityMigrationImpl._(
+      this.listener, this._graph, this._permissive, this._instrumentation);
 
   void finish() {
     _graph.propagate();
@@ -56,16 +59,19 @@ class NullabilityMigrationImpl implements NullabilityMigration {
   }
 
   void prepareInput(ResolvedUnitResult result) {
-    _variables ??= Variables(_graph, result.typeProvider, instrumentation: _instrumentation);
+    _variables ??= Variables(_graph, result.typeProvider,
+        instrumentation: _instrumentation);
     var unit = result.unit;
     unit.accept(NodeBuilder(_variables, unit.declaredElement.source,
-        _permissive ? listener : null, _graph, result.typeProvider, instrumentation: _instrumentation));
+        _permissive ? listener : null, _graph, result.typeProvider,
+        instrumentation: _instrumentation));
   }
 
   void processInput(ResolvedUnitResult result) {
     var unit = result.unit;
     unit.accept(EdgeBuilder(result.typeProvider, result.typeSystem, _variables,
-        _graph, unit.declaredElement.source, _permissive ? listener : null));
+        _graph, unit.declaredElement.source, _permissive ? listener : null,
+        instrumentation: _instrumentation));
   }
 
   @visibleForTesting
