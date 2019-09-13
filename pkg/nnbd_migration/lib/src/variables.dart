@@ -9,6 +9,7 @@ import 'package:analyzer/src/dart/element/handle.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/source.dart';
+import 'package:nnbd_migration/instrumentation.dart';
 import 'package:nnbd_migration/src/already_migrated_code_decorator.dart';
 import 'package:nnbd_migration/src/conditional_discard.dart';
 import 'package:nnbd_migration/src/decorated_type.dart';
@@ -138,10 +139,13 @@ class Variables implements VariableRecorder, VariableRepository {
     _decoratedElementTypes[element] = type;
   }
 
+  final NullabilityMigrationInstrumentation /*?*/ instrumentation;
+
   void recordDecoratedExpressionType(Expression node, DecoratedType type) {}
 
   void recordDecoratedTypeAnnotation(Source source, TypeAnnotation node,
       DecoratedType type, PotentiallyAddQuestionSuffix potentialModification) {
+    instrumentation?.explicitTypeNullability(source, node, type.node);
     if (potentialModification != null)
       _addPotentialModification(source, potentialModification);
     (_decoratedTypeAnnotations[source] ??=
