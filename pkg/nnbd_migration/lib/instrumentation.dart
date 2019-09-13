@@ -3,6 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/src/generated/source.dart';
 
 abstract class NullabilityMigrationInstrumentation {
@@ -12,7 +13,11 @@ abstract class NullabilityMigrationInstrumentation {
 
   void implicitDeclarationReturnType(Source source, AstNode node, DecoratedTypeInfo decoratedReturnType);
 
-  void implicitDeclarationType(Source source, AstNode node, DecoratedTypeInfo decoratedType) {}
+  void implicitDeclarationType(Source source, AstNode node, DecoratedTypeInfo decoratedType);
+
+  void externalDecoratedType(Element element, DecoratedTypeInfo decoratedType);
+
+  void graphEdge(EdgeInfo edge) {}
 }
 
 /// Information about a single node in the nullability inference graph.
@@ -21,3 +26,5 @@ abstract class NullabilityNodeInfo {}
 /// Information about the set of nullability nodes decorating a type in the
 /// program being migrated.
 abstract class DecoratedTypeInfo {}
+
+abstract class EdgeInfo {}

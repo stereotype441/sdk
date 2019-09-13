@@ -244,6 +244,7 @@ class Variables implements VariableRecorder, VariableRepository {
       // TODO(paulberry)
       throw UnimplementedError('Decorating ${element.runtimeType}');
     }
+    instrumentation?.externalDecoratedType(element, decoratedType);
     return decoratedType;
   }
 

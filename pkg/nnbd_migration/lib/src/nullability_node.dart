@@ -12,7 +12,7 @@ import 'edge_origin.dart';
 /// object to another [NullabilityNode] that is "downstream" from it (meaning
 /// that if the former node is nullable, then the latter node will either have
 /// to be nullable, or null checks will have to be added).
-class NullabilityEdge {
+class NullabilityEdge implements EdgeInfo {
   /// The node that is downstream.
   final NullabilityNode destinationNode;
 
@@ -86,6 +86,8 @@ class NullabilityGraph {
   /// propagation.
   static const _debugAfterPropagation = false;
 
+  final NullabilityMigrationInstrumentation /*?*/ instrumentation;
+
   /// Set containing all [NullabilityNode]s that have been passed as the
   /// `sourceNode` argument to [connect].
   final _allSourceNodes = Set<NullabilityNode>.identity();
@@ -124,6 +126,8 @@ class NullabilityGraph {
   /// During execution of [_propagateDownstream], a list of all the substitution
   /// nodes that have not yet been resolved.
   List<NullabilityNodeForSubstitution> _pendingSubstitutions = [];
+
+  NullabilityGraph({this.instrumentation});
 
   /// After calling [propagate], this getter may be queried to access the set of
   /// edges that could not be satisfied.
@@ -177,6 +181,7 @@ class NullabilityGraph {
       _NullabilityEdgeKind kind,
       EdgeOrigin origin) {
     var edge = NullabilityEdge._(destinationNode, sources, kind, origin);
+    instrumentation?.graphEdge(edge);
     for (var source in sources) {
       _connectDownstream(source, edge);
     }
