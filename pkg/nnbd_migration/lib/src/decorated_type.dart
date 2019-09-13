@@ -23,7 +23,7 @@ class DecoratedType {
 
   final DartType type;
 
-  final NullabilityNode node;
+  final NullabilityNodeImpl node;
 
   /// If `this` is a function type, the [DecoratedType] of its return type.
   final DecoratedType returnType;
@@ -112,7 +112,7 @@ class DecoratedType {
   /// nodes everywhere that don't correspond to any source location.  These
   /// nodes can later be unioned with other nodes.
   factory DecoratedType.forImplicitFunction(TypeProvider typeProvider,
-      FunctionType type, NullabilityNode node, NullabilityGraph graph,
+      FunctionType type, NullabilityNodeImpl node, NullabilityGraph graph,
       {DecoratedType returnType}) {
     var positionalParameters = <DecoratedType>[];
     var namedParameters = <String, DecoratedType>{};
@@ -159,20 +159,20 @@ class DecoratedType {
       typeArguments ??= type.typeArguments
           .map((t) => DecoratedType.forImplicitType(typeProvider, t, graph))
           .toList();
-      return DecoratedType(type, NullabilityNode.forInferredType(),
+      return DecoratedType(type, NullabilityNodeImpl.forInferredType(),
           typeArguments: typeArguments);
     } else if (type is FunctionType) {
       if (typeArguments != null) {
         throw "Not supported: implicit function type with explicit type arguments";
       }
       return DecoratedType.forImplicitFunction(
-          typeProvider, type, NullabilityNode.forInferredType(), graph);
+          typeProvider, type, NullabilityNodeImpl.forInferredType(), graph);
     } else if (type is TypeParameterType) {
       assert(typeArguments == null);
-      return DecoratedType(type, NullabilityNode.forInferredType());
+      return DecoratedType(type, NullabilityNodeImpl.forInferredType());
     } else if (type is BottomTypeImpl) {
       assert(typeArguments == null);
-      return DecoratedType(type, NullabilityNode.forInferredType());
+      return DecoratedType(type, NullabilityNodeImpl.forInferredType());
     }
     // TODO(paulberry)
     throw UnimplementedError(
@@ -388,7 +388,7 @@ class DecoratedType {
   }
 
   /// Creates a shallow copy of `this`, replacing the nullability node.
-  DecoratedType withNode(NullabilityNode node) => DecoratedType(type, node,
+  DecoratedType withNode(NullabilityNodeImpl node) => DecoratedType(type, node,
       returnType: returnType,
       positionalParameters: positionalParameters,
       namedParameters: namedParameters,
@@ -435,7 +435,7 @@ class DecoratedType {
         return this;
       } else {
         return inner
-            .withNode(NullabilityNode.forSubstitution(inner.node, node));
+            .withNode(NullabilityNodeImpl.forSubstitution(inner.node, node));
       }
     } else if (type.isVoid || type.isDynamic) {
       return this;
