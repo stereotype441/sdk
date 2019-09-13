@@ -109,12 +109,12 @@ int? y = null;
 ''';
     var sourcePath = await _checkSingleFileChanges(content, expected);
     var find = findNodes[sourcePath];
-    var xAnnotation =
+    var xNode =
         explicitTypeNullability(sourcePath, find.typeAnnotation('int x'));
-    expect(xAnnotation.isNullable, false);
-    var yAnnotation =
+    expect(xNode.isNullable, false);
+    var yNode =
         explicitTypeNullability(sourcePath, find.typeAnnotation('int y'));
-    expect(yAnnotation.isNullable, true);
+    expect(yNode.isNullable, true);
   }
 
   test_externalDecoratedType() async {
@@ -151,6 +151,36 @@ int f(int x) => x;
         getEdges((e) =>
             e.primarySource == xAnnotation &&
             e.destinationNode == returnAnnotation),
+        hasLength(1));
+  }
+
+  test_implicitDeclarationReturnType() async {
+    var content = '''
+abstract class Base {
+  int /*base*/ f();
+}
+abstract class Derived extends Base {
+  int /*derived*/ f();
+}
+''';
+    var expected = '''
+abstract class Base {
+  int /*base*/ f();
+}
+abstract class Derived extends Base {
+  int /*derived*/ f();
+}
+''';
+    var sourcePath = await _checkSingleFileChanges(content, expected);
+    var find = findNodes[sourcePath];
+    var baseReturnNode = explicitTypeNullability(
+        sourcePath, find.typeAnnotation('int /*base*/'));
+    var derivedReturnNode = explicitTypeNullability(
+        sourcePath, find.typeAnnotation('int /*derived*/'));
+    expect(
+        getEdges((e) =>
+            e.primarySource == derivedReturnNode &&
+            e.destinationNode == baseReturnNode),
         hasLength(1));
   }
 }
