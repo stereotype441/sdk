@@ -2,262 +2,21 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'package:analyzer/dart/ast/ast.dart';
-import 'package:analyzer/dart/element/element.dart';
-import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/test_utilities/find_node.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart' hide Element;
-import 'package:nnbd_migration/instrumentation.dart';
 import 'package:nnbd_migration/nnbd_migration.dart';
-import 'package:nnbd_migration/nullability_state.dart';
 import 'package:test/test.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
 
 import 'abstract_context.dart';
+import 'api_test_base.dart';
 
 main() {
   defineReflectiveSuite(() {
     defineReflectiveTests(_ProvisionalApiTest);
     defineReflectiveTests(_ProvisionalApiTestPermissive);
     defineReflectiveTests(_ProvisionalApiTestWithReset);
-    defineReflectiveTests(_InstrumentationTest);
   });
-}
-
-class _InstrumentationClient implements NullabilityMigrationInstrumentation {
-  final Map<String, Map<TypeAnnotation, NullabilityNodeInfo>>
-      _explicitTypeNullability = {};
-
-  final Map<Element, DecoratedTypeInfo> _externalDecoratedType = {};
-
-  final List<EdgeInfo> _edges = [];
-
-  final Map<String, Map<AstNode, DecoratedTypeInfo>> _implicitReturnType = {};
-
-  final Map<String, Map<AstNode, List<DecoratedTypeInfo>>>
-      _implicitTypeArguments = {};
-
-  final Map<String, Map<AstNode, DecoratedTypeInfo>> _implicitType = {};
-
-  @override
-  void explicitTypeNullability(
-      Source source, TypeAnnotation typeAnnotation, NullabilityNodeInfo node) {
-    (_explicitTypeNullability[source.fullName] ??= {})[typeAnnotation] = node;
-  }
-
-  @override
-  void externalDecoratedType(Element element, DecoratedTypeInfo decoratedType) {
-    _externalDecoratedType[element] = decoratedType;
-  }
-
-  @override
-  void graphEdge(EdgeInfo edge) {
-    _edges.add(edge);
-  }
-
-  @override
-  void implicitReturnType(
-      Source source, AstNode node, DecoratedTypeInfo decoratedReturnType) {
-    (_implicitReturnType[source.fullName] ??= {})[node] = decoratedReturnType;
-  }
-
-  @override
-  void implicitType(
-      Source source, AstNode node, DecoratedTypeInfo decoratedType) {
-    (_implicitType[source.fullName] ??= {})[node] = decoratedType;
-  }
-
-  @override
-  void implicitTypeArguments(
-      Source source, AstNode node, Iterable<DecoratedTypeInfo> types) {
-    (_implicitTypeArguments[source.fullName] ??= {})[node] = types.toList();
-  }
-
-  @override
-  void propagationInfo(NullabilityNodeInfo node, NullabilityState state,
-      StateChangeReason reason,
-      {EdgeInfo edge, SubstitutionNodeInfo substitutionNode}) {
-    // TODO: implement propagationInfo
-  }
-}
-
-@reflectiveTest
-class _InstrumentationTest extends _ProvisionalApiTestBase {
-  final _instrumentationClient = _InstrumentationClient();
-
-  @override
-  NullabilityMigrationInstrumentation get instrumentation =>
-      _instrumentationClient;
-
-  @override
-  bool get _usePermissiveMode => false;
-
-  NullabilityNodeInfo explicitTypeNullability(
-          String path, TypeAnnotation typeAnnotation) =>
-      (_instrumentationClient._explicitTypeNullability[path] ??
-          {})[typeAnnotation];
-
-  DecoratedTypeInfo externalDecoratedType(Element element) =>
-      _instrumentationClient._externalDecoratedType[element];
-
-  List<EdgeInfo> getEdges(bool Function(EdgeInfo) predicate) => [
-        for (var edge in _instrumentationClient._edges)
-          if (predicate(edge)) edge
-      ];
-
-  DecoratedTypeInfo implicitReturnType(String path, AstNode node) =>
-      (_instrumentationClient._implicitReturnType[path] ?? {})[node];
-
-  DecoratedTypeInfo implicitType(String path, AstNode node) =>
-      (_instrumentationClient._implicitType[path] ?? {})[node];
-
-  List<DecoratedTypeInfo> implicitTypeArguments(String path, AstNode node) =>
-      (_instrumentationClient._implicitTypeArguments[path] ?? {})[node];
-
-  solo_test_implicitTypeArguments() async {
-    var content = '''
-List<int> f() => [null];
-''';
-    var expected = '''
-List<int?> f() => [null];
-''';
-    var sourcePath = await _checkSingleFileChanges(content, expected);
-    var find = findNodes[sourcePath];
-    var implicitListLiteralElementNode =
-        implicitTypeArguments(sourcePath, find.listLiteral('[null]'))
-            .single
-            .node;
-    var returnElementNode =
-        explicitTypeNullability(sourcePath, find.typeAnnotation('int'));
-    expect(
-        getEdges((e) =>
-            e.primarySource.isImmutable &&
-            e.primarySource.isNullable &&
-            e.destinationNode == implicitListLiteralElementNode),
-        hasLength(1));
-    expect(
-        getEdges((e) =>
-            e.primarySource == implicitListLiteralElementNode &&
-            e.destinationNode == returnElementNode),
-        hasLength(1));
-  }
-
-  test_explicitTypeNullability() async {
-    var content = '''
-int x = 1;
-int y = null;
-''';
-    var expected = '''
-int x = 1;
-int? y = null;
-''';
-    var sourcePath = await _checkSingleFileChanges(content, expected);
-    var find = findNodes[sourcePath];
-    var xNode =
-        explicitTypeNullability(sourcePath, find.typeAnnotation('int x'));
-    expect(xNode.isNullable, false);
-    var yNode =
-        explicitTypeNullability(sourcePath, find.typeAnnotation('int y'));
-    expect(yNode.isNullable, true);
-  }
-
-  test_externalDecoratedType() async {
-    var content = '''
-main() {
-  print(1);
-}
-''';
-    var expected = '''
-main() {
-  print(1);
-}
-''';
-    var sourcePath = await _checkSingleFileChanges(content, expected);
-    var printElement = findNodes[sourcePath].simple('print').staticElement;
-    var printDecoratedType = externalDecoratedType(printElement);
-    expect(printDecoratedType.type.toString(), 'void Function(Object)');
-  }
-
-  test_graphEdge() async {
-    var content = '''
-int f(int x) => x;
-''';
-    var expected = '''
-int f(int x) => x;
-''';
-    var sourcePath = await _checkSingleFileChanges(content, expected);
-    var find = findNodes[sourcePath];
-    var xAnnotation =
-        explicitTypeNullability(sourcePath, find.typeAnnotation('int x'));
-    var returnAnnotation =
-        explicitTypeNullability(sourcePath, find.typeAnnotation('int f'));
-    expect(
-        getEdges((e) =>
-            e.primarySource == xAnnotation &&
-            e.destinationNode == returnAnnotation),
-        hasLength(1));
-  }
-
-  test_implicitReturnType() async {
-    var content = '''
-abstract class Base {
-  int f();
-}
-abstract class Derived extends Base {
-  f /*derived*/();
-}
-''';
-    var expected = '''
-abstract class Base {
-  int f();
-}
-abstract class Derived extends Base {
-  f /*derived*/();
-}
-''';
-    var sourcePath = await _checkSingleFileChanges(content, expected);
-    var find = findNodes[sourcePath];
-    var baseReturnNode =
-        explicitTypeNullability(sourcePath, find.typeAnnotation('int'));
-    var derivedReturnNode =
-        implicitReturnType(sourcePath, find.methodDeclaration('f /*derived*/'))
-            .node;
-    expect(
-        getEdges((e) =>
-            e.primarySource == derivedReturnNode &&
-            e.destinationNode == baseReturnNode),
-        hasLength(1));
-  }
-
-  test_implicitType() async {
-    var content = '''
-abstract class Base {
-  void f(int i);
-}
-abstract class Derived extends Base {
-  void f(i); /*derived*/
-}
-''';
-    var expected = '''
-abstract class Base {
-  void f(int i);
-}
-abstract class Derived extends Base {
-  void f(i); /*derived*/
-}
-''';
-    var sourcePath = await _checkSingleFileChanges(content, expected);
-    var find = findNodes[sourcePath];
-    var baseParamNode =
-        explicitTypeNullability(sourcePath, find.typeAnnotation('int i'));
-    var derivedParamNode =
-        implicitType(sourcePath, find.simpleParameter('i); /*derived*/')).node;
-    expect(
-        getEdges((e) =>
-            e.primarySource == baseParamNode &&
-            e.destinationNode == derivedParamNode),
-        hasLength(1));
-  }
 }
 
 /// Tests of the provisional API.
@@ -272,8 +31,6 @@ class _ProvisionalApiTest extends _ProvisionalApiTestBase
 abstract class _ProvisionalApiTestBase extends AbstractContextTest {
   final Map<String, FindNode> findNodes = {};
 
-  NullabilityMigrationInstrumentation get instrumentation => null;
-
   bool get _usePermissiveMode;
 
   /// Hook invoked after calling `prepareInput` on each input.
@@ -286,9 +43,9 @@ abstract class _ProvisionalApiTestBase extends AbstractContextTest {
     for (var path in input.keys) {
       newFile(path, content: input[path]);
     }
-    var listener = new _TestMigrationListener();
-    var migration = NullabilityMigration(listener,
-        permissive: _usePermissiveMode, instrumentation: instrumentation);
+    var listener = new TestMigrationListener();
+    var migration =
+        NullabilityMigration(listener, permissive: _usePermissiveMode);
     for (var path in input.keys) {
       var result = await session.getResolvedUnit(path);
       findNodes[path] = FindNode(input[path], result.unit);
@@ -300,7 +57,7 @@ abstract class _ProvisionalApiTestBase extends AbstractContextTest {
     }
     migration.finish();
     var sourceEdits = <String, List<SourceEdit>>{};
-    for (var entry in listener._edits.entries) {
+    for (var entry in listener.edits.entries) {
       var path = entry.key.fullName;
       expect(expectedOutput.keys, contains(path));
       sourceEdits[path] = entry.value;
@@ -3310,25 +3067,5 @@ class _ProvisionalApiTestWithReset extends _ProvisionalApiTestBase
   @override
   void _afterPrepare() {
     driver.resetUriResolution();
-  }
-}
-
-class _TestMigrationListener implements NullabilityMigrationListener {
-  final _edits = <Source, List<SourceEdit>>{};
-
-  List<String> details = [];
-
-  @override
-  void addEdit(SingleNullabilityFix fix, SourceEdit edit) {
-    (_edits[fix.source] ??= []).add(edit);
-  }
-
-  @override
-  void addFix(SingleNullabilityFix fix) {}
-
-  @override
-  void reportException(
-      Source source, AstNode node, Object exception, StackTrace stackTrace) {
-    fail('Exception reported: $exception');
   }
 }
