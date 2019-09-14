@@ -210,7 +210,7 @@ class C {
         .toList();
     expect(matchingEdges, hasLength(1));
     expect(matchingEdges.single.isUnion, true);
-    expect(matchingEdges.single.hard, false);
+    expect(matchingEdges.single.hard, true);
     matchingEdges = edges
         .where((e) =>
             e.primarySource == formalParamNode &&
@@ -218,7 +218,7 @@ class C {
         .toList();
     expect(matchingEdges, hasLength(1));
     expect(matchingEdges.single.isUnion, true);
-    expect(matchingEdges.single.hard, false);
+    expect(matchingEdges.single.hard, true);
   }
 
   test_immutableNode_always() async {
