@@ -20,6 +20,8 @@ abstract class DecoratedTypeInfo {
   DecoratedTypeInfo positionalParameter(int i);
 
   DecoratedTypeInfo namedParameter(String name);
+
+  DecoratedTypeInfo typeArgument(int i);
 }
 
 abstract class EdgeInfo {

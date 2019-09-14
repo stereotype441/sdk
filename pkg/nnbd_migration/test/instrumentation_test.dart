@@ -266,6 +266,28 @@ abstract class Derived extends Base {
         hasLength(1));
   }
 
+  test_implicitType_typeArgument() async {
+    await analyze('''
+abstract class Base {
+  void f(List<int> x);
+}
+abstract class Derived extends Base {
+  void f(x);
+}
+''');
+    var baseParamArgNode =
+    explicitTypeNullability[findNode.typeAnnotation('int>')];
+    var derivedParamArgNode =
+        implicitType[findNode.simpleParameter('callback)')]
+            .typeArgument(0)
+            .node;
+    expect(
+        edges.where((e) =>
+        e.primarySource == derivedParamArgNode &&
+            e.destinationNode == baseParamArgNode),
+        hasLength(1));
+  }
+
   test_implicitType_returnType() async {
     await analyze('''
 abstract class Base {

@@ -394,6 +394,9 @@ class DecoratedType implements DecoratedTypeInfo {
     }
   }
 
+  @override
+  DecoratedTypeInfo typeArgument(int i) => typeArguments[i];
+
   /// Creates a shallow copy of `this`, replacing the nullability node.
   DecoratedType withNode(NullabilityNode node) => DecoratedType(type, node,
       returnType: returnType,
