@@ -13,13 +13,13 @@ import 'package:nnbd_migration/nullability_state.dart';
 abstract class DecoratedTypeInfo {
   NullabilityNodeInfo get node;
 
-  DartType get type;
-
   DecoratedTypeInfo get returnType;
 
-  DecoratedTypeInfo positionalParameter(int i);
+  DartType get type;
 
   DecoratedTypeInfo namedParameter(String name);
+
+  DecoratedTypeInfo positionalParameter(int i);
 
   DecoratedTypeInfo typeArgument(int i);
 }

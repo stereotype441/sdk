@@ -160,6 +160,63 @@ int f(int x) => x;
         hasLength(1));
   }
 
+  test_graphEdge_hard() async {
+    await analyze('''
+int f(int x) => x;
+''');
+    var xNode = explicitTypeNullability[findNode.typeAnnotation('int x')];
+    var returnNode = explicitTypeNullability[findNode.typeAnnotation('int f')];
+    var matchingEdges = edges
+        .where(
+            (e) => e.primarySource == xNode && e.destinationNode == returnNode)
+        .toList();
+    expect(matchingEdges, hasLength(1));
+    expect(matchingEdges.single.kind, NullabilityEdgeKind.hard);
+  }
+
+  test_graphEdge_soft() async {
+    await analyze('''
+int f(int x, bool b) {
+  if (b) return x;
+  return 0;
+}
+''');
+    var xNode = explicitTypeNullability[findNode.typeAnnotation('int x')];
+    var returnNode = explicitTypeNullability[findNode.typeAnnotation('int f')];
+    var matchingEdges = edges
+        .where(
+            (e) => e.primarySource == xNode && e.destinationNode == returnNode)
+        .toList();
+    expect(matchingEdges, hasLength(1));
+    expect(matchingEdges.single.kind, NullabilityEdgeKind.soft);
+  }
+
+  test_graphEdge_union() async {
+    await analyze('''
+class C {
+  int i;
+  C(this.i); /*constructor*/
+}
+''');
+    var fieldNode = explicitTypeNullability[findNode.typeAnnotation('int')];
+    var formalParamNode =
+        implicitType[findNode.fieldFormalParameter('i); /*constructor*/')].node;
+    var matchingEdges = edges
+        .where((e) =>
+            e.primarySource == fieldNode &&
+            e.destinationNode == formalParamNode)
+        .toList();
+    expect(matchingEdges, hasLength(1));
+    expect(matchingEdges.single.kind, NullabilityEdgeKind.union);
+    matchingEdges = edges
+        .where((e) =>
+            e.primarySource == formalParamNode &&
+            e.destinationNode == fieldNode)
+        .toList();
+    expect(matchingEdges, hasLength(1));
+    expect(matchingEdges.single.kind, NullabilityEdgeKind.union);
+  }
+
   test_immutableNode_always() async {
     await analyze('''
 int x = null;
