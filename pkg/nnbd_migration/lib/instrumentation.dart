@@ -18,6 +18,8 @@ abstract class DecoratedTypeInfo {
   DecoratedTypeInfo get returnType;
 
   DecoratedTypeInfo positionalParameter(int i);
+
+  DecoratedTypeInfo namedParameter(String name);
 }
 
 abstract class EdgeInfo {

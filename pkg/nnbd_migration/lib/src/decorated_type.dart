@@ -321,6 +321,9 @@ class DecoratedType implements DecoratedTypeInfo {
   }
 
   @override
+  DecoratedTypeInfo namedParameter(String name) => namedParameters[name];
+
+  @override
   DecoratedTypeInfo positionalParameter(int i) => positionalParameters[i];
 
   /// Apply the given [substitution] to this type.
