@@ -2,8 +2,7 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'package:analyzer/src/test_utilities/find_node.dart';
-import 'package:analyzer_plugin/protocol/protocol_common.dart' hide Element;
+import 'package:analyzer_plugin/protocol/protocol_common.dart';
 import 'package:nnbd_migration/nnbd_migration.dart';
 import 'package:test/test.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
@@ -29,8 +28,6 @@ class _ProvisionalApiTest extends _ProvisionalApiTestBase
 
 /// Base class for provisional API tests.
 abstract class _ProvisionalApiTestBase extends AbstractContextTest {
-  final Map<String, FindNode> findNodes = {};
-
   bool get _usePermissiveMode;
 
   /// Hook invoked after calling `prepareInput` on each input.
@@ -47,9 +44,7 @@ abstract class _ProvisionalApiTestBase extends AbstractContextTest {
     var migration =
         NullabilityMigration(listener, permissive: _usePermissiveMode);
     for (var path in input.keys) {
-      var result = await session.getResolvedUnit(path);
-      findNodes[path] = FindNode(input[path], result.unit);
-      migration.prepareInput(result);
+      migration.prepareInput(await session.getResolvedUnit(path));
     }
     _afterPrepare();
     for (var path in input.keys) {
@@ -72,12 +67,10 @@ abstract class _ProvisionalApiTestBase extends AbstractContextTest {
 
   /// Verifies that migraiton of the single file with the given [content]
   /// produces the [expected] output.
-  Future<String> _checkSingleFileChanges(
-      String content, String expected) async {
+  Future<void> _checkSingleFileChanges(String content, String expected) async {
     var sourcePath = convertPath('/home/test/lib/test.dart');
     await _checkMultipleFileChanges(
         {sourcePath: content}, {sourcePath: expected});
-    return sourcePath;
   }
 }
 
