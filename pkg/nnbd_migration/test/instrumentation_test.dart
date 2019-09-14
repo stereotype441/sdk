@@ -73,10 +73,22 @@ class _InstrumentationClient implements NullabilityMigrationInstrumentation {
   void propagationStep(PropagationInfo info) {
     test.propagationSteps.add(info);
   }
+
+  @override
+  void immutableNode(NullabilityNodeInfo node) {
+    assert(node.isImmutable, true);
+    if (node.isNullable) {
+      test.always = node;
+    } else {
+      test.never = node;
+    }
+  }
 }
 
 @reflectiveTest
 class _InstrumentationTest extends AbstractContextTest {
+  NullabilityNodeInfo always;
+
   final Map<TypeAnnotation, NullabilityNodeInfo> explicitTypeNullability = {};
 
   final Map<Element, DecoratedTypeInfo> externalDecoratedType = {};
@@ -88,6 +100,8 @@ class _InstrumentationTest extends AbstractContextTest {
   final Map<AstNode, DecoratedTypeInfo> implicitType = {};
 
   final Map<AstNode, List<DecoratedTypeInfo>> implicitTypeArguments = {};
+
+  NullabilityNodeInfo never;
 
   final List<PropagationInfo> propagationSteps = [];
 
@@ -205,6 +219,28 @@ List<int> f() => [null];
             e.primarySource == implicitListLiteralElementNode &&
             e.destinationNode == returnElementNode),
         hasLength(1));
+  }
+
+  test_immutableNode_always() async {
+    await analyze('''
+int x = null;
+''');
+    expect(always.isImmutable, true);
+    expect(always.isNullable, true);
+    var xNode = explicitTypeNullability[findNode.typeAnnotation('int')];
+    var edge = edges.where((e) => e.destinationNode == xNode).single;
+    expect(edge.primarySource, always);
+  }
+
+  test_immutableNode_never() async {
+    await analyze('''
+bool f(int x) => x.isEven;
+''');
+    expect(never.isImmutable, true);
+    expect(never.isNullable, false);
+    var xNode = explicitTypeNullability[findNode.typeAnnotation('int')];
+    var edge = edges.where((e) => e.primarySource == xNode).single;
+    expect(edge.destinationNode, never);
   }
 
   test_propagationStep() async {

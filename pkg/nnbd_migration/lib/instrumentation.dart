@@ -11,15 +11,15 @@ import 'package:nnbd_migration/nullability_state.dart';
 /// Information about the set of nullability nodes decorating a type in the
 /// program being migrated.
 abstract class DecoratedTypeInfo {
-  DartType get type;
-
   NullabilityNodeInfo get node;
+
+  DartType get type;
 }
 
 abstract class EdgeInfo {
-  NullabilityNodeInfo get primarySource;
-
   NullabilityNodeInfo get destinationNode;
+
+  NullabilityNodeInfo get primarySource;
 }
 
 abstract class NullabilityMigrationInstrumentation {
@@ -29,6 +29,8 @@ abstract class NullabilityMigrationInstrumentation {
   void externalDecoratedType(Element element, DecoratedTypeInfo decoratedType);
 
   void graphEdge(EdgeInfo edge);
+
+  void immutableNode(NullabilityNodeInfo node);
 
   void implicitReturnType(
       Source source, AstNode node, DecoratedTypeInfo decoratedReturnType);
@@ -42,25 +44,25 @@ abstract class NullabilityMigrationInstrumentation {
   void propagationStep(PropagationInfo info);
 }
 
-abstract class PropagationInfo {
-  NullabilityNodeInfo get node;
-
-  NullabilityState get newState;
-
-  StateChangeReason get reason;
-
-  EdgeInfo get edge;
-
-  SubstitutionNodeInfo get substitutionNode;
-}
-
 /// Information about a single node in the nullability inference graph.
 abstract class NullabilityNodeInfo {
+  bool get isImmutable;
+
   /// After migration is complete, this getter can be used to query whether
   /// the type associated with this node was determined to be nullable.
   bool get isNullable;
+}
 
-  bool get isImmutable;
+abstract class PropagationInfo {
+  EdgeInfo get edge;
+
+  NullabilityState get newState;
+
+  NullabilityNodeInfo get node;
+
+  StateChangeReason get reason;
+
+  SubstitutionNodeInfo get substitutionNode;
 }
 
 enum StateChangeReason {
