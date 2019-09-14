@@ -16,6 +16,8 @@ abstract class DecoratedTypeInfo {
   DartType get type;
 
   DecoratedTypeInfo get returnType;
+
+  DecoratedTypeInfo positionalParameter(int i);
 }
 
 abstract class EdgeInfo {

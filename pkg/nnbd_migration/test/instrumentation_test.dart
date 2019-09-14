@@ -222,6 +222,28 @@ abstract class Derived extends Base {
         hasLength(1));
   }
 
+  test_implicitType_positionalParameter() async {
+    await analyze('''
+abstract class Base {
+  void f(void callback(int i));
+}
+abstract class Derived extends Base {
+  void f(callback);
+}
+''');
+    var baseParamParamNode =
+        explicitTypeNullability[findNode.typeAnnotation('int i')];
+    var derivedParamParamNode =
+        implicitType[findNode.simpleParameter('callback)')]
+            .positionalParameter(0)
+            .node;
+    expect(
+        edges.where((e) =>
+            e.primarySource == baseParamParamNode &&
+            e.destinationNode == derivedParamParamNode),
+        hasLength(1));
+  }
+
   test_implicitType_returnType() async {
     await analyze('''
 abstract class Base {

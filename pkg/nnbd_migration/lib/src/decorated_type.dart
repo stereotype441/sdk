@@ -320,6 +320,9 @@ class DecoratedType implements DecoratedTypeInfo {
         type.instantiate(undecoratedArgumentTypes), substitution);
   }
 
+  @override
+  DecoratedTypeInfo positionalParameter(int i) => positionalParameters[i];
+
   /// Apply the given [substitution] to this type.
   ///
   /// [undecoratedResult] is the result of the substitution, as determined by
