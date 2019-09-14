@@ -27,6 +27,8 @@ abstract class DecoratedTypeInfo {
 abstract class EdgeInfo {
   NullabilityNodeInfo get destinationNode;
 
+  Iterable<NullabilityNodeInfo> get guards;
+
   bool get hard;
 
   bool get isUnion;

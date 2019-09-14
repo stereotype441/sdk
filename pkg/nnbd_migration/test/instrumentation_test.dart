@@ -160,6 +160,27 @@ int f(int x) => x;
         hasLength(1));
   }
 
+  test_graphEdge_guards() async {
+    await analyze('''
+int f(int i, int j) {
+  if (i != null) {
+    return j;
+  }
+  return 1;
+}
+''');
+    var iNode = explicitTypeNullability[findNode.typeAnnotation('int i')];
+    var jNode = explicitTypeNullability[findNode.typeAnnotation('int j')];
+    var returnNode = explicitTypeNullability[findNode.typeAnnotation('int f')];
+    var matchingEdges = edges
+        .where(
+            (e) => e.primarySource == jNode && e.destinationNode == returnNode)
+        .toList();
+    expect(matchingEdges, hasLength(1));
+    expect(matchingEdges.single.guards, hasLength(1));
+    expect(matchingEdges.single.guards.single, iNode);
+  }
+
   test_graphEdge_hard() async {
     await analyze('''
 int f(int x) => x;
