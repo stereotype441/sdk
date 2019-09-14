@@ -171,7 +171,8 @@ int f(int x) => x;
             (e) => e.primarySource == xNode && e.destinationNode == returnNode)
         .toList();
     expect(matchingEdges, hasLength(1));
-    expect(matchingEdges.single.kind, NullabilityEdgeKind.hard);
+    expect(matchingEdges.single.isUnion, false);
+    expect(matchingEdges.single.hard, true);
   }
 
   test_graphEdge_soft() async {
@@ -188,7 +189,8 @@ int f(int x, bool b) {
             (e) => e.primarySource == xNode && e.destinationNode == returnNode)
         .toList();
     expect(matchingEdges, hasLength(1));
-    expect(matchingEdges.single.kind, NullabilityEdgeKind.soft);
+    expect(matchingEdges.single.isUnion, false);
+    expect(matchingEdges.single.hard, false);
   }
 
   test_graphEdge_union() async {
@@ -207,14 +209,16 @@ class C {
             e.destinationNode == formalParamNode)
         .toList();
     expect(matchingEdges, hasLength(1));
-    expect(matchingEdges.single.kind, NullabilityEdgeKind.union);
+    expect(matchingEdges.single.isUnion, true);
+    expect(matchingEdges.single.hard, false);
     matchingEdges = edges
         .where((e) =>
             e.primarySource == formalParamNode &&
             e.destinationNode == fieldNode)
         .toList();
     expect(matchingEdges, hasLength(1));
-    expect(matchingEdges.single.kind, NullabilityEdgeKind.union);
+    expect(matchingEdges.single.isUnion, true);
+    expect(matchingEdges.single.hard, false);
   }
 
   test_immutableNode_always() async {
