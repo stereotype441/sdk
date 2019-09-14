@@ -31,6 +31,8 @@ abstract class EdgeInfo {
 
   bool get hard;
 
+  bool get isSatisfied;
+
   bool get isUnion;
 
   NullabilityNodeInfo get primarySource;

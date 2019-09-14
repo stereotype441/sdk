@@ -196,6 +196,48 @@ int f(int x) => x;
     expect(matchingEdges.single.hard, true);
   }
 
+  test_graphEdge_isSatisfied() async {
+    await analyze('''
+void f1(int i, bool b) {
+  f2(i, b);
+}
+void f2(int j, bool b) {
+  if (b) {
+    f3(j);
+  }
+}
+void f3(int k) {
+  f4(l);
+}
+void f4(int l) {
+  print(l.isEven);
+}
+main() {
+  f(null, false);
+}
+''');
+    var iNode = explicitTypeNullability[findNode.typeAnnotation('int i')];
+    var jNode = explicitTypeNullability[findNode.typeAnnotation('int j')];
+    var kNode = explicitTypeNullability[findNode.typeAnnotation('int k')];
+    var lNode = explicitTypeNullability[findNode.typeAnnotation('int l')];
+    var iToJ = edges
+        .where((e) => e.primarySource == iNode && e.destinationNode == jNode)
+        .single;
+    var jToK = edges
+        .where((e) => e.primarySource == jNode && e.destinationNode == kNode)
+        .single;
+    var kToL = edges
+        .where((e) => e.primarySource == kNode && e.destinationNode == lNode)
+        .single;
+    expect(iNode.isNullable, true);
+    expect(jNode.isNullable, true);
+    expect(kNode.isNullable, false);
+    expect(lNode.isNullable, false);
+    expect(iToJ.isSatisfied, true);
+    expect(jToK.isSatisfied, false);
+    expect(kToL.isSatisfied, true);
+  }
+
   test_graphEdge_soft() async {
     await analyze('''
 int f(int x, bool b) {
