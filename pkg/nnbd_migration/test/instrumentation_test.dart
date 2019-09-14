@@ -163,7 +163,7 @@ int f(int x) => x;
   test_graphEdge_guards() async {
     await analyze('''
 int f(int i, int j) {
-  if (i != null) {
+  if (i == null) {
     return j;
   }
   return 1;
