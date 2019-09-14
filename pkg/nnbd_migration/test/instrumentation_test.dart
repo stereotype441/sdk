@@ -222,6 +222,26 @@ abstract class Derived extends Base {
         hasLength(1));
   }
 
+  test_implicitType_returnType() async {
+    await analyze('''
+abstract class Base {
+  void f(int callback());
+}
+abstract class Derived extends Base {
+  void f(callback);
+}
+''');
+    var baseParamReturnNode =
+        explicitTypeNullability[findNode.typeAnnotation('int callback')];
+    var derivedParamReturnNode =
+        implicitType[findNode.simpleParameter('callback)')].returnType.node;
+    expect(
+        edges.where((e) =>
+            e.primarySource == baseParamReturnNode &&
+            e.destinationNode == derivedParamReturnNode),
+        hasLength(1));
+  }
+
   test_implicitTypeArguments() async {
     await analyze('''
 List<int> f() => [null];
@@ -232,7 +252,8 @@ List<int> f() => [null];
         explicitTypeNullability[findNode.typeAnnotation('int')];
     expect(
         edges.where((e) =>
-            e.primarySource == always && e.destinationNode == implicitListLiteralElementNode),
+            e.primarySource == always &&
+            e.destinationNode == implicitListLiteralElementNode),
         hasLength(1));
     expect(
         edges.where((e) =>

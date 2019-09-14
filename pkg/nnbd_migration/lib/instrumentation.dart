@@ -14,6 +14,8 @@ abstract class DecoratedTypeInfo {
   NullabilityNodeInfo get node;
 
   DartType get type;
+
+  DecoratedTypeInfo get returnType;
 }
 
 abstract class EdgeInfo {
