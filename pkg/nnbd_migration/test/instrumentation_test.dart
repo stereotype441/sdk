@@ -207,13 +207,13 @@ void f2(int j, bool b) {
   }
 }
 void f3(int k) {
-  f4(l);
+  f4(k);
 }
 void f4(int l) {
   print(l.isEven);
 }
 main() {
-  f(null, false);
+  f1(null, false);
 }
 ''');
     var iNode = explicitTypeNullability[findNode.typeAnnotation('int i')];
