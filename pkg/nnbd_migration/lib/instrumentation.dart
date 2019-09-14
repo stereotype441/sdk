@@ -39,9 +39,19 @@ abstract class NullabilityMigrationInstrumentation {
   void implicitTypeArguments(
       Source source, AstNode node, Iterable<DecoratedTypeInfo> types);
 
-  void propagationInfo(NullabilityNodeInfo node, NullabilityState state,
-      StateChangeReason reason,
-      {EdgeInfo edge, SubstitutionNodeInfo substitutionNode});
+  void propagationStep(PropagationInfo info);
+}
+
+abstract class PropagationInfo {
+  NullabilityNodeInfo get node;
+
+  NullabilityState get newState;
+
+  StateChangeReason get reason;
+
+  EdgeInfo get edge;
+
+  SubstitutionNodeInfo get substitutionNode;
 }
 
 /// Information about a single node in the nullability inference graph.

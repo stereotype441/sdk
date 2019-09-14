@@ -70,10 +70,8 @@ class _InstrumentationClient implements NullabilityMigrationInstrumentation {
   }
 
   @override
-  void propagationInfo(NullabilityNodeInfo node, NullabilityState state,
-      StateChangeReason reason,
-      {EdgeInfo edge, SubstitutionNodeInfo substitutionNode}) {
-    // TODO: implement propagationInfo
+  void propagationStep(PropagationInfo info) {
+    test.propagationSteps.add(info);
   }
 }
 
@@ -90,6 +88,8 @@ class _InstrumentationTest extends AbstractContextTest {
   final Map<AstNode, DecoratedTypeInfo> implicitType = {};
 
   final Map<AstNode, List<DecoratedTypeInfo>> implicitTypeArguments = {};
+
+  final List<PropagationInfo> propagationSteps = [];
 
   FindNode findNode;
 
@@ -205,5 +205,18 @@ List<int> f() => [null];
             e.primarySource == implicitListLiteralElementNode &&
             e.destinationNode == returnElementNode),
         hasLength(1));
+  }
+
+  test_propagationStep() async {
+    await analyze('''
+int x = null;
+''');
+    var xNode = explicitTypeNullability[findNode.typeAnnotation('int')];
+    var step = propagationSteps.where((s) => s.node == xNode).single;
+    expect(step.newState, NullabilityState.ordinaryNullable);
+    expect(step.reason, StateChangeReason.downstream);
+    expect(step.edge.primarySource.isImmutable, true);
+    expect(step.edge.primarySource.isNullable, true);
+    expect(step.edge.destinationNode, xNode);
   }
 }
