@@ -61,6 +61,10 @@ class ExpressionChecks extends PotentialModification {
   }
 }
 
+/// [EdgeOrigin] object associated with [ExpressionChecks].  This is a separate
+/// object so that it can safely store a pointer to an AST node.  (We don't want
+/// to store pointers to AST nodes in [ExpressionChecks] objects because they
+/// are persisted for the duration of the migration calculation).
 class ExpressionChecksOrigin extends EdgeOrigin {
   final ExpressionChecks checks;
 
