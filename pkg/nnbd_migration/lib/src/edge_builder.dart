@@ -266,7 +266,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       var intentNode = _conditionInfo.trueDemonstratesNonNullIntent;
       if (intentNode != null && _conditionInfo.postDominatingIntent) {
         _graph.connect(_conditionInfo.trueDemonstratesNonNullIntent,
-            _graph.never, NonNullAssertionOrigin(source, node.offset),
+            _graph.never, NonNullAssertionOrigin(source, node),
             hard: true);
       }
     }
@@ -276,17 +276,16 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   DecoratedType visitAssignmentExpression(AssignmentExpression node) {
-    _CompoundOperatorInfo compoundOperatorInfo;
     bool isQuestionAssign = false;
+    bool isCompound = false;
     if (node.operator.type == TokenType.QUESTION_QUESTION_EQ) {
       isQuestionAssign = true;
     } else if (node.operator.type != TokenType.EQ) {
-      compoundOperatorInfo = _CompoundOperatorInfo(
-          node.staticElement, node.operator.offset, node.staticType);
+      isCompound = true;
     }
     var expressionType = _handleAssignment(node.rightHandSide,
         destinationExpression: node.leftHandSide,
-        compoundOperatorInfo: compoundOperatorInfo,
+        compoundOperatorInfo: isCompound ? node : null,
         questionAssignNode: isQuestionAssign ? node : null);
     var conditionalNode = _conditionalNodes[node.leftHandSide];
     if (conditionalNode != null) {
@@ -359,8 +358,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         });
         var ifNullNode = NullabilityNode.forIfNotNull();
         expressionType = DecoratedType(node.staticType, ifNullNode);
-        _connect(rightType.node, expressionType.node,
-            IfNullOrigin(source, node.offset));
+        _connect(
+            rightType.node, expressionType.node, IfNullOrigin(source, node));
       } finally {
         _flowAnalysis.ifNullExpression_end();
         _guards.removeLast();
@@ -464,7 +463,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
               .asSubstitution);
       var superConstructorDecoratedType =
           _variables.decoratedElementType(superConstructorElement);
-      var origin = ImplicitMixinSuperCallOrigin(source, node.offset);
+      var origin = ImplicitMixinSuperCallOrigin(source, node);
       _unionDecoratedTypeParameters(
           constructorDecoratedType, superConstructorDecoratedType, origin);
     }
@@ -549,7 +548,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         _connect(
             _graph.always,
             getOrComputeElementType(node.declaredElement).node,
-            OptionalFormalParameterOrigin(source, node.offset));
+            OptionalFormalParameterOrigin(source, node));
       }
     } else {
       _handleAssignment(defaultValue,
@@ -607,7 +606,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     var parameterElement = node.declaredElement as FieldFormalParameterElement;
     var parameterType = _variables.decoratedElementType(parameterElement);
     var fieldType = _variables.decoratedElementType(parameterElement.field);
-    var origin = FieldFormalParameterOrigin(source, node.offset);
+    var origin = FieldFormalParameterOrigin(source, node);
     if (node.type == null) {
       _unionDecoratedTypes(parameterType, fieldType, origin);
     } else {
@@ -1301,7 +1300,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
           throw new StateError('No type annotation for type name '
               '${typeName.toSource()}, offset=${typeName.offset}');
         }
-        var origin = InstantiateToBoundsOrigin(source, typeName.offset);
+        var origin = InstantiateToBoundsOrigin(source, typeName);
         for (int i = 0; i < instantiatedType.typeArguments.length; i++) {
           _unionDecoratedTypes(
               instantiatedType.typeArguments[i],
@@ -1346,7 +1345,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
                 '(${initializer.toSource()}) offset=${initializer.offset}');
           }
           _unionDecoratedTypes(initializerType, destinationType,
-              InitializerInferenceOrigin(source, variable.name.offset));
+              InitializerInferenceOrigin(source, variable));
         } else {
           _handleAssignment(initializer, destinationType: destinationType);
         }
@@ -1424,8 +1423,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       {bool hard = false}) {
     var edge = _graph.connect(source, destination, origin,
         hard: hard, guards: _guards);
-    if (origin is ExpressionChecks) {
-      origin.edges.add(edge);
+    if (origin is ExpressionChecksOrigin) {
+      origin.checks.edges.add(edge);
     }
   }
 
@@ -1556,7 +1555,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   DecoratedType _handleAssignment(Expression expression,
       {DecoratedType destinationType,
       Expression destinationExpression,
-      _CompoundOperatorInfo compoundOperatorInfo,
+      AssignmentExpression compoundOperatorInfo,
       Expression questionAssignNode,
       bool canInsertChecks = true}) {
     assert(
@@ -1587,16 +1586,18 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         throw StateError('No type computed for ${expression.runtimeType} '
             '(${expression.toSource()}) offset=${expression.offset}');
       }
-      ExpressionChecks expressionChecks;
+      ExpressionChecksOrigin expressionChecksOrigin;
       if (canInsertChecks && !sourceType.type.isDynamic) {
-        expressionChecks = ExpressionChecks(expression.end);
-        _variables.recordExpressionChecks(source, expression, expressionChecks);
+        expressionChecksOrigin = ExpressionChecksOrigin(
+            source, expression, ExpressionChecks(expression.end));
+        _variables.recordExpressionChecks(
+            source, expression, expressionChecksOrigin);
       }
       if (compoundOperatorInfo != null) {
-        var compoundOperatorMethod = compoundOperatorInfo.method;
+        var compoundOperatorMethod = compoundOperatorInfo.staticElement;
         if (compoundOperatorMethod != null) {
           _checkAssignment(
-              CompoundAssignmentOrigin(source, compoundOperatorInfo.offset),
+              CompoundAssignmentOrigin(source, compoundOperatorInfo),
               source: destinationType,
               destination: _notNullType,
               hard: _postDominatedLocals
@@ -1604,14 +1605,14 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
           DecoratedType compoundOperatorType =
               getOrComputeElementType(compoundOperatorMethod);
           assert(compoundOperatorType.positionalParameters.length > 0);
-          _checkAssignment(expressionChecks,
+          _checkAssignment(expressionChecksOrigin,
               source: sourceType,
               destination: compoundOperatorType.positionalParameters[0],
               hard: _postDominatedLocals.isReferenceInScope(expression));
-          sourceType = _fixNumericTypes(compoundOperatorType.returnType,
-              compoundOperatorInfo.undecoratedType);
+          sourceType = _fixNumericTypes(
+              compoundOperatorType.returnType, compoundOperatorInfo.staticType);
           _checkAssignment(
-              CompoundAssignmentOrigin(source, compoundOperatorInfo.offset),
+              CompoundAssignmentOrigin(source, compoundOperatorInfo),
               source: sourceType,
               destination: destinationType,
               hard: false);
@@ -1619,7 +1620,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
           sourceType = _dynamicType;
         }
       } else {
-        _checkAssignment(expressionChecks,
+        _checkAssignment(expressionChecksOrigin,
             source: sourceType,
             destination: destinationType,
             hard: _postDominatedLocals.isReferenceInScope(expression));
@@ -1701,7 +1702,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       }
       if (declaredElement is! ConstructorElement) {
         var classElement = declaredElement.enclosingElement as ClassElement;
-        var origin = InheritanceOrigin(source, node.offset);
+        var origin = InheritanceOrigin(source, node);
         for (var overriddenElement in _inheritanceManager.getOverridden(
                 classElement.type,
                 Name(classElement.library.source.uri, declaredElement.name)) ??
@@ -1919,8 +1920,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     // Any parameters not supplied must be optional.
     for (var entry in calleeType.namedParameters.entries) {
       if (suppliedNamedParameters.contains(entry.key)) continue;
-      entry.value.node.recordNamedParameterNotSupplied(_guards, _graph,
-          NamedParameterNotSuppliedOrigin(source, node.offset));
+      entry.value.node.recordNamedParameterNotSupplied(
+          _guards, _graph, NamedParameterNotSuppliedOrigin(source, node));
     }
     return calleeType.returnType;
   }
@@ -2024,7 +2025,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   NullabilityNode _nullabilityNodeForGLB(
       AstNode astNode, NullabilityNode leftNode, NullabilityNode rightNode) {
     var node = NullabilityNode.forGLB();
-    var origin = GreatestLowerBoundOrigin(source, astNode.offset);
+    var origin = GreatestLowerBoundOrigin(source, astNode);
     _graph.connect(leftNode, node, origin, guards: [rightNode]);
     _graph.connect(node, leftNode, origin);
     _graph.connect(node, rightNode, origin);
@@ -2239,14 +2240,6 @@ mixin _AssignmentChecker {
 
   /// Given a [type] representing a type parameter, retrieves the type's bound.
   DecoratedType _getTypeParameterTypeBound(DecoratedType type);
-}
-
-class _CompoundOperatorInfo {
-  final MethodElement method;
-  final int offset;
-  final DartType undecoratedType;
-
-  _CompoundOperatorInfo(this.method, this.offset, this.undecoratedType);
 }
 
 /// Information about a binary expression whose boolean value could possibly

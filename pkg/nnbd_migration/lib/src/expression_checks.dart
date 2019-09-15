@@ -2,6 +2,8 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart';
 import 'package:nnbd_migration/instrumentation.dart';
 import 'package:nnbd_migration/src/edge_origin.dart';
@@ -16,7 +18,7 @@ import 'package:nnbd_migration/src/potential_modification.dart';
 /// based on the nullability of the type itself (which can be checked by adding
 /// a trailing `!`) from checks based on type parameters (which will have to be
 /// checked using an `as` expression).
-class ExpressionChecks extends PotentialModification implements EdgeOrigin, EdgeOriginInfo {
+class ExpressionChecks extends PotentialModification {
   /// Source offset where a trailing `!` might need to be inserted.
   final int offset;
 
@@ -59,4 +61,15 @@ class ExpressionChecks extends PotentialModification implements EdgeOrigin, Edge
     // reified to contain only non-null ints.
     return isEmpty ? [] : [SourceEdit(offset, 0, '!')];
   }
+}
+
+/// [EdgeOrigin] object associated with [ExpressionChecks].  This is a separate
+/// object so that it can safely store a pointer to an AST node.  (We don't want
+/// to store pointers to AST nodes in [ExpressionChecks] objects because they
+/// are persisted for the duration of the migration calculation).
+class ExpressionChecksOrigin extends EdgeOrigin {
+  final ExpressionChecks checks;
+
+  ExpressionChecksOrigin(Source source, Expression node, this.checks)
+      : super(source, node);
 }
