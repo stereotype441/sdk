@@ -463,4 +463,22 @@ int x = null;
     expect(step.edge.primarySource, always);
     expect(step.edge.destinationNode, xNode);
   }
+
+  test_substitutionNode() async {
+    await analyze('''
+class C<T> {
+  void f(T t) {}
+}
+voig g(C<int> x, int y) {
+  x.f(y);
+}
+''');
+    var yNode = explicitTypeNullability[findNode.typeAnnotation('int y')];
+    var edge = edges.where((e) => e.primarySource == yNode).single;
+    var sNode = edge.destinationNode as SubstitutionNodeInfo;
+    expect(sNode.innerNode,
+        explicitTypeNullability[findNode.typeAnnotation('int>')]);
+    expect(sNode.outerNode,
+        explicitTypeNullability[findNode.typeAnnotation('T t')]);
+  }
 }

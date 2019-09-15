@@ -90,4 +90,18 @@ enum StateChangeReason {
   substituteOuter,
 }
 
-abstract class SubstitutionNodeInfo extends NullabilityNodeInfo {}
+abstract class SubstitutionNodeInfo extends NullabilityNodeInfo {
+  /// Nullability node representing the inner type of the substitution.
+  ///
+  /// For example, if this NullabilityNode arose from substituting `int*` for
+  /// `T` in the type `T*`, [innerNode] is the nullability corresponding to the
+  /// `*` in `int*`.
+  NullabilityNodeInfo get innerNode;
+
+  /// Nullability node representing the outer type of the substitution.
+  ///
+  /// For example, if this NullabilityNode arose from substituting `int*` for
+  /// `T` in the type `T*`, [innerNode] is the nullability corresponding to the
+  /// `*` in `T*`.
+  NullabilityNodeInfo get outerNode;
+}
