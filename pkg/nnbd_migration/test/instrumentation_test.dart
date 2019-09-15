@@ -41,8 +41,10 @@ class _InstrumentationClient implements NullabilityMigrationInstrumentation {
   }
 
   @override
-  void graphEdge(EdgeInfo edge) {
+  void graphEdge(EdgeInfo edge, EdgeOriginInfo originInfo) {
+    expect(test.edgeOrigin, isNot(contains(edge)));
     test.edges.add(edge);
+    test.edgeOrigin[edge] = originInfo;
   }
 
   @override
@@ -104,6 +106,8 @@ class _InstrumentationTest extends AbstractContextTest {
   NullabilityNodeInfo never;
 
   final List<PropagationInfo> propagationSteps = [];
+
+  final Map<EdgeInfo, EdgeOriginInfo> edgeOrigin = {};
 
   FindNode findNode;
 
@@ -179,6 +183,15 @@ int f(int i, int j) {
     expect(matchingEdges, hasLength(1));
     expect(matchingEdges.single.guards, hasLength(1));
     expect(matchingEdges.single.guards.single, iNode);
+  }
+
+  test_graphEdge_origin() async {
+    await analyze('''
+int f(int x) {
+  return x;
+}
+''');
+    TODO;
   }
 
   test_graphEdge_hard() async {

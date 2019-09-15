@@ -44,7 +44,7 @@ abstract class NullabilityMigrationInstrumentation {
 
   void externalDecoratedType(Element element, DecoratedTypeInfo decoratedType);
 
-  void graphEdge(EdgeInfo edge);
+  void graphEdge(EdgeInfo edge, EdgeOriginInfo originInfo);
 
   void immutableNode(NullabilityNodeInfo node);
 
@@ -59,6 +59,8 @@ abstract class NullabilityMigrationInstrumentation {
 
   void propagationStep(PropagationInfo info);
 }
+
+abstract class EdgeOriginInfo {}
 
 /// Information about a single node in the nullability inference graph.
 abstract class NullabilityNodeInfo {

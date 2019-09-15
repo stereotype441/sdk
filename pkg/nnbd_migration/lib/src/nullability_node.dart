@@ -6,6 +6,7 @@ import 'package:analyzer/src/generated/source.dart';
 import 'package:meta/meta.dart';
 import 'package:nnbd_migration/instrumentation.dart';
 import 'package:nnbd_migration/nullability_state.dart';
+import 'package:nnbd_migration/src/expression_checks.dart';
 
 import 'edge_origin.dart';
 
@@ -182,7 +183,7 @@ class NullabilityGraph {
       _NullabilityEdgeKind kind,
       EdgeOrigin origin) {
     var edge = NullabilityEdge._(destinationNode, sources, kind, origin);
-    instrumentation?.graphEdge(edge);
+    instrumentation?.graphEdge(edge, origin is ExpressionChecks ? origin : null);
     for (var source in sources) {
       _connectDownstream(source, edge);
     }
