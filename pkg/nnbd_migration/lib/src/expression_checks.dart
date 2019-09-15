@@ -2,6 +2,7 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart';
 import 'package:nnbd_migration/src/edge_origin.dart';
 import 'package:nnbd_migration/src/nullability_node.dart';
@@ -15,7 +16,7 @@ import 'package:nnbd_migration/src/potential_modification.dart';
 /// based on the nullability of the type itself (which can be checked by adding
 /// a trailing `!`) from checks based on type parameters (which will have to be
 /// checked using an `as` expression).
-class ExpressionChecks extends PotentialModification implements EdgeOrigin {
+class ExpressionChecks extends PotentialModification {
   /// Source offset where a trailing `!` might need to be inserted.
   final int offset;
 
@@ -58,4 +59,11 @@ class ExpressionChecks extends PotentialModification implements EdgeOrigin {
     // reified to contain only non-null ints.
     return isEmpty ? [] : [SourceEdit(offset, 0, '!')];
   }
+}
+
+class ExpressionChecksOrigin extends EdgeOrigin {
+  final ExpressionChecks checks;
+
+  ExpressionChecksOrigin(Source source, int offset, this.checks)
+      : super(source, offset);
 }
