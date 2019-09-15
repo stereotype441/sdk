@@ -592,7 +592,11 @@ C f(C y, C z) => (y += z);
     await analyze(code);
     var targetEdge =
         assertEdge(decoratedTypeAnnotation('C y').node, never, hard: true);
-    expect((graph.getEdgeOrigin(targetEdge) as CompoundAssignmentOrigin).offset,
+    expect(
+        (graph.getEdgeOrigin(targetEdge) as CompoundAssignmentOrigin)
+            .node
+            .operator
+            .offset,
         code.indexOf('+='));
     assertNullCheck(
         checkExpression('z);'),
@@ -605,6 +609,8 @@ C f(C y, C z) => (y += z);
         hard: false);
     expect(
         (graph.getEdgeOrigin(operatorReturnEdge) as CompoundAssignmentOrigin)
+            .node
+            .operator
             .offset,
         code.indexOf('+='));
     var fReturnEdge = assertEdge(decoratedTypeAnnotation('C operator').node,
@@ -623,7 +629,11 @@ C<int> f(C<int> y, C<int> z) => (y += z);
     await analyze(code);
     var targetEdge =
         assertEdge(decoratedTypeAnnotation('C<int> y').node, never, hard: true);
-    expect((graph.getEdgeOrigin(targetEdge) as CompoundAssignmentOrigin).offset,
+    expect(
+        (graph.getEdgeOrigin(targetEdge) as CompoundAssignmentOrigin)
+            .node
+            .operator
+            .offset,
         code.indexOf('+='));
     assertNullCheck(
         checkExpression('z);'),
@@ -636,6 +646,8 @@ C<int> f(C<int> y, C<int> z) => (y += z);
         hard: false);
     expect(
         (graph.getEdgeOrigin(operatorReturnEdge) as CompoundAssignmentOrigin)
+            .node
+            .operator
             .offset,
         code.indexOf('+='));
     var fReturnEdge = assertEdge(decoratedTypeAnnotation('C<T> operator').node,
