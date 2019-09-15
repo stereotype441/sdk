@@ -4,6 +4,7 @@
 
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/src/generated/source.dart';
+import 'package:nnbd_migration/instrumentation.dart';
 
 /// Edge origin resulting from the use of a type that is always nullable.
 ///
@@ -30,7 +31,7 @@ class CompoundAssignmentOrigin extends EdgeOrigin {
 /// Common interface for classes providing information about how an edge came
 /// to be; that is, what was found in the source code that led the migration
 /// tool to create the edge.
-abstract class EdgeOrigin {
+abstract class EdgeOrigin extends EdgeOriginInfo {
   /// The source file containing the code construct that led to the edge.
   final Source source;
 

@@ -187,11 +187,17 @@ int f(int i, int j) {
 
   test_graphEdge_origin() async {
     await analyze('''
-int f(int x) {
-  return x;
-}
+int f(int x) => x;
 ''');
-    TODO;
+    var xNode = explicitTypeNullability[findNode.typeAnnotation('int x')];
+    var returnNode = explicitTypeNullability[findNode.typeAnnotation('int f')];
+    var matchingEdges = edges
+        .where(
+            (e) => e.primarySource == xNode && e.destinationNode == returnNode)
+        .toList();
+    var origin = edgeOrigin[matchingEdges.single];
+    expect(origin.source, source);
+    expect(origin.node, findNode.simple('x;'));
   }
 
   test_graphEdge_hard() async {

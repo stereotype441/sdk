@@ -178,7 +178,7 @@ class NullabilityGraph {
       _NullabilityEdgeKind kind,
       EdgeOrigin origin) {
     var edge = NullabilityEdge._(destinationNode, sources, kind);
-    instrumentation?.graphEdge(edge, origin is ExpressionChecks ? origin : null);
+    instrumentation?.graphEdge(edge, origin);
     for (var source in sources) {
       _connectDownstream(source, edge);
     }

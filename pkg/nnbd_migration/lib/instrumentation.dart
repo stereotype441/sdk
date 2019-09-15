@@ -38,6 +38,12 @@ abstract class EdgeInfo {
   NullabilityNodeInfo get primarySource;
 }
 
+abstract class EdgeOriginInfo {
+  AstNode get node;
+
+  Source get source;
+}
+
 abstract class NullabilityMigrationInstrumentation {
   void explicitTypeNullability(
       Source source, TypeAnnotation typeAnnotation, NullabilityNodeInfo node);
@@ -59,8 +65,6 @@ abstract class NullabilityMigrationInstrumentation {
 
   void propagationStep(PropagationInfo info);
 }
-
-abstract class EdgeOriginInfo {}
 
 /// Information about a single node in the nullability inference graph.
 abstract class NullabilityNodeInfo {
