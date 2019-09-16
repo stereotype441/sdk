@@ -32,11 +32,10 @@ class CompoundAssignmentOrigin extends EdgeOrigin {
 /// to be; that is, what was found in the source code that led the migration
 /// tool to create the edge.
 abstract class EdgeOrigin extends EdgeOriginInfo {
-  /// The source file containing the code construct that led to the edge.
+  @override
   final Source source;
 
-  /// The AST node within the source file of the code construct that led to the
-  /// edge.
+  @override
   final AstNode node;
 
   EdgeOrigin(this.source, this.node);

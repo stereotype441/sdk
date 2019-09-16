@@ -41,8 +41,7 @@ class NullabilityMigrationImpl implements NullabilityMigration {
 
   NullabilityMigrationImpl._(
       this.listener, this._graph, this._permissive, this._instrumentation) {
-    _instrumentation?.immutableNode(_graph.never);
-    _instrumentation?.immutableNode(_graph.always);
+    _instrumentation?.immutableNodes(_graph.never, _graph.always);
   }
 
   void finish() {

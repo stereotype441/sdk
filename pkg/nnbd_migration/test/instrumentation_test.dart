@@ -48,13 +48,9 @@ class _InstrumentationClient implements NullabilityMigrationInstrumentation {
   }
 
   @override
-  void immutableNode(NullabilityNodeInfo node) {
-    assert(node.isImmutable, true);
-    if (node.isNullable) {
-      test.always = node;
-    } else {
-      test.never = node;
-    }
+  void immutableNodes(NullabilityNodeInfo never, NullabilityNodeInfo always) {
+    test.never = never;
+    test.always = always;
   }
 
   @override

@@ -85,28 +85,69 @@ abstract class EdgeInfo {
   NullabilityNodeInfo get primarySource;
 }
 
+/// Information exposed to the migration client about the location in source
+/// code that led an edge to be introduced into the nullability graph.
 abstract class EdgeOriginInfo {
+  /// The AST node that led the edge to be introduced into the nullability
+  /// graph.
   AstNode get node;
 
+  /// The source file that [node] appears in.
   Source get source;
 }
 
+/// Interface used by the migration engine to expose information to its client
+/// about the decisions made during migration, and how those decisions relate to
+/// the input source code.
 abstract class NullabilityMigrationInstrumentation {
+  /// Called whenever an explicit [typeAnnotation] is found in the source code,
+  /// to report the nullability [node] that was associated with this type.  If
+  /// the migration engine determines that the [node] should be nullable, a `?`
+  /// will be inserted after the type annotation.
   void explicitTypeNullability(
       Source source, TypeAnnotation typeAnnotation, NullabilityNodeInfo node);
 
+  /// Called whenever reference is made to an [element] outside of the code
+  /// being migrated, to report the nullability nodes associated with the type
+  /// of the element.
   void externalDecoratedType(Element element, DecoratedTypeInfo decoratedType);
 
+  /// Called whenever the migration engine creates a graph edge between
+  /// nullability nodes, to report information about the edge that was created,
+  /// and why it was created.
   void graphEdge(EdgeInfo edge, EdgeOriginInfo originInfo);
 
-  void immutableNode(NullabilityNodeInfo node);
+  /// Called when the migration engine start up, to report information about the
+  /// immutable migration nodes [never] and [always] that are used as the
+  /// starting point for nullability propagation.
+  void immutableNodes(NullabilityNodeInfo never, NullabilityNodeInfo always);
 
+  /// Called whenever the migration engine encounters an implicit return type
+  /// associated with an AST node, to report the nullability nodes associated
+  /// with the implicit return type of the AST node.
+  ///
+  /// [node] is the AST node having an implicit return type; it may be an
+  /// executable declaration, function-typed formal parameter declaration,
+  /// function type alias declaration, GenericFunctionType, or a function
+  /// expression.
   void implicitReturnType(
       Source source, AstNode node, DecoratedTypeInfo decoratedReturnType);
 
+  /// Called whenever the migration engine encounters an implicit type
+  /// associated with an AST node, to report the nullability nodes associated
+  /// with the implicit type of the AST node.
+  ///
+  /// [node] is the AST node having an implicit type; it may be a formal
+  /// parameter, a declared identifier, or a variable in a variable declaration
+  /// list.
   void implicitType(
       Source source, AstNode node, DecoratedTypeInfo decoratedType);
 
+  /// Called whenever the migration engine encounters an AST node with implicit
+  /// type arguments, to report the nullability nodes associated with the
+  /// implicit type arguments of the AST node.
+  ///
+  /// [node] is the AST node having implicit type arguments; it may be
   void implicitTypeArguments(
       Source source, AstNode node, Iterable<DecoratedTypeInfo> types);
 
