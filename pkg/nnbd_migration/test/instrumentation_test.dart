@@ -651,16 +651,18 @@ List<int> f(C c) => c.g(null);
             .node;
     var returnElementNode =
         explicitTypeNullability[findNode.typeAnnotation('int')];
-    expect(
-        edges.where((e) =>
-            e.primarySource == always &&
-            e.destinationNode == implicitInvocationTypeArgumentNode),
-        hasLength(1));
-    expect(
-        edges.where((e) =>
-            e.primarySource == implicitInvocationTypeArgumentNode &&
-            e.destinationNode == returnElementNode),
-        hasLength(1));
+    expect(edges.where((e) {
+      var destination = e.destinationNode;
+      return e.primarySource == always &&
+          destination is SubstitutionNodeInfo &&
+          destination.innerNode == implicitInvocationTypeArgumentNode;
+    }), hasLength(1));
+    expect(edges.where((e) {
+      var primary = e.primarySource;
+      return primary is SubstitutionNodeInfo &&
+          primary.innerNode == implicitInvocationTypeArgumentNode &&
+          e.destinationNode == returnElementNode;
+    }), hasLength(1));
   }
 
   test_implicitTypeArguments_instanceCreationExpression() async {
