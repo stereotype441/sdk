@@ -34,6 +34,7 @@ import 'package:analyzer/src/summary/idl.dart';
 import 'package:analyzer/src/summary2/linked_unit_context.dart';
 import 'package:analyzer/src/summary2/reference.dart';
 import 'package:analyzer/src/util/comment.dart';
+import 'package:meta/meta.dart';
 
 /// Assert that the given [object] is null, which in the places where this
 /// function is called means that the element is not resynthesized.
@@ -186,6 +187,23 @@ abstract class AbstractClassElementImpl extends ElementImpl
   @override
   PropertyAccessorElement getSetter(String setterName) {
     return getSetterFromAccessors(setterName, accessors);
+  }
+
+  @override
+  InterfaceType instantiate({
+    @required List<DartType> typeArguments,
+    @required NullabilitySuffix nullabilitySuffix,
+  }) {
+    if (typeArguments.length != typeParameters.length) {
+      var ta = 'typeArguments.length (${typeArguments.length})';
+      var tp = 'typeParameters.length (${typeParameters.length})';
+      throw ArgumentError('$ta != $tp');
+    }
+    return InterfaceTypeImpl.explicit(
+      this,
+      typeArguments,
+      nullabilitySuffix: nullabilitySuffix,
+    );
   }
 
   @override
@@ -6381,6 +6399,18 @@ class GenericTypeAliasElementImpl extends ElementImpl
   }
 
   @override
+  FunctionType instantiate2({
+    @required List<DartType> typeArguments,
+    @required NullabilitySuffix nullabilitySuffix,
+  }) {
+    // TODO(scheglov) Replace with strict function type.
+    return FunctionTypeImpl.forTypedef(
+      this,
+      nullabilitySuffix: nullabilitySuffix,
+    ).instantiate(typeArguments);
+  }
+
+  @override
   void visitChildren(ElementVisitor visitor) {
     super.visitChildren(visitor);
     safelyVisitChildren(typeParameters, visitor);
@@ -10159,6 +10189,13 @@ class TypeParameterElementImpl extends ElementImpl
       buffer.write(" extends ");
       buffer.write(bound);
     }
+  }
+
+  @override
+  TypeParameterType instantiate({
+    @required NullabilitySuffix nullabilitySuffix,
+  }) {
+    return TypeParameterTypeImpl(this, nullabilitySuffix: nullabilitySuffix);
   }
 }
 

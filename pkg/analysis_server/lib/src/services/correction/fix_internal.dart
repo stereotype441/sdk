@@ -21,6 +21,7 @@ import 'package:analysis_server/src/services/search/hierarchy.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/precedence.dart';
 import 'package:analyzer/dart/ast/token.dart';
+import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/error/error.dart';
@@ -363,24 +364,25 @@ class FixProcessor extends BaseProcessor {
     if (errorCode == HintCode.UNUSED_CATCH_STACK) {
       await _addFix_removeUnusedCatchStack();
     }
-    // TODO(brianwilkerson) Add a fix to remove the declaration. Decide whether
-    //  this should be a single general fix, or multiple more specific fixes
-    //  such as [_addFix_removeMethodDeclaration].
-//    if (errorCode == HintCode.UNUSED_ELEMENT ||
-//        errorCode == HintCode.UNUSED_FIELD) {
-//      await _addFix_removeUnusedDeclaration();
-//    }
+
+    // todo (pq): add support for elements.
+    if (errorCode ==
+            HintCode
+                .UNUSED_FIELD /* ||
+        errorCode == HintCode.UNUSED_ELEMENT */
+        ) {
+      await _addFix_removeUnusedField();
+    }
+
     if (errorCode == HintCode.UNUSED_IMPORT) {
       await _addFix_removeUnusedImport();
     }
     if (errorCode == HintCode.UNUSED_LABEL) {
       await _addFix_removeUnusedLabel();
     }
-    // TODO(brianwilkerson) Add a fix to remove the local variable, either with
-    //  or without the initialization code.
-//    if (errorCode == HintCode.UNUSED_LOCAL_VARIABLE) {
-//      await _addFix_removeUnusedLocalVariable();
-//    }
+    if (errorCode == HintCode.UNUSED_LOCAL_VARIABLE) {
+      await _addFix_removeUnusedLocalVariable();
+    }
     if (errorCode == HintCode.UNUSED_SHOWN_NAME) {
       await _addFix_removeNameFromCombinator();
     }
@@ -565,6 +567,22 @@ class FixProcessor extends BaseProcessor {
     if (errorCode ==
         CompileTimeErrorCode.EXTENSION_OVERRIDE_ACCESS_TO_STATIC_MEMBER) {
       await _addFix_replaceWithExtensionName();
+    }
+    if (errorCode ==
+        CompileTimeErrorCode
+            .UNQUALIFIED_REFERENCE_TO_STATIC_MEMBER_OF_EXTENDED_TYPE) {
+      await _addFix_qualifyReference();
+      // TODO(brianwilkerson) Consider adding fixes to create a field, getter,
+      //  method or setter. The existing _addFix methods would need to be
+      //  updated so that only the appropriate subset is generated.
+    }
+    if (errorCode ==
+        StaticTypeWarningCode
+            .UNQUALIFIED_REFERENCE_TO_NON_LOCAL_STATIC_MEMBER) {
+      await _addFix_qualifyReference();
+      // TODO(brianwilkerson) Consider adding fixes to create a field, getter,
+      //  method or setter. The existing _addFix methods would need to be
+      //  updated so that only the appropriate subset is generated.
     }
     // lints
     if (errorCode is LintCode) {
@@ -3035,6 +3053,38 @@ class FixProcessor extends BaseProcessor {
     _addFixFromBuilder(changeBuilder, DartFixKind.ADD_NE_NULL);
   }
 
+  Future<void> _addFix_qualifyReference() async {
+    if (node is! SimpleIdentifier) {
+      return;
+    }
+    SimpleIdentifier memberName = node;
+    AstNode parent = node.parent;
+    AstNode target = null;
+    if (parent is MethodInvocation && node == parent.methodName) {
+      target = parent.target;
+    } else if (parent is PropertyAccess && node == parent.propertyName) {
+      target = parent.target;
+    }
+    if (target != null) {
+      return;
+    }
+    Element enclosingElement = memberName.staticElement.enclosingElement;
+    if (enclosingElement.library != unitLibraryElement) {
+      // TODO(brianwilkerson) Support qualifying references to members defined
+      //  in other libraries. `DartEditBuilder` currently defines the method
+      //  `writeType`, which is close, but we also need to handle extensions,
+      //  which don't have a type.
+      return;
+    }
+    String containerName = enclosingElement.name;
+    var changeBuilder = _newDartChangeBuilder();
+    await changeBuilder.addFileEdit(file, (DartFileEditBuilder builder) {
+      builder.addSimpleInsertion(node.offset, '$containerName.');
+    });
+    _addFixFromBuilder(changeBuilder, DartFixKind.QUALIFY_REFERENCE,
+        args: ['$containerName.${memberName.name}']);
+  }
+
   Future<void> _addFix_removeAnnotation() async {
     void addFix(Annotation node) async {
       if (node == null) {
@@ -3461,6 +3511,86 @@ class FixProcessor extends BaseProcessor {
     }
   }
 
+  Future<void> _addFix_removeUnusedField() async {
+    final declaration = node.parent;
+    if (declaration is VariableDeclaration) {
+      Element element = declaration.declaredElement;
+      if (element is FieldElement) {
+        final references = _findAllReferences(unit, element);
+        final changeBuilder = _newDartChangeBuilder();
+        await changeBuilder.addFileEdit(file, (DartFileEditBuilder builder) {
+          for (var reference in references) {
+            final referenceNode = reference.thisOrAncestorMatching((node) =>
+                node is VariableDeclaration ||
+                node is ExpressionStatement ||
+                node is ConstructorFieldInitializer ||
+                node is FieldFormalParameter);
+            if (referenceNode == null) {
+              // todo (pq): in this case we should not create a change (not an incomplete one)
+              return;
+            }
+            var sourceRange;
+            if (referenceNode is VariableDeclaration) {
+              // todo (pq): add range util: SourceRange nodeInList<T>(NodeList<T> list, T node)
+              VariableDeclarationList parent = referenceNode.parent;
+              if (parent.variables.length == 1) {
+                sourceRange = range.node(parent.parent);
+              } else {
+                // Trailing comma.
+                if (referenceNode.endToken.next.type == TokenType.COMMA) {
+                  sourceRange = range.endEnd(referenceNode.beginToken.previous,
+                      referenceNode.endToken.next);
+                } else {
+                  // Leading comma.
+                  sourceRange = range.startEnd(
+                      referenceNode.beginToken.previous, referenceNode);
+                }
+              }
+            } else if (referenceNode is ConstructorFieldInitializer) {
+              ConstructorDeclaration cons =
+                  referenceNode.parent as ConstructorDeclaration;
+              // A() : _f = 0;
+              if (cons.initializers.length == 1) {
+                sourceRange = range.startEnd(cons.separator, referenceNode);
+              } else {
+                final nextToken = referenceNode.endToken.next;
+                // Trailing comma.
+                if (nextToken.type == TokenType.COMMA) {
+                  sourceRange = range.startEnd(referenceNode, nextToken);
+                } else {
+                  // Leading  comma.
+                  sourceRange = range.startEnd(
+                      referenceNode.beginToken.previous, referenceNode);
+                }
+              }
+            } else if (referenceNode is FieldFormalParameter) {
+              FormalParameterList params =
+                  referenceNode.parent as FormalParameterList;
+              if (params.parameters.length == 1) {
+                sourceRange = range.endStart(
+                    params.leftParenthesis, params.rightParenthesis);
+              } else {
+                final nextToken = referenceNode.endToken.next;
+                // Trailing comma.
+                if (nextToken.type == TokenType.COMMA) {
+                  sourceRange = range.startStart(referenceNode, nextToken.next);
+                } else {
+                  // Leading  comma.
+                  sourceRange = range.startEnd(
+                      referenceNode.beginToken.previous, referenceNode);
+                }
+              }
+            } else {
+              sourceRange = range.node(referenceNode);
+            }
+            builder.addDeletion(utils.getLinesRange(sourceRange));
+          }
+        });
+        _addFixFromBuilder(changeBuilder, DartFixKind.REMOVE_UNUSED_FIELD);
+      }
+    }
+  }
+
   Future<void> _addFix_removeUnusedImport() async {
     // prepare ImportDirective
     ImportDirective importDirective =
@@ -3485,6 +3615,50 @@ class FixProcessor extends BaseProcessor {
         builder.addDeletion(range.startStart(parent, nextToken));
       });
       _addFixFromBuilder(changeBuilder, DartFixKind.REMOVE_UNUSED_LABEL);
+    }
+  }
+
+  Future<void> _addFix_removeUnusedLocalVariable() async {
+    final declaration = node.parent;
+    if (!(declaration is VariableDeclaration && declaration.name == node)) {
+      return;
+    }
+
+    Element element = (declaration as VariableDeclaration).declaredElement;
+    if (element is LocalElement) {
+      final functionBody = declaration.thisOrAncestorOfType<FunctionBody>();
+      final references = findLocalElementReferences(functionBody, element);
+      final changeBuilder = _newDartChangeBuilder();
+      await changeBuilder.addFileEdit(file, (DartFileEditBuilder builder) {
+        for (var reference in references) {
+          final node = reference.thisOrAncestorMatching((node) =>
+              node is VariableDeclaration || node is AssignmentExpression);
+          var sourceRange;
+          if (node is VariableDeclaration) {
+            VariableDeclarationList parent = node.parent;
+            if (parent.variables.length == 1) {
+              sourceRange = range.node(parent.parent);
+            } else {
+              sourceRange =
+                  range.endEnd(node.beginToken.previous, node.endToken.next);
+            }
+          } else if (node is AssignmentExpression) {
+            // todo (pq): consider node.parent is! ExpressionStatement to handle
+            // assignments in parens, etc.
+            if (node.parent is ArgumentList) {
+              sourceRange =
+                  range.endStart(node.beginToken.previous, node.operator.next);
+            } else {
+              sourceRange = range.node(node.parent);
+            }
+          } else {
+            return;
+          }
+          builder.addDeletion(utils.getLinesRange(sourceRange));
+        }
+      });
+      _addFixFromBuilder(
+          changeBuilder, DartFixKind.REMOVE_UNUSED_LOCAL_VARIABLE);
     }
   }
 
@@ -4380,6 +4554,12 @@ class FixProcessor extends BaseProcessor {
     _addFixFromBuilder(changeBuilder, DartFixKind.CREATE_METHOD, args: [name]);
   }
 
+  List<SimpleIdentifier> _findAllReferences(AstNode root, Element element) {
+    var collector = _ElementReferenceCollector(element);
+    root.accept(collector);
+    return collector.references;
+  }
+
   /// Return the class, enum or mixin declaration for the given [element].
   Future<ClassOrMixinDeclaration> _getClassDeclaration(
       ClassElement element) async {
@@ -4782,6 +4962,32 @@ class _ClosestElementFinder {
   void _updateList(Iterable<Element> elements) {
     for (Element element in elements) {
       _update(element);
+    }
+  }
+}
+
+class _ElementReferenceCollector extends RecursiveAstVisitor<void> {
+  final Element element;
+  final List<SimpleIdentifier> references = [];
+
+  _ElementReferenceCollector(this.element);
+
+  @override
+  void visitSimpleIdentifier(SimpleIdentifier node) {
+    final staticElement = node.staticElement;
+    if (staticElement == element) {
+      references.add(node);
+    }
+    // Implicit Setter.
+    else if (staticElement is PropertyAccessorElement) {
+      if (staticElement.variable == element) {
+        references.add(node);
+      }
+      // Field Formals.
+    } else if (staticElement is FieldFormalParameterElement) {
+      if (staticElement.field == element) {
+        references.add(node);
+      }
     }
   }
 }

@@ -266,6 +266,8 @@ class DartFixKind {
       "Move type arguments to after class name");
   static const MAKE_VARIABLE_NOT_FINAL = const FixKind(
       'MAKE_VARIABLE_NOT_FINAL', 50, "Make variable '{0}' not final");
+  static const QUALIFY_REFERENCE =
+      const FixKind('QUALIFY_REFERENCE', 50, "Use '{0}'");
   static const REMOVE_ANNOTATION =
       const FixKind('REMOVE_ANNOTATION', 50, "Remove the '{0}' annotation");
   static const REMOVE_AWAIT = const FixKind('REMOVE_AWAIT', 50, "Remove await");
@@ -316,11 +318,15 @@ class DartFixKind {
       'REMOVE_UNUSED_CATCH_CLAUSE', 50, "Remove unused 'catch' clause");
   static const REMOVE_UNUSED_CATCH_STACK = const FixKind(
       'REMOVE_UNUSED_CATCH_STACK', 50, "Remove unused stack trace variable");
+  static const REMOVE_UNUSED_FIELD =
+      const FixKind('REMOVE_UNUSED_FIELD', 50, "Remove unused field");
   static const REMOVE_UNUSED_IMPORT = const FixKind(
       'REMOVE_UNUSED_IMPORT', 50, "Remove unused import",
       appliedTogetherMessage: "Remove all unused imports in this file");
   static const REMOVE_UNUSED_LABEL =
       const FixKind('REMOVE_UNUSED_LABEL', 50, "Remove unused label");
+  static const REMOVE_UNUSED_LOCAL_VARIABLE = const FixKind(
+      'REMOVE_UNUSED_LOCAL_VARIABLE', 50, "Remove unused local variable");
   static const RENAME_TO_CAMEL_CASE =
       const FixKind('RENAME_TO_CAMEL_CASE', 50, "Rename to '{0}'");
   static const REPLACE_BOOLEAN_WITH_BOOL = const FixKind(
