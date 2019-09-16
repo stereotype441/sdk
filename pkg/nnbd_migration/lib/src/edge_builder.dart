@@ -2161,7 +2161,7 @@ mixin _AssignmentChecker {
         // we know that S0 <: Future<A>.  Also, in either case, Future<A> <: S1.
         // Combining these, we have that S0 <: S1, contradicting our assumption.
         // So the RHS of the "or" is redundant, and we can simplify to:
-        // - T0 <: T1.
+        // - S0 <: S1.
         var s0 = source.typeArguments[0];
         _checkAssignment(origin, source: s0, destination: s1, hard: false);
         return;
