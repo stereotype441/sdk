@@ -15,7 +15,7 @@ import 'edge_origin.dart';
 /// that if the former node is nullable, then the latter node will either have
 /// to be nullable, or null checks will have to be added).
 class NullabilityEdge implements EdgeInfo {
-  /// The node that is downstream.
+  @override
   final NullabilityNode destinationNode;
 
   /// A set of source nodes.  By convention, the first node is the primary
@@ -27,19 +27,22 @@ class NullabilityEdge implements EdgeInfo {
 
   NullabilityEdge._(this.destinationNode, this.sources, this._kind);
 
+  @override
   Iterable<NullabilityNode> get guards => sources.skip(1);
 
+  @override
   bool get hard => _kind != _NullabilityEdgeKind.soft;
 
-  /// Indicates whether nullability was successfully propagated through this
-  /// edge.
+  @override
   bool get isSatisfied {
     if (!_isTriggered) return true;
     return destinationNode.isNullable;
   }
 
+  @override
   bool get isUnion => _kind == _NullabilityEdgeKind.union;
 
+  @override
   NullabilityNode get primarySource => sources.first;
 
   /// Indicates whether all the sources of this edge are nullable (and thus

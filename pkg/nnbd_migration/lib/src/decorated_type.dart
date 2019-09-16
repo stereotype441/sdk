@@ -22,11 +22,13 @@ class DecoratedType implements DecoratedTypeInfo {
   /// stored in [Variables._decoratedTypeParameterBounds].
   static final _decoratedTypeParameterBounds = Expando<DecoratedType>();
 
+  @override
   final DartType type;
 
+  @override
   final NullabilityNode node;
 
-  /// If `this` is a function type, the [DecoratedType] of its return type.
+  @override
   final DecoratedType returnType;
 
   /// If `this` is a function type, the [DecoratedType] of each of its
