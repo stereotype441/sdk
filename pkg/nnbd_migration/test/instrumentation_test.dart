@@ -714,7 +714,7 @@ List<int> f() => [null];
 Map<int, String> f() => {1: null};
 ''');
     var implicitMapLiteralTypeArguments =
-        implicitTypeArguments[findNode.listLiteral('{null: null}')];
+        implicitTypeArguments[findNode.setOrMapLiteral('{1: null}')];
     expect(implicitMapLiteralTypeArguments, hasLength(2));
     var implicitMapLiteralKeyNode = implicitMapLiteralTypeArguments[0].node;
     var implicitMapLiteralValueNode = implicitMapLiteralTypeArguments[1].node;
