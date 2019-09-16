@@ -516,6 +516,7 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
       // implicit return type.
       decoratedReturnType = _createDecoratedTypeForClass(
           declaredElement.enclosingElement, parameters.parent);
+      instrumentation?.implicitReturnType(source, node, decoratedReturnType);
     } else {
       // Inferred return type.
       decoratedReturnType = DecoratedType.forImplicitType(
