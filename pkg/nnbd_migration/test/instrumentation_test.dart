@@ -343,7 +343,8 @@ C f(bool b) => b ? C.named() : null;
 Object f(callback()) => callback();
 ''');
     var paramReturnNode =
-        implicitReturnType[findNode.simpleParameter('callback())')].node;
+        implicitReturnType[findNode.functionTypedFormalParameter('callback())')]
+            .node;
     var fReturnNode =
         explicitTypeNullability[findNode.typeAnnotation('Object')];
     expect(
@@ -359,7 +360,7 @@ f() => 1;
 Object g() => f();
 ''');
     var fReturnNode =
-        implicitReturnType[findNode.functionDeclaration('f()')].node;
+        implicitReturnType[findNode.functionDeclaration('f() =>')].node;
     var gReturnNode = explicitTypeNullability[findNode.typeAnnotation('int')];
     expect(
         edges.where((e) =>
