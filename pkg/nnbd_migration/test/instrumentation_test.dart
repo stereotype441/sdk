@@ -321,7 +321,108 @@ bool f(int x) => x.isEven;
     expect(edge.destinationNode, never);
   }
 
-  test_implicitReturnType() async {
+  test_implicitReturnType_constructor() async {
+    await analyze('''
+class C {
+  factory C() => f(true);
+  C.named();
+}
+C f(bool b) => b ? C.named() : null;
+''');
+    var factoryReturnNode = implicitReturnType[findNode.constructor('C(')].node;
+    var fReturnNode = explicitTypeNullability[findNode.typeAnnotation('C f')];
+    expect(
+        edges.where((e) =>
+            e.primarySource == fReturnNode &&
+            e.destinationNode == factoryReturnNode),
+        hasLength(1));
+  }
+
+  test_implicitReturnType_formalParameter() async {
+    await analyze('''
+Object f(callback()) => callback();
+''');
+    var paramReturnNode =
+        implicitReturnType[findNode.simpleParameter('callback())')].node;
+    var fReturnNode =
+        explicitTypeNullability[findNode.typeAnnotation('Object')];
+    expect(
+        edges.where((e) =>
+            e.primarySource == paramReturnNode &&
+            e.destinationNode == fReturnNode),
+        hasLength(1));
+  }
+
+  test_implicitReturnType_function() async {
+    await analyze('''
+f() => 1;
+Object g() => f();
+''');
+    var fReturnNode =
+        implicitReturnType[findNode.functionDeclaration('f()')].node;
+    var gReturnNode = explicitTypeNullability[findNode.typeAnnotation('int')];
+    expect(
+        edges.where((e) =>
+            e.primarySource == fReturnNode && e.destinationNode == gReturnNode),
+        hasLength(1));
+  }
+
+  test_implicitReturnType_functionExpression() async {
+    await analyze('''
+main() {
+  int Function() f = () => g();
+}
+int g() => 1;
+''');
+    var fReturnNode =
+        explicitTypeNullability[findNode.typeAnnotation('int Function')];
+    var functionExpressionReturnNode =
+        implicitReturnType[findNode.functionExpression('() => g()')].node;
+    var gReturnNode = explicitTypeNullability[findNode.typeAnnotation('int g')];
+    expect(
+        edges.where((e) =>
+            e.primarySource == gReturnNode &&
+            e.destinationNode == functionExpressionReturnNode),
+        hasLength(1));
+    expect(
+        edges.where((e) =>
+            e.primarySource == functionExpressionReturnNode &&
+            e.destinationNode == fReturnNode),
+        hasLength(1));
+  }
+
+  test_implicitReturnType_functionTypeAlias() async {
+    await analyze('''
+typedef F();
+Object f(F callback) => callback();
+''');
+    var typedefReturnNode =
+        implicitReturnType[findNode.functionTypeAlias('F()')].node;
+    var fReturnNode =
+        explicitTypeNullability[findNode.typeAnnotation('Object')];
+    expect(
+        edges.where((e) =>
+            e.primarySource == typedefReturnNode &&
+            e.destinationNode == fReturnNode),
+        hasLength(1));
+  }
+
+  test_implicitReturnType_genericFunctionType() async {
+    await analyze('''
+Object f(Function() callback) => callback();
+''');
+    var callbackReturnNode =
+        implicitReturnType[findNode.genericFunctionType('Function()')].node;
+    var fReturnNode =
+        explicitTypeNullability[findNode.typeAnnotation('Object')];
+    expect(
+        edges.where((e) =>
+            e.primarySource == callbackReturnNode &&
+            e.destinationNode == fReturnNode),
+        hasLength(1));
+  }
+
+  test_implicitReturnType_method() async {
     await analyze('''
 abstract class Base {
   int f();
