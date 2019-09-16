@@ -624,16 +624,18 @@ List<int> f() => g(null);
         implicitTypeArguments[findNode.methodInvocation('g(null)')].single.node;
     var returnElementNode =
         explicitTypeNullability[findNode.typeAnnotation('int')];
-    expect(
-        edges.where((e) =>
-            e.primarySource == always &&
-            e.destinationNode == implicitInvocationTypeArgumentNode),
-        hasLength(1));
-    expect(
-        edges.where((e) =>
-            e.primarySource == implicitInvocationTypeArgumentNode &&
-            e.destinationNode == returnElementNode),
-        hasLength(1));
+    expect(edges.where((e) {
+      var destination = e.destinationNode;
+      return e.primarySource == always &&
+          destination is SubstitutionNodeInfo &&
+          destination.innerNode == implicitInvocationTypeArgumentNode;
+    }), hasLength(1));
+    expect(edges.where((e) {
+      var source = e.primarySource;
+      return source is SubstitutionNodeInfo &&
+          source.innerNode == implicitInvocationTypeArgumentNode &&
+          e.destinationNode == returnElementNode;
+    }), hasLength(1));
   }
 
   test_implicitTypeArguments_genericMethodCall() async {
