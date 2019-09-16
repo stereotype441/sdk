@@ -361,7 +361,8 @@ Object g() => f();
 ''');
     var fReturnNode =
         implicitReturnType[findNode.functionDeclaration('f() =>')].node;
-    var gReturnNode = explicitTypeNullability[findNode.typeAnnotation('int')];
+    var gReturnNode =
+        explicitTypeNullability[findNode.typeAnnotation('Object')];
     expect(
         edges.where((e) =>
             e.primarySource == fReturnNode && e.destinationNode == gReturnNode),
