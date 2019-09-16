@@ -57,6 +57,21 @@ class HintCode extends AnalyzerErrorCode {
           "or removing the unreachable catch clause.");
 
   /**
+   * Users should not create a class named `Function` anymore.
+   */
+  static const HintCode DEPRECATED_FUNCTION_CLASS_DECLARATION = const HintCode(
+      'DEPRECATED_FUNCTION_CLASS_DECLARATION',
+      "Declaring a class named 'Function' is deprecated.",
+      correction: "Try renaming the class.");
+
+  /**
+   * `Function` should not be extended anymore.
+   */
+  static const HintCode DEPRECATED_EXTENDS_FUNCTION = const HintCode(
+      'DEPRECATED_EXTENDS_FUNCTION', "Extending 'Function' is deprecated.",
+      correction: "Try removing 'Function' from the 'extends' clause.");
+
+  /**
    * Parameters:
    * 0: the name of the member
    */
@@ -116,21 +131,6 @@ class HintCode extends AnalyzerErrorCode {
           correction: "Try replacing the use of the deprecated member with the "
               "replacement.",
           hasPublishedDocs: true);
-
-  /**
-   * Users should not create a class named `Function` anymore.
-   */
-  static const HintCode DEPRECATED_FUNCTION_CLASS_DECLARATION = const HintCode(
-      'DEPRECATED_FUNCTION_CLASS_DECLARATION',
-      "Declaring a class named 'Function' is deprecated.",
-      correction: "Try renaming the class.");
-
-  /**
-   * `Function` should not be extended anymore.
-   */
-  static const HintCode DEPRECATED_EXTENDS_FUNCTION = const HintCode(
-      'DEPRECATED_EXTENDS_FUNCTION', "Extending 'Function' is deprecated.",
-      correction: "Try removing 'Function' from the 'extends' clause.");
 
   /**
    * `Function` should not be mixed in anymore.
@@ -218,6 +218,18 @@ class HintCode extends AnalyzerErrorCode {
       'INFERENCE_FAILURE_ON_COLLECTION_LITERAL',
       "The type argument(s) of '{0}' can't be inferred.",
       correction: "Use explicit type argument(s) for '{0}'.");
+
+  /**
+   * When "strict-inference" is enabled, recursive local functions, top-level
+   * functions, methods, and function-typed function parameters must all
+   * specify a return type. See the strict-inference resource:
+   *
+   * https://github.com/dart-lang/language/blob/master/resources/type-system/strict-inference.md
+   */
+  static const HintCode INFERENCE_FAILURE_ON_FUNCTION_RETURN_TYPE = HintCode(
+      'INFERENCE_FAILURE_ON_FUNCTION_RETURN_TYPE',
+      "The return type of '{0}' cannot be inferred.",
+      correction: "Declare the return type of '{0}'.");
 
   /**
    * When "strict-inference" is enabled, types in instance creation
@@ -847,9 +859,9 @@ class HintCode extends AnalyzerErrorCode {
   // ```
   static const HintCode SDK_VERSION_BOOL_OPERATOR_IN_CONST_CONTEXT = const HintCode(
       'SDK_VERSION_BOOL_OPERATOR_IN_CONST_CONTEXT',
-      "Using the operator '{0}' for 'bool's in a constant expression wasn't "
-          "supported until version 2.3.2, but this code is required to be able "
-          "to run on earlier versions.",
+      "The use of the operator '{0}' for 'bool' operands in a constant context "
+          "wasn't supported until version 2.3.2, but this code is required to "
+          "be able to run on earlier versions.",
       correction: "Try updating the SDK constraints.");
 
   /**
@@ -1082,7 +1094,7 @@ class HintCode extends AnalyzerErrorCode {
   // ```
   static const HintCode SDK_VERSION_IS_EXPRESSION_IN_CONST_CONTEXT = const HintCode(
       'SDK_VERSION_IS_EXPRESSION_IN_CONST_CONTEXT',
-      "The use of an is expression in a constant expression wasn't supported "
+      "The use of an is expression in a constant context wasn't supported "
           "until version 2.3.2, but this code is required to be able to run on "
           "earlier versions.",
       correction: "Try updating the SDK constraints.");
@@ -1183,12 +1195,16 @@ class HintCode extends AnalyzerErrorCode {
   // dynamic x;
   // ``` */
   static const HintCode SDK_VERSION_NEVER = const HintCode(
-      'SDK_VERSION_NEVER', "The type Never is not yet supported.");
+      // TODO(brianwilkerson) Replace the message with the following when we know
+      //  when this feature will ship:
+      //    The type 'Never' wasn't supported until version 2.X.0, but this code
+      //    is required to be able to run on earlier versions.
+      'SDK_VERSION_NEVER',
+      "The type Never is not yet supported.");
 
   /**
    * No parameters.
    */
-
   // #### Description
   //
   // The analyzer produces this diagnostic when a for, if, or spread element is

@@ -34,6 +34,7 @@ import 'package:analyzer/src/summary/idl.dart';
 import 'package:analyzer/src/summary2/linked_unit_context.dart';
 import 'package:analyzer/src/summary2/reference.dart';
 import 'package:analyzer/src/util/comment.dart';
+import 'package:meta/meta.dart';
 
 /// Assert that the given [object] is null, which in the places where this
 /// function is called means that the element is not resynthesized.
@@ -100,6 +101,9 @@ abstract class AbstractClassElementImpl extends ElementImpl
     }
     this._fields = fields;
   }
+
+  @override
+  bool get isDartCoreObject => false;
 
   @override
   bool get isEnum => false;
@@ -186,6 +190,23 @@ abstract class AbstractClassElementImpl extends ElementImpl
   @override
   PropertyAccessorElement getSetter(String setterName) {
     return getSetterFromAccessors(setterName, accessors);
+  }
+
+  @override
+  InterfaceType instantiate({
+    @required List<DartType> typeArguments,
+    @required NullabilitySuffix nullabilitySuffix,
+  }) {
+    if (typeArguments.length != typeParameters.length) {
+      var ta = 'typeArguments.length (${typeArguments.length})';
+      var tp = 'typeParameters.length (${typeParameters.length})';
+      throw ArgumentError('$ta != $tp');
+    }
+    return InterfaceTypeImpl.explicit(
+      this,
+      typeArguments,
+      nullabilitySuffix: nullabilitySuffix,
+    );
   }
 
   @override
@@ -728,7 +749,7 @@ class ClassElementImpl extends AbstractClassElementImpl
     MethodElement method = lookUpConcreteMethod(
         FunctionElement.NO_SUCH_METHOD_METHOD_NAME, library);
     ClassElement definingClass = method?.enclosingElement;
-    return definingClass != null && !definingClass.type.isObject;
+    return definingClass != null && !definingClass.isDartCoreObject;
   }
 
   @override
@@ -824,6 +845,9 @@ class ClassElementImpl extends AbstractClassElementImpl
     _assertNotResynthesized(_unlinkedClass);
     setModifier(Modifier.ABSTRACT, isAbstract);
   }
+
+  @override
+  bool get isDartCoreObject => !isMixin && supertype == null;
 
   @override
   bool get isMixinApplication {
@@ -6381,6 +6405,18 @@ class GenericTypeAliasElementImpl extends ElementImpl
   }
 
   @override
+  FunctionType instantiate2({
+    @required List<DartType> typeArguments,
+    @required NullabilitySuffix nullabilitySuffix,
+  }) {
+    // TODO(scheglov) Replace with strict function type.
+    return FunctionTypeImpl.forTypedef(
+      this,
+      nullabilitySuffix: nullabilitySuffix,
+    ).instantiate(typeArguments);
+  }
+
+  @override
   void visitChildren(ElementVisitor visitor) {
     super.visitChildren(visitor);
     safelyVisitChildren(typeParameters, visitor);
@@ -10159,6 +10195,13 @@ class TypeParameterElementImpl extends ElementImpl
       buffer.write(" extends ");
       buffer.write(bound);
     }
+  }
+
+  @override
+  TypeParameterType instantiate({
+    @required NullabilitySuffix nullabilitySuffix,
+  }) {
+    return TypeParameterTypeImpl(this, nullabilitySuffix: nullabilitySuffix);
   }
 }
 
