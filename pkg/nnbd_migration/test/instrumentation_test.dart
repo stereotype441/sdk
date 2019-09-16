@@ -676,11 +676,12 @@ C<int> f() => C(null);
         implicitTypeArguments[findNode.instanceCreation('C(null)')].single.node;
     var returnElementNode =
         explicitTypeNullability[findNode.typeAnnotation('int')];
-    expect(
-        edges.where((e) =>
-            e.primarySource == always &&
-            e.destinationNode == implicitInvocationTypeArgumentNode),
-        hasLength(1));
+    expect(edges.where((e) {
+      var destination = e.destinationNode;
+      return e.primarySource == always &&
+          destination is SubstitutionNodeInfo &&
+          destination.innerNode == implicitInvocationTypeArgumentNode;
+    }), hasLength(1));
     expect(
         edges.where((e) =>
             e.primarySource == implicitInvocationTypeArgumentNode &&
