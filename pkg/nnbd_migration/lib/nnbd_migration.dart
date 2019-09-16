@@ -69,7 +69,9 @@ abstract class NullabilityMigration {
   /// complete.  TODO(paulberry): remove this mode once the migration algorithm
   /// is fully implemented.
   factory NullabilityMigration(NullabilityMigrationListener listener,
-      {bool permissive, NullabilityMigrationInstrumentation instrumentation}) = NullabilityMigrationImpl;
+          {bool permissive,
+          NullabilityMigrationInstrumentation instrumentation}) =
+      NullabilityMigrationImpl;
 
   void finish();
 

@@ -73,7 +73,8 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
   final DecoratedType _nonNullableStackTraceType;
 
   NodeBuilder(this._variables, this.source, this.listener, this._graph,
-      this._typeProvider, {this.instrumentation})
+      this._typeProvider,
+      {this.instrumentation})
       : _dynamicType = DecoratedType(_typeProvider.dynamicType, _graph.always),
         _nonNullableObjectType =
             DecoratedType(_typeProvider.objectType, _graph.never),
@@ -154,7 +155,8 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   DecoratedType visitConstructorDeclaration(ConstructorDeclaration node) {
-    _handleExecutableDeclaration(node,
+    _handleExecutableDeclaration(
+        node,
         node.declaredElement,
         node.metadata,
         null,
@@ -177,8 +179,7 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
         instrumentation?.implicitType(source, node, type);
       }
       _variables.recordDecoratedElementType(
-          node.identifier.staticElement,
-          type);
+          node.identifier.staticElement, type);
     }
     return type;
   }
@@ -209,7 +210,8 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   DecoratedType visitFunctionDeclaration(FunctionDeclaration node) {
-    _handleExecutableDeclaration(node,
+    _handleExecutableDeclaration(
+        node,
         node.declaredElement,
         node.metadata,
         node.returnType,
@@ -298,7 +300,7 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
   @override
   DecoratedType visitMethodDeclaration(MethodDeclaration node) {
     _handleExecutableDeclaration(
-      node,
+        node,
         node.declaredElement,
         node.metadata,
         node.returnType,
@@ -364,7 +366,7 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
       var returnType = node.returnType;
       if (returnType == null) {
         decoratedReturnType = DecoratedType.forImplicitType(
-              _typeProvider, DynamicTypeImpl.instance, _graph);
+            _typeProvider, DynamicTypeImpl.instance, _graph);
         instrumentation?.implicitReturnType(source, node, decoratedReturnType);
       } else {
         decoratedReturnType = returnType.accept(this);
@@ -467,12 +469,10 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
       var declaredElement = variable.declaredElement;
       if (type == null) {
         type = DecoratedType.forImplicitType(
-                  _typeProvider, declaredElement.type, _graph);
+            _typeProvider, declaredElement.type, _graph);
         instrumentation?.implicitType(source, node, type);
       }
-      _variables.recordDecoratedElementType(
-          declaredElement,
-          type);
+      _variables.recordDecoratedElementType(declaredElement, type);
       variable.initializer?.accept(this);
     }
     return null;
@@ -562,14 +562,14 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
         decoratedType = type.accept(this);
       } else {
         decoratedType = DecoratedType.forImplicitType(
-              _typeProvider, declaredElement.type, _graph);
+            _typeProvider, declaredElement.type, _graph);
         instrumentation?.implicitType(source, node, decoratedType);
       }
     } else {
       DecoratedType decoratedReturnType;
       if (type == null) {
         decoratedReturnType = DecoratedType.forImplicitType(
-              _typeProvider, DynamicTypeImpl.instance, _graph);
+            _typeProvider, DynamicTypeImpl.instance, _graph);
         instrumentation?.implicitReturnType(source, node, decoratedReturnType);
       } else {
         decoratedReturnType = type.accept(this);

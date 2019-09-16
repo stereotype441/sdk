@@ -185,21 +185,6 @@ int f(int i, int j) {
     expect(matchingEdges.single.guards.single, iNode);
   }
 
-  test_graphEdge_origin() async {
-    await analyze('''
-int f(int x) => x;
-''');
-    var xNode = explicitTypeNullability[findNode.typeAnnotation('int x')];
-    var returnNode = explicitTypeNullability[findNode.typeAnnotation('int f')];
-    var matchingEdges = edges
-        .where(
-            (e) => e.primarySource == xNode && e.destinationNode == returnNode)
-        .toList();
-    var origin = edgeOrigin[matchingEdges.single];
-    expect(origin.source, source);
-    expect(origin.node, findNode.simple('x;'));
-  }
-
   test_graphEdge_hard() async {
     await analyze('''
 int f(int x) => x;
@@ -255,6 +240,21 @@ main() {
     expect(iToJ.isSatisfied, true);
     expect(jToK.isSatisfied, false);
     expect(kToL.isSatisfied, true);
+  }
+
+  test_graphEdge_origin() async {
+    await analyze('''
+int f(int x) => x;
+''');
+    var xNode = explicitTypeNullability[findNode.typeAnnotation('int x')];
+    var returnNode = explicitTypeNullability[findNode.typeAnnotation('int f')];
+    var matchingEdges = edges
+        .where(
+            (e) => e.primarySource == xNode && e.destinationNode == returnNode)
+        .toList();
+    var origin = edgeOrigin[matchingEdges.single];
+    expect(origin.source, source);
+    expect(origin.node, findNode.simple('x;'));
   }
 
   test_graphEdge_soft() async {

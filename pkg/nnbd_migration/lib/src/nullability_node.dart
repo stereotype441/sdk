@@ -229,7 +229,8 @@ class NullabilityGraph {
       var node = edge.destinationNode;
       if (node is NullabilityNodeMutable && !node.isNullable) {
         _unionedWithAlways.add(node);
-        _setState(_PropagationStep(node, NullabilityState.ordinaryNullable, StateChangeReason.union,
+        _setState(_PropagationStep(
+            node, NullabilityState.ordinaryNullable, StateChangeReason.union,
             edge: edge));
         // Was not previously nullable, so we need to propagate.
         _pendingEdges.addAll(node._downstreamEdges);
@@ -255,7 +256,9 @@ class NullabilityGraph {
           continue;
         }
         if (node is NullabilityNodeMutable && !node.isNullable) {
-          _setNullable(_PropagationStep(node, NullabilityState.ordinaryNullable, StateChangeReason.downstream, edge: edge));
+          _setNullable(_PropagationStep(node, NullabilityState.ordinaryNullable,
+              StateChangeReason.downstream,
+              edge: edge));
         }
       }
       if (_pendingSubstitutions.isEmpty) break;
@@ -309,8 +312,10 @@ class NullabilityGraph {
     // Otherwise, if the inner node is in the non-nullable state, then we set
     // the outer node to the ordinary nullable state.
     if (substitutionNode.innerNode._state == NullabilityState.nonNullable) {
-      _setNullable(_PropagationStep(substitutionNode.outerNode as NullabilityNodeMutable,
-          NullabilityState.ordinaryNullable, StateChangeReason.substituteOuter,
+      _setNullable(_PropagationStep(
+          substitutionNode.outerNode as NullabilityNodeMutable,
+          NullabilityState.ordinaryNullable,
+          StateChangeReason.substituteOuter,
           substitutionNode: substitutionNode));
       return;
     }
@@ -323,7 +328,8 @@ class NullabilityGraph {
     var pendingEdges = <NullabilityEdge>[];
     var node = substitutionNode.innerNode;
     if (node is NullabilityNodeMutable) {
-      var oldState = _setNullable(_PropagationStep(node, NullabilityState.exactNullable, StateChangeReason.substituteInner,
+      var oldState = _setNullable(_PropagationStep(node,
+          NullabilityState.exactNullable, StateChangeReason.substituteInner,
           substitutionNode: substitutionNode));
       if (oldState != NullabilityState.exactNullable) {
         // Was not previously in the "exact nullable" state.  Need to
@@ -337,7 +343,8 @@ class NullabilityGraph {
       var edge = pendingEdges.removeLast();
       var node = edge.primarySource;
       if (node is NullabilityNodeMutable) {
-        var oldState = _setNullable(_PropagationStep(node, NullabilityState.exactNullable, StateChangeReason.exactUpstream,
+        var oldState = _setNullable(_PropagationStep(node,
+            NullabilityState.exactNullable, StateChangeReason.exactUpstream,
             edge: edge));
         if (oldState != NullabilityState.exactNullable) {
           // Was not previously in the "exact nullable" state.  Need to
@@ -350,8 +357,7 @@ class NullabilityGraph {
     }
   }
 
-  NullabilityState _setNullable(
-      _PropagationStep propagationStep) {
+  NullabilityState _setNullable(_PropagationStep propagationStep) {
     var node = propagationStep.node;
     assert(propagationStep.newState.isNullable);
     var oldState = node._state;
@@ -370,20 +376,6 @@ class NullabilityGraph {
     propagationStep.node._state = propagationStep.newState;
     instrumentation?.propagationStep(propagationStep);
   }
-}
-
-class _PropagationStep implements PropagationInfo {
-  final NullabilityNodeMutable node;
-
-  final NullabilityState newState;
-
-  final StateChangeReason reason;
-  
-  final NullabilityEdge edge;
-  
-  final NullabilityNodeForSubstitution substitutionNode;
-
-  _PropagationStep(this.node, this.newState, this.reason, {this.edge, this.substitutionNode});
 }
 
 /// Same as [NullabilityGraph], but extended with extra methods for easier
@@ -671,4 +663,19 @@ class _NullabilityNodeSimple extends NullabilityNodeMutable {
 
   _NullabilityNodeSimple(this._debugPrefix)
       : super._(initialState: NullabilityState.undetermined);
+}
+
+class _PropagationStep implements PropagationInfo {
+  final NullabilityNodeMutable node;
+
+  final NullabilityState newState;
+
+  final StateChangeReason reason;
+
+  final NullabilityEdge edge;
+
+  final NullabilityNodeForSubstitution substitutionNode;
+
+  _PropagationStep(this.node, this.newState, this.reason,
+      {this.edge, this.substitutionNode});
 }

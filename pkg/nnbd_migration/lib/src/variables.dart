@@ -34,6 +34,8 @@ class Variables implements VariableRecorder, VariableRepository {
 
   final AlreadyMigratedCodeDecorator _alreadyMigratedCodeDecorator;
 
+  final NullabilityMigrationInstrumentation /*?*/ instrumentation;
+
   Variables(this._graph, TypeProvider typeProvider, {this.instrumentation})
       : _alreadyMigratedCodeDecorator =
             AlreadyMigratedCodeDecorator(_graph, typeProvider);
@@ -138,8 +140,6 @@ class Variables implements VariableRecorder, VariableRepository {
     }());
     _decoratedElementTypes[element] = type;
   }
-
-  final NullabilityMigrationInstrumentation /*?*/ instrumentation;
 
   void recordDecoratedExpressionType(Expression node, DecoratedType type) {}
 

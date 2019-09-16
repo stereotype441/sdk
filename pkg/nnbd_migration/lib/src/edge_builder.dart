@@ -192,7 +192,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   List<String> _objectGetNames;
 
   EdgeBuilder(this._typeProvider, this._typeSystem, this._variables,
-      this._graph, this.source, this.listener, {this.instrumentation})
+      this._graph, this.source, this.listener,
+      {this.instrumentation})
       : _decoratedClassHierarchy = DecoratedClassHierarchy(_variables, _graph),
         _inheritanceManager = InheritanceManager3(_typeSystem),
         _notNullType = DecoratedType(_typeProvider.objectType, _graph.never),
@@ -801,7 +802,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         decoratedTypeArguments = typeArgumentTypes
             .map((t) => DecoratedType.forImplicitType(_typeProvider, t, _graph))
             .toList();
-        instrumentation?.implicitTypeArguments(source, node, decoratedTypeArguments);
+        instrumentation?.implicitTypeArguments(
+            source, node, decoratedTypeArguments);
       } else {
         // Note: this could happen if the code being migrated has errors.
         typeArgumentTypes = const [];
@@ -1116,7 +1118,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
           var valueType = DecoratedType.forImplicitType(
               _typeProvider, setOrMapType.typeArguments[1], _graph);
           _currentMapValueType = valueType;
-          instrumentation?.implicitTypeArguments(source, node, [keyType, valueType]);
+          instrumentation
+              ?.implicitTypeArguments(source, node, [keyType, valueType]);
         } else {
           assert(typeArguments.length == 2);
           _currentMapKeyType =

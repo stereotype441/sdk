@@ -13,8 +13,7 @@ class NullabilityState {
 
   /// State of a nullability node that has been determined to be nullable by
   /// propagating downstream.
-  static const ordinaryNullable =
-  NullabilityState._('ordinary nullable', true);
+  static const ordinaryNullable = NullabilityState._('ordinary nullable', true);
 
   /// State of a nullability node that has been determined to be nullable by
   /// propagating upstream from a contravariant use of a generic.
