@@ -147,15 +147,24 @@ abstract class NullabilityMigrationInstrumentation {
   /// type arguments, to report the nullability nodes associated with the
   /// implicit type arguments of the AST node.
   ///
-  /// [node] is the AST node having implicit type arguments; it may be
+  /// [node] is the AST node having implicit type arguments; it may be a
+  /// constructor redirection, function expression invocation, method
+  /// invocation, instance creation expression, or list/map/set literal.
   void implicitTypeArguments(
       Source source, AstNode node, Iterable<DecoratedTypeInfo> types);
 
+  /// Called whenever the migration engine performs a step in the propagation of
+  /// nullability information through the nullability graph, to report details
+  /// of the step that was performed and why.
   void propagationStep(PropagationInfo info);
 }
 
-/// Information about a single node in the nullability inference graph.
+/// Information exposed to the migration client about a single node in the
+/// nullability graph.
 abstract class NullabilityNodeInfo {
+  /// Indicates whether the node is immutable.  The only immutable nodes in the
+  /// nullability graph are the nodes `never` and `always` that are used as the
+  /// starting points for nullability propagation.
   bool get isImmutable;
 
   /// After migration is complete, this getter can be used to query whether
@@ -163,27 +172,67 @@ abstract class NullabilityNodeInfo {
   bool get isNullable;
 }
 
+/// Information exposed to the migration client about a single step in the
+/// nullability propagation algorithm, in which the nullability state of a
+/// single node was changed.
 abstract class PropagationInfo {
+  /// The edge that caused the nullability state of [node] to be set to
+  /// [newState], or `null` if the nullability state was changed for reasons
+  /// not associated with an edge.  Will be `null` when [reason] is
+  /// [StateChangeReason.substituteInner] or
+  /// [StateChangeReason.substituteOuter], non-null otherwise.
   EdgeInfo get edge;
 
+  /// The new state that [node] was placed into.
   NullabilityState get newState;
 
+  /// The nullability node whose state was changed.
   NullabilityNodeInfo get node;
 
+  /// The reason the nullability node's state was changed.
   StateChangeReason get reason;
 
+  /// The substitution node that caused the nullability state of [node] to be
+  /// set to [newState], or `null` if the nullability state was changed for
+  /// reasons not associated with a substitution node.  Will be non-null when
+  /// [reason] is [StateChangeReason.substituteInner] or
+  /// [StateChangeReason.substituteOuter], `null` otherwise.
   SubstitutionNodeInfo get substitutionNode;
 }
 
+/// Enum representing the various reasons why a nullability node might change
+/// state during nullability propagation.
 enum StateChangeReason {
+  /// A union edge exists between this node and a node that is known a priori to
+  /// be nullable, so this node is being made nullable as well.
   union,
+
+  /// A hard or union edge exists whose primary source is this node, and whose
+  /// destination is non-nullable, so this node is being made non-nullable as
+  /// well.
   upstream,
+
+  /// An edge exists whose destination is this node, and whose primary source is
+  /// nullable, so this node is being made nullable as well.
   downstream,
+
+  /// An edge exists whose primary source is this node, and whose destination is
+  /// exact nullable, so this node is being made exact nullable as well.
   exactUpstream,
+
+  /// A substitution node exists whose inner node points to this node, and the
+  /// substitution node is nullable, so this node is being made nullable as
+  /// well.
   substituteInner,
+
+  /// A substitution node exists whose outer node points to this node, and the
+  /// substitution node is nullable, so this node is being made nullable as
+  /// well.
   substituteOuter,
 }
 
+/// Information exposed to the migration client about a node in the nullability
+/// graph resulting from a type substitution.
 abstract class SubstitutionNodeInfo extends NullabilityNodeInfo {
   /// Nullability node representing the inner type of the substitution.
   ///

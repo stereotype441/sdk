@@ -494,6 +494,7 @@ abstract class NullabilityNode implements NullabilityNodeInfo {
 
   /// After nullability propagation, this getter can be used to query whether
   /// the type associated with this node should be considered nullable.
+  @override
   bool get isNullable;
 
   /// Indicates whether this node is associated with a named parameter for which
@@ -565,18 +566,10 @@ class NullabilityNodeForLUB extends _NullabilityNodeCompound {
 /// substitution.
 class NullabilityNodeForSubstitution extends _NullabilityNodeCompound
     implements SubstitutionNodeInfo {
-  /// Nullability node representing the inner type of the substitution.
-  ///
-  /// For example, if this NullabilityNode arose from substituting `int*` for
-  /// `T` in the type `T*`, [innerNode] is the nullability corresponding to the
-  /// `*` in `int*`.
+  @override
   final NullabilityNode innerNode;
 
-  /// Nullability node representing the outer type of the substitution.
-  ///
-  /// For example, if this NullabilityNode arose from substituting `int*` for
-  /// `T` in the type `T*`, [innerNode] is the nullability corresponding to the
-  /// `*` in `T*`.
+  @override
   final NullabilityNode outerNode;
 
   NullabilityNodeForSubstitution._(this.innerNode, this.outerNode);
@@ -669,14 +662,19 @@ class _NullabilityNodeSimple extends NullabilityNodeMutable {
 }
 
 class _PropagationStep implements PropagationInfo {
+  @override
   final NullabilityNodeMutable node;
 
+  @override
   final NullabilityState newState;
 
+  @override
   final StateChangeReason reason;
 
+  @override
   final NullabilityEdge edge;
 
+  @override
   final NullabilityNodeForSubstitution substitutionNode;
 
   _PropagationStep(this.node, this.newState, this.reason,
