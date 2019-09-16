@@ -444,7 +444,58 @@ abstract class Derived extends Base {
         hasLength(1));
   }
 
-  test_implicitType() async {
+  test_implicitType_catch_exception() async {
+    await analyze('''
+void f() {
+  try {} catch (e) {
+    Object o = e;
+  }
+}
+''');
+    var oNode = explicitTypeNullability[findNode.typeAnnotation('Object')];
+    var eNode = implicitType[findNode.simple('e)')].node;
+    expect(
+        edges.where(
+            (e) => e.primarySource == eNode && e.destinationNode == oNode),
+        hasLength(1));
+  }
+
+  test_implicitType_catch_stackTrace() async {
+    await analyze('''
+void f() {
+  try {} catch (e, st) {
+    Object o = st;
+  }
+}
+''');
+    var oNode = explicitTypeNullability[findNode.typeAnnotation('Object')];
+    var stNode = implicitType[findNode.simple('st)')].node;
+    expect(
+        edges.where(
+            (e) => e.primarySource == stNode && e.destinationNode == oNode),
+        hasLength(1));
+  }
+
+  test_implicitType_declaredIdentifier_forEachPartsWithDeclaration() async {
+    await analyze('''
+void f(List<int> l) {
+  for (var x in l) {
+    int y = x;
+  }
+}
+''');
+    var xNode = implicitType[(findNode.forStatement('for').forLoopParts
+                as ForEachPartsWithDeclaration)
+            .loopVariable]
+        .node;
+    var yNode = explicitTypeNullability[findNode.typeAnnotation('int y')];
+    expect(
+        edges.where(
+            (e) => e.primarySource == xNode && e.destinationNode == yNode),
+        hasLength(1));
+  }
+
+  test_implicitType_formalParameter() async {
     await analyze('''
 abstract class Base {
   void f(int i);
@@ -547,6 +598,20 @@ abstract class Derived extends Base {
         edges.where((e) =>
             e.primarySource == derivedParamArgNode &&
             e.destinationNode == baseParamArgNode),
+        hasLength(1));
+  }
+
+  test_implicitType_variableDeclarationList() async {
+    await analyze('''
+void f(int i) {
+  var j = i;
+}
+''');
+    var iNode = explicitTypeNullability[findNode.typeAnnotation('int')];
+    var jNode = implicitType[findNode.variableDeclarationList('j')].node;
+    expect(
+        edges.where(
+            (e) => e.primarySource == iNode && e.destinationNode == jNode),
         hasLength(1));
   }
 
