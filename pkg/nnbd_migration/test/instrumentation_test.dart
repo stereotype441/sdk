@@ -615,7 +615,76 @@ void f(int i) {
         hasLength(1));
   }
 
-  test_implicitTypeArguments() async {
+  test_implicitTypeArguments_genericFunctionCall() async {
+    await analyze('''
+List<T> g<T>(T t) {}
+List<int> f() => g(null);
+''');
+    var implicitInvocationTypeArgumentNode =
+        implicitTypeArguments[findNode.methodInvocation('g(null)')].single.node;
+    var returnElementNode =
+        explicitTypeNullability[findNode.typeAnnotation('int')];
+    expect(
+        edges.where((e) =>
+            e.primarySource == always &&
+            e.destinationNode == implicitInvocationTypeArgumentNode),
+        hasLength(1));
+    expect(
+        edges.where((e) =>
+            e.primarySource == implicitInvocationTypeArgumentNode &&
+            e.destinationNode == returnElementNode),
+        hasLength(1));
+  }
+
+  test_implicitTypeArguments_genericMethodCall() async {
+    await analyze('''
+class C {
+  List<T> g<T>(T t) {}
+}
+List<int> f(C c) => c.g(null);
+''');
+    var implicitInvocationTypeArgumentNode =
+        implicitTypeArguments[findNode.methodInvocation('c.g(null)')]
+            .single
+            .node;
+    var returnElementNode =
+        explicitTypeNullability[findNode.typeAnnotation('int')];
+    expect(
+        edges.where((e) =>
+            e.primarySource == always &&
+            e.destinationNode == implicitInvocationTypeArgumentNode),
+        hasLength(1));
+    expect(
+        edges.where((e) =>
+            e.primarySource == implicitInvocationTypeArgumentNode &&
+            e.destinationNode == returnElementNode),
+        hasLength(1));
+  }
+
+  test_implicitTypeArguments_instanceCreationExpression() async {
+    await analyze('''
+class C<T> {
+  C(T t);
+}
+C<int> f() => C(null);
+''');
+    var implicitInvocationTypeArgumentNode =
+        implicitTypeArguments[findNode.instanceCreation('C(null)')].single.node;
+    var returnElementNode =
+        explicitTypeNullability[findNode.typeAnnotation('int')];
+    expect(
+        edges.where((e) =>
+            e.primarySource == always &&
+            e.destinationNode == implicitInvocationTypeArgumentNode),
+        hasLength(1));
+    expect(
+        edges.where((e) =>
+            e.primarySource == implicitInvocationTypeArgumentNode &&
+            e.destinationNode == returnElementNode),
+        hasLength(1));
+  }
+
+  test_implicitTypeArguments_listLiteral() async {
     await analyze('''
 List<int> f() => [null];
 ''');
@@ -632,6 +701,75 @@ List<int> f() => [null];
         edges.where((e) =>
             e.primarySource == implicitListLiteralElementNode &&
             e.destinationNode == returnElementNode),
+        hasLength(1));
+  }
+
+  test_implicitTypeArguments_mapLiteral() async {
+    await analyze('''
+Map<int, String> f() => {1: null};
+''');
+    var implicitMapLiteralTypeArguments =
+        implicitTypeArguments[findNode.listLiteral('{null: null}')];
+    expect(implicitMapLiteralTypeArguments, hasLength(2));
+    var implicitMapLiteralKeyNode = implicitMapLiteralTypeArguments[0].node;
+    var implicitMapLiteralValueNode = implicitMapLiteralTypeArguments[1].node;
+    var returnKeyNode = explicitTypeNullability[findNode.typeAnnotation('int')];
+    var returnValueNode =
+        explicitTypeNullability[findNode.typeAnnotation('String')];
+    expect(
+        edges.where((e) =>
+            e.primarySource == never &&
+            e.destinationNode == implicitMapLiteralKeyNode),
+        hasLength(1));
+    expect(
+        edges.where((e) =>
+            e.primarySource == implicitMapLiteralKeyNode &&
+            e.destinationNode == returnKeyNode),
+        hasLength(1));
+    expect(
+        edges.where((e) =>
+            e.primarySource == always &&
+            e.destinationNode == implicitMapLiteralValueNode),
+        hasLength(1));
+    expect(
+        edges.where((e) =>
+            e.primarySource == implicitMapLiteralValueNode &&
+            e.destinationNode == returnValueNode),
+        hasLength(1));
+  }
+
+  test_implicitTypeArguments_setLiteral() async {
+    await analyze('''
+Set<int> f() => {null};
+''');
+    var implicitSetLiteralElementNode =
+        implicitTypeArguments[findNode.setOrMapLiteral('{null}')].single.node;
+    var returnElementNode =
+        explicitTypeNullability[findNode.typeAnnotation('int')];
+    expect(
+        edges.where((e) =>
+            e.primarySource == always &&
+            e.destinationNode == implicitSetLiteralElementNode),
+        hasLength(1));
+    expect(
+        edges.where((e) =>
+            e.primarySource == implicitSetLiteralElementNode &&
+            e.destinationNode == returnElementNode),
+        hasLength(1));
+  }
+
+  test_implicitTypeArguments_typeAnnotation() async {
+    await analyze('''
+List<Object> f(List l) => l;
+''');
+    var implicitListElementType =
+        implicitTypeArguments[findNode.typeAnnotation('List l')].single.node;
+    var implicitReturnElementType =
+        explicitTypeNullability[findNode.typeAnnotation('Object')];
+    expect(
+        edges.where((e) =>
+            e.primarySource == implicitListElementType &&
+            e.destinationNode == implicitReturnElementType),
         hasLength(1));
   }
 
