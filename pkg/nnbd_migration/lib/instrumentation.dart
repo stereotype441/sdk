@@ -78,7 +78,7 @@ abstract class EdgeInfo {
   /// corresponding type formal bound on a generic function type in an
   /// overriding class).
   ///
-  /// Union edges are always [hard].
+  /// The [isHard] property is always true for union edges.
   bool get isUnion;
 
   /// Information about the graph node that this edge "points away from".
