@@ -44,12 +44,12 @@ class NullabilityEdge implements EdgeInfo {
   @override
   NullabilityNode get sourceNode => upstreamNodes.first;
 
-  /// Indicates whether all the sources of this edge are nullable (and thus
-  /// downstream nullability propagation should try to make the destination node
-  /// nullable, if possible).
+  /// Indicates whether all the upstream nodes of this edge are nullable (and
+  /// thus downstream nullability propagation should try to make the destination
+  /// node nullable, if possible).
   bool get _isTriggered {
-    for (var source in upstreamNodes) {
-      if (!source.isNullable) return false;
+    for (var upstreamNode in upstreamNodes) {
+      if (!upstreamNode.isNullable) return false;
     }
     return true;
   }
