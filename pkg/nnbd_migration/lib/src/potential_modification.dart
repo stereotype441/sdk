@@ -4,10 +4,7 @@
 
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/type.dart';
-import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart' show SourceEdit;
-import 'package:analyzer_plugin/protocol/protocol_common.dart';
-import 'package:nnbd_migration/nnbd_migration.dart';
 import 'package:nnbd_migration/src/conditional_discard.dart';
 import 'package:nnbd_migration/src/nullability_node.dart';
 
@@ -170,45 +167,12 @@ class PotentiallyAddRequired extends PotentialModification {
       isEmpty ? const [] : [SourceEdit(_offset, 0, '@required ')];
 }
 
-class SingleNullabilityFixImpl implements SingleNullabilityFix {
-  @override
-  final Source source;
-
-  @override
-  final Location location;
-
-  @override
-  final NullabilityFixDescription description;
-
-  factory SingleNullabilityFixImpl(Source source, int offset, int length, LineInfo lineInfo, NullabilityFixDescription description) {
-    // TODO(paulberry): once everything is migrated into the analysis server,
-    // the migration engine can just create SingleNullabilityFix objects
-    // directly and set their kind appropriately; we won't need to translate the
-    // kinds using a bunch of `is` checks.
-    Location location;
-
-      final locationInfo = lineInfo
-          .getLocation(offset);
-      location = new Location(
-        source.fullName,
-        offset,
-        length,
-        locationInfo.lineNumber,
-        locationInfo.columnNumber,
-      );
-
-    return SingleNullabilityFixImpl._(source, location, description);
-  }
-
-  SingleNullabilityFixImpl._(this.source, this.location, this.description);
-}
-
 /// Interface used by data structures representing potential modifications to
 /// the code being migrated.
 abstract class PotentialModification {
   bool get isEmpty;
 
-  /// Gets the individual edits that need to be done, considering the
+  /// Gets the individual migrations that need to be done, considering the
   /// solution to the constraint equations.
   Iterable<SourceEdit> get modifications;
 }

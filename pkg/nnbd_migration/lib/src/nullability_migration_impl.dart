@@ -97,3 +97,65 @@ class NullabilityMigrationImpl implements NullabilityMigration {
     }
   }
 }
+
+/// Implementation of [SingleNullabilityFix] used internally by
+/// [NullabilityMigration].
+class _SingleNullabilityFix extends SingleNullabilityFix {
+  @override
+  final Source source;
+
+  @override
+  final NullabilityFixDescription description;
+
+  Location _location;
+
+  factory _SingleNullabilityFix(Source source,
+      PotentialModification potentialModification, LineInfo lineInfo) {
+    // TODO(paulberry): once everything is migrated into the analysis server,
+    // the migration engine can just create SingleNullabilityFix objects
+    // directly and set their kind appropriately; we won't need to translate the
+    // kinds using a bunch of `is` checks.
+    NullabilityFixDescription desc;
+    if (potentialModification is ExpressionChecks) {
+      desc = NullabilityFixDescription.checkExpression;
+    } else if (potentialModification is PotentiallyAddQuestionSuffix) {
+      desc = NullabilityFixDescription.makeTypeNullable(
+          potentialModification.type.toString());
+    } else if (potentialModification is ConditionalModification) {
+      desc = potentialModification.discard.keepFalse
+          ? NullabilityFixDescription.discardThen
+          : NullabilityFixDescription.discardElse;
+    } else if (potentialModification is PotentiallyAddImport) {
+      desc =
+          NullabilityFixDescription.addImport(potentialModification.importPath);
+    } else if (potentialModification is PotentiallyAddRequired) {
+      desc = NullabilityFixDescription.addRequired(
+          potentialModification.className,
+          potentialModification.methodName,
+          potentialModification.parameterName);
+    } else {
+      throw new UnimplementedError('TODO(paulberry)');
+    }
+
+    Location location;
+
+    if (potentialModification.modifications.isNotEmpty) {
+      final locationInfo = lineInfo
+          .getLocation(potentialModification.modifications.first.offset);
+      location = new Location(
+        source.fullName,
+        potentialModification.modifications.first.offset,
+        potentialModification.modifications.first.length,
+        locationInfo.lineNumber,
+        locationInfo.columnNumber,
+      );
+    }
+
+    return _SingleNullabilityFix._(source, desc, location: location);
+  }
+
+  _SingleNullabilityFix._(this.source, this.description, {Location location})
+      : this._location = location;
+
+  Location get location => _location;
+}
