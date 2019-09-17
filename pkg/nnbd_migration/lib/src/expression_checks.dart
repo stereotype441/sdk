@@ -5,6 +5,7 @@
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart';
+import 'package:nnbd_migration/nnbd_migration.dart';
 import 'package:nnbd_migration/src/edge_origin.dart';
 import 'package:nnbd_migration/src/nullability_node.dart';
 import 'package:nnbd_migration/src/potential_modification.dart';
@@ -50,6 +51,9 @@ class ExpressionChecks extends PotentialModification {
     }
     return true;
   }
+
+  @override
+  NullabilityFixDescription get description;
 
   @override
   Iterable<SourceEdit> get modifications {
