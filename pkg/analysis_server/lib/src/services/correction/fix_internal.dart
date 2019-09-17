@@ -24,6 +24,7 @@ import 'package:analyzer/dart/ast/precedence.dart';
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/error/error.dart';
 import 'package:analyzer/file_system/file_system.dart';
@@ -3527,82 +3528,65 @@ class FixProcessor extends BaseProcessor {
 
   Future<void> _addFix_removeUnusedField() async {
     final declaration = node.parent;
-    if (declaration is VariableDeclaration) {
-      Element element = declaration.declaredElement;
-      if (element is FieldElement) {
-        final references = _findAllReferences(unit, element);
-        final changeBuilder = _newDartChangeBuilder();
-        await changeBuilder.addFileEdit(file, (DartFileEditBuilder builder) {
-          for (var reference in references) {
-            final referenceNode = reference.thisOrAncestorMatching((node) =>
-                node is VariableDeclaration ||
-                node is ExpressionStatement ||
-                node is ConstructorFieldInitializer ||
-                node is FieldFormalParameter);
-            if (referenceNode == null) {
-              // todo (pq): in this case we should not create a change (not an incomplete one)
-              return;
-            }
-            var sourceRange;
-            if (referenceNode is VariableDeclaration) {
-              // todo (pq): add range util: SourceRange nodeInList<T>(NodeList<T> list, T node)
-              VariableDeclarationList parent = referenceNode.parent;
-              if (parent.variables.length == 1) {
-                sourceRange = range.node(parent.parent);
-              } else {
-                // Trailing comma.
-                if (referenceNode.endToken.next.type == TokenType.COMMA) {
-                  sourceRange = range.endEnd(referenceNode.beginToken.previous,
-                      referenceNode.endToken.next);
-                } else {
-                  // Leading comma.
-                  sourceRange = range.startEnd(
-                      referenceNode.beginToken.previous, referenceNode);
-                }
-              }
-            } else if (referenceNode is ConstructorFieldInitializer) {
-              ConstructorDeclaration cons =
-                  referenceNode.parent as ConstructorDeclaration;
-              // A() : _f = 0;
-              if (cons.initializers.length == 1) {
-                sourceRange = range.startEnd(cons.separator, referenceNode);
-              } else {
-                final nextToken = referenceNode.endToken.next;
-                // Trailing comma.
-                if (nextToken.type == TokenType.COMMA) {
-                  sourceRange = range.startEnd(referenceNode, nextToken);
-                } else {
-                  // Leading  comma.
-                  sourceRange = range.startEnd(
-                      referenceNode.beginToken.previous, referenceNode);
-                }
-              }
-            } else if (referenceNode is FieldFormalParameter) {
-              FormalParameterList params =
-                  referenceNode.parent as FormalParameterList;
-              if (params.parameters.length == 1) {
-                sourceRange = range.endStart(
-                    params.leftParenthesis, params.rightParenthesis);
-              } else {
-                final nextToken = referenceNode.endToken.next;
-                // Trailing comma.
-                if (nextToken.type == TokenType.COMMA) {
-                  sourceRange = range.startStart(referenceNode, nextToken.next);
-                } else {
-                  // Leading  comma.
-                  sourceRange = range.startEnd(
-                      referenceNode.beginToken.previous, referenceNode);
-                }
-              }
-            } else {
-              sourceRange = range.node(referenceNode);
-            }
-            builder.addDeletion(utils.getLinesRange(sourceRange));
-          }
-        });
-        _addFixFromBuilder(changeBuilder, DartFixKind.REMOVE_UNUSED_FIELD);
-      }
+    if (declaration is! VariableDeclaration) {
+      return;
     }
+    final element = (declaration as VariableDeclaration).declaredElement;
+    if (element is! FieldElement) {
+      return;
+    }
+
+    final sourceRanges = <SourceRange>[];
+    final references = _findAllReferences(unit, element);
+    for (var reference in references) {
+      // todo (pq): consider scoping this to parent or parent.parent.
+      final referenceNode = reference.thisOrAncestorMatching((node) =>
+          node is VariableDeclaration ||
+          node is ExpressionStatement ||
+          node is ConstructorFieldInitializer ||
+          node is FieldFormalParameter);
+      if (referenceNode == null) {
+        return;
+      }
+      var sourceRange;
+      if (referenceNode is VariableDeclaration) {
+        VariableDeclarationList parent = referenceNode.parent;
+        if (parent.variables.length == 1) {
+          sourceRange = utils.getLinesRange(range.node(parent.parent));
+        } else {
+          sourceRange = range.nodeInList(parent.variables, referenceNode);
+        }
+      } else if (referenceNode is ConstructorFieldInitializer) {
+        ConstructorDeclaration cons =
+            referenceNode.parent as ConstructorDeclaration;
+        // A() : _f = 0;
+        if (cons.initializers.length == 1) {
+          sourceRange = range.endEnd(cons.parameters, referenceNode);
+        } else {
+          sourceRange = range.nodeInList(cons.initializers, referenceNode);
+        }
+      } else if (referenceNode is FieldFormalParameter) {
+        FormalParameterList params =
+            referenceNode.parent as FormalParameterList;
+        if (params.parameters.length == 1) {
+          sourceRange =
+              range.endStart(params.leftParenthesis, params.rightParenthesis);
+        } else {
+          sourceRange = range.nodeInList(params.parameters, referenceNode);
+        }
+      } else {
+        sourceRange = utils.getLinesRange(range.node(referenceNode));
+      }
+      sourceRanges.add(sourceRange);
+    }
+
+    final changeBuilder = _newDartChangeBuilder();
+    await changeBuilder.addFileEdit(file, (DartFileEditBuilder builder) {
+      for (var sourceRange in sourceRanges) {
+        builder.addDeletion(sourceRange);
+      }
+    });
+    _addFixFromBuilder(changeBuilder, DartFixKind.REMOVE_UNUSED_FIELD);
   }
 
   Future<void> _addFix_removeUnusedImport() async {
@@ -3637,43 +3621,47 @@ class FixProcessor extends BaseProcessor {
     if (!(declaration is VariableDeclaration && declaration.name == node)) {
       return;
     }
-
     Element element = (declaration as VariableDeclaration).declaredElement;
-    if (element is LocalElement) {
-      final functionBody = declaration.thisOrAncestorOfType<FunctionBody>();
-      final references = findLocalElementReferences(functionBody, element);
-      final changeBuilder = _newDartChangeBuilder();
-      await changeBuilder.addFileEdit(file, (DartFileEditBuilder builder) {
-        for (var reference in references) {
-          final node = reference.thisOrAncestorMatching((node) =>
-              node is VariableDeclaration || node is AssignmentExpression);
-          var sourceRange;
-          if (node is VariableDeclaration) {
-            VariableDeclarationList parent = node.parent;
-            if (parent.variables.length == 1) {
-              sourceRange = range.node(parent.parent);
-            } else {
-              sourceRange =
-                  range.endEnd(node.beginToken.previous, node.endToken.next);
-            }
-          } else if (node is AssignmentExpression) {
-            // todo (pq): consider node.parent is! ExpressionStatement to handle
-            // assignments in parens, etc.
-            if (node.parent is ArgumentList) {
-              sourceRange =
-                  range.endStart(node.beginToken.previous, node.operator.next);
-            } else {
-              sourceRange = range.node(node.parent);
-            }
-          } else {
-            return;
-          }
-          builder.addDeletion(utils.getLinesRange(sourceRange));
-        }
-      });
-      _addFixFromBuilder(
-          changeBuilder, DartFixKind.REMOVE_UNUSED_LOCAL_VARIABLE);
+    if (element is! LocalElement) {
+      return;
     }
+
+    final sourceRanges = <SourceRange>[];
+
+    final functionBody = declaration.thisOrAncestorOfType<FunctionBody>();
+    final references = findLocalElementReferences(functionBody, element);
+    for (var reference in references) {
+      final node = reference.thisOrAncestorMatching((node) =>
+          node is VariableDeclaration || node is AssignmentExpression);
+      var sourceRange;
+      if (node is VariableDeclaration) {
+        VariableDeclarationList parent = node.parent;
+        if (parent.variables.length == 1) {
+          sourceRange = utils.getLinesRange(range.node(parent.parent));
+        } else {
+          sourceRange = range.nodeInList(parent.variables, node);
+        }
+      } else if (node is AssignmentExpression) {
+        // todo (pq): consider node.parent is! ExpressionStatement to handle
+        // assignments in parens, etc.
+        if (node.parent is ArgumentList) {
+          sourceRange = range.startStart(node, node.operator.next);
+        } else {
+          sourceRange = utils.getLinesRange(range.node(node.parent));
+        }
+      } else {
+        return;
+      }
+      sourceRanges.add(sourceRange);
+    }
+
+    final changeBuilder = _newDartChangeBuilder();
+    await changeBuilder.addFileEdit(file, (DartFileEditBuilder builder) {
+      for (var sourceRange in sourceRanges) {
+        builder.addDeletion(sourceRange);
+      }
+    });
+    _addFixFromBuilder(changeBuilder, DartFixKind.REMOVE_UNUSED_LOCAL_VARIABLE);
   }
 
   Future<void> _addFix_renameToCamelCase() async {
