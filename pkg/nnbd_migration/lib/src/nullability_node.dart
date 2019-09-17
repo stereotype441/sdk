@@ -17,17 +17,17 @@ class NullabilityEdge implements EdgeInfo {
   @override
   final NullabilityNode destinationNode;
 
-  /// A set of source nodes.  By convention, the first node is the primary
-  /// source and the other nodes are "guards".  The destination node will only
-  /// need to be made nullable if all the source nodes are nullable.
-  final List<NullabilityNode> sources;
+  /// A set of upstream nodes.  By convention, the first node is the source node
+  /// and the other nodes are "guards".  The destination node will only need to
+  /// be made nullable if all the upstream nodes are nullable.
+  final List<NullabilityNode> upstreamNodes;
 
   final _NullabilityEdgeKind _kind;
 
-  NullabilityEdge._(this.destinationNode, this.sources, this._kind);
+  NullabilityEdge._(this.destinationNode, this.upstreamNodes, this._kind);
 
   @override
-  Iterable<NullabilityNode> get guards => sources.skip(1);
+  Iterable<NullabilityNode> get guards => upstreamNodes.skip(1);
 
   @override
   bool get isHard => _kind != _NullabilityEdgeKind.soft;
@@ -42,13 +42,13 @@ class NullabilityEdge implements EdgeInfo {
   bool get isUnion => _kind == _NullabilityEdgeKind.union;
 
   @override
-  NullabilityNode get sourceNode => sources.first;
+  NullabilityNode get sourceNode => upstreamNodes.first;
 
   /// Indicates whether all the sources of this edge are nullable (and thus
   /// downstream nullability propagation should try to make the destination node
   /// nullable, if possible).
   bool get _isTriggered {
-    for (var source in sources) {
+    for (var source in upstreamNodes) {
       if (!source.isNullable) return false;
     }
     return true;
@@ -227,7 +227,7 @@ class NullabilityGraph {
       if (!edge.isUnion) continue;
       // Union edges always have exactly one source, so we don't need to check
       // whether all sources are nullable.
-      assert(edge.sources.length == 1);
+      assert(edge.upstreamNodes.length == 1);
       var node = edge.destinationNode;
       if (node is NullabilityNodeMutable && !node.isNullable) {
         _unionedWithAlways.add(node);

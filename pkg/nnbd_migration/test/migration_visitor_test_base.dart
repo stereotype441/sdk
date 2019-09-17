@@ -193,7 +193,7 @@ mixin EdgeTester {
     var edges = getEdges(x, y);
     for (var edge in edges) {
       if (edge.isUnion) {
-        expect(edge.sources, hasLength(1));
+        expect(edge.upstreamNodes, hasLength(1));
         return;
       }
     }

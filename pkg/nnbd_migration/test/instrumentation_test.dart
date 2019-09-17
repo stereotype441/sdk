@@ -658,9 +658,9 @@ List<int> f(C c) => c.g(null);
           destination.innerNode == implicitInvocationTypeArgumentNode;
     }), hasLength(1));
     expect(edges.where((e) {
-      var primary = e.sourceNode;
-      return primary is SubstitutionNodeInfo &&
-          primary.innerNode == implicitInvocationTypeArgumentNode &&
+      var source = e.sourceNode;
+      return source is SubstitutionNodeInfo &&
+          source.innerNode == implicitInvocationTypeArgumentNode &&
           e.destinationNode == returnElementNode;
     }), hasLength(1));
   }

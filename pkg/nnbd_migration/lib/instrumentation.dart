@@ -208,17 +208,17 @@ enum StateChangeReason {
   /// be nullable, so this node is being made nullable as well.
   union,
 
-  /// A hard or union edge exists whose primary source is this node, and whose
+  /// A hard or union edge exists whose source is this node, and whose
   /// destination is non-nullable, so this node is being made non-nullable as
   /// well.
   upstream,
 
-  /// An edge exists whose destination is this node, and whose primary source is
+  /// An edge exists whose destination is this node, and whose source is
   /// nullable, so this node is being made nullable as well.
   downstream,
 
-  /// An edge exists whose primary source is this node, and whose destination is
-  /// exact nullable, so this node is being made exact nullable as well.
+  /// An edge exists whose source is this node, and whose destination is exact
+  /// nullable, so this node is being made exact nullable as well.
   exactUpstream,
 
   /// A substitution node exists whose inner node points to this node, and the
