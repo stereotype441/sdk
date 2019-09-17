@@ -156,7 +156,7 @@ int f(int x) => x;
     var returnNode = explicitTypeNullability[findNode.typeAnnotation('int f')];
     expect(
         edges.where(
-            (e) => e.primarySource == xNode && e.destinationNode == returnNode),
+            (e) => e.sourceNode == xNode && e.destinationNode == returnNode),
         hasLength(1));
   }
 
@@ -174,7 +174,7 @@ int f(int i, int j) {
     var returnNode = explicitTypeNullability[findNode.typeAnnotation('int f')];
     var matchingEdges = edges
         .where(
-            (e) => e.primarySource == jNode && e.destinationNode == returnNode)
+            (e) => e.sourceNode == jNode && e.destinationNode == returnNode)
         .toList();
     expect(matchingEdges, hasLength(1));
     expect(matchingEdges.single.guards, hasLength(1));
@@ -189,7 +189,7 @@ int f(int x) => x;
     var returnNode = explicitTypeNullability[findNode.typeAnnotation('int f')];
     var matchingEdges = edges
         .where(
-            (e) => e.primarySource == xNode && e.destinationNode == returnNode)
+            (e) => e.sourceNode == xNode && e.destinationNode == returnNode)
         .toList();
     expect(matchingEdges, hasLength(1));
     expect(matchingEdges.single.isUnion, false);
@@ -221,13 +221,13 @@ main() {
     var kNode = explicitTypeNullability[findNode.typeAnnotation('int k')];
     var lNode = explicitTypeNullability[findNode.typeAnnotation('int l')];
     var iToJ = edges
-        .where((e) => e.primarySource == iNode && e.destinationNode == jNode)
+        .where((e) => e.sourceNode == iNode && e.destinationNode == jNode)
         .single;
     var jToK = edges
-        .where((e) => e.primarySource == jNode && e.destinationNode == kNode)
+        .where((e) => e.sourceNode == jNode && e.destinationNode == kNode)
         .single;
     var kToL = edges
-        .where((e) => e.primarySource == kNode && e.destinationNode == lNode)
+        .where((e) => e.sourceNode == kNode && e.destinationNode == lNode)
         .single;
     expect(iNode.isNullable, true);
     expect(jNode.isNullable, true);
@@ -246,7 +246,7 @@ int f(int x) => x;
     var returnNode = explicitTypeNullability[findNode.typeAnnotation('int f')];
     var matchingEdges = edges
         .where(
-            (e) => e.primarySource == xNode && e.destinationNode == returnNode)
+            (e) => e.sourceNode == xNode && e.destinationNode == returnNode)
         .toList();
     var origin = edgeOrigin[matchingEdges.single];
     expect(origin.source, source);
@@ -264,7 +264,7 @@ int f(int x, bool b) {
     var returnNode = explicitTypeNullability[findNode.typeAnnotation('int f')];
     var matchingEdges = edges
         .where(
-            (e) => e.primarySource == xNode && e.destinationNode == returnNode)
+            (e) => e.sourceNode == xNode && e.destinationNode == returnNode)
         .toList();
     expect(matchingEdges, hasLength(1));
     expect(matchingEdges.single.isUnion, false);
@@ -283,7 +283,7 @@ class C {
         implicitType[findNode.fieldFormalParameter('i); /*constructor*/')].node;
     var matchingEdges = edges
         .where((e) =>
-            e.primarySource == fieldNode &&
+            e.sourceNode == fieldNode &&
             e.destinationNode == formalParamNode)
         .toList();
     expect(matchingEdges, hasLength(1));
@@ -291,7 +291,7 @@ class C {
     expect(matchingEdges.single.isHard, true);
     matchingEdges = edges
         .where((e) =>
-            e.primarySource == formalParamNode &&
+            e.sourceNode == formalParamNode &&
             e.destinationNode == fieldNode)
         .toList();
     expect(matchingEdges, hasLength(1));
@@ -307,7 +307,7 @@ int x = null;
     expect(always.isNullable, true);
     var xNode = explicitTypeNullability[findNode.typeAnnotation('int')];
     var edge = edges.where((e) => e.destinationNode == xNode).single;
-    expect(edge.primarySource, always);
+    expect(edge.sourceNode, always);
   }
 
   test_immutableNode_never() async {
@@ -317,7 +317,7 @@ bool f(int x) => x.isEven;
     expect(never.isImmutable, true);
     expect(never.isNullable, false);
     var xNode = explicitTypeNullability[findNode.typeAnnotation('int')];
-    var edge = edges.where((e) => e.primarySource == xNode).single;
+    var edge = edges.where((e) => e.sourceNode == xNode).single;
     expect(edge.destinationNode, never);
   }
 
@@ -333,7 +333,7 @@ C f(bool b) => b ? C.named() : null;
     var fReturnNode = explicitTypeNullability[findNode.typeAnnotation('C f')];
     expect(
         edges.where((e) =>
-            e.primarySource == fReturnNode &&
+            e.sourceNode == fReturnNode &&
             e.destinationNode == factoryReturnNode),
         hasLength(1));
   }
@@ -349,7 +349,7 @@ Object f(callback()) => callback();
         explicitTypeNullability[findNode.typeAnnotation('Object')];
     expect(
         edges.where((e) =>
-            e.primarySource == paramReturnNode &&
+            e.sourceNode == paramReturnNode &&
             e.destinationNode == fReturnNode),
         hasLength(1));
   }
@@ -365,7 +365,7 @@ Object g() => f();
         explicitTypeNullability[findNode.typeAnnotation('Object')];
     expect(
         edges.where((e) =>
-            e.primarySource == fReturnNode && e.destinationNode == gReturnNode),
+            e.sourceNode == fReturnNode && e.destinationNode == gReturnNode),
         hasLength(1));
   }
 
@@ -383,12 +383,12 @@ int g() => 1;
     var gReturnNode = explicitTypeNullability[findNode.typeAnnotation('int g')];
     expect(
         edges.where((e) =>
-            e.primarySource == gReturnNode &&
+            e.sourceNode == gReturnNode &&
             e.destinationNode == functionExpressionReturnNode),
         hasLength(1));
     expect(
         edges.where((e) =>
-            e.primarySource == functionExpressionReturnNode &&
+            e.sourceNode == functionExpressionReturnNode &&
             e.destinationNode == fReturnNode),
         hasLength(1));
   }
@@ -404,7 +404,7 @@ Object f(F callback) => callback();
         explicitTypeNullability[findNode.typeAnnotation('Object')];
     expect(
         edges.where((e) =>
-            e.primarySource == typedefReturnNode &&
+            e.sourceNode == typedefReturnNode &&
             e.destinationNode == fReturnNode),
         hasLength(1));
   }
@@ -419,7 +419,7 @@ Object f(Function() callback) => callback();
         explicitTypeNullability[findNode.typeAnnotation('Object')];
     expect(
         edges.where((e) =>
-            e.primarySource == callbackReturnNode &&
+            e.sourceNode == callbackReturnNode &&
             e.destinationNode == fReturnNode),
         hasLength(1));
   }
@@ -439,7 +439,7 @@ abstract class Derived extends Base {
         implicitReturnType[findNode.methodDeclaration('f /*derived*/')].node;
     expect(
         edges.where((e) =>
-            e.primarySource == derivedReturnNode &&
+            e.sourceNode == derivedReturnNode &&
             e.destinationNode == baseReturnNode),
         hasLength(1));
   }
@@ -456,7 +456,7 @@ void f() {
     var eNode = implicitType[findNode.simple('e)')].node;
     expect(
         edges.where(
-            (e) => e.primarySource == eNode && e.destinationNode == oNode),
+            (e) => e.sourceNode == eNode && e.destinationNode == oNode),
         hasLength(1));
   }
 
@@ -472,7 +472,7 @@ void f() {
     var stNode = implicitType[findNode.simple('st)')].node;
     expect(
         edges.where(
-            (e) => e.primarySource == stNode && e.destinationNode == oNode),
+            (e) => e.sourceNode == stNode && e.destinationNode == oNode),
         hasLength(1));
   }
 
@@ -491,7 +491,7 @@ void f(List<int> l) {
     var yNode = explicitTypeNullability[findNode.typeAnnotation('int y')];
     expect(
         edges.where(
-            (e) => e.primarySource == xNode && e.destinationNode == yNode),
+            (e) => e.sourceNode == xNode && e.destinationNode == yNode),
         hasLength(1));
   }
 
@@ -510,7 +510,7 @@ abstract class Derived extends Base {
         implicitType[findNode.simpleParameter('i); /*derived*/')].node;
     expect(
         edges.where((e) =>
-            e.primarySource == baseParamNode &&
+            e.sourceNode == baseParamNode &&
             e.destinationNode == derivedParamNode),
         hasLength(1));
   }
@@ -532,7 +532,7 @@ abstract class Derived extends Base {
             .node;
     expect(
         edges.where((e) =>
-            e.primarySource == baseParamParamNode &&
+            e.sourceNode == baseParamParamNode &&
             e.destinationNode == derivedParamParamNode),
         hasLength(1));
   }
@@ -554,7 +554,7 @@ abstract class Derived extends Base {
             .node;
     expect(
         edges.where((e) =>
-            e.primarySource == baseParamParamNode &&
+            e.sourceNode == baseParamParamNode &&
             e.destinationNode == derivedParamParamNode),
         hasLength(1));
   }
@@ -574,7 +574,7 @@ abstract class Derived extends Base {
         implicitType[findNode.simpleParameter('callback)')].returnType.node;
     expect(
         edges.where((e) =>
-            e.primarySource == baseParamReturnNode &&
+            e.sourceNode == baseParamReturnNode &&
             e.destinationNode == derivedParamReturnNode),
         hasLength(1));
   }
@@ -596,7 +596,7 @@ abstract class Derived extends Base {
             .node;
     expect(
         edges.where((e) =>
-            e.primarySource == derivedParamArgNode &&
+            e.sourceNode == derivedParamArgNode &&
             e.destinationNode == baseParamArgNode),
         hasLength(1));
   }
@@ -611,7 +611,7 @@ void f(int i) {
     var jNode = implicitType[findNode.variableDeclarationList('j')].node;
     expect(
         edges.where(
-            (e) => e.primarySource == iNode && e.destinationNode == jNode),
+            (e) => e.sourceNode == iNode && e.destinationNode == jNode),
         hasLength(1));
   }
 
@@ -626,12 +626,12 @@ List<int> f() => g(null);
         explicitTypeNullability[findNode.typeAnnotation('int')];
     expect(edges.where((e) {
       var destination = e.destinationNode;
-      return e.primarySource == always &&
+      return e.sourceNode == always &&
           destination is SubstitutionNodeInfo &&
           destination.innerNode == implicitInvocationTypeArgumentNode;
     }), hasLength(1));
     expect(edges.where((e) {
-      var source = e.primarySource;
+      var source = e.sourceNode;
       return source is SubstitutionNodeInfo &&
           source.innerNode == implicitInvocationTypeArgumentNode &&
           e.destinationNode == returnElementNode;
@@ -653,12 +653,12 @@ List<int> f(C c) => c.g(null);
         explicitTypeNullability[findNode.typeAnnotation('int')];
     expect(edges.where((e) {
       var destination = e.destinationNode;
-      return e.primarySource == always &&
+      return e.sourceNode == always &&
           destination is SubstitutionNodeInfo &&
           destination.innerNode == implicitInvocationTypeArgumentNode;
     }), hasLength(1));
     expect(edges.where((e) {
-      var primary = e.primarySource;
+      var primary = e.sourceNode;
       return primary is SubstitutionNodeInfo &&
           primary.innerNode == implicitInvocationTypeArgumentNode &&
           e.destinationNode == returnElementNode;
@@ -678,13 +678,13 @@ C<int> f() => C(null);
         explicitTypeNullability[findNode.typeAnnotation('int')];
     expect(edges.where((e) {
       var destination = e.destinationNode;
-      return e.primarySource == always &&
+      return e.sourceNode == always &&
           destination is SubstitutionNodeInfo &&
           destination.innerNode == implicitInvocationTypeArgumentNode;
     }), hasLength(1));
     expect(
         edges.where((e) =>
-            e.primarySource == implicitInvocationTypeArgumentNode &&
+            e.sourceNode == implicitInvocationTypeArgumentNode &&
             e.destinationNode == returnElementNode),
         hasLength(1));
   }
@@ -699,12 +699,12 @@ List<int> f() => [null];
         explicitTypeNullability[findNode.typeAnnotation('int')];
     expect(
         edges.where((e) =>
-            e.primarySource == always &&
+            e.sourceNode == always &&
             e.destinationNode == implicitListLiteralElementNode),
         hasLength(1));
     expect(
         edges.where((e) =>
-            e.primarySource == implicitListLiteralElementNode &&
+            e.sourceNode == implicitListLiteralElementNode &&
             e.destinationNode == returnElementNode),
         hasLength(1));
   }
@@ -723,22 +723,22 @@ Map<int, String> f() => {1: null};
         explicitTypeNullability[findNode.typeAnnotation('String')];
     expect(
         edges.where((e) =>
-            e.primarySource == never &&
+            e.sourceNode == never &&
             e.destinationNode == implicitMapLiteralKeyNode),
         hasLength(1));
     expect(
         edges.where((e) =>
-            e.primarySource == implicitMapLiteralKeyNode &&
+            e.sourceNode == implicitMapLiteralKeyNode &&
             e.destinationNode == returnKeyNode),
         hasLength(1));
     expect(
         edges.where((e) =>
-            e.primarySource == always &&
+            e.sourceNode == always &&
             e.destinationNode == implicitMapLiteralValueNode),
         hasLength(1));
     expect(
         edges.where((e) =>
-            e.primarySource == implicitMapLiteralValueNode &&
+            e.sourceNode == implicitMapLiteralValueNode &&
             e.destinationNode == returnValueNode),
         hasLength(1));
   }
@@ -753,12 +753,12 @@ Set<int> f() => {null};
         explicitTypeNullability[findNode.typeAnnotation('int')];
     expect(
         edges.where((e) =>
-            e.primarySource == always &&
+            e.sourceNode == always &&
             e.destinationNode == implicitSetLiteralElementNode),
         hasLength(1));
     expect(
         edges.where((e) =>
-            e.primarySource == implicitSetLiteralElementNode &&
+            e.sourceNode == implicitSetLiteralElementNode &&
             e.destinationNode == returnElementNode),
         hasLength(1));
   }
@@ -773,7 +773,7 @@ List<Object> f(List l) => l;
         explicitTypeNullability[findNode.typeAnnotation('Object')];
     expect(
         edges.where((e) =>
-            e.primarySource == implicitListElementType &&
+            e.sourceNode == implicitListElementType &&
             e.destinationNode == implicitReturnElementType),
         hasLength(1));
   }
@@ -786,7 +786,7 @@ int x = null;
     var step = propagationSteps.where((s) => s.node == xNode).single;
     expect(step.newState, NullabilityState.ordinaryNullable);
     expect(step.reason, StateChangeReason.downstream);
-    expect(step.edge.primarySource, always);
+    expect(step.edge.sourceNode, always);
     expect(step.edge.destinationNode, xNode);
   }
 
@@ -800,7 +800,7 @@ voig g(C<int> x, int y) {
 }
 ''');
     var yNode = explicitTypeNullability[findNode.typeAnnotation('int y')];
-    var edge = edges.where((e) => e.primarySource == yNode).single;
+    var edge = edges.where((e) => e.sourceNode == yNode).single;
     var sNode = edge.destinationNode as SubstitutionNodeInfo;
     expect(sNode.innerNode,
         explicitTypeNullability[findNode.typeAnnotation('int>')]);

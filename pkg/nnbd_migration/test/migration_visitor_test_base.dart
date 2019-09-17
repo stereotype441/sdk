@@ -212,7 +212,7 @@ mixin EdgeTester {
     return graph
         .getAllEdges()
         .where((e) =>
-            sourceMatcher.matches(e.primarySource) &&
+            sourceMatcher.matches(e.sourceNode) &&
             destinationMatcher.matches(e.destinationNode))
         .toList();
   }
