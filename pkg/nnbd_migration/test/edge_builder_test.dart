@@ -4505,8 +4505,7 @@ Map<String, int> f() {
     assertNoUpstreamNullability(mapNode);
     assertEdge(always, assertEdge(anyNode, keyNode, hard: false).sourceNode,
         hard: false);
-    assertEdge(
-        always, assertEdge(anyNode, valueNode, hard: false).sourceNode,
+    assertEdge(always, assertEdge(anyNode, valueNode, hard: false).sourceNode,
         hard: false);
   }
 
@@ -4523,8 +4522,7 @@ Map<String, int> f() {
     assertNoUpstreamNullability(mapNode);
     assertNoUpstreamNullability(
         assertEdge(anyNode, keyNode, hard: false).sourceNode);
-    assertEdge(
-        always, assertEdge(anyNode, valueNode, hard: false).sourceNode,
+    assertEdge(always, assertEdge(anyNode, valueNode, hard: false).sourceNode,
         hard: false);
   }
 
@@ -4606,8 +4604,7 @@ Set<String> f() {
     var setNode = decoratedTypeAnnotation('Set').node;
 
     assertNoUpstreamNullability(setNode);
-    assertEdge(
-        always, assertEdge(anyNode, valueNode, hard: false).sourceNode,
+    assertEdge(always, assertEdge(anyNode, valueNode, hard: false).sourceNode,
         hard: false);
   }
 

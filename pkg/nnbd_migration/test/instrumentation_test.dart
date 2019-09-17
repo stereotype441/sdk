@@ -173,8 +173,7 @@ int f(int i, int j) {
     var jNode = explicitTypeNullability[findNode.typeAnnotation('int j')];
     var returnNode = explicitTypeNullability[findNode.typeAnnotation('int f')];
     var matchingEdges = edges
-        .where(
-            (e) => e.sourceNode == jNode && e.destinationNode == returnNode)
+        .where((e) => e.sourceNode == jNode && e.destinationNode == returnNode)
         .toList();
     expect(matchingEdges, hasLength(1));
     expect(matchingEdges.single.guards, hasLength(1));
@@ -188,8 +187,7 @@ int f(int x) => x;
     var xNode = explicitTypeNullability[findNode.typeAnnotation('int x')];
     var returnNode = explicitTypeNullability[findNode.typeAnnotation('int f')];
     var matchingEdges = edges
-        .where(
-            (e) => e.sourceNode == xNode && e.destinationNode == returnNode)
+        .where((e) => e.sourceNode == xNode && e.destinationNode == returnNode)
         .toList();
     expect(matchingEdges, hasLength(1));
     expect(matchingEdges.single.isUnion, false);
@@ -245,8 +243,7 @@ int f(int x) => x;
     var xNode = explicitTypeNullability[findNode.typeAnnotation('int x')];
     var returnNode = explicitTypeNullability[findNode.typeAnnotation('int f')];
     var matchingEdges = edges
-        .where(
-            (e) => e.sourceNode == xNode && e.destinationNode == returnNode)
+        .where((e) => e.sourceNode == xNode && e.destinationNode == returnNode)
         .toList();
     var origin = edgeOrigin[matchingEdges.single];
     expect(origin.source, source);
@@ -263,8 +260,7 @@ int f(int x, bool b) {
     var xNode = explicitTypeNullability[findNode.typeAnnotation('int x')];
     var returnNode = explicitTypeNullability[findNode.typeAnnotation('int f')];
     var matchingEdges = edges
-        .where(
-            (e) => e.sourceNode == xNode && e.destinationNode == returnNode)
+        .where((e) => e.sourceNode == xNode && e.destinationNode == returnNode)
         .toList();
     expect(matchingEdges, hasLength(1));
     expect(matchingEdges.single.isUnion, false);
@@ -283,16 +279,14 @@ class C {
         implicitType[findNode.fieldFormalParameter('i); /*constructor*/')].node;
     var matchingEdges = edges
         .where((e) =>
-            e.sourceNode == fieldNode &&
-            e.destinationNode == formalParamNode)
+            e.sourceNode == fieldNode && e.destinationNode == formalParamNode)
         .toList();
     expect(matchingEdges, hasLength(1));
     expect(matchingEdges.single.isUnion, true);
     expect(matchingEdges.single.isHard, true);
     matchingEdges = edges
         .where((e) =>
-            e.sourceNode == formalParamNode &&
-            e.destinationNode == fieldNode)
+            e.sourceNode == formalParamNode && e.destinationNode == fieldNode)
         .toList();
     expect(matchingEdges, hasLength(1));
     expect(matchingEdges.single.isUnion, true);
@@ -455,8 +449,7 @@ void f() {
     var oNode = explicitTypeNullability[findNode.typeAnnotation('Object')];
     var eNode = implicitType[findNode.simple('e)')].node;
     expect(
-        edges.where(
-            (e) => e.sourceNode == eNode && e.destinationNode == oNode),
+        edges.where((e) => e.sourceNode == eNode && e.destinationNode == oNode),
         hasLength(1));
   }
 
@@ -471,8 +464,8 @@ void f() {
     var oNode = explicitTypeNullability[findNode.typeAnnotation('Object')];
     var stNode = implicitType[findNode.simple('st)')].node;
     expect(
-        edges.where(
-            (e) => e.sourceNode == stNode && e.destinationNode == oNode),
+        edges
+            .where((e) => e.sourceNode == stNode && e.destinationNode == oNode),
         hasLength(1));
   }
 
@@ -490,8 +483,7 @@ void f(List<int> l) {
         .node;
     var yNode = explicitTypeNullability[findNode.typeAnnotation('int y')];
     expect(
-        edges.where(
-            (e) => e.sourceNode == xNode && e.destinationNode == yNode),
+        edges.where((e) => e.sourceNode == xNode && e.destinationNode == yNode),
         hasLength(1));
   }
 
@@ -610,8 +602,7 @@ void f(int i) {
     var iNode = explicitTypeNullability[findNode.typeAnnotation('int')];
     var jNode = implicitType[findNode.variableDeclarationList('j')].node;
     expect(
-        edges.where(
-            (e) => e.sourceNode == iNode && e.destinationNode == jNode),
+        edges.where((e) => e.sourceNode == iNode && e.destinationNode == jNode),
         hasLength(1));
   }
 
