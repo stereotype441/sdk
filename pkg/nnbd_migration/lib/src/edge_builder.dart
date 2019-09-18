@@ -1368,25 +1368,14 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   @override
   DecoratedType visitVariableDeclarationList(VariableDeclarationList node) {
     node.metadata.accept(this);
-    var typeAnnotation = node.type;
     for (var variable in node.variables) {
       variable.metadata.accept(this);
       var initializer = variable.initializer;
       _flowAnalysis.add(variable.declaredElement,
           assigned: initializer != null);
       if (initializer != null) {
-        var destinationType = getOrComputeElementType(variable.declaredElement);
-        if (typeAnnotation == null) {
-          var initializerType = initializer.accept(this);
-          if (initializerType == null) {
-            throw StateError('No type computed for ${initializer.runtimeType} '
-                '(${initializer.toSource()}) offset=${initializer.offset}');
-          }
-          _unionDecoratedTypes(initializerType, destinationType,
-              InitializerInferenceOrigin(source, variable));
-        } else {
-          _handleAssignment(initializer, destinationType: destinationType);
-        }
+        _handleAssignment(initializer,
+            destinationType: getOrComputeElementType(variable.declaredElement));
       }
     }
 
