@@ -1760,12 +1760,31 @@ class C {
   test_for_each_with_declaration() async {
     await analyze('''
 void f(List<int> l) {
-  for (int x in l) {}
+  for (int i in l) {}
 }
 ''');
     assertEdge(decoratedTypeAnnotation('List<int>').node, never, hard: true);
     assertEdge(substitutionNode(decoratedTypeAnnotation('int> l').node, never),
-        decoratedTypeAnnotation('int x').node,
+        decoratedTypeAnnotation('int i').node,
+        hard: false);
+  }
+
+  test_for_each_with_declaration_implicit_type() async {
+    await analyze('''
+void f(List<int> l) {
+  for (var i in l) {
+    g(i);
+  }
+}
+void g(int j) {}
+''');
+    var jNode = decoratedTypeAnnotation('int j').node;
+    var iMatcher = anyNode;
+    assertEdge(iMatcher, jNode, hard: false);
+    var iNode = iMatcher.matchingNode;
+    assertEdge(decoratedTypeAnnotation('List<int>').node, never, hard: true);
+    assertEdge(
+        substitutionNode(decoratedTypeAnnotation('int> l').node, never), iNode,
         hard: false);
   }
 
