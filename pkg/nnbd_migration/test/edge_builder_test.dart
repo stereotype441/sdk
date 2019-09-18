@@ -1757,6 +1757,31 @@ class C {
         decoratedTypeAnnotation('int i').node);
   }
 
+  test_for_each_with_declaration() async {
+    await analyze('''
+void f(List<int> l) {
+  for (int x in l) {}
+}
+''');
+    assertEdge(decoratedTypeAnnotation('List<int>').node, never, hard: true);
+    assertEdge(substitutionNode(decoratedTypeAnnotation('int> l').node, never),
+        decoratedTypeAnnotation('int x').node,
+        hard: false);
+  }
+
+  test_for_each_with_identifier() async {
+    await analyze('''
+void f(List<int> l) {
+  int x;
+  for (x in l) {}
+}
+''');
+    assertEdge(decoratedTypeAnnotation('List<int>').node, never, hard: true);
+    assertEdge(substitutionNode(decoratedTypeAnnotation('int> l').node, never),
+        decoratedTypeAnnotation('int x').node,
+        hard: false);
+  }
+
   test_for_element_list() async {
     await analyze('''
 void f(List<int> ints) {
