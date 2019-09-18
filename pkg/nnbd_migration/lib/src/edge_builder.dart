@@ -261,7 +261,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   }
 
   @override
-  DecoratedType visitAssertStatement(AssertStatement node) {
+  DecoratedType visitAssertInitializer(AssertInitializer node) {
     _checkExpressionNotNull(node.condition);
     if (identical(_conditionInfo?.condition, node.condition)) {
       var intentNode = _conditionInfo.trueDemonstratesNonNullIntent;
@@ -276,7 +276,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   }
 
   @override
-  DecoratedType visitAssertInitializer(AssertInitializer node) {
+  DecoratedType visitAssertStatement(AssertStatement node) {
     _checkExpressionNotNull(node.condition);
     if (identical(_conditionInfo?.condition, node.condition)) {
       var intentNode = _conditionInfo.trueDemonstratesNonNullIntent;
