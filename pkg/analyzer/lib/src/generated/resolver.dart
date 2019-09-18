@@ -4738,7 +4738,7 @@ class ResolverVisitor extends ScopedVisitor {
     if (type.isDartAsyncFutureOr) {
       return type;
     }
-    return typeProvider.futureOrType.instantiate([type]);
+    return typeProvider.futureOrType2(type);
   }
 
   /// If [contextType] is defined and is a subtype of `Iterable<Object>` and
@@ -6686,9 +6686,11 @@ abstract class TypeProvider {
   InterfaceType get futureOrNullType;
 
   /// Return the type representing the built-in type 'FutureOr'.
+  @Deprecated('Use futureOrType2() instead.')
   InterfaceType get futureOrType;
 
   /// Return the type representing the built-in type 'Future'.
+  @Deprecated('Use futureType2() instead.')
   InterfaceType get futureType;
 
   /// Return the type representing the built-in type 'int'.
