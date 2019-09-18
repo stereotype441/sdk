@@ -3610,30 +3610,6 @@ part of 'lib.dart';
     // metadata was visited.
   }
 
-  solo_test_postDominators_ignore_field_formal_params() async {
-    await analyze('''
-class C {
-  Object x;
-  Object y;
-  Object z;
-  C(int w, this.x, int this.y, void this.z())
-    : assert(w != null),
-      assert(x != null),
-      assert(y != null),
-      assert(z != null);
-}
-''');
-    var ctorType = variables.decoratedElementType(findNode.constructor('C(').declaredElement);
-    var wType = ctorType.positionalParameters[0];
-    var xType = ctorType.positionalParameters[1];
-    var yType = ctorType.positionalParameters[2];
-    var zType = ctorType.positionalParameters[3];
-    assertEdge(wType.node, never, hard: true);
-    assertEdge(xType.node, never, hard: false);
-    assertEdge(yType.node, never, hard: false);
-    assertEdge(zType.node, never, hard: false);
-  }
-
   test_postDominators_assert() async {
     await analyze('''
 void test(bool b1, bool b2, bool b3, bool _b) {
@@ -3967,6 +3943,31 @@ void test(bool b, C c1, C c2) {
         assertEdge(decoratedTypeAnnotation('C c3').node, never, hard: true));
     assertNullCheck(checkExpression('c4.m'),
         assertEdge(decoratedTypeAnnotation('C c4').node, never, hard: true));
+  }
+
+  test_postDominators_ignore_field_formal_params() async {
+    await analyze('''
+class C {
+  Object x;
+  Object y;
+  Object z;
+  C(int w, this.x, int this.y, void this.z())
+    : assert(w != null),
+      assert(x != null),
+      assert(y != null),
+      assert(z != null);
+}
+''');
+    var ctorType = variables
+        .decoratedElementType(findNode.constructor('C(').declaredElement);
+    var wType = ctorType.positionalParameters[0];
+    var xType = ctorType.positionalParameters[1];
+    var yType = ctorType.positionalParameters[2];
+    var zType = ctorType.positionalParameters[3];
+    assertEdge(wType.node, never, hard: true);
+    assertNoEdge(xType.node, never);
+    assertNoEdge(yType.node, never);
+    assertNoEdge(zType.node, never);
   }
 
   test_postDominators_inReturn_local() async {
