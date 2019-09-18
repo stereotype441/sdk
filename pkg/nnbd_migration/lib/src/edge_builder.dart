@@ -1716,7 +1716,10 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     _currentFunctionType = _variables.decoratedElementType(declaredElement);
     _addParametersToFlowAnalysis(parameters);
     // Push a scope of post-dominated declarations on the stack.
-    _postDominatedLocals.pushScope(elements: [for (var param in declaredElement.parameters) if (!param.isInitializingFormal) param]);
+    _postDominatedLocals.pushScope(elements: [
+      for (var param in declaredElement.parameters)
+        if (!param.isInitializingFormal) param
+    ]);
     try {
       initializers?.accept(this);
       body.accept(this);
