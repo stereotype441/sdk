@@ -29,6 +29,10 @@ class NullabilityFixDescription {
     appliedMessage: 'Added a non-null assertion to nullable expression',
   );
 
+  /// An implicit type needs to be made explicit.
+  static const addExplicitType = const NullabilityFixDescription._(
+      appliedMessage: 'Added an explicit type');
+
   /// A message used by dartfix to indicate a fix has been applied.
   final String appliedMessage;
 

@@ -8,6 +8,7 @@ import 'package:analyzer_plugin/protocol/protocol_common.dart' show SourceEdit;
 import 'package:nnbd_migration/instrumentation.dart';
 import 'package:nnbd_migration/nnbd_migration.dart';
 import 'package:nnbd_migration/src/conditional_discard.dart';
+import 'package:nnbd_migration/src/decorated_type.dart';
 import 'package:nnbd_migration/src/nullability_node.dart';
 
 /// Records information about how a conditional expression or statement might
@@ -163,6 +164,42 @@ class PotentiallyAddQuestionSuffix extends PotentialModification {
 
   @override
   Iterable<FixReasonInfo> get reasons => [node];
+}
+
+class PotentialNullabilityNodeMismatch implements NullabilityMismatchInfo {
+  @override
+  final NullabilityNode firstNode;
+
+  @override
+  final NullabilityNode secondNode;
+
+  bool get isMatched => firstNode.isNullable == secondNode.isNullable;
+
+  PotentialNullabilityNodeMismatch(this.firstNode, this.secondNode);
+}
+
+/// Records information about the possible addition of an explicit type to the
+/// source code.
+class PotentiallyAddExplicitType extends PotentialModification {
+  PotentiallyAddExplicitType(this.offset, this.implicitType);
+
+  @override
+  NullabilityFixDescription get description => NullabilityFixDescription.addExplicitType;
+
+  final int offset;
+
+  final DecoratedType implicitType;
+
+  final List<PotentialNullabilityNodeMismatch> _potentialMismatches = [];
+
+  @override
+  bool get isEmpty => !_potentialMismatches.any((m) => !m.isMatched);
+
+  @override
+  Iterable<SourceEdit> get modifications => [SourceEdit(offset, 0, ' ${implicitType.toCode()}')];
+
+  @override
+  Iterable<FixReasonInfo> get reasons => _potentialMismatches.where((m) => !m.isMatched);
 }
 
 /// Records information about the possible addition of a `@required` annotation

@@ -1376,6 +1376,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       if (initializer != null) {
         _handleAssignment(initializer,
             destinationType: getOrComputeElementType(variable.declaredElement));
+        var potentialModification = PotentiallyAddExplicitType()
       }
     }
 

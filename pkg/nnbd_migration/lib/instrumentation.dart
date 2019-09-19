@@ -97,6 +97,12 @@ abstract class EdgeOriginInfo {
   Source get source;
 }
 
+abstract class NullabilityMismatchInfo implements FixReasonInfo {
+  NullabilityNodeInfo get firstNode;
+
+  NullabilityNodeInfo get secondNode;
+}
+
 /// Interface used by the migration engine to expose information to its client
 /// about a reason for a modification to the source file.
 abstract class FixReasonInfo {}

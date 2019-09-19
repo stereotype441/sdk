@@ -552,4 +552,8 @@ class DecoratedType implements DecoratedTypeInfo {
     }
     return true;
   }
+
+  String toCode() {
+    throw UnimplementedError('TODO(paulberry)');
+  }
 }
