@@ -28,16 +28,13 @@ class NullabilityMigrationImplTest {
   }
 
   void test_modification_columnLineInfo() {
-    final innerModification = PotentialModificationMock();
     final potentialModification =
-        PotentiallyAddImport.forOffset(10, 'foo', innerModification);
+    PotentialModificationMock();
     final listener = NullabilityMigrationListenerMock();
     final source = SourceMock('0123456\n8910');
     when(variables.getPotentialModifications()).thenReturn({
       source: [potentialModification]
     });
-
-    when(innerModification.isEmpty).thenReturn(false);
 
     NullabilityMigrationImpl.broadcast(variables, listener, null);
 

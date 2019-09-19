@@ -1914,6 +1914,20 @@ void main() {
     await _checkSingleFileChanges(content, expected);
   }
 
+  test_named_parameter_add_required() async {
+    var content = '''
+void f({String s}) {
+  assert(s != null);
+}
+''';
+    var expected = '''
+void f({required String s}) {
+  assert(s != null);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_named_parameter_no_default_unused() async {
     var content = '''
 void f({String s}) {}
