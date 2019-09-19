@@ -69,8 +69,6 @@ class NullabilityMigrationImplTest {
       source: [potentialModification]
     });
 
-    when(potentialModification.modifications).thenReturn([]);
-
     NullabilityMigrationImpl.broadcast(variables, listener, null);
 
     verifyNever(listener.addFix(any));
