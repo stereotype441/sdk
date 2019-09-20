@@ -75,7 +75,15 @@ class _VisitResult {
   }
 }
 
-class FixBuilder extends GeneralizingAstVisitor<_VisitResult>
+enum IfBehavior {
+  keepAll,
+  keepConditionAndThen,
+  keepConditionAndElse,
+  keepThen,
+  keepElse
+}
+
+abstract class FixBuilder extends GeneralizingAstVisitor<_VisitResult>
     with
         PermissiveModeVisitor<_VisitResult>,
         AnnotationTracker<_VisitResult> {
@@ -114,17 +122,61 @@ class FixBuilder extends GeneralizingAstVisitor<_VisitResult>
     return result;
   }
 
+  IfBehavior getIfBehavior(IfStatement node);
+
   @override
   _VisitResult visitIfStatement(IfStatement node) {
+    switch (getIfBehavior(node)) {
+      case IfBehavior.keepAll:
+        return super.visitIfStatement(node);
+      case IfBehavior.keepConditionAndThen:
+        return _sequenceStatements(node.condition, node.thenStatement);
+      case IfBehavior.keepConditionAndElse:
+        if (node.elseStatement != null) {
+          TODO;
+        }
+        // TODO: Handle this case.
+        break;
+      case IfBehavior.keepThen:
+        // TODO: Handle this case.
+        break;
+      case IfBehavior.keepElse:
+        // TODO: Handle this case.
+        break;
+    }
     var conditionalDiscard = _getConditionalDiscard(node);
     // keep  pure  hasFalse behavior
     // both  DC    DC       unchanged
-    // true  true  true     keep true only
-    // true  true  false    keep true only
-    // true  false true     keep condition and true
-    // true  false false    keep condition and true
-    // false true  true     keep
-    if (conditionalDiscard.pu)
+    // true  true  DC       keep true only
+    // true  false DC       sequence condition and true
+    // false true  true     keep false only
+    // false true  false    eliminate
+    // false false true     sequence condition and false
+    // false false false    keep condition only
+    if (conditionalDiscard.keepTrue) {
+      if (conditionalDiscard.keepFalse) {
+        return super.visitIfStatement(node);
+      } else if (conditionalDiscard.pureCondition) {
+        return _extractStatement(node.thenStatement);
+      } else {
+        return _sequenceStatements(node.condition, node.thenStatement);
+      }
+    } else {
+      assert(conditionalDiscard.keepFalse);
+      if (conditionalDiscard.pureCondition) {
+        if (node.elseStatement != null) {
+          return _extractStatement(node.elseStatement);
+        } else {
+          return _discardStatement();
+        }
+      } else {
+        if (node.elseStatement != null) {
+          return _sequenceStatements(node.condition, node.elseStatement);
+        } else {
+          return _extractStatement(node.condition);
+        }
+      }
+    }
   }
 
   bool _needsNullCheck(Expression node) {
