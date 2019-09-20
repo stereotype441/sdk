@@ -2491,6 +2491,11 @@ class BodyBuilder extends ScopeListener<JumpTarget>
       int count, Token leftBracket, Token constKeyword, Token rightBracket) {
     debugEvent("LiteralList");
 
+    if (constantContext == ConstantContext.required && constKeyword == null) {
+      addProblem(fasta.messageMissingExplicitConst, offsetForToken(leftBracket),
+          noLength);
+    }
+
     // TODO(danrubel): Replace this with popListForValue
     // when control flow and spread collections have been enabled by default
     List<Expression> expressions =
@@ -2582,6 +2587,11 @@ class BodyBuilder extends ScopeListener<JumpTarget>
     bool hasSetEntry,
   ) {
     debugEvent("LiteralSetOrMap");
+
+    if (constantContext == ConstantContext.required && constKeyword == null) {
+      addProblem(fasta.messageMissingExplicitConst, offsetForToken(leftBrace),
+          noLength);
+    }
 
     List<dynamic> setOrMapEntries =
         new List<dynamic>.filled(count, null, growable: true);
@@ -3173,7 +3183,7 @@ class BodyBuilder extends ScopeListener<JumpTarget>
         if (parameterCount > 1) {
           stackTrace = catchParameters.parameters[1];
           stackTrace.build(libraryBuilder, functionNestingLevel).type =
-              coreTypes.stackTraceClass.rawType;
+              coreTypes.stackTraceRawType(libraryBuilder.nonNullable);
         }
       }
       if (parameterCount > 2) {
@@ -3195,7 +3205,7 @@ class BodyBuilder extends ScopeListener<JumpTarget>
         catchKeyword,
         exception?.target,
         stackTrace?.target,
-        coreTypes.stackTraceClass.rawType,
+        coreTypes.stackTraceRawType(libraryBuilder.nonNullable),
         body));
     if (compileTimeErrors == null) {
       push(NullValue.Block);
@@ -3445,12 +3455,14 @@ class BodyBuilder extends ScopeListener<JumpTarget>
           charOffset);
     }
 
-    bool isConst = constness == Constness.explicitConst;
+    bool isConst = constness == Constness.explicitConst ||
+        constantContext != ConstantContext.none;
     if (target is Constructor) {
-      isConst =
-          isConst || constantContext != ConstantContext.none && target.isConst;
-      if ((isConst || constantContext == ConstantContext.inferred) &&
-          !target.isConst) {
+      if (constantContext == ConstantContext.required &&
+          constness == Constness.implicit) {
+        addProblem(fasta.messageMissingExplicitConst, charOffset, charLength);
+      }
+      if (isConst && !target.isConst) {
         return wrapInvalidConstructorInvocation(
             desugarSyntheticExpression(buildProblem(
                 fasta.messageNonConstConstructor, charOffset, charLength)),
@@ -3467,10 +3479,11 @@ class BodyBuilder extends ScopeListener<JumpTarget>
     } else {
       Procedure procedure = target;
       if (procedure.isFactory) {
-        isConst = isConst ||
-            constantContext != ConstantContext.none && procedure.isConst;
-        if ((isConst || constantContext == ConstantContext.inferred) &&
-            !procedure.isConst) {
+        if (constantContext == ConstantContext.required &&
+            constness == Constness.implicit) {
+          addProblem(fasta.messageMissingExplicitConst, charOffset, charLength);
+        }
+        if (isConst && !procedure.isConst) {
           return wrapInvalidConstructorInvocation(
               desugarSyntheticExpression(buildProblem(
                   fasta.messageNonConstFactory, charOffset, charLength)),
@@ -3486,8 +3499,9 @@ class BodyBuilder extends ScopeListener<JumpTarget>
             node, typeEnvironment, uri);
         return node;
       } else {
+        assert(constness == Constness.implicit);
         StaticInvocation node =
-            new StaticInvocation(target, arguments, isConst: isConst)
+            new StaticInvocation(target, arguments, isConst: false)
               ..fileOffset = charOffset;
         libraryBuilder.checkBoundsInStaticInvocation(
             node, typeEnvironment, uri);
@@ -4906,6 +4920,7 @@ class BodyBuilder extends ScopeListener<JumpTarget>
               forest.createIntLiteral(location?.line ?? 0, null)
                 ..fileOffset = charOffset,
             ]),
+            constness: Constness.explicitNew,
             charOffset: charOffset))
       ..fileOffset = charOffset;
   }
@@ -4922,6 +4937,7 @@ class BodyBuilder extends ScopeListener<JumpTarget>
         forest.createArguments(charOffset, <Expression>[
           forest.createStringLiteral(className, null)..fileOffset = charOffset
         ]),
+        constness: Constness.explicitNew,
         charOffset: charOffset);
     if (invocation is shadow.SyntheticExpressionJudgment) {
       invocation = desugarSyntheticExpression(invocation);
@@ -5025,6 +5041,7 @@ class BodyBuilder extends ScopeListener<JumpTarget>
               forest.createStringLiteral(name, null)
                 ..fileOffset = assignmentOffset
             ]),
+            constness: Constness.explicitNew,
             charOffset: assignmentOffset);
         if (invocation is shadow.SyntheticExpressionJudgment) {
           invocation = desugarSyntheticExpression(invocation);
@@ -5173,7 +5190,8 @@ class BodyBuilder extends ScopeListener<JumpTarget>
     for (Expression argument in expressions.reversed) {
       expression = new Let(
           new VariableDeclaration.forValue(argument,
-              isFinal: true, type: coreTypes.objectClass.rawType),
+              isFinal: true,
+              type: coreTypes.objectRawType(libraryBuilder.nullable)),
           expression);
     }
     return expression;
