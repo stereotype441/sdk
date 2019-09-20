@@ -31,32 +31,44 @@ import 'package:nnbd_migration/src/utilities/annotation_tracker.dart';
 import 'package:nnbd_migration/src/utilities/permissive_mode.dart';
 import 'package:nnbd_migration/src/utilities/scoped_set.dart';
 
-abstract class FixBuilder extends GeneralizingAstVisitor<_VisitResult> {
+abstract class FixBuilder extends GeneralizingAstVisitor<_Plan> {
   IfBehavior getIfBehavior(IfStatement node);
 
   bool needsNullCheck(Expression node);
 
   List<SourceEdit> run(CompilationUnit unit) {
-    return unit.accept(this).edits;
+    var edits = <SourceEdit>[];
+    unit.accept(this).execute(edits);
+    return edits;
   }
 
   @override
-  _VisitResult visitExpression(Expression node) {
-    var result = super.visitExpression(node)..precedence = node.precedence;
+  _Plan visitExpression(Expression node) {
+    var innerPlan = super.visitExpression(node)..precedence = node.precedence;
     if (needsNullCheck(node)) {
-      if (result.precedence < Precedence.postfix) {
-        result.prefix('(');
-        result.suffix(')!');
-        result.precedence = Precedence.postfix;
+      if (innerPlan.precedence < Precedence.postfix) {
+        return _Plan(
+            precedence: Precedence.postfix,
+            execute: (edits) {
+              edits.add(SourceEdit(node.offset, 0, '('));
+              innerPlan.execute(edits);
+              edits.add(SourceEdit(node.end, 0, ')!'));
+            });
       } else {
-        result.suffix('!');
+        return _Plan(
+            precedence: Precedence.postfix,
+            execute: (edits) {
+              innerPlan.execute(edits);
+              edits.add(SourceEdit(node.end, 0, '!'));
+            });
       }
+    } else {
+      return innerPlan;
     }
-    return result;
   }
 
   @override
-  _VisitResult visitIfStatement(IfStatement node) {
+  _Plan visitIfStatement(IfStatement node) {
     switch (getIfBehavior(node)) {
       case IfBehavior.keepAll:
         return super.visitIfStatement(node);
@@ -83,26 +95,25 @@ abstract class FixBuilder extends GeneralizingAstVisitor<_VisitResult> {
   }
 
   @override
-  _VisitResult visitNode(AstNode node) {
-    var result = _VisitResult(node.offset, node.end);
-    for (var entity in node.childEntities) {
-      if (entity is AstNode) {
-        var subResult = entity.accept(this);
-        result.merge(subResult);
+  _Plan visitNode(AstNode node) {
+    return _Plan(execute: (edits) {
+      for (var entity in node.childEntities) {
+        if (entity is AstNode) {
+          entity.accept(this).execute(edits);
+        }
       }
-    }
-    return result;
+    });
   }
 
-  _VisitResult _discardStatement() {
+  _Plan _discardStatement() {
     throw UnimplementedError('TODO(paulberry)');
   }
 
-  _VisitResult _extractStatement(AstNode node) {
+  _Plan _extractStatement(AstNode node) {
     throw UnimplementedError('TODO(paulberry)');
   }
 
-  _VisitResult _sequenceStatements(List<AstNode> nodes) {
+  _Plan _sequenceStatements(List<AstNode> nodes) {
     throw UnimplementedError('TODO(paulberry)');
   }
 }
@@ -115,47 +126,10 @@ enum IfBehavior {
   keepElse
 }
 
-class _VisitResult {
-  final int offset;
-
-  final int end;
-
-  List<SourceEdit> edits = [];
+class _Plan {
+  final void Function(List<SourceEdit> edits) execute;
 
   Precedence precedence;
 
-  _VisitResult(this.offset, this.end);
-
-  void merge(_VisitResult subResult) {
-    var subEdits = subResult.edits;
-    if (subEdits.isEmpty) return;
-    if (edits.isEmpty) {
-      edits = subEdits;
-      return;
-    }
-    if (subEdits.first.offset == edits.last.end) {
-      edits.last.length += subEdits.first.length;
-      edits.last.replacement += subEdits.first.replacement;
-      edits.addAll(subEdits.skip(1));
-    } else {
-      assert(edits.last.end < subEdits.first.offset);
-      edits.addAll(subEdits);
-    }
-  }
-
-  void prefix(String s) {
-    if (edits.isNotEmpty && edits.first.offset == offset) {
-      edits.first.replacement = s + edits.first.replacement;
-    } else {
-      edits.insert(0, SourceEdit(offset, 0, s));
-    }
-  }
-
-  void suffix(String s) {
-    if (edits.isNotEmpty && edits.last.end == end) {
-      edits.last.replacement += s;
-    } else {
-      edits.add(SourceEdit(end, 0, s));
-    }
-  }
+  _Plan({@required this.execute, this.precedence});
 }
