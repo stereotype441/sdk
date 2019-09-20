@@ -1114,6 +1114,7 @@ class Class extends NamedNode implements Annotatable, FileUriNode {
       RedirectingFactoryConstructor member = redirectingFactoryConstructors[i];
       canonicalName.getChildFromMember(member).bindTo(member.reference);
     }
+    dirty = false;
   }
 
   /// The immediate super class, or `null` if this is the root class.
@@ -1222,9 +1223,6 @@ class Class extends NamedNode implements Annotatable, FileUriNode {
   Supertype get asThisSupertype {
     return new Supertype(this, _getAsTypeArguments(typeParameters));
   }
-
-  InterfaceType _rawType;
-  InterfaceType get rawType => _rawType ??= new InterfaceType(this);
 
   InterfaceType _thisType;
   InterfaceType get thisType {
@@ -2608,7 +2606,7 @@ abstract class Expression extends TreeNode {
     // subtypes of Object (not just interface types), and function types are
     // considered subtypes of Function.
     if (superclass.typeParameters.isEmpty) {
-      return superclass.rawType;
+      return types.coreTypes.legacyRawType(superclass);
     }
     var type = getStaticType(types);
     while (type is TypeParameterType) {
@@ -2624,7 +2622,7 @@ abstract class Expression extends TreeNode {
       return superclass.bottomType;
     }
     types.typeError(this, '$type is not a subtype of $superclass');
-    return superclass.rawType;
+    return types.coreTypes.legacyRawType(superclass);
   }
 
   R accept<R>(ExpressionVisitor<R> v);
@@ -3421,8 +3419,9 @@ class ConstructorInvocation extends InvocationExpression {
 
   DartType getStaticType(TypeEnvironment types) {
     return arguments.types.isEmpty
-        ? target.enclosingClass.rawType
-        : new InterfaceType(target.enclosingClass, arguments.types);
+        ? types.coreTypes.legacyRawType(target.enclosingClass)
+        : new InterfaceType(
+            target.enclosingClass, arguments.types, Nullability.legacy);
   }
 
   R accept<R>(ExpressionVisitor<R> v) => v.visitConstructorInvocation(this);
@@ -3441,10 +3440,16 @@ class ConstructorInvocation extends InvocationExpression {
     }
   }
 
+  // TODO(dmitryas): Change the getter into a method that accepts a CoreTypes.
   InterfaceType get constructedType {
+    Class enclosingClass = target.enclosingClass;
+    // TODO(dmitryas): Get raw type from a CoreTypes object if arguments is
+    // empty.
     return arguments.types.isEmpty
-        ? target.enclosingClass.rawType
-        : new InterfaceType(target.enclosingClass, arguments.types);
+        ? new InterfaceType(
+            enclosingClass, const <DartType>[], Nullability.legacy)
+        : new InterfaceType(
+            enclosingClass, arguments.types, Nullability.legacy);
   }
 }
 
@@ -3753,7 +3758,7 @@ class InstanceCreation extends Expression {
 
   DartType getStaticType(TypeEnvironment types) {
     return typeArguments.isEmpty
-        ? classNode.rawType
+        ? types.coreTypes.legacyRawType(classNode)
         : new InterfaceType(classNode, typeArguments);
   }
 
