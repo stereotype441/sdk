@@ -84,6 +84,16 @@ var x = y++!;
 ''');
   }
 
+  test_null_check_prefix() {
+    parse('''
+var x = ++y;
+''');
+    nullCheck(findNode.simple('y').parent as Expression);
+    checkResult('''
+var x = (++y)!;
+''');
+  }
+
   test_null_check_simple() {
     parse('''
 var x = y;
