@@ -62,6 +62,10 @@ class FixBuilderTest {
     expect(SourceEdit.applySequence(content, edits.reversed), expected);
   }
 
+  void ifBehavior(IfStatement statement, IfBehavior behavior) {
+    fixBuilder._ifBehavior[statement] = behavior;
+  }
+
   void nullCheck(Expression expression) {
     fixBuilder._nullCheck.add(expression);
   }
@@ -69,9 +73,42 @@ class FixBuilderTest {
   void parse(String content) {
     this.content = content;
     var parseResult = parseString(content: content);
-    expect(parseResult.errors, isEmpty);
     findNode = FindNode(content, parseResult.unit);
     unit = parseResult.unit;
+  }
+
+  test_if_keepAll() {
+    parse('''
+void f() {
+  if (a) b; else c;
+}
+''');
+    ifBehavior(findNode.statement('if') as IfStatement, IfBehavior.keepAll);
+    checkResult('''
+void f() {
+  if (a) b; else c;
+}
+''');
+  }
+
+  solo_test_if_keepThen_removeBraces() {
+    parse('''
+void f() {
+  a;
+  if (b) {
+    c;
+  }
+  d;
+}
+''');
+    ifBehavior(findNode.statement('if') as IfStatement, IfBehavior.keepThen);
+    checkResult('''
+void f() {
+  a;
+  c;
+  d;
+}
+''');
   }
 
   test_null_check_postfix() {

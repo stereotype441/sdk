@@ -31,40 +31,37 @@ import 'package:nnbd_migration/src/utilities/annotation_tracker.dart';
 import 'package:nnbd_migration/src/utilities/permissive_mode.dart';
 import 'package:nnbd_migration/src/utilities/scoped_set.dart';
 
+class _EditAccumulator {
+  List<SourceEdit> edits;
+
+  void insert(int offset, String s) {
+    edits.add(SourceEdit(offset, 0, s));
+  }
+
+  void delete(int offset, int end) {
+    edits.add(SourceEdit(offset, end - offset, ''));
+  }
+}
+
 abstract class FixBuilder extends GeneralizingAstVisitor<_Plan> {
   IfBehavior getIfBehavior(IfStatement node);
 
   bool needsNullCheck(Expression node);
 
   List<SourceEdit> run(CompilationUnit unit) {
-    var edits = <SourceEdit>[];
-    unit.accept(this).execute(edits);
-    return edits;
+    var editAccumulator = _EditAccumulator();
+    unit.accept(this).execute(editAccumulator);
+    return editAccumulator.edits;
   }
 
   @override
-  _Plan visitExpression(Expression node) {
-    var innerPlan = super.visitExpression(node)..precedence = node.precedence;
+  _ExpressionPlan visitExpression(Expression node) {
+    var innerPlan = super.visitExpression(node);
+    var expressionPlan = _ExpressionPlan(innerPlan.offset, innerPlan.end, innerPlan.execute, node.precedence);
     if (needsNullCheck(node)) {
-      if (innerPlan.precedence < Precedence.postfix) {
-        return _Plan(
-            precedence: Precedence.postfix,
-            execute: (edits) {
-              edits.add(SourceEdit(node.offset, 0, '('));
-              innerPlan.execute(edits);
-              edits.add(SourceEdit(node.end, 0, ')!'));
-            });
-      } else {
-        return _Plan(
-            precedence: Precedence.postfix,
-            execute: (edits) {
-              innerPlan.execute(edits);
-              edits.add(SourceEdit(node.end, 0, '!'));
-            });
-      }
-    } else {
-      return innerPlan;
+      expressionPlan = _ExpressionPlan.nullCheck(expressionPlan);
     }
+    return expressionPlan;
   }
 
   @override
@@ -78,7 +75,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<_Plan> {
         if (node.elseStatement != null) {
           return _sequenceStatements([node.condition, node.elseStatement]);
         } else {
-          return _extractStatement(node.condition);
+          return _extractStatement(_expressionToStatement(node.condition));
         }
         break;
       case IfBehavior.keepThen:
@@ -105,16 +102,29 @@ abstract class FixBuilder extends GeneralizingAstVisitor<_Plan> {
     });
   }
 
+
+
   _Plan _discardStatement() {
     throw UnimplementedError('TODO(paulberry)');
   }
 
-  _Plan _extractStatement(AstNode node) {
+  _StatementPlan _extractStatement(AstNode node) {
+    var innerPlan =
+    return _Plan(execute: (edits) {
+
+    });
     throw UnimplementedError('TODO(paulberry)');
   }
 
   _Plan _sequenceStatements(List<AstNode> nodes) {
     throw UnimplementedError('TODO(paulberry)');
+  }
+
+  _StatementPlan _expressionToStatement(_ExpressionPlan inner) {
+    return _StatementPlan(execute: (edits) {
+      inner.execute(edits);
+      edits.add(SourceEdit(inner.end, 0, ';'));
+    });
   }
 }
 
@@ -126,10 +136,46 @@ enum IfBehavior {
   keepElse
 }
 
+class _ExpressionPlan extends _Plan {
+  final Precedence precedence;
+
+  _ExpressionPlan(int offset, int end, _PlanExecutor execute, this.precedence) : super(offset, end, execute);
+
+  _ExpressionPlan.nullCheck(_ExpressionPlan inner) : this(inner.offset, inner.end, (editAccumulator) {
+    if (inner.precedence < Precedence.postfix) {
+      editAccumulator.insert(inner.offset, '(');
+            inner.execute(editAccumulator);
+            editAccumulator.insert(inner.end, ')!');
+    } else {
+      inner.execute(editAccumulator);
+      editAccumulator.insert(inner.end, '!');
+    }
+  }, Precedence.postfix);
+}
+
+class _StatementPlan extends _Plan {
+  _StatementPlan(int offset, int end, _PlanExecutor execute) : super(offset, end, execute);
+
+  _StatementPlan.expressionStatement(_ExpressionPlan inner) : this(inner.offset, inner.end, (editAccumulator) {
+    inner.execute(editAccumulator);
+    editAccumulator.insert(inner.end, ';');
+  });
+
+  _StatementPlan.liftStatement(int offset, int end, _ExpressionPlan inner) : this(offset, end, (editAccumulator) {
+    editAccumulator.delete(offset, inner.offset);
+    inner.execute(editAccumulator);
+    editAccumulator.delete(inner.end, end);
+  });
+}
+
+typedef void _PlanExecutor(_EditAccumulator editAccumulator);
+
 class _Plan {
-  final void Function(List<SourceEdit> edits) execute;
+  final int offset;
 
-  Precedence precedence;
+  final int end;
 
-  _Plan({@required this.execute, this.precedence});
+  final _PlanExecutor execute;
+
+  _Plan(this.offset, this.end, this.execute);
 }
