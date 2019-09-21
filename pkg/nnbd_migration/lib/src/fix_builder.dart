@@ -43,6 +43,76 @@ class _EditAccumulator {
   }
 }
 
+class _RecursivePlanVisitor extends GeneralizingAstVisitor<_RecursivePlan> {
+  final _Planner _subPlanner;
+
+  _RecursivePlanVisitor(this._subPlanner);
+  
+  @override
+  _RecursivePlan visitExpression(Expression node) {
+    assert(false);
+    var subPlans = <_Plan>[];
+    for (var entity in node.childEntities) {
+      if (entity is AstNode) {
+        var subPlan = _subPlanner(entity);
+        if (subPlan is _RecursivePlan) {
+          subPlans.addAll(subPlan.subPlans);
+        } else if (entity is Expression && subPlan is _ExpressionPlan) {
+          // We know that [entity] was allowed here, so parenthesize the
+          // replacement if it has lower precedence than entity's precedence.
+          // TODO(paulberry): this is a conservative approximation.  Really we
+          // should have separate overrides for each expression type that know
+          // precisely what precedence is allowed for each subexpression.
+          subPlans.add(subPlan.parenthesizeFor(entity.precedence));
+        } else {
+          subPlans.add(subPlan);
+        }
+      }
+    }
+    return _RecursiveExpressionPlan._(node.offset, node.end, subPlans, node.precedence);
+  }
+
+  @override
+  _RecursivePlan visitBlock(Block node) {
+    var subPlans = <_Plan>[];
+    for (var entity in node.childEntities) {
+      if (entity is AstNode) {
+        var subPlan = _subPlanner(entity);
+        if (subPlan is _RecursivePlan) {
+          subPlans.addAll(subPlan.subPlans);
+        } else {
+          subPlans.add(subPlan);
+        }
+      }
+    }
+    return _RecursiveStatementsPlan._(node.offset, node.end, subPlans, true);
+  }
+
+  @override
+  _RecursivePlan visitNode(AstNode node) {
+    var subPlans = <_Plan>[];
+    for (var entity in node.childEntities) {
+      if (entity is AstNode) {
+        var subPlan = _subPlanner(entity);
+        if (subPlan is _RecursivePlan) {
+          subPlans.addAll(subPlan.subPlans);
+        } else if (subPlan is _StatementsPlan) {
+          subPlans.add(subPlan.toBlock());
+        } else {
+          subPlans.add(subPlan);
+        }
+      }
+    }
+    if (node is Statement) {
+      return _RecursiveStatementsPlan._(node.offset, node.end, subPlans, false);
+    } else {
+      return _RecursivePlan._(node.offset, node.end, subPlans);
+    }
+  }
+}
+
+typedef _Plan _Planner(AstNode node);
+
 abstract class FixBuilder extends GeneralizingAstVisitor<_Plan> {
   IfBehavior getIfBehavior(IfStatement node);
 
@@ -55,20 +125,24 @@ abstract class FixBuilder extends GeneralizingAstVisitor<_Plan> {
   }
 
   @override
-  _ExpressionPlan visitExpression(Expression node) {
-    var innerPlan = super.visitExpression(node);
-    var expressionPlan = _ExpressionPlan(innerPlan.offset, innerPlan.end, innerPlan.execute, node.precedence);
+  _Plan visitNode(AstNode node) {
+    return _RecursivePlan(node, (subNode) => subNode.accept(this));
+  }
+
+  @override
+  _Plan visitExpression(Expression node) {
+    var plan = visitNode(node);
     if (needsNullCheck(node)) {
-      expressionPlan = _ExpressionPlan.nullCheck(expressionPlan);
+      plan = _NullCheckExpressionPlan(plan);
     }
-    return expressionPlan;
+    return plan;
   }
 
   @override
   _Plan visitIfStatement(IfStatement node) {
     switch (getIfBehavior(node)) {
       case IfBehavior.keepAll:
-        return super.visitIfStatement(node);
+        return visitNode(node);
       case IfBehavior.keepConditionAndThen:
         return _sequenceStatements([node.condition, node.thenStatement]);
       case IfBehavior.keepConditionAndElse:
@@ -89,17 +163,6 @@ abstract class FixBuilder extends GeneralizingAstVisitor<_Plan> {
         break;
     }
     throw StateError('Unexpected if behavior');
-  }
-
-  @override
-  _Plan visitNode(AstNode node) {
-    return _Plan(execute: (edits) {
-      for (var entity in node.childEntities) {
-        if (entity is AstNode) {
-          entity.accept(this).execute(edits);
-        }
-      }
-    });
   }
 
 
@@ -136,46 +199,163 @@ enum IfBehavior {
   keepElse
 }
 
-class _ExpressionPlan extends _Plan {
-  final Precedence precedence;
+abstract class _Plan {
+  int get offset;
 
-  _ExpressionPlan(int offset, int end, _PlanExecutor execute, this.precedence) : super(offset, end, execute);
+  int get end;
 
-  _ExpressionPlan.nullCheck(_ExpressionPlan inner) : this(inner.offset, inner.end, (editAccumulator) {
-    if (inner.precedence < Precedence.postfix) {
-      editAccumulator.insert(inner.offset, '(');
-            inner.execute(editAccumulator);
-            editAccumulator.insert(inner.end, ')!');
+  void execute(_EditAccumulator accumulator);
+}
+
+mixin _ExpressionPlan on _Plan {
+  Precedence get precedence;
+
+  _ExpressionPlan parenthesizeFor(Precedence precedence) {
+    if (this.precedence < precedence) {
+      return _ParenthesesPlan(this);
     } else {
-      inner.execute(editAccumulator);
-      editAccumulator.insert(inner.end, '!');
+      return this;
     }
-  }, Precedence.postfix);
+  }
 }
 
-class _StatementPlan extends _Plan {
-  _StatementPlan(int offset, int end, _PlanExecutor execute) : super(offset, end, execute);
+mixin _StatementsPlan on _Plan {
+  bool get isBlock;
 
-  _StatementPlan.expressionStatement(_ExpressionPlan inner) : this(inner.offset, inner.end, (editAccumulator) {
-    inner.execute(editAccumulator);
-    editAccumulator.insert(inner.end, ';');
-  });
-
-  _StatementPlan.liftStatement(int offset, int end, _ExpressionPlan inner) : this(offset, end, (editAccumulator) {
-    editAccumulator.delete(offset, inner.offset);
-    inner.execute(editAccumulator);
-    editAccumulator.delete(inner.end, end);
-  });
+  _StatementsPlan toBlock() {
+    if (!this.isBlock) {
+      return _BlockPlan(this);
+    } else {
+      return this;
+    }
+  }
 }
 
-typedef void _PlanExecutor(_EditAccumulator editAccumulator);
+abstract class _WrapPlan implements _Plan {
+  final _Plan _inner;
 
-class _Plan {
+  _WrapPlan(this._inner);
+
+  int get offset => _inner.offset;
+
+  int get end => _inner.end;
+}
+
+class _ParenthesesPlan extends _WrapPlan with _ExpressionPlan {
+  _ParenthesesPlan(_Plan inner) : super(inner);
+
+  @override
+  void execute(_EditAccumulator accumulator) {
+    accumulator.insert(offset, '(');
+    _inner.execute(accumulator);
+    accumulator.insert(end, ')');
+  }
+
+  @override
+  Precedence get precedence => Precedence.primary;
+}
+
+class _BlockPlan extends _WrapPlan with _StatementsPlan {
+  _BlockPlan(_Plan inner) : super(inner);
+
+  @override
+  void execute(_EditAccumulator accumulator) {
+    accumulator.indent(2);
+    accumulator.insert(offset, '{\n' + accumulator.indentation(offset));
+    _inner.execute(accumulator);
+    accumulator.indent(-2);
+    accumulator.insert(end, '\n' + accumulator.indentation(end) + '}');
+  }
+
+  @override
+  bool get isBlock => true;
+}
+
+class _NullCheckExpressionPlan extends _WrapPlan with _ExpressionPlan {
+  _NullCheckExpressionPlan(_ExpressionPlan inner) : super(inner.parenthesizeFor(Precedence.postfix));
+
+  @override
+  void execute(_EditAccumulator accumulator) {
+    _inner.execute(accumulator);
+    accumulator.insert(end, '!');
+  }
+
+  @override
+  Precedence get precedence => Precedence.postfix;
+}
+
+abstract class _UnwrapPlan implements _Plan {
+  final _Plan _inner;
+
   final int offset;
 
   final int end;
 
-  final _PlanExecutor execute;
+  _UnwrapPlan(this._inner, this.offset, this.end);
 
-  _Plan(this.offset, this.end, this.execute);
+  @override
+  void execute(_EditAccumulator accumulator) {
+    accumulator.delete(offset, _inner.offset);
+    _inner.execute(accumulator);
+    accumulator.delete(_inner.end, end);
+  }
+}
+
+class _ExpressionStatementPlan extends _WrapPlan with _StatementsPlan {
+  _ExpressionStatementPlan(_Plan inner) : super(inner);
+
+  void execute(_EditAccumulator accumulator) {
+    _inner.execute(accumulator);
+    accumulator.insert(end, ';');
+  }
+
+  @override
+  bool get isBlock => false;
+}
+
+class _RecursivePlan implements _Plan {
+  final int offset;
+
+  final int end;
+
+  final List<_Plan> subPlans;
+
+  _RecursivePlan._(this.offset, this.end, this.subPlans);
+
+  @override
+  void execute(_EditAccumulator accumulator) {
+    for (var subPlan in subPlans) {
+      subPlan.execute(accumulator);
+    }
+  }
+  
+  factory _RecursivePlan(AstNode node, _Planner subPlanner) {
+    return node.accept(_RecursivePlanVisitor(subPlanner));
+  }
+}
+
+class _RecursiveExpressionPlan extends _RecursivePlan with _ExpressionPlan {
+  _RecursiveExpressionPlan._(int offset, int end, List<_Plan> subPlans, this.precedence) : super._(offset, end, subPlans);
+
+  @override
+  final Precedence precedence;
+}
+
+class _RecursiveStatementsPlan extends _RecursivePlan with _StatementsPlan {
+  _RecursiveStatementsPlan._(int offset, int end, List<_Plan> subPlans, this.isBlock) : super._(offset, end, subPlans);
+
+  @override
+  final bool isBlock;
+}
+
+/// TODO(paulberry): maybe not needed?
+class _IdentityPlan implements _Plan {
+  final int offset;
+
+  final int end;
+
+  _IdentityPlan(this.offset, this.end);
+
+  @override
+  void execute(_EditAccumulator accumulator) {}
 }
