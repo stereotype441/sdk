@@ -80,23 +80,7 @@ class NullabilityMigrationImpl implements NullabilityMigration {
       Variables variables,
       NullabilityMigrationListener listener,
       NullabilityMigrationInstrumentation instrumentation) {
-    for (var entry in variables.getPotentialModifications().entries) {
-      var source = entry.key;
-      final lineInfo = LineInfo.fromContent(source.contents.data);
-      for (var potentialModification in entry.value) {
-        var modifications = potentialModification.modifications;
-        if (modifications.isEmpty) {
-          continue;
-        }
-        var fix =
-            _SingleNullabilityFix(source, potentialModification, lineInfo);
-        listener.addFix(fix);
-        instrumentation?.fix(fix, potentialModification.reasons);
-        for (var edit in modifications) {
-          listener.addEdit(fix, edit);
-        }
-      }
-    }
+    throw UnimplementedError('TODO(paulberry)');
   }
 }
 
