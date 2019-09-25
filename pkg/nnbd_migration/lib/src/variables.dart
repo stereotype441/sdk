@@ -156,9 +156,7 @@ class Variables implements VariableRecorder, VariableRepository {
 
   @override
   void recordExpressionChecks(
-      Source source, Expression expression, ExpressionChecksOrigin origin) {
-    throw UnimplementedError('TODO(paulberry)');
-  }
+      Source source, Expression expression, ExpressionChecksOrigin origin) {}
 
   @override
   void recordPossiblyOptional(

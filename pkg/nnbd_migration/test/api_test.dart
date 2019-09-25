@@ -33,6 +33,9 @@ abstract class _ProvisionalApiTestBase extends AbstractContextTest {
   /// Hook invoked after calling `prepareInput` on each input.
   void _afterPrepare() {}
 
+  /// Hook invoked after calling `processInput` on each input.
+  void _afterProcess() {}
+
   /// Verifies that migration of the files in [input] produces the output in
   /// [expectedOutput].
   Future<void> _checkMultipleFileChanges(
@@ -50,7 +53,10 @@ abstract class _ProvisionalApiTestBase extends AbstractContextTest {
     for (var path in input.keys) {
       migration.processInput(await session.getResolvedUnit(path));
     }
-    migration.finish();
+    _afterProcess();
+    for (var path in input.keys) {
+      migration.finishInput(await session.getResolvedUnit(path));
+    }
     var sourceEdits = <String, List<SourceEdit>>{};
     for (var entry in listener.edits.entries) {
       var path = entry.key.fullName;
@@ -76,6 +82,28 @@ abstract class _ProvisionalApiTestBase extends AbstractContextTest {
 
 /// Mixin containing test cases for the provisional API.
 mixin _ProvisionalApiTestCases on _ProvisionalApiTestBase {
+  solo_test_constructorDeclaration_factory_simple() async {
+    var content = '''
+class C {
+  C._();
+  factory C(int i) => C._();
+}
+main() {
+  C(null);
+}
+''';
+    var expected = '''
+class C {
+  C._();
+  factory C(int? i) => C._();
+}
+main() {
+  C(null);
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_add_required() async {
     var content = '''
 int f({String s}) => s.length;
@@ -417,28 +445,6 @@ class C {
   }
 }
 C? f() => null;
-''';
-    await _checkSingleFileChanges(content, expected);
-  }
-
-  test_constructorDeclaration_factory_simple() async {
-    var content = '''
-class C {
-  C._();
-  factory C(int i) => C._();
-}
-main() {
-  C(null);
-}
-''';
-    var expected = '''
-class C {
-  C._();
-  factory C(int? i) => C._();
-}
-main() {
-  C(null);
-}
 ''';
     await _checkSingleFileChanges(content, expected);
   }
@@ -3153,6 +3159,11 @@ class _ProvisionalApiTestWithReset extends _ProvisionalApiTestBase
 
   @override
   void _afterPrepare() {
+    driver.resetUriResolution();
+  }
+
+  @override
+  void _afterProcess() {
     driver.resetUriResolution();
   }
 }

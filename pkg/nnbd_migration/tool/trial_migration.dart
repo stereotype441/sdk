@@ -55,7 +55,10 @@ main() async {
       var resolvedUnit = await context.currentSession.getResolvedUnit(file);
       migration.processInput(resolvedUnit);
     }
-    migration.finish();
+    for (var file in files) {
+      var resolvedUnit = await context.currentSession.getResolvedUnit(file);
+      migration.finishInput(resolvedUnit);
+    }
     var exceptionCount = listener.numExceptions - previousExceptionCount;
     print('  $exceptionCount exceptions in this package');
   }

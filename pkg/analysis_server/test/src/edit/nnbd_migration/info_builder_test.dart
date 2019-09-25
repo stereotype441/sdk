@@ -46,7 +46,7 @@ class InfoBuilderTest extends AbstractAnalysisTest {
         instrumentation: instrumentationListener);
     migration.prepareInput(result);
     migration.processInput(result);
-    migration.finish();
+    migration.finishInput(result);
     // Build the migration info.
     InfoBuilder builder = InfoBuilder(server);
     InstrumentationInformation info = instrumentationListener.data;
