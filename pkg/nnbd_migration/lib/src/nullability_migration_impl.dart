@@ -50,8 +50,8 @@ class NullabilityMigrationImpl implements NullabilityMigration {
     if (_variables != null) {
       if (!_propagated) _propagate();
       var unit = result.unit;
-      unit.accept(FixBuilder(
-          listener, unit.declaredElement.source, result.lineInfo, _variables));
+      unit.accept(FixBuilder(listener, unit.declaredElement.source,
+          result.lineInfo, _variables, result.typeProvider, result.typeSystem));
     }
   }
 

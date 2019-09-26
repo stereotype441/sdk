@@ -2,7 +2,7 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'package:analysis_server/src/protocol_server.dart';
+import 'package:analysis_server/src/protocol_server.dart' hide Element;
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/ast.dart';
@@ -33,7 +33,7 @@ import 'package:nnbd_migration/src/utilities/annotation_tracker.dart';
 import 'package:nnbd_migration/src/utilities/permissive_mode.dart';
 import 'package:nnbd_migration/src/variables.dart';
 
-class FixBuilder extends GeneralizingAstVisitor<void> {
+class FixBuilder extends GeneralizingAstVisitor<DartType> {
   final NullabilityMigrationListener _listener;
 
   final Source _source;
@@ -42,10 +42,27 @@ class FixBuilder extends GeneralizingAstVisitor<void> {
 
   final Variables _variables;
 
-  FixBuilder(this._listener, this._source, this._lineInfo, this._variables);
+  final TypeProvider _typeProvider;
+
+  final TypeSystem _typeSystem;
+
+  FixBuilder(this._listener, this._source, this._lineInfo, this._variables,
+      this._typeProvider, this._typeSystem);
 
   @override
-  void visitDefaultFormalParameter(DefaultFormalParameter node) {
+  DartType visitAssignmentExpression(AssignmentExpression node) {
+    if (node.operator.type != TokenType.EQ) {
+      throw UnimplementedError('TODO(paulberry)');
+    } else {
+      // TODO(paulberry): make sure we reach setters when evaluating LHS.
+      var lhsType = node.leftHandSide.accept(this);
+      var rhsType = _visitSubexpression(node.rightHandSide, lhsType);
+      node.rightHandSide.accept(this);
+    }
+  }
+
+  @override
+  DartType visitDefaultFormalParameter(DefaultFormalParameter node) {
     var element = node.declaredElement;
     var decoratedType = _variables.decoratedElementType(element);
     if (node.defaultValue != null) {
@@ -66,11 +83,59 @@ class FixBuilder extends GeneralizingAstVisitor<void> {
               method.enclosingElement.name, method.name, element.name));
       _listener.addFix(fix);
       _listener.addEdit(fix, SourceEdit(offset, 0, 'required '));
+      return null;
     }
   }
 
   @override
-  void visitTypeAnnotation(TypeAnnotation node) {
+  DartType visitExpression(Expression node) {
+    // TODO(paulberry): when we no longer need the exception in visitExpression,
+    // get rid of calls to visitNode.
+    throw UnimplementedError('TODO(paulberry)');
+  }
+
+  @override
+  DartType visitFunctionExpression(FunctionExpression node) {
+    if (node.parent is FunctionDeclaration) return visitNode(node);
+    return super.visitFunctionExpression(node);
+  }
+
+  DartType visitLiteral(Literal node) {
+    if (node is StringLiteral) {
+      // TODO(paulberry): need to visit interpolations
+      throw UnimplementedError('TODO(paulberry)');
+    }
+    return (node.staticType as TypeImpl)
+        .withNullability(NullabilitySuffix.none);
+  }
+
+  @override
+  DartType visitMethodInvocation(MethodInvocation node) {
+    if (node.realTarget != null) {
+      throw UnimplementedError('TODO(paulberry)');
+    }
+    var type = _computeMigratedType(node.methodName.staticElement);
+    if (type is FunctionType) {
+      if (type.typeFormals.isNotEmpty) {
+        throw UnimplementedError('TODO(paulberry)');
+      }
+      node.typeArguments?.accept(this);
+      node.argumentList.accept(this);
+      return type.returnType;
+    } else {
+      throw UnimplementedError('TODO(paulberry)');
+    }
+  }
+
+  @override
+  DartType visitSimpleIdentifier(SimpleIdentifier node) {
+    var element = node.staticElement;
+    if (element == null) return _typeProvider.dynamicType;
+    return _computeMigratedType(element);
+  }
+
+  @override
+  DartType visitTypeAnnotation(TypeAnnotation node) {
     super.visitTypeAnnotation(node);
     var decoratedType = _variables.decoratedTypeAnnotation(_source, node);
     if (decoratedType != null && decoratedType.node.isNullable) {
@@ -86,10 +151,38 @@ class FixBuilder extends GeneralizingAstVisitor<void> {
         _listener.addEdit(fix, SourceEdit(offset, 0, '?'));
       }
     }
+    return null;
   }
 
   @override
-  void visitTypeName(TypeName node) => visitTypeAnnotation(node);
+  DartType visitTypeName(TypeName node) => visitTypeAnnotation(node);
+
+  DartType _computeMigratedType(Element element) {
+    if (element is ClassElement) {
+      return (_typeProvider.typeType as TypeImpl)
+          .withNullability(NullabilitySuffix.none);
+    } else if (element is PropertyAccessorElement) {
+      throw UnimplementedError('TODO(paulberry)');
+    }
+    return _variables.decoratedElementType(element).toFinalType();
+  }
+
+  DartType _visitSubexpression(
+      Expression subexpression, DartType expectedType) {
+    var type = subexpression.accept(this);
+    if (_typeSystem.isNullable(type) && !_typeSystem.isNullable(expectedType)) {
+      // TODO(paulberry): add parens if necessary.
+      // See https://github.com/dart-lang/sdk/issues/38469
+      var offset = subexpression.end;
+      var fix = _SingleNullabilityFix(_source, _lineInfo, offset, 0,
+          NullabilityFixDescription.checkExpression);
+      _listener.addFix(fix);
+      _listener.addEdit(fix, SourceEdit(offset, 0, '!'));
+      return _typeSystem.promoteToNonNull(type as TypeImpl);
+    } else {
+      return type;
+    }
+  }
 }
 
 /// Implementation of [SingleNullabilityFix] used internally by

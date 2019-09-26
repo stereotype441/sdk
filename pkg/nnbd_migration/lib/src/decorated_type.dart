@@ -3,11 +3,13 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type_algebra.dart';
 import 'package:analyzer/src/generated/resolver.dart';
+import 'package:analyzer/src/generated/utilities_dart.dart';
 import 'package:nnbd_migration/instrumentation.dart';
 import 'package:nnbd_migration/src/nullability_node.dart';
 
@@ -344,6 +346,49 @@ class DecoratedType implements DecoratedTypeInfo {
       ).substituteType(type);
     }
     return _substitute(substitution, undecoratedResult);
+  }
+
+  DartType toFinalType() {
+    var type = this.type;
+    if (type.isVoid || type.isDynamic) return type;
+    var nullabilitySuffix =
+        node.isNullable ? NullabilitySuffix.question : NullabilitySuffix.none;
+    if (type is FunctionType) {
+      if (typeFormals.isNotEmpty) {
+        throw UnimplementedError('TODO(paulberry)');
+      }
+      var parameters = <ParameterElement>[];
+      int i = 0;
+      for (int i = 0; i < type.parameters.length; i++) {
+        var origParameter = type.parameters[i];
+        ParameterKind parameterKind;
+        DecoratedType parameterType;
+        var name = origParameter.name;
+        if (origParameter.isNamed) {
+          parameterKind = origParameter.isOptional
+              ? ParameterKind.POSITIONAL
+              : ParameterKind.REQUIRED;
+          parameterType = namedParameters[name];
+        } else {
+          // TODO(paulberry): infer ParameterKind.NAMED_REQUIRED when
+          // appropriate.
+          parameterKind = ParameterKind.NAMED;
+          parameterType = positionalParameters[i];
+        }
+        parameters.add(ParameterElementImpl.synthetic(
+            name, parameterType.toFinalType(), parameterKind));
+      }
+      return FunctionTypeImpl.synthetic(
+          returnType.toFinalType(), typeFormals, parameters,
+          nullabilitySuffix: nullabilitySuffix);
+    } else if (type is InterfaceType) {
+      if (type.typeArguments.isNotEmpty) {
+        throw UnimplementedError('TODO(paulberry)');
+      }
+      return InterfaceTypeImpl.explicit(type.element, [],
+          nullabilitySuffix: nullabilitySuffix);
+    }
+    throw UnimplementedError('TODO(paulberry)');
   }
 
   @override
