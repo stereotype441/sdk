@@ -71,10 +71,8 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
     if (node.operator.type != TokenType.EQ) {
       throw UnimplementedError('TODO(paulberry)');
     } else {
-      var target = _visitAssignmentTarget(node.leftHandSide);
-      var rhsType = _visitSubexpression(node.rightHandSide, true);
-      target(rhsType);
-      return rhsType;
+      bool targetIsNullable = _visitAssignmentTarget(node.leftHandSide);
+      return _visitSubexpression(node.rightHandSide, targetIsNullable);
     }
   }
 
@@ -238,18 +236,19 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
 
   @override
   DartType visitPrefixedIdentifier(PrefixedIdentifier node) {
-    return _handlePropertyAccess(
-        node.prefix, node.period.type, node.identifier);
+    assert(!node.identifier.inSetterContext());
+    return _handlePropertyGet(node.prefix, node.period.type, node.identifier);
   }
 
   @override
   DartType visitPropertyAccess(PropertyAccess node) {
-    return _handlePropertyAccess(
+    return _handlePropertyGet(
         node.target, node.operator.type, node.propertyName);
   }
 
   @override
   DartType visitSimpleIdentifier(SimpleIdentifier node) {
+    assert(!node.inSetterContext());
     var element = node.staticElement;
     if (element == null) return _typeProvider.dynamicType;
     return _computeMigratedType(element);
@@ -337,7 +336,7 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
     }
   }
 
-  DartType _handlePropertyAccess(
+  DartType _handlePropertyGet(
       Expression target, TokenType tokenType, SimpleIdentifier propertyName) {
     DartType targetType;
     if (tokenType == TokenType.PERIOD_PERIOD) {
@@ -357,7 +356,7 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
     return _computeMigratedType(element);
   }
 
-  void Function(DartType) _visitAssignmentTarget(Expression node) {
+  bool _visitAssignmentTarget(Expression node) {
     if (node is IndexExpression) {
       assert(node.inSetterContext());
       if (node.leftBracket.type != TokenType.OPEN_SQUARE_BRACKET) {
@@ -374,12 +373,25 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
       assert(operatorMethodType.typeFormals.isEmpty);
       _visitSubexpression(
           node.index, _typeSystem.isNullable(type.parameters[0].type));
-      return (valueType) {
-        if (_typeSystem.isNullable(valueType) &&
-            !_typeSystem.isNullable(type.parameters[0].type)) {
-          throw UnimplementedError('TODO(paulberry)');
-        }
-      };
+      return _typeSystem.isNullable(type.parameters[1].type);
+    } else if (node is SimpleIdentifier) {
+      return _typeSystem.isNullable(_computeMigratedType(node.staticElement));
+    } else if (node is PrefixedIdentifier) {
+      assert(node.identifier.inSetterContext());
+      var tokenType = node.period.type;
+      var target = node.prefix;
+      var propertyName = node.identifier;
+      DartType targetType;
+      if (tokenType == TokenType.PERIOD) {
+        targetType = _visitSubexpression(target, false);
+      } else {
+        throw UnimplementedError('TODO(paulberry)');
+      }
+      if (targetType is InterfaceType && targetType.typeArguments.isNotEmpty) {
+        throw UnimplementedError('TODO(paulberry): substitute');
+      }
+      var element = propertyName.staticElement;
+      return _typeSystem.isNullable(_computeMigratedType(element));
     } else {
       // Need to implement more cases, and add
       // `assert(!node.inSetterContext());` to their visit methods.
