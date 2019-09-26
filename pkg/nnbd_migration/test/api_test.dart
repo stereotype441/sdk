@@ -82,28 +82,6 @@ abstract class _ProvisionalApiTestBase extends AbstractContextTest {
 
 /// Mixin containing test cases for the provisional API.
 mixin _ProvisionalApiTestCases on _ProvisionalApiTestBase {
-  solo_test_constructorDeclaration_factory_simple() async {
-    var content = '''
-class C {
-  C._();
-  factory C(int i) => C._();
-}
-main() {
-  C(null);
-}
-''';
-    var expected = '''
-class C {
-  C._();
-  factory C(int? i) => C._();
-}
-main() {
-  C(null);
-}
-''';
-    await _checkSingleFileChanges(content, expected);
-  }
-
   test_add_required() async {
     var content = '''
 int f({String s}) => s.length;
@@ -445,6 +423,28 @@ class C {
   }
 }
 C? f() => null;
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_constructorDeclaration_factory_simple() async {
+    var content = '''
+class C {
+  C._();
+  factory C(int i) => C._();
+}
+main() {
+  C(null);
+}
+''';
+    var expected = '''
+class C {
+  C._();
+  factory C(int? i) => C._();
+}
+main() {
+  C(null);
+}
 ''';
     await _checkSingleFileChanges(content, expected);
   }

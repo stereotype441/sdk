@@ -46,25 +46,12 @@ class NullabilityMigrationImpl implements NullabilityMigration {
     _instrumentation?.immutableNodes(_graph.never, _graph.always);
   }
 
-  void _propagate() {
-    _propagated = true;
-    _graph.propagate();
-    if (_graph.unsatisfiedSubstitutions.isNotEmpty) {
-      // TODO(paulberry): for now we just ignore unsatisfied substitutions, to
-      // work around https://github.com/dart-lang/sdk/issues/38257
-      // throw new UnimplementedError('Need to report unsatisfied substitutions');
-    }
-    // TODO(paulberry): it would be nice to report on unsatisfied edges as well,
-    // however, since every `!` we add has an unsatisfied edge associated with
-    // it, we can't report on every unsatisfied edge.  We need to figure out a
-    // way to report unsatisfied edges that isn't too overwhelming.
-  }
-
   void finishInput(ResolvedUnitResult result) {
     if (_variables != null) {
       if (!_propagated) _propagate();
       var unit = result.unit;
-      unit.accept(FixBuilder());
+      unit.accept(FixBuilder(
+          listener, unit.declaredElement.source, result.lineInfo, _variables));
     }
   }
 
@@ -82,6 +69,20 @@ class NullabilityMigrationImpl implements NullabilityMigration {
     unit.accept(EdgeBuilder(result.typeProvider, result.typeSystem, _variables,
         _graph, unit.declaredElement.source, _permissive ? listener : null,
         instrumentation: _instrumentation));
+  }
+
+  void _propagate() {
+    _propagated = true;
+    _graph.propagate();
+    if (_graph.unsatisfiedSubstitutions.isNotEmpty) {
+      // TODO(paulberry): for now we just ignore unsatisfied substitutions, to
+      // work around https://github.com/dart-lang/sdk/issues/38257
+      // throw new UnimplementedError('Need to report unsatisfied substitutions');
+    }
+    // TODO(paulberry): it would be nice to report on unsatisfied edges as well,
+    // however, since every `!` we add has an unsatisfied edge associated with
+    // it, we can't report on every unsatisfied edge.  We need to figure out a
+    // way to report unsatisfied edges that isn't too overwhelming.
   }
 
   @visibleForTesting
