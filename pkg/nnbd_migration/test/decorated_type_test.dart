@@ -314,6 +314,38 @@ class DecoratedTypeTest extends Object
     assertDartType(type, 'dynamic');
   }
 
+  test_toFinalType_function_generic_substitute_named() {
+    var t = typeParameter('T', object());
+    var type = function(dynamic_,
+            typeFormals: [t],
+            named: {'x': list(typeParameterType(t, node: never), node: never)},
+            node: never)
+        .toFinalType(typeProvider) as FunctionType;
+    assertDartType(type, 'dynamic Function<T>({x: List<T>})');
+    expect(type.typeFormals[0], isNot(same(t)));
+    expect(
+        ((type.parameters[0].type as InterfaceType).typeArguments[0]
+                as TypeParameterType)
+            .element,
+        same(type.typeFormals[0]));
+  }
+
+  test_toFinalType_function_generic_substitute_optional() {
+    var t = typeParameter('T', object());
+    var type = function(dynamic_,
+            typeFormals: [t],
+            positional: [list(typeParameterType(t, node: never), node: never)],
+            node: never)
+        .toFinalType(typeProvider) as FunctionType;
+    assertDartType(type, 'dynamic Function<T>([List<T>])');
+    expect(type.typeFormals[0], isNot(same(t)));
+    expect(
+        ((type.parameters[0].type as InterfaceType).typeArguments[0]
+                as TypeParameterType)
+            .element,
+        same(type.typeFormals[0]));
+  }
+
   test_toFinalType_function_generic_substitute_required() {
     var t = typeParameter('T', object());
     var type = function(dynamic_,
