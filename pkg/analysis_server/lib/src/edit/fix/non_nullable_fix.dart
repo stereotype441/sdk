@@ -53,11 +53,10 @@ class NonNullableFix extends FixCodeTask {
   }
 
   @override
-  int get numPhases => 2;
+  int get numPhases => 3;
 
   @override
   Future<void> finish() async {
-    migration.finish();
     if (outputDir != null) {
       OverlayResourceProvider provider = listener.server.resourceProvider;
       Folder outputFolder = provider.getFolder(outputDir);
@@ -178,6 +177,9 @@ analyzer:
         break;
       case 1:
         migration.processInput(result);
+        break;
+      case 2:
+        migration.finishInput(result);
         break;
       default:
         throw new ArgumentError('Unsupported phase $phase');

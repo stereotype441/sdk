@@ -66,7 +66,7 @@ abstract class NullabilityMigration {
           NullabilityMigrationInstrumentation instrumentation}) =
       NullabilityMigrationImpl;
 
-  void finish();
+  void finishInput(ResolvedUnitResult result);
 
   void prepareInput(ResolvedUnitResult result);
 
