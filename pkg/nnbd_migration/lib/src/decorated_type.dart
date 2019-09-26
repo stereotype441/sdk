@@ -8,6 +8,7 @@ import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type_algebra.dart';
+import 'package:analyzer/src/dart/element/type_algebra.dart' as type_algebra;
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/utilities_dart.dart';
 import 'package:nnbd_migration/instrumentation.dart';
@@ -370,11 +371,16 @@ class DecoratedType implements DecoratedTypeInfo {
     var nullabilitySuffix =
         node.isNullable ? NullabilitySuffix.question : NullabilitySuffix.none;
     if (type is FunctionType) {
-      if (typeFormals.isNotEmpty) {
-        throw UnimplementedError('TODO(paulberry)');
+      var newTypeFormals = <TypeParameterElement>[];
+      var typeFormalSubstitution = <TypeParameterElement, DartType>{};
+      for (var typeFormal in typeFormals) {
+        var newTypeFormal = TypeParameterElementImpl.synthetic(typeFormal.name);
+        newTypeFormals.add(newTypeFormal);
+        typeFormalSubstitution[typeFormal] = TypeParameterTypeImpl(
+            newTypeFormal,
+            nullabilitySuffix: NullabilitySuffix.none);
       }
       var parameters = <ParameterElement>[];
-      int i = 0;
       for (int i = 0; i < type.parameters.length; i++) {
         var origParameter = type.parameters[i];
         ParameterKind parameterKind;
@@ -392,10 +398,16 @@ class DecoratedType implements DecoratedTypeInfo {
           parameterType = positionalParameters[i];
         }
         parameters.add(ParameterElementImpl.synthetic(
-            name, parameterType.toFinalType(typeProvider), parameterKind));
+            name,
+            type_algebra.substitute(parameterType.toFinalType(typeProvider),
+                typeFormalSubstitution),
+            parameterKind));
       }
       return FunctionTypeImpl.synthetic(
-          returnType.toFinalType(typeProvider), typeFormals, parameters,
+          type_algebra.substitute(
+              returnType.toFinalType(typeProvider), typeFormalSubstitution),
+          newTypeFormals,
+          parameters,
           nullabilitySuffix: nullabilitySuffix);
     } else if (type is InterfaceType) {
       return InterfaceTypeImpl.explicit(type.element,
