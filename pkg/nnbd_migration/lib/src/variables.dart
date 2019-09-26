@@ -160,9 +160,7 @@ class Variables implements VariableRecorder, VariableRepository {
 
   @override
   void recordPossiblyOptional(
-      Source source, DefaultFormalParameter parameter, NullabilityNode node) {
-    throw UnimplementedError('TODO(paulberry)');
-  }
+      Source source, DefaultFormalParameter parameter, NullabilityNode node) {}
 
   /// Creates a decorated type for the given [element], which should come from
   /// an already-migrated library (or the SDK).

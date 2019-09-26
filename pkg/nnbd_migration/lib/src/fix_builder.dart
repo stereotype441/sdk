@@ -45,6 +45,31 @@ class FixBuilder extends GeneralizingAstVisitor<void> {
   FixBuilder(this._listener, this._source, this._lineInfo, this._variables);
 
   @override
+  void visitDefaultFormalParameter(DefaultFormalParameter node) {
+    var element = node.declaredElement;
+    var decoratedType = _variables.decoratedElementType(element);
+    if (node.defaultValue != null) {
+      return null;
+    } else if (node.declaredElement.hasRequired) {
+      // TODO(paulberry): change `@required` to `required`.  See
+      // https://github.com/dart-lang/sdk/issues/38462
+      return null;
+    } else if (!decoratedType.node.isNullable) {
+      var offset = node.offset;
+      var method = element.enclosingElement;
+      var fix = _SingleNullabilityFix(
+          _source,
+          _lineInfo,
+          offset,
+          0,
+          NullabilityFixDescription.addRequired(
+              method.enclosingElement.name, method.name, element.name));
+      _listener.addFix(fix);
+      _listener.addEdit(fix, SourceEdit(offset, 0, 'required '));
+    }
+  }
+
+  @override
   void visitTypeAnnotation(TypeAnnotation node) {
     super.visitTypeAnnotation(node);
     var decoratedType = _variables.decoratedTypeAnnotation(_source, node);
