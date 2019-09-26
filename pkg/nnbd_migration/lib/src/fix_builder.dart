@@ -71,10 +71,10 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
     if (node.operator.type != TokenType.EQ) {
       throw UnimplementedError('TODO(paulberry)');
     } else {
-      // TODO(paulberry): make sure we reach setters when evaluating LHS.
-      var lhsType = node.leftHandSide.accept(this);
-      return _visitSubexpression(
-          node.rightHandSide, _typeSystem.isNullable(lhsType));
+      var target = _visitAssignmentTarget(node.leftHandSide);
+      var rhsType = _visitSubexpression(node.rightHandSide, true);
+      target(rhsType);
+      return rhsType;
     }
   }
 
@@ -169,11 +169,9 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
 
   @override
   DartType visitIndexExpression(IndexExpression node) {
-    var parent = node.parent;
-    if (parent is AssignmentExpression &&
-        identical(node, parent.leftHandSide)) {
-      throw UnimplementedError('TODO(paulberry)');
-    }
+    // We should only visit expressions in getter context.  Setter context
+    // should be handled by [_visitAssignmentTarget].
+    assert(!node.inSetterContext());
     if (node.leftBracket.type != TokenType.OPEN_SQUARE_BRACKET) {
       throw UnimplementedError('TODO(paulberry)');
     }
@@ -357,6 +355,36 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
     }
     var element = propertyName.staticElement;
     return _computeMigratedType(element);
+  }
+
+  void Function(DartType) _visitAssignmentTarget(Expression node) {
+    if (node is IndexExpression) {
+      assert(node.inSetterContext());
+      if (node.leftBracket.type != TokenType.OPEN_SQUARE_BRACKET) {
+        throw UnimplementedError('TODO(paulberry)');
+      }
+      if (node.target == null) {
+        throw UnimplementedError('TODO(paulberry)');
+      }
+      var targetType = _visitSubexpression(node.target, false);
+      var element = node.staticElement;
+      var operatorMethodType =
+          _computeMigratedType(element, targetType: targetType) as FunctionType;
+      var type = operatorMethodType;
+      assert(operatorMethodType.typeFormals.isEmpty);
+      _visitSubexpression(
+          node.index, _typeSystem.isNullable(type.parameters[0].type));
+      return (valueType) {
+        if (_typeSystem.isNullable(valueType) &&
+            !_typeSystem.isNullable(type.parameters[0].type)) {
+          throw UnimplementedError('TODO(paulberry)');
+        }
+      };
+    } else {
+      // Need to implement more cases, and add
+      // `assert(!node.inSetterContext());` to their visit methods.
+      throw UnimplementedError('TODO(paulberry)');
+    }
   }
 
   Map<TypeParameterElement, DartType> _visitInvocationArguments(
