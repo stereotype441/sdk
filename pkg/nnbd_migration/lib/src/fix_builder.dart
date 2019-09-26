@@ -7,14 +7,26 @@ import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/ast/token.dart';
+import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
+import 'package:analyzer/dart/element/type.dart';
+import 'package:analyzer/src/dart/element/handle.dart';
+import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
+import 'package:analyzer/src/dart/element/member.dart';
+import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type_algebra.dart';
+import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
 import 'package:analyzer/src/generated/resolver.dart';
+import 'package:analyzer/src/generated/resolver.dart';
+import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:front_end/src/scanner/token.dart';
@@ -191,6 +203,8 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
       // TODO(paulberry): in addition to getting the right target, we need to
       // figure out isNullAware correctly.
       throw UnimplementedError('TODO(paulberry)');
+    } else {
+      type = _computeMigratedType(node.methodName.staticElement);
     }
     if (type is FunctionType) {
       if (type.typeFormals.isNotEmpty) {
@@ -258,30 +272,45 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
   }
 
   DartType _computeMigratedType(Element element, {DartType targetType}) {
+    Element baseElement;
+    if (element is Member) {
+      assert(targetType != null);
+      baseElement = element.baseElement;
+    } else {
+      baseElement = element;
+    }
     DartType type;
-    if (element is ClassElement || element is TypeParameterElement) {
+    if (baseElement is ClassElement || baseElement is TypeParameterElement) {
       return (_typeProvider.typeType as TypeImpl)
           .withNullability(NullabilitySuffix.none);
-    } else if (element is PropertyAccessorElement) {
-      if (element.isSynthetic) {
-        type = _variables.decoratedElementType(element.variable).toFinalType();
+    } else if (baseElement is PropertyAccessorElement) {
+      if (baseElement.isSynthetic) {
+        type =
+            _variables.decoratedElementType(baseElement.variable).toFinalType();
       } else {
-        var functionType = _variables.decoratedElementType(element);
-        var decoratedType = element.isGetter
+        var functionType = _variables.decoratedElementType(baseElement);
+        var decoratedType = baseElement.isGetter
             ? functionType.returnType
             : functionType.positionalParameters[0];
         type = decoratedType.toFinalType();
       }
     } else {
-      type = _variables.decoratedElementType(element).toFinalType();
+      type = _variables.decoratedElementType(baseElement).toFinalType();
     }
     if (targetType is InterfaceType && targetType.typeArguments.isNotEmpty) {
-      var superclass = element.enclosingElement as ClassElement;
-      return substitute(
-          type,
-          _decoratedClassHierarchy
-              .getDecoratedSupertype(targetType.element, superclass)
-              .asFinalSubstitution);
+      var superclass = baseElement.enclosingElement as ClassElement;
+      var class_ = targetType.element;
+      if (class_ != superclass) {
+        type = substitute(
+            type,
+            _decoratedClassHierarchy
+                .getDecoratedSupertype(class_, superclass)
+                .asFinalSubstitution);
+      }
+      return substitute(type, {
+        for (int i = 0; i < targetType.typeArguments.length; i++)
+          class_.typeParameters[i]: targetType.typeArguments[i]
+      });
     } else {
       return type;
     }
