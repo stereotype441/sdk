@@ -284,9 +284,10 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
       if (_typeSystem.isNullable(targetType)) {
         throw UnimplementedError('TODO(paulberry)');
       }
+    } else if (tokenType == TokenType.PERIOD) {
+      targetType = _visitSubexpression(target, false);
     } else {
       throw UnimplementedError('TODO(paulberry)');
-      targetType = _visitSubexpression(target, false);
     }
     if (targetType is InterfaceType && targetType.typeArguments.isNotEmpty) {
       throw UnimplementedError('TODO(paulberry): substitute');
