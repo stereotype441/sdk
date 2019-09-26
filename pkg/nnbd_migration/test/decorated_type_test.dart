@@ -39,6 +39,11 @@ class DecoratedTypeTest extends Object
 
   ClassElement get listElement => typeProvider.listElement;
 
+  void assertDartType(DartType type, String expected) {
+    // TODO(paulberry): is it necessary to pass withNullabilty: true?
+    expect((type as TypeImpl).toString(withNullability: true), expected);
+  }
+
   void setUp() {
     NullabilityNode.clearDebugNames();
   }
@@ -295,133 +300,133 @@ class DecoratedTypeTest extends Object
   test_toFinalType_bottom_non_nullable() {
     var type =
         DecoratedType(BottomTypeImpl.instance, never).toFinalType(typeProvider);
-    expect((type as TypeImpl).toString(), 'Never');
+    assertDartType(type, 'Never');
   }
 
   test_toFinalType_bottom_nullable() {
     var type = DecoratedType(BottomTypeImpl.instance, always)
         .toFinalType(typeProvider);
-    expect((type as TypeImpl).toString(), 'Null');
+    assertDartType(type, 'Null');
   }
 
   test_toFinalType_dynamic() {
     var type = dynamic_.toFinalType(typeProvider);
-    expect((type as TypeImpl).toString(withNullability: true), 'dynamic');
+    assertDartType(type, 'dynamic');
   }
 
   test_toFinalType_function_named_parameter_non_nullable() {
     var xType = int_(node: never);
     var type = function(dynamic_, named: {'x': xType}, node: never)
         .toFinalType(typeProvider);
-    expect(type.toString(), 'dynamic Function({x: int})');
+    assertDartType(type, 'dynamic Function({x: int})');
   }
 
   test_toFinalType_function_named_parameter_nullable() {
     var xType = int_(node: always);
     var type = function(dynamic_, named: {'x': xType}, node: never)
         .toFinalType(typeProvider);
-    expect(type.toString(), 'dynamic Function({x: int?})');
+    assertDartType(type, 'dynamic Function({x: int?})');
   }
 
   test_toFinalType_function_non_nullable() {
     var type = function(dynamic_, node: never).toFinalType(typeProvider);
-    expect(type.toString(), 'dynamic Function()');
+    assertDartType(type, 'dynamic Function()');
   }
 
   test_toFinalType_function_nullable() {
     var type = function(dynamic_, node: never).toFinalType(typeProvider);
-    expect(type.toString(), 'dynamic Function()?');
+    assertDartType(type, 'dynamic Function()?');
   }
 
   test_toFinalType_function_optional_parameter_non_nullable() {
     var argType = int_(node: never);
     var type = function(dynamic_, positional: [argType], node: never)
         .toFinalType(typeProvider);
-    expect(type.toString(), 'dynamic Function([int])');
+    assertDartType(type, 'dynamic Function([int])');
   }
 
   test_toFinalType_function_optional_parameter_nullable() {
     var argType = int_(node: always);
     var type = function(dynamic_, positional: [argType], node: never)
         .toFinalType(typeProvider);
-    expect(type.toString(), 'dynamic Function([int?])');
+    assertDartType(type, 'dynamic Function([int?])');
   }
 
   test_toFinalType_function_required_parameter_non_nullable() {
     var argType = int_(node: never);
     var type = function(dynamic_, required: [argType], node: never)
         .toFinalType(typeProvider);
-    expect(type.toString(), 'dynamic Function(int)');
+    assertDartType(type, 'dynamic Function(int)');
   }
 
   test_toFinalType_function_required_parameter_nullable() {
     var argType = int_(node: always);
     var type = function(dynamic_, positional: [argType], node: never)
         .toFinalType(typeProvider);
-    expect(type.toString(), 'dynamic Function(int?)');
+    assertDartType(type, 'dynamic Function(int?)');
   }
 
   test_toFinalType_function_return_type_non_nullable() {
     var returnType = int_(node: never);
     var type = function(returnType, node: never).toFinalType(typeProvider);
-    expect(type.toString(), 'int Function()');
+    assertDartType(type, 'int Function()');
   }
 
   test_toFinalType_function_return_type_nullable() {
     var returnType = int_(node: always);
     var type = function(returnType, node: never).toFinalType(typeProvider);
-    expect(type.toString(), 'int? Function()');
+    assertDartType(type, 'int? Function()');
   }
 
   test_toFinalType_interface_non_nullable() {
     var type = int_(node: never).toFinalType(typeProvider);
-    expect((type as TypeImpl).toString(), 'int');
+    assertDartType(type, 'int');
   }
 
   test_toFinalType_interface_nullable() {
     var type = int_(node: always).toFinalType(typeProvider);
-    expect((type as TypeImpl).toString(), 'int?');
+    assertDartType(type, 'int?');
   }
 
   test_toFinalType_interface_type_argument_non_nullable() {
     var argType = int_(node: never);
     var type = list(argType, node: never).toFinalType(typeProvider);
-    expect((type as TypeImpl).toString(), 'List<int>');
+    assertDartType(type, 'List<int>');
   }
 
   test_toFinalType_interface_type_argument_nullable() {
     var argType = int_(node: always);
     var type = list(argType, node: never).toFinalType(typeProvider);
-    expect((type as TypeImpl).toString(), 'List<int?>');
+    assertDartType(type, 'List<int?>');
   }
 
   test_toFinalType_null_non_nullable() {
     var type = DecoratedType(null_.type, never).toFinalType(typeProvider);
-    expect((type as TypeImpl).toString(), 'Never');
+    assertDartType(type, 'Never');
   }
 
   test_toFinalType_null_nullable() {
     var type = DecoratedType(null_.type, always).toFinalType(typeProvider);
-    expect((type as TypeImpl).toString(), 'Null');
+    assertDartType(type, 'Null');
   }
 
   test_toFinalType_typeParameter_non_nullable() {
     var t = typeParameter('T', null);
     var type = typeParameterType(t, node: never).toFinalType(typeProvider);
     expect(t, TypeMatcher<TypeParameterType>());
-    expect(type.toString(), 'T');
+    assertDartType(type, 'T');
   }
 
   test_toFinalType_typeParameter_nullable() {
     var t = typeParameter('T', null);
     var type = typeParameterType(t, node: always).toFinalType(typeProvider);
     expect(t, TypeMatcher<TypeParameterType>());
-    expect(type.toString(), 'T?');
+    assertDartType(type, 'T?');
   }
 
   test_toFinalType_void() {
     var type = void_.toFinalType(typeProvider);
-    expect((type as TypeImpl).toString(withNullability: true), 'void');
+    assertDartType(type, 'void');
   }
 
   test_toString_bottom() {
