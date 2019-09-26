@@ -3,6 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/testing/test_type_provider.dart';
@@ -289,6 +290,138 @@ class DecoratedTypeTest extends Object
     var argType = int_();
     var node = newNode();
     expect(list(argType, node: node) == list(argType, node: node), isTrue);
+  }
+
+  test_toFinalType_bottom_non_nullable() {
+    var type =
+        DecoratedType(BottomTypeImpl.instance, never).toFinalType(typeProvider);
+    expect((type as TypeImpl).toString(), 'Never');
+  }
+
+  test_toFinalType_bottom_nullable() {
+    var type = DecoratedType(BottomTypeImpl.instance, always)
+        .toFinalType(typeProvider);
+    expect((type as TypeImpl).toString(), 'Null');
+  }
+
+  test_toFinalType_dynamic() {
+    var type = dynamic_.toFinalType(typeProvider);
+    expect((type as TypeImpl).toString(withNullability: true), 'dynamic');
+  }
+
+  test_toFinalType_function_named_parameter_non_nullable() {
+    var xType = int_(node: never);
+    var type = function(dynamic_, named: {'x': xType}, node: never)
+        .toFinalType(typeProvider);
+    expect(type.toString(), 'dynamic Function({x: int})');
+  }
+
+  test_toFinalType_function_named_parameter_nullable() {
+    var xType = int_(node: always);
+    var type = function(dynamic_, named: {'x': xType}, node: never)
+        .toFinalType(typeProvider);
+    expect(type.toString(), 'dynamic Function({x: int?})');
+  }
+
+  test_toFinalType_function_non_nullable() {
+    var type = function(dynamic_, node: never).toFinalType(typeProvider);
+    expect(type.toString(), 'dynamic Function()');
+  }
+
+  test_toFinalType_function_nullable() {
+    var type = function(dynamic_, node: never).toFinalType(typeProvider);
+    expect(type.toString(), 'dynamic Function()?');
+  }
+
+  test_toFinalType_function_optional_parameter_non_nullable() {
+    var argType = int_(node: never);
+    var type = function(dynamic_, positional: [argType], node: never)
+        .toFinalType(typeProvider);
+    expect(type.toString(), 'dynamic Function([int])');
+  }
+
+  test_toFinalType_function_optional_parameter_nullable() {
+    var argType = int_(node: always);
+    var type = function(dynamic_, positional: [argType], node: never)
+        .toFinalType(typeProvider);
+    expect(type.toString(), 'dynamic Function([int?])');
+  }
+
+  test_toFinalType_function_required_parameter_non_nullable() {
+    var argType = int_(node: never);
+    var type = function(dynamic_, required: [argType], node: never)
+        .toFinalType(typeProvider);
+    expect(type.toString(), 'dynamic Function(int)');
+  }
+
+  test_toFinalType_function_required_parameter_nullable() {
+    var argType = int_(node: always);
+    var type = function(dynamic_, positional: [argType], node: never)
+        .toFinalType(typeProvider);
+    expect(type.toString(), 'dynamic Function(int?)');
+  }
+
+  test_toFinalType_function_return_type_non_nullable() {
+    var returnType = int_(node: never);
+    var type = function(returnType, node: never).toFinalType(typeProvider);
+    expect(type.toString(), 'int Function()');
+  }
+
+  test_toFinalType_function_return_type_nullable() {
+    var returnType = int_(node: always);
+    var type = function(returnType, node: never).toFinalType(typeProvider);
+    expect(type.toString(), 'int? Function()');
+  }
+
+  test_toFinalType_interface_non_nullable() {
+    var type = int_(node: never).toFinalType(typeProvider);
+    expect((type as TypeImpl).toString(), 'int');
+  }
+
+  test_toFinalType_interface_nullable() {
+    var type = int_(node: always).toFinalType(typeProvider);
+    expect((type as TypeImpl).toString(), 'int?');
+  }
+
+  test_toFinalType_interface_type_argument_non_nullable() {
+    var argType = int_(node: never);
+    var type = list(argType, node: never).toFinalType(typeProvider);
+    expect((type as TypeImpl).toString(), 'List<int>');
+  }
+
+  test_toFinalType_interface_type_argument_nullable() {
+    var argType = int_(node: always);
+    var type = list(argType, node: never).toFinalType(typeProvider);
+    expect((type as TypeImpl).toString(), 'List<int?>');
+  }
+
+  test_toFinalType_null_non_nullable() {
+    var type = DecoratedType(null_.type, never).toFinalType(typeProvider);
+    expect((type as TypeImpl).toString(), 'Never');
+  }
+
+  test_toFinalType_null_nullable() {
+    var type = DecoratedType(null_.type, always).toFinalType(typeProvider);
+    expect((type as TypeImpl).toString(), 'Null');
+  }
+
+  test_toFinalType_typeParameter_non_nullable() {
+    var t = typeParameter('T', null);
+    var type = typeParameterType(t, node: never).toFinalType(typeProvider);
+    expect(t, TypeMatcher<TypeParameterType>());
+    expect(type.toString(), 'T');
+  }
+
+  test_toFinalType_typeParameter_nullable() {
+    var t = typeParameter('T', null);
+    var type = typeParameterType(t, node: always).toFinalType(typeProvider);
+    expect(t, TypeMatcher<TypeParameterType>());
+    expect(type.toString(), 'T?');
+  }
+
+  test_toFinalType_void() {
+    var type = void_.toFinalType(typeProvider);
+    expect((type as TypeImpl).toString(withNullability: true), 'void');
   }
 
   test_toString_bottom() {

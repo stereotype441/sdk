@@ -201,6 +201,13 @@ class DecoratedType implements DecoratedTypeInfo {
     assert(parameter.enclosingElement == null);
   }
 
+  Map<TypeParameterElement, DartType> asFinalSubstitution(TypeProvider typeProvider) {
+    return {
+      for (var entry in asSubstitution.entries)
+        entry.key: entry.value.toFinalType(typeProvider)
+    };
+  }
+
   /// If `this` represents an interface type, returns the substitution necessary
   /// to produce this type using the class's type as a starting point.
   /// Otherwise throws an exception.
@@ -217,10 +224,6 @@ class DecoratedType implements DecoratedTypeInfo {
       throw StateError(
           'Tried to convert a non-interface type to a substitution');
     }
-  }
-
-  Map<TypeParameterElement, DartType> get asFinalSubstitution {
-    return {for (var entry in asSubstitution.entries) entry.key: entry.value.toFinalType()};
   }
 
   /// If this type is a function type, returns its generic formal parameters.
@@ -352,9 +355,17 @@ class DecoratedType implements DecoratedTypeInfo {
     return _substitute(substitution, undecoratedResult);
   }
 
-  DartType toFinalType() {
+  DartType toFinalType(TypeProvider typeProvider) {
     var type = this.type;
     if (type.isVoid || type.isDynamic) return type;
+    if (type.isBottom || type.isDartCoreNull) {
+      if (node.isNullable) {
+        return BottomTypeImpl.instance;
+      } else {
+        return (typeProvider.nullType as TypeImpl)
+            .withNullability(NullabilitySuffix.none);
+      }
+    }
     var nullabilitySuffix =
         node.isNullable ? NullabilitySuffix.question : NullabilitySuffix.none;
     if (type is FunctionType) {
@@ -380,14 +391,14 @@ class DecoratedType implements DecoratedTypeInfo {
           parameterType = positionalParameters[i];
         }
         parameters.add(ParameterElementImpl.synthetic(
-            name, parameterType.toFinalType(), parameterKind));
+            name, parameterType.toFinalType(typeProvider), parameterKind));
       }
       return FunctionTypeImpl.synthetic(
-          returnType.toFinalType(), typeFormals, parameters,
+          returnType.toFinalType(typeProvider), typeFormals, parameters,
           nullabilitySuffix: nullabilitySuffix);
     } else if (type is InterfaceType) {
-      return InterfaceTypeImpl.explicit(
-          type.element, [for (var arg in typeArguments) arg.toFinalType()],
+      return InterfaceTypeImpl.explicit(type.element,
+          [for (var arg in typeArguments) arg.toFinalType(typeProvider)],
           nullabilitySuffix: nullabilitySuffix);
     } else if (type is TypeParameterType) {
       return TypeParameterTypeImpl(type.element,
