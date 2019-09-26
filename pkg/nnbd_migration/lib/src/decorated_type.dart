@@ -349,6 +349,12 @@ class DecoratedType implements DecoratedTypeInfo {
     return _substitute(substitution, undecoratedResult);
   }
 
+  /// Convert this decorated type into the [DartType] that it will represent
+  /// after the code has been migrated.
+  ///
+  /// This method should be used after nullability propagation; it makes use of
+  /// the nullabilities associated with nullability nodes to determine which
+  /// types should be nullable and which types should not.
   DartType toFinalType(TypeProvider typeProvider) {
     var type = this.type;
     if (type.isVoid || type.isDynamic) return type;
