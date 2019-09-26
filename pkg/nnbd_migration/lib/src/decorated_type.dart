@@ -382,10 +382,8 @@ class DecoratedType implements DecoratedTypeInfo {
           returnType.toFinalType(), typeFormals, parameters,
           nullabilitySuffix: nullabilitySuffix);
     } else if (type is InterfaceType) {
-      if (type.typeArguments.isNotEmpty) {
-        throw UnimplementedError('TODO(paulberry)');
-      }
-      return InterfaceTypeImpl.explicit(type.element, [],
+      return InterfaceTypeImpl.explicit(
+          type.element, [for (var arg in typeArguments) arg.toFinalType()],
           nullabilitySuffix: nullabilitySuffix);
     }
     throw UnimplementedError('TODO(paulberry)');
