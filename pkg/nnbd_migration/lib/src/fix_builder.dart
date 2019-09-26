@@ -148,7 +148,17 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
 
   @override
   DartType visitMethodInvocation(MethodInvocation node) {
-    if (node.realTarget != null) {
+    bool isNullAware = node.operator != null &&
+        node.operator.type == TokenType.QUESTION_PERIOD;
+    DartType targetType;
+    if (node.target != null) {
+      targetType = _visitSubexpression(node.target, isNullAware);
+      if (targetType is InterfaceType && targetType.typeArguments.isNotEmpty) {
+        throw UnimplementedError('TODO(paulberry)');
+      }
+    } else if (node.realTarget != null) {
+      // TODO(paulberry): in addition to getting the right target, we need to
+      // figure out isNullAware correctly.
       throw UnimplementedError('TODO(paulberry)');
     }
     var type = _computeMigratedType(node.methodName.staticElement);
