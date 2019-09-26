@@ -49,7 +49,7 @@ abstract class FixBuilder extends EditPlanner {
           return _UnwrapPlan(
               node.offset, node.end, node.thenStatement.accept(this));
         } else {
-          return _DropStatementsPlan(node.offset, node.end);
+          return DropStatementPlan(node.offset, node.end);
         }
         break;
     }
@@ -63,24 +63,6 @@ enum IfBehavior {
   keepConditionAndElse,
   keepThen,
   keepElse
-}
-
-class _DropStatementsPlan extends EditPlan with StatementsPlan {
-  @override
-  final int offset;
-
-  @override
-  final int end;
-
-  _DropStatementsPlan(this.offset, this.end);
-
-  @override
-  bool get isSingleStatement => false;
-
-  @override
-  void execute(EditAccumulator accumulator) {
-    accumulator.delete(offset, end);
-  }
 }
 
 class _ExpressionStatementPlan extends WrapPlan with StatementsPlan {
