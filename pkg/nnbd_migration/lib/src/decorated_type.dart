@@ -365,14 +365,14 @@ class DecoratedType implements DecoratedTypeInfo {
         DecoratedType parameterType;
         var name = origParameter.name;
         if (origParameter.isNamed) {
-          parameterKind = origParameter.isOptional
-              ? ParameterKind.POSITIONAL
-              : ParameterKind.REQUIRED;
-          parameterType = namedParameters[name];
-        } else {
           // TODO(paulberry): infer ParameterKind.NAMED_REQUIRED when
           // appropriate.
           parameterKind = ParameterKind.NAMED;
+          parameterType = namedParameters[name];
+        } else {
+          parameterKind = origParameter.isOptional
+              ? ParameterKind.POSITIONAL
+              : ParameterKind.REQUIRED;
           parameterType = positionalParameters[i];
         }
         parameters.add(ParameterElementImpl.synthetic(
