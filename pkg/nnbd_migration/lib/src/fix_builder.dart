@@ -86,15 +86,23 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
 
   @override
   DartType visitDefaultFormalParameter(DefaultFormalParameter node) {
+    node.metadata.accept(this);
+    node.parameter.accept(this);
     var element = node.declaredElement;
-    var decoratedType = _variables.decoratedElementType(element);
+    var type = _computeMigratedType(element);
+    var isNullable = _typeSystem.isNullable(type);
     if (node.defaultValue != null) {
+      _visitSubexpression(node.defaultValue, isNullable);
       return null;
     } else if (node.declaredElement.hasRequired) {
       // TODO(paulberry): change `@required` to `required`.  See
       // https://github.com/dart-lang/sdk/issues/38462
       return null;
-    } else if (!decoratedType.node.isNullable) {
+    } else if (!isNullable) {
+      if (node.metadata.isNotEmpty) {
+        throw new UnimplementedError(
+            'TODO(paulberry): figure out where to add "required"');
+      }
       var offset = node.offset;
       var method = element.enclosingElement;
       var fix = _SingleNullabilityFix(
