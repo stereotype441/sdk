@@ -56,8 +56,8 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
     } else {
       // TODO(paulberry): make sure we reach setters when evaluating LHS.
       var lhsType = node.leftHandSide.accept(this);
-      var rhsType = _visitSubexpression(node.rightHandSide, lhsType);
-      node.rightHandSide.accept(this);
+      return _visitSubexpression(
+          node.rightHandSide, _typeSystem.isNullable(lhsType));
     }
   }
 
@@ -128,6 +128,16 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
   }
 
   @override
+  DartType visitPrefixedIdentifier(PrefixedIdentifier node) {
+    var prefixType = _visitSubexpression(node.prefix, false);
+    if (prefixType is InterfaceType && prefixType.typeArguments.isNotEmpty) {
+      throw UnimplementedError('TODO(paulberry): substitute');
+    }
+    var element = node.identifier.staticElement;
+    return _computeMigratedType(element);
+  }
+
+  @override
   DartType visitSimpleIdentifier(SimpleIdentifier node) {
     var element = node.staticElement;
     if (element == null) return _typeProvider.dynamicType;
@@ -162,15 +172,21 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
       return (_typeProvider.typeType as TypeImpl)
           .withNullability(NullabilitySuffix.none);
     } else if (element is PropertyAccessorElement) {
-      throw UnimplementedError('TODO(paulberry)');
+      var type = _variables.decoratedElementType(element).toFinalType()
+          as FunctionType;
+      if (element.isGetter) {
+        return type.returnType;
+      } else {
+        return type.normalParameterTypes[0];
+      }
+    } else {
+      return _variables.decoratedElementType(element).toFinalType();
     }
-    return _variables.decoratedElementType(element).toFinalType();
   }
 
-  DartType _visitSubexpression(
-      Expression subexpression, DartType expectedType) {
+  DartType _visitSubexpression(Expression subexpression, bool nullableContext) {
     var type = subexpression.accept(this);
-    if (_typeSystem.isNullable(type) && !_typeSystem.isNullable(expectedType)) {
+    if (_typeSystem.isNullable(type) && !nullableContext) {
       // TODO(paulberry): add parens if necessary.
       // See https://github.com/dart-lang/sdk/issues/38469
       var offset = subexpression.end;
