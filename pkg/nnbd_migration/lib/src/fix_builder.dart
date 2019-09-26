@@ -176,7 +176,7 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
     }
     node.constructorName.accept(this);
     var type = _computeMigratedType(constructor) as FunctionType;
-    _visitInvocationArguments(type, node.argumentList);
+    _visitInvocationArguments(type, node.argumentList, null);
     return InterfaceTypeImpl.explicit(class_, [],
         nullabilitySuffix: NullabilitySuffix.none);
   }
@@ -207,12 +207,9 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
       type = _computeMigratedType(node.methodName.staticElement);
     }
     if (type is FunctionType) {
-      if (type.typeFormals.isNotEmpty) {
-        throw UnimplementedError('TODO(paulberry)');
-      }
-      node.typeArguments?.accept(this);
-      _visitInvocationArguments(type, node.argumentList);
-      return type.returnType;
+      var substitution = _visitInvocationArguments(
+          type, node.argumentList, node.typeArguments);
+      return substitute(type.returnType, substitution);
     } else {
       throw UnimplementedError('TODO(paulberry)');
     }
@@ -339,7 +336,27 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
     return _computeMigratedType(element);
   }
 
-  void _visitInvocationArguments(FunctionType type, ArgumentList argumentList) {
+  Map<TypeParameterElement, DartType> _visitInvocationArguments(
+      FunctionType type,
+      ArgumentList argumentList,
+      TypeArgumentList typeArguments) {
+    typeArguments?.accept(this);
+    Map<TypeParameterElement, DartType> substitution;
+    if (type.typeFormals.isNotEmpty) {
+      if (typeArguments != null) {
+        assert(type.typeFormals.length == typeArguments.arguments.length);
+        substitution = {
+          for (int i = 0; i < type.typeFormals.length; i++)
+            type.typeFormals[i]: _variables
+                .decoratedTypeAnnotation(_source, typeArguments.arguments[i])
+                .toFinalType(_typeProvider)
+        };
+      } else {
+        throw UnimplementedError('TODO(paulberry)');
+      }
+    } else {
+      substitution = const {};
+    }
     int i = 0;
     for (var argument in argumentList.arguments) {
       Expression expression;
@@ -351,8 +368,10 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
         expression = argument;
         parameterType = type.parameters[i++].type;
       }
+      parameterType = substitute(parameterType, substitution);
       _visitSubexpression(expression, _typeSystem.isNullable(parameterType));
     }
+    return substitution;
   }
 
   DartType _visitSubexpression(Expression subexpression, bool nullableContext) {
