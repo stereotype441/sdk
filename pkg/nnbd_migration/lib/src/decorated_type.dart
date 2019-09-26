@@ -201,13 +201,6 @@ class DecoratedType implements DecoratedTypeInfo {
     assert(parameter.enclosingElement == null);
   }
 
-  Map<TypeParameterElement, DartType> asFinalSubstitution(TypeProvider typeProvider) {
-    return {
-      for (var entry in asSubstitution.entries)
-        entry.key: entry.value.toFinalType(typeProvider)
-    };
-  }
-
   /// If `this` represents an interface type, returns the substitution necessary
   /// to produce this type using the class's type as a starting point.
   /// Otherwise throws an exception.
@@ -315,6 +308,14 @@ class DecoratedType implements DecoratedTypeInfo {
     return false;
   }
 
+  Map<TypeParameterElement, DartType> asFinalSubstitution(
+      TypeProvider typeProvider) {
+    return {
+      for (var entry in asSubstitution.entries)
+        entry.key: entry.value.toFinalType(typeProvider)
+    };
+  }
+
   /// Converts one function type into another by substituting the given
   /// [argumentTypes] for the function's generic parameters.
   DecoratedType instantiate(List<DecoratedType> argumentTypes) {
@@ -360,10 +361,10 @@ class DecoratedType implements DecoratedTypeInfo {
     if (type.isVoid || type.isDynamic) return type;
     if (type.isBottom || type.isDartCoreNull) {
       if (node.isNullable) {
-        return BottomTypeImpl.instance;
-      } else {
         return (typeProvider.nullType as TypeImpl)
             .withNullability(NullabilitySuffix.none);
+      } else {
+        return BottomTypeImpl.instance;
       }
     }
     var nullabilitySuffix =
