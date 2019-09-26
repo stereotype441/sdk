@@ -236,7 +236,6 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
 
   @override
   DartType visitPrefixedIdentifier(PrefixedIdentifier node) {
-    assert(!node.identifier.inSetterContext());
     return _handlePropertyGet(node.prefix, node.period.type, node.identifier);
   }
 
@@ -338,13 +337,9 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
 
   DartType _handlePropertyGet(
       Expression target, TokenType tokenType, SimpleIdentifier propertyName) {
+    assert(!propertyName.inSetterContext());
     DartType targetType;
-    if (tokenType == TokenType.PERIOD_PERIOD) {
-      targetType = _currentCascadeTargetType;
-      if (_typeSystem.isNullable(targetType)) {
-        throw UnimplementedError('TODO(paulberry)');
-      }
-    } else if (tokenType == TokenType.PERIOD) {
+    if (tokenType == TokenType.PERIOD) {
       targetType = _visitSubexpression(target, false);
     } else {
       throw UnimplementedError('TODO(paulberry)');
@@ -377,26 +372,34 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
     } else if (node is SimpleIdentifier) {
       return _typeSystem.isNullable(_computeMigratedType(node.staticElement));
     } else if (node is PrefixedIdentifier) {
-      assert(node.identifier.inSetterContext());
-      var tokenType = node.period.type;
-      var target = node.prefix;
-      var propertyName = node.identifier;
-      DartType targetType;
-      if (tokenType == TokenType.PERIOD) {
-        targetType = _visitSubexpression(target, false);
-      } else {
-        throw UnimplementedError('TODO(paulberry)');
-      }
-      if (targetType is InterfaceType && targetType.typeArguments.isNotEmpty) {
-        throw UnimplementedError('TODO(paulberry): substitute');
-      }
-      var element = propertyName.staticElement;
-      return _typeSystem.isNullable(_computeMigratedType(element));
+      return _handlePropertySet(node.prefix, node.period.type, node.identifier);
+    } else if (node is PropertyAccess) {
+      return _handlePropertySet(node.target, node.operator.type, node.propertyName);
     } else {
       // Need to implement more cases, and add
       // `assert(!node.inSetterContext());` to their visit methods.
       throw UnimplementedError('TODO(paulberry)');
     }
+  }
+
+  bool _handlePropertySet(Expression target, TokenType tokenType, SimpleIdentifier propertyName) {
+    assert(propertyName.inSetterContext());
+    DartType targetType;
+    if (tokenType == TokenType.PERIOD_PERIOD) {
+      targetType = _currentCascadeTargetType;
+      if (_typeSystem.isNullable(targetType)) {
+        throw UnimplementedError('TODO(paulberry)');
+      }
+    } else if (tokenType == TokenType.PERIOD) {
+      targetType = _visitSubexpression(target, false);
+    } else {
+      throw UnimplementedError('TODO(paulberry)');
+    }
+    if (targetType is InterfaceType && targetType.typeArguments.isNotEmpty) {
+      throw UnimplementedError('TODO(paulberry): substitute');
+    }
+    var element = propertyName.staticElement;
+    return _typeSystem.isNullable(_computeMigratedType(element));
   }
 
   Map<TypeParameterElement, DartType> _visitInvocationArguments(
