@@ -413,8 +413,12 @@ class DecoratedType implements DecoratedTypeInfo {
     } else if (type is TypeParameterType) {
       return TypeParameterTypeImpl(type.element,
           nullabilitySuffix: nullabilitySuffix);
+    } else {
+      // The above cases should cover all possible types.  On the off chance
+      // they don't, fall back on returning DecoratedType.type.
+      assert(false, 'Unexpected type (${type.runtimeType})');
+      return type;
     }
-    throw UnimplementedError('TODO(paulberry)');
   }
 
   @override
