@@ -309,14 +309,6 @@ class DecoratedType implements DecoratedTypeInfo {
     return false;
   }
 
-  Map<TypeParameterElement, DartType> asFinalSubstitution(
-      TypeProvider typeProvider) {
-    return {
-      for (var entry in asSubstitution.entries)
-        entry.key: entry.value.toFinalType(typeProvider)
-    };
-  }
-
   /// Converts one function type into another by substituting the given
   /// [argumentTypes] for the function's generic parameters.
   DecoratedType instantiate(List<DecoratedType> argumentTypes) {
