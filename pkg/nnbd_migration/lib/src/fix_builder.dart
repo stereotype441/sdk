@@ -215,29 +215,22 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
     DartType methodType;
     if (node.operator == null) {
       methodType = _computeMigratedType(node.methodName.staticElement);
-    } else if (node.operator.type == TokenType.PERIOD_PERIOD) {
-      assert(node.target == null);
-      var targetType = _currentCascadeTargetType;
-      if (_typeSystem.isNullable(targetType)) {
+    } else {
+      DartType targetType;
+      if (node.operator.type == TokenType.PERIOD_PERIOD) {
+        assert(node.target == null);
+        targetType = _currentCascadeTargetType;
+        if (_typeSystem.isNullable(targetType)) {
+          throw UnimplementedError('TODO(paulberry)');
+        }
+      } else if (node.operator.type == TokenType.PERIOD) {
+        assert(node.target != null);
+        targetType = _visitSubexpression(node.target, false);
+      } else {
         throw UnimplementedError('TODO(paulberry)');
       }
       methodType = _computeMigratedType(node.methodName.staticElement,
           targetType: targetType);
-    } else {
-      throw UnimplementedError('TODO(paulberry)');
-      bool isNullAware = node.operator != null &&
-          node.operator.type == TokenType.QUESTION_PERIOD;
-      if (node.target != null) {
-        DartType targetType = _visitSubexpression(node.target, isNullAware);
-        methodType = _computeMigratedType(node.methodName.staticElement,
-            targetType: targetType);
-      } else if (node.realTarget != null) {
-        // TODO(paulberry): in addition to getting the right target, we need to
-        // figure out isNullAware correctly.
-        throw UnimplementedError('TODO(paulberry)');
-      } else {
-        methodType = _computeMigratedType(node.methodName.staticElement);
-      }
     }
     if (methodType is FunctionType) {
       var substitution = _visitInvocationArguments(
