@@ -391,7 +391,7 @@ class DecoratedType implements DecoratedTypeInfo {
         var name = origParameter.name;
         if (origParameter.isNamed) {
           // TODO(paulberry): infer ParameterKind.NAMED_REQUIRED when
-          // appropriate.
+          // appropriate. See https://github.com/dart-lang/sdk/issues/38596.
           parameterKind = ParameterKind.NAMED;
           parameterType = namedParameters[name];
         } else {
