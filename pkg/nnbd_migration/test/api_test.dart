@@ -609,7 +609,7 @@ main() {
     await _checkSingleFileChanges(content, expected);
   }
 
-  test_data_flow_generic_contravariant_inward() async {
+  solo_test_data_flow_generic_contravariant_inward() async {
     var content = '''
 class C<T> {
   void f(T t) {}

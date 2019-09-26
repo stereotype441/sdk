@@ -219,6 +219,10 @@ class DecoratedType implements DecoratedTypeInfo {
     }
   }
 
+  Map<TypeParameterElement, DartType> get asFinalSubstitution {
+    return {for (var entry in asSubstitution.entries) entry.key: entry.value.toFinalType()};
+  }
+
   /// If this type is a function type, returns its generic formal parameters.
   /// Otherwise returns `null`.
   List<TypeParameterElement> get typeFormals {
@@ -384,6 +388,9 @@ class DecoratedType implements DecoratedTypeInfo {
     } else if (type is InterfaceType) {
       return InterfaceTypeImpl.explicit(
           type.element, [for (var arg in typeArguments) arg.toFinalType()],
+          nullabilitySuffix: nullabilitySuffix);
+    } else if (type is TypeParameterType) {
+      return TypeParameterTypeImpl(type.element,
           nullabilitySuffix: nullabilitySuffix);
     }
     throw UnimplementedError('TODO(paulberry)');

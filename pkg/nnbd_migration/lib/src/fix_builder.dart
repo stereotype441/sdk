@@ -12,8 +12,8 @@ import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
-import 'package:analyzer/src/dart/element/handle.dart';
 import 'package:analyzer/src/dart/element/type.dart';
+import 'package:analyzer/src/dart/element/type_algebra.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/generated/source.dart';
@@ -24,6 +24,7 @@ import 'package:nnbd_migration/instrumentation.dart';
 import 'package:nnbd_migration/instrumentation.dart';
 import 'package:nnbd_migration/nnbd_migration.dart';
 import 'package:nnbd_migration/src/conditional_discard.dart';
+import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
 import 'package:nnbd_migration/src/decorated_type.dart';
 import 'package:nnbd_migration/src/expression_checks.dart';
 import 'package:nnbd_migration/src/nullability_migration_impl.dart';
@@ -48,8 +49,10 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
 
   DartType _currentCascadeTargetType;
 
+  final DecoratedClassHierarchy _decoratedClassHierarchy;
+
   FixBuilder(this._listener, this._source, this._lineInfo, this._variables,
-      this._typeProvider, this._typeSystem);
+      this._typeProvider, this._typeSystem, this._decoratedClassHierarchy);
 
   @override
   DartType visitAssignmentExpression(AssignmentExpression node) {
@@ -179,18 +182,16 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
   DartType visitMethodInvocation(MethodInvocation node) {
     bool isNullAware = node.operator != null &&
         node.operator.type == TokenType.QUESTION_PERIOD;
-    DartType targetType;
+    DartType type;
     if (node.target != null) {
-      targetType = _visitSubexpression(node.target, isNullAware);
-      if (targetType is InterfaceType && targetType.typeArguments.isNotEmpty) {
-        throw UnimplementedError('TODO(paulberry)');
-      }
+      var targetType = _visitSubexpression(node.target, isNullAware);
+      type = _computeMigratedType(node.methodName.staticElement,
+          targetType: targetType);
     } else if (node.realTarget != null) {
       // TODO(paulberry): in addition to getting the right target, we need to
       // figure out isNullAware correctly.
       throw UnimplementedError('TODO(paulberry)');
     }
-    var type = _computeMigratedType(node.methodName.staticElement);
     if (type is FunctionType) {
       if (type.typeFormals.isNotEmpty) {
         throw UnimplementedError('TODO(paulberry)');
@@ -256,23 +257,33 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
     return null;
   }
 
-  DartType _computeMigratedType(Element element) {
-    if (element is ClassElement) {
+  DartType _computeMigratedType(Element element, {DartType targetType}) {
+    DartType type;
+    if (element is ClassElement || element is TypeParameterElement) {
       return (_typeProvider.typeType as TypeImpl)
           .withNullability(NullabilitySuffix.none);
     } else if (element is PropertyAccessorElement) {
       if (element.isSynthetic) {
-        return _variables.decoratedElementType(element.variable).toFinalType();
-      }
-      var type = _variables.decoratedElementType(element).toFinalType()
-          as FunctionType;
-      if (element.isGetter) {
-        return type.returnType;
+        type = _variables.decoratedElementType(element.variable).toFinalType();
       } else {
-        return type.normalParameterTypes[0];
+        var functionType = _variables.decoratedElementType(element);
+        var decoratedType = element.isGetter
+            ? functionType.returnType
+            : functionType.positionalParameters[0];
+        type = decoratedType.toFinalType();
       }
     } else {
-      return _variables.decoratedElementType(element).toFinalType();
+      type = _variables.decoratedElementType(element).toFinalType();
+    }
+    if (targetType is InterfaceType && targetType.typeArguments.isNotEmpty) {
+      var superclass = element.enclosingElement as ClassElement;
+      return substitute(
+          type,
+          _decoratedClassHierarchy
+              .getDecoratedSupertype(targetType.element, superclass)
+              .asFinalSubstitution);
+    } else {
+      return type;
     }
   }
 
