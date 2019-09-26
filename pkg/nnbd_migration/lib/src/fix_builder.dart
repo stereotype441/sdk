@@ -285,17 +285,20 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
           .withNullability(NullabilitySuffix.none);
     } else if (baseElement is PropertyAccessorElement) {
       if (baseElement.isSynthetic) {
-        type =
-            _variables.decoratedElementType(baseElement.variable).toFinalType();
+        type = _variables
+            .decoratedElementType(baseElement.variable)
+            .toFinalType(_typeProvider);
       } else {
         var functionType = _variables.decoratedElementType(baseElement);
         var decoratedType = baseElement.isGetter
             ? functionType.returnType
             : functionType.positionalParameters[0];
-        type = decoratedType.toFinalType();
+        type = decoratedType.toFinalType(_typeProvider);
       }
     } else {
-      type = _variables.decoratedElementType(baseElement).toFinalType();
+      type = _variables
+          .decoratedElementType(baseElement)
+          .toFinalType(_typeProvider);
     }
     if (targetType is InterfaceType && targetType.typeArguments.isNotEmpty) {
       var superclass = baseElement.enclosingElement as ClassElement;
@@ -305,7 +308,7 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
             type,
             _decoratedClassHierarchy
                 .getDecoratedSupertype(class_, superclass)
-                .asFinalSubstitution);
+                .asFinalSubstitution(_typeProvider));
       }
       return substitute(type, {
         for (int i = 0; i < targetType.typeArguments.length; i++)
