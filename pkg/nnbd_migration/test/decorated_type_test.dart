@@ -40,7 +40,9 @@ class DecoratedTypeTest extends Object
   ClassElement get listElement => typeProvider.listElement;
 
   void assertDartType(DartType type, String expected) {
-    // TODO(paulberry): is it necessary to pass withNullabilty: true?
+    // Note: by default DartType.toString doesn't print nullability suffixes,
+    // so we have to override that behavior in order to make sure the
+    // nullability suffixes are correct.
     expect((type as TypeImpl).toString(withNullability: true), expected);
   }
 
