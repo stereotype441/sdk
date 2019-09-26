@@ -314,8 +314,35 @@ class DecoratedTypeTest extends Object
     assertDartType(type, 'dynamic');
   }
 
+  test_toFinalType_function_generic_substitute_bounds() {
+    var u = typeParameter('U', object(node: never));
+    var t = typeParameter(
+        'T', list(typeParameterType(u, node: never), node: never));
+    var v = typeParameter(
+        'V', list(typeParameterType(u, node: never), node: never));
+    var type = function(dynamic_, typeFormals: [t, u, v], node: never)
+        .toFinalType(typeProvider) as FunctionType;
+    assertDartType(
+        type,
+        'dynamic Function<T extends List<U>,U extends Object,'
+        'V extends List<U>>()');
+    expect(type.typeFormals[0], isNot(same(t)));
+    expect(type.typeFormals[1], isNot(same(u)));
+    expect(type.typeFormals[2], isNot(same(v)));
+    expect(
+        ((type.typeFormals[0].bound as InterfaceType).typeArguments[0]
+                as TypeParameterType)
+            .element,
+        same(type.typeFormals[1]));
+    expect(
+        ((type.typeFormals[2].bound as InterfaceType).typeArguments[0]
+                as TypeParameterType)
+            .element,
+        same(type.typeFormals[1]));
+  }
+
   test_toFinalType_function_generic_substitute_named() {
-    var t = typeParameter('T', object());
+    var t = typeParameter('T', object(node: never));
     var type = function(dynamic_,
             typeFormals: [t],
             named: {'x': list(typeParameterType(t, node: never), node: never)},
@@ -331,7 +358,7 @@ class DecoratedTypeTest extends Object
   }
 
   test_toFinalType_function_generic_substitute_optional() {
-    var t = typeParameter('T', object());
+    var t = typeParameter('T', object(node: never));
     var type = function(dynamic_,
             typeFormals: [t],
             positional: [list(typeParameterType(t, node: never), node: never)],
@@ -363,7 +390,7 @@ class DecoratedTypeTest extends Object
   }
 
   test_toFinalType_function_generic_substitute_return_type() {
-    var t = typeParameter('T', object());
+    var t = typeParameter('T', object(node: never));
     var type = function(list(typeParameterType(t, node: never), node: never),
             typeFormals: [t], node: never)
         .toFinalType(typeProvider) as FunctionType;
@@ -473,14 +500,14 @@ class DecoratedTypeTest extends Object
   }
 
   test_toFinalType_typeParameter_non_nullable() {
-    var t = typeParameter('T', object());
+    var t = typeParameter('T', object(node: never));
     var type = typeParameterType(t, node: never).toFinalType(typeProvider);
     expect(type, TypeMatcher<TypeParameterType>());
     assertDartType(type, 'T');
   }
 
   test_toFinalType_typeParameter_nullable() {
-    var t = typeParameter('T', object());
+    var t = typeParameter('T', object(node: never));
     var type = typeParameterType(t, node: always).toFinalType(typeProvider);
     expect(type, TypeMatcher<TypeParameterType>());
     assertDartType(type, 'T?');

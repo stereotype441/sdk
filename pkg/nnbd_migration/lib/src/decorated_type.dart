@@ -371,7 +371,7 @@ class DecoratedType implements DecoratedTypeInfo {
     var nullabilitySuffix =
         node.isNullable ? NullabilitySuffix.question : NullabilitySuffix.none;
     if (type is FunctionType) {
-      var newTypeFormals = <TypeParameterElement>[];
+      var newTypeFormals = <TypeParameterElementImpl>[];
       var typeFormalSubstitution = <TypeParameterElement, DartType>{};
       for (var typeFormal in typeFormals) {
         var newTypeFormal = TypeParameterElementImpl.synthetic(typeFormal.name);
@@ -379,6 +379,11 @@ class DecoratedType implements DecoratedTypeInfo {
         typeFormalSubstitution[typeFormal] = TypeParameterTypeImpl(
             newTypeFormal,
             nullabilitySuffix: NullabilitySuffix.none);
+      }
+      for (int i = 0; i < newTypeFormals.length; i++) {
+        newTypeFormals[i].bound = type_algebra.substitute(
+            typeFormalBounds[i].toFinalType(typeProvider),
+            typeFormalSubstitution);
       }
       var parameters = <ParameterElement>[];
       for (int i = 0; i < type.parameters.length; i++) {
