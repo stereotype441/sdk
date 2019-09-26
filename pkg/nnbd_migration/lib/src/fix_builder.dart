@@ -214,6 +214,17 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
   @override
   DartType visitTypeName(TypeName node) => visitTypeAnnotation(node);
 
+  @override
+  DartType visitVariableDeclaration(VariableDeclaration node) {
+    node.metadata.accept(this);
+    var element = node.declaredElement;
+    var type = _computeMigratedType(element);
+    if (node.initializer != null) {
+      _visitSubexpression(node.initializer, _typeSystem.isNullable(type));
+    }
+    return null;
+  }
+
   DartType _computeMigratedType(Element element) {
     if (element is ClassElement) {
       return (_typeProvider.typeType as TypeImpl)
