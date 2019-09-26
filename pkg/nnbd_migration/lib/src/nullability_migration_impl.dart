@@ -8,6 +8,7 @@ import 'package:analyzer/src/generated/source.dart';
 import 'package:meta/meta.dart';
 import 'package:nnbd_migration/instrumentation.dart';
 import 'package:nnbd_migration/nnbd_migration.dart';
+import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
 import 'package:nnbd_migration/src/edge_builder.dart';
 import 'package:nnbd_migration/src/node_builder.dart';
 import 'package:nnbd_migration/src/nullability_node.dart';
@@ -25,6 +26,10 @@ class NullabilityMigrationImpl implements NullabilityMigration {
   final bool _permissive;
 
   final NullabilityMigrationInstrumentation _instrumentation;
+
+  bool _propagated = false;
+
+  DecoratedClassHierarchy _decoratedClassHierarchy;
 
   /// Prepares to perform nullability migration.
   ///
@@ -60,8 +65,11 @@ class NullabilityMigrationImpl implements NullabilityMigration {
   }
 
   void prepareInput(ResolvedUnitResult result) {
-    _variables ??= Variables(_graph, result.typeProvider,
-        instrumentation: _instrumentation);
+    if (_variables == null) {
+      _variables = Variables(_graph, result.typeProvider,
+          instrumentation: _instrumentation);
+      _decoratedClassHierarchy = DecoratedClassHierarchy(_variables, _graph);
+    }
     var unit = result.unit;
     unit.accept(NodeBuilder(_variables, unit.declaredElement.source,
         _permissive ? listener : null, _graph, result.typeProvider,

@@ -12,6 +12,7 @@ import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/generated/utilities_dart.dart';
 import 'package:meta/meta.dart';
 import 'package:nnbd_migration/src/conditional_discard.dart';
+import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
 import 'package:nnbd_migration/src/decorated_type.dart';
 import 'package:nnbd_migration/src/edge_builder.dart';
 import 'package:nnbd_migration/src/expression_checks.dart';
@@ -140,8 +141,9 @@ class EdgeBuilderTestBase extends MigrationVisitorTestBase {
   @override
   Future<CompilationUnit> analyze(String code) async {
     var unit = await super.analyze(code);
-    unit.accept(EdgeBuilder(
-        typeProvider, typeSystem, variables, graph, testSource, null));
+    var decoratedClassHierarchy = DecoratedClassHierarchy(variables, graph);
+    unit.accept(EdgeBuilder(typeProvider, typeSystem, variables, graph,
+        testSource, null, decoratedClassHierarchy));
     return unit;
   }
 }
