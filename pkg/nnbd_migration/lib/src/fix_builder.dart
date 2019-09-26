@@ -202,7 +202,7 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
   }
 
   DartType visitLiteral(Literal node) {
-    if (node is StringLiteral) {
+    if (node is AdjacentStrings) {
       // TODO(paulberry): need to visit interpolations
       throw UnimplementedError('TODO(paulberry)');
     }
