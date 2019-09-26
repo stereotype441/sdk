@@ -106,8 +106,9 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
       _currentCascadeTargetType = _visitSubexpression(node.target, true);
       for (var cascadeSection in node.cascadeSections) {
         if (cascadeSection is AssignmentExpression) {
-          // TODO(paulberry): make sure visitPropertyAccess handles the ".."
-          // properly.
+          _visitSubexpression(cascadeSection, true);
+        } else if (cascadeSection is MethodInvocation) {
+          // TODO(paulberry): coalesce this with the previous case
           _visitSubexpression(cascadeSection, true);
         } else {
           throw UnimplementedError('TODO(paulberry)');
@@ -211,24 +212,35 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
 
   @override
   DartType visitMethodInvocation(MethodInvocation node) {
-    bool isNullAware = node.operator != null &&
-        node.operator.type == TokenType.QUESTION_PERIOD;
-    DartType type;
-    if (node.target != null) {
-      var targetType = _visitSubexpression(node.target, isNullAware);
-      type = _computeMigratedType(node.methodName.staticElement,
-          targetType: targetType);
-    } else if (node.realTarget != null) {
-      // TODO(paulberry): in addition to getting the right target, we need to
-      // figure out isNullAware correctly.
+    bool isNullAware;
+    DartType methodType;
+    if (node.operator == null) {
       throw UnimplementedError('TODO(paulberry)');
+      isNullAware = node.operator != null &&
+          node.operator.type == TokenType.QUESTION_PERIOD;
+      if (node.target != null) {
+        DartType targetType = _visitSubexpression(node.target, isNullAware);
+        methodType = _computeMigratedType(node.methodName.staticElement,
+            targetType: targetType);
+      } else if (node.realTarget != null) {
+        // TODO(paulberry): in addition to getting the right target, we need to
+        // figure out isNullAware correctly.
+        throw UnimplementedError('TODO(paulberry)');
+      } else {
+        methodType = _computeMigratedType(node.methodName.staticElement);
+      }
+    } else if (node.operator.type == TokenType.PERIOD_PERIOD) {
+      assert(node.target == null);
+      isNullAware = false;
+      methodType = _computeMigratedType(node.methodName.staticElement,
+          targetType: _currentCascadeTargetType);
     } else {
-      type = _computeMigratedType(node.methodName.staticElement);
+      throw UnimplementedError('TODO(paulberry)');
     }
-    if (type is FunctionType) {
+    if (methodType is FunctionType) {
       var substitution = _visitInvocationArguments(
-          type, node.argumentList.arguments, node.typeArguments);
-      return substitute(type.returnType, substitution);
+          methodType, node.argumentList.arguments, node.typeArguments);
+      return substitute(methodType.returnType, substitution);
     } else {
       throw UnimplementedError('TODO(paulberry)');
     }
