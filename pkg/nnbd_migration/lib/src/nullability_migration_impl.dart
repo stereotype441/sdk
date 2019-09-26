@@ -10,6 +10,7 @@ import 'package:nnbd_migration/instrumentation.dart';
 import 'package:nnbd_migration/nnbd_migration.dart';
 import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
 import 'package:nnbd_migration/src/edge_builder.dart';
+import 'package:nnbd_migration/src/fix_builder.dart';
 import 'package:nnbd_migration/src/node_builder.dart';
 import 'package:nnbd_migration/src/nullability_node.dart';
 import 'package:nnbd_migration/src/potential_modification.dart';
@@ -48,19 +49,18 @@ class NullabilityMigrationImpl implements NullabilityMigration {
     _instrumentation?.immutableNodes(_graph.never, _graph.always);
   }
 
-  void finish() {
-    _graph.propagate();
-    if (_graph.unsatisfiedSubstitutions.isNotEmpty) {
-      // TODO(paulberry): for now we just ignore unsatisfied substitutions, to
-      // work around https://github.com/dart-lang/sdk/issues/38257
-      // throw new UnimplementedError('Need to report unsatisfied substitutions');
-    }
-    // TODO(paulberry): it would be nice to report on unsatisfied edges as well,
-    // however, since every `!` we add has an unsatisfied edge associated with
-    // it, we can't report on every unsatisfied edge.  We need to figure out a
-    // way to report unsatisfied edges that isn't too overwhelming.
+  void finishInput(ResolvedUnitResult result) {
     if (_variables != null) {
-      broadcast(_variables, listener, _instrumentation);
+      if (!_propagated) _propagate();
+      var unit = result.unit;
+      unit.accept(FixBuilder(
+          listener,
+          unit.declaredElement.source,
+          result.lineInfo,
+          _variables,
+          result.typeProvider,
+          result.typeSystem,
+          _decoratedClassHierarchy));
     }
   }
 
@@ -78,9 +78,29 @@ class NullabilityMigrationImpl implements NullabilityMigration {
 
   void processInput(ResolvedUnitResult result) {
     var unit = result.unit;
-    unit.accept(EdgeBuilder(result.typeProvider, result.typeSystem, _variables,
-        _graph, unit.declaredElement.source, _permissive ? listener : null,
+    unit.accept(EdgeBuilder(
+        result.typeProvider,
+        result.typeSystem,
+        _variables,
+        _graph,
+        unit.declaredElement.source,
+        _permissive ? listener : null,
+        _decoratedClassHierarchy,
         instrumentation: _instrumentation));
+  }
+
+  void _propagate() {
+    _propagated = true;
+    _graph.propagate();
+    if (_graph.unsatisfiedSubstitutions.isNotEmpty) {
+      // TODO(paulberry): for now we just ignore unsatisfied substitutions, to
+      // work around https://github.com/dart-lang/sdk/issues/38257
+      // throw new UnimplementedError('Need to report unsatisfied substitutions');
+    }
+    // TODO(paulberry): it would be nice to report on unsatisfied edges as well,
+    // however, since every `!` we add has an unsatisfied edge associated with
+    // it, we can't report on every unsatisfied edge.  We need to figure out a
+    // way to report unsatisfied edges that isn't too overwhelming.
   }
 
   @visibleForTesting
@@ -88,23 +108,7 @@ class NullabilityMigrationImpl implements NullabilityMigration {
       Variables variables,
       NullabilityMigrationListener listener,
       NullabilityMigrationInstrumentation instrumentation) {
-    for (var entry in variables.getPotentialModifications().entries) {
-      var source = entry.key;
-      final lineInfo = LineInfo.fromContent(source.contents.data);
-      for (var potentialModification in entry.value) {
-        var modifications = potentialModification.modifications;
-        if (modifications.isEmpty) {
-          continue;
-        }
-        var fix =
-            _SingleNullabilityFix(source, potentialModification, lineInfo);
-        listener.addFix(fix);
-        instrumentation?.fix(fix, potentialModification.reasons);
-        for (var edit in modifications) {
-          listener.addEdit(fix, edit);
-        }
-      }
-    }
+    throw UnimplementedError('TODO(paulberry)');
   }
 }
 
