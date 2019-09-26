@@ -127,7 +127,7 @@ class _InstrumentationTest extends AbstractContextTest {
     findNode = FindNode(content, result.unit);
     migration.prepareInput(result);
     migration.processInput(result);
-    migration.finish();
+    migration.finishInput(result);
   }
 
   test_explicitTypeNullability() async {
