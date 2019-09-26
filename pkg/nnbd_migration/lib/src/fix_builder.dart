@@ -107,6 +107,9 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
     if (class_.typeParameters.isNotEmpty) {
       throw UnimplementedError('TODO(paulberry)');
     }
+    node.constructorName.accept(this);
+    var type = _computeMigratedType(constructor) as FunctionType;
+    _visitInvocationArguments(type, node.argumentList);
     return InterfaceTypeImpl.explicit(class_, [],
         nullabilitySuffix: NullabilitySuffix.none);
   }
@@ -131,7 +134,7 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
         throw UnimplementedError('TODO(paulberry)');
       }
       node.typeArguments?.accept(this);
-      node.argumentList.accept(this);
+      _visitInvocationArguments(type, node.argumentList);
       return type.returnType;
     } else {
       throw UnimplementedError('TODO(paulberry)');
@@ -192,6 +195,22 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
       }
     } else {
       return _variables.decoratedElementType(element).toFinalType();
+    }
+  }
+
+  void _visitInvocationArguments(FunctionType type, ArgumentList argumentList) {
+    int i = 0;
+    for (var argument in argumentList.arguments) {
+      Expression expression;
+      DartType parameterType;
+      if (argument is NamedExpression) {
+        expression = argument.expression;
+        parameterType = type.namedParameterTypes[argument.name.label.name];
+      } else {
+        expression = argument;
+        parameterType = type.parameters[i++].type;
+      }
+      _visitSubexpression(expression, _typeSystem.isNullable(parameterType));
     }
   }
 
