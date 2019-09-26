@@ -354,13 +354,24 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
   bool _visitAssignmentTarget(Expression node) {
     if (node is IndexExpression) {
       assert(node.inSetterContext());
-      if (node.leftBracket.type != TokenType.OPEN_SQUARE_BRACKET) {
+      DartType targetType;
+      if (node.period == null) {
+        if (node.leftBracket.type != TokenType.OPEN_SQUARE_BRACKET) {
+          throw UnimplementedError('TODO(paulberry)');
+        }
+        if (node.target == null) {
+          throw UnimplementedError('TODO(paulberry)');
+        }
+        targetType = _visitSubexpression(node.target, false);
+      } else if (node.period.type == TokenType.PERIOD_PERIOD) {
+        assert(node.target == null);
+        targetType = _currentCascadeTargetType;
+        if (_typeSystem.isNullable(targetType)) {
+          throw UnimplementedError('TODO(paulberry)');
+        }
+      } else {
         throw UnimplementedError('TODO(paulberry)');
       }
-      if (node.target == null) {
-        throw UnimplementedError('TODO(paulberry)');
-      }
-      var targetType = _visitSubexpression(node.target, false);
       var element = node.staticElement;
       var operatorMethodType =
           _computeMigratedType(element, targetType: targetType) as FunctionType;
