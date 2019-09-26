@@ -62,6 +62,29 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
   }
 
   @override
+  DartType visitBinaryExpression(BinaryExpression node) {
+    var operatorType = node.operator.type;
+    if (operatorType == TokenType.EQ || operatorType == TokenType.BANG_EQ) {
+      _visitSubexpression(node.leftOperand, true);
+      _visitSubexpression(node.rightOperand, true);
+      return (_typeProvider.boolType as TypeImpl)
+          .withNullability(NullabilitySuffix.none);
+    }
+    var element = node.staticElement;
+    if (element == null) {
+      throw UnimplementedError('TODO(paulberry)');
+    }
+    var methodType = _computeMigratedType(element) as FunctionType;
+    var lhsType = _visitSubexpression(node.leftOperand, false);
+    if (lhsType is InterfaceType && lhsType.typeArguments.isNotEmpty) {
+      throw UnimplementedError('TODO(paulberry)');
+    }
+    _visitSubexpression(node.rightOperand,
+        _typeSystem.isNullable(methodType.parameters[0].type));
+    return methodType.returnType;
+  }
+
+  @override
   DartType visitDefaultFormalParameter(DefaultFormalParameter node) {
     var element = node.declaredElement;
     var decoratedType = _variables.decoratedElementType(element);
