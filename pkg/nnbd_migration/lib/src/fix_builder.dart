@@ -168,6 +168,29 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
   }
 
   @override
+  DartType visitIndexExpression(IndexExpression node) {
+    var parent = node.parent;
+    if (parent is AssignmentExpression &&
+        identical(node, parent.leftHandSide)) {
+      throw UnimplementedError('TODO(paulberry)');
+    }
+    if (node.leftBracket.type != TokenType.OPEN_SQUARE_BRACKET) {
+      throw UnimplementedError('TODO(paulberry)');
+    }
+    if (node.target == null) {
+      throw UnimplementedError('TODO(paulberry)');
+    }
+    var targetType = _visitSubexpression(node.target, false);
+    var element = node.staticElement;
+    var operatorMethodType =
+        _computeMigratedType(element, targetType: targetType) as FunctionType;
+    var substitution =
+        _visitInvocationArguments(operatorMethodType, [node.index], null);
+    assert(substitution.isEmpty);
+    return operatorMethodType.returnType;
+  }
+
+  @override
   DartType visitInstanceCreationExpression(InstanceCreationExpression node) {
     var constructor = node.staticElement;
     var class_ = constructor.enclosingElement;
@@ -176,7 +199,7 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
     }
     node.constructorName.accept(this);
     var type = _computeMigratedType(constructor) as FunctionType;
-    _visitInvocationArguments(type, node.argumentList, null);
+    _visitInvocationArguments(type, node.argumentList.arguments, null);
     return InterfaceTypeImpl.explicit(class_, [],
         nullabilitySuffix: NullabilitySuffix.none);
   }
@@ -208,7 +231,7 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
     }
     if (type is FunctionType) {
       var substitution = _visitInvocationArguments(
-          type, node.argumentList, node.typeArguments);
+          type, node.argumentList.arguments, node.typeArguments);
       return substitute(type.returnType, substitution);
     } else {
       throw UnimplementedError('TODO(paulberry)');
@@ -338,7 +361,7 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
 
   Map<TypeParameterElement, DartType> _visitInvocationArguments(
       FunctionType type,
-      ArgumentList argumentList,
+      List<Expression> arguments,
       TypeArgumentList typeArguments) {
     typeArguments?.accept(this);
     Map<TypeParameterElement, DartType> substitution;
@@ -358,7 +381,7 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
       substitution = const {};
     }
     int i = 0;
-    for (var argument in argumentList.arguments) {
+    for (var argument in arguments) {
       Expression expression;
       DartType parameterType;
       if (argument is NamedExpression) {
