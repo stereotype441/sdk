@@ -30,8 +30,6 @@ class Variables implements VariableRecorder, VariableRepository {
 
   final _decoratedTypeAnnotations = <Source, Map<int, DecoratedType>>{};
 
-  final _potentialModifications = <Source, List<PotentialModification>>{};
-
   final AlreadyMigratedCodeDecorator _alreadyMigratedCodeDecorator;
 
   final NullabilityMigrationInstrumentation /*?*/ instrumentation;
@@ -102,14 +100,10 @@ class Variables implements VariableRecorder, VariableRepository {
     }
   }
 
-  Map<Source, List<PotentialModification>> getPotentialModifications() =>
-      _potentialModifications;
-
   @override
   void recordConditionalDiscard(
       Source source, AstNode node, ConditionalDiscard conditionalDiscard) {
-    _addPotentialModification(
-        source, ConditionalModification(node, conditionalDiscard));
+    throw UnimplementedError('TODO(paulberry)');
   }
 
   @override
@@ -146,8 +140,6 @@ class Variables implements VariableRecorder, VariableRepository {
   void recordDecoratedTypeAnnotation(Source source, TypeAnnotation node,
       DecoratedType type, PotentiallyAddQuestionSuffix potentialModification) {
     instrumentation?.explicitTypeNullability(source, node, type.node);
-    if (potentialModification != null)
-      _addPotentialModification(source, potentialModification);
     (_decoratedTypeAnnotations[source] ??=
         {})[_uniqueOffsetForTypeAnnotation(node)] = type;
   }
@@ -164,21 +156,11 @@ class Variables implements VariableRecorder, VariableRepository {
 
   @override
   void recordExpressionChecks(
-      Source source, Expression expression, ExpressionChecksOrigin origin) {
-    _addPotentialModification(source, origin.checks);
-  }
+      Source source, Expression expression, ExpressionChecksOrigin origin) {}
 
   @override
   void recordPossiblyOptional(
-      Source source, DefaultFormalParameter parameter, NullabilityNode node) {
-    var modification = PotentiallyAddRequired(parameter, node);
-    _addPotentialModification(source, modification);
-  }
-
-  void _addPotentialModification(
-      Source source, PotentialModification potentialModification) {
-    (_potentialModifications[source] ??= []).add(potentialModification);
-  }
+      Source source, DefaultFormalParameter parameter, NullabilityNode node) {}
 
   /// Creates a decorated type for the given [element], which should come from
   /// an already-migrated library (or the SDK).

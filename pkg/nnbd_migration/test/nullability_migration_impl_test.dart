@@ -37,9 +37,7 @@ class NullabilityMigrationImplTest {
         [SourceEdit(offset, 0, '?')]);
     final listener = NullabilityMigrationListenerMock();
     final source = SourceMock(text);
-    when(variables.getPotentialModifications()).thenReturn({
-      source: [potentialModification]
-    });
+    throw UnimplementedError('TODO(paulberry)');
 
     NullabilityMigrationImpl.broadcast(variables, listener, null);
 
@@ -65,9 +63,7 @@ class NullabilityMigrationImplTest {
         _PotentialModificationMock.empty(_NullabilityFixDescriptionMock('foo'));
     final listener = NullabilityMigrationListenerMock();
     final source = SourceMock('');
-    when(variables.getPotentialModifications()).thenReturn({
-      source: [potentialModification]
-    });
+    throw UnimplementedError('TODO(paulberry)');
 
     NullabilityMigrationImpl.broadcast(variables, listener, null);
 
@@ -79,7 +75,7 @@ class NullabilityMigrationImplTest {
   void test_noPotentialChanges_notReported() {
     final listener = NullabilityMigrationListenerMock();
     final source = SourceMock('');
-    when(variables.getPotentialModifications()).thenReturn({source: []});
+    throw UnimplementedError('TODO(paulberry)');
 
     NullabilityMigrationImpl.broadcast(variables, listener, null);
 
