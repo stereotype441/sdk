@@ -100,6 +100,17 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
     return super.visitFunctionExpression(node);
   }
 
+  @override
+  DartType visitInstanceCreationExpression(InstanceCreationExpression node) {
+    var constructor = node.staticElement;
+    var class_ = constructor.enclosingElement;
+    if (class_.typeParameters.isNotEmpty) {
+      throw UnimplementedError('TODO(paulberry)');
+    }
+    return InterfaceTypeImpl.explicit(class_, [],
+        nullabilitySuffix: NullabilitySuffix.none);
+  }
+
   DartType visitLiteral(Literal node) {
     if (node is StringLiteral) {
       // TODO(paulberry): need to visit interpolations
