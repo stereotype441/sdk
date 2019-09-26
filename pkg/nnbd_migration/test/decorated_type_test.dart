@@ -394,7 +394,7 @@ class DecoratedTypeTest extends Object
     var type = function(list(typeParameterType(t, node: never), node: never),
             typeFormals: [t], node: never)
         .toFinalType(typeProvider) as FunctionType;
-    assertDartType(type, 'List<T extends Object> Function<T>()');
+    assertDartType(type, 'List<T> Function<T extends Object>()');
     expect(type.typeFormals[0], isNot(same(t)));
     expect(
         ((type.returnType as InterfaceType).typeArguments[0]
