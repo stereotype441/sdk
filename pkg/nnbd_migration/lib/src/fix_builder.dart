@@ -212,11 +212,20 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
 
   @override
   DartType visitMethodInvocation(MethodInvocation node) {
-    bool isNullAware;
     DartType methodType;
     if (node.operator == null) {
+      methodType = _computeMigratedType(node.methodName.staticElement);
+    } else if (node.operator.type == TokenType.PERIOD_PERIOD) {
+      assert(node.target == null);
+      var targetType = _currentCascadeTargetType;
+      if (_typeSystem.isNullable(targetType)) {
+        throw UnimplementedError('TODO(paulberry)');
+      }
+      methodType = _computeMigratedType(node.methodName.staticElement,
+          targetType: targetType);
+    } else {
       throw UnimplementedError('TODO(paulberry)');
-      isNullAware = node.operator != null &&
+      bool isNullAware = node.operator != null &&
           node.operator.type == TokenType.QUESTION_PERIOD;
       if (node.target != null) {
         DartType targetType = _visitSubexpression(node.target, isNullAware);
@@ -229,13 +238,6 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
       } else {
         methodType = _computeMigratedType(node.methodName.staticElement);
       }
-    } else if (node.operator.type == TokenType.PERIOD_PERIOD) {
-      assert(node.target == null);
-      isNullAware = false;
-      methodType = _computeMigratedType(node.methodName.staticElement,
-          targetType: _currentCascadeTargetType);
-    } else {
-      throw UnimplementedError('TODO(paulberry)');
     }
     if (methodType is FunctionType) {
       var substitution = _visitInvocationArguments(
@@ -363,6 +365,27 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
     return _computeMigratedType(element);
   }
 
+  bool _handlePropertySet(
+      Expression target, TokenType tokenType, SimpleIdentifier propertyName) {
+    assert(propertyName.inSetterContext());
+    DartType targetType;
+    if (tokenType == TokenType.PERIOD_PERIOD) {
+      targetType = _currentCascadeTargetType;
+      if (_typeSystem.isNullable(targetType)) {
+        throw UnimplementedError('TODO(paulberry)');
+      }
+    } else if (tokenType == TokenType.PERIOD) {
+      targetType = _visitSubexpression(target, false);
+    } else {
+      throw UnimplementedError('TODO(paulberry)');
+    }
+    if (targetType is InterfaceType && targetType.typeArguments.isNotEmpty) {
+      throw UnimplementedError('TODO(paulberry): substitute');
+    }
+    var element = propertyName.staticElement;
+    return _typeSystem.isNullable(_computeMigratedType(element));
+  }
+
   bool _visitAssignmentTarget(Expression node) {
     if (node is IndexExpression) {
       assert(node.inSetterContext());
@@ -397,32 +420,13 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
     } else if (node is PrefixedIdentifier) {
       return _handlePropertySet(node.prefix, node.period.type, node.identifier);
     } else if (node is PropertyAccess) {
-      return _handlePropertySet(node.target, node.operator.type, node.propertyName);
+      return _handlePropertySet(
+          node.target, node.operator.type, node.propertyName);
     } else {
       // Need to implement more cases, and add
       // `assert(!node.inSetterContext());` to their visit methods.
       throw UnimplementedError('TODO(paulberry)');
     }
-  }
-
-  bool _handlePropertySet(Expression target, TokenType tokenType, SimpleIdentifier propertyName) {
-    assert(propertyName.inSetterContext());
-    DartType targetType;
-    if (tokenType == TokenType.PERIOD_PERIOD) {
-      targetType = _currentCascadeTargetType;
-      if (_typeSystem.isNullable(targetType)) {
-        throw UnimplementedError('TODO(paulberry)');
-      }
-    } else if (tokenType == TokenType.PERIOD) {
-      targetType = _visitSubexpression(target, false);
-    } else {
-      throw UnimplementedError('TODO(paulberry)');
-    }
-    if (targetType is InterfaceType && targetType.typeArguments.isNotEmpty) {
-      throw UnimplementedError('TODO(paulberry): substitute');
-    }
-    var element = propertyName.staticElement;
-    return _typeSystem.isNullable(_computeMigratedType(element));
   }
 
   Map<TypeParameterElement, DartType> _visitInvocationArguments(
