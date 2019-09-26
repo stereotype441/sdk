@@ -766,7 +766,7 @@ abstract class FunctionTypeImpl extends TypeImpl implements FunctionType {
             counter++;
           }
           TypeParameterTypeImpl t =
-              new TypeParameterTypeImpl(new TypeParameterElementImpl(name, -1));
+              new TypeParameterTypeImpl(new TypeParameterElementImpl(name, -1), nullabilitySuffix: NullabilitySuffix.none);
           t.appendTo(typeParametersBuffer, visitedTypes,
               withNullability: withNullability);
           instantiateTypeArgs.add(t);
