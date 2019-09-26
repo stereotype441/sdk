@@ -46,6 +46,8 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
 
   final TypeSystem _typeSystem;
 
+  DartType _currentCascadeTargetType;
+
   FixBuilder(this._listener, this._source, this._lineInfo, this._variables,
       this._typeProvider, this._typeSystem);
 
@@ -82,6 +84,25 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
     _visitSubexpression(node.rightOperand,
         _typeSystem.isNullable(methodType.parameters[0].type));
     return methodType.returnType;
+  }
+
+  @override
+  DartType visitCascadeExpression(CascadeExpression node) {
+    var oldCascadeTargetType = _currentCascadeTargetType;
+    try {
+      _currentCascadeTargetType = _visitSubexpression(node.target, true);
+      for (var cascadeSection in node.cascadeSections) {
+        if (cascadeSection is AssignmentExpression) {
+          // TODO(paulberry): make sure visitPropertyAccess handles the ".."
+          // properly.
+          _visitSubexpression(cascadeSection, true);
+        } else {
+          throw UnimplementedError('TODO(paulberry)');
+        }
+      }
+    } finally {
+      _currentCascadeTargetType = oldCascadeTargetType;
+    }
   }
 
   @override
@@ -184,12 +205,14 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
 
   @override
   DartType visitPrefixedIdentifier(PrefixedIdentifier node) {
-    var prefixType = _visitSubexpression(node.prefix, false);
-    if (prefixType is InterfaceType && prefixType.typeArguments.isNotEmpty) {
-      throw UnimplementedError('TODO(paulberry): substitute');
-    }
-    var element = node.identifier.staticElement;
-    return _computeMigratedType(element);
+    return _handlePropertyAccess(
+        node.prefix, node.period.type, node.identifier);
+  }
+
+  @override
+  DartType visitPropertyAccess(PropertyAccess node) {
+    return _handlePropertyAccess(
+        node.target, node.operator.type, node.propertyName);
   }
 
   @override
@@ -251,6 +274,25 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
     } else {
       return _variables.decoratedElementType(element).toFinalType();
     }
+  }
+
+  DartType _handlePropertyAccess(
+      Expression target, TokenType tokenType, SimpleIdentifier propertyName) {
+    DartType targetType;
+    if (tokenType == TokenType.PERIOD_PERIOD) {
+      targetType = _currentCascadeTargetType;
+      if (_typeSystem.isNullable(targetType)) {
+        throw UnimplementedError('TODO(paulberry)');
+      }
+    } else {
+      throw UnimplementedError('TODO(paulberry)');
+      targetType = _visitSubexpression(target, false);
+    }
+    if (targetType is InterfaceType && targetType.typeArguments.isNotEmpty) {
+      throw UnimplementedError('TODO(paulberry): substitute');
+    }
+    var element = propertyName.staticElement;
+    return _computeMigratedType(element);
   }
 
   void _visitInvocationArguments(FunctionType type, ArgumentList argumentList) {
