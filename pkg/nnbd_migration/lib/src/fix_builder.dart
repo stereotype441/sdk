@@ -238,6 +238,9 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
       return (_typeProvider.typeType as TypeImpl)
           .withNullability(NullabilitySuffix.none);
     } else if (element is PropertyAccessorElement) {
+      if (element.isSynthetic) {
+        return _variables.decoratedElementType(element.variable).toFinalType();
+      }
       var type = _variables.decoratedElementType(element).toFinalType()
           as FunctionType;
       if (element.isGetter) {
