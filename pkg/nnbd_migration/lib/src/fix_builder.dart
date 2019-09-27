@@ -11,10 +11,10 @@ import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type_provider.dart';
+import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:front_end/src/fasta/flow_analysis/flow_analysis.dart';
 import 'package:nnbd_migration/src/variables.dart';
-import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
 
 abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   final TypeProvider _typeProvider;
@@ -25,13 +25,29 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
 
   /// If we are visiting a function body or initializer, instance of flow
   /// analysis.  Otherwise `null`.
-  FlowAnalysis<Statement, Expression, PromotableElement, DartType> _flowAnalysis;
+  FlowAnalysis<Statement, Expression, PromotableElement, DartType>
+      _flowAnalysis;
+
+  /// If we are visiting a function body or initializer, assigned variable
+  /// information  used in flow analysis.  Otherwise `null`.
+  AssignedVariables<AstNode, VariableElement> _assignedVariables;
 
   FixBuilder(TypeProvider typeProvider, this._typeSystem, this._variables)
       : _typeProvider = (typeProvider as TypeProviderImpl)
             .withNullability(NullabilitySuffix.none);
 
   void addNullCheck(Expression subexpression);
+
+  void createFlowAnalysis(AstNode node) {
+    assert(_flowAnalysis == null);
+    assert(_assignedVariables == null);
+    _flowAnalysis =
+        FlowAnalysis<Statement, Expression, PromotableElement, DartType>(
+            const AnalyzerNodeOperations(),
+            TypeSystemTypeOperations(_typeSystem),
+            AnalyzerFunctionBodyAccess(node is FunctionBody ? node : null));
+    _assignedVariables = FlowAnalysisHelper.computeAssignedVariables(node);
+  }
 
   @override
   DartType visitBinaryExpression(BinaryExpression node) {
@@ -46,7 +62,8 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
         if (leftOperand is SimpleIdentifier && rightOperand is NullLiteral) {
           var leftElement = leftOperand.staticElement;
           if (leftElement is PromotableElement) {
-            _flowAnalysis.conditionEqNull(node, leftElement, notEqual: operatorType == TokenType.BANG_EQ);
+            _flowAnalysis.conditionEqNull(node, leftElement,
+                notEqual: operatorType == TokenType.BANG_EQ);
           }
         }
         return _typeProvider.boolType;
@@ -63,21 +80,6 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
       default:
         throw UnimplementedError('TODO(paulberry)');
     }
-  }
-
-  /// If we are visiting a function body or initializer, assigned variable
-  /// information  used in flow analysis.  Otherwise `null`.
-  AssignedVariables<AstNode, VariableElement> _assignedVariables;
-
-  void createFlowAnalysis(AstNode node) {
-    assert(_flowAnalysis == null);
-    assert(_assignedVariables == null);
-    _flowAnalysis =
-        FlowAnalysis<Statement, Expression, PromotableElement, DartType>(
-            const AnalyzerNodeOperations(),
-            TypeSystemTypeOperations(_typeSystem),
-            AnalyzerFunctionBodyAccess(node is FunctionBody ? node : null));
-    _assignedVariables = FlowAnalysisHelper.computeAssignedVariables(node);
   }
 
   @override

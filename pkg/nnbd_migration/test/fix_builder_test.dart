@@ -203,6 +203,7 @@ f() => #foo;
       {bool nullableContext = true,
       Set<Expression> nullChecked = const <Expression>{}}) {
     var fixBuilder = _FixBuilder(typeProvider, typeSystem, variables);
+    fixBuilder.createFlowAnalysis(node.thisOrAncestorOfType<FunctionBody>());
     var type = fixBuilder.visitSubexpression(node, nullableContext);
     expect((type as TypeImpl).toString(withNullability: true), expectedType);
     expect(fixBuilder.nullCheckedExpressions, nullChecked);
