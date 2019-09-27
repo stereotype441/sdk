@@ -736,7 +736,7 @@ class FlowModel<Variable, Type> {
         );
 
   FlowModel._(this.reachable, this.variableInfo)
-      : _freshVariableInfo = VariableModel.fresh() {
+      : _freshVariableInfo = new VariableModel.fresh() {
     assert(() {
       for (VariableModel<Type> value in variableInfo.values) {
         assert(value != null);
