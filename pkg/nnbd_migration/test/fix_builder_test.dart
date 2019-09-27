@@ -104,26 +104,27 @@ f() {
   test_binaryExpression_question_question() async {
     await analyze('''
 f() {
-  var x = null;
-  var y = null;
+  int x = null;
+  double y = null;
   return x ?? y;
 }
 ''');
-    visitSubexpression(findNode.binary('??'), 'bool');
+    visitSubexpression(findNode.binary('??'), 'num?');
   }
 
   test_binaryExpression_question_question_nullChecked() async {
     await analyze('''
 f() {
-  var x = null;
-  var y = null;
+  int x = null;
+  double y = null;
   return x ?? y;
 }
 ''');
-    var xRef = findNode.simple('x ??');
     var yRef = findNode.simple('y;');
-    visitSubexpression(findNode.binary('??'), 'bool',
-        nullableContext: false, nullChecked: {xRef, yRef});
+    // TODO(paulberry): the type should be `num` (not `num?`).  This should
+    // start working once `??` support is added to flow analysis.
+    visitSubexpression(findNode.binary('??'), 'num?',
+        nullableContext: false, nullChecked: {yRef});
   }
 
   test_booleanLiteral() async {

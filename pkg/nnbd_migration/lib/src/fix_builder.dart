@@ -12,6 +12,7 @@ import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type_provider.dart';
 import 'package:analyzer/src/generated/resolver.dart';
+import 'package:front_end/src/fasta/flow_analysis/flow_analysis.dart';
 import 'package:nnbd_migration/src/variables.dart';
 
 abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
@@ -20,6 +21,10 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   final TypeSystem _typeSystem;
 
   final Variables _variables;
+
+  /// If we are visiting a function body or initializer, instance of flow
+  /// analysis.  Otherwise `null`.
+  FlowAnalysis<Statement, Expression, VariableElement, DartType> _flowAnalysis;
 
   FixBuilder(TypeProvider typeProvider, this._typeSystem, this._variables)
       : _typeProvider = (typeProvider as TypeProviderImpl)
@@ -41,7 +46,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
         visitSubexpression(node.rightOperand, false);
         return _typeProvider.boolType;
       case TokenType.QUESTION_QUESTION:
-        throw StateError('Should be handled by _visitSubexpression');
+        throw StateError('Should be handled by visitSubexpression');
       default:
         throw UnimplementedError('TODO(paulberry)');
     }
@@ -76,6 +81,18 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   }
 
   DartType visitSubexpression(Expression subexpression, bool nullableContext) {
+    if (subexpression is BinaryExpression &&
+        subexpression.operator.type == TokenType.QUESTION_QUESTION) {
+      // If `a ?? b` is used in a non-nullable context, we don't want to migrate
+      // it to `(a ?? b)!`.  We want to migrate it to `a ?? b!`.
+      var leftType = visitSubexpression(subexpression.leftOperand, true);
+      var rightType =
+          visitSubexpression(subexpression.rightOperand, nullableContext);
+      // Since flow analysis doesn't support `??` yet, the best we can do is
+      // take the LUB of the two types.  TODO(paulberry): improve this once flow
+      // analysis supports `??`.
+      return _typeSystem.leastUpperBound(leftType, rightType);
+    }
     var type = subexpression.accept(this);
     if (_typeSystem.isNullable(type) && !nullableContext) {
       addNullCheck(subexpression);
