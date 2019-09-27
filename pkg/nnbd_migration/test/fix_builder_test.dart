@@ -86,6 +86,16 @@ f() {
     visitSubexpression(findNode.binary('||'), 'bool');
   }
 
+  test_binaryExpression_bar_bar_flow() async {
+    await analyze('''
+f() {
+  bool x = null;
+  return x == null || x;
+}
+''');
+    visitSubexpression(findNode.binary('||'), 'bool');
+  }
+
   test_binaryExpression_bar_bar_nullChecked() async {
     await analyze('''
 f() {
