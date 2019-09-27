@@ -14,9 +14,7 @@ main() {
       h.run((flow) {
         h.declare(x, initialized: true);
         flow.conditional_thenBegin(h.notNull(x)());
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         flow.conditional_elseBegin(_Expression());
         expect(flow.promotedType(x), isNull);
         flow.conditional_end(_Expression(), _Expression());
@@ -32,38 +30,34 @@ main() {
         flow.conditional_thenBegin(h.eqNull(x)());
         expect(flow.promotedType(x), isNull);
         flow.conditional_elseBegin(_Expression());
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         flow.conditional_end(_Expression(), _Expression());
         expect(flow.promotedType(x), isNull);
       });
     });
 
     test('conditional_end keeps promotions common to true and false branches',
-            () {
-          var h = _Harness();
-          var x = h.addVar('x', 'int?');
-          var y = h.addVar('y', 'int?');
-          var z = h.addVar('z', 'int?');
-          h.run((flow) {
-            h.declare(x, initialized: true);
-            h.declare(y, initialized: true);
-            h.declare(z, initialized: true);
-            flow.conditional_thenBegin(_Expression());
-            h.promote(x, 'int');
-            h.promote(y, 'int');
-            flow.conditional_elseBegin(_Expression());
-            h.promote(x, 'int');
-            h.promote(z, 'int');
-            flow.conditional_end(_Expression(), _Expression());
-            expect(flow
-                .promotedType(x)
-                .type, 'int');
-            expect(flow.promotedType(y), isNull);
-            expect(flow.promotedType(z), isNull);
-          });
-        });
+        () {
+      var h = _Harness();
+      var x = h.addVar('x', 'int?');
+      var y = h.addVar('y', 'int?');
+      var z = h.addVar('z', 'int?');
+      h.run((flow) {
+        h.declare(x, initialized: true);
+        h.declare(y, initialized: true);
+        h.declare(z, initialized: true);
+        flow.conditional_thenBegin(_Expression());
+        h.promote(x, 'int');
+        h.promote(y, 'int');
+        flow.conditional_elseBegin(_Expression());
+        h.promote(x, 'int');
+        h.promote(z, 'int');
+        flow.conditional_end(_Expression(), _Expression());
+        expect(flow.promotedType(x).type, 'int');
+        expect(flow.promotedType(y), isNull);
+        expect(flow.promotedType(z), isNull);
+      });
+    });
 
     test('conditional joins true states', () {
       // if (... ? (x != null && y != null) : (x != null && z != null)) {
@@ -80,9 +74,7 @@ main() {
         h.if_(
             h.conditional(h.expr, h.and(h.notNull(x), h.notNull(y)),
                 h.and(h.notNull(x), h.notNull(z))), () {
-          expect(flow
-              .promotedType(x)
-              .type, 'int');
+          expect(flow.promotedType(x).type, 'int');
           expect(flow.promotedType(y), isNull);
           expect(flow.promotedType(z), isNull);
         });
@@ -105,10 +97,8 @@ main() {
         h.ifElse(
             h.conditional(h.expr, h.or(h.eqNull(x), h.eqNull(y)),
                 h.or(h.eqNull(x), h.eqNull(z))),
-                () {}, () {
-          expect(flow
-              .promotedType(x)
-              .type, 'int');
+            () {}, () {
+          expect(flow.promotedType(x).type, 'int');
           expect(flow.promotedType(y), isNull);
           expect(flow.promotedType(z), isNull);
         });
@@ -123,9 +113,7 @@ main() {
         var expr = _Expression();
         flow.conditionEqNull(expr, x, notEqual: true);
         flow.ifStatement_thenBegin(expr);
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         flow.ifStatement_elseBegin();
         expect(flow.promotedType(x), isNull);
         flow.ifStatement_end(true);
@@ -142,9 +130,7 @@ main() {
         flow.ifStatement_thenBegin(expr);
         expect(flow.promotedType(x), isNull);
         flow.ifStatement_elseBegin();
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         flow.ifStatement_end(true);
       });
     });
@@ -155,9 +141,7 @@ main() {
       h.run((flow) {
         h.declare(x, initialized: true);
         h.promote(x, 'int');
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         flow.doStatement_bodyBegin(_Statement(), {x});
         expect(flow.promotedType(x), isNull);
         flow.doStatement_conditionBegin();
@@ -180,9 +164,7 @@ main() {
         expect(flow.promotedType(x), isNull);
         flow.doStatement_conditionBegin();
         expect(flow.isReachable, true);
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         flow.doStatement_end(_Expression());
       });
     });
@@ -196,9 +178,7 @@ main() {
         flow.doStatement_conditionBegin();
         expect(flow.promotedType(x), isNull);
         flow.doStatement_end(h.eqNull(x)());
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
       });
     });
 
@@ -210,23 +190,13 @@ main() {
       expect(() => flow.finish(), _asserts);
     });
 
-    test('finish checks for un-added variables', () {
-      var h = _Harness();
-      var x = _Var('x', _Type('int'));
-      var flow = h.createFlow();
-      flow.isAssigned(x);
-      expect(() => flow.finish(), _asserts);
-    });
-
     test('for_conditionBegin() un-promotes', () {
       var h = _Harness();
       var x = h.addVar('x', 'int?');
       h.run((flow) {
         h.declare(x, initialized: true);
         h.promote(x, 'int');
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         flow.for_conditionBegin({x});
         expect(flow.promotedType(x), isNull);
         flow.for_bodyBegin(_Statement(), _Expression());
@@ -269,9 +239,7 @@ main() {
         h.declare(x, initialized: true);
         flow.for_conditionBegin({});
         flow.for_bodyBegin(_Statement(), h.notNull(x)());
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         flow.for_updaterBegin();
         flow.for_end();
       });
@@ -313,9 +281,7 @@ main() {
         h.promote(x, 'int');
         h.promote(z, 'int');
         flow.for_updaterBegin();
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         expect(flow.promotedType(y), isNull);
         expect(flow.promotedType(z), isNull);
         flow.for_end();
@@ -344,9 +310,7 @@ main() {
         });
         flow.for_updaterBegin();
         flow.for_end();
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         expect(flow.promotedType(y), isNull);
         expect(flow.promotedType(z), isNull);
       });
@@ -358,9 +322,7 @@ main() {
       h.run((flow) {
         h.declare(x, initialized: true);
         h.promote(x, 'int');
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         flow.forEach_bodyBegin({x}, null);
         expect(flow.promotedType(x), isNull);
         flow.forEach_end();
@@ -387,9 +349,7 @@ main() {
         h.declare(x, initialized: true);
         flow.forEach_bodyBegin({}, null);
         h.promote(x, 'int');
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         flow.forEach_end();
         expect(flow.promotedType(x), isNull);
       });
@@ -403,9 +363,7 @@ main() {
         flow.ifStatement_thenBegin(h.eqNull(x)());
         flow.handleExit();
         flow.ifStatement_end(false);
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
       });
     });
 
@@ -421,9 +379,7 @@ main() {
         if (expectedPromotedType == null) {
           expect(flow.promotedType(x), isNull);
         } else {
-          expect(flow
-              .promotedType(x)
-              .type, expectedPromotedType);
+          expect(flow.promotedType(x).type, expectedPromotedType);
         }
         flow.ifStatement_elseBegin();
         expect(flow.promotedType(x), isNull);
@@ -449,9 +405,7 @@ main() {
       h.run((flow) {
         h.declare(x, initialized: true);
         flow.logicalBinaryOp_rightBegin(h.notNull(x)(), isAnd: true);
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         flow.logicalBinaryOp_end(_Expression(), _Expression(), isAnd: true);
       });
     });
@@ -465,30 +419,26 @@ main() {
         var wholeExpr = _Expression();
         flow.logicalBinaryOp_end(wholeExpr, h.notNull(x)(), isAnd: true);
         flow.ifStatement_thenBegin(wholeExpr);
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         flow.ifStatement_end(false);
       });
     });
 
     test('logicalBinaryOp_rightEnd(isAnd: false) keeps promotions from RHS',
-            () {
-          var h = _Harness();
-          var x = h.addVar('x', 'int?');
-          h.run((flow) {
-            h.declare(x, initialized: true);
-            flow.logicalBinaryOp_rightBegin(_Expression(), isAnd: false);
-            var wholeExpr = _Expression();
-            flow.logicalBinaryOp_end(wholeExpr, h.eqNull(x)(), isAnd: false);
-            flow.ifStatement_thenBegin(wholeExpr);
-            flow.ifStatement_elseBegin();
-            expect(flow
-                .promotedType(x)
-                .type, 'int');
-            flow.ifStatement_end(true);
-          });
-        });
+        () {
+      var h = _Harness();
+      var x = h.addVar('x', 'int?');
+      h.run((flow) {
+        h.declare(x, initialized: true);
+        flow.logicalBinaryOp_rightBegin(_Expression(), isAnd: false);
+        var wholeExpr = _Expression();
+        flow.logicalBinaryOp_end(wholeExpr, h.eqNull(x)(), isAnd: false);
+        flow.ifStatement_thenBegin(wholeExpr);
+        flow.ifStatement_elseBegin();
+        expect(flow.promotedType(x).type, 'int');
+        flow.ifStatement_end(true);
+      });
+    });
 
     test('logicalBinaryOp_rightBegin(isAnd: false) promotes in RHS', () {
       var h = _Harness();
@@ -496,9 +446,7 @@ main() {
       h.run((flow) {
         h.declare(x, initialized: true);
         flow.logicalBinaryOp_rightBegin(h.eqNull(x)(), isAnd: false);
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         flow.logicalBinaryOp_end(_Expression(), _Expression(), isAnd: false);
       });
     });
@@ -514,12 +462,8 @@ main() {
         h.declare(x, initialized: true);
         h.declare(y, initialized: true);
         h.if_(h.and(h.notNull(x), h.notNull(y)), () {
-          expect(flow
-              .promotedType(x)
-              .type, 'int');
-          expect(flow
-              .promotedType(y)
-              .type, 'int');
+          expect(flow.promotedType(x).type, 'int');
+          expect(flow.promotedType(y).type, 'int');
         });
       });
     });
@@ -535,12 +479,8 @@ main() {
         h.declare(x, initialized: true);
         h.declare(y, initialized: true);
         h.ifElse(h.or(h.eqNull(x), h.eqNull(y)), () {}, () {
-          expect(flow
-              .promotedType(x)
-              .type, 'int');
-          expect(flow
-              .promotedType(y)
-              .type, 'int');
+          expect(flow.promotedType(x).type, 'int');
+          expect(flow.promotedType(y).type, 'int');
         });
       });
     });
@@ -563,15 +503,11 @@ main() {
         h.promote(x, 'int');
         flow.switchStatement_expressionEnd(_Statement());
         flow.switchStatement_beginCase(false, {x});
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         flow.write(x);
         expect(flow.promotedType(x), isNull);
         flow.switchStatement_beginCase(false, {x});
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         flow.write(x);
         expect(flow.promotedType(x), isNull);
         flow.switchStatement_end(false);
@@ -586,9 +522,7 @@ main() {
         h.promote(x, 'int');
         flow.switchStatement_expressionEnd(_Statement());
         flow.switchStatement_beginCase(false, {x});
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         flow.write(x);
         expect(flow.promotedType(x), isNull);
         flow.switchStatement_end(false);
@@ -630,9 +564,7 @@ main() {
         flow.switchStatement_end(false);
         expect(flow.promotedType(x), isNull);
         expect(flow.promotedType(y), isNull);
-        expect(flow
-            .promotedType(z)
-            .type, 'int');
+        expect(flow.promotedType(z).type, 'int');
       });
     });
 
@@ -663,14 +595,10 @@ main() {
         flow.write(y);
         flow.handleBreak(stmt);
         flow.switchStatement_end(true);
-        expect(flow
-            .promotedType(w)
-            .type, 'int');
+        expect(flow.promotedType(w).type, 'int');
         expect(flow.promotedType(x), isNull);
         expect(flow.promotedType(y), isNull);
-        expect(flow
-            .promotedType(z)
-            .type, 'int');
+        expect(flow.promotedType(z).type, 'int');
       });
     });
 
@@ -700,96 +628,82 @@ main() {
         h.promote(y, 'int');
         flow.tryCatchStatement_bodyBegin();
         h.promote(x, 'int');
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
-        expect(flow
-            .promotedType(y)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
+        expect(flow.promotedType(y).type, 'int');
         flow.tryCatchStatement_bodyEnd({});
         flow.tryCatchStatement_catchBegin();
         expect(flow.promotedType(x), isNull);
-        expect(flow
-            .promotedType(y)
-            .type, 'int');
+        expect(flow.promotedType(y).type, 'int');
         flow.tryCatchStatement_catchEnd();
         flow.tryCatchStatement_end();
       });
     });
 
     test('tryCatchStatement_bodyEnd() un-promotes variables assigned in body',
-            () {
-          var h = _Harness();
-          var x = h.addVar('x', 'int?');
-          h.run((flow) {
-            h.declare(x, initialized: true);
-            h.promote(x, 'int');
-            expect(flow
-                .promotedType(x)
-                .type, 'int');
-            flow.tryCatchStatement_bodyBegin();
-            flow.write(x);
-            h.promote(x, 'int');
-            expect(flow
-                .promotedType(x)
-                .type, 'int');
-            flow.tryCatchStatement_bodyEnd({x});
-            flow.tryCatchStatement_catchBegin();
-            expect(flow.promotedType(x), isNull);
-            flow.tryCatchStatement_catchEnd();
-            flow.tryCatchStatement_end();
-          });
-        });
+        () {
+      var h = _Harness();
+      var x = h.addVar('x', 'int?');
+      h.run((flow) {
+        h.declare(x, initialized: true);
+        h.promote(x, 'int');
+        expect(flow.promotedType(x).type, 'int');
+        flow.tryCatchStatement_bodyBegin();
+        flow.write(x);
+        h.promote(x, 'int');
+        expect(flow.promotedType(x).type, 'int');
+        flow.tryCatchStatement_bodyEnd({x});
+        flow.tryCatchStatement_catchBegin();
+        expect(flow.promotedType(x), isNull);
+        flow.tryCatchStatement_catchEnd();
+        flow.tryCatchStatement_end();
+      });
+    });
 
     test('tryCatchStatement_catchBegin() restores previous post-body state',
-            () {
-          var h = _Harness();
-          var x = h.addVar('x', 'int?');
-          h.run((flow) {
-            h.declare(x, initialized: true);
-            flow.tryCatchStatement_bodyBegin();
-            flow.tryCatchStatement_bodyEnd({});
-            flow.tryCatchStatement_catchBegin();
-            h.promote(x, 'int');
-            expect(flow
-                .promotedType(x)
-                .type, 'int');
-            flow.tryCatchStatement_catchEnd();
-            flow.tryCatchStatement_catchBegin();
-            expect(flow.promotedType(x), isNull);
-            flow.tryCatchStatement_catchEnd();
-            flow.tryCatchStatement_end();
-          });
-        });
+        () {
+      var h = _Harness();
+      var x = h.addVar('x', 'int?');
+      h.run((flow) {
+        h.declare(x, initialized: true);
+        flow.tryCatchStatement_bodyBegin();
+        flow.tryCatchStatement_bodyEnd({});
+        flow.tryCatchStatement_catchBegin();
+        h.promote(x, 'int');
+        expect(flow.promotedType(x).type, 'int');
+        flow.tryCatchStatement_catchEnd();
+        flow.tryCatchStatement_catchBegin();
+        expect(flow.promotedType(x), isNull);
+        flow.tryCatchStatement_catchEnd();
+        flow.tryCatchStatement_end();
+      });
+    });
 
     test('tryCatchStatement_catchEnd() joins catch state with after-try state',
-            () {
-          var h = _Harness();
-          var x = h.addVar('x', 'int?');
-          var y = h.addVar('y', 'int?');
-          var z = h.addVar('z', 'int?');
-          h.run((flow) {
-            h.declare(x, initialized: true);
-            h.declare(y, initialized: true);
-            h.declare(z, initialized: true);
-            flow.tryCatchStatement_bodyBegin();
-            h.promote(x, 'int');
-            h.promote(y, 'int');
-            flow.tryCatchStatement_bodyEnd({});
-            flow.tryCatchStatement_catchBegin();
-            h.promote(x, 'int');
-            h.promote(z, 'int');
-            flow.tryCatchStatement_catchEnd();
-            flow.tryCatchStatement_end();
-            // Only x should be promoted, because it's the only variable
-            // promoted in both the try body and the catch handler.
-            expect(flow
-                .promotedType(x)
-                .type, 'int');
-            expect(flow.promotedType(y), isNull);
-            expect(flow.promotedType(z), isNull);
-          });
-        });
+        () {
+      var h = _Harness();
+      var x = h.addVar('x', 'int?');
+      var y = h.addVar('y', 'int?');
+      var z = h.addVar('z', 'int?');
+      h.run((flow) {
+        h.declare(x, initialized: true);
+        h.declare(y, initialized: true);
+        h.declare(z, initialized: true);
+        flow.tryCatchStatement_bodyBegin();
+        h.promote(x, 'int');
+        h.promote(y, 'int');
+        flow.tryCatchStatement_bodyEnd({});
+        flow.tryCatchStatement_catchBegin();
+        h.promote(x, 'int');
+        h.promote(z, 'int');
+        flow.tryCatchStatement_catchEnd();
+        flow.tryCatchStatement_end();
+        // Only x should be promoted, because it's the only variable
+        // promoted in both the try body and the catch handler.
+        expect(flow.promotedType(x).type, 'int');
+        expect(flow.promotedType(y), isNull);
+        expect(flow.promotedType(z), isNull);
+      });
+    });
 
     test('tryCatchStatement_catchEnd() joins catch states', () {
       var h = _Harness();
@@ -814,9 +728,7 @@ main() {
         flow.tryCatchStatement_end();
         // Only x should be promoted, because it's the only variable promoted
         // in both catch handlers.
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         expect(flow.promotedType(y), isNull);
         expect(flow.promotedType(z), isNull);
       });
@@ -832,38 +744,28 @@ main() {
         h.promote(y, 'int');
         flow.tryFinallyStatement_bodyBegin();
         h.promote(x, 'int');
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
-        expect(flow
-            .promotedType(y)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
+        expect(flow.promotedType(y).type, 'int');
         flow.tryFinallyStatement_finallyBegin({});
         expect(flow.promotedType(x), isNull);
-        expect(flow
-            .promotedType(y)
-            .type, 'int');
+        expect(flow.promotedType(y).type, 'int');
         flow.tryFinallyStatement_end({});
       });
     });
 
     test(
         'tryFinallyStatement_finallyBegin() un-promotes variables assigned in '
-            'body', () {
+        'body', () {
       var h = _Harness();
       var x = h.addVar('x', 'int?');
       h.run((flow) {
         h.declare(x, initialized: true);
         h.promote(x, 'int');
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         flow.tryFinallyStatement_bodyBegin();
         flow.write(x);
         h.promote(x, 'int');
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         flow.tryFinallyStatement_finallyBegin({x});
         expect(flow.promotedType(x), isNull);
         flow.tryFinallyStatement_end({});
@@ -879,29 +781,21 @@ main() {
         h.declare(y, initialized: true);
         flow.tryFinallyStatement_bodyBegin();
         h.promote(x, 'int');
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         flow.tryFinallyStatement_finallyBegin({});
         expect(flow.promotedType(x), isNull);
         h.promote(y, 'int');
-        expect(flow
-            .promotedType(y)
-            .type, 'int');
+        expect(flow.promotedType(y).type, 'int');
         flow.tryFinallyStatement_end({});
         // Both x and y should now be promoted.
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
-        expect(flow
-            .promotedType(y)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
+        expect(flow.promotedType(y).type, 'int');
       });
     });
 
     test(
         'tryFinallyStatement_end() does not restore try body promotions for '
-            'variables assigned in finally', () {
+        'variables assigned in finally', () {
       var h = _Harness();
       var x = h.addVar('x', 'int?');
       var y = h.addVar('y', 'int?');
@@ -910,25 +804,19 @@ main() {
         h.declare(y, initialized: true);
         flow.tryFinallyStatement_bodyBegin();
         h.promote(x, 'int');
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         flow.tryFinallyStatement_finallyBegin({});
         expect(flow.promotedType(x), isNull);
         flow.write(x);
         flow.write(y);
         h.promote(y, 'int');
-        expect(flow
-            .promotedType(y)
-            .type, 'int');
+        expect(flow.promotedType(y).type, 'int');
         flow.tryFinallyStatement_end({x, y});
         // x should not be re-promoted, because it might have been assigned a
         // non-promoted value in the "finally" block.  But y's promotion still
         // stands, because y was promoted in the finally block.
         expect(flow.promotedType(x), isNull);
-        expect(flow
-            .promotedType(y)
-            .type, 'int');
+        expect(flow.promotedType(y).type, 'int');
       });
     });
 
@@ -938,9 +826,7 @@ main() {
       h.run((flow) {
         h.declare(x, initialized: true);
         h.promote(x, 'int');
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         flow.whileStatement_conditionBegin({x});
         expect(flow.promotedType(x), isNull);
         flow.whileStatement_bodyBegin(_Statement(), _Expression());
@@ -969,9 +855,7 @@ main() {
         h.declare(x, initialized: true);
         flow.whileStatement_conditionBegin({});
         flow.whileStatement_bodyBegin(_Statement(), h.notNull(x)());
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         flow.whileStatement_end();
       });
     });
@@ -997,9 +881,7 @@ main() {
           flow.handleBreak(stmt);
         });
         flow.whileStatement_end();
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         expect(flow.promotedType(y), isNull);
         expect(flow.promotedType(z), isNull);
       });
@@ -1025,16 +907,12 @@ main() {
       h.run((flow) {
         h.declare(x, initialized: true);
         h.promote(x, 'int');
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         // if (false) {
         var falseExpression = _Expression();
         flow.booleanLiteral(falseExpression, false);
         flow.ifStatement_thenBegin(falseExpression);
-        expect(flow
-            .promotedType(x)
-            .type, 'int');
+        expect(flow.promotedType(x).type, 'int');
         flow.ifStatement_end(false);
       });
     });
@@ -1101,7 +979,7 @@ main() {
       test('promoted -> unchanged (same)', () {
         var h = _Harness();
         var s1 =
-        FlowModel<_Var, _Type>(true).promote(h, objectQVar, _Type('int'));
+            FlowModel<_Var, _Type>(true).promote(h, objectQVar, _Type('int'));
         var s2 = s1.promote(h, objectQVar, _Type('int'));
         expect(s2, same(s1));
       });
@@ -1109,7 +987,7 @@ main() {
       test('promoted -> unchanged (supertype)', () {
         var h = _Harness();
         var s1 =
-        FlowModel<_Var, _Type>(true).promote(h, objectQVar, _Type('int'));
+            FlowModel<_Var, _Type>(true).promote(h, objectQVar, _Type('int'));
         var s2 = s1.promote(h, objectQVar, _Type('Object'));
         expect(s2, same(s1));
       });
@@ -1117,7 +995,7 @@ main() {
       test('promoted -> unchanged (unrelated)', () {
         var h = _Harness();
         var s1 =
-        FlowModel<_Var, _Type>(true).promote(h, objectQVar, _Type('int'));
+            FlowModel<_Var, _Type>(true).promote(h, objectQVar, _Type('int'));
         var s2 = s1.promote(h, objectQVar, _Type('String'));
         expect(s2, same(s1));
       });
@@ -1125,7 +1003,7 @@ main() {
       test('promoted -> subtype', () {
         var h = _Harness();
         var s1 =
-        FlowModel<_Var, _Type>(true).promote(h, objectQVar, _Type('int?'));
+            FlowModel<_Var, _Type>(true).promote(h, objectQVar, _Type('int?'));
         var s2 = s1.promote(h, objectQVar, _Type('int'));
         expect(s2.reachable, true);
         _Type.allowComparisons(() {
@@ -1147,7 +1025,7 @@ main() {
         var s1 = FlowModel<_Var, _Type>(true);
         var s2 = s1.write(objectQVar);
         expect(s2.reachable, true);
-        expect(s2.variableInfo[objectQVar], VariableModel<_Type>(null, true));
+        expect(s2.infoFor(objectQVar), VariableModel<_Type>(null, true));
       });
 
       test('un-promotes', () {
@@ -1176,14 +1054,14 @@ main() {
         var s2 = s1.markNonNullable(h, intQVar);
         expect(s2.reachable, true);
         _Type.allowComparisons(() {
-          expect(s2.variableInfo[intQVar], VariableModel(_Type('int'), false));
+          expect(s2.infoFor(intQVar), VariableModel(_Type('int'), false));
         });
       });
 
       test('promoted -> unchanged', () {
         var h = _Harness();
         var s1 =
-        FlowModel<_Var, _Type>(true).promote(h, objectQVar, _Type('int'));
+            FlowModel<_Var, _Type>(true).promote(h, objectQVar, _Type('int'));
         var s2 = s1.markNonNullable(h, objectQVar);
         expect(s2, same(s1));
       });
@@ -1191,7 +1069,7 @@ main() {
       test('promoted -> re-promoted', () {
         var h = _Harness();
         var s1 =
-        FlowModel<_Var, _Type>(true).promote(h, objectQVar, _Type('int?'));
+            FlowModel<_Var, _Type>(true).promote(h, objectQVar, _Type('int?'));
         var s2 = s1.markNonNullable(h, objectQVar);
         expect(s2.reachable, true);
         _Type.allowComparisons(() {
@@ -1205,7 +1083,7 @@ main() {
       test('unchanged', () {
         var h = _Harness();
         var s1 =
-        FlowModel<_Var, _Type>(true).promote(h, objectQVar, _Type('int'));
+            FlowModel<_Var, _Type>(true).promote(h, objectQVar, _Type('int'));
         var s2 = s1.removePromotedAll([intQVar]);
         expect(s2, same(s1));
       });
@@ -1247,10 +1125,10 @@ main() {
         var s1 = s0.write(a).write(b);
         var s2 = s0.write(a).write(c);
         var result = s1.restrict(h, s2, Set());
-        expect(result.variableInfo[a].assigned, true);
-        expect(result.variableInfo[b].assigned, true);
-        expect(result.variableInfo[c].assigned, true);
-        expect(result.variableInfo[d].assigned, false);
+        expect(result.infoFor(a).assigned, true);
+        expect(result.infoFor(b).assigned, true);
+        expect(result.infoFor(c).assigned, true);
+        expect(result.infoFor(d).assigned, false);
       });
 
       test('promotion', () {
@@ -1264,9 +1142,9 @@ main() {
           var result = s1.restrict(h, s2, unsafe ? [x].toSet() : Set());
           if (expectedType == null) {
             expect(result.variableInfo, contains(x));
-            expect(result.variableInfo[x].promotedType, isNull);
+            expect(result.infoFor(x).promotedType, isNull);
           } else {
-            expect(result.variableInfo[x].promotedType.type, expectedType);
+            expect(result.infoFor(x).promotedType.type, expectedType);
           }
         }
 
@@ -1438,8 +1316,8 @@ class _Harness
 
   /// Given three [LazyExpression]s, produces a new [LazyExpression]
   /// representing the result of combining them with `?` and `:`.
-  LazyExpression conditional(LazyExpression cond, LazyExpression ifTrue,
-      LazyExpression ifFalse) {
+  LazyExpression conditional(
+      LazyExpression cond, LazyExpression ifTrue, LazyExpression ifFalse) {
     return () {
       var expr = _Expression();
       _flow.conditional_thenBegin(cond());

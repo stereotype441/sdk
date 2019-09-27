@@ -742,7 +742,7 @@ class FlowModel<Variable, Type> {
   }
 
   /// Gets the info for the given [variable], creating it if it doesn't exist.
-  VariableModel infoFor(Variable variable) =>
+  VariableModel<Type> infoFor(Variable variable) =>
       variableInfo[variable] ?? VariableModel<Type>(null, false);
 
   /// Updates the state to indicate that the given [variable] has been
