@@ -14,7 +14,6 @@ import 'package:analyzer/src/dart/element/type_provider.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:front_end/src/fasta/flow_analysis/flow_analysis.dart';
 import 'package:nnbd_migration/src/variables.dart';
-import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
 
 abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   final TypeProvider _typeProvider;
@@ -51,21 +50,6 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
       default:
         throw UnimplementedError('TODO(paulberry)');
     }
-  }
-
-  /// If we are visiting a function body or initializer, assigned variable
-  /// information  used in flow analysis.  Otherwise `null`.
-  AssignedVariables<AstNode, VariableElement> _assignedVariables;
-
-  void createFlowAnalysis() {
-    assert(_flowAnalysis == null);
-    assert(_assignedVariables == null);
-    _flowAnalysis =
-        FlowAnalysis<Statement, Expression, VariableElement, DartType>(
-            const AnalyzerNodeOperations(),
-            DecoratedTypeOperations(_typeSystem, _variables, _graph),
-            AnalyzerFunctionBodyAccess(node is FunctionBody ? node : null));
-    _assignedVariables = FlowAnalysisHelper.computeAssignedVariables(node);
   }
 
   @override
