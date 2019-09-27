@@ -851,11 +851,24 @@ class FlowModel<Variable, Type> {
     for (MapEntry<Variable, VariableModel<Type>> entry
         in variableInfo.entries) {
       Variable variable = entry.key;
+      VariableModel<Type> thisModel = entry.value;
       VariableModel<Type> otherModel = other.infoFor(variable);
-      VariableModel<Type> restricted = entry.value
-          .restrict(typeOperations, otherModel, unsafe.contains(variable));
+      VariableModel<Type> restricted = thisModel.restrict(
+          typeOperations, otherModel, unsafe.contains(variable));
       newVariableInfo[variable] = restricted;
-      if (!identical(restricted, entry.value)) variableInfoMatchesThis = false;
+      if (!identical(restricted, thisModel)) variableInfoMatchesThis = false;
+      if (!identical(restricted, otherModel)) variableInfoMatchesOther = false;
+    }
+    for (MapEntry<Variable, VariableModel<Type>> entry
+        in other.variableInfo.entries) {
+      Variable variable = entry.key;
+      if (variableInfo.containsKey(variable)) continue;
+      VariableModel<Type> thisModel = VariableModel<Type>(null, false);
+      VariableModel<Type> otherModel = entry.value;
+      VariableModel<Type> restricted = thisModel.restrict(
+          typeOperations, otherModel, unsafe.contains(variable));
+      newVariableInfo[variable] = restricted;
+      variableInfoMatchesThis = false;
       if (!identical(restricted, otherModel)) variableInfoMatchesOther = false;
     }
     assert(variableInfoMatchesThis ==
