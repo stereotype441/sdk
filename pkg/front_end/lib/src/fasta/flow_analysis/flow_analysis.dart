@@ -723,6 +723,9 @@ class FlowModel<Variable, Type> {
   /// variable that is no longer in scope.
   final Map<Variable, VariableModel<Type> /*!*/ > variableInfo;
 
+  /// Variable model for variables that have never been seen before.
+  final VariableModel<Type> _freshVariableInfo;
+
   /// Creates a state object with the given [reachable] status.  All variables
   /// are assumed to be unpromoted and already assigned, so joining another
   /// state with this one will have no effect on it.
@@ -732,7 +735,8 @@ class FlowModel<Variable, Type> {
           const {},
         );
 
-  FlowModel._(this.reachable, this.variableInfo) {
+  FlowModel._(this.reachable, this.variableInfo)
+      : _freshVariableInfo = VariableModel.fresh() {
     assert(() {
       for (VariableModel<Type> value in variableInfo.values) {
         assert(value != null);
@@ -743,7 +747,7 @@ class FlowModel<Variable, Type> {
 
   /// Gets the info for the given [variable], creating it if it doesn't exist.
   VariableModel<Type> infoFor(Variable variable) =>
-      variableInfo[variable] ?? VariableModel<Type>(null, false);
+      variableInfo[variable] ?? _freshVariableInfo;
 
   /// Updates the state to indicate that the given [variable] has been
   /// determined to contain a non-null value.
@@ -846,8 +850,7 @@ class FlowModel<Variable, Type> {
     Map<Variable, VariableModel<Type>> newVariableInfo =
         <Variable, VariableModel<Type>>{};
     bool variableInfoMatchesThis = true;
-    bool variableInfoMatchesOther =
-        other.variableInfo.length == variableInfo.length;
+    bool variableInfoMatchesOther = true;
     for (MapEntry<Variable, VariableModel<Type>> entry
         in variableInfo.entries) {
       Variable variable = entry.key;
@@ -855,7 +858,9 @@ class FlowModel<Variable, Type> {
       VariableModel<Type> otherModel = other.infoFor(variable);
       VariableModel<Type> restricted = thisModel.restrict(
           typeOperations, otherModel, unsafe.contains(variable));
-      newVariableInfo[variable] = restricted;
+      if (!identical(restricted, _freshVariableInfo)) {
+        newVariableInfo[variable] = restricted;
+      }
       if (!identical(restricted, thisModel)) variableInfoMatchesThis = false;
       if (!identical(restricted, otherModel)) variableInfoMatchesOther = false;
     }
@@ -863,12 +868,14 @@ class FlowModel<Variable, Type> {
         in other.variableInfo.entries) {
       Variable variable = entry.key;
       if (variableInfo.containsKey(variable)) continue;
-      VariableModel<Type> thisModel = VariableModel<Type>(null, false);
+      VariableModel<Type> thisModel = _freshVariableInfo;
       VariableModel<Type> otherModel = entry.value;
       VariableModel<Type> restricted = thisModel.restrict(
           typeOperations, otherModel, unsafe.contains(variable));
-      newVariableInfo[variable] = restricted;
-      variableInfoMatchesThis = false;
+      if (!identical(restricted, _freshVariableInfo)) {
+        newVariableInfo[variable] = restricted;
+      }
+      if (!identical(restricted, thisModel)) variableInfoMatchesThis = false;
       if (!identical(restricted, otherModel)) variableInfoMatchesOther = false;
     }
     assert(variableInfoMatchesThis ==
@@ -1066,6 +1073,12 @@ class VariableModel<Type> {
   final bool assigned;
 
   VariableModel(this.promotedType, this.assigned);
+
+  /// Creates a [VariableModel] representing a variable that's never been seen
+  /// before.
+  VariableModel.fresh()
+      : promotedType = null,
+        assigned = false;
 
   @override
   bool operator ==(Object other) {
