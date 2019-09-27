@@ -147,6 +147,69 @@ f() {
         nullableContext: false, nullChecked: {yRef});
   }
 
+  test_binaryExpression_userDefinable_simple() async {
+    await analyze('''
+class C {
+  int operator+(String s) => 1;
+}
+f(C c) => c + 'foo';
+''');
+    visitSubexpression(findNode.binary('c +'), 'int');
+  }
+
+  test_binaryExpression_userDefinable_simple_check_lhs() async {
+    await analyze('''
+class C {
+  int operator+(String s) => 1;
+}
+f(C/*?*/ c) => c + 'foo';
+''');
+    visitSubexpression(findNode.binary('c +'), 'int',
+        nullChecked: {findNode.simple('c +')});
+  }
+
+  test_binaryExpression_userDefinable_simple_check_rhs() async {
+    await analyze('''
+class C {
+  int operator+(String s) => 1;
+}
+f(C c, String/*?*/ s) => c + s;
+''');
+    visitSubexpression(findNode.binary('c +'), 'int',
+        nullChecked: {findNode.simple('s;')});
+  }
+
+  test_binaryExpression_userDefinable_substituted() async {
+    await analyze('''
+class C<T, U> {
+  T operator+(U u) => throw 'foo';
+}
+f(C<int, String> c) => c + 'foo';
+''');
+    visitSubexpression(findNode.binary('c +'), 'int');
+  }
+
+  test_binaryExpression_userDefinable_substituted_check_rhs() async {
+    await analyze('''
+class C<T, U> {
+  T operator+(U u) => throw 'foo';
+}
+f(C<int, String/*!*/> c, String/*?*/ s) => c + s;
+''');
+    visitSubexpression(findNode.binary('c +'), 'int',
+        nullChecked: {findNode.simple('s;')});
+  }
+
+  test_binaryExpression_userDefinable_substituted_no_check_rhs() async {
+    await analyze('''
+class C<T, U> {
+  T operator+(U u) => throw 'foo';
+}
+f(C<int, String/*?*/> c, String/*?*/ s) => c + s;
+''');
+    visitSubexpression(findNode.binary('c +'), 'int');
+  }
+
   test_booleanLiteral() async {
     await analyze('''
 f() => true;

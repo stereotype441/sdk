@@ -78,7 +78,13 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
       case TokenType.QUESTION_QUESTION:
         throw StateError('Should be handled by visitSubexpression');
       default:
-        throw UnimplementedError('TODO(paulberry)');
+        var targetType = visitSubexpression(leftOperand, false);
+        var methodType =
+            _computeMigratedType(node.staticElement, targetType: targetType)
+                as FunctionType;
+        visitSubexpression(rightOperand,
+            _typeSystem.isNullable(methodType.parameters[0].type));
+        return methodType.returnType;
     }
   }
 
