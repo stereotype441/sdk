@@ -8,6 +8,7 @@ import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type_algebra.dart';
+import 'package:analyzer/src/dart/element/type_algebra.dart' as type_algebra;
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/utilities_dart.dart';
 import 'package:nnbd_migration/instrumentation.dart';
@@ -308,14 +309,6 @@ class DecoratedType implements DecoratedTypeInfo {
     return false;
   }
 
-  Map<TypeParameterElement, DartType> asFinalSubstitution(
-      TypeProvider typeProvider) {
-    return {
-      for (var entry in asSubstitution.entries)
-        entry.key: entry.value.toFinalType(typeProvider)
-    };
-  }
-
   /// Converts one function type into another by substituting the given
   /// [argumentTypes] for the function's generic parameters.
   DecoratedType instantiate(List<DecoratedType> argumentTypes) {
@@ -356,6 +349,12 @@ class DecoratedType implements DecoratedTypeInfo {
     return _substitute(substitution, undecoratedResult);
   }
 
+  /// Convert this decorated type into the [DartType] that it will represent
+  /// after the code has been migrated.
+  ///
+  /// This method should be used after nullability propagation; it makes use of
+  /// the nullabilities associated with nullability nodes to determine which
+  /// types should be nullable and which types should not.
   DartType toFinalType(TypeProvider typeProvider) {
     var type = this.type;
     if (type.isVoid || type.isDynamic) return type;
@@ -370,11 +369,21 @@ class DecoratedType implements DecoratedTypeInfo {
     var nullabilitySuffix =
         node.isNullable ? NullabilitySuffix.question : NullabilitySuffix.none;
     if (type is FunctionType) {
-      if (typeFormals.isNotEmpty) {
-        throw UnimplementedError('TODO(paulberry)');
+      var newTypeFormals = <TypeParameterElementImpl>[];
+      var typeFormalSubstitution = <TypeParameterElement, DartType>{};
+      for (var typeFormal in typeFormals) {
+        var newTypeFormal = TypeParameterElementImpl.synthetic(typeFormal.name);
+        newTypeFormals.add(newTypeFormal);
+        typeFormalSubstitution[typeFormal] = TypeParameterTypeImpl(
+            newTypeFormal,
+            nullabilitySuffix: NullabilitySuffix.none);
+      }
+      for (int i = 0; i < newTypeFormals.length; i++) {
+        newTypeFormals[i].bound = type_algebra.substitute(
+            typeFormalBounds[i].toFinalType(typeProvider),
+            typeFormalSubstitution);
       }
       var parameters = <ParameterElement>[];
-      int i = 0;
       for (int i = 0; i < type.parameters.length; i++) {
         var origParameter = type.parameters[i];
         ParameterKind parameterKind;
@@ -382,7 +391,7 @@ class DecoratedType implements DecoratedTypeInfo {
         var name = origParameter.name;
         if (origParameter.isNamed) {
           // TODO(paulberry): infer ParameterKind.NAMED_REQUIRED when
-          // appropriate.
+          // appropriate. See https://github.com/dart-lang/sdk/issues/38596.
           parameterKind = ParameterKind.NAMED;
           parameterType = namedParameters[name];
         } else {
@@ -392,10 +401,16 @@ class DecoratedType implements DecoratedTypeInfo {
           parameterType = positionalParameters[i];
         }
         parameters.add(ParameterElementImpl.synthetic(
-            name, parameterType.toFinalType(typeProvider), parameterKind));
+            name,
+            type_algebra.substitute(parameterType.toFinalType(typeProvider),
+                typeFormalSubstitution),
+            parameterKind));
       }
       return FunctionTypeImpl.synthetic(
-          returnType.toFinalType(typeProvider), typeFormals, parameters,
+          type_algebra.substitute(
+              returnType.toFinalType(typeProvider), typeFormalSubstitution),
+          newTypeFormals,
+          parameters,
           nullabilitySuffix: nullabilitySuffix);
     } else if (type is InterfaceType) {
       return InterfaceTypeImpl.explicit(type.element,
@@ -404,8 +419,12 @@ class DecoratedType implements DecoratedTypeInfo {
     } else if (type is TypeParameterType) {
       return TypeParameterTypeImpl(type.element,
           nullabilitySuffix: nullabilitySuffix);
+    } else {
+      // The above cases should cover all possible types.  On the off chance
+      // they don't, fall back on returning DecoratedType.type.
+      assert(false, 'Unexpected type (${type.runtimeType})');
+      return type;
     }
-    throw UnimplementedError('TODO(paulberry)');
   }
 
   @override
