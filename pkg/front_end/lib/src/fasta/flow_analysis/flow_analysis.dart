@@ -511,16 +511,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// Return whether the [variable] is definitely assigned in the current state.
   bool isAssigned(Variable variable) {
     _variableReferenced(variable);
-    VariableModel<Type> variableInfo = _current.variableInfo[variable];
-    if (variableInfo == null) {
-      // In error-free code, variables should always be registered with flow
-      // analysis before they're used.  But this can't be relied on when the
-      // analyzer is doing error recovery.  So if we encounter a variable that
-      // hasn't been registered with flow analysis yet, assume it's unassigned.
-      return false;
-    } else {
-      return variableInfo.assigned;
-    }
+    return _current.infoFor(variable).assigned;
   }
 
   void isExpression_end(
@@ -598,7 +589,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// is currently promoted.  Otherwise returns `null`.
   Type promotedType(Variable variable) {
     _variableReferenced(variable);
-    return _current.variableInfo[variable]?.promotedType;
+    return _current.infoFor(variable).promotedType;
   }
 
   /// Call this method just before visiting one of the cases in the body of a
@@ -817,12 +808,13 @@ class FlowModel<Variable, Type> {
   /// optional [assigned] boolean indicates whether the variable is assigned at
   /// the point of declaration.
   FlowModel<Variable, Type> add(Variable variable, {bool assigned: false}) {
-    Map<Variable, VariableModel<Type>> newVariableInfo =
-        new Map<Variable, VariableModel<Type>>.from(variableInfo);
-    newVariableInfo[variable] = new VariableModel<Type>(null, assigned);
-
-    return new FlowModel<Variable, Type>._(reachable, newVariableInfo);
+    return _updateVariableInfo(
+        variable, new VariableModel<Type>(null, assigned));
   }
+
+  /// Gets the info for the given [variable], creating it if it doesn't exist.
+  VariableModel infoFor(Variable variable) =>
+      variableInfo[variable] ?? VariableModel<Type>(null, false);
 
   /// Updates the state to indicate that the given [variable] has been
   /// determined to contain a non-null value.
@@ -831,7 +823,7 @@ class FlowModel<Variable, Type> {
   /// assigned?  Does it matter?
   FlowModel<Variable, Type> markNonNullable(
       TypeOperations<Variable, Type> typeOperations, Variable variable) {
-    VariableModel<Type> info = variableInfo[variable];
+    VariableModel<Type> info = infoFor(variable);
     Type previousType = info.promotedType;
     previousType ??= typeOperations.variableType(variable);
     Type type = typeOperations.promoteToNonNull(previousType);
@@ -853,7 +845,7 @@ class FlowModel<Variable, Type> {
     Variable variable,
     Type type,
   ) {
-    VariableModel<Type> info = variableInfo[variable];
+    VariableModel<Type> info = infoFor(variable);
     Type previousType = info.promotedType;
     previousType ??= typeOperations.variableType(variable);
 
@@ -895,8 +887,8 @@ class FlowModel<Variable, Type> {
         referencedVariables?.add(variable);
         return true;
       }());
-      VariableModel<Type> info = variableInfo[variable];
-      if (info?.promotedType != null) {
+      VariableModel<Type> info = infoFor(variable);
+      if (info.promotedType != null) {
         (newVariableInfo ??= new Map<Variable, VariableModel<Type>>.from(
             variableInfo))[variable] = info.withPromotedType(null);
       }
@@ -939,7 +931,7 @@ class FlowModel<Variable, Type> {
     for (MapEntry<Variable, VariableModel<Type>> entry
         in variableInfo.entries) {
       Variable variable = entry.key;
-      VariableModel<Type> otherModel = other.variableInfo[variable];
+      VariableModel<Type> otherModel = other.infoFor(variable);
       VariableModel<Type> restricted = entry.value
           .restrict(typeOperations, otherModel, unsafe.contains(variable));
       newVariableInfo[variable] = restricted;
@@ -977,7 +969,7 @@ class FlowModel<Variable, Type> {
   /// TODO(paulberry): allow for writes that preserve type promotions.
   FlowModel<Variable, Type> write(
       TypeOperations<Variable, Type> typeOperations, Variable variable) {
-    VariableModel<Type> infoForVar = variableInfo[variable];
+    VariableModel<Type> infoForVar = infoFor(variable);
     VariableModel<Type> newInfoForVar = infoForVar.write();
     if (identical(newInfoForVar, infoForVar)) return this;
     return _updateVariableInfo(variable, newInfoForVar);
