@@ -3,12 +3,26 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 
 class FixBuilder extends GeneralizingAstVisitor<DartType> {
+  @override
+  DartType visitBinaryExpression(BinaryExpression node) {
+    var operatorType = node.operator.type;
+    if (operatorType == TokenType.EQ || operatorType == TokenType.BANG_EQ) {
+      _visitSubexpression(node.leftOperand, true);
+      _visitSubexpression(node.rightOperand, true);
+      return (_typeProvider.boolType as TypeImpl)
+          .withNullability(NullabilitySuffix.none);
+    } else {
+      throw UnimplementedError('TODO(paulberry)');
+    }
+  }
+
   @override
   DartType visitExpression(Expression node) {
     // Every expression type needs its own visit method.
