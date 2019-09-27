@@ -19,6 +19,13 @@ main() {
 
 @reflectiveTest
 class FixBuilderTest extends EdgeBuilderTestBase {
+  test_booleanLiteral() async {
+    await analyze('''
+f() => true;
+''');
+    visit(findNode.booleanLiteral('true'), 'bool');
+  }
+
   test_stringLiteral() async {
     await analyze('''
 f() => 'foo';

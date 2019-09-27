@@ -35,6 +35,10 @@ class FindNode {
     return _node(search, (n) => n is Block);
   }
 
+  BooleanLiteral booleanLiteral(String search) {
+    return _node(search, (n) => n is BooleanLiteral);
+  }
+
   BreakStatement breakStatement(String search) {
     return _node(search, (n) => n is BreakStatement);
   }
