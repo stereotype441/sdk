@@ -30,8 +30,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   @override
   DartType visitBinaryExpression(BinaryExpression node) {
     var operatorType = node.operator.type;
-    if (operatorType == TokenType.EQ || operatorType == TokenType.BANG_EQ) {
-      throw UnimplementedError('TODO(paulberry): test');
+    if (operatorType == TokenType.EQ_EQ || operatorType == TokenType.BANG_EQ) {
       _visitSubexpression(node.leftOperand, true);
       _visitSubexpression(node.rightOperand, true);
       return _typeProvider.boolType;

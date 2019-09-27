@@ -29,6 +29,17 @@ class FixBuilderTest extends EdgeBuilderTestBase {
     return unit;
   }
 
+  test_binaryExpression_eq() async {
+    await analyze('''
+f() {
+  var x = null;
+  var y = null;
+  return x == y;
+}
+''');
+    visit(findNode.binary('=='), 'bool');
+  }
+
   test_booleanLiteral() async {
     await analyze('''
 f() => true;
@@ -75,17 +86,6 @@ f() {
 }
 ''');
     visit(findNode.simple('x;'), 'int?');
-  }
-
-  test_simpleIdentifier_localVariable_nullable_checked() async {
-    await analyze('''
-int/*!*/ f() {
-  int x = null;
-  return x;
-}
-''');
-    var xRef = findNode.simple('x;');
-    visit(xRef, 'int', nullChecked: {xRef});
   }
 
   test_stringLiteral() async {
