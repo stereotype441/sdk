@@ -71,10 +71,8 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
     if (node.operator.type != TokenType.EQ) {
       throw UnimplementedError('TODO(paulberry)');
     } else {
-      // TODO(paulberry): make sure we reach setters when evaluating LHS.
-      var lhsType = node.leftHandSide.accept(this);
-      return _visitSubexpression(
-          node.rightHandSide, _typeSystem.isNullable(lhsType));
+      bool targetIsNullable = _visitAssignmentTarget(node.leftHandSide);
+      return _visitSubexpression(node.rightHandSide, targetIsNullable);
     }
   }
 
@@ -108,8 +106,9 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
       _currentCascadeTargetType = _visitSubexpression(node.target, true);
       for (var cascadeSection in node.cascadeSections) {
         if (cascadeSection is AssignmentExpression) {
-          // TODO(paulberry): make sure visitPropertyAccess handles the ".."
-          // properly.
+          _visitSubexpression(cascadeSection, true);
+        } else if (cascadeSection is MethodInvocation) {
+          // TODO(paulberry): coalesce this with the previous case
           _visitSubexpression(cascadeSection, true);
         } else {
           throw UnimplementedError('TODO(paulberry)');
@@ -168,6 +167,27 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
   }
 
   @override
+  DartType visitIndexExpression(IndexExpression node) {
+    // We should only visit expressions in getter context.  Setter context
+    // should be handled by [_visitAssignmentTarget].
+    assert(!node.inSetterContext());
+    if (node.leftBracket.type != TokenType.OPEN_SQUARE_BRACKET) {
+      throw UnimplementedError('TODO(paulberry)');
+    }
+    if (node.target == null) {
+      throw UnimplementedError('TODO(paulberry)');
+    }
+    var targetType = _visitSubexpression(node.target, false);
+    var element = node.staticElement;
+    var operatorMethodType =
+        _computeMigratedType(element, targetType: targetType) as FunctionType;
+    var substitution =
+        _visitInvocationArguments(operatorMethodType, [node.index], null);
+    assert(substitution.isEmpty);
+    return operatorMethodType.returnType;
+  }
+
+  @override
   DartType visitInstanceCreationExpression(InstanceCreationExpression node) {
     var constructor = node.staticElement;
     var class_ = constructor.enclosingElement;
@@ -176,13 +196,13 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
     }
     node.constructorName.accept(this);
     var type = _computeMigratedType(constructor) as FunctionType;
-    _visitInvocationArguments(type, node.argumentList);
+    _visitInvocationArguments(type, node.argumentList.arguments, null);
     return InterfaceTypeImpl.explicit(class_, [],
         nullabilitySuffix: NullabilitySuffix.none);
   }
 
   DartType visitLiteral(Literal node) {
-    if (node is StringLiteral) {
+    if (node is AdjacentStrings) {
       // TODO(paulberry): need to visit interpolations
       throw UnimplementedError('TODO(paulberry)');
     }
@@ -192,27 +212,30 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
 
   @override
   DartType visitMethodInvocation(MethodInvocation node) {
-    bool isNullAware = node.operator != null &&
-        node.operator.type == TokenType.QUESTION_PERIOD;
-    DartType type;
-    if (node.target != null) {
-      var targetType = _visitSubexpression(node.target, isNullAware);
-      type = _computeMigratedType(node.methodName.staticElement,
-          targetType: targetType);
-    } else if (node.realTarget != null) {
-      // TODO(paulberry): in addition to getting the right target, we need to
-      // figure out isNullAware correctly.
-      throw UnimplementedError('TODO(paulberry)');
+    DartType methodType;
+    if (node.operator == null) {
+      methodType = _computeMigratedType(node.methodName.staticElement);
     } else {
-      type = _computeMigratedType(node.methodName.staticElement);
-    }
-    if (type is FunctionType) {
-      if (type.typeFormals.isNotEmpty) {
+      DartType targetType;
+      if (node.operator.type == TokenType.PERIOD_PERIOD) {
+        assert(node.target == null);
+        targetType = _currentCascadeTargetType;
+        if (_typeSystem.isNullable(targetType)) {
+          throw UnimplementedError('TODO(paulberry)');
+        }
+      } else if (node.operator.type == TokenType.PERIOD) {
+        assert(node.target != null);
+        targetType = _visitSubexpression(node.target, false);
+      } else {
         throw UnimplementedError('TODO(paulberry)');
       }
-      node.typeArguments?.accept(this);
-      _visitInvocationArguments(type, node.argumentList);
-      return type.returnType;
+      methodType = _computeMigratedType(node.methodName.staticElement,
+          targetType: targetType);
+    }
+    if (methodType is FunctionType) {
+      var substitution = _visitInvocationArguments(
+          methodType, node.argumentList.arguments, node.typeArguments);
+      return substitute(methodType.returnType, substitution);
     } else {
       throw UnimplementedError('TODO(paulberry)');
     }
@@ -220,18 +243,18 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
 
   @override
   DartType visitPrefixedIdentifier(PrefixedIdentifier node) {
-    return _handlePropertyAccess(
-        node.prefix, node.period.type, node.identifier);
+    return _handlePropertyGet(node.prefix, node.period.type, node.identifier);
   }
 
   @override
   DartType visitPropertyAccess(PropertyAccess node) {
-    return _handlePropertyAccess(
+    return _handlePropertyGet(
         node.target, node.operator.type, node.propertyName);
   }
 
   @override
   DartType visitSimpleIdentifier(SimpleIdentifier node) {
+    assert(!node.inSetterContext());
     var element = node.staticElement;
     if (element == null) return _typeProvider.dynamicType;
     return _computeMigratedType(element);
@@ -285,17 +308,20 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
           .withNullability(NullabilitySuffix.none);
     } else if (baseElement is PropertyAccessorElement) {
       if (baseElement.isSynthetic) {
-        type =
-            _variables.decoratedElementType(baseElement.variable).toFinalType();
+        type = _variables
+            .decoratedElementType(baseElement.variable)
+            .toFinalType(_typeProvider);
       } else {
         var functionType = _variables.decoratedElementType(baseElement);
         var decoratedType = baseElement.isGetter
             ? functionType.returnType
             : functionType.positionalParameters[0];
-        type = decoratedType.toFinalType();
+        type = decoratedType.toFinalType(_typeProvider);
       }
     } else {
-      type = _variables.decoratedElementType(baseElement).toFinalType();
+      type = _variables
+          .decoratedElementType(baseElement)
+          .toFinalType(_typeProvider);
     }
     if (targetType is InterfaceType && targetType.typeArguments.isNotEmpty) {
       var superclass = baseElement.enclosingElement as ClassElement;
@@ -305,7 +331,7 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
             type,
             _decoratedClassHierarchy
                 .getDecoratedSupertype(class_, superclass)
-                .asFinalSubstitution);
+                .asFinalSubstitution(_typeProvider));
       }
       return substitute(type, {
         for (int i = 0; i < targetType.typeArguments.length; i++)
@@ -316,8 +342,25 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
     }
   }
 
-  DartType _handlePropertyAccess(
+  DartType _handlePropertyGet(
       Expression target, TokenType tokenType, SimpleIdentifier propertyName) {
+    assert(!propertyName.inSetterContext());
+    DartType targetType;
+    if (tokenType == TokenType.PERIOD) {
+      targetType = _visitSubexpression(target, false);
+    } else {
+      throw UnimplementedError('TODO(paulberry)');
+    }
+    if (targetType is InterfaceType && targetType.typeArguments.isNotEmpty) {
+      throw UnimplementedError('TODO(paulberry): substitute');
+    }
+    var element = propertyName.staticElement;
+    return _computeMigratedType(element);
+  }
+
+  bool _handlePropertySet(
+      Expression target, TokenType tokenType, SimpleIdentifier propertyName) {
+    assert(propertyName.inSetterContext());
     DartType targetType;
     if (tokenType == TokenType.PERIOD_PERIOD) {
       targetType = _currentCascadeTargetType;
@@ -333,12 +376,75 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
       throw UnimplementedError('TODO(paulberry): substitute');
     }
     var element = propertyName.staticElement;
-    return _computeMigratedType(element);
+    return _typeSystem.isNullable(_computeMigratedType(element));
   }
 
-  void _visitInvocationArguments(FunctionType type, ArgumentList argumentList) {
+  bool _visitAssignmentTarget(Expression node) {
+    if (node is IndexExpression) {
+      assert(node.inSetterContext());
+      DartType targetType;
+      if (node.period == null) {
+        if (node.leftBracket.type != TokenType.OPEN_SQUARE_BRACKET) {
+          throw UnimplementedError('TODO(paulberry)');
+        }
+        if (node.target == null) {
+          throw UnimplementedError('TODO(paulberry)');
+        }
+        targetType = _visitSubexpression(node.target, false);
+      } else if (node.period.type == TokenType.PERIOD_PERIOD) {
+        assert(node.target == null);
+        targetType = _currentCascadeTargetType;
+        if (_typeSystem.isNullable(targetType)) {
+          throw UnimplementedError('TODO(paulberry)');
+        }
+      } else {
+        throw UnimplementedError('TODO(paulberry)');
+      }
+      var element = node.staticElement;
+      var operatorMethodType =
+          _computeMigratedType(element, targetType: targetType) as FunctionType;
+      var type = operatorMethodType;
+      assert(operatorMethodType.typeFormals.isEmpty);
+      _visitSubexpression(
+          node.index, _typeSystem.isNullable(type.parameters[0].type));
+      return _typeSystem.isNullable(type.parameters[1].type);
+    } else if (node is SimpleIdentifier) {
+      return _typeSystem.isNullable(_computeMigratedType(node.staticElement));
+    } else if (node is PrefixedIdentifier) {
+      return _handlePropertySet(node.prefix, node.period.type, node.identifier);
+    } else if (node is PropertyAccess) {
+      return _handlePropertySet(
+          node.target, node.operator.type, node.propertyName);
+    } else {
+      // Need to implement more cases, and add
+      // `assert(!node.inSetterContext());` to their visit methods.
+      throw UnimplementedError('TODO(paulberry)');
+    }
+  }
+
+  Map<TypeParameterElement, DartType> _visitInvocationArguments(
+      FunctionType type,
+      List<Expression> arguments,
+      TypeArgumentList typeArguments) {
+    typeArguments?.accept(this);
+    Map<TypeParameterElement, DartType> substitution;
+    if (type.typeFormals.isNotEmpty) {
+      if (typeArguments != null) {
+        assert(type.typeFormals.length == typeArguments.arguments.length);
+        substitution = {
+          for (int i = 0; i < type.typeFormals.length; i++)
+            type.typeFormals[i]: _variables
+                .decoratedTypeAnnotation(_source, typeArguments.arguments[i])
+                .toFinalType(_typeProvider)
+        };
+      } else {
+        throw UnimplementedError('TODO(paulberry)');
+      }
+    } else {
+      substitution = const {};
+    }
     int i = 0;
-    for (var argument in argumentList.arguments) {
+    for (var argument in arguments) {
       Expression expression;
       DartType parameterType;
       if (argument is NamedExpression) {
@@ -348,8 +454,10 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
         expression = argument;
         parameterType = type.parameters[i++].type;
       }
+      parameterType = substitute(parameterType, substitution);
       _visitSubexpression(expression, _typeSystem.isNullable(parameterType));
     }
+    return substitution;
   }
 
   DartType _visitSubexpression(Expression subexpression, bool nullableContext) {
