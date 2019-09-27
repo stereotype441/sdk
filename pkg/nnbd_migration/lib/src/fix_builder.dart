@@ -20,6 +20,9 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
       // TODO(paulberry): need to visit interpolations
       throw UnimplementedError('TODO(paulberry)');
     }
+    if (node is TypedLiteral) {
+      throw UnimplementedError('TODO(paulberry)');
+    }
     return (node.staticType as TypeImpl)
         .withNullability(NullabilitySuffix.none);
   }
