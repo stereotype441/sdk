@@ -35,16 +35,28 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
 
   @override
   DartType visitBinaryExpression(BinaryExpression node) {
-    switch (node.operator.type) {
+    var leftOperand = node.leftOperand;
+    var rightOperand = node.rightOperand;
+    var operatorType = node.operator.type;
+    switch (operatorType) {
       case TokenType.BANG_EQ:
       case TokenType.EQ_EQ:
-        visitSubexpression(node.leftOperand, true);
-        visitSubexpression(node.rightOperand, true);
+        visitSubexpression(leftOperand, true);
+        visitSubexpression(rightOperand, true);
+        if (leftOperand is SimpleIdentifier && rightOperand is NullLiteral) {
+          var leftElement = leftOperand.staticElement;
+          if (leftElement is VariableElement) {
+            _flowAnalysis.conditionEqNull(node, leftElement, notEqual: operatorType == TokenType.BANG_EQ);
+          }
+        }
         return _typeProvider.boolType;
       case TokenType.AMPERSAND_AMPERSAND:
       case TokenType.BAR_BAR:
-        visitSubexpression(node.leftOperand, false);
-        visitSubexpression(node.rightOperand, false);
+        var isAnd = operatorType == TokenType.AMPERSAND_AMPERSAND;
+        visitSubexpression(leftOperand, false);
+        _flowAnalysis.logicalBinaryOp_rightBegin(leftOperand, isAnd: isAnd);
+        visitSubexpression(rightOperand, false);
+        _flowAnalysis.logicalBinaryOp_end(node, rightOperand, isAnd: isAnd);
         return _typeProvider.boolType;
       case TokenType.QUESTION_QUESTION:
         throw StateError('Should be handled by visitSubexpression');
@@ -57,13 +69,13 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   /// information  used in flow analysis.  Otherwise `null`.
   AssignedVariables<AstNode, VariableElement> _assignedVariables;
 
-  void createFlowAnalysis() {
+  void createFlowAnalysis(AstNode node) {
     assert(_flowAnalysis == null);
     assert(_assignedVariables == null);
     _flowAnalysis =
         FlowAnalysis<Statement, Expression, VariableElement, DartType>(
             const AnalyzerNodeOperations(),
-            DecoratedTypeOperations(_typeSystem, _variables, _graph),
+            TypeSystemTypeOperations(_typeSystem),
             AnalyzerFunctionBodyAccess(node is FunctionBody ? node : null));
     _assignedVariables = FlowAnalysisHelper.computeAssignedVariables(node);
   }
@@ -93,6 +105,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     assert(!node.inSetterContext());
     var element = node.staticElement;
     if (element == null) return _typeProvider.dynamicType;
+    if (element is VariableElement )
     return _computeMigratedType(element);
   }
 
