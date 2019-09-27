@@ -187,6 +187,10 @@ class FindNode {
     return _node(search, (n) => n is NamedExpression);
   }
 
+  NullLiteral nullLiteral(String search) {
+    return _node(search, (n) => n is NullLiteral);
+  }
+
   ParenthesizedExpression parenthesized(String search) {
     return _node(search, (n) => n is ParenthesizedExpression);
   }

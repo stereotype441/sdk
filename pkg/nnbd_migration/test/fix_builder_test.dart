@@ -40,6 +40,13 @@ f() => 1;
     visit(findNode.integerLiteral('1'), 'int');
   }
 
+  test_nullLiteral() async {
+    await analyze('''
+f() => null;
+''');
+    visit(findNode.nullLiteral('null'), 'Null');
+  }
+
   test_stringLiteral() async {
     await analyze('''
 f() => 'foo';
