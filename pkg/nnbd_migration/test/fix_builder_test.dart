@@ -29,7 +29,18 @@ class FixBuilderTest extends EdgeBuilderTestBase {
     return unit;
   }
 
-  test_binaryExpression_eq() async {
+  test_binaryExpression_bang_eq() async {
+    await analyze('''
+f() {
+  var x = null;
+  var y = null;
+  return x != y;
+}
+''');
+    visit(findNode.binary('!='), 'bool');
+  }
+
+  test_binaryExpression_eq_eq() async {
     await analyze('''
 f() {
   var x = null;
