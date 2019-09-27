@@ -26,6 +26,13 @@ f() => true;
     visit(findNode.booleanLiteral('true'), 'bool');
   }
 
+  test_doubleLiteral() async {
+    await analyze('''
+f() => 1.0;
+''');
+    visit(findNode.doubleLiteral('1.0'), 'double');
+  }
+
   test_stringLiteral() async {
     await analyze('''
 f() => 'foo';

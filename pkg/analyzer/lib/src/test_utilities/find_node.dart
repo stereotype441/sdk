@@ -79,6 +79,10 @@ class FindNode {
     return _node(search, (n) => n is DoStatement);
   }
 
+  DoubleLiteral doubleLiteral(String search) {
+    return _node(search, (n) => n is DoubleLiteral);
+  }
+
   ExportDirective export(String search) {
     return _node(search, (n) => n is ExportDirective);
   }
