@@ -33,6 +33,13 @@ f() => 1.0;
     visit(findNode.doubleLiteral('1.0'), 'double');
   }
 
+  test_integerLiteral() async {
+    await analyze('''
+f() => 1;
+''');
+    visit(findNode.integerLiteral('1'), 'int');
+  }
+
   test_stringLiteral() async {
     await analyze('''
 f() => 'foo';
