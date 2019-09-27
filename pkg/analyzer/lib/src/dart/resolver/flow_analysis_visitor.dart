@@ -13,18 +13,18 @@ import 'package:front_end/src/fasta/flow_analysis/flow_analysis.dart';
 import 'package:meta/meta.dart';
 
 class AnalyzerFunctionBodyAccess
-    implements FunctionBodyAccess<VariableElement> {
+    implements FunctionBodyAccess<PromotableElement> {
   final FunctionBody node;
 
   AnalyzerFunctionBodyAccess(this.node);
 
   @override
-  bool isPotentiallyMutatedInClosure(VariableElement variable) {
+  bool isPotentiallyMutatedInClosure(PromotableElement variable) {
     return node.isPotentiallyMutatedInClosure(variable);
   }
 
   @override
-  bool isPotentiallyMutatedInScope(VariableElement variable) {
+  bool isPotentiallyMutatedInScope(PromotableElement variable) {
     return node.isPotentiallyMutatedInScope(variable);
   }
 }
@@ -51,13 +51,13 @@ class FlowAnalysisHelper {
   final TypeSystemTypeOperations _typeOperations;
 
   /// Precomputed sets of potentially assigned variables.
-  final AssignedVariables<AstNode, VariableElement> assignedVariables;
+  final AssignedVariables<AstNode, PromotableElement> assignedVariables;
 
   /// The result for post-resolution stages of analysis.
   final FlowAnalysisResult result;
 
   /// The current flow, when resolving a function body, or `null` otherwise.
-  FlowAnalysis<Statement, Expression, VariableElement, DartType> flow;
+  FlowAnalysis<Statement, Expression, PromotableElement, DartType> flow;
 
   int _blockFunctionBodyLevel = 0;
 
@@ -276,9 +276,9 @@ class FlowAnalysisHelper {
   }
 
   /// Computes the [AssignedVariables] map for the given [node].
-  static AssignedVariables<AstNode, VariableElement> computeAssignedVariables(
+  static AssignedVariables<AstNode, PromotableElement> computeAssignedVariables(
       AstNode node) {
-    var assignedVariables = AssignedVariables<AstNode, VariableElement>();
+    var assignedVariables = AssignedVariables<AstNode, PromotableElement>();
     node.accept(_AssignedVariablesVisitor(assignedVariables));
     return assignedVariables;
   }
