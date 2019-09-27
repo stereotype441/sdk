@@ -53,6 +53,16 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
         .withNullability(NullabilitySuffix.none);
   }
 
+  @override
+  DartType visitSimpleIdentifier(SimpleIdentifier node) {
+    // TODO(paulberry): add an assertion message pointing to how setter context
+    // should be handled.
+    assert(!node.inSetterContext());
+    var element = node.staticElement;
+    if (element == null) return _typeProvider.dynamicType;
+    return _computeMigratedType(element);
+  }
+
   DartType _visitSubexpression(Expression subexpression, bool nullableContext) {
     var type = subexpression.accept(this);
     if (_typeSystem.isNullable(type) && !nullableContext) {
