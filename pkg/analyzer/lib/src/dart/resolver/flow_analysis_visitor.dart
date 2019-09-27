@@ -334,7 +334,7 @@ class FlowAnalysisResult {
 }
 
 class TypeSystemTypeOperations
-    implements TypeOperations<VariableElement, DartType> {
+    implements TypeOperations<PromotableElement, DartType> {
   final TypeSystem typeSystem;
 
   TypeSystemTypeOperations(this.typeSystem);
@@ -360,7 +360,7 @@ class TypeSystemTypeOperations
   }
 
   @override
-  DartType variableType(VariableElement variable) {
+  DartType variableType(PromotableElement variable) {
     return variable.type;
   }
 }
