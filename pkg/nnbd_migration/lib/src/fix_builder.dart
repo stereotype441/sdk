@@ -32,14 +32,16 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     switch (node.operator.type) {
       case TokenType.BANG_EQ:
       case TokenType.EQ_EQ:
-        _visitSubexpression(node.leftOperand, true);
-        _visitSubexpression(node.rightOperand, true);
+        visitSubexpression(node.leftOperand, true);
+        visitSubexpression(node.rightOperand, true);
         return _typeProvider.boolType;
       case TokenType.AMPERSAND_AMPERSAND:
       case TokenType.BAR_BAR:
-        _visitSubexpression(node.leftOperand, false);
-        _visitSubexpression(node.rightOperand, false);
+        visitSubexpression(node.leftOperand, false);
+        visitSubexpression(node.rightOperand, false);
         return _typeProvider.boolType;
+      case TokenType.QUESTION_QUESTION:
+        throw StateError('Should be handled by _visitSubexpression');
       default:
         throw UnimplementedError('TODO(paulberry)');
     }
@@ -71,6 +73,16 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     var element = node.staticElement;
     if (element == null) return _typeProvider.dynamicType;
     return _computeMigratedType(element);
+  }
+
+  DartType visitSubexpression(Expression subexpression, bool nullableContext) {
+    var type = subexpression.accept(this);
+    if (_typeSystem.isNullable(type) && !nullableContext) {
+      addNullCheck(subexpression);
+      return _typeSystem.promoteToNonNull(type as TypeImpl);
+    } else {
+      return type;
+    }
   }
 
   DartType _computeMigratedType(Element element, {DartType targetType}) {
@@ -119,16 +131,6 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
 //      for (int i = 0; i < targetType.typeArguments.length; i++)
 //      class_.typeParameters[i]: targetType.typeArguments[i]
 //      });
-    } else {
-      return type;
-    }
-  }
-
-  DartType _visitSubexpression(Expression subexpression, bool nullableContext) {
-    var type = subexpression.accept(this);
-    if (_typeSystem.isNullable(type) && !nullableContext) {
-      addNullCheck(subexpression);
-      return _typeSystem.promoteToNonNull(type as TypeImpl);
     } else {
       return type;
     }

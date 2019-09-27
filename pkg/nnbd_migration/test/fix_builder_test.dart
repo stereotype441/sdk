@@ -37,7 +37,7 @@ f() {
   return x && y;
 }
 ''');
-    visit(findNode.binary('&&'), 'bool');
+    visitSubexpression(findNode.binary('&&'), 'bool');
   }
 
   test_binaryExpression_ampersand_ampersand_nullChecked() async {
@@ -50,7 +50,8 @@ f() {
 ''');
     var xRef = findNode.simple('x &&');
     var yRef = findNode.simple('y;');
-    visit(findNode.binary('&&'), 'bool', nullChecked: {xRef, yRef});
+    visitSubexpression(findNode.binary('&&'), 'bool',
+        nullChecked: {xRef, yRef});
   }
 
   test_binaryExpression_bang_eq() async {
@@ -61,7 +62,7 @@ f() {
   return x != y;
 }
 ''');
-    visit(findNode.binary('!='), 'bool');
+    visitSubexpression(findNode.binary('!='), 'bool');
   }
 
   test_binaryExpression_bar_bar() async {
@@ -72,7 +73,7 @@ f() {
   return x || y;
 }
 ''');
-    visit(findNode.binary('||'), 'bool');
+    visitSubexpression(findNode.binary('||'), 'bool');
   }
 
   test_binaryExpression_bar_bar_nullChecked() async {
@@ -85,7 +86,8 @@ f() {
 ''');
     var xRef = findNode.simple('x ||');
     var yRef = findNode.simple('y;');
-    visit(findNode.binary('||'), 'bool', nullChecked: {xRef, yRef});
+    visitSubexpression(findNode.binary('||'), 'bool',
+        nullChecked: {xRef, yRef});
   }
 
   test_binaryExpression_eq_eq() async {
@@ -96,35 +98,60 @@ f() {
   return x == y;
 }
 ''');
-    visit(findNode.binary('=='), 'bool');
+    visitSubexpression(findNode.binary('=='), 'bool');
+  }
+
+  test_binaryExpression_question_question() async {
+    await analyze('''
+f() {
+  var x = null;
+  var y = null;
+  return x ?? y;
+}
+''');
+    visitSubexpression(findNode.binary('??'), 'bool');
+  }
+
+  test_binaryExpression_question_question_nullChecked() async {
+    await analyze('''
+f() {
+  var x = null;
+  var y = null;
+  return x ?? y;
+}
+''');
+    var xRef = findNode.simple('x ??');
+    var yRef = findNode.simple('y;');
+    visitSubexpression(findNode.binary('??'), 'bool',
+        nullableContext: false, nullChecked: {xRef, yRef});
   }
 
   test_booleanLiteral() async {
     await analyze('''
 f() => true;
 ''');
-    visit(findNode.booleanLiteral('true'), 'bool');
+    visitSubexpression(findNode.booleanLiteral('true'), 'bool');
   }
 
   test_doubleLiteral() async {
     await analyze('''
 f() => 1.0;
 ''');
-    visit(findNode.doubleLiteral('1.0'), 'double');
+    visitSubexpression(findNode.doubleLiteral('1.0'), 'double');
   }
 
   test_integerLiteral() async {
     await analyze('''
 f() => 1;
 ''');
-    visit(findNode.integerLiteral('1'), 'int');
+    visitSubexpression(findNode.integerLiteral('1'), 'int');
   }
 
   test_nullLiteral() async {
     await analyze('''
 f() => null;
 ''');
-    visit(findNode.nullLiteral('null'), 'Null');
+    visitSubexpression(findNode.nullLiteral('null'), 'Null');
   }
 
   test_simpleIdentifier_localVariable_nonNullable() async {
@@ -134,7 +161,7 @@ f() {
   return x;
 }
 ''');
-    visit(findNode.simple('x;'), 'int');
+    visitSubexpression(findNode.simple('x;'), 'int');
   }
 
   test_simpleIdentifier_localVariable_nullable() async {
@@ -144,27 +171,28 @@ f() {
   return x;
 }
 ''');
-    visit(findNode.simple('x;'), 'int?');
+    visitSubexpression(findNode.simple('x;'), 'int?');
   }
 
   test_stringLiteral() async {
     await analyze('''
 f() => 'foo';
 ''');
-    visit(findNode.stringLiteral("'foo'"), 'String');
+    visitSubexpression(findNode.stringLiteral("'foo'"), 'String');
   }
 
   test_symbolLiteral() async {
     await analyze('''
 f() => #foo;
 ''');
-    visit(findNode.symbolLiteral('#foo'), 'Symbol');
+    visitSubexpression(findNode.symbolLiteral('#foo'), 'Symbol');
   }
 
-  DartType visit(AstNode node, String expectedType,
-      {Set<Expression> nullChecked = const <Expression>{}}) {
+  DartType visitSubexpression(Expression node, String expectedType,
+      {bool nullableContext = true,
+      Set<Expression> nullChecked = const <Expression>{}}) {
     var fixBuilder = _FixBuilder(typeProvider, typeSystem, variables);
-    var type = node.accept(fixBuilder);
+    var type = fixBuilder.visitSubexpression(node, nullableContext);
     expect((type as TypeImpl).toString(withNullability: true), expectedType);
     expect(fixBuilder.nullCheckedExpressions, nullChecked);
     return type;
