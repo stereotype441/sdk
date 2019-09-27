@@ -9,12 +9,12 @@ import 'package:args/args.dart';
 
 import 'dartfuzz_values.dart';
 import 'dartfuzz_api_table.dart';
-import 'dartfuzz_ffiapi.dart';
+import 'dartfuzz_ffi_api.dart';
 
 // Version of DartFuzz. Increase this each time changes are made
 // to preserve the property that a given version of DartFuzz yields
 // the same fuzzed program for a deterministic random seed.
-const String version = '1.51';
+const String version = '1.52';
 
 // Restriction on statements and expressions.
 const int stmtDepth = 1;
@@ -258,6 +258,10 @@ class DartFuzz {
   // in emask.
   // Returns true is the expression is skipped.
   bool processExprOpen(DartType tp) {
+    // Do nothing if we are not in minimization mode.
+    if (!minimize) {
+      return false;
+    }
     // Check whether the bit for the current expression number is set in the
     // expression bitmap. If so skip this expression.
     final newMask = genMask(exprCntr);
@@ -272,7 +276,7 @@ class DartFuzz {
       emask |= newMask;
     }
     exprCntr++;
-    if (!minimize || skipStmt) {
+    if (skipStmt) {
       return false;
     }
     if (!skipExpr && maskBitSet) {
@@ -473,6 +477,11 @@ class DartFuzz {
     emitLn("", newline: false);
     tryBody();
     emit(";", newline: true);
+    indent -= 2;
+    emitLn('} on OutOfMemoryError {');
+    indent += 2;
+    emitLn("print(\'oom\');");
+    emitLn("exit(${oomExitCode});");
     indent -= 2;
     emitLn('} catch (e, st) {');
     indent += 2;
@@ -1677,6 +1686,9 @@ class DartFuzz {
   T oneOf<T>(List<T> choices) {
     return choices[rand.nextInt(choices.length)];
   }
+
+  // Special return code to handle oom errors.
+  static const oomExitCode = 254;
 
   // Random seed used to generate program.
   final int seed;
