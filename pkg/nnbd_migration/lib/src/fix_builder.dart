@@ -8,16 +8,28 @@ import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type.dart';
+import 'package:analyzer/src/dart/element/type_provider.dart';
+import 'package:analyzer/src/generated/resolver.dart';
 
-class FixBuilder extends GeneralizingAstVisitor<DartType> {
+abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
+  final TypeProvider _typeProvider;
+
+  final TypeSystem _typeSystem;
+
+  FixBuilder(TypeProvider typeProvider, this._typeSystem)
+      : _typeProvider = (typeProvider as TypeProviderImpl)
+            .withNullability(NullabilitySuffix.none);
+
+  void addNullCheck(Expression subexpression);
+
   @override
   DartType visitBinaryExpression(BinaryExpression node) {
     var operatorType = node.operator.type;
     if (operatorType == TokenType.EQ || operatorType == TokenType.BANG_EQ) {
+      throw UnimplementedError('TODO(paulberry): test');
       _visitSubexpression(node.leftOperand, true);
       _visitSubexpression(node.rightOperand, true);
-      return (_typeProvider.boolType as TypeImpl)
-          .withNullability(NullabilitySuffix.none);
+      return _typeProvider.boolType;
     } else {
       throw UnimplementedError('TODO(paulberry)');
     }
@@ -39,5 +51,15 @@ class FixBuilder extends GeneralizingAstVisitor<DartType> {
     }
     return (node.staticType as TypeImpl)
         .withNullability(NullabilitySuffix.none);
+  }
+
+  DartType _visitSubexpression(Expression subexpression, bool nullableContext) {
+    var type = subexpression.accept(this);
+    if (_typeSystem.isNullable(type) && !nullableContext) {
+      addNullCheck(subexpression);
+      return _typeSystem.promoteToNonNull(type as TypeImpl);
+    } else {
+      return type;
+    }
   }
 }

@@ -5,6 +5,8 @@
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type.dart';
+import 'package:analyzer/src/generated/resolver.dart';
+import 'package:analyzer/src/generated/type_system.dart';
 import 'package:nnbd_migration/src/fix_builder.dart';
 import 'package:test/test.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
@@ -61,9 +63,25 @@ f() => #foo;
     visit(findNode.symbolLiteral('#foo'), 'Symbol');
   }
 
-  DartType visit(AstNode node, String expectedType) {
-    var type = node.accept(FixBuilder());
+  DartType visit(AstNode node, String expectedType,
+      {Set<Expression> nullChecked = const <Expression>{}}) {
+    var fixBuilder = _FixBuilder(typeProvider, typeSystem);
+    var type = node.accept(fixBuilder);
     expect((type as TypeImpl).toString(withNullability: true), expectedType);
+    expect(fixBuilder.nullCheckedExpressions, nullChecked);
     return type;
+  }
+}
+
+class _FixBuilder extends FixBuilder {
+  final Set<Expression> nullCheckedExpressions = {};
+
+  _FixBuilder(TypeProvider typeProvider, TypeSystem typeSystem)
+      : super(typeProvider, typeSystem);
+
+  @override
+  void addNullCheck(Expression subexpression) {
+    var newlyAdded = nullCheckedExpressions.add(subexpression);
+    expect(newlyAdded, true);
   }
 }
