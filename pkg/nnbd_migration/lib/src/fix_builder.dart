@@ -25,7 +25,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
 
   /// If we are visiting a function body or initializer, instance of flow
   /// analysis.  Otherwise `null`.
-  FlowAnalysis<Statement, Expression, VariableElement, DartType> _flowAnalysis;
+  FlowAnalysis<Statement, Expression, PromotableElement, DartType> _flowAnalysis;
 
   FixBuilder(TypeProvider typeProvider, this._typeSystem, this._variables)
       : _typeProvider = (typeProvider as TypeProviderImpl)
@@ -45,7 +45,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
         visitSubexpression(rightOperand, true);
         if (leftOperand is SimpleIdentifier && rightOperand is NullLiteral) {
           var leftElement = leftOperand.staticElement;
-          if (leftElement is VariableElement) {
+          if (leftElement is PromotableElement) {
             _flowAnalysis.conditionEqNull(node, leftElement, notEqual: operatorType == TokenType.BANG_EQ);
           }
         }
@@ -73,7 +73,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     assert(_flowAnalysis == null);
     assert(_assignedVariables == null);
     _flowAnalysis =
-        FlowAnalysis<Statement, Expression, VariableElement, DartType>(
+        FlowAnalysis<Statement, Expression, PromotableElement, DartType>(
             const AnalyzerNodeOperations(),
             TypeSystemTypeOperations(_typeSystem),
             AnalyzerFunctionBodyAccess(node is FunctionBody ? node : null));
@@ -105,7 +105,10 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     assert(!node.inSetterContext());
     var element = node.staticElement;
     if (element == null) return _typeProvider.dynamicType;
-    if (element is VariableElement TODO)
+    if (element is PromotableElement) {
+      var promotedType = _flowAnalysis.promotedType(element);
+      if (promotedType != null) return promotedType;
+    }
     return _computeMigratedType(element);
   }
 
