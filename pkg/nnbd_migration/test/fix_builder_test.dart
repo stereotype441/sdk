@@ -40,6 +40,16 @@ f() {
     visitSubexpression(findNode.binary('&&'), 'bool');
   }
 
+  test_binaryExpression_ampersand_ampersand_flow() async {
+    await analyze('''
+f() {
+  bool x = null;
+  return x != null && x;
+}
+''');
+    visitSubexpression(findNode.binary('&&'), 'bool');
+  }
+
   test_binaryExpression_ampersand_ampersand_nullChecked() async {
     await analyze('''
 f() {
