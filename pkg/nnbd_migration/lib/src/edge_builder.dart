@@ -1372,10 +1372,12 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     for (var variable in node.variables) {
       variable.metadata.accept(this);
       var initializer = variable.initializer;
-      _flowAnalysis.add(variable.declaredElement as PromotableElement,
-          assigned: initializer != null);
+      var declaredElement = variable.declaredElement;
+      if (declaredElement is PromotableElement) {
+        _flowAnalysis.add(declaredElement, assigned: initializer != null);
+      }
       if (initializer != null) {
-        var destinationType = getOrComputeElementType(variable.declaredElement);
+        var destinationType = getOrComputeElementType(declaredElement);
         if (typeAnnotation == null) {
           var initializerType = initializer.accept(this);
           if (initializerType == null) {
