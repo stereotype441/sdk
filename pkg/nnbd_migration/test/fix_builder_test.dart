@@ -8,6 +8,7 @@ import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/type_system.dart';
 import 'package:nnbd_migration/src/fix_builder.dart';
+import 'package:nnbd_migration/src/variables.dart';
 import 'package:test/test.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
 
@@ -21,6 +22,13 @@ main() {
 
 @reflectiveTest
 class FixBuilderTest extends EdgeBuilderTestBase {
+  @override
+  Future<CompilationUnit> analyze(String code) async {
+    var unit = await super.analyze(code);
+    graph.propagate();
+    return unit;
+  }
+
   test_booleanLiteral() async {
     await analyze('''
 f() => true;
@@ -49,6 +57,37 @@ f() => null;
     visit(findNode.nullLiteral('null'), 'Null');
   }
 
+  test_simpleIdentifier_localVariable_nonNullable() async {
+    await analyze('''
+f() {
+  int x = 1;
+  return x;
+}
+''');
+    visit(findNode.simple('x;'), 'int');
+  }
+
+  test_simpleIdentifier_localVariable_nullable() async {
+    await analyze('''
+f() {
+  int x = null;
+  return x;
+}
+''');
+    visit(findNode.simple('x;'), 'int?');
+  }
+
+  test_simpleIdentifier_localVariable_nullable_checked() async {
+    await analyze('''
+int/*!*/ f() {
+  int x = null;
+  return x;
+}
+''');
+    var xRef = findNode.simple('x;');
+    visit(xRef, 'int', nullChecked: {xRef});
+  }
+
   test_stringLiteral() async {
     await analyze('''
 f() => 'foo';
@@ -65,7 +104,7 @@ f() => #foo;
 
   DartType visit(AstNode node, String expectedType,
       {Set<Expression> nullChecked = const <Expression>{}}) {
-    var fixBuilder = _FixBuilder(typeProvider, typeSystem);
+    var fixBuilder = _FixBuilder(typeProvider, typeSystem, variables);
     var type = node.accept(fixBuilder);
     expect((type as TypeImpl).toString(withNullability: true), expectedType);
     expect(fixBuilder.nullCheckedExpressions, nullChecked);
@@ -76,8 +115,9 @@ f() => #foo;
 class _FixBuilder extends FixBuilder {
   final Set<Expression> nullCheckedExpressions = {};
 
-  _FixBuilder(TypeProvider typeProvider, TypeSystem typeSystem)
-      : super(typeProvider, typeSystem);
+  _FixBuilder(
+      TypeProvider typeProvider, TypeSystem typeSystem, Variables variables)
+      : super(typeProvider, typeSystem, variables);
 
   @override
   void addNullCheck(Expression subexpression) {

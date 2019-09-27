@@ -5,18 +5,23 @@
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
+import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
+import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type_provider.dart';
 import 'package:analyzer/src/generated/resolver.dart';
+import 'package:nnbd_migration/src/variables.dart';
 
 abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   final TypeProvider _typeProvider;
 
   final TypeSystem _typeSystem;
 
-  FixBuilder(TypeProvider typeProvider, this._typeSystem)
+  final Variables _variables;
+
+  FixBuilder(TypeProvider typeProvider, this._typeSystem, this._variables)
       : _typeProvider = (typeProvider as TypeProviderImpl)
             .withNullability(NullabilitySuffix.none);
 
@@ -61,6 +66,57 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     var element = node.staticElement;
     if (element == null) return _typeProvider.dynamicType;
     return _computeMigratedType(element);
+  }
+
+  DartType _computeMigratedType(Element element, {DartType targetType}) {
+    Element baseElement;
+    if (element is Member) {
+      assert(targetType != null);
+      baseElement = element.baseElement;
+    } else {
+      baseElement = element;
+    }
+    DartType type;
+    if (baseElement is ClassElement || baseElement is TypeParameterElement) {
+      throw UnimplementedError('TODO(paulberry)');
+//      return (_typeProvider.typeType as TypeImpl)
+//          .withNullability(NullabilitySuffix.none);
+    } else if (baseElement is PropertyAccessorElement) {
+      throw UnimplementedError('TODO(paulberry)');
+//      if (baseElement.isSynthetic) {
+//        type = _variables
+//            .decoratedElementType(baseElement.variable)
+//            .toFinalType(_typeProvider);
+//      } else {
+//        var functionType = _variables.decoratedElementType(baseElement);
+//        var decoratedType = baseElement.isGetter
+//            ? functionType.returnType
+//            : functionType.positionalParameters[0];
+//        type = decoratedType.toFinalType(_typeProvider);
+//      }
+    } else {
+      type = _variables
+          .decoratedElementType(baseElement)
+          .toFinalType(_typeProvider);
+    }
+    if (targetType is InterfaceType && targetType.typeArguments.isNotEmpty) {
+      throw UnimplementedError('TODO(paulberry)');
+//      var superclass = baseElement.enclosingElement as ClassElement;
+//      var class_ = targetType.element;
+//      if (class_ != superclass) {
+//        type = substitute(
+//            type,
+//            _decoratedClassHierarchy
+//                .getDecoratedSupertype(class_, superclass)
+//                .asFinalSubstitution(_typeProvider));
+//      }
+//      return substitute(type, {
+//      for (int i = 0; i < targetType.typeArguments.length; i++)
+//      class_.typeParameters[i]: targetType.typeArguments[i]
+//      });
+    } else {
+      return type;
+    }
   }
 
   DartType _visitSubexpression(Expression subexpression, bool nullableContext) {
