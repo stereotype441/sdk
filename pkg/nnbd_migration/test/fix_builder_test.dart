@@ -29,6 +29,30 @@ class FixBuilderTest extends EdgeBuilderTestBase {
     return unit;
   }
 
+  test_binaryExpression_ampersand_ampersand() async {
+    await analyze('''
+f() {
+  var x = true;
+  var y = true;
+  return x && y;
+}
+''');
+    visit(findNode.binary('&&'), 'bool');
+  }
+
+  test_binaryExpression_ampersand_ampersand_nullChecked() async {
+    await analyze('''
+f() {
+  var x = null;
+  var y = null;
+  return x && y;
+}
+''');
+    var xRef = findNode.simple('x &&');
+    var yRef = findNode.simple('y;');
+    visit(findNode.binary('&&'), 'bool', nullChecked: {xRef, yRef});
+  }
+
   test_binaryExpression_bang_eq() async {
     await analyze('''
 f() {
@@ -38,6 +62,30 @@ f() {
 }
 ''');
     visit(findNode.binary('!='), 'bool');
+  }
+
+  test_binaryExpression_bar_bar() async {
+    await analyze('''
+f() {
+  var x = true;
+  var y = true;
+  return x || y;
+}
+''');
+    visit(findNode.binary('||'), 'bool');
+  }
+
+  test_binaryExpression_bar_bar_nullChecked() async {
+    await analyze('''
+f() {
+  var x = null;
+  var y = null;
+  return x || y;
+}
+''');
+    var xRef = findNode.simple('x ||');
+    var yRef = findNode.simple('y;');
+    visit(findNode.binary('||'), 'bool', nullChecked: {xRef, yRef});
   }
 
   test_binaryExpression_eq_eq() async {
