@@ -105,7 +105,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     assert(!node.inSetterContext());
     var element = node.staticElement;
     if (element == null) return _typeProvider.dynamicType;
-    if (element is VariableElement )
+    if (element is VariableElement TODO)
     return _computeMigratedType(element);
   }
 
