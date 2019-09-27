@@ -21,7 +21,6 @@ main() {
 @reflectiveTest
 class EditDartfixDomainHandlerTest extends AbstractAnalysisTest {
   int requestId = 30;
-  String libPath;
 
   String get nextRequestId => (++requestId).toString();
 
@@ -78,7 +77,6 @@ class EditDartfixDomainHandlerTest extends AbstractAnalysisTest {
   void setUp() {
     super.setUp();
     registerLintRules();
-    libPath = resourceProvider.convertPath('/project/lib');
     testFile = resourceProvider.convertPath('/project/lib/fileToBeFixed.dart');
   }
 
@@ -193,12 +191,7 @@ f(Iterable<int> i) {
   }
 
   test_dartfix_nonNullable() async {
-    // Add analysis options to enable non-nullable analysis
-    newFile('/project/analysis_options.yaml', content: '''
-analyzer:
-  enable-experiment:
-    - non-nullable
-''');
+    createAnalysisOptionsFile(experiments: ['non-nullable']);
     addTestFile('''
 int f(int i) => 0;
 int g(int i) => f(i);
@@ -293,12 +286,7 @@ linter:
   }
 
   test_dartfix_nonNullable_outputDir() async {
-    // Add analysis options to enable non-nullable analysis
-    newFile('/project/analysis_options.yaml', content: '''
-analyzer:
-  enable-experiment:
-    - non-nullable
-''');
+    createAnalysisOptionsFile(experiments: ['non-nullable']);
     addTestFile('''
 int f(int i) => 0;
 int g(int i) => f(i);
