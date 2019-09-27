@@ -44,7 +44,14 @@ f() => 1;
     await analyze('''
 f() => 'foo';
 ''');
-    visit(findNode.stringLiteral('foo'), 'String');
+    visit(findNode.stringLiteral("'foo'"), 'String');
+  }
+
+  test_symbolLiteral() async {
+    await analyze('''
+f() => #foo;
+''');
+    visit(findNode.symbolLiteral('#foo'), 'Symbol');
   }
 
   DartType visit(AstNode node, String expectedType) {

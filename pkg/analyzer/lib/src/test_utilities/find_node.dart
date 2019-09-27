@@ -247,6 +247,10 @@ class FindNode {
     return _node(search, (n) => n is SwitchStatement);
   }
 
+  SymbolLiteral symbolLiteral(String search) {
+    return _node(search, (n) => n is SymbolLiteral);
+  }
+
   ThisExpression this_(String search) {
     return _node(search, (n) => n is ThisExpression);
   }
