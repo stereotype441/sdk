@@ -163,7 +163,7 @@ class FlowAnalysisHelper {
     if (_blockFunctionBodyLevel > 1) {
       assert(flow != null);
     } else {
-      flow = FlowAnalysis<Statement, Expression, VariableElement, DartType>(
+      flow = FlowAnalysis<Statement, Expression, PromotableElement, DartType>(
         _nodeOperations,
         _typeOperations,
         AnalyzerFunctionBodyAccess(node),
