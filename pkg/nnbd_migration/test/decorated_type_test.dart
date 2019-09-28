@@ -50,6 +50,24 @@ class DecoratedTypeTest extends Object
     NullabilityNode.clearDebugNames();
   }
 
+  test_asFinalSubstitution_non_nullable() {
+    var type = list(int_(node: never), node: never);
+    var substitution = type.asFinalSubstitution(typeProvider);
+    expect(substitution, hasLength(1));
+    expect(substitution.keys.single,
+        same((type.type as InterfaceType).element.typeParameters[0]));
+    assertDartType(substitution.values.single, 'int');
+  }
+
+  test_asFinalSubstitution_nullable() {
+    var type = list(int_(node: always), node: never);
+    var substitution = type.asFinalSubstitution(typeProvider);
+    expect(substitution, hasLength(1));
+    expect(substitution.keys.single,
+        same((type.type as InterfaceType).element.typeParameters[0]));
+    assertDartType(substitution.values.single, 'int?');
+  }
+
   test_equal_dynamic_and_void() {
     expect(dynamic_ == dynamic_, isTrue);
     expect(dynamic_ == void_, isFalse);
