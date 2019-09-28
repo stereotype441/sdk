@@ -3,6 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/generated/resolver.dart';
@@ -279,12 +280,15 @@ bool _f(dynamic d, bool b) => d && b;
   }
 
   DartType visitSubexpression(Expression node, String expectedType,
-      {NullabilityContext context = NullabilityContext.nullable,
+      {DartType contextType,
+      NullabilityContext context = NullabilityContext.nullable,
       Set<Expression> nullChecked = const <Expression>{}}) {
+    contextType ??= (typeProvider.objectType as TypeImpl)
+        .withNullability(NullabilitySuffix.none);
     var fixBuilder = _FixBuilder(
         decoratedClassHierarchy, typeProvider, typeSystem, variables);
     fixBuilder.createFlowAnalysis(node.thisOrAncestorOfType<FunctionBody>());
-    var type = fixBuilder.visitSubexpression(node, context);
+    var type = fixBuilder.visitSubexpression(node, contextType, context);
     expect((type as TypeImpl).toString(withNullability: true), expectedType);
     expect(fixBuilder.nullCheckedExpressions, nullChecked);
     return type;

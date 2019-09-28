@@ -63,8 +63,10 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     switch (operatorType) {
       case TokenType.BANG_EQ:
       case TokenType.EQ_EQ:
-        visitSubexpression(leftOperand, NullabilityContext.nullable);
-        visitSubexpression(rightOperand, NullabilityContext.nullable);
+        visitSubexpression(leftOperand, _typeProvider.dynamicType,
+            NullabilityContext.nullable);
+        visitSubexpression(rightOperand, _typeProvider.dynamicType,
+            NullabilityContext.nullable);
         if (leftOperand is SimpleIdentifier && rightOperand is NullLiteral) {
           var leftElement = leftOperand.staticElement;
           if (leftElement is PromotableElement) {
@@ -76,29 +78,34 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
       case TokenType.AMPERSAND_AMPERSAND:
       case TokenType.BAR_BAR:
         var isAnd = operatorType == TokenType.AMPERSAND_AMPERSAND;
-        visitSubexpression(leftOperand, NullabilityContext.nonNullableUsage);
+        visitSubexpression(leftOperand, _typeProvider.boolType,
+            NullabilityContext.nonNullableUsage);
         _flowAnalysis.logicalBinaryOp_rightBegin(leftOperand, isAnd: isAnd);
-        visitSubexpression(rightOperand, NullabilityContext.nonNullableUsage);
+        visitSubexpression(rightOperand, _typeProvider.boolType,
+            NullabilityContext.nonNullableUsage);
         _flowAnalysis.logicalBinaryOp_end(node, rightOperand, isAnd: isAnd);
         return _typeProvider.boolType;
       case TokenType.QUESTION_QUESTION:
         throw StateError('Should be handled by visitSubexpression');
       default:
-        var targetType = visitSubexpression(
-            leftOperand, NullabilityContext.nonNullableUsage);
+        var targetType = visitSubexpression(leftOperand,
+            _typeProvider.objectType, NullabilityContext.nonNullableUsage);
         NullabilityContext context;
+        DartType contextType;
         DartType returnType;
         if (staticElement == null) {
           context = NullabilityContext.nullable;
+          contextType = _typeProvider.dynamicType;
           returnType = _typeProvider.dynamicType;
         } else {
           var methodType =
               _computeMigratedType(staticElement, targetType: targetType)
                   as FunctionType;
-          context = _assignmentContext(methodType.parameters[0].type);
+          contextType = methodType.parameters[0].type;
+          context = _assignmentContext(contextType);
           returnType = methodType.returnType;
         }
-        visitSubexpression(rightOperand, context);
+        visitSubexpression(rightOperand, contextType, context);
         return returnType;
     }
   }
@@ -135,15 +142,18 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     return _computeMigratedType(element);
   }
 
-  DartType visitSubexpression(
-      Expression subexpression, NullabilityContext context) {
+  DartType visitSubexpression(Expression subexpression, DartType contextType,
+      NullabilityContext context) {
     if (subexpression is BinaryExpression &&
         subexpression.operator.type == TokenType.QUESTION_QUESTION) {
       // If `a ?? b` is used in a non-nullable context, we don't want to migrate
       // it to `(a ?? b)!`.  We want to migrate it to `a ?? b!`.
       var leftType = visitSubexpression(
-          subexpression.leftOperand, NullabilityContext.nullable);
-      var rightType = visitSubexpression(subexpression.rightOperand, context);
+          subexpression.leftOperand,
+          _typeSystem.makeNullable(contextType as TypeImpl),
+          NullabilityContext.nullable);
+      var rightType =
+          visitSubexpression(subexpression.rightOperand, contextType, context);
       // Since flow analysis doesn't support `??` yet, the best we can do is
       // take the LUB of the two types.  TODO(paulberry): improve this once flow
       // analysis supports `??`.
