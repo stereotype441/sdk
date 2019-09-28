@@ -182,11 +182,10 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
       var superclass = baseElement.enclosingElement as ClassElement;
       var class_ = targetType.element;
       if (class_ != superclass) {
-        type = substitute(
-            type,
-            _decoratedClassHierarchy
-                .getDecoratedSupertype(class_, superclass)
-                .asFinalSubstitution(_typeProvider));
+        var supertype = _decoratedClassHierarchy
+            .getDecoratedSupertype(class_, superclass)
+            .toFinalType(_typeProvider) as InterfaceType;
+        type = Substitution.fromInterfaceType(supertype).substituteType(type);
       }
       return substitute(type, {
         for (int i = 0; i < targetType.typeArguments.length; i++)

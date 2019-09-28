@@ -7,6 +7,7 @@ import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/type_system.dart';
+import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
 import 'package:nnbd_migration/src/fix_builder.dart';
 import 'package:nnbd_migration/src/variables.dart';
 import 'package:test/test.dart';
@@ -27,6 +28,16 @@ class FixBuilderTest extends EdgeBuilderTestBase {
     var unit = await super.analyze(code);
     graph.propagate();
     return unit;
+  }
+
+  solo_test_binaryExpression_userDefinable_substituted() async {
+    await analyze('''
+class _C<T, U> {
+  T operator+(U u) => throw 'foo';
+}
+_f(_C<int, String> c) => c + 'foo';
+''');
+    visitSubexpression(findNode.binary('c +'), 'int');
   }
 
   test_binaryExpression_ampersand_ampersand() async {
@@ -153,16 +164,6 @@ _f(_C c, String/*?*/ s) => c + s;
         nullChecked: {findNode.simple('s;')});
   }
 
-  solo_test_binaryExpression_userDefinable_substituted() async {
-    await analyze('''
-class _C<T, U> {
-  T operator+(U u) => throw 'foo';
-}
-_f(_C<int, String> c) => c + 'foo';
-''');
-    visitSubexpression(findNode.binary('c +'), 'int');
-  }
-
   test_binaryExpression_userDefinable_substituted_check_rhs() async {
     await analyze('''
 class _C<T, U> {
@@ -259,9 +260,9 @@ f() => #foo;
 class _FixBuilder extends FixBuilder {
   final Set<Expression> nullCheckedExpressions = {};
 
-  _FixBuilder(
+  _FixBuilder(DecoratedClassHierarchy decoratedClassHierarchy,
       TypeProvider typeProvider, TypeSystem typeSystem, Variables variables)
-      : super(typeProvider, typeSystem, variables);
+      : super(decoratedClassHierarchy, typeProvider, typeSystem, variables);
 
   @override
   void addNullCheck(Expression subexpression) {
