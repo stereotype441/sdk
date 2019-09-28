@@ -384,6 +384,16 @@ class EdgeBuilderTest extends EdgeBuilderTestBase {
     return variables.decoratedExpressionType(findNode.expression(text));
   }
 
+  solo_test_foo() async {
+    await analyze('''
+class _C<T, U> {
+  T operator+(U u) => throw 'foo';
+}
+_f(_C<int, String> c) => c + 'foo';
+''');
+    fail('TODO(paulberry)');
+  }
+
   test_already_migrated_field() async {
     await analyze('''
 double f() => double.NAN;
