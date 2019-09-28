@@ -31,32 +31,21 @@ class FixBuilderTest extends EdgeBuilderTestBase {
 
   test_binaryExpression_ampersand_ampersand() async {
     await analyze('''
-f() {
-  var x = true;
-  var y = true;
-  return x && y;
-}
+f(bool x, bool y) => x && y;
 ''');
     visitSubexpression(findNode.binary('&&'), 'bool');
   }
 
   test_binaryExpression_ampersand_ampersand_flow() async {
     await analyze('''
-f() {
-  bool x = null;
-  return x != null && x;
-}
+f(bool/*?*/ x) => x != null && x;
 ''');
     visitSubexpression(findNode.binary('&&'), 'bool');
   }
 
   test_binaryExpression_ampersand_ampersand_nullChecked() async {
     await analyze('''
-f() {
-  var x = null;
-  var y = null;
-  return x && y;
-}
+f(bool/*?*/ x, bool/*?*/ y) => x && y;
 ''');
     var xRef = findNode.simple('x &&');
     var yRef = findNode.simple('y;');
@@ -66,13 +55,10 @@ f() {
 
   test_binaryExpression_bang_eq() async {
     await analyze('''
-f() {
-  var x = null;
-  var y = null;
-  return x != y;
-}
+f(Object/*?*/ x, Object/*?*/ y) => x != y;
 ''');
     visitSubexpression(findNode.binary('!='), 'bool');
+    TODO; // Fix up remaining methods to use /*?*/ rather than declarations.
   }
 
   test_binaryExpression_bar_bar() async {
