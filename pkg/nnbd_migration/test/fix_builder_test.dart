@@ -30,6 +30,20 @@ class FixBuilderTest extends EdgeBuilderTestBase {
     return unit;
   }
 
+  test_assign_dynamic_to_non_nullable() async {
+    // Explicit assignments of `dynamic` to another type are null checked if
+    // necessary.  Note that this is not strictly necessary but we do it for
+    // clarity.
+    // TODO(paulberry): make this a more realistic test by testing the actual
+    // assignment context.
+    await analyze('''
+Object/*!*/ _f(dynamic d) => d;
+''');
+    var dRef = findNode.simple('d;');
+    visitSubexpression(dRef, 'dynamic',
+        context: NullabilityContext.assignToNonNullable, nullChecked: {dRef});
+  }
+
   test_binaryExpression_ampersand_ampersand() async {
     await analyze('''
 _f(bool x, bool y) => x && y;
@@ -119,7 +133,17 @@ Object/*!*/ _f(int/*?*/ x, double/*?*/ y) {
     // TODO(paulberry): the type should be `num` (not `num?`).  This should
     // start working once `??` support is added to flow analysis.
     visitSubexpression(findNode.binary('??'), 'num?',
-        nullableContext: false, nullChecked: {yRef});
+        context: NullabilityContext.assignToNonNullable, nullChecked: {yRef});
+  }
+
+  test_binaryExpression_userDefinable_dynamic() async {
+    await analyze('''
+Object/*!*/ _f(dynamic d, int/*?*/ i) => d + i;
+''');
+    var plusNode = findNode.binary('+');
+    visitSubexpression(plusNode, 'dynamic',
+        context: NullabilityContext.assignToNonNullable,
+        nullChecked: {plusNode});
   }
 
   test_binaryExpression_userDefinable_simple() async {
@@ -245,13 +269,22 @@ f() => #foo;
     visitSubexpression(findNode.symbolLiteral('#foo'), 'Symbol');
   }
 
+  test_use_of_dynamic() async {
+    // Use of `dynamic` in a context requiring non-null is not explicitly null
+    // checked.
+    await analyze('''
+bool _f(dynamic d, bool b) => d && b;
+''');
+    visitSubexpression(findNode.binary('&&'), 'bool');
+  }
+
   DartType visitSubexpression(Expression node, String expectedType,
-      {bool nullableContext = true,
+      {NullabilityContext context = NullabilityContext.nullable,
       Set<Expression> nullChecked = const <Expression>{}}) {
     var fixBuilder = _FixBuilder(
         decoratedClassHierarchy, typeProvider, typeSystem, variables);
     fixBuilder.createFlowAnalysis(node.thisOrAncestorOfType<FunctionBody>());
-    var type = fixBuilder.visitSubexpression(node, nullableContext);
+    var type = fixBuilder.visitSubexpression(node, context);
     expect((type as TypeImpl).toString(withNullability: true), expectedType);
     expect(fixBuilder.nullCheckedExpressions, nullChecked);
     return type;
