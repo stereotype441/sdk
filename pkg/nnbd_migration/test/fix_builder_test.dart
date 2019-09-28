@@ -31,21 +31,21 @@ class FixBuilderTest extends EdgeBuilderTestBase {
 
   test_binaryExpression_ampersand_ampersand() async {
     await analyze('''
-f(bool x, bool y) => x && y;
+_f(bool x, bool y) => x && y;
 ''');
     visitSubexpression(findNode.binary('&&'), 'bool');
   }
 
   test_binaryExpression_ampersand_ampersand_flow() async {
     await analyze('''
-f(bool/*?*/ x) => x != null && x;
+_f(bool/*?*/ x) => x != null && x;
 ''');
     visitSubexpression(findNode.binary('&&'), 'bool');
   }
 
   test_binaryExpression_ampersand_ampersand_nullChecked() async {
     await analyze('''
-f(bool/*?*/ x, bool/*?*/ y) => x && y;
+_f(bool/*?*/ x, bool/*?*/ y) => x && y;
 ''');
     var xRef = findNode.simple('x &&');
     var yRef = findNode.simple('y;');
@@ -55,17 +55,14 @@ f(bool/*?*/ x, bool/*?*/ y) => x && y;
 
   test_binaryExpression_bang_eq() async {
     await analyze('''
-f(Object/*?*/ x, Object/*?*/ y) => x != y;
+_f(Object/*?*/ x, Object/*?*/ y) => x != y;
 ''');
     visitSubexpression(findNode.binary('!='), 'bool');
-    TODO; // Fix up remaining methods to use /*?*/ rather than declarations.
   }
 
   test_binaryExpression_bar_bar() async {
     await analyze('''
-f() {
-  var x = true;
-  var y = true;
+_f(bool x, bool y) {
   return x || y;
 }
 ''');
@@ -74,8 +71,7 @@ f() {
 
   test_binaryExpression_bar_bar_flow() async {
     await analyze('''
-f() {
-  bool x = null;
+_f(bool/*?*/ x) {
   return x == null || x;
 }
 ''');
@@ -84,9 +80,7 @@ f() {
 
   test_binaryExpression_bar_bar_nullChecked() async {
     await analyze('''
-f() {
-  var x = null;
-  var y = null;
+_f(Object/*?*/ x, Object/*?*/ y) {
   return x || y;
 }
 ''');
@@ -98,9 +92,7 @@ f() {
 
   test_binaryExpression_eq_eq() async {
     await analyze('''
-f() {
-  var x = null;
-  var y = null;
+_f(Object/*?*/ x, Object/*?*/ y) {
   return x == y;
 }
 ''');
@@ -109,9 +101,7 @@ f() {
 
   test_binaryExpression_question_question() async {
     await analyze('''
-f() {
-  int x = null;
-  double y = null;
+_f(int/*?*/ x, double/*?*/ y) {
   return x ?? y;
 }
 ''');
@@ -120,9 +110,7 @@ f() {
 
   test_binaryExpression_question_question_nullChecked() async {
     await analyze('''
-f() {
-  int x = null;
-  double y = null;
+Object/*!*/ _f(int/*?*/ x, double/*?*/ y) {
   return x ?? y;
 }
 ''');
@@ -135,20 +123,20 @@ f() {
 
   test_binaryExpression_userDefinable_simple() async {
     await analyze('''
-class C {
+class _C {
   int operator+(String s) => 1;
 }
-f(C c) => c + 'foo';
+_f(_C c) => c + 'foo';
 ''');
     visitSubexpression(findNode.binary('c +'), 'int');
   }
 
   test_binaryExpression_userDefinable_simple_check_lhs() async {
     await analyze('''
-class C {
+class _C {
   int operator+(String s) => 1;
 }
-f(C/*?*/ c) => c + 'foo';
+_f(_C/*?*/ c) => c + 'foo';
 ''');
     visitSubexpression(findNode.binary('c +'), 'int',
         nullChecked: {findNode.simple('c +')});
@@ -156,10 +144,10 @@ f(C/*?*/ c) => c + 'foo';
 
   test_binaryExpression_userDefinable_simple_check_rhs() async {
     await analyze('''
-class C {
+class _C {
   int operator+(String s) => 1;
 }
-f(C c, String/*?*/ s) => c + s;
+_f(_C c, String/*?*/ s) => c + s;
 ''');
     visitSubexpression(findNode.binary('c +'), 'int',
         nullChecked: {findNode.simple('s;')});
@@ -167,20 +155,20 @@ f(C c, String/*?*/ s) => c + s;
 
   test_binaryExpression_userDefinable_substituted() async {
     await analyze('''
-class C<T, U> {
+class _C<T, U> {
   T operator+(U u) => throw 'foo';
 }
-f(C<int, String> c) => c + 'foo';
+_f(_C<int, String> c) => c + 'foo';
 ''');
     visitSubexpression(findNode.binary('c +'), 'int');
   }
 
   test_binaryExpression_userDefinable_substituted_check_rhs() async {
     await analyze('''
-class C<T, U> {
+class _C<T, U> {
   T operator+(U u) => throw 'foo';
 }
-f(C<int, String/*!*/> c, String/*?*/ s) => c + s;
+_f(_C<int, String/*!*/> c, String/*?*/ s) => c + s;
 ''');
     visitSubexpression(findNode.binary('c +'), 'int',
         nullChecked: {findNode.simple('s;')});
@@ -188,10 +176,10 @@ f(C<int, String/*!*/> c, String/*?*/ s) => c + s;
 
   test_binaryExpression_userDefinable_substituted_no_check_rhs() async {
     await analyze('''
-class C<T, U> {
+class _C<T, U> {
   T operator+(U u) => throw 'foo';
 }
-f(C<int, String/*?*/> c, String/*?*/ s) => c + s;
+_f(_C<int, String/*?*/> c, String/*?*/ s) => c + s;
 ''');
     visitSubexpression(findNode.binary('c +'), 'int');
   }
@@ -226,8 +214,7 @@ f() => null;
 
   test_simpleIdentifier_localVariable_nonNullable() async {
     await analyze('''
-f() {
-  int x = 1;
+_f(int x) {
   return x;
 }
 ''');
@@ -236,8 +223,7 @@ f() {
 
   test_simpleIdentifier_localVariable_nullable() async {
     await analyze('''
-f() {
-  int x = null;
+_f(int/*?*/ x) {
   return x;
 }
 ''');
