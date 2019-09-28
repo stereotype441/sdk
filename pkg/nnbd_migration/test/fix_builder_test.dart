@@ -30,16 +30,6 @@ class FixBuilderTest extends EdgeBuilderTestBase {
     return unit;
   }
 
-  solo_test_binaryExpression_userDefinable_substituted() async {
-    await analyze('''
-class _C<T, U> {
-  T operator+(U u) => throw 'foo';
-}
-_f(_C<int, String> c) => c + 'foo';
-''');
-    visitSubexpression(findNode.binary('c +'), 'int');
-  }
-
   test_binaryExpression_ampersand_ampersand() async {
     await analyze('''
 _f(bool x, bool y) => x && y;
@@ -164,6 +154,16 @@ _f(_C c, String/*?*/ s) => c + s;
         nullChecked: {findNode.simple('s;')});
   }
 
+  test_binaryExpression_userDefinable_substituted() async {
+    await analyze('''
+class _C<T, U> {
+  T operator+(U u) => throw 'foo';
+}
+_f(_C<int, String> c) => c + 'foo';
+''');
+    visitSubexpression(findNode.binary('c +'), 'int');
+  }
+
   test_binaryExpression_userDefinable_substituted_check_rhs() async {
     await analyze('''
 class _C<T, U> {
@@ -248,7 +248,8 @@ f() => #foo;
   DartType visitSubexpression(Expression node, String expectedType,
       {bool nullableContext = true,
       Set<Expression> nullChecked = const <Expression>{}}) {
-    var fixBuilder = _FixBuilder(typeProvider, typeSystem, variables);
+    var fixBuilder = _FixBuilder(
+        decoratedClassHierarchy, typeProvider, typeSystem, variables);
     fixBuilder.createFlowAnalysis(node.thisOrAncestorOfType<FunctionBody>());
     var type = fixBuilder.visitSubexpression(node, nullableContext);
     expect((type as TypeImpl).toString(withNullability: true), expectedType);
