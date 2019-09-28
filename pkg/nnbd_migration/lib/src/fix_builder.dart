@@ -10,13 +10,17 @@ import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/dart/element/type.dart';
+import 'package:analyzer/src/dart/element/type_algebra.dart';
 import 'package:analyzer/src/dart/element/type_provider.dart';
 import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:front_end/src/fasta/flow_analysis/flow_analysis.dart';
+import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
 import 'package:nnbd_migration/src/variables.dart';
 
 abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
+  final DecoratedClassHierarchy _decoratedClassHierarchy;
+
   final TypeProvider _typeProvider;
 
   final TypeSystem _typeSystem;
@@ -32,7 +36,8 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   /// information  used in flow analysis.  Otherwise `null`.
   AssignedVariables<AstNode, VariableElement> _assignedVariables;
 
-  FixBuilder(TypeProvider typeProvider, this._typeSystem, this._variables)
+  FixBuilder(this._decoratedClassHierarchy, TypeProvider typeProvider,
+      this._typeSystem, this._variables)
       : _typeProvider = (typeProvider as TypeProviderImpl)
             .withNullability(NullabilitySuffix.none);
 
@@ -174,20 +179,19 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
           .toFinalType(_typeProvider);
     }
     if (targetType is InterfaceType && targetType.typeArguments.isNotEmpty) {
-      throw UnimplementedError('TODO(paulberry)');
-//      var superclass = baseElement.enclosingElement as ClassElement;
-//      var class_ = targetType.element;
-//      if (class_ != superclass) {
-//        type = substitute(
-//            type,
-//            _decoratedClassHierarchy
-//                .getDecoratedSupertype(class_, superclass)
-//                .asFinalSubstitution(_typeProvider));
-//      }
-//      return substitute(type, {
-//      for (int i = 0; i < targetType.typeArguments.length; i++)
-//      class_.typeParameters[i]: targetType.typeArguments[i]
-//      });
+      var superclass = baseElement.enclosingElement as ClassElement;
+      var class_ = targetType.element;
+      if (class_ != superclass) {
+        type = substitute(
+            type,
+            _decoratedClassHierarchy
+                .getDecoratedSupertype(class_, superclass)
+                .asFinalSubstitution(_typeProvider));
+      }
+      return substitute(type, {
+        for (int i = 0; i < targetType.typeArguments.length; i++)
+          class_.typeParameters[i]: targetType.typeArguments[i]
+      });
     } else {
       return type;
     }
