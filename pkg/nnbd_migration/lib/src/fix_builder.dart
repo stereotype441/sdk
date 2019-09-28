@@ -18,12 +18,6 @@ import 'package:front_end/src/fasta/flow_analysis/flow_analysis.dart';
 import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
 import 'package:nnbd_migration/src/variables.dart';
 
-enum NullabilityContext {
-  nullable,
-  nonNullableUsage,
-  assignToNonNullable
-}
-
 abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   final DecoratedClassHierarchy _decoratedClassHierarchy;
 
@@ -90,7 +84,8 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
       case TokenType.QUESTION_QUESTION:
         throw StateError('Should be handled by visitSubexpression');
       default:
-        var targetType = visitSubexpression(leftOperand, NullabilityContext.nonNullableUsage);
+        var targetType = visitSubexpression(
+            leftOperand, NullabilityContext.nonNullableUsage);
         NullabilityContext context;
         DartType returnType;
         if (staticElement == null) {
@@ -100,16 +95,13 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
           var methodType =
               _computeMigratedType(staticElement, targetType: targetType)
                   as FunctionType;
-          context =
-              _assignmentContext(methodType.parameters[0].type);
+          context = _assignmentContext(methodType.parameters[0].type);
           returnType = methodType.returnType;
         }
         visitSubexpression(rightOperand, context);
         return returnType;
     }
   }
-
-  NullabilityContext _assignmentContext(DartType type) => _typeSystem.isNullable(type) ? NullabilityContext.nullable : NullabilityContext.assignToNonNullable;
 
   @override
   DartType visitExpression(Expression node) {
@@ -143,14 +135,15 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     return _computeMigratedType(element);
   }
 
-  DartType visitSubexpression(Expression subexpression, NullabilityContext context) {
+  DartType visitSubexpression(
+      Expression subexpression, NullabilityContext context) {
     if (subexpression is BinaryExpression &&
         subexpression.operator.type == TokenType.QUESTION_QUESTION) {
       // If `a ?? b` is used in a non-nullable context, we don't want to migrate
       // it to `(a ?? b)!`.  We want to migrate it to `a ?? b!`.
-      var leftType = visitSubexpression(subexpression.leftOperand, NullabilityContext.nullable);
-      var rightType =
-          visitSubexpression(subexpression.rightOperand, context);
+      var leftType = visitSubexpression(
+          subexpression.leftOperand, NullabilityContext.nullable);
+      var rightType = visitSubexpression(subexpression.rightOperand, context);
       // Since flow analysis doesn't support `??` yet, the best we can do is
       // take the LUB of the two types.  TODO(paulberry): improve this once flow
       // analysis supports `??`.
@@ -176,6 +169,11 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
       return type;
     }
   }
+
+  NullabilityContext _assignmentContext(DartType type) =>
+      _typeSystem.isNullable(type)
+          ? NullabilityContext.nullable
+          : NullabilityContext.assignToNonNullable;
 
   DartType _computeMigratedType(Element element, {DartType targetType}) {
     Element baseElement;
@@ -226,3 +224,5 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     }
   }
 }
+
+enum NullabilityContext { nullable, nonNullableUsage, assignToNonNullable }
