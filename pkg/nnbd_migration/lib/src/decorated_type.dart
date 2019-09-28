@@ -309,6 +309,16 @@ class DecoratedType implements DecoratedTypeInfo {
     return false;
   }
 
+  /// If `this` represents an interface type, returns the substitution necessary
+  /// to produce this type using the class's type as a starting point.
+  /// Otherwise throws an exception.
+  ///
+  /// The substitution is expressed using [DartType] objects representing the
+  /// type that will be present after the code has been migrated.
+  ///
+  /// This method should be used after nullability propagation; it makes use of
+  /// the nullabilities associated with nullability nodes to determine which
+  /// types should be nullable and which types should not.
   Map<TypeParameterElement, DartType> asFinalSubstitution(
       TypeProvider typeProvider) {
     return {
