@@ -24,25 +24,16 @@ main() {
 
 @reflectiveTest
 class FixBuilderTest extends EdgeBuilderTestBase {
+  DartType get dynamicType => typeProvider.dynamicType;
+
+  DartType get objectType => (typeProvider.objectType as TypeImpl)
+      .withNullability(NullabilitySuffix.none);
+
   @override
   Future<CompilationUnit> analyze(String code) async {
     var unit = await super.analyze(code);
     graph.propagate();
     return unit;
-  }
-
-  test_assign_dynamic_to_non_nullable() async {
-    // Explicit assignments of `dynamic` to another type are null checked if
-    // necessary.  Note that this is not strictly necessary but we do it for
-    // clarity.
-    // TODO(paulberry): make this a more realistic test by testing the actual
-    // assignment context.
-    await analyze('''
-Object/*!*/ _f(dynamic d) => d;
-''');
-    var dRef = findNode.simple('d;');
-    visitSubexpression(dRef, 'dynamic',
-        context: NullabilityContext.assignToNonNullable, nullChecked: {dRef});
   }
 
   test_binaryExpression_ampersand_ampersand() async {
@@ -134,17 +125,15 @@ Object/*!*/ _f(int/*?*/ x, double/*?*/ y) {
     // TODO(paulberry): the type should be `num` (not `num?`).  This should
     // start working once `??` support is added to flow analysis.
     visitSubexpression(findNode.binary('??'), 'num?',
-        context: NullabilityContext.assignToNonNullable, nullChecked: {yRef});
+        contextType: objectType, nullChecked: {yRef});
   }
 
   test_binaryExpression_userDefinable_dynamic() async {
     await analyze('''
 Object/*!*/ _f(dynamic d, int/*?*/ i) => d + i;
 ''');
-    var plusNode = findNode.binary('+');
-    visitSubexpression(plusNode, 'dynamic',
-        context: NullabilityContext.assignToNonNullable,
-        nullChecked: {plusNode});
+    visitSubexpression(findNode.binary('+'), 'dynamic',
+        contextType: objectType);
   }
 
   test_binaryExpression_userDefinable_simple() async {
@@ -281,14 +270,12 @@ bool _f(dynamic d, bool b) => d && b;
 
   DartType visitSubexpression(Expression node, String expectedType,
       {DartType contextType,
-      NullabilityContext context = NullabilityContext.nullable,
       Set<Expression> nullChecked = const <Expression>{}}) {
-    contextType ??= (typeProvider.objectType as TypeImpl)
-        .withNullability(NullabilitySuffix.none);
+    contextType ??= dynamicType;
     var fixBuilder = _FixBuilder(
         decoratedClassHierarchy, typeProvider, typeSystem, variables);
     fixBuilder.createFlowAnalysis(node.thisOrAncestorOfType<FunctionBody>());
-    var type = fixBuilder.visitSubexpression(node, contextType, context);
+    var type = fixBuilder.visitSubexpression(node, contextType);
     expect((type as TypeImpl).toString(withNullability: true), expectedType);
     expect(fixBuilder.nullCheckedExpressions, nullChecked);
     return type;
