@@ -153,7 +153,7 @@ _f(_C c, String/*?*/ s) => c + s;
         nullChecked: {findNode.simple('s;')});
   }
 
-  test_binaryExpression_userDefinable_substituted() async {
+  solo_test_binaryExpression_userDefinable_substituted() async {
     await analyze('''
 class _C<T, U> {
   T operator+(U u) => throw 'foo';
