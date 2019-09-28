@@ -145,7 +145,7 @@ _f(_C/*?*/ c) => c + 'foo';
   test_binaryExpression_userDefinable_simple_check_rhs() async {
     await analyze('''
 class _C {
-  int operator+(String s) => 1;
+  int operator+(String/*!*/ s) => 1;
 }
 _f(_C c, String/*?*/ s) => c + s;
 ''');
