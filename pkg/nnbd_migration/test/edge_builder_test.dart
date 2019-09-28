@@ -384,16 +384,6 @@ class EdgeBuilderTest extends EdgeBuilderTestBase {
     return variables.decoratedExpressionType(findNode.expression(text));
   }
 
-  solo_test_foo() async {
-    await analyze('''
-class _C<T, U> {
-  T operator+(U u) => throw 'foo';
-}
-_f(_C<int, String> c) => c + 'foo';
-''');
-    fail('TODO(paulberry)');
-  }
-
   test_already_migrated_field() async {
     await analyze('''
 double f() => double.NAN;
@@ -1175,6 +1165,25 @@ Int f(Int i, Int j) => i + j/*check*/;
         assertEdge(decoratedTypeAnnotation('Int j').node,
             decoratedTypeAnnotation('Int other').node,
             hard: true));
+  }
+
+  test_binaryExpression_plus_substituted() async {
+    await analyze('''
+class _C<T, U> {
+  T operator+(U u) => throw 'foo';
+}
+Object _f(_C<int, String> c, String s) => c + s;
+''');
+    assertEdge(
+        decoratedTypeAnnotation('String s').node,
+        substitutionNode(decoratedTypeAnnotation('String>').node,
+            decoratedTypeAnnotation('U u').node),
+        hard: true);
+    assertEdge(
+        substitutionNode(decoratedTypeAnnotation('int,').node,
+            decoratedTypeAnnotation('T operator').node),
+        decoratedTypeAnnotation('Object _f').node,
+        hard: false);
   }
 
   test_binaryExpression_questionQuestion() async {
