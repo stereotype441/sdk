@@ -229,6 +229,13 @@ f() => null;
     visitSubexpression(findNode.nullLiteral('null'), 'Null');
   }
 
+  test_parenthesizedExpression() async {
+    await analyze('''
+f() => (1);
+''');
+    visitSubexpression(findNode.integerLiteral('1'), 'int');
+  }
+
   test_simpleIdentifier_className() async {
     await analyze('''
 _f() => int;
