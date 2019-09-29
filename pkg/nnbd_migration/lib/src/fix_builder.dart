@@ -69,8 +69,18 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     var targetInfo = visitAssignmentTarget(node.leftHandSide);
     if (node.operator.type == TokenType.EQ) {
       return visitSubexpression(node.rightHandSide, targetInfo.setType);
-    } else {
+    } else if (node.operator.type == TokenType.QUESTION_QUESTION_EQ) {
       throw UnimplementedError('TODO(paulberry)');
+    } else {
+      var combiner = node.staticElement;
+      if (combiner == null) {
+        visitSubexpression(node.rightHandSide, _typeProvider.dynamicType);
+        return _typeProvider.dynamicType;
+      } else {
+        var combinerType = _computeMigratedType(combiner) as FunctionType;
+        visitSubexpression(node.rightHandSide, combinerType.parameters[0].type);
+        return combinerType.returnType;
+      }
     }
   }
 

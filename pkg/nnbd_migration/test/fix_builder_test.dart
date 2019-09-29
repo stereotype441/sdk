@@ -40,6 +40,55 @@ class FixBuilderTest extends EdgeBuilderTestBase {
     return unit;
   }
 
+  test_assignmentExpression_compound_combined_nullable_noProblem() async {
+    await analyze('''
+abstract class _C {
+  _D/*?*/ operator+(int/*!*/ value);
+}
+abstract class _D extends _C {}
+abstract class _E {
+  _C/*!*/ get x;
+  void set x(_C/*?*/ value);
+  f(int/*!*/ y) => x += y;
+}
+''');
+    visitSubexpression(findNode.assignment('+='), '_D?');
+  }
+
+  test_assignmentExpression_compound_rhs_nonNullable() async {
+    await analyze('''
+abstract class _C {
+  _D/*!*/ operator+(int/*!*/ value);
+}
+abstract class _D extends _C {}
+_f(_C/*!*/ x, int/*!*/ y) => x += y;
+''');
+    visitSubexpression(findNode.assignment('+='), '_D');
+  }
+
+  test_assignmentExpression_compound_rhs_nullable_check() async {
+    await analyze('''
+abstract class _C {
+  _D/*!*/ operator+(int/*!*/ value);
+}
+abstract class _D extends _C {}
+_f(_C/*!*/ x, int/*?*/ y) => x += y;
+''');
+    visitSubexpression(findNode.assignment('+='), '_D',
+        nullChecked: {findNode.simple('y;')});
+  }
+
+  test_assignmentExpression_compound_rhs_nullable_noCheck() async {
+    await analyze('''
+abstract class _C {
+  _D/*!*/ operator+(int/*?*/ value);
+}
+abstract class _D extends _C {}
+_f(_C/*!*/ x, int/*?*/ y) => x += y;
+''');
+    visitSubexpression(findNode.assignment('+='), '_D');
+  }
+
   test_assignmentExpression_simple_nonNullable_to_nonNullable() async {
     await analyze('''
 _f(int/*!*/ x, int/*!*/ y) => x = y;
