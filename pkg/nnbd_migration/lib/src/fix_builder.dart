@@ -15,6 +15,7 @@ import 'package:analyzer/src/dart/element/type_provider.dart';
 import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:front_end/src/fasta/flow_analysis/flow_analysis.dart';
+import 'package:meta/meta.dart';
 import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
 import 'package:nnbd_migration/src/variables.dart';
 
@@ -155,13 +156,11 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     try {
       _contextType = contextType;
       var type = subexpression.accept(this);
-      if (!type.isDynamic &&
-          _typeSystem.isNullable(type) &&
-          !_typeSystem.isNullable(contextType)) {
+      if (_isAssignmentAllowed(from: contextType, to: type)) {
+        return type;
+      } else {
         addNullCheck(subexpression);
         return _typeSystem.promoteToNonNull(type as TypeImpl);
-      } else {
-        return type;
       }
     } finally {
       _contextType = oldContextType;
@@ -212,5 +211,11 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     } else {
       return type;
     }
+  }
+
+  bool _isAssignmentAllowed({@required DartType from, @required DartType to}) {
+    return to.isDynamic ||
+        !_typeSystem.isNullable(to) ||
+        _typeSystem.isNullable(from);
   }
 }
