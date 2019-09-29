@@ -55,6 +55,16 @@ abstract class _E {
     visitSubexpression(findNode.assignment('+='), '_D?');
   }
 
+  test_assignmentExpression_compound_dynamic() async {
+    // To confirm that the RHS is visited, we check that a null check was
+    // properly inserted into a subexpression of the RHS.
+    await analyze('''
+_f(dynamic x, int/*?*/ y) => x += y + 1;
+''');
+    visitSubexpression(findNode.assignment('+='), 'dynamic',
+        nullChecked: {findNode.simple('y +')});
+  }
+
   test_assignmentExpression_compound_rhs_nonNullable() async {
     await analyze('''
 abstract class _C {
