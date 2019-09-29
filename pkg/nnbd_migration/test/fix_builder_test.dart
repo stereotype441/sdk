@@ -69,6 +69,40 @@ _f(int/*?*/ x, int/*?*/ y) => x = y;
     visitSubexpression(findNode.assignment('= '), 'int?');
   }
 
+  test_assignmentTarget_simpleIdentifier_field_nonNullable() async {
+    await analyze('''
+class _C {
+  int/*!*/ x;
+  _f() => x = 0;
+}
+''');
+    visitAssignmentTarget(findNode.simple('x '), 'int', 'int');
+  }
+
+  test_assignmentTarget_simpleIdentifier_field_nullable() async {
+    await analyze('''
+class _C {
+  int/*?*/ x;
+  _f() => x = 0;
+}
+''');
+    visitAssignmentTarget(findNode.simple('x '), 'int?', 'int?');
+  }
+
+  test_assignmentTarget_simpleIdentifier_localVariable_nonNullable() async {
+    await analyze('''
+_f(int/*!*/ x) => x = 0;
+''');
+    visitAssignmentTarget(findNode.simple('x '), 'int', 'int');
+  }
+
+  test_assignmentTarget_simpleIdentifier_localVariable_nullable() async {
+    await analyze('''
+_f(int/*?*/ x) => x = 0;
+''');
+    visitAssignmentTarget(findNode.simple('x '), 'int?', 'int?');
+  }
+
   test_binaryExpression_ampersand_ampersand() async {
     await analyze('''
 _f(bool x, bool y) => x && y;
@@ -344,6 +378,20 @@ f() => #foo;
 bool _f(dynamic d, bool b) => d && b;
 ''');
     visitSubexpression(findNode.binary('&&'), 'bool');
+  }
+
+  void visitAssignmentTarget(
+      Expression node, String expectedGetType, String expectedSetType,
+      {Set<Expression> nullChecked = const <Expression>{}}) {
+    var fixBuilder = _FixBuilder(
+        decoratedClassHierarchy, typeProvider, typeSystem, variables);
+    fixBuilder.createFlowAnalysis(node.thisOrAncestorOfType<FunctionBody>());
+    var targetInfo = fixBuilder.visitAssignmentTarget(node);
+    expect((targetInfo.getType as TypeImpl).toString(withNullability: true),
+        expectedGetType);
+    expect((targetInfo.setType as TypeImpl).toString(withNullability: true),
+        expectedSetType);
+    expect(fixBuilder.nullCheckedExpressions, nullChecked);
   }
 
   void visitSubexpression(Expression node, String expectedType,
