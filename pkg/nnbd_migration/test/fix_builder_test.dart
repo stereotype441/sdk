@@ -6,6 +6,7 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type.dart';
+import 'package:analyzer/src/dart/element/type_provider.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/type_system.dart';
 import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
@@ -24,10 +25,13 @@ main() {
 
 @reflectiveTest
 class FixBuilderTest extends EdgeBuilderTestBase {
-  DartType get dynamicType => typeProvider.dynamicType;
+  DartType get dynamicType => postMigrationTypeProvider.dynamicType;
 
-  DartType get objectType => (typeProvider.objectType as TypeImpl)
-      .withNullability(NullabilitySuffix.none);
+  DartType get objectType => postMigrationTypeProvider.objectType;
+
+  TypeProvider get postMigrationTypeProvider =>
+      (typeProvider as TypeProviderImpl)
+          .withNullability(NullabilitySuffix.none);
 
   @override
   Future<CompilationUnit> analyze(String code) async {
@@ -223,6 +227,13 @@ f() => 1;
 f() => null;
 ''');
     visitSubexpression(findNode.nullLiteral('null'), 'Null');
+  }
+
+  test_simpleIdentifier_className() async {
+    await analyze('''
+_f() => int;
+''');
+    visitSubexpression(findNode.simple('int'), 'Type');
   }
 
   test_simpleIdentifier_localVariable_nonNullable() async {
