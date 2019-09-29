@@ -346,7 +346,7 @@ bool _f(dynamic d, bool b) => d && b;
     visitSubexpression(findNode.binary('&&'), 'bool');
   }
 
-  DartType visitSubexpression(Expression node, String expectedType,
+  void visitSubexpression(Expression node, String expectedType,
       {DartType contextType,
       Set<Expression> nullChecked = const <Expression>{}}) {
     contextType ??= dynamicType;
@@ -356,7 +356,6 @@ bool _f(dynamic d, bool b) => d && b;
     var type = fixBuilder.visitSubexpression(node, contextType);
     expect((type as TypeImpl).toString(withNullability: true), expectedType);
     expect(fixBuilder.nullCheckedExpressions, nullChecked);
-    return type;
   }
 }
 
