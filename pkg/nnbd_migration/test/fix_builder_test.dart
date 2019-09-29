@@ -40,21 +40,21 @@ class FixBuilderTest extends EdgeBuilderTestBase {
     return unit;
   }
 
-  test_assignmentExpression_assign_nonNullable_to_nonNullable() async {
+  test_assignmentExpression_simple_nonNullable_to_nonNullable() async {
     await analyze('''
 _f(int/*!*/ x, int/*!*/ y) => x = y;
 ''');
     visitSubexpression(findNode.assignment('= '), 'int');
   }
 
-  test_assignmentExpression_assign_nonNullable_to_nullable() async {
+  test_assignmentExpression_simple_nonNullable_to_nullable() async {
     await analyze('''
 _f(int/*?*/ x, int/*!*/ y) => x = y;
 ''');
     visitSubexpression(findNode.assignment('= '), 'int');
   }
 
-  test_assignmentExpression_assign_nullable_to_nonNullable() async {
+  test_assignmentExpression_simple_nullable_to_nonNullable() async {
     await analyze('''
 _f(int/*!*/ x, int/*?*/ y) => x = y;
 ''');
@@ -62,18 +62,28 @@ _f(int/*!*/ x, int/*?*/ y) => x = y;
         contextType: objectType, nullChecked: {findNode.simple('y;')});
   }
 
-  test_assignmentExpression_assign_nullable_to_nullable() async {
+  test_assignmentExpression_simple_nullable_to_nullable() async {
     await analyze('''
 _f(int/*?*/ x, int/*?*/ y) => x = y;
 ''');
     visitSubexpression(findNode.assignment('= '), 'int?');
   }
 
+  test_assignmentExpression_simple_promoted() async {
+    await analyze('''
+_f(bool/*?*/ x, bool/*?*/ y) => x != null && (x = y) != null;
+''');
+    // On the RHS of the `&&`, `x` is promoted to non-nullable, but it is still
+    // considered to be a nullable assignment target, so no null check is
+    // generated for `y`.
+    visitSubexpression(findNode.binary('&&'), 'bool');
+  }
+
   test_assignmentTarget_simpleIdentifier_field_nonNullable() async {
     await analyze('''
 class _C {
   int/*!*/ x;
-  _f() => x = 0;
+  _f() => x += 0;
 }
 ''');
     visitAssignmentTarget(findNode.simple('x '), 'int', 'int');
@@ -83,22 +93,64 @@ class _C {
     await analyze('''
 class _C {
   int/*?*/ x;
-  _f() => x = 0;
+  _f() => x += 0;
 }
 ''');
     visitAssignmentTarget(findNode.simple('x '), 'int?', 'int?');
   }
 
+  test_assignmentTarget_simpleIdentifier_getset_getterNullable() async {
+    await analyze('''
+class _C {
+  int/*?*/ get x => 1;
+  void set x(int/*!*/ value) {}
+  _f() => x += 0;
+}
+''');
+    visitAssignmentTarget(findNode.simple('x +='), 'int?', 'int');
+  }
+
+  test_assignmentTarget_simpleIdentifier_getset_setterNullable() async {
+    await analyze('''
+class _C {
+  int/*!*/ get x => 1;
+  void set x(int/*?*/ value) {}
+  _f() => x += 0;
+}
+''');
+    visitAssignmentTarget(findNode.simple('x +='), 'int', 'int?');
+  }
+
   test_assignmentTarget_simpleIdentifier_localVariable_nonNullable() async {
     await analyze('''
-_f(int/*!*/ x) => x = 0;
+_f(int/*!*/ x) => x += 0;
 ''');
     visitAssignmentTarget(findNode.simple('x '), 'int', 'int');
   }
 
   test_assignmentTarget_simpleIdentifier_localVariable_nullable() async {
     await analyze('''
-_f(int/*?*/ x) => x = 0;
+_f(int/*?*/ x) => x += 0;
+''');
+    visitAssignmentTarget(findNode.simple('x '), 'int?', 'int?');
+  }
+
+  test_assignmentTarget_simpleIdentifier_setter_nonNullable() async {
+    await analyze('''
+class _C {
+  void set x(int/*!*/ value) {}
+  _f() => x = 0;
+}
+''');
+    visitAssignmentTarget(findNode.simple('x '), 'int', 'int');
+  }
+
+  test_assignmentTarget_simpleIdentifier_setter_nullable() async {
+    await analyze('''
+class _C {
+  void set x(int/*?*/ value) {}
+  _f() => x = 0;
+}
 ''');
     visitAssignmentTarget(findNode.simple('x '), 'int?', 'int?');
   }

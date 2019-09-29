@@ -213,7 +213,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
         var functionType = _variables.decoratedElementType(baseElement);
         var decoratedType = baseElement.isGetter
             ? functionType.returnType
-            : throw UnimplementedError('TODO(paulberry)');
+            : functionType.positionalParameters[0];
         type = decoratedType.toFinalType(_typeProvider);
       }
     } else {
