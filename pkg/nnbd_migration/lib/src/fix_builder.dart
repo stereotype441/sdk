@@ -174,18 +174,17 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     if (baseElement is ClassElement || baseElement is TypeParameterElement) {
       return _typeProvider.typeType;
     } else if (baseElement is PropertyAccessorElement) {
-      throw UnimplementedError('TODO(paulberry)');
-//      if (baseElement.isSynthetic) {
-//        type = _variables
-//            .decoratedElementType(baseElement.variable)
-//            .toFinalType(_typeProvider);
-//      } else {
-//        var functionType = _variables.decoratedElementType(baseElement);
-//        var decoratedType = baseElement.isGetter
-//            ? functionType.returnType
-//            : functionType.positionalParameters[0];
-//        type = decoratedType.toFinalType(_typeProvider);
-//      }
+      if (baseElement.isSynthetic) {
+        type = _variables
+            .decoratedElementType(baseElement.variable)
+            .toFinalType(_typeProvider);
+      } else {
+        var functionType = _variables.decoratedElementType(baseElement);
+        var decoratedType = baseElement.isGetter
+            ? functionType.returnType
+            : throw UnimplementedError('TODO(paulberry)');
+        type = decoratedType.toFinalType(_typeProvider);
+      }
     } else {
       type = _variables
           .decoratedElementType(baseElement)

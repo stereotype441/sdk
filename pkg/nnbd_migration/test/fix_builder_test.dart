@@ -236,6 +236,46 @@ _f() => int;
     visitSubexpression(findNode.simple('int'), 'Type');
   }
 
+  test_simpleIdentifier_field() async {
+    await analyze('''
+class _C {
+  int i = 1;
+  f() => i;
+}
+''');
+    visitSubexpression(findNode.simple('i;'), 'int');
+  }
+
+  test_simpleIdentifier_field_nullable() async {
+    await analyze('''
+class _C {
+  int/*?*/ i = 1;
+  f() => i;
+}
+''');
+    visitSubexpression(findNode.simple('i;'), 'int?');
+  }
+
+  test_simpleIdentifier_getter() async {
+    await analyze('''
+class _C {
+  int get i => 1;
+  f() => i;
+}
+''');
+    visitSubexpression(findNode.simple('i;'), 'int');
+  }
+
+  test_simpleIdentifier_getter_nullable() async {
+    await analyze('''
+class _C {
+  int/*?*/ get i => 1;
+  f() => i;
+}
+''');
+    visitSubexpression(findNode.simple('i;'), 'int?');
+  }
+
   test_simpleIdentifier_localVariable_nonNullable() async {
     await analyze('''
 _f(int x) {
