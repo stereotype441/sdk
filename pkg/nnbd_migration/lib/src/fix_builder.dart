@@ -205,11 +205,11 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     try {
       _contextType = contextType;
       var type = subexpression.accept(this);
-      if (_isAssignmentAllowed(from: contextType, to: type)) {
-        return type;
-      } else {
+      if (_doesAssignmentNeedCheck(from: type, to: contextType)) {
         addNullCheck(subexpression);
         return _typeSystem.promoteToNonNull(type as TypeImpl);
+      } else {
+        return type;
       }
     } finally {
       _contextType = oldContextType;
@@ -262,9 +262,10 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     }
   }
 
-  bool _isAssignmentAllowed({@required DartType from, @required DartType to}) {
-    return to.isDynamic ||
-        !_typeSystem.isNullable(to) ||
-        _typeSystem.isNullable(from);
+  bool _doesAssignmentNeedCheck(
+      {@required DartType from, @required DartType to}) {
+    return !from.isDynamic &&
+        _typeSystem.isNullable(from) &&
+        !_typeSystem.isNullable(to);
   }
 }
