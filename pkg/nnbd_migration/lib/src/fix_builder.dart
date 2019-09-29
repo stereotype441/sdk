@@ -18,6 +18,14 @@ import 'package:front_end/src/fasta/flow_analysis/flow_analysis.dart';
 import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
 import 'package:nnbd_migration/src/variables.dart';
 
+class AssignmentTargetInfo {
+  final DartType getType;
+
+  final DartType setType;
+
+  AssignmentTargetInfo(this.getType, this.setType);
+}
+
 abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   final DecoratedClassHierarchy _decoratedClassHierarchy;
 
@@ -54,6 +62,29 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
             TypeSystemTypeOperations(_typeSystem),
             AnalyzerFunctionBodyAccess(node is FunctionBody ? node : null));
     _assignedVariables = FlowAnalysisHelper.computeAssignedVariables(node);
+  }
+
+  @override
+  DartType visitAssignmentExpression(AssignmentExpression node) {
+    var targetInfo = visitAssignmentTarget(node.leftHandSide);
+    if (node.operator.type == TokenType.EQ) {
+      return visitSubexpression(node.rightHandSide, targetInfo.setType);
+    } else {
+      throw UnimplementedError('TODO(paulberry)');
+    }
+  }
+
+  AssignmentTargetInfo visitAssignmentTarget(Expression node) {
+    if (node is SimpleIdentifier) {
+      var setType = _computeMigratedType(node.staticElement);
+      var auxiliaryElements = node.auxiliaryElements;
+      var getType = auxiliaryElements == null
+          ? setType
+          : _computeMigratedType(auxiliaryElements.staticElement);
+      return AssignmentTargetInfo(getType, setType);
+    } else {
+      throw UnimplementedError('TODO(paulberry)');
+    }
   }
 
   @override

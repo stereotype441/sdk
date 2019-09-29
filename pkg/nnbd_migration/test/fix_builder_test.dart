@@ -40,6 +40,35 @@ class FixBuilderTest extends EdgeBuilderTestBase {
     return unit;
   }
 
+  test_assignmentExpression_assign_nonNullable_to_nonNullable() async {
+    await analyze('''
+_f(int/*!*/ x, int/*!*/ y) => x = y;
+''');
+    visitSubexpression(findNode.assignment('= '), 'int');
+  }
+
+  test_assignmentExpression_assign_nonNullable_to_nullable() async {
+    await analyze('''
+_f(int/*?*/ x, int/*!*/ y) => x = y;
+''');
+    visitSubexpression(findNode.assignment('= '), 'int');
+  }
+
+  test_assignmentExpression_assign_nullable_to_nonNullable() async {
+    await analyze('''
+_f(int/*!*/ x, int/*?*/ y) => x = y;
+''');
+    visitSubexpression(findNode.assignment('= '), 'int',
+        contextType: objectType, nullChecked: {findNode.simple('y;')});
+  }
+
+  test_assignmentExpression_assign_nullable_to_nullable() async {
+    await analyze('''
+_f(int/*?*/ x, int/*?*/ y) => x = y;
+''');
+    visitSubexpression(findNode.assignment('= '), 'int?');
+  }
+
   test_binaryExpression_ampersand_ampersand() async {
     await analyze('''
 _f(bool x, bool y) => x && y;
