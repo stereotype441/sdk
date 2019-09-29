@@ -122,9 +122,7 @@ Object/*!*/ _f(int/*?*/ x, double/*?*/ y) {
 }
 ''');
     var yRef = findNode.simple('y;');
-    // TODO(paulberry): the type should be `num` (not `num?`).  This should
-    // start working once `??` support is added to flow analysis.
-    visitSubexpression(findNode.binary('??'), 'num?',
+    visitSubexpression(findNode.binary('??'), 'num',
         contextType: objectType, nullChecked: {yRef});
   }
 

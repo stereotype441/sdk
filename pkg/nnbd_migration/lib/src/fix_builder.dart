@@ -36,6 +36,8 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   /// information  used in flow analysis.  Otherwise `null`.
   AssignedVariables<AstNode, VariableElement> _assignedVariables;
 
+  DartType _contextType;
+
   FixBuilder(this._decoratedClassHierarchy, TypeProvider typeProvider,
       this._typeSystem, this._variables)
       : _typeProvider = (typeProvider as TypeProviderImpl)
@@ -82,7 +84,14 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
         _flowAnalysis.logicalBinaryOp_end(node, rightOperand, isAnd: isAnd);
         return _typeProvider.boolType;
       case TokenType.QUESTION_QUESTION:
-        throw StateError('Should be handled by visitSubexpression');
+        // If `a ?? b` is used in a non-nullable context, we don't want to
+        // migrate it to `(a ?? b)!`.  We want to migrate it to `a ?? b!`.
+        // TODO(paulberry): once flow analysis supports `??`, integrate it here.
+        var leftType = visitSubexpression(node.leftOperand,
+            _typeSystem.makeNullable(_contextType as TypeImpl));
+        var rightType = visitSubexpression(node.rightOperand, _contextType);
+        return _typeSystem.leastUpperBound(
+            _typeSystem.promoteToNonNull(leftType as TypeImpl), rightType);
       default:
         var targetType =
             visitSubexpression(leftOperand, _typeProvider.objectType);
@@ -136,27 +145,20 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   }
 
   DartType visitSubexpression(Expression subexpression, DartType contextType) {
-    if (subexpression is BinaryExpression &&
-        subexpression.operator.type == TokenType.QUESTION_QUESTION) {
-      // If `a ?? b` is used in a non-nullable context, we don't want to migrate
-      // it to `(a ?? b)!`.  We want to migrate it to `a ?? b!`.
-      var leftType = visitSubexpression(subexpression.leftOperand,
-          _typeSystem.makeNullable(contextType as TypeImpl));
-      var rightType =
-          visitSubexpression(subexpression.rightOperand, contextType);
-      // Since flow analysis doesn't support `??` yet, the best we can do is
-      // take the LUB of the two types.  TODO(paulberry): improve this once flow
-      // analysis supports `??`.
-      return _typeSystem.leastUpperBound(leftType, rightType);
-    }
-    var type = subexpression.accept(this);
-    if (!type.isDynamic &&
-        _typeSystem.isNullable(type) &&
-        !_typeSystem.isNullable(contextType)) {
-      addNullCheck(subexpression);
-      return _typeSystem.promoteToNonNull(type as TypeImpl);
-    } else {
-      return type;
+    var oldContextType = _contextType;
+    try {
+      _contextType = contextType;
+      var type = subexpression.accept(this);
+      if (!type.isDynamic &&
+          _typeSystem.isNullable(type) &&
+          !_typeSystem.isNullable(contextType)) {
+        addNullCheck(subexpression);
+        return _typeSystem.promoteToNonNull(type as TypeImpl);
+      } else {
+        return type;
+      }
+    } finally {
+      _contextType = oldContextType;
     }
   }
 
