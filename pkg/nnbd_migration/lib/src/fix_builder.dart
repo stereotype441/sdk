@@ -27,6 +27,14 @@ class AssignmentTargetInfo {
   AssignmentTargetInfo(this.getType, this.setType);
 }
 
+class CompoundAssignmentCombinedNullable implements Problem {
+  const CompoundAssignmentCombinedNullable();
+}
+
+class CompoundAssignmentLhsNullable implements Problem {
+  const CompoundAssignmentLhsNullable();
+}
+
 abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   final DecoratedClassHierarchy _decoratedClassHierarchy;
 
@@ -54,6 +62,8 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
 
   void addNullCheck(Expression subexpression);
 
+  void addProblem(AstNode node, Problem problem);
+
   void createFlowAnalysis(AstNode node) {
     assert(_flowAnalysis == null);
     assert(_assignedVariables == null);
@@ -80,14 +90,15 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
         combinedType = _typeProvider.dynamicType;
       } else {
         if (_typeSystem.isNullable(targetInfo.getType)) {
-          addProblem(node, CompoundAssignmentLhsNullable());
+          addProblem(node, const CompoundAssignmentLhsNullable());
         }
         var combinerType = _computeMigratedType(combiner) as FunctionType;
         visitSubexpression(node.rightHandSide, combinerType.parameters[0].type);
         combinedType = combinerType.returnType;
       }
-      if (_isNullCheckNeeded(combinedType, targedInfo.setType)) {
-        addProblem(node, CompoundAssignmentCombinedNullable());
+      if (_doesAssignmentNeedCheck(
+          from: combinedType, to: targetInfo.setType)) {
+        addProblem(node, const CompoundAssignmentCombinedNullable());
       }
       return combinedType;
     }
@@ -269,3 +280,5 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
         !_typeSystem.isNullable(to);
   }
 }
+
+abstract class Problem {}

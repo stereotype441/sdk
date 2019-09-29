@@ -500,7 +500,8 @@ bool _f(dynamic d, bool b) => d && b;
 
   void visitAssignmentTarget(
       Expression node, String expectedGetType, String expectedSetType,
-      {Set<Expression> nullChecked = const <Expression>{}}) {
+      {Set<Expression> nullChecked = const <Expression>{},
+      Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
     var fixBuilder = _FixBuilder(
         decoratedClassHierarchy, typeProvider, typeSystem, variables);
     fixBuilder.createFlowAnalysis(node.thisOrAncestorOfType<FunctionBody>());
@@ -510,11 +511,13 @@ bool _f(dynamic d, bool b) => d && b;
     expect((targetInfo.setType as TypeImpl).toString(withNullability: true),
         expectedSetType);
     expect(fixBuilder.nullCheckedExpressions, nullChecked);
+    expect(fixBuilder.problems, problems);
   }
 
   void visitSubexpression(Expression node, String expectedType,
       {DartType contextType,
-      Set<Expression> nullChecked = const <Expression>{}}) {
+      Set<Expression> nullChecked = const <Expression>{},
+      Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
     contextType ??= dynamicType;
     var fixBuilder = _FixBuilder(
         decoratedClassHierarchy, typeProvider, typeSystem, variables);
@@ -522,11 +525,14 @@ bool _f(dynamic d, bool b) => d && b;
     var type = fixBuilder.visitSubexpression(node, contextType);
     expect((type as TypeImpl).toString(withNullability: true), expectedType);
     expect(fixBuilder.nullCheckedExpressions, nullChecked);
+    expect(fixBuilder.problems, problems);
   }
 }
 
 class _FixBuilder extends FixBuilder {
   final Set<Expression> nullCheckedExpressions = {};
+
+  final Map<AstNode, Set<Problem>> problems = {};
 
   _FixBuilder(DecoratedClassHierarchy decoratedClassHierarchy,
       TypeProvider typeProvider, TypeSystem typeSystem, Variables variables)
@@ -535,6 +541,12 @@ class _FixBuilder extends FixBuilder {
   @override
   void addNullCheck(Expression subexpression) {
     var newlyAdded = nullCheckedExpressions.add(subexpression);
+    expect(newlyAdded, true);
+  }
+
+  @override
+  void addProblem(AstNode node, Problem problem) {
+    var newlyAdded = (problems[node] ??= {}).add(problem);
     expect(newlyAdded, true);
   }
 }
