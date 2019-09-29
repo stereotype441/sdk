@@ -149,6 +149,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     throw UnimplementedError('No visit method for ${node.runtimeType}');
   }
 
+  @override
   DartType visitLiteral(Literal node) {
     if (node is AdjacentStrings) {
       // TODO(paulberry): need to visit interpolations
@@ -159,6 +160,11 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     }
     return (node.staticType as TypeImpl)
         .withNullability(NullabilitySuffix.none);
+  }
+
+  @override
+  DartType visitParenthesizedExpression(ParenthesizedExpression node) {
+    return node.expression.accept(this);
   }
 
   @override
