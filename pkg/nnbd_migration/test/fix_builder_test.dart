@@ -95,6 +95,24 @@ _f(dynamic x, int/*?*/ y) => x += y + 1;
         nullChecked: {findNode.simple('y +')});
   }
 
+  test_assignmentExpression_compound_lhs_nullable_problem() async {
+    await analyze('''
+abstract class _C {
+  _D/*!*/ operator+(int/*!*/ value);
+}
+abstract class _D extends _C {}
+abstract class _E {
+  _C/*?*/ get x;
+  void set x(_C/*?*/ value);
+  f(int/*!*/ y) => x += y;
+}
+''');
+    var assignment = findNode.assignment('+=');
+    visitSubexpression(assignment, '_D', problems: {
+      assignment: {const CompoundAssignmentLhsNullable()}
+    });
+  }
+
   test_assignmentExpression_compound_rhs_nonNullable() async {
     await analyze('''
 abstract class _C {
