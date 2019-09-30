@@ -55,6 +55,24 @@ abstract class _E {
     visitSubexpression(findNode.assignment('+='), '_D?');
   }
 
+  test_assignmentExpression_compound_combined_nullable_problem() async {
+    await analyze('''
+abstract class _C {
+  _D/*?*/ operator+(int/*!*/ value);
+}
+abstract class _D extends _C {}
+abstract class _E {
+  _C/*!*/ get x;
+  void set x(_C/*!*/ value);
+  f(int/*!*/ y) => x += y;
+}
+''');
+    var assignment = findNode.assignment('+=');
+    visitSubexpression(assignment, '_D', problems: {
+      assignment: {const CompoundAssignmentCombinedNullable()}
+    });
+  }
+
   test_assignmentExpression_compound_dynamic() async {
     // To confirm that the RHS is visited, we check that a null check was
     // properly inserted into a subexpression of the RHS.

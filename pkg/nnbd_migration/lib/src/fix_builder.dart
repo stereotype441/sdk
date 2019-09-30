@@ -112,6 +112,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
       if (_doesAssignmentNeedCheck(
           from: combinedType, to: targetInfo.setType)) {
         addProblem(node, const CompoundAssignmentCombinedNullable());
+        combinedType = _typeSystem.promoteToNonNull(combinedType as TypeImpl);
       }
       return combinedType;
     }
