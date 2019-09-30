@@ -65,6 +65,18 @@ _f(dynamic x, int/*?*/ y) => x += y + 1;
         nullChecked: {findNode.simple('y +')});
   }
 
+  test_assignmentExpression_compound_promoted() async {
+    await analyze('''
+f(bool/*?*/ x, bool/*?*/ y) => x != null && (x = y);
+''');
+    // It is ok to assign a nullable value to `x` even though it is promoted to
+    // non-nullable, so `y` should not be null-checked.  However, the whole
+    // assignment `x = y` should be null checked because the RHS of `&&` cannot
+    // be nullable.
+    visitSubexpression(findNode.binary('&&'), 'bool',
+        nullChecked: {findNode.parenthesized('x = y')});
+  }
+
   test_assignmentExpression_compound_rhs_nonNullable() async {
     await analyze('''
 abstract class _C {
