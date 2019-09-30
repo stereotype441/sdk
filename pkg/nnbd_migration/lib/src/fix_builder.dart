@@ -35,13 +35,21 @@ class CompoundAssignmentLhsNullable implements Problem {
   const CompoundAssignmentLhsNullable();
 }
 
+/// This class visits the AST of code being migrated, after graph propagation,
+/// to figure out what changes need to be made to the code.  It doesn't actually
+/// make the changes; it simply reports what changes are necessary through
+/// abstract methods.
 abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
+  /// The decorated class hierarchy for this migration run.
   final DecoratedClassHierarchy _decoratedClassHierarchy;
 
+  /// Type provider providing non-nullable types.
   final TypeProvider _typeProvider;
 
+  /// The type system.
   final TypeSystem _typeSystem;
 
+  /// Variables for this migration run.
   final Variables _variables;
 
   /// If we are visiting a function body or initializer, instance of flow
@@ -53,6 +61,8 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   /// information  used in flow analysis.  Otherwise `null`.
   AssignedVariables<AstNode, VariableElement> _assignedVariables;
 
+  /// If we are visiting a subexpression, the context type used for type
+  /// inference.  This is used to determine when `!` needs to be inserted.
   DartType _contextType;
 
   FixBuilder(this._decoratedClassHierarchy, TypeProvider typeProvider,
@@ -60,10 +70,13 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
       : _typeProvider = (typeProvider as TypeProviderImpl)
             .withNullability(NullabilitySuffix.none);
 
+  /// Called whenever an expression is found for which a `!` needs to be
+  /// inserted.
   void addNullCheck(Expression subexpression);
 
   void addProblem(AstNode node, Problem problem);
 
+  /// Initializes flow analysis for a function node.
   void createFlowAnalysis(AstNode node) {
     assert(_flowAnalysis == null);
     assert(_assignedVariables == null);
@@ -169,7 +182,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
           returnType = methodType.returnType;
         }
         visitSubexpression(rightOperand, contextType);
-        return returnType;
+        return _fixNumericTypes(returnType, node.staticType);
     }
   }
 
@@ -199,9 +212,6 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
 
   @override
   DartType visitSimpleIdentifier(SimpleIdentifier node) {
-    // TODO(paulberry): add an assertion message pointing to how setter context
-    // should be handled.
-    assert(!node.inSetterContext());
     var element = node.staticElement;
     if (element == null) return _typeProvider.dynamicType;
     if (element is PromotableElement) {
@@ -211,6 +221,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     return _computeMigratedType(element);
   }
 
+  /// Recursively visits a subexpression, providing a context type.
   DartType visitSubexpression(Expression subexpression, DartType contextType) {
     var oldContextType = _contextType;
     try {
@@ -227,6 +238,11 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     }
   }
 
+  /// Computes the type that [element] will have after migration.
+  ///
+  /// If [targetType] is present, and [element] is a class member, it is the
+  /// type of the class within which [element] is being accessed; this is used
+  /// to perform the correct substitutions.
   DartType _computeMigratedType(Element element, {DartType targetType}) {
     Element baseElement;
     if (element is Member) {
@@ -272,11 +288,27 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     }
   }
 
+  /// Determines whether a null check is needed when assigning a value of type
+  /// [from] to a context of type [to].
   bool _doesAssignmentNeedCheck(
       {@required DartType from, @required DartType to}) {
     return !from.isDynamic &&
         _typeSystem.isNullable(from) &&
         !_typeSystem.isNullable(to);
+  }
+
+  /// Determines whether a `num` type originating from a call to a
+  /// user-definable operator needs to be changed to `int`.  [type] is the type
+  /// determined by naive operator lookup; [originalType] is the type that was
+  /// determined by the analyzer's full resolution algorithm when analyzing the
+  /// pre-migrated code.
+  DartType _fixNumericTypes(DartType type, DartType originalType) {
+    if (type.isDartCoreNum && originalType.isDartCoreInt) {
+      return (originalType as TypeImpl)
+          .withNullability((type as TypeImpl).nullabilitySuffix);
+    } else {
+      return type;
+    }
   }
 }
 
