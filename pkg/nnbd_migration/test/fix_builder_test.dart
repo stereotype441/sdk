@@ -55,6 +55,18 @@ abstract class _E {
     visitSubexpression(findNode.assignment('+='), '_D?');
   }
 
+  test_assignmentExpression_compound_combined_nullable_noProblem_dynamic() async {
+    await analyze('''
+abstract class _E {
+  dynamic get x;
+  void set x(Object/*!*/ value);
+  f(int/*!*/ y) => x += y;
+}
+''');
+    var assignment = findNode.assignment('+=');
+    visitSubexpression(assignment, 'dynamic');
+  }
+
   test_assignmentExpression_compound_combined_nullable_problem() async {
     await analyze('''
 abstract class _C {
