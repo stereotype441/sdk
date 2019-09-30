@@ -19,20 +19,50 @@ import 'package:meta/meta.dart';
 import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
 import 'package:nnbd_migration/src/variables.dart';
 
+/// Information about the target of an assignment expression analyzed by
+/// [FixBuilder].
 class AssignmentTargetInfo {
-  final DartType getType;
+  /// The type that the assignment target has when read.  This is only relevant
+  /// for compound assignments (since they both read and write the assignment
+  /// target)
+  final DartType readType;
 
-  final DartType setType;
+  /// The type taht the assignment target has when written to.
+  final DartType writeType;
 
-  AssignmentTargetInfo(this.getType, this.setType);
+  AssignmentTargetInfo(this.readType, this.writeType);
 }
 
+/// Problem reported by [FixBuilder] when encountering a compound assignment
+/// for which the combination result is nullable.  This occurs if the compound
+/// assignment resolves to a user-defined operator that returns a nullable type,
+/// but the target of the assignment expects a non-nullable type.  We need to
+/// add a null check but it's nontrivial to do so because we would have to
+/// rewrite the assignment as an ordinary assignment (e.g. change `x += y` to
+/// `x = (x + y)!`), but that might change semantics by causing subexpressions
+/// of the target to be evaluated twice.
+///
+/// TODO(paulberry): consider alternatives.  For example, we could rewrite the
+/// expression anyway but warn the user if it might change semantics.  Or we
+/// could rewrite only when we can prove that there's no change to semantics,
+/// and report a problem otherwise.
 class CompoundAssignmentCombinedNullable implements Problem {
   const CompoundAssignmentCombinedNullable();
 }
 
-class CompoundAssignmentLhsNullable implements Problem {
-  const CompoundAssignmentLhsNullable();
+/// Problem reported by [FixBuilder] when encountering a compound assignment
+/// for which the value read from the target of the assignment has a nullable
+/// type.  We need to add a null check but it's nontrivial to do so because we
+/// would have to rewrite the assignment as an ordinary assignment (e.g. change
+/// `x += y` to `x = x! + y`), but that might change semantics by causing
+/// subexpressions of the target to be evaluated twice.
+///
+/// TODO(paulberry): consider alternatives.  For example, we could rewrite the
+/// expression anyway but warn the user if it might change semantics.  Or we
+/// could rewrite only when we can prove that there's no change to semantics,
+/// and report a problem otherwise.
+class CompoundAssignmentReadNullable implements Problem {
+  const CompoundAssignmentReadNullable();
 }
 
 /// This class visits the AST of code being migrated, after graph propagation,
@@ -92,7 +122,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   DartType visitAssignmentExpression(AssignmentExpression node) {
     var targetInfo = visitAssignmentTarget(node.leftHandSide);
     if (node.operator.type == TokenType.EQ) {
-      return visitSubexpression(node.rightHandSide, targetInfo.setType);
+      return visitSubexpression(node.rightHandSide, targetInfo.writeType);
     } else if (node.operator.type == TokenType.QUESTION_QUESTION_EQ) {
       throw UnimplementedError('TODO(paulberry)');
     } else {
@@ -102,15 +132,15 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
         visitSubexpression(node.rightHandSide, _typeProvider.dynamicType);
         combinedType = _typeProvider.dynamicType;
       } else {
-        if (_typeSystem.isNullable(targetInfo.getType)) {
-          addProblem(node, const CompoundAssignmentLhsNullable());
+        if (_typeSystem.isNullable(targetInfo.readType)) {
+          addProblem(node, const CompoundAssignmentReadNullable());
         }
         var combinerType = _computeMigratedType(combiner) as FunctionType;
         visitSubexpression(node.rightHandSide, combinerType.parameters[0].type);
         combinedType = combinerType.returnType;
       }
       if (_doesAssignmentNeedCheck(
-          from: combinedType, to: targetInfo.setType)) {
+          from: combinedType, to: targetInfo.writeType)) {
         addProblem(node, const CompoundAssignmentCombinedNullable());
       }
       return combinedType;
@@ -119,12 +149,12 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
 
   AssignmentTargetInfo visitAssignmentTarget(Expression node) {
     if (node is SimpleIdentifier) {
-      var setType = _computeMigratedType(node.staticElement);
+      var writeType = _computeMigratedType(node.staticElement);
       var auxiliaryElements = node.auxiliaryElements;
-      var getType = auxiliaryElements == null
-          ? setType
+      var readType = auxiliaryElements == null
+          ? writeType
           : _computeMigratedType(auxiliaryElements.staticElement);
-      return AssignmentTargetInfo(getType, setType);
+      return AssignmentTargetInfo(readType, writeType);
     } else {
       throw UnimplementedError('TODO(paulberry)');
     }

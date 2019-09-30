@@ -557,17 +557,17 @@ bool _f(dynamic d, bool b) => d && b;
   }
 
   void visitAssignmentTarget(
-      Expression node, String expectedGetType, String expectedSetType,
+      Expression node, String expectedReadType, String expectedWriteType,
       {Set<Expression> nullChecked = const <Expression>{},
       Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
     var fixBuilder = _FixBuilder(
         decoratedClassHierarchy, typeProvider, typeSystem, variables);
     fixBuilder.createFlowAnalysis(node.thisOrAncestorOfType<FunctionBody>());
     var targetInfo = fixBuilder.visitAssignmentTarget(node);
-    expect((targetInfo.getType as TypeImpl).toString(withNullability: true),
-        expectedGetType);
-    expect((targetInfo.setType as TypeImpl).toString(withNullability: true),
-        expectedSetType);
+    expect((targetInfo.readType as TypeImpl).toString(withNullability: true),
+        expectedReadType);
+    expect((targetInfo.writeType as TypeImpl).toString(withNullability: true),
+        expectedWriteType);
     expect(fixBuilder.nullCheckedExpressions, nullChecked);
     expect(fixBuilder.problems, problems);
   }
