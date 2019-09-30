@@ -40,6 +40,24 @@ class FixBuilderTest extends EdgeBuilderTestBase {
     return unit;
   }
 
+  test_assignmentExpresion_compound_combined_nullable_problem() async {
+    await analyze('''
+abstract class _C {
+  _D/*?*/ operator+(int/*!*/ value);
+}
+abstract class _D extends _C {}
+abstract class _E {
+  _C/*!*/ get x;
+  void set x(_C/*!*/ value);
+  f(int/*!*/ y) => x += y;
+}
+''');
+    var assignment = findNode.assignment('+=');
+    visitSubexpression(assignment, '_D', problems: {
+      assignment: {const CompoundAssignmentCombinedNullable()}
+    });
+  }
+
   test_assignmentExpression_compound_combined_nullable_noProblem() async {
     await analyze('''
 abstract class _C {
@@ -67,24 +85,6 @@ abstract class _E {
     visitSubexpression(assignment, 'dynamic');
   }
 
-  test_assignmentExpression_compound_combined_nullable_problem() async {
-    await analyze('''
-abstract class _C {
-  _D/*?*/ operator+(int/*!*/ value);
-}
-abstract class _D extends _C {}
-abstract class _E {
-  _C/*!*/ get x;
-  void set x(_C/*!*/ value);
-  f(int/*!*/ y) => x += y;
-}
-''');
-    var assignment = findNode.assignment('+=');
-    visitSubexpression(assignment, '_D', problems: {
-      assignment: {const CompoundAssignmentCombinedNullable()}
-    });
-  }
-
   test_assignmentExpression_compound_dynamic() async {
     // To confirm that the RHS is visited, we check that a null check was
     // properly inserted into a subexpression of the RHS.
@@ -93,6 +93,13 @@ _f(dynamic x, int/*?*/ y) => x += y + 1;
 ''');
     visitSubexpression(findNode.assignment('+='), 'dynamic',
         nullChecked: {findNode.simple('y +')});
+  }
+
+  test_assignmentExpression_compound_intRules() async {
+    await analyze('''
+_f(int x, int y) => x += y;
+''');
+    visitSubexpression(findNode.assignment('+='), 'int');
   }
 
   test_assignmentExpression_compound_lhs_nullable_problem() async {

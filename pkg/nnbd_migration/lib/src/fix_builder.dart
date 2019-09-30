@@ -107,7 +107,8 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
         }
         var combinerType = _computeMigratedType(combiner) as FunctionType;
         visitSubexpression(node.rightHandSide, combinerType.parameters[0].type);
-        combinedType = combinerType.returnType;
+        combinedType =
+            _fixNumericTypes(combinerType.returnType, node.staticType);
       }
       if (_doesAssignmentNeedCheck(
           from: combinedType, to: targetInfo.setType)) {
