@@ -138,6 +138,13 @@ Object/*!*/ _f(dynamic d, int/*?*/ i) => d + i;
         contextType: objectType);
   }
 
+  test_binaryExpression_userDefinable_intRules() async {
+    await analyze('''
+_f(int i, int j) => i + j;
+''');
+    visitSubexpression(findNode.binary('+'), 'int');
+  }
+
   test_binaryExpression_userDefinable_simple() async {
     await analyze('''
 class _C {

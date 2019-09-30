@@ -109,7 +109,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
           returnType = methodType.returnType;
         }
         visitSubexpression(rightOperand, contextType);
-        return returnType;
+        return _fixNumericTypes(returnType, node.staticType);
     }
   }
 
@@ -218,5 +218,17 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     return !from.isDynamic &&
         _typeSystem.isNullable(from) &&
         !_typeSystem.isNullable(to);
+  }
+
+  DartType _fixNumericTypes(DartType type, DartType originalType) {
+    if (type.isDartCoreNum && originalType.isDartCoreInt) {
+      // In a few cases the type computed by normal method lookup is `num`,
+      // but special rules kick in to cause the type to be `int` instead.  If
+      // that is the case, we need to fix up the inferred type.
+      return (originalType as TypeImpl)
+          .withNullability((type as TypeImpl).nullabilitySuffix);
+    } else {
+      return type;
+    }
   }
 }
