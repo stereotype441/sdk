@@ -260,6 +260,16 @@ class _C {
     visitSubexpression(findNode.simple('i;'), 'int');
   }
 
+  test_simpleIdentifier_field_generic() async {
+    await analyze('''
+class _C<T> {
+  List<T> x = null;
+  f() => x;
+}
+''');
+    visitSubexpression(findNode.simple('x;'), 'List<T>?');
+  }
+
   test_simpleIdentifier_field_nullable() async {
     await analyze('''
 class _C {
