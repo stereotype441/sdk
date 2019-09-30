@@ -230,7 +230,6 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   DartType _computeMigratedType(Element element, {DartType targetType}) {
     Element baseElement;
     if (element is Member) {
-      assert(targetType != null);
       baseElement = element.baseElement;
     } else {
       baseElement = element;

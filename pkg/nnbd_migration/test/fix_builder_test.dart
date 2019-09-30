@@ -150,6 +150,20 @@ _f(bool/*?*/ x, bool/*?*/ y) => x != null && (x = y) != null;
     visitSubexpression(findNode.binary('&&'), 'bool');
   }
 
+  test_assignmentTarget_simpleIdentifier_field_generic() async {
+    await analyze('''
+abstract class _C<T> {
+  _C<T> operator+(int i);
+}
+class _D<T> {
+  _D(this.x);
+  _C<T/*!*/>/*!*/ x;
+  _f() => x += 0;
+}
+''');
+    visitAssignmentTarget(findNode.simple('x +='), '_C<T>', '_C<T>');
+  }
+
   test_assignmentTarget_simpleIdentifier_field_nonNullable() async {
     await analyze('''
 class _C {
@@ -168,6 +182,21 @@ class _C {
 }
 ''');
     visitAssignmentTarget(findNode.simple('x '), 'int?', 'int?');
+  }
+
+  test_assignmentTarget_simpleIdentifier_getset_generic() async {
+    await analyze('''
+abstract class _C<T> {
+  _C<T> operator+(int i);
+}
+abstract class _D<T> extends _C<T> {}
+abstract class _E<T> {
+  _D<T/*!*/>/*!*/ get x;
+  void set x(_C<T/*!*/>/*!*/ value);
+  _f() => x += 0;
+}
+''');
+    visitAssignmentTarget(findNode.simple('x +='), '_D<T>', '_C<T>');
   }
 
   test_assignmentTarget_simpleIdentifier_getset_getterNullable() async {
