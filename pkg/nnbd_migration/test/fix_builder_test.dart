@@ -312,6 +312,13 @@ Object/*!*/ _f(dynamic d, int/*?*/ i) => d + i;
         contextType: objectType);
   }
 
+  test_binaryExpression_userDefinable_intRules() async {
+    await analyze('''
+_f(int i, int j) => i + j;
+''');
+    visitSubexpression(findNode.binary('+'), 'int');
+  }
+
   test_binaryExpression_userDefinable_simple() async {
     await analyze('''
 class _C {
@@ -425,6 +432,16 @@ class _C {
 }
 ''');
     visitSubexpression(findNode.simple('i;'), 'int');
+  }
+
+  test_simpleIdentifier_field_generic() async {
+    await analyze('''
+class _C<T> {
+  List<T> x = null;
+  f() => x;
+}
+''');
+    visitSubexpression(findNode.simple('x;'), 'List<T>?');
   }
 
   test_simpleIdentifier_field_nullable() async {
