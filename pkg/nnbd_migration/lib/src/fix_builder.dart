@@ -104,6 +104,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   /// inserted.
   void addNullCheck(Expression subexpression);
 
+  /// Called whenever code is found that can't be automatically fixed.
   void addProblem(AstNode node, Problem problem);
 
   /// Initializes flow analysis for a function node.
@@ -342,4 +343,5 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   }
 }
 
+/// Common supertype for problems reported by [FixBuilder.addProblem].
 abstract class Problem {}
