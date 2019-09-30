@@ -212,9 +212,8 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
 
   @override
   DartType visitSimpleIdentifier(SimpleIdentifier node) {
-    // TODO(paulberry): add an assertion message pointing to how setter context
-    // should be handled.
-    assert(!node.inSetterContext());
+    assert(!node.inSetterContext(),
+        'Should use visitAssignmentTarget in setter contexts');
     var element = node.staticElement;
     if (element == null) return _typeProvider.dynamicType;
     if (element is PromotableElement) {
