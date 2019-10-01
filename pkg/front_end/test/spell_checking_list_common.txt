@@ -464,6 +464,7 @@ comparable
 compare
 comparing
 comparison
+comparisons
 compatibility
 compatible
 compilation
@@ -1887,6 +1888,7 @@ outlining
 output
 outside
 over
+overall
 overflow
 overloadable
 overloaded
@@ -2742,6 +2744,7 @@ throws
 thumb
 thus
 time
+timeline
 times
 tip
 to
