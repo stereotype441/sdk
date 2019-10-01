@@ -129,6 +129,31 @@ class AssignedVariables<Node, Variable> {
   }
 }
 
+abstract class _ExpressionInfo {
+  const _ExpressionInfo();
+}
+
+class _ConditionInfo<Variable, Type> extends _ExpressionInfo {
+  /// The state when the condition evaluates to `true`.
+  final FlowModel<Variable, Type> ifTrue;
+
+  /// The state when the condition evaluates to `false`.
+  final FlowModel<Variable, Type> ifFalse;
+
+  _ConditionInfo(this.ifTrue, this.ifFalse);
+}
+
+class _VariableReadInfo<Variable> extends _ExpressionInfo {
+  /// The variable that was read.
+  final Variable variable;
+
+  _VariableReadInfo(this.variable);
+}
+
+class _NullInfo extends _ExpressionInfo {
+  const _NullInfo();
+}
+
 class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// The [NodeOperations], used to manipulate expressions.
   final NodeOperations<Expression> nodeOperations;
@@ -150,14 +175,13 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   FlowModel<Variable, Type> _current;
 
-  /// The last boolean condition, for [_conditionTrue] and [_conditionFalse].
-  Expression _condition;
+  /// The most recently visited expression for which [_expressionInfo] is
+  /// stored.
+  Expression _expressionWithInfo;
 
-  /// The state when [_condition] evaluates to `true`.
-  FlowModel<Variable, Type> _conditionTrue;
-
-  /// The state when [_condition] evaluates to `false`.
-  FlowModel<Variable, Type> _conditionFalse;
+  /// If [_expressionWithInfo] is not null, information associated with that
+  /// expression.
+  _ExpressionInfo _expressionInfo;
 
   factory FlowAnalysis(
     NodeOperations<Expression> nodeOperations,
@@ -175,21 +199,17 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   bool get isReachable => _current.reachable;
 
   void booleanLiteral(Expression expression, bool value) {
-    _condition = expression;
-    if (value) {
-      _conditionTrue = _current;
-      _conditionFalse = _current.setReachable(false);
-    } else {
-      _conditionTrue = _current.setReachable(false);
-      _conditionFalse = _current;
-    }
+    _expressionWithInfo = expression;
+    var unreachable = _current.setReachable(false);
+    _expressionInfo = value ? _ConditionInfo(_current, unreachable) :
+        _ConditionInfo(unreachable, _current);
   }
 
   void conditional_elseBegin(Expression thenExpression) {
     FlowModel<Variable, Type> afterThen = _current;
     FlowModel<Variable, Type> falseCondition = _stack.removeLast();
 
-    _conditionalEnd(thenExpression);
+    _expressionInfoStack.add(_getExpressionInfo(thenExpression));
     // Tail of the stack: falseThen, trueThen
 
     _stack.add(afterThen);
@@ -213,39 +233,19 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     FlowModel<Variable, Type> trueResult = _join(trueThen, trueElse);
     FlowModel<Variable, Type> falseResult = _join(falseThen, falseElse);
 
-    _condition = conditionalExpression;
-    _conditionTrue = trueResult;
-    _conditionFalse = falseResult;
+    _expressionWithInfo = conditionalExpression;
+    _expressionInfo = _ConditionInfo(trueResult, falseResult);
 
     _current = _join(afterThen, afterElse);
   }
 
   void conditional_thenBegin(Expression condition) {
+    _expressionInfoStack.add(_getExpressionInfo(condition));
     _conditionalEnd(condition);
     // Tail of the stack: falseCondition, trueCondition
 
     FlowModel<Variable, Type> trueCondition = _stack.removeLast();
     _current = trueCondition;
-  }
-
-  /// The [binaryExpression] checks that the [variable] is, or is not, equal to
-  /// `null`.
-  void conditionEqNull(Expression binaryExpression, Variable variable,
-      {bool notEqual: false}) {
-    if (functionBody.isPotentiallyMutatedInClosure(variable)) {
-      return;
-    }
-
-    _condition = binaryExpression;
-    FlowModel<Variable, Type> currentModel =
-        _current.markNonNullable(typeOperations, variable);
-    if (notEqual) {
-      _conditionTrue = currentModel;
-      _conditionFalse = _current;
-    } else {
-      _conditionTrue = _current;
-      _conditionFalse = currentModel;
-    }
   }
 
   void doStatement_bodyBegin(
@@ -483,14 +483,10 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
       return;
     }
 
-    _condition = isExpression;
-    if (isNot) {
-      _conditionTrue = _current;
-      _conditionFalse = _current.promote(typeOperations, variable, type);
-    } else {
-      _conditionTrue = _current.promote(typeOperations, variable, type);
-      _conditionFalse = _current;
-    }
+    _expressionWithInfo = isExpression;
+    var promoted = _current.promote(typeOperations, variable, type);
+    _expressionInfo = isNot ? _ConditionInfo(_current, promoted)
+        : _ConditionInfo(promoted, _current);
   }
 
   void logicalBinaryOp_end(Expression wholeExpression, Expression rightOperand,
@@ -516,11 +512,42 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
     FlowModel<Variable, Type> afterResult = _join(trueResult, falseResult);
 
-    _condition = wholeExpression;
-    _conditionTrue = trueResult;
-    _conditionFalse = falseResult;
+    _expressionWithInfo = wholeExpression;
+    _expressionInfo = _ConditionInfo(trueResult, falseResult);
 
     _current = afterResult;
+  }
+
+  final List<_VariableReadInfo<Variable>> _expressionInfoStack = [];
+
+  void equalityTest_rightBegin(Expression leftOperand) {
+    var expressionInfo = _expressionInfo;
+    if (identical(leftOperand, _expressionWithInfo)) {
+      _expressionInfoStack.add(expressionInfo);
+    } else {
+      _expressionInfoStack.add(null);
+    }
+  }
+
+  void equalityTest_end(Expression equalityExpression, Expression rightOperand, bool notEqual) {
+    // TODO(paulberry): verify in finish() that the stack is empty.
+    var lhsInfo = _expressionInfoStack.removeLast();
+    if (identical(rightOperand, _expressionWithInfo)) {
+      var rhsInfo = _expressionInfo;
+      Variable variable;
+      if (lhsInfo is _VariableReadInfo<Variable> && rhsInfo is _NullInfo) {
+        variable = lhsInfo.variable;
+      } else if (lhsInfo is _NullInfo && rhsInfo is _VariableReadInfo<Variable>) {
+        variable = rhsInfo.variable;
+      } else {
+        return;
+      }
+      _expressionWithInfo = equalityExpression;
+      FlowModel<Variable, Type> currentModel =
+      _current.markNonNullable(typeOperations, variable);
+      _expressionInfo = notEqual ? _ConditionInfo(currentModel, _current)
+          : _ConditionInfo(_current, currentModel);
+    }
   }
 
   void logicalBinaryOp_rightBegin(Expression leftOperand,
@@ -542,14 +569,28 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     FlowModel<Variable, Type> trueExpr = _stack.removeLast();
     FlowModel<Variable, Type> falseExpr = _stack.removeLast();
 
-    _condition = notExpression;
-    _conditionTrue = falseExpr;
-    _conditionFalse = trueExpr;
+    _expressionWithInfo = notExpression;
+    _expressionInfo = _ConditionInfo(falseExpr, trueExpr);
   }
 
   /// Retrieves the type that the [variable] is promoted to, if the [variable]
   /// is currently promoted.  Otherwise returns `null`.
+  ///
+  /// Note: usually clients will want to use [variableReference_end] instead.
   Type promotedType(Variable variable) {
+    return _current.infoFor(variable).promotedType;
+  }
+
+  /// Call this method when visiting a read of a local variable.  Retrieves the
+  /// type that the [variable] is promoted to, if the [variable] is currently
+  /// promoted.  Otherwise returns `null`.
+  ///
+  /// [variableRead] should be the expression used to read the variable.  This
+  /// is recorded so that flow analysis can tell whether enclosing
+  /// subexpressions refer directly to the variable read.
+  Type variableReference_end(Expression variableRead, Variable variable) {
+    _variableRead = variableRead;
+    _variableReadVariable = variable;
     return _current.infoFor(variable).promotedType;
   }
 
@@ -683,14 +724,12 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _current = _current.write(variable);
   }
 
-  void _conditionalEnd(Expression condition) {
-    condition = nodeOperations.unwrapParenthesized(condition);
-    if (identical(condition, _condition)) {
-      _stack.add(_conditionFalse);
-      _stack.add(_conditionTrue);
+  _ExpressionInfo _getExpressionInfo(Expression expression) {
+    expression = nodeOperations.unwrapParenthesized(expression);
+    if (identical(expression, _expressionInfo)) {
+      return _expressionInfo;
     } else {
-      _stack.add(_current);
-      _stack.add(_current);
+      return null;
     }
   }
 

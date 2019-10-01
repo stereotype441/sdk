@@ -1172,7 +1172,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     var staticElement = node.staticElement;
     if (staticElement is PromotableElement) {
       if (!node.inDeclarationContext()) {
-        var promotedType = _flowAnalysis.promotedType(staticElement);
+        var promotedType = _flowAnalysis.variableReference_end(node, staticElement);
         if (promotedType != null) return promotedType;
       }
       return getOrComputeElementType(staticElement);

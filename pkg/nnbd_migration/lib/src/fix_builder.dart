@@ -258,7 +258,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     var element = node.staticElement;
     if (element == null) return _typeProvider.dynamicType;
     if (element is PromotableElement) {
-      var promotedType = _flowAnalysis.promotedType(element);
+      var promotedType = _flowAnalysis.variableReference_end(node, element);
       if (promotedType != null) return promotedType;
     }
     return _computeMigratedType(element);
