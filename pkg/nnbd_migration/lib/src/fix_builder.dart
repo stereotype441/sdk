@@ -27,7 +27,7 @@ class AssignmentTargetInfo {
   /// target)
   final DartType readType;
 
-  /// The type taht the assignment target has when written to.
+  /// The type that the assignment target has when written to.
   final DartType writeType;
 
   AssignmentTargetInfo(this.readType, this.writeType);
@@ -42,10 +42,8 @@ class AssignmentTargetInfo {
 /// `x = (x + y)!`), but that might change semantics by causing subexpressions
 /// of the target to be evaluated twice.
 ///
-/// TODO(paulberry): consider alternatives.  For example, we could rewrite the
-/// expression anyway but warn the user if it might change semantics.  Or we
-/// could rewrite only when we can prove that there's no change to semantics,
-/// and report a problem otherwise.
+/// TODO(paulberry): consider alternatives.
+/// See https://github.com/dart-lang/sdk/issues/38675.
 class CompoundAssignmentCombinedNullable implements Problem {
   const CompoundAssignmentCombinedNullable();
 }
@@ -57,10 +55,8 @@ class CompoundAssignmentCombinedNullable implements Problem {
 /// `x += y` to `x = x! + y`), but that might change semantics by causing
 /// subexpressions of the target to be evaluated twice.
 ///
-/// TODO(paulberry): consider alternatives.  For example, we could rewrite the
-/// expression anyway but warn the user if it might change semantics.  Or we
-/// could rewrite only when we can prove that there's no change to semantics,
-/// and report a problem otherwise.
+/// TODO(paulberry): consider alternatives.
+/// See https://github.com/dart-lang/sdk/issues/38676.
 class CompoundAssignmentReadNullable implements Problem {
   const CompoundAssignmentReadNullable();
 }
@@ -127,7 +123,9 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     } else if (node.operator.type == TokenType.QUESTION_QUESTION_EQ) {
       // TODO(paulberry): if targetInfo.readType is non-nullable, then the
       // assignment is dead code.
+      // See https://github.com/dart-lang/sdk/issues/38678
       // TODO(paulberry): once flow analysis supports `??=`, integrate it here.
+      // See https://github.com/dart-lang/sdk/issues/38680
       var rhsType =
           visitSubexpression(node.rightHandSide, targetInfo.writeType);
       return _typeSystem.leastUpperBound(
@@ -203,6 +201,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
         // If `a ?? b` is used in a non-nullable context, we don't want to
         // migrate it to `(a ?? b)!`.  We want to migrate it to `a ?? b!`.
         // TODO(paulberry): once flow analysis supports `??`, integrate it here.
+        // See https://github.com/dart-lang/sdk/issues/38680
         var leftType = visitSubexpression(node.leftOperand,
             _typeSystem.makeNullable(_contextType as TypeImpl));
         var rightType = visitSubexpression(node.rightOperand, _contextType);
