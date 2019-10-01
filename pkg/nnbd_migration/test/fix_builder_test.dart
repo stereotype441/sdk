@@ -40,24 +40,6 @@ class FixBuilderTest extends EdgeBuilderTestBase {
     return unit;
   }
 
-  test_assignmentExpresion_compound_combined_nullable_problem() async {
-    await analyze('''
-abstract class _C {
-  _D/*?*/ operator+(int/*!*/ value);
-}
-abstract class _D extends _C {}
-abstract class _E {
-  _C/*!*/ get x;
-  void set x(_C/*!*/ value);
-  f(int/*!*/ y) => x += y;
-}
-''');
-    var assignment = findNode.assignment('+=');
-    visitSubexpression(assignment, '_D', problems: {
-      assignment: {const CompoundAssignmentCombinedNullable()}
-    });
-  }
-
   test_assignmentExpression_compound_combined_nullable_noProblem() async {
     await analyze('''
 abstract class _C {
@@ -83,6 +65,24 @@ abstract class _E {
 ''');
     var assignment = findNode.assignment('+=');
     visitSubexpression(assignment, 'dynamic');
+  }
+
+  test_assignmentExpression_compound_combined_nullable_problem() async {
+    await analyze('''
+abstract class _C {
+  _D/*?*/ operator+(int/*!*/ value);
+}
+abstract class _D extends _C {}
+abstract class _E {
+  _C/*!*/ get x;
+  void set x(_C/*!*/ value);
+  f(int/*!*/ y) => x += y;
+}
+''');
+    var assignment = findNode.assignment('+=');
+    visitSubexpression(assignment, '_D', problems: {
+      assignment: {const CompoundAssignmentCombinedNullable()}
+    });
   }
 
   test_assignmentExpression_compound_dynamic() async {
@@ -116,7 +116,7 @@ abstract class _E {
 ''');
     var assignment = findNode.assignment('+=');
     visitSubexpression(assignment, '_D', problems: {
-      assignment: {const CompoundAssignmentLhsNullable()}
+      assignment: {const CompoundAssignmentReadNullable()}
     });
   }
 
@@ -164,6 +164,36 @@ abstract class _D extends _C {}
 _f(_C/*!*/ x, int/*?*/ y) => x += y;
 ''');
     visitSubexpression(findNode.assignment('+='), '_D');
+  }
+
+  test_assignmentExpression_null_aware_rhs_nonNullable() async {
+    await analyze('''
+abstract class _B {}
+abstract class _C extends _B {}
+abstract class _D extends _C {}
+abstract class _E extends _C {}
+abstract class _F {
+  _D/*?*/ get x;
+  void set x(_B/*?*/ value);
+  f(_E/*!*/ y) => x ??= y;
+}
+''');
+    visitSubexpression(findNode.assignment('??='), '_C');
+  }
+
+  test_assignmentExpression_null_aware_rhs_nullable() async {
+    await analyze('''
+abstract class _B {}
+abstract class _C extends _B {}
+abstract class _D extends _C {}
+abstract class _E extends _C {}
+abstract class _F {
+  _D/*?*/ get x;
+  void set x(_B/*?*/ value);
+  f(_E/*?*/ y) => x ??= y;
+}
+''');
+    visitSubexpression(findNode.assignment('??='), '_C?');
   }
 
   test_assignmentExpression_simple_nonNullable_to_nonNullable() async {

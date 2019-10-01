@@ -125,7 +125,14 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     if (node.operator.type == TokenType.EQ) {
       return visitSubexpression(node.rightHandSide, targetInfo.writeType);
     } else if (node.operator.type == TokenType.QUESTION_QUESTION_EQ) {
-      throw UnimplementedError('TODO(paulberry)');
+      // TODO(paulberry): if targetInfo.readType is non-nullable, then the
+      // assignment is dead code.
+      // TODO(paulberry): once flow analysis supports `??=`, integrate it here.
+      var rhsType =
+          visitSubexpression(node.rightHandSide, targetInfo.writeType);
+      return _typeSystem.leastUpperBound(
+          _typeSystem.promoteToNonNull(targetInfo.readType as TypeImpl),
+          rhsType);
     } else {
       var combiner = node.staticElement;
       DartType combinedType;
