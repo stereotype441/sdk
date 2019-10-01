@@ -537,6 +537,10 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     }
   }
 
+  void nonNullAssert_end(Expression nonNullAssertExpression, Expression operand) {
+
+  }
+
   void logicalNot_end(Expression notExpression, Expression operand) {
     _conditionalEnd(operand);
     FlowModel<Variable, Type> trueExpr = _stack.removeLast();
