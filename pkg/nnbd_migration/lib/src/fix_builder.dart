@@ -157,6 +157,8 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     }
   }
 
+  /// Recursively visits an assignment target, returning information about the
+  /// target's read and write types.
   AssignmentTargetInfo visitAssignmentTarget(Expression node) {
     if (node is SimpleIdentifier) {
       var writeType = _computeMigratedType(node.staticElement);
