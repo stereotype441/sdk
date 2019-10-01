@@ -138,11 +138,13 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
         }
         var combinerType = _computeMigratedType(combiner) as FunctionType;
         visitSubexpression(node.rightHandSide, combinerType.parameters[0].type);
-        combinedType = combinerType.returnType;
+        combinedType =
+            _fixNumericTypes(combinerType.returnType, node.staticType);
       }
       if (_doesAssignmentNeedCheck(
           from: combinedType, to: targetInfo.writeType)) {
         addProblem(node, const CompoundAssignmentCombinedNullable());
+        combinedType = _typeSystem.promoteToNonNull(combinedType as TypeImpl);
       }
       return combinedType;
     }
@@ -243,6 +245,8 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
 
   @override
   DartType visitSimpleIdentifier(SimpleIdentifier node) {
+    assert(!node.inSetterContext(),
+        'Should use visitAssignmentTarget in setter contexts');
     var element = node.staticElement;
     if (element == null) return _typeProvider.dynamicType;
     if (element is PromotableElement) {
