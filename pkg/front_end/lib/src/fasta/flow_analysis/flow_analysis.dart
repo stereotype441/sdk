@@ -227,6 +227,40 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _current = _join(_expressionEnd(condition)._ifFalse, context._breakModel);
   }
 
+  /// Call this method just after visiting a binary `==` or `!=` expression.
+  void equalityOp_end(Expression wholeExpression, Expression rightOperand,
+      {bool notEqual = false}) {
+    var context = _stack.removeLast() as _BranchContext<Variable, Type>;
+    var lhsInfo = context._conditionInfo;
+    var rhsInfo = _getExpressionInfo(rightOperand);
+    Variable variable;
+    if (lhsInfo is _NullInfo<Variable, Type> &&
+        rhsInfo is _VariableReadInfo<Variable, Type>) {
+      variable = rhsInfo._variable;
+    } else if (rhsInfo is _NullInfo<Variable, Type> &&
+        lhsInfo is _VariableReadInfo<Variable, Type>) {
+      variable = lhsInfo._variable;
+    } else {
+      return;
+    }
+    if (functionBody.isPotentiallyMutatedInClosure(variable)) {
+      return;
+    }
+    FlowModel<Variable, Type> ifNotNull =
+        _current.markNonNullable(typeOperations, variable);
+    _storeExpressionInfo(
+        wholeExpression,
+        notEqual
+            ? _ExpressionInfo(_current, ifNotNull, _current)
+            : _ExpressionInfo(_current, _current, ifNotNull));
+  }
+
+  /// Call this method just after visiting the left hand side of a binary `==`
+  /// or `!=` expression.
+  void equalityOp_rightBegin(Expression leftOperand) {
+    _stack.add(_BranchContext<Variable, Type>(_getExpressionInfo(leftOperand)));
+  }
+
   /// This method should be called at the conclusion of flow analysis for a top
   /// level function or method.  Performs assertion checks.
   void finish() {
@@ -465,6 +499,11 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
             conditionInfo._ifTrue));
   }
 
+  /// Call this method when encountering an expression that is a `null` literal.
+  void nullLiteral(Expression expression) {
+    _storeExpressionInfo(expression, _NullInfo(_current));
+  }
+
   /// Retrieves the type that the [variable] is promoted to, if the [variable]
   /// is currently promoted.  Otherwise returns `null`.
   ///
@@ -570,6 +609,16 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     context._afterBodyAndCatches = _current;
     _current =
         _join(_current, context._previous.removePromotedAll(assignedInBody));
+  }
+
+  /// Call this method when encountering an expression that reads the value of
+  /// a variable.
+  ///
+  /// If the variable's type is currently promoted, the promoted type is
+  /// returned.  Otherwise `null` is returned.
+  Type variableRead(Expression expression, Variable variable) {
+    _storeExpressionInfo(expression, _VariableReadInfo(_current, variable));
+    return _current.infoFor(variable).promotedType;
   }
 
   void whileStatement_bodyBegin(
@@ -1154,6 +1203,20 @@ class _IfContext<Variable, Type> extends _BranchContext<Variable, Type> {
       : super(conditionInfo);
 }
 
+/// [_ExpressionInfo] representing a `null` literal.
+class _NullInfo<Variable, Type> implements _ExpressionInfo<Variable, Type> {
+  @override
+  final FlowModel<Variable, Type> _after;
+
+  _NullInfo(this._after);
+
+  @override
+  FlowModel<Variable, Type> get _ifFalse => _after;
+
+  @override
+  FlowModel<Variable, Type> get _ifTrue => _after;
+}
+
 /// [_FlowContext] representing a language construct for which flow analysis
 /// must store a flow model state to be retrieved later, such as a `try`
 /// statement, function expression, or "if-null" (`??`) expression.
@@ -1196,6 +1259,25 @@ class _TryContext<Variable, Type> extends _SimpleContext<Variable, Type> {
   FlowModel<Variable, Type> _afterBodyAndCatches;
 
   _TryContext(FlowModel<Variable, Type> previous) : super(previous);
+}
+
+/// [_ExpressionInfo] representing an expression that reads the value of a
+/// variable.
+class _VariableReadInfo<Variable, Type>
+    implements _ExpressionInfo<Variable, Type> {
+  @override
+  final FlowModel<Variable, Type> _after;
+
+  /// The variable that is being read.
+  final Variable _variable;
+
+  _VariableReadInfo(this._after, this._variable);
+
+  @override
+  FlowModel<Variable, Type> get _ifFalse => _after;
+
+  @override
+  FlowModel<Variable, Type> get _ifTrue => _after;
 }
 
 /// [_FlowContext] representing a `while` loop (or a C-style `for` loop, which
