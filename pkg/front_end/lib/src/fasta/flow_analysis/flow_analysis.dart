@@ -209,22 +209,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _current = conditionInfo._ifTrue;
   }
 
-  /// The [binaryExpression] checks that the [variable] is, or is not, equal to
-  /// `null`.
-  void conditionEqNull(Expression binaryExpression, Variable variable,
-      {bool notEqual: false}) {
-    if (functionBody.isPotentiallyMutatedInClosure(variable)) {
-      return;
-    }
-    FlowModel<Variable, Type> ifNotNull =
-        _current.markNonNullable(typeOperations, variable);
-    _storeExpressionInfo(
-        binaryExpression,
-        notEqual
-            ? _ExpressionInfo(_current, ifNotNull, _current)
-            : _ExpressionInfo(_current, _current, ifNotNull));
-  }
-
   void doStatement_bodyBegin(
       Statement doStatement, Iterable<Variable> loopAssigned) {
     var context = _BranchTargetContext<Variable, Type>();
@@ -483,6 +467,9 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   /// Retrieves the type that the [variable] is promoted to, if the [variable]
   /// is currently promoted.  Otherwise returns `null`.
+  ///
+  /// For testing only.  Please use [variableRead] instead.
+  @visibleForTesting
   Type promotedType(Variable variable) {
     return _current.infoFor(variable).promotedType;
   }

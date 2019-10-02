@@ -3448,9 +3448,10 @@ class ResolverVisitor extends ScopedVisitor {
       node.accept(elementResolver);
     } else if (operator == TokenType.BANG_EQ || operator == TokenType.EQ_EQ) {
       left.accept(this);
+      _flowAnalysis?.flow?.equalityOp_rightBegin(left);
       right.accept(this);
       node.accept(elementResolver);
-      _flowAnalysis?.binaryExpression_equal(node, left, right,
+      _flowAnalysis?.flow?.equalityOp_end(node, right,
           notEqual: operator == TokenType.BANG_EQ);
     } else {
       if (operator == TokenType.QUESTION_QUESTION) {
@@ -4264,6 +4265,12 @@ class ResolverVisitor extends ScopedVisitor {
     node.visitChildren(this);
     node.accept(elementResolver);
     node.accept(typeAnalyzer);
+  }
+
+  @override
+  void visitNullLiteral(NullLiteral node) {
+    _flowAnalysis?.flow?.nullLiteral(node);
+    super.visitNullLiteral(node);
   }
 
   @override
