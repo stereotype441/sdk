@@ -139,19 +139,25 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// The enclosing function body, used to check for potential mutations.
   final FunctionBodyAccess<Variable> functionBody;
 
+  /// Stack of [_FlowContext] objects representing the statements and
+  /// expressions that are currently being visited.
   final List<_FlowContext> _stack = [];
 
-  /// The mapping from labeled [Statement]s to the index in the [_stack]
-  /// where the first related element is located.  The number of elements
-  /// is statement specific.  Loops have two elements: `break` and `continue`
-  /// states.
-  final Map<Statement, _StatementContext<Variable, Type>> _statementToContext =
+  /// The mapping from [Statement]s that can act as targets for `break` and
+  /// `continue` statements (i.e. loops and switch statements) to the to their
+  /// context information.
+  final Map<Statement, _BranchTargetContext<Variable, Type>> _statementToContext =
       {};
 
   FlowModel<Variable, Type> _current;
 
+  /// The last completed expression for which an [_ExpressionInfo] object
+  /// exists, or `null` if no expression has been completed that has a
+  /// corresponding [_ExpressionInfo] object.
   Expression _expressionWithInfo;
 
+  /// If [_expressionWithInfo] is not `null`, the [_ExpressionInfo] object
+  /// corresponding to it.  Otherwise `null`.
   _ExpressionInfo<Variable, Type> _expressionInfo;
 
   factory FlowAnalysis(
@@ -221,19 +227,19 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   void doStatement_bodyBegin(
       Statement doStatement, Iterable<Variable> loopAssigned) {
-    var context = _StatementContext<Variable, Type>();
+    var context = _BranchTargetContext<Variable, Type>();
     _stack.add(context);
     _current = _current.removePromotedAll(loopAssigned);
     _statementToContext[doStatement] = context;
   }
 
   void doStatement_conditionBegin() {
-    var context = _stack.last as _StatementContext<Variable, Type>;
+    var context = _stack.last as _BranchTargetContext<Variable, Type>;
     _current = _join(_current, context._continueModel);
   }
 
   void doStatement_end(Expression condition) {
-    var context = _stack.removeLast() as _StatementContext<Variable, Type>;
+    var context = _stack.removeLast() as _BranchTargetContext<Variable, Type>;
     _current = _join(_expressionEnd(condition)._ifFalse, context._breakModel);
   }
 
@@ -602,10 +608,18 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _current = _current.write(variable);
   }
 
-  _ExpressionInfo<Variable, Type> _expressionEnd(Expression condition) =>
-      _getExpressionInfo(condition) ??
+  /// Gets the [_ExpressionInfo] associated with the [expression] (which should
+  /// be the last expression that was traversed).  If there is no
+  /// [_ExpressionInfo] associated with the [expression], then a fresh
+  /// [_ExpressionInfo] is created recording the current flow analysis state.
+  _ExpressionInfo<Variable, Type> _expressionEnd(Expression expression) =>
+      _getExpressionInfo(expression) ??
       _ExpressionInfo(_current, _current, _current);
 
+  /// Gets the [_ExpressionInfo] associated with the [expression] (which should
+  /// be the last expression that was traversed).  If there is no
+  /// [_ExpressionInfo] associated with the [expression], then `null` is
+  /// returned.
   _ExpressionInfo<Variable, Type> _getExpressionInfo(Expression expression) {
     expression = nodeOperations.unwrapParenthesized(expression);
     if (identical(expression, _expressionWithInfo)) {
@@ -1129,13 +1143,13 @@ class _SimpleContext<Variable, Type> extends _FlowContext {
 }
 
 class _SimpleStatementContext<Variable, Type>
-    extends _StatementContext<Variable, Type> {
+    extends _BranchTargetContext<Variable, Type> {
   final FlowModel<Variable, Type> _previous;
 
   _SimpleStatementContext(this._previous);
 }
 
-class _StatementContext<Variable, Type> extends _FlowContext {
+class _BranchTargetContext<Variable, Type> extends _FlowContext {
   FlowModel<Variable, Type> _breakModel;
 
   FlowModel<Variable, Type> _continueModel;
@@ -1149,7 +1163,7 @@ class _TryContext<Variable, Type> extends _SimpleContext<Variable, Type> {
   _TryContext(FlowModel<Variable, Type> previous) : super(previous);
 }
 
-class _WhileContext<Variable, Type> extends _StatementContext<Variable, Type> {
+class _WhileContext<Variable, Type> extends _BranchTargetContext<Variable, Type> {
   final _ExpressionInfo<Variable, Type> _conditionInfo;
 
   _WhileContext(this._conditionInfo);
