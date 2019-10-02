@@ -146,13 +146,13 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// The mapping from [Statement]s that can act as targets for `break` and
   /// `continue` statements (i.e. loops and switch statements) to the to their
   /// context information.
-  final Map<Statement, _BranchTargetContext<Variable, Type>> _statementToContext =
-      {};
+  final Map<Statement, _BranchTargetContext<Variable, Type>>
+      _statementToContext = {};
 
   FlowModel<Variable, Type> _current;
 
-  /// The last completed expression for which an [_ExpressionInfo] object
-  /// exists, or `null` if no expression has been completed that has a
+  /// The most recently visited expression for which an [_ExpressionInfo] object
+  /// exists, or `null` if no expression has been visited that has a
   /// corresponding [_ExpressionInfo] object.
   Expression _expressionWithInfo;
 
@@ -633,11 +633,14 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
           FlowModel<Variable, Type> first, FlowModel<Variable, Type> second) =>
       FlowModel.join(typeOperations, first, second);
 
+  /// Associates [expression], which should be the most recently visited
+  /// expression, with the given [expressionInfo] object, and updates the
+  /// current flow model state to correspond to it.
   void _storeExpressionInfo(
-      Expression expression, _ExpressionInfo<Variable, Type> info) {
+      Expression expression, _ExpressionInfo<Variable, Type> expressionInfo) {
     _expressionWithInfo = expression;
-    _expressionInfo = info;
-    _current = info._after;
+    _expressionInfo = expressionInfo;
+    _current = expressionInfo._after;
   }
 }
 
@@ -1101,69 +1104,118 @@ class VariableModel<Type> {
   }
 }
 
+/// [_FlowContext] representing a language construct that branches on a boolean
+/// condition, such as an `if` statement, conditional expression, or a logical
+/// binary operator.
 class _BranchContext<Variable, Type> extends _FlowContext {
+  /// Flow models associated with the condition being branched on.
   final _ExpressionInfo<Variable, Type> _conditionInfo;
 
   _BranchContext(this._conditionInfo);
 }
 
+/// [_FlowContext] representing a language construct that can be targeted by
+/// `break` or `continue` statements, such as a loop or switch statement.
+class _BranchTargetContext<Variable, Type> extends _FlowContext {
+  /// Accumulated flow model for all `break` statements seen so far, or `null`
+  /// if no `break` statements have been seen yet.
+  FlowModel<Variable, Type> _breakModel;
+
+  /// Accumulated flow model for all `continue` statements seen so far, or
+  /// `null` if no `continue` statements have been seen yet.
+  FlowModel<Variable, Type> _continueModel;
+}
+
+/// [_FlowContext] representing a conditional expression.
 class _ConditionalContext<Variable, Type>
     extends _BranchContext<Variable, Type> {
+  /// Flow models associated with the value of the conditional expression in the
+  /// circumstance where the "then" branch is taken.
   _ExpressionInfo<Variable, Type> _thenInfo;
 
   _ConditionalContext(_ExpressionInfo<Variable, Type> conditionInfo)
       : super(conditionInfo);
 }
 
+/// A collection of flow models representing the possible outcomes of evaluating
+/// an expression that are relevant to flow analysis.
 class _ExpressionInfo<Variable, Type> {
+  /// The state after the expression evaluates, if we don't care what it
+  /// evaluates to.
   final FlowModel<Variable, Type> _after;
 
-  /// The state when the condition evaluates to `true`.
+  /// The state after the expression evaluates, if it evaluates to `true`.
   final FlowModel<Variable, Type> _ifTrue;
 
-  /// The state when the condition evaluates to `false`.
+  /// The state after the expression evaluates, if it evaluates to `false`.
   final FlowModel<Variable, Type> _ifFalse;
 
   _ExpressionInfo(this._after, this._ifTrue, this._ifFalse);
 }
 
+/// Base class for objects representing constructs in the Dart programming
+/// langauge for which flow analysis information needs to be tracked.
 class _FlowContext {}
 
+/// [_FlowContext] representing an `if` statement.
 class _IfContext<Variable, Type> extends _BranchContext<Variable, Type> {
+  /// Flow model associated with the state of program execution after the `if`
+  /// statement executes, in the circumstance where the "then" branch is taken.
   FlowModel<Variable, Type> _afterThen;
 
   _IfContext(_ExpressionInfo<Variable, Type> conditionInfo)
       : super(conditionInfo);
 }
 
+/// [_FlowContext] representing a language construct for which flow analysis
+/// must store a flow model state to be retrieved later, such as a `try`
+/// statement, function expression, or "if-null" (`??`) expression.
 class _SimpleContext<Variable, Type> extends _FlowContext {
+  /// The stored state.  For a `try` statement, this is the state from the
+  /// beginning of the `try` block.  For a function expression, this is the
+  /// state at the point the function expression was created.  For an "if-null"
+  /// expression, this is the state after execution of the expression before the
+  /// `??`.
   final FlowModel<Variable, Type> _previous;
 
   _SimpleContext(this._previous);
 }
 
+/// [_FlowContext] representing a language construct that can be targeted by
+/// `break` or `continue` statements, and for which flow analysis must store a
+/// flow model state to be retrieved later.  Examples include "for each" and
+/// `switch` statements.
 class _SimpleStatementContext<Variable, Type>
     extends _BranchTargetContext<Variable, Type> {
+  /// The stored state.  For a "for each" statement, this is the state after
+  /// evaluation of the iterable.  For a `switch` statement, this is the state
+  /// after evaluation of the switch expression.
   final FlowModel<Variable, Type> _previous;
 
   _SimpleStatementContext(this._previous);
 }
 
-class _BranchTargetContext<Variable, Type> extends _FlowContext {
-  FlowModel<Variable, Type> _breakModel;
-
-  FlowModel<Variable, Type> _continueModel;
-}
-
+/// [_FlowContext] representing a try statement.
 class _TryContext<Variable, Type> extends _SimpleContext<Variable, Type> {
+  /// If the statement is a "try/catch" statement, the flow model representing
+  /// program state at the top of any `catch` block.
   FlowModel<Variable, Type> _beforeCatch;
 
+  /// If the statement is a "try/catch" statement, the accumulated flow model
+  /// representing program state after the `try` block or one of the `catch`
+  /// blocks has finished executing.  If the statement is a "try/finally"
+  /// statement, the flow model representing program state after the `try` block
+  /// has finished executing.
   FlowModel<Variable, Type> _afterBodyAndCatches;
 
   _TryContext(FlowModel<Variable, Type> previous) : super(previous);
 }
 
-class _WhileContext<Variable, Type> extends _BranchTargetContext<Variable, Type> {
+/// [_FlowContext] representing a `while` loop (or a C-style `for` loop, which
+/// is functionally similar).
+class _WhileContext<Variable, Type>
+    extends _BranchTargetContext<Variable, Type> {
+  /// Flow models associated with the loop condition.
   final _ExpressionInfo<Variable, Type> _conditionInfo;
 
   _WhileContext(this._conditionInfo);
