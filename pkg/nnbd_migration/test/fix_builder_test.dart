@@ -347,7 +347,7 @@ _f(bool x, bool y) => x && y;
     visitSubexpression(findNode.binary('&&'), 'bool');
   }
 
-  test_binaryExpression_ampersand_ampersand_flow() async {
+  solo_test_binaryExpression_ampersand_ampersand_flow() async {
     await analyze('''
 _f(bool/*?*/ x) => x != null && x;
 ''');
