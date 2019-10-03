@@ -168,16 +168,6 @@ abstract class ArgumentList implements AstNode {
   /// list to the given list of [parameters]. The list of parameters must be the
   /// same length as the number of arguments, but can contain `null` entries if
   /// a given argument does not correspond to a formal parameter.
-  ///
-  /// Deprecated: The analyzer no longer computes propagated type information.
-  /// Use [correspondingStaticParameters] instead.
-  @deprecated
-  void set correspondingPropagatedParameters(List<ParameterElement> parameters);
-
-  /// Set the parameter elements corresponding to each of the arguments in this
-  /// list to the given list of [parameters]. The list of parameters must be the
-  /// same length as the number of arguments, but can contain `null` entries if
-  /// a given argument does not correspond to a formal parameter.
   void set correspondingStaticParameters(List<ParameterElement> parameters);
 
   /// Return the left parenthesis.
@@ -943,10 +933,6 @@ abstract class ClassDeclaration implements ClassOrMixinDeclaration {
   /// Set the token representing the 'class' keyword.
   void set classKeyword(Token token);
 
-  @deprecated
-  @override
-  ClassElement get element;
-
   /// Return the extends clause for this class, or `null` if the class does not
   /// extend any other class.
   ExtendsClause get extendsClause;
@@ -1213,11 +1199,6 @@ abstract class CompilationUnit implements AstNode {
   /// Return the directives contained in this compilation unit.
   NodeList<Directive> get directives;
 
-  /// Return the element associated with this compilation unit, or `null` if the
-  /// AST structure has not been resolved.
-  @deprecated
-  CompilationUnitElement get element;
-
   /// Set the element associated with this compilation unit to the given
   /// [element].
   void set element(CompilationUnitElement element);
@@ -1436,10 +1417,6 @@ abstract class ConstructorDeclaration implements ClassMember {
   @override
   ConstructorElement get declaredElement;
 
-  @override
-  @deprecated
-  ConstructorElement get element;
-
   /// Set the element associated with this constructor to the given [element].
   void set element(ConstructorElement element);
 
@@ -1654,12 +1631,6 @@ abstract class Declaration implements AnnotatedNode {
   /// this node corresponds to a list of declarations or if the AST structure
   /// has not been resolved.
   Element get declaredElement;
-
-  /// Return the element associated with this declaration, or `null` if either
-  /// this node corresponds to a list of declarations or if the AST structure
-  /// has not been resolved.
-  @deprecated
-  Element get element;
 }
 
 /// The declaration of a single identifier.
@@ -1671,10 +1642,6 @@ abstract class Declaration implements AnnotatedNode {
 abstract class DeclaredIdentifier implements Declaration {
   @override
   LocalVariableElement get declaredElement;
-
-  @deprecated
-  @override
-  LocalVariableElement get element;
 
   /// Return the name of the variable being declared.
   SimpleIdentifier get identifier;
@@ -1910,10 +1877,6 @@ abstract class EnumDeclaration implements NamedCompilationUnitMember {
   @override
   ClassElement get declaredElement;
 
-  @deprecated
-  @override
-  ClassElement get element;
-
   /// Return the 'enum' keyword.
   Token get enumKeyword;
 
@@ -1950,28 +1913,6 @@ abstract class ExportDirective implements NamespaceDirective {}
 ///
 /// Clients may not extend, implement or mix-in this class.
 abstract class Expression implements CollectionElement {
-  /// Return the best parameter element information available for this
-  /// expression. If type propagation was able to find a better parameter
-  /// element than static analysis, that type will be returned. Otherwise, the
-  /// result of static analysis will be returned.
-  ///
-  /// Deprecated: The analyzer no longer computes propagated type information.
-  /// Use [staticParameterElement] instead.
-  @deprecated
-  ParameterElement get bestParameterElement;
-
-  /// Return the best type information available for this expression. If type
-  /// propagation was able to find a better type than static analysis, that type
-  /// will be returned. Otherwise, the result of static analysis will be
-  /// returned. If no type analysis has been performed, then the type 'dynamic'
-  /// will be returned.
-  ///
-  /// Deprecated: The analyzer no longer computes propagated type information.
-  /// Use [staticType] instead, but be aware that [staticType] will return
-  /// `null` under some circumstances, while [bestType] did not.
-  @deprecated
-  DartType get bestType;
-
   /// Return `true` if this expression is syntactically valid for the LHS of an
   /// [AssignmentExpression].
   bool get isAssignable;
@@ -1981,40 +1922,6 @@ abstract class Expression implements CollectionElement {
   /// example `a * b + c` is parsed as `(a * b) + c` because the precedence of
   /// `*` is greater than the precedence of `+`.
   Precedence get precedence;
-
-  /// Return the precedence of this expression. The precedence is a positive
-  /// integer value that defines how the source code is parsed into an AST. For
-  /// example `a * b + c` is parsed as `(a * b) + c` because the precedence of
-  /// `*` is greater than the precedence of `+`.
-  @Deprecated('Use precedence')
-  Precedence get precedence2;
-
-  /// If this expression is an argument to an invocation, and the AST structure
-  /// has been resolved, and the function being invoked is known based on
-  /// propagated type information, and this expression corresponds to one of the
-  /// parameters of the function being invoked, then return the parameter
-  /// element representing the parameter to which the value of this expression
-  /// will be bound. Otherwise, return `null`.
-  ///
-  /// Deprecated: The analyzer no longer computes propagated type information.
-  /// Use [staticParameterElement] instead.
-  @deprecated
-  ParameterElement get propagatedParameterElement;
-
-  /// Return the propagated type of this expression, or `null` if type
-  /// propagation has not been performed on the AST structure.
-  ///
-  /// Deprecated: The analyzer no longer computes propagated type information.
-  /// Use [staticType] instead.
-  @deprecated
-  DartType get propagatedType;
-
-  /// Set the propagated type of this expression to the given [type].
-  ///
-  /// Deprecated: The analyzer no longer computes propagated type information.
-  /// Use [staticType] instead.
-  @deprecated
-  void set propagatedType(DartType type);
 
   /// If this expression is an argument to an invocation, and the AST structure
   /// has been resolved, and the function being invoked is known based on static
@@ -2370,11 +2277,6 @@ abstract class FormalParameter implements AstNode {
   /// parameter has not been resolved.
   ParameterElement get declaredElement;
 
-  /// Return the element representing this parameter, or `null` if this
-  /// parameter has not been resolved.
-  @deprecated
-  ParameterElement get element;
-
   /// Return the name of the parameter being declared.
   SimpleIdentifier get identifier;
 
@@ -2648,10 +2550,6 @@ abstract class FunctionDeclaration implements NamedCompilationUnitMember {
   @override
   ExecutableElement get declaredElement;
 
-  @deprecated
-  @override
-  ExecutableElement get element;
-
   /// Return the token representing the 'external' keyword, or `null` if this is
   /// not an external function.
   Token get externalKeyword;
@@ -2718,11 +2616,6 @@ abstract class FunctionExpression implements Expression {
   /// structure has not been resolved.
   ExecutableElement get declaredElement;
 
-  /// Return the element associated with the function, or `null` if the AST
-  /// structure has not been resolved.
-  @deprecated
-  ExecutableElement get element;
-
   /// Set the element associated with the function to the given [element].
   void set element(ExecutableElement element);
 
@@ -2756,17 +2649,6 @@ abstract class FunctionExpressionInvocation implements InvocationExpression {
   /// Set the list of arguments to the method to the given [argumentList].
   void set argumentList(ArgumentList argumentList);
 
-  /// Return the best element available for the function being invoked. If
-  /// resolution was able to find a better element based on type propagation,
-  /// that element will be returned. Otherwise, the element found using the
-  /// result of static analysis will be returned. If resolution has not been
-  /// performed, then `null` will be returned.
-  ///
-  /// Deprecated: The analyzer no longer computes propagated type information.
-  /// Use [staticElement] instead.
-  @deprecated
-  ExecutableElement get bestElement;
-
   /// Return the expression producing the function being invoked.
   @override
   Expression get function;
@@ -2774,23 +2656,6 @@ abstract class FunctionExpressionInvocation implements InvocationExpression {
   /// Set the expression producing the function being invoked to the given
   /// [expression].
   void set function(Expression expression);
-
-  /// Return the element associated with the function being invoked based on
-  /// propagated type information, or `null` if the AST structure has not been
-  /// resolved or the function could not be resolved.
-  ///
-  /// Deprecated: The analyzer no longer computes propagated type information.
-  /// Use [staticElement] instead.
-  @deprecated
-  ExecutableElement get propagatedElement;
-
-  /// Set the element associated with the function being invoked based on
-  /// propagated type information to the given [element].
-  ///
-  /// Deprecated: The analyzer no longer computes propagated type information.
-  /// Use [staticElement] instead.
-  @deprecated
-  void set propagatedElement(ExecutableElement element);
 
   /// Return the element associated with the function being invoked based on
   /// static type information, or `null` if the AST structure has not been
@@ -2995,29 +2860,8 @@ abstract class HideCombinator implements Combinator {
 ///
 /// Clients may not extend, implement or mix-in this class.
 abstract class Identifier implements Expression {
-  /// Return the best element available for this operator. If resolution was
-  /// able to find a better element based on type propagation, that element will
-  /// be returned. Otherwise, the element found using the result of static
-  /// analysis will be returned. If resolution has not been performed, then
-  /// `null` will be returned.
-  ///
-  /// Deprecated: The analyzer no longer computes propagated type information.
-  /// Use [staticElement] instead.
-  @deprecated
-  Element get bestElement;
-
   /// Return the lexical representation of the identifier.
   String get name;
-
-  /// Return the element associated with this identifier based on propagated
-  /// type information, or `null` if the AST structure has not been resolved or
-  /// if this identifier could not be resolved. One example of the latter case
-  /// is an identifier that is not defined within the scope in which it appears.
-  ///
-  /// Deprecated: The analyzer no longer computes propagated type information.
-  /// Use [staticElement] instead.
-  @deprecated
-  Element get propagatedElement;
 
   /// Return the element associated with this identifier based on static type
   /// information, or `null` if the AST structure has not been resolved or if
@@ -3512,27 +3356,6 @@ abstract class InvocationExpression implements Expression {
   /// [staticInvokeType] before applying type arguments `TArgs`.
   Expression get function;
 
-  /// Return the function type of the invocation based on the propagated type
-  /// information, or `null` if the AST structure has not been resolved, or if
-  /// the invoke could not be resolved.
-  ///
-  /// This will usually be a [FunctionType], but it can also be an
-  /// [InterfaceType] with a `call` method, `dynamic`, `Function`, or a `@proxy`
-  /// interface type that implements `Function`.
-  ///
-  /// Deprecated: The analyzer no longer computes propagated type information.
-  /// Use [staticInvokeType] instead.
-  @deprecated
-  DartType get propagatedInvokeType;
-
-  /// Sets the function type of the invocation based on the propagated type
-  /// information.
-  ///
-  /// Deprecated: The analyzer no longer computes propagated type information.
-  /// Use [staticInvokeType] instead.
-  @deprecated
-  void set propagatedInvokeType(DartType value);
-
   /// Return the function type of the invocation based on the static type
   /// information, or `null` if the AST structure has not been resolved, or if
   /// the invoke could not be resolved.
@@ -3769,10 +3592,6 @@ abstract class MethodDeclaration implements ClassMember {
   @override
   ExecutableElement get declaredElement;
 
-  @deprecated
-  @override
-  ExecutableElement get element;
-
   /// Return the token for the 'external' keyword, or `null` if the constructor
   /// is not external.
   Token get externalKeyword;
@@ -3912,36 +3731,6 @@ abstract class MethodInvocation implements InvocationExpression {
 ///
 /// Clients may not extend, implement or mix-in this class.
 abstract class MethodReferenceExpression implements AstNode {
-  /// Return the best element available for this expression. If resolution was
-  /// able to find a better element based on type propagation, that element will
-  /// be returned. Otherwise, the element found using the result of static
-  /// analysis will be returned. If resolution has not been performed, then
-  /// `null` will be returned.
-  ///
-  /// Deprecated: The analyzer no longer computes propagated type information.
-  /// Use [staticElement] instead.
-  @deprecated
-  MethodElement get bestElement;
-
-  /// Return the element associated with the expression based on propagated
-  /// types, or `null` if the AST structure has not been resolved, or there is
-  /// no meaningful propagated element to return (e.g. because this is a
-  /// non-compound assignment expression, or because the method referred to
-  /// could not be resolved).
-  ///
-  /// Deprecated: The analyzer no longer computes propagated type information.
-  /// Use [staticElement] instead.
-  @deprecated
-  MethodElement get propagatedElement;
-
-  /// Set the element associated with the expression based on propagated types
-  /// to the given [element].
-  ///
-  /// Deprecated: The analyzer no longer computes propagated type information.
-  /// Use [staticElement] instead.
-  @deprecated
-  void set propagatedElement(MethodElement element);
-
   /// Return the element associated with the expression based on the static
   /// types, or `null` if the AST structure has not been resolved, or there is
   /// no meaningful static element to return (e.g. because this is a
@@ -4671,14 +4460,6 @@ abstract class SimpleIdentifier implements Identifier {
   /// identifier or a method invocation.
   bool get isQualified;
 
-  /// Set the element associated with this identifier based on propagated type
-  /// information to the given [element].
-  ///
-  /// Deprecated: The analyzer no longer computes propagated type information.
-  /// Use [staticElement] instead.
-  @deprecated
-  void set propagatedElement(Element element);
-
   /// Set the element associated with this identifier based on static type
   /// information to the given [element].
   void set staticElement(Element element);
@@ -5328,10 +5109,6 @@ abstract class UriBasedDirective implements Directive {
 abstract class VariableDeclaration implements Declaration {
   @override
   VariableElement get declaredElement;
-
-  @deprecated
-  @override
-  VariableElement get element;
 
   /// Return the equal sign separating the variable name from the initial value,
   /// or `null` if the initial value was not specified.

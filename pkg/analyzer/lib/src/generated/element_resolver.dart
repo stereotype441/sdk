@@ -490,7 +490,7 @@ class ElementResolver extends SimpleAstVisitor<void> {
     bool isInSetterContext = node.inSetterContext();
     if (isInGetterContext && isInSetterContext) {
       node.staticElement = result.setter;
-      node.auxiliaryElements = AuxiliaryElements(result.getter, null);
+      node.auxiliaryElements = AuxiliaryElements(result.getter);
     } else if (isInGetterContext) {
       node.staticElement = result.getter;
     } else if (isInSetterContext) {
@@ -716,7 +716,7 @@ class ElementResolver extends SimpleAstVisitor<void> {
                 propertyName,
                 [memberName, element.name]);
           }
-          propertyName.auxiliaryElements = AuxiliaryElements(getter, null);
+          propertyName.auxiliaryElements = AuxiliaryElements(getter);
         }
       } else if (propertyName.inGetterContext()) {
         member = result.getter;
@@ -861,7 +861,6 @@ class ElementResolver extends SimpleAstVisitor<void> {
       propertyResolver.resolve(null, enclosingType, node.name, node);
       node.auxiliaryElements = AuxiliaryElements(
         propertyResolver.result.getter,
-        null,
       );
     }
     //
@@ -1969,9 +1968,6 @@ class SyntheticIdentifier extends IdentifierImpl {
   Token get beginToken => null;
 
   @override
-  Element get bestElement => null;
-
-  @override
   Iterable<SyntacticEntity> get childEntities {
     // Should never be called, since a SyntheticIdentifier never appears in the
     // AST--it is just used for lookup.
@@ -1990,10 +1986,6 @@ class SyntheticIdentifier extends IdentifierImpl {
 
   @override
   Precedence get precedence => Precedence.primary;
-
-  @deprecated
-  @override
-  Element get propagatedElement => null;
 
   @override
   Element get staticElement => null;

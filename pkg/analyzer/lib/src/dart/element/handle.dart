@@ -3,7 +3,6 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'package:analyzer/dart/analysis/session.dart';
-import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
@@ -78,9 +77,6 @@ class ClassElementHandle extends ElementHandle implements ClassElement {
   bool get isEnum => actualElement.isEnum;
 
   @override
-  bool get isJS => actualElement.hasJS;
-
-  @override
   bool get isMixin => actualElement.isMixin;
 
   @override
@@ -91,9 +87,6 @@ class ClassElementHandle extends ElementHandle implements ClassElement {
 
   @override
   bool get isProxy => actualElement.isProxy;
-
-  @override
-  bool get isRequired => actualElement.hasRequired;
 
   @override
   bool get isSimplyBounded => actualElement.isSimplyBounded;
@@ -128,10 +121,6 @@ class ClassElementHandle extends ElementHandle implements ClassElement {
 
   @override
   ConstructorElement get unnamedConstructor => actualElement.unnamedConstructor;
-
-  @deprecated
-  @override
-  NamedCompilationUnitMember computeNode() => super.computeNode();
 
   @override
   FieldElement getField(String fieldName) => actualElement.getField(fieldName);
@@ -273,10 +262,6 @@ class CompilationUnitElementHandle extends ElementHandle
   @override
   int get uriOffset => actualElement.uriOffset;
 
-  @deprecated
-  @override
-  CompilationUnit computeNode() => actualElement.computeNode();
-
   @override
   ClassElement getEnum(String enumName) => actualElement.getEnum(enumName);
 
@@ -329,10 +314,6 @@ class ConstructorElementHandle extends ExecutableElementHandle
   @override
   ConstructorElement get redirectedConstructor =>
       actualElement.redirectedConstructor;
-
-  @deprecated
-  @override
-  ConstructorDeclaration computeNode() => actualElement.computeNode();
 }
 
 /**
@@ -441,37 +422,13 @@ abstract class ElementHandle implements Element {
   bool get hasVisibleForTesting => actualElement.hasVisibleForTesting;
 
   @override
-  bool get isAlwaysThrows => actualElement.hasAlwaysThrows;
-
-  @override
-  bool get isDeprecated => actualElement.hasDeprecated;
-
-  @override
-  bool get isFactory => actualElement.hasFactory;
-
-  @override
-  bool get isJS => actualElement.hasJS;
-
-  @override
-  bool get isOverride => actualElement.hasOverride;
-
-  @override
   bool get isPrivate => actualElement.isPrivate;
-
-  @override
-  bool get isProtected => actualElement.hasProtected;
 
   @override
   bool get isPublic => actualElement.isPublic;
 
   @override
-  bool get isRequired => actualElement.hasRequired;
-
-  @override
   bool get isSynthetic => actualElement.isSynthetic;
-
-  @override
-  bool get isVisibleForTesting => actualElement.hasVisibleForTesting;
 
   @override
   LibraryElement get library =>
@@ -501,23 +458,12 @@ abstract class ElementHandle implements Element {
   @override
   Source get source => actualElement.source;
 
-  @deprecated
-  @override
-  CompilationUnit get unit => actualElement.unit;
-
   @override
   bool operator ==(Object object) =>
       object is Element && object.location == _location;
 
   @override
   T accept<T>(ElementVisitor<T> visitor) => actualElement.accept(visitor);
-
-  @override
-  String computeDocumentationComment() => documentationComment;
-
-  @deprecated
-  @override
-  AstNode computeNode() => actualElement.computeNode();
 
   @override
   E getAncestor<E extends Element>(Predicate<Element> predicate) =>
@@ -689,16 +635,8 @@ class FieldElementHandle extends PropertyInducingElementHandle
   @override
   bool get isEnumConstant => actualElement.isEnumConstant;
 
-  @deprecated
-  @override
-  bool get isVirtual => actualElement.isVirtual;
-
   @override
   ElementKind get kind => ElementKind.FIELD;
-
-  @deprecated
-  @override
-  VariableDeclaration computeNode() => actualElement.computeNode();
 }
 
 /**
@@ -726,10 +664,6 @@ class FunctionElementHandle extends ExecutableElementHandle
 
   @override
   SourceRange get visibleRange => actualElement.visibleRange;
-
-  @deprecated
-  @override
-  FunctionDeclaration computeNode() => actualElement.computeNode();
 }
 
 /**
@@ -774,10 +708,6 @@ class FunctionTypeAliasElementHandle extends ElementHandle
 
   @override
   List<TypeParameterElement> get typeParameters => actualElement.typeParameters;
-
-  @deprecated
-  @override
-  FunctionTypeAlias computeNode() => actualElement.computeNode();
 
   @override
   FunctionType instantiate(List<DartType> argumentTypes) =>
@@ -832,10 +762,6 @@ class GenericTypeAliasElementHandle extends ElementHandle
 
   @override
   List<TypeParameterElement> get typeParameters => actualElement.typeParameters;
-
-  @deprecated
-  @override
-  FunctionTypeAlias computeNode() => actualElement.computeNode();
 
   @override
   FunctionType instantiate(List<DartType> argumentTypes) =>
@@ -1038,10 +964,6 @@ class LocalVariableElementHandle extends VariableElementHandle
 
   @override
   SourceRange get visibleRange => actualElement.visibleRange;
-
-  @deprecated
-  @override
-  VariableDeclaration computeNode() => actualElement.computeNode();
 }
 
 /**
@@ -1069,10 +991,6 @@ class MethodElementHandle extends ExecutableElementHandle
 
   @override
   ElementKind get kind => ElementKind.METHOD;
-
-  @deprecated
-  @override
-  MethodDeclaration computeNode() => actualElement.computeNode();
 }
 
 /**
@@ -1117,10 +1035,6 @@ class ParameterElementHandle extends VariableElementHandle
 
   @override
   SourceRange get visibleRange => actualElement.visibleRange;
-
-  @deprecated
-  @override
-  FormalParameter computeNode() => super.computeNode();
 }
 
 /**
@@ -1142,9 +1056,6 @@ class PrefixElementHandle extends ElementHandle implements PrefixElement {
   @override
   LibraryElement get enclosingElement =>
       super.enclosingElement as LibraryElement;
-
-  @override
-  List<LibraryElement> get importedLibraries => const <LibraryElement>[];
 
   @override
   ElementKind get kind => ElementKind.PREFIX;
@@ -1219,10 +1130,6 @@ abstract class PropertyInducingElementHandle extends VariableElementHandle
   @override
   bool get isConstantEvaluated => actualElement.isConstantEvaluated;
 
-  @deprecated
-  @override
-  DartType get propagatedType => null;
-
   @override
   PropertyAccessorElement get setter => actualElement.setter;
 }
@@ -1243,10 +1150,6 @@ class TopLevelVariableElementHandle extends PropertyInducingElementHandle
 
   @override
   ElementKind get kind => ElementKind.TOP_LEVEL_VARIABLE;
-
-  @deprecated
-  @override
-  VariableDeclaration computeNode() => super.computeNode();
 }
 
 /**
@@ -1321,16 +1224,6 @@ abstract class VariableElementHandle extends ElementHandle
 
   @override
   bool get isLate => actualElement.isLate;
-
-  @deprecated
-  @override
-  bool get isPotentiallyMutatedInClosure =>
-      actualElement.isPotentiallyMutatedInClosure;
-
-  @deprecated
-  @override
-  bool get isPotentiallyMutatedInScope =>
-      actualElement.isPotentiallyMutatedInScope;
 
   @override
   bool get isStatic => actualElement.isStatic;

@@ -13,7 +13,6 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/error/error.dart';
-import 'package:analyzer/src/dart/ast/utilities.dart';
 import 'package:analyzer/src/dart/constant/compute.dart';
 import 'package:analyzer/src/dart/constant/evaluation.dart';
 import 'package:analyzer/src/dart/constant/value.dart';
@@ -146,17 +145,6 @@ abstract class AbstractClassElementImpl extends ElementImpl
 
   @override
   T accept<T>(ElementVisitor<T> visitor) => visitor.visitClassElement(this);
-
-  @deprecated
-  @override
-  NamedCompilationUnitMember computeNode() {
-    if (isEnum) {
-      return getNodeMatching((node) => node is EnumDeclaration);
-    } else {
-      return getNodeMatching(
-          (node) => node is ClassDeclaration || node is ClassTypeAlias);
-    }
-  }
 
   @override
   ElementImpl getChild(String identifier) {
@@ -444,22 +432,13 @@ abstract class AbstractClassElementImpl extends ElementImpl
 
 /// For AST nodes that could be in both the getter and setter contexts
 /// ([IndexExpression]s and [SimpleIdentifier]s), the additional resolved
-/// elements are stored in the AST node, in an [AuxiliaryElements]. Because
-/// resolved elements are either statically resolved or resolved using
-/// propagated type information, this class is a wrapper for a pair of
-/// [ExecutableElement]s, not just a single [ExecutableElement].
+/// element (getter) is stored in the AST node, in an [AuxiliaryElements].
 class AuxiliaryElements {
   /// The element based on static type information, or `null` if the AST
   /// structure has not been resolved or if the node could not be resolved.
   final ExecutableElement staticElement;
 
-  /// Initialize a newly created pair to have both the [staticElement] and
-  /// `null`.
-  AuxiliaryElements(this.staticElement, ExecutableElement propagatedElement);
-
-  /// The element based on propagated type information, or `null` if the AST
-  /// structure has not been resolved or if the node could not be resolved.
-  ExecutableElement get propagatedElement => null;
+  AuxiliaryElements(this.staticElement);
 }
 
 /// An [AbstractClassElementImpl] which is a class.
@@ -2130,10 +2109,6 @@ class CompilationUnitElementImpl extends UriReferencedElementImpl
     }
   }
 
-  @deprecated
-  @override
-  CompilationUnit computeNode() => unit;
-
   /// Return the annotations associated with the directive at the given
   /// [offset], or an empty list if the directive has no annotations or if
   /// there is no directive at the given offset.
@@ -2846,11 +2821,6 @@ class ConstructorElementImpl extends ExecutableElementImpl
     }
   }
 
-  @deprecated
-  @override
-  ConstructorDeclaration computeNode() =>
-      getNodeMatching((node) => node is ConstructorDeclaration);
-
   /// Resynthesize the AST for the given serialized constructor initializer.
   ConstructorInitializer _buildConstructorInitializer(
       UnlinkedConstructorInitializer serialized) {
@@ -3043,11 +3013,6 @@ class DefaultParameterElementImpl extends ParameterElementImpl
   DefaultParameterElementImpl.forSerialized(
       UnlinkedParam unlinkedParam, ElementImpl enclosingElement)
       : super.forSerialized(unlinkedParam, enclosingElement);
-
-  @deprecated
-  @override
-  DefaultFormalParameter computeNode() =>
-      getNodeMatching((node) => node is DefaultFormalParameter);
 }
 
 /// The synthetic element representing the declaration of the type `dynamic`.
@@ -3630,21 +3595,6 @@ abstract class ElementImpl implements Element {
   String get identifier => name;
 
   @override
-  bool get isAlwaysThrows => hasAlwaysThrows;
-
-  @override
-  bool get isDeprecated => hasDeprecated;
-
-  @override
-  bool get isFactory => hasFactory;
-
-  @override
-  bool get isJS => hasJS;
-
-  @override
-  bool get isOverride => hasOverride;
-
-  @override
   bool get isPrivate {
     String name = displayName;
     if (name == null) {
@@ -3654,13 +3604,7 @@ abstract class ElementImpl implements Element {
   }
 
   @override
-  bool get isProtected => hasProtected;
-
-  @override
   bool get isPublic => !isPrivate;
-
-  @override
-  bool get isRequired => hasRequired;
 
   /// Return `true` if this element is resynthesized from a summary.
   bool get isResynthesized => enclosingUnit?.resynthesizerContext != null;
@@ -3677,9 +3621,6 @@ abstract class ElementImpl implements Element {
   void set isSynthetic(bool isSynthetic) {
     setModifier(Modifier.SYNTHETIC, isSynthetic);
   }
-
-  @override
-  bool get isVisibleForTesting => hasVisibleForTesting;
 
   @override
   LibraryElement get library =>
@@ -3757,12 +3698,6 @@ abstract class ElementImpl implements Element {
     return _enclosingElement?.typeParameterContext;
   }
 
-  @deprecated
-  @override
-  CompilationUnit get unit {
-    throw UnimplementedError();
-  }
-
   @override
   bool operator ==(Object object) {
     if (identical(this, object)) {
@@ -3803,13 +3738,6 @@ abstract class ElementImpl implements Element {
     }
   }
 
-  @override
-  String computeDocumentationComment() => documentationComment;
-
-  @deprecated
-  @override
-  AstNode computeNode() => getNodeMatching((node) => node is AstNode);
-
   /// Set this element as the enclosing element for given [element].
   void encloseElement(ElementImpl element) {
     element.enclosingElement = this;
@@ -3841,21 +3769,6 @@ abstract class ElementImpl implements Element {
       return "$shortName (${source.fullName})";
     }
     return shortName;
-  }
-
-  /// Return the resolved [AstNode] of the given type enclosing [getNameOffset].
-  @deprecated
-  AstNode getNodeMatching(Predicate<AstNode> predicate) {
-    CompilationUnit unit = this.unit;
-    if (unit == null) {
-      return null;
-    }
-    int offset = nameOffset;
-    AstNode node = new NodeLocator(offset).searchWithin(unit);
-    if (node == null) {
-      return null;
-    }
-    return node.thisOrAncestorMatching(predicate);
   }
 
   /// Return `true` if this element has the given [modifier] associated with it.
@@ -5644,25 +5557,11 @@ class FieldElementImpl extends PropertyInducingElementImpl
     setModifier(Modifier.STATIC, isStatic);
   }
 
-  @deprecated
-  @override
-  bool get isVirtual => true;
-
   @override
   ElementKind get kind => ElementKind.FIELD;
 
   @override
   T accept<T>(ElementVisitor<T> visitor) => visitor.visitFieldElement(this);
-
-  @deprecated
-  @override
-  AstNode computeNode() {
-    if (isEnumConstant) {
-      return getNodeMatching((node) => node is EnumConstantDeclaration);
-    } else {
-      return getNodeMatching((node) => node is VariableDeclaration);
-    }
-  }
 }
 
 /// A [ParameterElementImpl] that has the additional information of the
@@ -5847,11 +5746,6 @@ class FunctionElementImpl extends ExecutableElementImpl
 
   @override
   T accept<T>(ElementVisitor<T> visitor) => visitor.visitFunctionElement(this);
-
-  @deprecated
-  @override
-  FunctionDeclaration computeNode() =>
-      getNodeMatching((node) => node is FunctionDeclaration);
 
   /// Set the visible range for this element to the range starting at the given
   /// [offset] with the given [length].
@@ -6424,11 +6318,6 @@ class GenericTypeAliasElementImpl extends ElementImpl
       function.appendTo(buffer);
     }
   }
-
-  @deprecated
-  @override
-  GenericTypeAlias computeNode() =>
-      getNodeMatching((node) => node is GenericTypeAlias);
 
   @override
   ElementImpl getChild(String identifier) {
@@ -7795,12 +7684,6 @@ class LocalVariableElementImpl extends NonParameterVariableElementImpl
   }
 
   @override
-  bool get isPotentiallyMutatedInClosure => true;
-
-  @override
-  bool get isPotentiallyMutatedInScope => true;
-
-  @override
   ElementKind get kind => ElementKind.LOCAL_VARIABLE;
 
   @override
@@ -7821,11 +7704,6 @@ class LocalVariableElementImpl extends NonParameterVariableElementImpl
     buffer.write(" ");
     buffer.write(displayName);
   }
-
-  @deprecated
-  @override
-  Declaration computeNode() => getNodeMatching(
-      (node) => node is DeclaredIdentifier || node is VariableDeclaration);
 
   /// Set the visible range for this element to the range starting at the given
   /// [offset] with the given [length].
@@ -7916,11 +7794,6 @@ class MethodElementImpl extends ExecutableElementImpl implements MethodElement {
 
   @override
   T accept<T>(ElementVisitor<T> visitor) => visitor.visitMethodElement(this);
-
-  @deprecated
-  @override
-  MethodDeclaration computeNode() =>
-      getNodeMatching((node) => node is MethodDeclaration);
 }
 
 /// A [ClassElementImpl] representing a mixin declaration.
@@ -8267,21 +8140,6 @@ class MultiplyDefinedElementImpl implements MultiplyDefinedElement {
   bool get hasVisibleForTesting => false;
 
   @override
-  bool get isAlwaysThrows => false;
-
-  @override
-  bool get isDeprecated => false;
-
-  @override
-  bool get isFactory => false;
-
-  @override
-  bool get isJS => false;
-
-  @override
-  bool get isOverride => false;
-
-  @override
   bool get isPrivate {
     String name = displayName;
     if (name == null) {
@@ -8291,21 +8149,12 @@ class MultiplyDefinedElementImpl implements MultiplyDefinedElement {
   }
 
   @override
-  bool get isProtected => false;
-
-  @override
   bool get isPublic => !isPrivate;
-
-  @override
-  bool get isRequired => false;
 
   @override
   bool get isSynthetic => true;
 
   bool get isVisibleForTemplate => false;
-
-  @override
-  bool get isVisibleForTesting => false;
 
   @override
   ElementKind get kind => ElementKind.ERROR;
@@ -8335,18 +8184,8 @@ class MultiplyDefinedElementImpl implements MultiplyDefinedElement {
   DartType get type => DynamicTypeImpl.instance;
 
   @override
-  CompilationUnit get unit => null;
-
-  @override
   T accept<T>(ElementVisitor<T> visitor) =>
       visitor.visitMultiplyDefinedElement(this);
-
-  @override
-  String computeDocumentationComment() => null;
-
-  @deprecated
-  @override
-  AstNode computeNode() => null;
 
   @override
   E getAncestor<E extends Element>(Predicate<Element> predicate) => null;
@@ -8983,12 +8822,6 @@ class ParameterElementImpl extends VariableElementImpl
   bool get isLate => false;
 
   @override
-  bool get isPotentiallyMutatedInClosure => true;
-
-  @override
-  bool get isPotentiallyMutatedInScope => true;
-
-  @override
   ElementKind get kind => ElementKind.PARAMETER;
 
   @override
@@ -9198,11 +9031,6 @@ class ParameterElementImpl extends VariableElementImpl
       appendToWithoutDelimiters(buffer);
     }
   }
-
-  @deprecated
-  @override
-  FormalParameter computeNode() =>
-      getNodeMatching((node) => node is FormalParameter);
 
   /// Set the visible range for this element to the range starting at the given
   /// [offset] with the given [length].
@@ -9470,9 +9298,6 @@ class PrefixElementImpl extends ElementImpl implements PrefixElement {
       super.enclosingElement as LibraryElement;
 
   @override
-  List<LibraryElement> get importedLibraries => const <LibraryElement>[];
-
-  @override
   ElementKind get kind => ElementKind.PREFIX;
 
   @override
@@ -9676,20 +9501,6 @@ class PropertyAccessorElementImpl extends ExecutableElementImpl
     super.appendToWithName(
         buffer, (isGetter ? 'get ' : 'set ') + variable.displayName);
   }
-
-  @deprecated
-  @override
-  AstNode computeNode() {
-    if (isSynthetic) {
-      return null;
-    }
-    if (enclosingElement is ClassElement) {
-      return getNodeMatching((node) => node is MethodDeclaration);
-    } else if (enclosingElement is CompilationUnitElement) {
-      return getNodeMatching((node) => node is FunctionDeclaration);
-    }
-    return null;
-  }
 }
 
 /// Implicit getter for a [PropertyInducingElementImpl].
@@ -9810,13 +9621,6 @@ abstract class PropertyInducingElementImpl
     }
     return hasModifier(Modifier.LATE);
   }
-
-  @deprecated
-  @override
-  DartType get propagatedType => null;
-
-  @deprecated
-  void set propagatedType(DartType propagatedType) {}
 
   @override
   DartType get type {
@@ -10075,11 +9879,6 @@ class TopLevelVariableElementImpl extends PropertyInducingElementImpl
   @override
   T accept<T>(ElementVisitor<T> visitor) =>
       visitor.visitTopLevelVariableElement(this);
-
-  @deprecated
-  @override
-  VariableDeclaration computeNode() =>
-      getNodeMatching((node) => node is VariableDeclaration);
 }
 
 /// A concrete implementation of a [TypeParameterElement].
@@ -10576,12 +10375,6 @@ abstract class VariableElementImpl extends ElementImpl
   void set isFinal(bool isFinal) {
     setModifier(Modifier.FINAL, isFinal);
   }
-
-  @override
-  bool get isPotentiallyMutatedInClosure => false;
-
-  @override
-  bool get isPotentiallyMutatedInScope => false;
 
   @override
   bool get isStatic => hasModifier(Modifier.STATIC);

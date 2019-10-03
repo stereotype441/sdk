@@ -45,7 +45,6 @@ import 'package:path/path.dart' as path;
 
 export 'package:analyzer/src/dart/constant/constant_verifier.dart';
 export 'package:analyzer/src/dart/resolver/exit_detector.dart';
-export 'package:analyzer/src/dart/resolver/inheritance_manager.dart';
 export 'package:analyzer/src/dart/resolver/scope.dart';
 export 'package:analyzer/src/generated/type_system.dart';
 
