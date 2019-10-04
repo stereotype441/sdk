@@ -95,6 +95,7 @@ import 'kernel_builder.dart'
         NamedTypeBuilder,
         ProcedureBuilder,
         LibraryBuilder,
+        NullabilityBuilder,
         TypeBuilder,
         TypeDeclarationBuilder;
 
@@ -120,13 +121,16 @@ class KernelTarget extends TargetImplementation {
 
   Component component;
 
-  final TypeBuilder dynamicType = new NamedTypeBuilder("dynamic", null);
+  // 'dynamic' is always nullable.
+  final TypeBuilder dynamicType = new NamedTypeBuilder(
+      "dynamic", const NullabilityBuilder.nullable(), null);
 
-  final NamedTypeBuilder objectType = new NamedTypeBuilder("Object", null);
+  final NamedTypeBuilder objectType =
+      new NamedTypeBuilder("Object", const NullabilityBuilder.omitted(), null);
 
-  final TypeBuilder bottomType = new NamedTypeBuilder("Null", null);
-
-  bool get legacyMode => backendTarget.legacyMode;
+  // Null is always nullable.
+  final TypeBuilder bottomType =
+      new NamedTypeBuilder("Null", const NullabilityBuilder.nullable(), null);
 
   final bool excludeSource = !CompilerContext.current.options.embedSourceText;
 
@@ -234,8 +238,9 @@ class KernelTarget extends TargetImplementation {
     cls.implementedTypes.clear();
     cls.supertype = null;
     cls.mixedInType = null;
-    builder.supertype = new NamedTypeBuilder("Object", null)
-      ..bind(objectClassBuilder);
+    builder.supertype =
+        new NamedTypeBuilder("Object", const NullabilityBuilder.omitted(), null)
+          ..bind(objectClassBuilder);
     builder.interfaces = null;
     builder.mixedInType = null;
   }
@@ -261,7 +266,6 @@ class KernelTarget extends TargetImplementation {
           loader.checkSemantics(objectClassBuilder);
       loader.finishTypeVariables(objectClassBuilder, dynamicType);
       loader.buildComponent();
-      loader.finalizeInitializingFormals();
       installDefaultSupertypes();
       installSyntheticConstructors(myClasses);
       loader.resolveConstructors();
@@ -377,7 +381,8 @@ class KernelTarget extends TargetImplementation {
             Class cls = declaration.cls;
             if (cls != objectClass) {
               cls.supertype ??= objectClass.asRawSupertype;
-              declaration.supertype ??= new NamedTypeBuilder("Object", null)
+              declaration.supertype ??= new NamedTypeBuilder(
+                  "Object", const NullabilityBuilder.omitted(), null)
                 ..bind(objectClassBuilder);
             }
             if (declaration.isMixinApplication) {
@@ -460,7 +465,7 @@ class KernelTarget extends TargetImplementation {
       unhandled("${type.runtimeType}", "installForwardingConstructors",
           builder.charOffset, builder.fileUri);
     }
-    if (supertype.isMixinApplication) {
+    if (supertype.isMixinApplication && supertype is SourceClassBuilder) {
       installForwardingConstructors(supertype);
     }
     if (supertype is ClassBuilder) {

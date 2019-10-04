@@ -259,12 +259,6 @@ abstract class TypeConstraintGatherer {
     // identical().  If P and Q are equal but not identical, recursing through
     // the types will give the proper result.
     if (identical(subtype, supertype)) return true;
-    // Any type `P` is a subtype match for `dynamic`, `Object`, or `void` under
-    // no constraints.
-    if (_isTop(supertype)) return true;
-    // `Null` is a subtype match for any type `Q` under no constraints.
-    // Note that nullable types will change this.
-    if (_isNull(subtype)) return true;
 
     // Handle FutureOr<T> union type.
     if (subtype is InterfaceType &&
@@ -302,10 +296,26 @@ abstract class TypeConstraintGatherer {
       //   - And `P` is a subtype match for `Q` with respect to `L` under
       //     constraints `C`
       DartType supertypeArg = supertype.typeArguments[0];
-      InterfaceType supertypeFuture = futureType(supertypeArg);
-      return trySubtypeMatch(subtype, supertypeFuture) ||
-          _isSubtypeMatch(subtype, supertypeArg);
+      DartType supertypeFuture = futureType(supertypeArg);
+
+      // The match against FutureOr<X> succeeds if the match against either
+      // Future<X> or X succeeds.  If they both succeed, the one adding new
+      // constraints should be preferred.  If both matches against Future<X> and
+      // X add new constraints, the former should be preferred over the latter.
+      int oldProtoConstraintsLength = _protoConstraints.length;
+      bool matchesFuture = trySubtypeMatch(subtype, supertypeFuture);
+      bool matchesArg = oldProtoConstraintsLength != _protoConstraints.length
+          ? false
+          : _isSubtypeMatch(subtype, supertypeArg);
+      return matchesFuture || matchesArg;
     }
+
+    // Any type `P` is a subtype match for `dynamic`, `Object`, or `void` under
+    // no constraints.
+    if (_isTop(supertype)) return true;
+    // `Null` is a subtype match for any type `Q` under no constraints.
+    // Note that nullable types will change this.
+    if (_isNull(subtype)) return true;
 
     // A type variable `T` not in `L` with bound `P` is a subtype match for the
     // same type variable `T` with bound `Q` with respect to `L` under

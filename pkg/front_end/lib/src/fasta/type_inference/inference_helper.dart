@@ -35,6 +35,4 @@ abstract class InferenceHelper {
 
   String constructorNameForDiagnostics(String name,
       {String className, bool isSuper});
-
-  Expression desugarSyntheticExpression(Expression node);
 }

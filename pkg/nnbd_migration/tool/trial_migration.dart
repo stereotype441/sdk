@@ -78,6 +78,11 @@ main() async {
 /// if its category contains the string.
 const String categoryOfInterest = null;
 
+/// Set this to `true` to cause just the exception nodes to be printed when
+/// `categoryOfInterest` is non-null.  Set this to `false` to cause the full
+/// stack trace to be printed.
+const bool printExceptionNodeOnly = false;
+
 class _Listener implements NullabilityMigrationListener {
   final groupedExceptions = <String, List<String>>{};
 
@@ -102,7 +107,7 @@ class _Listener implements NullabilityMigrationListener {
     } else if (edit.replacement == "import 'package:meta/meta.dart';\n" &&
         edit.length == 0) {
       ++numMetaImportsAdded;
-    } else if (edit.replacement == '@required ' && edit.length == 0) {
+    } else if (edit.replacement == 'required ' && edit.length == 0) {
       ++numRequiredAnnotationsAdded;
     } else if ((edit.replacement == '/* ' ||
             edit.replacement == ' /*' ||
@@ -131,7 +136,11 @@ Exception $exception
 $stackTrace
 ''';
     if (categoryOfInterest != null && category.contains(categoryOfInterest)) {
-      print(detail);
+      if (printExceptionNodeOnly) {
+        print('$node');
+      } else {
+        print(detail);
+      }
     }
     (groupedExceptions[category] ??= []).add(detail);
     ++numExceptions;

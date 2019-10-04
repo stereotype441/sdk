@@ -177,7 +177,7 @@ static RawInstance* CreateParameterMirrorList(const Function& func,
     args.SetAt(6, is_final);
     args.SetAt(7, default_value);
     args.SetAt(8, metadata);
-    param = CreateMirror(Symbols::_LocalParameterMirror(), args);
+    param = CreateMirror(Symbols::_ParameterMirror(), args);
     results.SetAt(i, param);
   }
   results.MakeImmutable();
@@ -190,7 +190,7 @@ static RawInstance* CreateTypeVariableMirror(const TypeParameter& param,
   args.SetAt(0, param);
   args.SetAt(1, String::Handle(param.name()));
   args.SetAt(2, owner_mirror);
-  return CreateMirror(Symbols::_LocalTypeVariableMirror(), args);
+  return CreateMirror(Symbols::_TypeVariableMirror(), args);
 }
 
 // We create a list in native code and let Dart code create the type mirror
@@ -225,7 +225,7 @@ static RawInstance* CreateTypedefMirror(const Class& cls,
   args.SetAt(3, Bool::Get(cls.IsGeneric()));
   args.SetAt(4, cls.IsGeneric() ? is_declaration : Bool::False());
   args.SetAt(5, owner_mirror);
-  return CreateMirror(Symbols::_LocalTypedefMirror(), args);
+  return CreateMirror(Symbols::_TypedefMirror(), args);
 }
 
 static RawInstance* CreateFunctionTypeMirror(const AbstractType& type) {
@@ -236,7 +236,7 @@ static RawInstance* CreateFunctionTypeMirror(const AbstractType& type) {
   args.SetAt(0, MirrorReference::Handle(MirrorReference::New(cls)));
   args.SetAt(1, MirrorReference::Handle(MirrorReference::New(func)));
   args.SetAt(2, type);
-  return CreateMirror(Symbols::_LocalFunctionTypeMirror(), args);
+  return CreateMirror(Symbols::_FunctionTypeMirror(), args);
 }
 
 static RawInstance* CreateMethodMirror(const Function& func,
@@ -253,23 +253,30 @@ static RawInstance* CreateMethodMirror(const Function& func,
   args.SetAt(4, Bool::Get(func.is_static()));
 
   intptr_t kind_flags = 0;
-  kind_flags |= (func.is_abstract() << Mirrors::kAbstract);
-  kind_flags |= (func.IsGetterFunction() << Mirrors::kGetter);
-  kind_flags |= (func.IsSetterFunction() << Mirrors::kSetter);
+  kind_flags |=
+      (static_cast<intptr_t>(func.is_abstract()) << Mirrors::kAbstract);
+  kind_flags |=
+      (static_cast<intptr_t>(func.IsGetterFunction()) << Mirrors::kGetter);
+  kind_flags |=
+      (static_cast<intptr_t>(func.IsSetterFunction()) << Mirrors::kSetter);
   bool is_ctor = (func.kind() == RawFunction::kConstructor);
-  kind_flags |= (is_ctor << Mirrors::kConstructor);
-  kind_flags |= ((is_ctor && func.is_const()) << Mirrors::kConstCtor);
+  kind_flags |= (static_cast<intptr_t>(is_ctor) << Mirrors::kConstructor);
+  kind_flags |= (static_cast<intptr_t>(is_ctor && func.is_const())
+                 << Mirrors::kConstCtor);
   kind_flags |=
-      ((is_ctor && func.IsGenerativeConstructor()) << Mirrors::kGenerativeCtor);
+      (static_cast<intptr_t>(is_ctor && func.IsGenerativeConstructor())
+       << Mirrors::kGenerativeCtor);
+  kind_flags |= (static_cast<intptr_t>(is_ctor && func.is_redirecting())
+                 << Mirrors::kRedirectingCtor);
+  kind_flags |= (static_cast<intptr_t>(is_ctor && func.IsFactory())
+                 << Mirrors::kFactoryCtor);
   kind_flags |=
-      ((is_ctor && func.is_redirecting()) << Mirrors::kRedirectingCtor);
-  kind_flags |= ((is_ctor && func.IsFactory()) << Mirrors::kFactoryCtor);
-  kind_flags |= (func.is_external() << Mirrors::kExternal);
+      (static_cast<intptr_t>(func.is_external()) << Mirrors::kExternal);
   bool is_synthetic = func.is_no_such_method_forwarder();
-  kind_flags |= (is_synthetic << Mirrors::kSynthetic);
+  kind_flags |= (static_cast<intptr_t>(is_synthetic) << Mirrors::kSynthetic);
   args.SetAt(5, Smi::Handle(Smi::New(kind_flags)));
 
-  return CreateMirror(Symbols::_LocalMethodMirror(), args);
+  return CreateMirror(Symbols::_MethodMirror(), args);
 }
 
 static RawInstance* CreateVariableMirror(const Field& field,
@@ -288,7 +295,7 @@ static RawInstance* CreateVariableMirror(const Field& field,
   args.SetAt(5, Bool::Get(field.is_final()));
   args.SetAt(6, Bool::Get(field.is_const()));
 
-  return CreateMirror(Symbols::_LocalVariableMirror(), args);
+  return CreateMirror(Symbols::_VariableMirror(), args);
 }
 
 static RawInstance* CreateClassMirror(const Class& cls,
@@ -319,7 +326,7 @@ static RawInstance* CreateClassMirror(const Class& cls,
   args.SetAt(6, Bool::Get(cls.is_transformed_mixin_application()));
   args.SetAt(7, cls.NumTypeParameters() == 0 ? Bool::False() : is_declaration);
   args.SetAt(8, Bool::Get(cls.is_enum_class()));
-  return CreateMirror(Symbols::_LocalClassMirror(), args);
+  return CreateMirror(Symbols::_ClassMirror(), args);
 }
 
 static bool IsCensoredLibrary(const String& url) {
@@ -353,7 +360,7 @@ static RawInstance* CreateLibraryMirror(Thread* thread, const Library& lib) {
     return Instance::null();
   }
   args.SetAt(2, str);
-  return CreateMirror(Symbols::_LocalLibraryMirror(), args);
+  return CreateMirror(Symbols::_LibraryMirror(), args);
 }
 
 static RawInstance* CreateCombinatorMirror(const Object& identifiers,
@@ -361,7 +368,7 @@ static RawInstance* CreateCombinatorMirror(const Object& identifiers,
   const Array& args = Array::Handle(Array::New(2));
   args.SetAt(0, identifiers);
   args.SetAt(1, Bool::Get(is_show));
-  return CreateMirror(Symbols::_LocalCombinatorMirror(), args);
+  return CreateMirror(Symbols::_CombinatorMirror(), args);
 }
 
 static RawInstance* CreateLibraryDependencyMirror(Thread* thread,
@@ -412,7 +419,7 @@ static RawInstance* CreateLibraryDependencyMirror(Thread* thread,
   args.SetAt(4, Bool::Get(is_import));
   args.SetAt(5, Bool::Get(is_deferred));
   args.SetAt(6, metadata);
-  return CreateMirror(Symbols::_LocalLibraryDependencyMirror(), args);
+  return CreateMirror(Symbols::_LibraryDependencyMirror(), args);
 }
 
 static RawInstance* CreateLibraryDependencyMirror(Thread* thread,
@@ -637,7 +644,7 @@ static RawInstance* CreateIsolateMirror() {
   const Array& args = Array::Handle(Array::New(2));
   args.SetAt(0, debug_name);
   args.SetAt(1, root_library_mirror);
-  return CreateMirror(Symbols::_LocalIsolateMirror(), args);
+  return CreateMirror(Symbols::_IsolateMirror(), args);
 }
 
 static void VerifyMethodKindShifts() {
@@ -646,7 +653,7 @@ static void VerifyMethodKindShifts() {
   Zone* zone = thread->zone();
   const Library& lib = Library::Handle(zone, Library::MirrorsLibrary());
   const Class& cls = Class::Handle(
-      zone, lib.LookupClassAllowPrivate(Symbols::_LocalMethodMirror()));
+      zone, lib.LookupClassAllowPrivate(Symbols::_MethodMirror()));
   Error& error = Error::Handle(zone);
   error ^= cls.EnsureIsFinalized(thread);
   ASSERT(error.IsNull());

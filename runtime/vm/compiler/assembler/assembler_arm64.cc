@@ -1116,12 +1116,12 @@ void Assembler::LoadClassId(Register result, Register object) {
 
 void Assembler::LoadClassById(Register result, Register class_id) {
   ASSERT(result != class_id);
+
+  const intptr_t table_offset = target::Isolate::class_table_offset() +
+                                target::ClassTable::table_offset();
+
   LoadIsolate(result);
-  const intptr_t offset = target::Isolate::class_table_offset() +
-                          target::ClassTable::table_offset();
-  LoadFromOffset(result, result, offset);
-  ASSERT(target::ClassTable::kSizeOfClassPairLog2 == 4);
-  add(class_id, class_id, Operand(class_id));
+  LoadFromOffset(result, result, table_offset);
   ldr(result, Address(result, class_id, UXTX, Address::Scaled));
 }
 
@@ -1307,21 +1307,29 @@ void Assembler::LeaveDartFrame(RestorePP restore_pp) {
 }
 
 void Assembler::EnterSafepoint(Register state) {
+  // We generate the same number of instructions whether or not the slow-path is
+  // forced. This simplifies GenerateJitCallbackTrampolines.
+
   Register addr = TMP2;
   ASSERT(addr != state);
 
   Label slow_path, done, retry;
-  if (!FLAG_use_slow_path) {
-    movz(addr, Immediate(target::Thread::safepoint_state_offset()), 0);
-    add(addr, THR, Operand(addr));
-    Bind(&retry);
-    ldxr(state, addr);
-    cmp(state, Operand(target::Thread::safepoint_state_unacquired()));
-    b(&slow_path, NE);
+  if (FLAG_use_slow_path) {
+    b(&slow_path);
+  }
 
-    movz(state, Immediate(target::Thread::safepoint_state_acquired()), 0);
-    stxr(TMP, state, addr);
-    cbz(&done, TMP);  // 0 means stxr was successful.
+  movz(addr, Immediate(target::Thread::safepoint_state_offset()), 0);
+  add(addr, THR, Operand(addr));
+  Bind(&retry);
+  ldxr(state, addr);
+  cmp(state, Operand(target::Thread::safepoint_state_unacquired()));
+  b(&slow_path, NE);
+
+  movz(state, Immediate(target::Thread::safepoint_state_acquired()), 0);
+  stxr(TMP, state, addr);
+  cbz(&done, TMP);  // 0 means stxr was successful.
+
+  if (!FLAG_use_slow_path) {
     b(&retry);
   }
 
@@ -1352,21 +1360,28 @@ void Assembler::TransitionGeneratedToNative(Register destination,
 }
 
 void Assembler::ExitSafepoint(Register state) {
+  // We generate the same number of instructions whether or not the slow-path is
+  // forced, for consistency with EnterSafepoint.
   Register addr = TMP2;
   ASSERT(addr != state);
 
   Label slow_path, done, retry;
-  if (!FLAG_use_slow_path) {
-    movz(addr, Immediate(target::Thread::safepoint_state_offset()), 0);
-    add(addr, THR, Operand(addr));
-    Bind(&retry);
-    ldxr(state, addr);
-    cmp(state, Operand(target::Thread::safepoint_state_acquired()));
-    b(&slow_path, NE);
+  if (FLAG_use_slow_path) {
+    b(&slow_path);
+  }
 
-    movz(state, Immediate(target::Thread::safepoint_state_unacquired()), 0);
-    stxr(TMP, state, addr);
-    cbz(&done, TMP);  // 0 means stxr was successful.
+  movz(addr, Immediate(target::Thread::safepoint_state_offset()), 0);
+  add(addr, THR, Operand(addr));
+  Bind(&retry);
+  ldxr(state, addr);
+  cmp(state, Operand(target::Thread::safepoint_state_acquired()));
+  b(&slow_path, NE);
+
+  movz(state, Immediate(target::Thread::safepoint_state_unacquired()), 0);
+  stxr(TMP, state, addr);
+  cbz(&done, TMP);  // 0 means stxr was successful.
+
+  if (!FLAG_use_slow_path) {
     b(&retry);
   }
 
@@ -1553,10 +1568,16 @@ void Assembler::MaybeTraceAllocation(intptr_t cid,
                                      Register temp_reg,
                                      Label* trace) {
   ASSERT(cid > 0);
-  intptr_t state_offset = target::ClassTable::StateOffsetFor(cid);
+
+  const intptr_t shared_table_offset =
+      target::Isolate::class_table_offset() +
+      target::ClassTable::shared_class_table_offset();
+  const intptr_t table_offset =
+      target::SharedClassTable::class_heap_stats_table_offset();
+  const intptr_t state_offset = target::ClassTable::StateOffsetFor(cid);
+
   LoadIsolate(temp_reg);
-  intptr_t table_offset = target::Isolate::class_table_offset() +
-                          target::ClassTable::class_heap_stats_table_offset();
+  ldr(temp_reg, Address(temp_reg, shared_table_offset));
   ldr(temp_reg, Address(temp_reg, table_offset));
   AddImmediate(temp_reg, state_offset);
   ldr(temp_reg, Address(temp_reg, 0));
@@ -1566,10 +1587,17 @@ void Assembler::MaybeTraceAllocation(intptr_t cid,
 
 void Assembler::UpdateAllocationStats(intptr_t cid) {
   ASSERT(cid > 0);
-  intptr_t counter_offset = target::ClassTable::NewSpaceCounterOffsetFor(cid);
+
+  const intptr_t shared_table_offset =
+      target::Isolate::class_table_offset() +
+      target::ClassTable::shared_class_table_offset();
+  const intptr_t table_offset =
+      target::SharedClassTable::class_heap_stats_table_offset();
+  const intptr_t counter_offset =
+      target::ClassTable::NewSpaceCounterOffsetFor(cid);
+
   LoadIsolate(TMP2);
-  intptr_t table_offset = target::Isolate::class_table_offset() +
-                          target::ClassTable::class_heap_stats_table_offset();
+  ldr(TMP2, Address(TMP2, shared_table_offset));
   ldr(TMP, Address(TMP2, table_offset));
   AddImmediate(TMP2, TMP, counter_offset);
   ldr(TMP, Address(TMP2, 0));
@@ -1579,14 +1607,21 @@ void Assembler::UpdateAllocationStats(intptr_t cid) {
 
 void Assembler::UpdateAllocationStatsWithSize(intptr_t cid, Register size_reg) {
   ASSERT(cid > 0);
+
+  const intptr_t shared_table_offset =
+      target::Isolate::class_table_offset() +
+      target::ClassTable::shared_class_table_offset();
+  const intptr_t table_offset =
+      target::SharedClassTable::class_heap_stats_table_offset();
+
   const uword class_offset = target::ClassTable::ClassOffsetFor(cid);
   const uword count_field_offset =
       target::ClassHeapStats::allocated_since_gc_new_space_offset();
   const uword size_field_offset =
       target::ClassHeapStats::allocated_size_since_gc_new_space_offset();
+
   LoadIsolate(TMP2);
-  intptr_t table_offset = target::Isolate::class_table_offset() +
-                          target::ClassTable::class_heap_stats_table_offset();
+  ldr(TMP2, Address(TMP2, shared_table_offset));
   ldr(TMP, Address(TMP2, table_offset));
   AddImmediate(TMP2, TMP, class_offset);
   ldr(TMP, Address(TMP2, count_field_offset));

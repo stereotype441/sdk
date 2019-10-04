@@ -87,7 +87,12 @@ class Value : public ZoneAllocated {
         reaching_type_(NULL) {}
 
   Definition* definition() const { return definition_; }
-  void set_definition(Definition* definition) { definition_ = definition; }
+  void set_definition(Definition* definition) {
+    definition_ = definition;
+    // Clone the reaching type if there was one and the owner no longer matches
+    // this value's definition.
+    SetReachingType(reaching_type_);
+  }
 
   Value* previous_use() const { return previous_use_; }
   void set_previous_use(Value* previous) { previous_use_ = previous; }
@@ -156,6 +161,7 @@ class Value : public ZoneAllocated {
 
  private:
   friend class FlowGraphPrinter;
+  friend class FlowGraphDeserializer;  // For setting reaching_type_ directly.
 
   Definition* definition_;
   Value* previous_use_;
@@ -1378,6 +1384,10 @@ class BlockEntryInstr : public Instruction {
   intptr_t offset() const { return offset_; }
   void set_offset(intptr_t offset) { offset_ = offset; }
 
+  // Stack-based IR bookkeeping.
+  intptr_t stack_depth() const { return stack_depth_; }
+  void set_stack_depth(intptr_t s) { stack_depth_ = s; }
+
   // For all instruction in this block: Remove all inputs (including in the
   // environment) from their definition's use lists for all instructions.
   void ClearAllInstructions();
@@ -1389,12 +1399,16 @@ class BlockEntryInstr : public Instruction {
   ADD_EXTRA_INFO_TO_S_EXPRESSION_SUPPORT
 
  protected:
-  BlockEntryInstr(intptr_t block_id, intptr_t try_index, intptr_t deopt_id)
+  BlockEntryInstr(intptr_t block_id,
+                  intptr_t try_index,
+                  intptr_t deopt_id,
+                  intptr_t stack_depth)
       : Instruction(deopt_id),
         block_id_(block_id),
         try_index_(try_index),
         preorder_number_(-1),
         postorder_number_(-1),
+        stack_depth_(stack_depth),
         dominator_(nullptr),
         dominated_blocks_(1),
         last_instruction_(NULL),
@@ -1409,6 +1423,8 @@ class BlockEntryInstr : public Instruction {
                              BitVector* block_marks);
 
  private:
+  friend class FlowGraphDeserializer;  // Access to AddPredecessor().
+
   virtual void RawSetInputAt(intptr_t i, Value* value) { UNREACHABLE(); }
 
   virtual void ClearPredecessors() = 0;
@@ -1420,6 +1436,8 @@ class BlockEntryInstr : public Instruction {
   intptr_t try_index_;
   intptr_t preorder_number_;
   intptr_t postorder_number_;
+  // Expected stack depth on entry (for stack-based IR only).
+  intptr_t stack_depth_;
   // Starting and ending lifetime positions for this block.  Used by
   // the linear scan register allocator.
   intptr_t start_pos_;
@@ -1504,8 +1522,9 @@ class BlockEntryWithInitialDefs : public BlockEntryInstr {
  public:
   BlockEntryWithInitialDefs(intptr_t block_id,
                             intptr_t try_index,
-                            intptr_t deopt_id)
-      : BlockEntryInstr(block_id, try_index, deopt_id) {}
+                            intptr_t deopt_id,
+                            intptr_t stack_depth)
+      : BlockEntryInstr(block_id, try_index, deopt_id, stack_depth) {}
 
   GrowableArray<Definition*>* initial_definitions() {
     return &initial_definitions_;
@@ -1622,8 +1641,11 @@ class GraphEntryInstr : public BlockEntryWithInitialDefs {
 
 class JoinEntryInstr : public BlockEntryInstr {
  public:
-  JoinEntryInstr(intptr_t block_id, intptr_t try_index, intptr_t deopt_id)
-      : BlockEntryInstr(block_id, try_index, deopt_id),
+  JoinEntryInstr(intptr_t block_id,
+                 intptr_t try_index,
+                 intptr_t deopt_id,
+                 intptr_t stack_depth = 0)
+      : BlockEntryInstr(block_id, try_index, deopt_id, stack_depth),
         predecessors_(2),  // Two is the assumed to be the common case.
         phis_(NULL) {}
 
@@ -1690,8 +1712,11 @@ class PhiIterator : public ValueObject {
 
 class TargetEntryInstr : public BlockEntryInstr {
  public:
-  TargetEntryInstr(intptr_t block_id, intptr_t try_index, intptr_t deopt_id)
-      : BlockEntryInstr(block_id, try_index, deopt_id),
+  TargetEntryInstr(intptr_t block_id,
+                   intptr_t try_index,
+                   intptr_t deopt_id,
+                   intptr_t stack_depth = 0)
+      : BlockEntryInstr(block_id, try_index, deopt_id, stack_depth),
         predecessor_(NULL),
         edge_weight_(0.0) {}
 
@@ -1741,7 +1766,10 @@ class FunctionEntryInstr : public BlockEntryWithInitialDefs {
                      intptr_t block_id,
                      intptr_t try_index,
                      intptr_t deopt_id)
-      : BlockEntryWithInitialDefs(block_id, try_index, deopt_id),
+      : BlockEntryWithInitialDefs(block_id,
+                                  try_index,
+                                  deopt_id,
+                                  /*stack_depth=*/0),
         graph_entry_(graph_entry) {}
 
   DECLARE_INSTRUCTION(FunctionEntry)
@@ -1807,8 +1835,7 @@ class OsrEntryInstr : public BlockEntryWithInitialDefs {
                 intptr_t try_index,
                 intptr_t deopt_id,
                 intptr_t stack_depth)
-      : BlockEntryWithInitialDefs(block_id, try_index, deopt_id),
-        stack_depth_(stack_depth),
+      : BlockEntryWithInitialDefs(block_id, try_index, deopt_id, stack_depth),
         graph_entry_(graph_entry) {}
 
   DECLARE_INSTRUCTION(OsrEntry)
@@ -1821,7 +1848,6 @@ class OsrEntryInstr : public BlockEntryWithInitialDefs {
     return graph_entry_;
   }
 
-  intptr_t stack_depth() const { return stack_depth_; }
   GraphEntryInstr* graph_entry() const { return graph_entry_; }
 
   PRINT_TO_SUPPORT
@@ -1833,7 +1859,6 @@ class OsrEntryInstr : public BlockEntryWithInitialDefs {
     graph_entry_ = predecessor->AsGraphEntry();
   }
 
-  const intptr_t stack_depth_;
   GraphEntryInstr* graph_entry_;
 
   DISALLOW_COPY_AND_ASSIGN(OsrEntryInstr);
@@ -1860,8 +1885,7 @@ class IndirectEntryInstr : public JoinEntryInstr {
 
 class CatchBlockEntryInstr : public BlockEntryWithInitialDefs {
  public:
-  CatchBlockEntryInstr(TokenPosition handler_token_pos,
-                       bool is_generated,
+  CatchBlockEntryInstr(bool is_generated,
                        intptr_t block_id,
                        intptr_t try_index,
                        GraphEntryInstr* graph_entry,
@@ -1873,7 +1897,10 @@ class CatchBlockEntryInstr : public BlockEntryWithInitialDefs {
                        const LocalVariable* stacktrace_var,
                        const LocalVariable* raw_exception_var,
                        const LocalVariable* raw_stacktrace_var)
-      : BlockEntryWithInitialDefs(block_id, try_index, deopt_id),
+      : BlockEntryWithInitialDefs(block_id,
+                                  try_index,
+                                  deopt_id,
+                                  /*stack_depth=*/0),
         graph_entry_(graph_entry),
         predecessor_(NULL),
         catch_handler_types_(Array::ZoneHandle(handler_types.raw())),
@@ -1883,7 +1910,6 @@ class CatchBlockEntryInstr : public BlockEntryWithInitialDefs {
         raw_exception_var_(raw_exception_var),
         raw_stacktrace_var_(raw_stacktrace_var),
         needs_stacktrace_(needs_stacktrace),
-        handler_token_pos_(handler_token_pos),
         is_generated_(is_generated) {}
 
   DECLARE_INSTRUCTION(CatchBlockEntry)
@@ -1909,7 +1935,6 @@ class CatchBlockEntryInstr : public BlockEntryWithInitialDefs {
   bool needs_stacktrace() const { return needs_stacktrace_; }
 
   bool is_generated() const { return is_generated_; }
-  TokenPosition handler_token_pos() const { return handler_token_pos_; }
 
   // Returns try index for the try block to which this catch handler
   // corresponds.
@@ -1936,7 +1961,6 @@ class CatchBlockEntryInstr : public BlockEntryWithInitialDefs {
   const LocalVariable* raw_exception_var_;
   const LocalVariable* raw_stacktrace_var_;
   const bool needs_stacktrace_;
-  TokenPosition handler_token_pos_;
   bool is_generated_;
 
   DISALLOW_COPY_AND_ASSIGN(CatchBlockEntryInstr);
@@ -3267,7 +3291,18 @@ class AssertSubtypeInstr : public TemplateInstruction<2, Throws, Pure> {
 
 class AssertAssignableInstr : public TemplateDefinition<3, Throws, Pure> {
  public:
-  enum Kind { kParameterCheck, kInsertedByFrontend, kFromSource, kUnknown };
+#define FOR_EACH_ASSERT_ASSIGNABLE_KIND(V)                                     \
+  V(ParameterCheck)                                                            \
+  V(InsertedByFrontend)                                                        \
+  V(FromSource)                                                                \
+  V(Unknown)
+
+#define KIND_DEFN(name) k##name,
+  enum Kind { FOR_EACH_ASSERT_ASSIGNABLE_KIND(KIND_DEFN) };
+#undef KIND_DEFN
+
+  static const char* KindToCString(Kind kind);
+  static bool ParseKind(const char* str, Kind* out);
 
   AssertAssignableInstr(TokenPosition token_pos,
                         Value* value,
@@ -3324,6 +3359,7 @@ class AssertAssignableInstr : public TemplateDefinition<3, Throws, Pure> {
   virtual Value* RedefinedValue() const;
 
   PRINT_OPERANDS_TO_SUPPORT
+  ADD_EXTRA_INFO_TO_S_EXPRESSION_SUPPORT
 
  private:
   const TokenPosition token_pos_;
@@ -3383,7 +3419,7 @@ class SpecialParameterInstr : public TemplateDefinition<0, NoThrow> {
 #undef KIND_INC
 
   static const char* KindToCString(SpecialParameterKind k);
-  static bool KindFromCString(const char* str, SpecialParameterKind* out);
+  static bool ParseKind(const char* str, SpecialParameterKind* out);
 
   SpecialParameterInstr(SpecialParameterKind kind,
                         intptr_t deopt_id,
@@ -3664,6 +3700,7 @@ class InstanceCallInstr : public TemplateDartCall<0> {
 
   PRINT_OPERANDS_TO_SUPPORT
   ADD_OPERANDS_TO_S_EXPRESSION_SUPPORT
+  ADD_EXTRA_INFO_TO_S_EXPRESSION_SUPPORT
 
   bool MatchesCoreName(const String& name);
 
@@ -3812,6 +3849,7 @@ class StrictCompareInstr : public TemplateComparison<2, NoThrow, Pure> {
   bool AttributesEqual(Instruction* other) const;
 
   PRINT_OPERANDS_TO_SUPPORT
+  ADD_EXTRA_INFO_TO_S_EXPRESSION_SUPPORT;
 
  private:
   // True if the comparison must check for double or Mint and
@@ -4435,6 +4473,7 @@ class NativeCallInstr : public TemplateDartCall<0> {
 
   PRINT_OPERANDS_TO_SUPPORT
   ADD_OPERANDS_TO_S_EXPRESSION_SUPPORT
+  ADD_EXTRA_INFO_TO_S_EXPRESSION_SUPPORT
 
  private:
   void set_native_c_function(NativeFunction value) {
@@ -4543,6 +4582,8 @@ class DebugStepCheckInstr : public TemplateInstruction<0, NoThrow> {
   virtual bool ComputeCanDeoptimize() const { return false; }
   virtual bool HasUnknownSideEffects() const { return true; }
   virtual Instruction* Canonicalize(FlowGraph* flow_graph);
+
+  ADD_EXTRA_INFO_TO_S_EXPRESSION_SUPPORT
 
  private:
   const TokenPosition token_pos_;
@@ -4660,6 +4701,7 @@ class StoreInstanceFieldInstr : public TemplateInstruction<2, NoThrow> {
 
   PRINT_OPERANDS_TO_SUPPORT
   ADD_OPERANDS_TO_S_EXPRESSION_SUPPORT
+  ADD_EXTRA_INFO_TO_S_EXPRESSION_SUPPORT
 
  private:
   friend class JitCallSpecializer;  // For ASSERT(initialization_).
@@ -5505,6 +5547,8 @@ class LoadUntaggedInstr : public TemplateDefinition<1, NoThrow> {
   virtual bool AttributesEqual(Instruction* other) const {
     return other->AsLoadUntagged()->offset_ == offset_;
   }
+
+  PRINT_OPERANDS_TO_SUPPORT
 
  private:
   intptr_t offset_;
@@ -7752,6 +7796,8 @@ class CheckNullInstr : public TemplateDefinition<1, Throws, Pure> {
                                         FlowGraphCompiler* compiler);
 
   virtual Value* RedefinedValue() const;
+
+  ADD_EXTRA_INFO_TO_S_EXPRESSION_SUPPORT
 
  private:
   const TokenPosition token_pos_;

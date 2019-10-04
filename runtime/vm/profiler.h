@@ -95,6 +95,13 @@ class Profiler : public AllStatic {
  private:
   static void DumpStackTrace(uword sp, uword fp, uword pc, bool for_crash);
 
+  // Calculates the sample buffer capacity. Returns
+  // SampleBuffer::kDefaultBufferCapacity if --sample-buffer-duration is not
+  // provided. Otherwise, the capacity is based on the sample rate, maximum
+  // sample stack depth, and the number of seconds of samples the sample buffer
+  // should be able to accomodate.
+  static intptr_t CalculateSampleBufferCapacity();
+
   // Does not walk the thread's stack.
   static void SampleThreadSingleFrame(Thread* thread, uintptr_t pc);
   static bool initialized_;
@@ -477,24 +484,56 @@ class AbstractCode {
   const char* Name() const {
     if (code_.IsCode()) {
       return Code::Cast(code_).Name();
-    } else {
+    } else if (code_.IsBytecode()) {
       return Bytecode::Cast(code_).Name();
+    } else {
+      return "";
     }
   }
 
   const char* QualifiedName() const {
     if (code_.IsCode()) {
       return Code::Cast(code_).QualifiedName();
-    } else {
+    } else if (code_.IsBytecode()) {
       return Bytecode::Cast(code_).QualifiedName();
+    } else {
+      return "";
+    }
+  }
+
+  bool IsStubCode() const {
+    if (code_.IsCode()) {
+      return Code::Cast(code_).IsStubCode();
+    } else if (code_.IsBytecode()) {
+      return (Bytecode::Cast(code_).function() == Function::null());
+    } else {
+      return false;
+    }
+  }
+
+  bool IsAllocationStubCode() const {
+    if (code_.IsCode()) {
+      return Code::Cast(code_).IsAllocationStubCode();
+    } else {
+      return false;
+    }
+  }
+
+  bool IsTypeTestStubCode() const {
+    if (code_.IsCode()) {
+      return Code::Cast(code_).IsTypeTestStubCode();
+    } else {
+      return false;
     }
   }
 
   RawObject* owner() const {
     if (code_.IsCode()) {
       return Code::Cast(code_).owner();
-    } else {
+    } else if (code_.IsBytecode()) {
       return Bytecode::Cast(code_).function();
+    } else {
+      return Object::null();
     }
   }
 

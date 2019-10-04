@@ -1036,15 +1036,16 @@ void NativeEntryInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
   __ pushl(EDI);
 
   // Load the thread object.
-  // Linking in AOT is not relevant here since we don't support AOT for IA32.
+  //
   // Create another frame to align the frame before continuing in "native" code.
   // If we were called by a trampoline, it has already loaded the thread.
+  ASSERT(!FLAG_precompiled_mode);  // No relocation for AOT linking.
   if (!NativeCallbackTrampolines::Enabled()) {
     __ EnterFrame(0);
     __ ReserveAlignedFrameSpace(compiler::target::kWordSize);
 
     __ movl(compiler::Address(SPREG, 0), compiler::Immediate(callback_id_));
-    __ movl(EAX, compiler::Immediate(reinterpret_cast<int64_t>(
+    __ movl(EAX, compiler::Immediate(reinterpret_cast<intptr_t>(
                      DLRT_GetThreadForNativeCallback)));
     __ call(EAX);
     __ movl(THR, EAX);
@@ -2760,10 +2761,9 @@ LocationSummary* CatchBlockEntryInstr::MakeLocationSummary(Zone* zone,
 
 void CatchBlockEntryInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
   __ Bind(compiler->GetJumpLabel(this));
-  compiler->AddExceptionHandler(catch_try_index(), try_index(),
-                                compiler->assembler()->CodeSize(),
-                                handler_token_pos(), is_generated(),
-                                catch_handler_types_, needs_stacktrace());
+  compiler->AddExceptionHandler(
+      catch_try_index(), try_index(), compiler->assembler()->CodeSize(),
+      is_generated(), catch_handler_types_, needs_stacktrace());
   // On lazy deoptimization we patch the optimized code here to enter the
   // deoptimization stub.
   const intptr_t deopt_id = DeoptId::ToDeoptAfter(GetDeoptId());

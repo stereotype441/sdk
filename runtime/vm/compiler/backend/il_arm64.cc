@@ -1020,10 +1020,6 @@ void NativeEntryInstr::SaveArgument(FlowGraphCompiler* compiler,
 }
 
 void NativeEntryInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
-  if (FLAG_precompiled_mode) {
-    UNREACHABLE();
-  }
-
   // Constant pool cannot be used until we enter the actual Dart frame.
   __ set_constant_pool_allowed(false);
 
@@ -1052,8 +1048,33 @@ void NativeEntryInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
 
   // Load the thread object. If we were called by a trampoline, the thread is
   // already loaded.
-  //
-  // TODO(35765): Fix linking issue on AOT.
+  if (FLAG_precompiled_mode) {
+    compiler::Label skip_reloc;
+    __ b(&skip_reloc);
+    compiler->InsertBSSRelocation(
+        BSS::Relocation::DRT_GetThreadForNativeCallback);
+    __ Bind(&skip_reloc);
+
+    __ adr(R0, compiler::Immediate(-compiler::target::kWordSize));
+
+    // R0 holds the address of the relocation.
+    __ ldr(R1, compiler::Address(R0));
+
+    // R1 holds the relocation itself: R0 - bss_start.
+    // R0 = R0 + (bss_start - R0) = bss_start
+    __ add(R0, R0, compiler::Operand(R1));
+
+    // R0 holds the start of the BSS section.
+    // Load the "get-thread" routine: *bss_start.
+    __ ldr(R1, compiler::Address(R0));
+  } else if (!NativeCallbackTrampolines::Enabled()) {
+    // In JIT mode, we can just paste the address of the runtime entry into the
+    // generated code directly. This is not a problem since we don't save
+    // callbacks into JIT snapshots.
+    __ LoadImmediate(
+        R1, reinterpret_cast<int64_t>(DLRT_GetThreadForNativeCallback));
+  }
+
   if (!NativeCallbackTrampolines::Enabled()) {
     // Create another frame to align the frame before continuing in "native"
     // code.
@@ -1061,8 +1082,6 @@ void NativeEntryInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
     __ ReserveAlignedFrameSpace(0);
 
     __ LoadImmediate(R0, callback_id_);
-    __ LoadImmediate(
-        R1, reinterpret_cast<int64_t>(DLRT_GetThreadForNativeCallback));
     __ blr(R1);
     __ mov(THR, R0);
 
@@ -2842,10 +2861,9 @@ LocationSummary* CatchBlockEntryInstr::MakeLocationSummary(Zone* zone,
 
 void CatchBlockEntryInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
   __ Bind(compiler->GetJumpLabel(this));
-  compiler->AddExceptionHandler(catch_try_index(), try_index(),
-                                compiler->assembler()->CodeSize(),
-                                handler_token_pos(), is_generated(),
-                                catch_handler_types_, needs_stacktrace());
+  compiler->AddExceptionHandler(
+      catch_try_index(), try_index(), compiler->assembler()->CodeSize(),
+      is_generated(), catch_handler_types_, needs_stacktrace());
   // On lazy deoptimization we patch the optimized code here to enter the
   // deoptimization stub.
   const intptr_t deopt_id = DeoptId::ToDeoptAfter(GetDeoptId());
@@ -5399,6 +5417,55 @@ static void EmitInt64ModTruncDiv(FlowGraphCompiler* compiler,
                                  Register tmp,
                                  Register out) {
   ASSERT(op_kind == Token::kMOD || op_kind == Token::kTRUNCDIV);
+
+  // Special case 64-bit div/mod by compile-time constant. Note that various
+  // special constants (such as powers of two) should have been optimized
+  // earlier in the pipeline. Div or mod by zero falls into general code
+  // to implement the exception.
+  if (FLAG_optimization_level <= 2) {
+    // We only consider magic operations under O3.
+  } else if (auto c = instruction->right()->definition()->AsConstant()) {
+    if (c->value().IsInteger()) {
+      const int64_t divisor = Integer::Cast(c->value()).AsInt64Value();
+      if (divisor <= -2 || divisor >= 2) {
+        // For x DIV c or x MOD c: use magic operations.
+        compiler::Label pos;
+        int64_t magic = 0;
+        int64_t shift = 0;
+        Utils::CalculateMagicAndShiftForDivRem(divisor, &magic, &shift);
+        // Compute tmp = high(magic * numerator).
+        __ LoadImmediate(TMP2, magic);
+        __ smulh(TMP2, TMP2, left);
+        // Compute tmp +/-= numerator.
+        if (divisor > 0 && magic < 0) {
+          __ add(TMP2, TMP2, compiler::Operand(left));
+        } else if (divisor < 0 && magic > 0) {
+          __ sub(TMP2, TMP2, compiler::Operand(left));
+        }
+        // Shift if needed.
+        if (shift != 0) {
+          __ add(TMP2, ZR, compiler::Operand(TMP2, ASR, shift));
+        }
+        // Finalize DIV or MOD.
+        if (op_kind == Token::kTRUNCDIV) {
+          __ sub(out, TMP2, compiler::Operand(TMP2, ASR, 63));
+        } else {
+          __ sub(TMP2, TMP2, compiler::Operand(TMP2, ASR, 63));
+          __ LoadImmediate(TMP, divisor);
+          __ msub(out, TMP2, TMP, left);
+          // Compensate for Dart's Euclidean view of MOD.
+          __ CompareRegisters(out, ZR);
+          if (divisor > 0) {
+            __ add(TMP2, out, compiler::Operand(TMP));
+          } else {
+            __ sub(TMP2, out, compiler::Operand(TMP));
+          }
+          __ csel(out, TMP2, out, LT);
+        }
+        return;
+      }
+    }
+  }
 
   // Prepare a slow path.
   Range* right_range = instruction->right()->definition()->range();

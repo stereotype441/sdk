@@ -186,6 +186,8 @@ class FfiTransformer extends Transformer {
   final Constructor structFromPointer;
   final Procedure libraryLookupMethod;
   final Procedure abiMethod;
+  final Procedure pointerFromFunctionProcedure;
+  final Procedure nativeCallbackFunctionProcedure;
 
   /// Classes corresponding to [NativeType], indexed by [NativeType].
   final List<Class> nativeTypesClasses;
@@ -220,6 +222,10 @@ class FfiTransformer extends Transformer {
         libraryLookupMethod =
             index.getMember('dart:ffi', 'DynamicLibrary', 'lookup'),
         abiMethod = index.getTopLevelMember('dart:ffi', '_abi'),
+        pointerFromFunctionProcedure =
+            index.getTopLevelMember('dart:ffi', '_pointerFromFunction'),
+        nativeCallbackFunctionProcedure =
+            index.getTopLevelMember('dart:ffi', '_nativeCallbackFunction'),
         nativeTypesClasses = nativeTypeClassNames
             .map((name) => index.getClass('dart:ffi', name))
             .toList();
@@ -247,9 +253,9 @@ class FfiTransformer extends Transformer {
     if (nativeType is! InterfaceType) {
       return null;
     }
-    InterfaceType native = nativeType;
-    Class nativeClass = native.classNode;
-    NativeType nativeType_ = getType(nativeClass);
+    final InterfaceType native = nativeType;
+    final Class nativeClass = native.classNode;
+    final NativeType nativeType_ = getType(nativeClass);
 
     if (hierarchy.isSubclassOf(nativeClass, structClass)) {
       return allowStructs ? nativeType : null;
@@ -275,17 +281,17 @@ class FfiTransformer extends Transformer {
       return null;
     }
 
-    FunctionType fun = native.typeArguments[0];
+    final FunctionType fun = native.typeArguments[0];
     if (fun.namedParameters.isNotEmpty) return null;
     if (fun.positionalParameters.length != fun.requiredParameterCount) {
       return null;
     }
     if (fun.typeParameters.length != 0) return null;
     // TODO(36730): Structs cannot appear in native function signatures.
-    DartType returnType =
+    final DartType returnType =
         convertNativeTypeToDartType(fun.returnType, /*allowStructs=*/ false);
     if (returnType == null) return null;
-    List<DartType> argumentTypes = fun.positionalParameters
+    final List<DartType> argumentTypes = fun.positionalParameters
         .map((t) => convertNativeTypeToDartType(t, /*allowStructs=*/ false))
         .toList();
     if (argumentTypes.contains(null)) return null;
@@ -293,7 +299,7 @@ class FfiTransformer extends Transformer {
   }
 
   NativeType getType(Class c) {
-    int index = nativeTypesClasses.indexOf(c);
+    final int index = nativeTypesClasses.indexOf(c);
     if (index == -1) {
       return null;
     }

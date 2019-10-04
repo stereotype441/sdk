@@ -363,6 +363,11 @@ Rti evalInInstance(instance, String recipe) {
 @pragma('dart2js:noInline')
 Rti instantiatedGenericFunctionType(
     Rti genericFunctionRti, Rti instantiationRti) {
+  // If --lax-runtime-type-to-string is enabled and we never check the function
+  // type, then the function won't have a signature, so its RTI will be null. In
+  // this case, there is nothing to instantiate, so we return `null` and the
+  // instantiation appears to be an interface type instead.
+  if (genericFunctionRti == null) return null;
   var bounds = Rti._getGenericFunctionBounds(genericFunctionRti);
   var typeArguments = Rti._getInterfaceTypeArguments(instantiationRti);
   assert(_Utils.arrayLength(bounds) == _Utils.arrayLength(typeArguments));
@@ -1202,8 +1207,16 @@ class _Universe {
   static Object typeRules(universe) =>
       JS('', '#.#', universe, RtiUniverseFieldNames.typeRules);
 
-  static Object findRule(universe, String targetType) =>
+  static Object _findRule(universe, String targetType) =>
       JS('', '#.#', typeRules(universe), targetType);
+
+  static Object findRule(universe, String targetType) {
+    Object rule = _findRule(universe, targetType);
+    while (_Utils.isString(rule)) {
+      rule = _findRule(universe, _Utils.asString(rule));
+    }
+    return rule;
+  }
 
   static void addRules(universe, rules) {
     // TODO(fishythefish): Use `Object.assign()` when IE11 is deprecated.
@@ -2147,11 +2160,16 @@ bool _isSubtype(universe, Rti s, sEnv, Rti t, tEnv) {
     }
   }
 
+  // TODO(fishythefish): Disallow JavaScriptFunction as a subtype of function
+  // types using features inaccessible from JavaScript.
+
   if (isGenericFunctionKind(t)) {
+    if (isJsFunctionType(s)) return true;
     return _isGenericFunctionSubtype(universe, s, sEnv, t, tEnv);
   }
 
   if (isFunctionKind(t)) {
+    if (isJsFunctionType(s)) return true;
     return _isFunctionSubtype(universe, s, sEnv, t, tEnv);
   }
 
@@ -2397,6 +2415,11 @@ bool isNullType(Rti t) =>
 bool isFunctionType(Rti t) =>
     Rti._getKind(t) == Rti.kindInterface &&
     Rti._getInterfaceName(t) == JS_GET_NAME(JsGetName.FUNCTION_CLASS_TYPE_NAME);
+
+bool isJsFunctionType(Rti t) =>
+    Rti._getKind(t) == Rti.kindInterface &&
+    Rti._getInterfaceName(t) ==
+        JS_GET_NAME(JsGetName.JS_FUNCTION_CLASS_TYPE_NAME);
 
 /// Unchecked cast to Rti.
 Rti _castToRti(s) => JS('Rti', '#', s);

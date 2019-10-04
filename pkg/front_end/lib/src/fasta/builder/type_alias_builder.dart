@@ -10,6 +10,7 @@ import 'package:kernel/ast.dart'
         DynamicType,
         FunctionType,
         InvalidType,
+        Nullability,
         TypeParameter,
         Typedef,
         VariableDeclaration;
@@ -37,6 +38,7 @@ import 'builder.dart'
     show
         LibraryBuilder,
         MetadataBuilder,
+        NullabilityBuilder,
         TypeBuilder,
         TypeDeclarationBuilder,
         TypeVariableBuilder;
@@ -146,11 +148,11 @@ class TypeAliasBuilder extends TypeDeclarationBuilder {
   }
 
   /// [arguments] have already been built.
-  DartType buildTypesWithBuiltArguments(
-      LibraryBuilder library, List<DartType> arguments) {
+  DartType buildTypesWithBuiltArguments(LibraryBuilder library,
+      Nullability nullability, List<DartType> arguments) {
     DartType thisType = buildThisType(library);
     if (const DynamicType() == thisType) return thisType;
-    FunctionType result = thisType;
+    FunctionType result = thisType.withNullability(nullability);
     if (typedef.typeParameters.isEmpty && arguments == null) return result;
     Map<TypeParameter, DartType> substitution = <TypeParameter, DartType>{};
     for (int i = 0; i < typedef.typeParameters.length; i++) {
@@ -202,14 +204,18 @@ class TypeAliasBuilder extends TypeDeclarationBuilder {
   int get typeVariablesCount => typeVariables?.length ?? 0;
 
   @override
-  DartType buildType(LibraryBuilder library, List<TypeBuilder> arguments) {
+  DartType buildType(LibraryBuilder library,
+      NullabilityBuilder nullabilityBuilder, List<TypeBuilder> arguments) {
     DartType thisType = buildThisType(library);
     if (thisType is InvalidType) return thisType;
-    FunctionType result = thisType;
-    if (typedef.typeParameters.isEmpty && arguments == null) return result;
+    if (typedef.typeParameters.isEmpty && arguments == null) {
+      return thisType.withNullability(nullabilityBuilder.build(library));
+    }
     // Otherwise, substitute.
     return buildTypesWithBuiltArguments(
-        library, buildTypeArguments(library, arguments));
+        library,
+        nullabilityBuilder.build(library),
+        buildTypeArguments(library, arguments));
   }
 }
 

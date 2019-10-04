@@ -6,6 +6,7 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/src/dart/ast/ast.dart';
 import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/type.dart';
@@ -145,6 +146,9 @@ class ReferenceResolver extends ThrowingAstVisitor<void> {
     LinkingNodeContext(node, functionScope);
 
     node.parameters?.accept(this);
+    node.initializers.accept(
+      _SetGenericFunctionTypeIdVisitor(this),
+    );
 
     scope = outerScope;
     reference = outerReference;
@@ -153,6 +157,9 @@ class ReferenceResolver extends ThrowingAstVisitor<void> {
   @override
   void visitDefaultFormalParameter(DefaultFormalParameter node) {
     node.parameter.accept(this);
+    node.defaultValue?.accept(
+      _SetGenericFunctionTypeIdVisitor(this),
+    );
   }
 
   @override

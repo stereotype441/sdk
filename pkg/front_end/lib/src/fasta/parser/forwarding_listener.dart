@@ -76,8 +76,8 @@ class ForwardingListener implements Listener {
   }
 
   @override
-  void beginClassOrNamedMixinApplication(Token token) {
-    listener?.beginClassOrNamedMixinApplication(token);
+  void beginClassOrNamedMixinApplicationPrelude(Token token) {
+    listener?.beginClassOrNamedMixinApplicationPrelude(token);
   }
 
   @override
@@ -143,6 +143,11 @@ class ForwardingListener implements Listener {
   @override
   void beginExport(Token token) {
     listener?.beginExport(token);
+  }
+
+  @override
+  void beginExtensionDeclarationPrelude(Token extensionKeyword) {
+    listener?.beginExtensionDeclarationPrelude(extensionKeyword);
   }
 
   @override
@@ -988,8 +993,9 @@ class ForwardingListener implements Listener {
   }
 
   @override
-  void endTypeVariable(Token token, int index, Token extendsOrSuper) {
-    listener?.endTypeVariable(token, index, extendsOrSuper);
+  void endTypeVariable(
+      Token token, int index, Token extendsOrSuper, Token variance) {
+    listener?.endTypeVariable(token, index, extendsOrSuper, variance);
   }
 
   @override
@@ -1550,6 +1556,11 @@ class ForwardingListener implements Listener {
   }
 
   @override
+  void handleVarianceModifier(Token variance) {
+    listener?.handleVarianceModifier(variance);
+  }
+
+  @override
   void handleVoidKeyword(Token token) {
     listener?.handleVoidKeyword(token);
   }
@@ -1572,5 +1583,10 @@ class ForwardingListener implements Listener {
   @override
   void reportNonNullAssertExpressionNotEnabled(Token bang) {
     listener?.reportNonNullAssertExpressionNotEnabled(bang);
+  }
+
+  @override
+  void reportVarianceModifierNotEnabled(Token variance) {
+    listener?.reportVarianceModifierNotEnabled(variance);
   }
 }

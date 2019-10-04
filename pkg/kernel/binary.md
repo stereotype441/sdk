@@ -143,7 +143,7 @@ type CanonicalName {
 
 type ComponentFile {
   UInt32 magic = 0x90ABCDEF;
-  UInt32 formatVersion = 29;
+  UInt32 formatVersion = 34;
   List<String> problemsAsJson; // Described in problems.md.
   Library[] libraries;
   UriSource sourceMap;
@@ -228,7 +228,7 @@ type Name {
 }
 
 type Library {
-  Byte flags (isExternal, isSynthetic);
+  Byte flags (isExternal, isSynthetic, isNonNullableByDefault);
   UInt languageVersionMajor;
   UInt languageVersionMinor;
   CanonicalNameReference canonicalName;
@@ -242,6 +242,7 @@ type Library {
   List<LibraryPart> libraryParts;
   List<Typedef> typedefs;
   List<Class> classes;
+  List<Extension> extensions;
   List<Field> fields;
   List<Procedure> procedures;
 
@@ -334,6 +335,26 @@ type Class extends Node {
   // a specific procedure. Note the "+1" to account for needing the end of the last entry.
   UInt32[procedures.length + 1] procedureOffsets;
   UInt32 procedureCount = procedures.length;
+}
+
+type Extension extends Node {
+  Byte tag = 115;
+  CanonicalNameReference canonicalName;
+  StringReference name;
+  UriReference fileUri;
+  FileOffset fileOffset;
+  List<TypeParameter> typeParameters;
+  DartType onType;
+  List<ExtensionMemberDescriptor> members;
+}
+
+enum ExtensionMemberKind { Field = 0, Method = 1, Getter = 2, Setter = 3, Operator = 4, TearOff = 5, }
+
+type ExtensionMemberDescriptor {
+  StringReference name;
+  ExtensionMemberKind kind;
+  Byte flags (isStatic);
+  MemberReference member;
 }
 
 abstract type Member extends Node {}
@@ -682,6 +703,12 @@ type Not extends Expression {
   Expression operand;
 }
 
+type NullCheck extends Expression {
+  Byte tag = 117;
+  FileOffset fileOffset;
+  Expression operand;
+}
+
 /*
  enum LogicalOperator { &&, || }
 */
@@ -737,6 +764,13 @@ type InstanceCreation extends Expression {
   List<Pair<FieldReference, Expression>> fieldValues;
   List<AssertStatement> asserts;
   List<Expression> unusedArguments;
+}
+
+type FileUriExpression extends Expression {
+  Byte tag = 116;
+  UriReference fileUri;
+  FileOffset fileOffset;
+  Expression expression;
 }
 
 type IsExpression extends Expression {
@@ -1202,6 +1236,8 @@ type FunctionDeclaration extends Statement {
 
 enum Nullability { nullable = 0, nonNullable = 1, neither = 2, legacy = 3, }
 
+enum Variance { unrelated = 0, covariant = 1, contravariant = 2, invariant = 3, }
+
 abstract type DartType extends Node {}
 
 type BottomType extends DartType {
@@ -1298,6 +1334,7 @@ type TypeParameter {
   // Note: there is no tag on TypeParameter
   Byte flags (isGenericCovariantImpl);
   List<Expression> annotations;
+  Byte variance; // Index into the Variance enum above
   StringReference name; // Cosmetic, may be empty, not unique.
   DartType bound; // 'dynamic' if no explicit bound was given.
   Option<DartType> defaultType; // type used when the parameter is not passed

@@ -6,9 +6,12 @@ library fasta.procedure_builder;
 
 import 'dart:core' hide MapEntry;
 
-import 'package:kernel/ast.dart';
+import 'package:front_end/src/fasta/kernel/kernel_api.dart';
+import 'package:kernel/ast.dart' hide Variance;
 
 import 'package:kernel/type_algebra.dart';
+
+import '../../base/common.dart';
 
 import 'builder.dart'
     show
@@ -45,7 +48,7 @@ import '../kernel/kernel_builder.dart'
         TypeVariableBuilder,
         isRedirectingGenerativeConstructorImplementation;
 
-import '../kernel/kernel_shadow_ast.dart' show VariableDeclarationJudgment;
+import '../kernel/kernel_shadow_ast.dart' show VariableDeclarationImpl;
 
 import '../kernel/redirecting_factory_body.dart' show RedirectingFactoryBody;
 
@@ -301,7 +304,7 @@ abstract class FunctionBuilder extends MemberBuilder {
       // Do this after building the parameters, since the diet listener
       // assumes that parameters are built, even if illegal in number.
       VariableDeclaration parameter =
-          new VariableDeclarationJudgment("#synthetic", 0);
+          new VariableDeclarationImpl("#synthetic", 0);
       result.positionalParameters.clear();
       result.positionalParameters.add(parameter);
       parameter.parent = result;
@@ -360,6 +363,27 @@ abstract class FunctionBuilder extends MemberBuilder {
     }
     return function = result;
   }
+
+  /// Returns the [index]th parameter of this function.
+  ///
+  /// The index is the syntactical index, including both positional and named
+  /// parameter in the order they are declared, and excluding the synthesized
+  /// this parameter on extension instance members.
+  VariableDeclaration getFormalParameter(int index) {
+    if (isExtensionInstanceMember) {
+      return formals[index + 1].variable;
+    } else {
+      return formals[index].variable;
+    }
+  }
+
+  /// If this is an extension instance method, the tear off closure parameter
+  /// corresponding to the [index]th parameter on the instance method is
+  /// returned.
+  ///
+  /// This is used to update the default value for the closure parameter when
+  /// it has been computed for the original parameter.
+  VariableDeclaration getExtensionTearOffParameter(int index) => null;
 
   /// Returns the parameter for 'this' synthetically added to extension
   /// instance members.
@@ -437,6 +461,7 @@ class ProcedureBuilder extends FunctionBuilder {
   final Procedure _procedure;
   final int charOpenParenOffset;
   final ProcedureKind kind;
+  ProcedureBuilder patchForTesting;
 
   AsyncMarker actualAsyncModifier = AsyncMarker.Sync;
 
@@ -450,6 +475,14 @@ class ProcedureBuilder extends FunctionBuilder {
   /// If this is an extension instance method then [_extensionTearOff] holds
   /// the synthetically created tear off function.
   Procedure _extensionTearOff;
+
+  /// If this is an extension instance method then
+  /// [_extensionTearOffParameterMap] holds a map from the parameters of
+  /// the methods to the parameter of the closure returned in the tear-off.
+  ///
+  /// This map is used to set the default values on the closure parameters when
+  /// these have been built.
+  Map<VariableDeclaration, VariableDeclaration> _extensionTearOffParameterMap;
 
   ProcedureBuilder(
       List<MetadataBuilder> metadata,
@@ -485,59 +518,6 @@ class ProcedureBuilder extends FunctionBuilder {
     return _body;
   }
 
-  /// If this is an extension instance setter, wrap the setter body to return
-  /// the rhs value from the method.
-  ///
-  /// That is, this setter
-  ///
-  ///     extension E on A {
-  ///       void set property(B value) {
-  ///         value++;
-  ///       }
-  ///     }
-  ///
-  /// is converted into this top level method
-  ///
-  ///    B E|property(A #this, B value) {
-  ///      final #t1 = value;
-  ///      value++;
-  ///      return #t1;
-  ///    }
-  ///
-  void _updateExtensionSetterBody() {
-    if (isExtensionInstanceMember && isSetter) {
-      // TODO(johnniwinther): Avoid the synthetic variable if the parameter is
-      // never modified.
-      VariableDeclaration value = procedure.function.positionalParameters[1];
-      procedure.function.returnType = value.type;
-      Statement body = procedure.function.body;
-      List<Statement> statements = [];
-      Block block = new Block(statements);
-      VariableDeclaration variableDeclaration =
-          new VariableDeclarationJudgment.forValue(
-              new VariableGet(value)..fileOffset = procedure.fileOffset)
-            ..type = value.type;
-      statements.add(variableDeclaration);
-      if (body is Block) {
-        statements.addAll(body.statements);
-      } else {
-        statements.add(body);
-      }
-      ReturnStatement returnStatement = new ReturnStatement(
-          new VariableGet(variableDeclaration)
-            ..fileOffset = procedure.fileEndOffset);
-      statements.add(returnStatement);
-      setParents(block.statements, block);
-      procedure.function.body = block;
-      block.parent = procedure.function;
-    }
-  }
-
-  void set body(Statement newBody) {
-    super.body = newBody;
-    _updateExtensionSetterBody();
-  }
-
   void set asyncModifier(AsyncMarker newModifier) {
     actualAsyncModifier = newModifier;
     if (function != null) {
@@ -548,7 +528,6 @@ class ProcedureBuilder extends FunctionBuilder {
   }
 
   bool get isEligibleForTopLevelInference {
-    if (library.legacyMode) return false;
     if (isDeclarationInstanceMember) {
       if (returnType == null) return true;
       if (formals != null) {
@@ -577,8 +556,8 @@ class ProcedureBuilder extends FunctionBuilder {
       _procedure.isConst = isConst;
       if (isExtensionMethod) {
         ExtensionBuilder extensionBuilder = parent;
-        procedure.isExtensionMember = true;
-        procedure.isStatic = true;
+        _procedure.isExtensionMember = true;
+        _procedure.isStatic = true;
         String kindInfix = '';
         if (isExtensionInstanceMember) {
           // Instance getter and setter are converted to methods so we use an
@@ -598,18 +577,18 @@ class ProcedureBuilder extends FunctionBuilder {
               throw new UnsupportedError(
                   'Unexpected extension method kind ${kind}');
           }
-          procedure.kind = ProcedureKind.Method;
+          _procedure.kind = ProcedureKind.Method;
         }
-        procedure.name = new Name(
+        _procedure.name = new Name(
             '${extensionBuilder.name}|${kindInfix}${name}',
             libraryBuilder.library);
       } else {
         _procedure.isStatic = isStatic;
         _procedure.name = new Name(name, libraryBuilder.library);
       }
-    }
-    if (extensionTearOff != null) {
-      _buildExtensionTearOff(libraryBuilder, parent);
+      if (extensionTearOff != null) {
+        _buildExtensionTearOff(libraryBuilder, parent);
+      }
     }
     return _procedure;
   }
@@ -639,6 +618,8 @@ class ProcedureBuilder extends FunctionBuilder {
         _extensionTearOff != null, "No extension tear off created for $this.");
     if (_extensionTearOff.name != null) return;
 
+    _extensionTearOffParameterMap = {};
+
     int fileOffset = _procedure.fileOffset;
 
     int extensionTypeParameterCount =
@@ -646,17 +627,18 @@ class ProcedureBuilder extends FunctionBuilder {
 
     List<TypeParameter> typeParameters = <TypeParameter>[];
 
+    Map<TypeParameter, DartType> substitutionMap = {};
     List<DartType> typeArguments = <DartType>[];
     for (TypeParameter typeParameter in function.typeParameters) {
       TypeParameter newTypeParameter = new TypeParameter(typeParameter.name);
       typeParameters.add(newTypeParameter);
-      typeArguments.add(new TypeParameterType(newTypeParameter));
+      typeArguments.add(substitutionMap[typeParameter] =
+          new TypeParameterType(newTypeParameter));
     }
 
     List<TypeParameter> tearOffTypeParameters = <TypeParameter>[];
     List<TypeParameter> closureTypeParameters = <TypeParameter>[];
-    Substitution substitution =
-        Substitution.fromPairs(function.typeParameters, typeArguments);
+    Substitution substitution = Substitution.fromMap(substitutionMap);
     for (int index = 0; index < typeParameters.length; index++) {
       TypeParameter newTypeParameter = typeParameters[index];
       newTypeParameter.bound =
@@ -672,12 +654,11 @@ class ProcedureBuilder extends FunctionBuilder {
     VariableDeclaration copyParameter(
         VariableDeclaration parameter, DartType type,
         {bool isOptional}) {
-      // TODO(johnniwinther): Handle default values.
-      return new VariableDeclaration(parameter.name,
-          type: type,
-          initializer: isOptional ? new NullLiteral() : null,
-          isFinal: parameter.isFinal)
+      VariableDeclaration newParameter = new VariableDeclaration(parameter.name,
+          type: type, isFinal: parameter.isFinal)
         ..fileOffset = parameter.fileOffset;
+      _extensionTearOffParameterMap[parameter] = newParameter;
+      return newParameter;
     }
 
     VariableDeclaration extensionThis = copyParameter(
@@ -720,7 +701,7 @@ class ProcedureBuilder extends FunctionBuilder {
 
     Statement closureBody = new ReturnStatement(
         new StaticInvocation(
-            procedure,
+            _procedure,
             new Arguments(closurePositionalArguments,
                 types: typeArguments, named: closureNamedArguments))
           ..fileOffset = fileOffset)
@@ -731,10 +712,10 @@ class ProcedureBuilder extends FunctionBuilder {
         typeParameters: closureTypeParameters,
         positionalParameters: closurePositionalParameters,
         namedParameters: closureNamedParameters,
-        requiredParameterCount: procedure.function.requiredParameterCount - 1,
+        requiredParameterCount: _procedure.function.requiredParameterCount - 1,
         returnType: closureReturnType,
-        asyncMarker: procedure.function.asyncMarker,
-        dartAsyncMarker: procedure.function.dartAsyncMarker))
+        asyncMarker: _procedure.function.asyncMarker,
+        dartAsyncMarker: _procedure.function.dartAsyncMarker))
       ..fileOffset = fileOffset;
 
     _extensionTearOff
@@ -749,6 +730,14 @@ class ProcedureBuilder extends FunctionBuilder {
       ..fileUri = fileUri
       ..fileOffset = fileOffset;
     _extensionTearOff.function.parent = _extensionTearOff;
+  }
+
+  @override
+  VariableDeclaration getExtensionTearOffParameter(int index) {
+    if (_extensionTearOffParameterMap != null) {
+      return _extensionTearOffParameterMap[getFormalParameter(index)];
+    }
+    return null;
   }
 
   /// The [Procedure] built by this builder.
@@ -797,6 +786,9 @@ class ProcedureBuilder extends FunctionBuilder {
     if (patch is ProcedureBuilder) {
       if (checkPatch(patch)) {
         patch.actualOrigin = this;
+        if (retainDataForTesting) {
+          patchForTesting = patch;
+        }
       }
     } else {
       reportPatchMismatch(patch);
@@ -820,6 +812,8 @@ class ConstructorBuilder extends FunctionBuilder {
 
   @override
   ConstructorBuilder actualOrigin;
+
+  ConstructorBuilder patchForTesting;
 
   Constructor get actualConstructor => _constructor;
 
@@ -863,7 +857,6 @@ class ConstructorBuilder extends FunctionBuilder {
   }
 
   bool get isEligibleForTopLevelInference {
-    if (library.legacyMode) return false;
     if (formals != null) {
       for (FormalParameterBuilder formal in formals) {
         if (formal.type == null && formal.isInitializingFormal) return true;
@@ -906,7 +899,7 @@ class ConstructorBuilder extends FunctionBuilder {
       BodyBuilder bodyBuilder = library.loader
           .createBodyBuilderForOutlineExpression(
               library, classBuilder, this, classBuilder.scope, fileUri);
-      bodyBuilder.constantContext = ConstantContext.inferred;
+      bodyBuilder.constantContext = ConstantContext.required;
       bodyBuilder.parseInitializers(beginInitializers);
       bodyBuilder.resolveRedirectingFactoryTargets();
     }
@@ -941,9 +934,7 @@ class ConstructorBuilder extends FunctionBuilder {
     assert(lastInitializer == superInitializer ||
         lastInitializer == redirectingInitializer);
     Initializer error = helper.buildInvalidInitializer(
-        helper.desugarSyntheticExpression(
-            helper.buildProblem(message, charOffset, noLength)),
-        charOffset);
+        helper.buildProblem(message, charOffset, noLength));
     initializers.add(error..parent = _constructor);
     initializers.add(lastInitializer);
   }
@@ -965,10 +956,8 @@ class ConstructorBuilder extends FunctionBuilder {
             initializer.fileOffset, helper);
       } else if (_constructor.initializers.isNotEmpty) {
         Initializer first = _constructor.initializers.first;
-        Initializer error = helper.buildInvalidInitializer(
-            helper.desugarSyntheticExpression(helper.buildProblem(
-                messageThisInitializerNotAlone, first.fileOffset, noLength)),
-            first.fileOffset);
+        Initializer error = helper.buildInvalidInitializer(helper.buildProblem(
+            messageThisInitializerNotAlone, first.fileOffset, noLength));
         initializers.add(error..parent = _constructor);
       } else {
         initializers.add(initializer..parent = _constructor);
@@ -1017,6 +1006,9 @@ class ConstructorBuilder extends FunctionBuilder {
     if (patch is ConstructorBuilder) {
       if (checkPatch(patch)) {
         patch.actualOrigin = this;
+        if (retainDataForTesting) {
+          patchForTesting = patch;
+        }
       }
     } else {
       reportPatchMismatch(patch);

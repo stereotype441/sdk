@@ -47,21 +47,23 @@ class FlowGraphDeserializer : ValueObject {
         zone_(ASSERT_NOTNULL(zone)),
         root_sexp_(ASSERT_NOTNULL(root)),
         parsed_function_(pf),
-        block_map_(zone_),
-        definition_map_(zone_),
-        values_map_(zone_),
-        pushed_stack_(zone_, 2),
+        block_map_(zone),
+        pushed_stack_map_(zone),
+        definition_map_(zone),
+        values_map_(zone),
+        recursive_types_map_(zone),
+        pending_typeref_map_(zone),
+        array_type_args_(TypeArguments::Handle(zone)),
         instance_class_(Class::Handle(zone)),
         instance_field_(Field::Handle(zone)),
-        instance_object_(Object::Handle(zone)),
+        instance_fields_array_(Array::Handle(zone)),
+        instance_type_args_(TypeArguments::Handle(zone)),
         name_class_(Class::Handle(zone)),
         name_field_(Field::Handle(zone)),
         name_function_(Function::Handle(zone)),
         name_library_(Library::Handle(zone)),
-        value_class_(Class::Handle(zone)),
-        value_object_(Object::Handle(zone)),
-        value_type_(AbstractType::Handle(zone)),
-        value_type_args_(TypeArguments::Handle(zone)),
+        type_param_class_(Class::Handle(zone)),
+        type_param_function_(Function::Handle(zone)),
         tmp_string_(String::Handle(zone)) {
     // See canonicalization comment in ParseDartValue as to why this is
     // currently necessary.
@@ -85,15 +87,28 @@ class FlowGraphDeserializer : ValueObject {
   M(TargetEntry)
 
 #define FOR_EACH_HANDLED_INSTRUCTION_IN_DESERIALIZER(M)                        \
+  M(AllocateObject)                                                            \
+  M(AssertAssignable)                                                          \
+  M(AssertBoolean)                                                             \
+  M(BooleanNegate)                                                             \
   M(Branch)                                                                    \
+  M(CheckNull)                                                                 \
   M(CheckStackOverflow)                                                        \
   M(Constant)                                                                  \
+  M(DebugStepCheck)                                                            \
   M(Goto)                                                                      \
-  M(PushArgument)                                                              \
+  M(InstanceCall)                                                              \
+  M(LoadClassId)                                                               \
+  M(LoadField)                                                                 \
+  M(NativeCall)                                                                \
   M(Parameter)                                                                 \
+  M(PushArgument)                                                              \
   M(Return)                                                                    \
   M(SpecialParameter)                                                          \
-  M(StaticCall)
+  M(StaticCall)                                                                \
+  M(StoreInstanceField)                                                        \
+  M(StrictCompare)                                                             \
+  M(Throw)
 
   // Helper methods for AllUnhandledInstructions.
   static bool IsHandledInstruction(Instruction* inst);
@@ -123,37 +138,38 @@ class FlowGraphDeserializer : ValueObject {
   bool ParseConstantPool(SExpList* pool);
   bool ParseEntries(SExpList* list);
 
-  struct CommonEntryInfo {
-    intptr_t block_id;
-    intptr_t try_index;
-    intptr_t deopt_id;
-  };
+  using PushStack = ZoneGrowableArray<PushArgumentInstr*>;
+  using BlockWorklist = GrowableArray<intptr_t>;
 
-#define HANDLER_DECL(name)                                                     \
-  name##Instr* Handle##name(SExpList* list, const CommonEntryInfo& info);
+  // Starts parsing the contents of [list], where the blocks begin at position
+  // [pos] and [worklist] contains the blocks whose body instructions should
+  // be parsed first.
+  bool ParseBlocks(SExpList* list, intptr_t pos, BlockWorklist* worklist);
 
-  FOR_EACH_HANDLED_BLOCK_TYPE_IN_DESERIALIZER(HANDLER_DECL);
-
-#undef HANDLER_DECL
-
-  // Block parsing is split into two passes. This pass checks the
-  // block ID and other extra information needed for certain block types.
-  // In addition, it parses initial definitions found in the entry list.
-  // The block is added to the [block_map_] as well as returned.
-  BlockEntryInstr* ParseBlockHeader(SExpList* list, SExpSymbol* tag);
+  // Block parsing is split into two passes. This pass adds function entries
+  // to the flow graph and also parses initial definitions found in the Entries
+  // list. The block is added to the [block_map_] before returning.
+  BlockEntryInstr* ParseBlockHeader(SExpList* list,
+                                    intptr_t block_id,
+                                    SExpSymbol* tag);
 
   // Expects [current_block_] to be set before calling.
   bool ParseInitialDefinitions(SExpList* list);
 
   // Expects [current_block_] to be set before calling.
   // Takes the tagged list to parse and the index where parsing should start.
-  // Returns the index of the first non-Phi instruction or definition or -1 on
-  // error.
-  intptr_t ParsePhis(SExpList* list, intptr_t pos);
+  // Attempts to parse Phi definitions until the first non-Phi instruction.
+  bool ParsePhis(SExpList* list);
 
-  // Parses the instructions in the body of a block. [current_block_] must be
-  // set before calling.
-  bool ParseBlockContents(SExpList* list);
+  // Expects [current_block_] to be set before calling.
+  // Returns the position of the first non-Phi instruction in a block.
+  intptr_t SkipPhis(SExpList* list);
+
+  // Parses the deopt environment, Phi definitions for JoinEntrys, and the
+  // instructions in the body of the block. Adds the IDs of the block successors
+  // to the worklist, if any. [current_block_] and [pushed_stack_] must be set
+  // before calling.
+  bool ParseBlockContents(SExpList* list, BlockWorklist* worklist);
 
   // Helper function used by ParseConstantPool, ParsePhis, and ParseDefinition.
   // This handles all the extra information stored in (def ...) expressions,
@@ -164,7 +180,20 @@ class FlowGraphDeserializer : ValueObject {
   Definition* ParseDefinition(SExpList* list);
   Instruction* ParseInstruction(SExpList* list);
 
-  struct CommonInstrInfo {
+  struct EntryInfo {
+    intptr_t block_id;
+    intptr_t try_index;
+    intptr_t deopt_id;
+  };
+
+#define HANDLER_DECL(name)                                                     \
+  name##Instr* Deserialize##name(SExpList* list, const EntryInfo& info);
+
+  FOR_EACH_HANDLED_BLOCK_TYPE_IN_DESERIALIZER(HANDLER_DECL);
+
+#undef HANDLER_DECL
+
+  struct InstrInfo {
     intptr_t deopt_id;
     TokenPosition token_pos;
   };
@@ -188,14 +217,41 @@ class FlowGraphDeserializer : ValueObject {
 #undef HANDLE_CASE
 
 #define HANDLER_DECL(name)                                                     \
-  name##Instr* Handle##name(SExpList* list, const CommonInstrInfo& info);
+  name##Instr* Deserialize##name(SExpList* list, const InstrInfo& info);
 
   FOR_EACH_HANDLED_INSTRUCTION_IN_DESERIALIZER(HANDLER_DECL);
 
 #undef HANDLER_DECL
 
-  Value* ParseValue(SExpression* sexp);
+  // Common information parsed from call instruction S-expressions.
+  struct CallInfo : public ValueObject {
+    explicit CallInfo(Zone* zone) : argument_names(Array::ZoneHandle(zone)) {}
+
+    Array& argument_names;
+    intptr_t type_args_len = 0;
+    intptr_t args_len = 0;
+    PushArgumentsArray* arguments = nullptr;
+    CompileType* result_type = nullptr;
+    Code::EntryKind entry_kind = Code::EntryKind::kNormal;
+  };
+
+  // Helper function for parsing call instructions that returns a structure
+  // of information common to all calls.
+  bool ParseCallInfo(SExpList* call, CallInfo* out);
+
+  // Parses [sexp] as a value form, that is, either the binding name for
+  // a definition as a symbol or the form (value <name> { ... }).
+  // If [allow_pending], then values for definitions not already in the
+  // [definition_map_] will be added to the [values_map_], otherwise,
+  // values for definitions not yet seen cause an error to be stored and
+  // nullptr to be returned.
+  Value* ParseValue(SExpression* sexp, bool allow_pending = true);
   CompileType* ParseCompileType(SExpList* list);
+
+  // Parses [list] as an environment form: a list containing either binding
+  // names for definitions or a# for pushed arguments (where # is the depth
+  // of the argument from the top of the stack). Requires [pushed_stack_] to
+  // be set if any references to pushed arguments are found.
   Environment* ParseEnvironment(SExpList* list);
 
   // Parsing functions for which there are no good distinguished error
@@ -204,27 +260,56 @@ class FlowGraphDeserializer : ValueObject {
   // Parses a Dart value and returns a canonicalized result.
   bool ParseDartValue(SExpression* sexp, Object* out);
 
-  // Helper function for ParseDartValue for parsing instances.
-  // Does not canonicalize (that is currently done in ParseDartValue), so
-  // do not call this method directly.
-  bool ParseInstance(SExpList* list, Instance* out);
+  // Canonicalizes and replaces the original contents of the handle pointed to
+  // by [inst] if [inst] is an Instance (if not, it trivially succeeds). The
+  // replacement happens whether successful or not. [sexp] is the SExpression
+  // to be used for error reporting.
+  bool CanonicalizeInstance(SExpression* sexp, Object* inst);
+
+  // Helper functions for ParseDartValue for parsing particular type of values.
+  // If necessary, they canonicalize the returned value, and so may be used
+  // directly by other code as well. Helpers that take SExpression* take either
+  // serialized constants or references to constant definitions.
+  //
+  // Due to particulars of operator=() on non-Object values, for a given X,
+  // ParseX takes Object* instead of X* for the out parameter.
+  bool ParseAbstractType(SExpression* sexp, Object* out);
+  bool ParseClass(SExpList* list, Object* out);
+  bool ParseClosure(SExpList* list, Object* out);
+  bool ParseField(SExpList* list, Object* out);
+  bool ParseFunction(SExpList* list, Object* out);
+  bool ParseImmutableList(SExpList* list, Object* out);
+  bool ParseInstance(SExpList* list, Object* out);
+  bool ParseType(SExpression* sexp, Object* out);
+  bool ParseTypeParameter(SExpList* list, Object* out);
+  bool ParseTypeArguments(SExpression* sexp, Object* out);
+  bool ParseTypeRef(SExpList* list, Object* out);
 
   bool ParseCanonicalName(SExpSymbol* sym, Object* out);
+
+  const Field& MayCloneField(const Field& field) const;
+  bool ParseSlot(SExpList* list, const Slot** out);
+
   bool ParseBlockId(SExpSymbol* sym, intptr_t* out);
   bool ParseSSATemp(SExpSymbol* sym, intptr_t* out);
   bool ParseUse(SExpSymbol* sym, intptr_t* out);
   bool ParseSymbolAsPrefixedInt(SExpSymbol* sym, char prefix, intptr_t* out);
 
+  bool ArePendingTypeRefs() const;
+
+  // Allocates a new ICData structure. [list] is the ICData S-expression, while
+  // [inst] is the Instruction generated from the instruction S-expression
+  // containing [list].
+  bool CreateICData(SExpList* list, Instruction* inst);
+
   // Helper function for creating a placeholder value when the definition
-  // has not yet been seen.
-  Value* AddNewPendingValue(intptr_t index);
+  // with index [i] has not yet been seen. If [inherit_type], then the type of
+  // the definition should be used as the reaching type for the use. [s] is used
+  // for any errors that occur when resolving the pending value.
+  Value* AddNewPendingValue(SExpression* s, intptr_t i, bool inherit_type);
 
-  // Similar helper, but where we already have a created value.
-  void AddPendingValue(intptr_t index, Value* val);
-
-  // Helper function for rebinding pending values once the definition has
-  // been located.
-  void FixPendingValues(intptr_t index, Definition* def);
+  // Helper function for rebinding values pending on this definition.
+  bool FixPendingValues(intptr_t index, Definition* def);
 
   // Creates a PushArgumentsArray of size [len] from [pushed_stack_] if there
   // are enough and pops the fetched arguments from the stack.
@@ -236,6 +321,14 @@ class FlowGraphDeserializer : ValueObject {
   // Retrieves the block corresponding to the given block ID symbol from
   // [block_map_]. Assumes all blocks have had their header parsed.
   BlockEntryInstr* FetchBlock(SExpSymbol* sym);
+
+  // Checks that the pushed argument stacks for all predecessors of [succ_block]
+  // are the same as [curr_stack]. This check ensures that we can choose an
+  // arbitrary predecessor's pushed argument stack when parsing [succ_block]'s
+  // contents. [list] is used for error reporting.
+  bool AreStacksConsistent(SExpList* list,
+                           PushStack* curr_stack,
+                           BlockEntryInstr* succ_block);
 
   // Utility functions for checking the shape of an S-expression.
   // If these functions return nullptr for a non-null argument, they have the
@@ -274,30 +367,55 @@ class FlowGraphDeserializer : ValueObject {
   // available via [flow_graph_].
   IntMap<BlockEntryInstr*> block_map_;
 
+  // Map from block IDs to pushed argument stacks. Used for PushArgument
+  // instructions, environment parsing, and calls during block parsing. Also
+  // used to check that the final pushed argument stacks for predecessor blocks
+  // are consistent when parsing a JoinEntry.
+  IntMap<PushStack*> pushed_stack_map_;
+
   // Map from variable indexes to definitions.
   IntMap<Definition*> definition_map_;
 
+  // Information needed to handle uses seen prior to their definitions.
+  struct PendingValue {
+    // SExpression used for error reporting.
+    SExpression* sexp;
+    // Value to be rebound once the right definition is found.
+    Value* value;
+    // Whether the type should inherit the type of the found definition.
+    bool inherit_type;
+  };
+
   // Map from variable indices to lists of values. The list of values are
   // values that were parsed prior to the corresponding definition being found.
-  IntMap<ZoneGrowableArray<Value*>*> values_map_;
+  IntMap<ZoneGrowableArray<PendingValue>*> values_map_;
 
-  // Stack of currently pushed arguments, used by environment parsing and calls.
-  GrowableArray<PushArgumentInstr*> pushed_stack_;
+  // Map from hash values to SExpLists. This is used by ParseTypeRef to
+  // determine whether or not the recursive type it refers to is being currently
+  // built. The SExpList can be used to report hash collisions.
+  IntMap<SExpList*> recursive_types_map_;
+
+  // Map from hash values to arrays of TypeRefs. This is used by ParseType and
+  // ParseTypeRef to store and later fill in TypeRefs pending on the type being
+  // constructed. Since entries are added at the start of parsing recursive
+  // Type S-exps and removed before the resulting Type is successfully returned,
+  // this map should be empty outside of parsing recursive types.
+  IntMap<ZoneGrowableArray<TypeRef*>*> pending_typeref_map_;
 
   // Temporary handles used by functions that are not re-entrant or where the
   // handle is not live after the re-entrant call. Comments show which handles
   // are expected to only be used within a single method.
-  Class& instance_class_;           // ParseInstance
-  Field& instance_field_;           // ParseInstance
-  Object& instance_object_;         // ParseInstance
-  Class& name_class_;               // ParseCanonicalName
-  Field& name_field_;               // ParseCanonicalName
-  Function& name_function_;         // ParseCanonicalName
-  Library& name_library_;           // ParseCanonicalName
-  Class& value_class_;              // ParseDartValue
-  Object& value_object_;            // ParseDartValue
-  AbstractType& value_type_;        // ParseDartValue
-  TypeArguments& value_type_args_;  // ParseDartValue
+  TypeArguments& array_type_args_;     // ParseImmutableList
+  Class& instance_class_;              // ParseInstance
+  Field& instance_field_;              // ParseInstance
+  Array& instance_fields_array_;       // ParseInstance
+  TypeArguments& instance_type_args_;  // ParseInstance
+  Class& name_class_;                  // ParseCanonicalName
+  Field& name_field_;                  // ParseCanonicalName
+  Function& name_function_;            // ParseCanonicalName
+  Library& name_library_;              // ParseCanonicalName
+  Class& type_param_class_;            // ParseTypeParameter
+  Function& type_param_function_;      // ParseTypeParameter
   // Uses of string handles tend to be immediate, so we only need one.
   String& tmp_string_;
 

@@ -15,6 +15,7 @@ enum ExperimentalFlag {
   setLiterals,
   spreadCollections,
   tripleShift,
+  variance,
 }
 
 ExperimentalFlag parseExperimentalFlag(String flag) {
@@ -33,6 +34,8 @@ ExperimentalFlag parseExperimentalFlag(String flag) {
       return ExperimentalFlag.spreadCollections;
     case "triple-shift":
       return ExperimentalFlag.tripleShift;
+    case "variance":
+      return ExperimentalFlag.variance;
   }
   return null;
 }
@@ -40,11 +43,12 @@ ExperimentalFlag parseExperimentalFlag(String flag) {
 const Map<ExperimentalFlag, bool> defaultExperimentalFlags = {
   ExperimentalFlag.constantUpdate2018: true,
   ExperimentalFlag.controlFlowCollections: true,
-  ExperimentalFlag.extensionMethods: false,
+  ExperimentalFlag.extensionMethods: true,
   ExperimentalFlag.nonNullable: false,
   ExperimentalFlag.setLiterals: true,
   ExperimentalFlag.spreadCollections: true,
   ExperimentalFlag.tripleShift: false,
+  ExperimentalFlag.variance: false,
 };
 
 const Map<ExperimentalFlag, bool> expiredExperimentalFlags = {
@@ -55,4 +59,5 @@ const Map<ExperimentalFlag, bool> expiredExperimentalFlags = {
   ExperimentalFlag.setLiterals: true,
   ExperimentalFlag.spreadCollections: true,
   ExperimentalFlag.tripleShift: false,
+  ExperimentalFlag.variance: false,
 };

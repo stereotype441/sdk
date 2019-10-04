@@ -4,27 +4,17 @@
 
 import 'dart:async';
 
-import 'package:analyzer/src/dart/analysis/driver.dart';
+import 'package:analyzer/dart/analysis/features.dart';
+import 'package:analyzer/src/generated/engine.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
 
 import '../src/dart/resolution/driver_resolution.dart';
 
 main() {
   defineReflectiveSuite(() {
-    if (AnalysisDriver.useSummary2) {
-      defineReflectiveTests(InvalidCodeSummary2Test);
-    } else {
-      defineReflectiveTests(InvalidCodeTest);
-    }
+    defineReflectiveTests(InvalidCodeTest);
+    defineReflectiveTests(InvalidCodeWithExtensionMethodsTest);
   });
-}
-
-@reflectiveTest
-class InvalidCodeSummary2Test extends InvalidCodeTest {
-  @failingTest
-  test_fuzz_12() {
-    return test_fuzz_12();
-  }
 }
 
 /// Tests for various end-to-end cases when invalid code caused exceptions
@@ -156,6 +146,7 @@ class A<T extends F> {}
 ''');
   }
 
+  @failingTest
   test_fuzz_12() async {
     // This code crashed with summary2 because usually AST reader is lazy,
     // so we did not read metadata `@b` for `c`. But default values must be
@@ -173,6 +164,12 @@ void f({a = [for (@b c = 0;;)]}) {}
     await _assertCanBeAnalyzed(r'''
 const v = [<S extends num>(S x) => x is int ? x : 0];
 ''');
+  }
+
+  test_fuzz_38091() async {
+    // https://github.com/dart-lang/sdk/issues/38091
+    // this caused an infinite loop in parser recovery
+    await _assertCanBeAnalyzed(r'c(=k(<)>');
   }
 
   test_genericFunction_asTypeArgument_ofUnresolvedClass() async {
@@ -214,8 +211,54 @@ class C {
   }
 
   Future<void> _assertCanBeAnalyzed(String text) async {
-    addTestFile(text);
-    await resolveTestFile();
+    await resolveTestCode(text);
+    assertHasTestErrors();
+  }
+}
+
+@reflectiveTest
+class InvalidCodeWithExtensionMethodsTest extends DriverResolutionTest {
+  @override
+  AnalysisOptionsImpl get analysisOptions => AnalysisOptionsImpl()
+    ..contextFeatures = new FeatureSet.forTesting(
+        sdkVersion: '2.3.0', additionalFeatures: [Feature.extension_methods]);
+
+  test_extensionOverrideInAnnotationContext() async {
+    await _assertCanBeAnalyzed('''
+class R {
+  const R(int x);
+}
+
+@R(E(null).f())
+extension E on Object {
+  int f() => 0;
+}
+''');
+  }
+
+  test_extensionOverrideInConstContext() async {
+    await _assertCanBeAnalyzed('''
+extension E on Object {
+  int f() => 0;
+}
+
+const e = E(null).f();
+''');
+  }
+
+  test_fuzz_14() async {
+    // This crashes because parser produces `ConstructorDeclaration`.
+    // So, we try to create `ConstructorElement` for it, and it wants
+    // `ClassElement` as the enclosing element. But we have `ExtensionElement`.
+    await _assertCanBeAnalyzed(r'''
+extension E {
+  factory S() {}
+}
+''');
+  }
+
+  Future<void> _assertCanBeAnalyzed(String text) async {
+    await resolveTestCode(text);
     assertHasTestErrors();
   }
 }

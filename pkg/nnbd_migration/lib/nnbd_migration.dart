@@ -7,6 +7,7 @@ import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:meta/meta.dart';
+import 'package:nnbd_migration/instrumentation.dart';
 import 'package:nnbd_migration/src/nullability_migration_impl.dart';
 
 /// Description of fixes that might be performed by nullability migration.
@@ -31,25 +32,21 @@ class NullabilityFixDescription {
   /// A message used by dartfix to indicate a fix has been applied.
   final String appliedMessage;
 
-  /// An import needs to be added.
-  factory NullabilityFixDescription.addImport(String uri) =>
-      NullabilityFixDescription._(appliedMessage: 'Add import $uri');
-
-  /// A formal parameter needs to have a required modifier added.
+  /// A formal parameter needs to have a required keyword added.
   factory NullabilityFixDescription.addRequired(
           String className, String functionName, String paramName) =>
       NullabilityFixDescription._(
           appliedMessage:
-              "Add 'required' modifier to parameter $paramName in " +
+              "Add 'required' keyword to parameter '$paramName' in " +
                   (className == null
                       ? functionName
-                      : '$className.$functionName'));
+                      : "'$className.$functionName'"));
 
   /// An explicit type mentioned in the source program needs to be made
   /// nullable.
   factory NullabilityFixDescription.makeTypeNullable(String type) =>
       NullabilityFixDescription._(
-        appliedMessage: 'Changed type $type to be nullable',
+        appliedMessage: "Changed type '$type' to be nullable",
       );
 
   const NullabilityFixDescription._({@required this.appliedMessage});
@@ -68,7 +65,9 @@ abstract class NullabilityMigration {
   /// complete.  TODO(paulberry): remove this mode once the migration algorithm
   /// is fully implemented.
   factory NullabilityMigration(NullabilityMigrationListener listener,
-      {bool permissive}) = NullabilityMigrationImpl;
+          {bool permissive,
+          NullabilityMigrationInstrumentation instrumentation}) =
+      NullabilityMigrationImpl;
 
   void finish();
 

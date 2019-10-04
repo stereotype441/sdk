@@ -11,6 +11,7 @@ import 'package:kernel/ast.dart'
         Class,
         DartType,
         DynamicType,
+        Extension,
         Field,
         FunctionType,
         Library,
@@ -45,6 +46,8 @@ import '../kernel/kernel_builder.dart'
 import '../kernel/redirecting_factory_body.dart' show RedirectingFactoryBody;
 
 import 'dill_class_builder.dart' show DillClassBuilder;
+
+import 'dill_extension_builder.dart';
 
 import 'dill_member_builder.dart' show DillMemberBuilder;
 
@@ -93,8 +96,6 @@ class DillLibraryBuilder extends LibraryBuilder {
   /// [../kernel/kernel_library_builder.dart].
   Map<String, String> unserializableExports;
 
-  bool exportsAlreadyFinalized = false;
-
   // TODO(jensj): These 4 booleans could potentially be merged into a single
   // state field.
   bool isReadyToBuild = false;
@@ -113,10 +114,16 @@ class DillLibraryBuilder extends LibraryBuilder {
 
   void ensureLoaded() {
     if (!isReadyToBuild) throw new StateError("Not ready to build.");
+    if (isBuilt && !isBuiltAndMarked) {
+      isBuiltAndMarked = true;
+      finalizeExports();
+      return;
+    }
     isBuiltAndMarked = true;
     if (isBuilt) return;
     isBuilt = true;
     library.classes.forEach(addClass);
+    library.extensions.forEach(addExtension);
     library.procedures.forEach(addMember);
     library.typedefs.forEach(addTypedef);
     library.fields.forEach(addMember);
@@ -162,6 +169,12 @@ class DillLibraryBuilder extends LibraryBuilder {
         classBulder.addMember(field);
       }
     }
+  }
+
+  void addExtension(Extension extension) {
+    DillExtensionBuilder extensionBuilder =
+        new DillExtensionBuilder(extension, this);
+    addBuilder(extension.name, extensionBuilder, extension.fileOffset);
   }
 
   void addMember(Member member) {
@@ -241,8 +254,6 @@ class DillLibraryBuilder extends LibraryBuilder {
   }
 
   void finalizeExports() {
-    if (exportsAlreadyFinalized) return;
-    exportsAlreadyFinalized = true;
     unserializableExports?.forEach((String name, String messageText) {
       Builder declaration;
       switch (name) {

@@ -40,7 +40,8 @@ FlowGraphBuilder::FlowGraphBuilder(
     bool optimizing,
     intptr_t osr_id,
     intptr_t first_block_id,
-    bool inlining_unchecked_entry)
+    bool inlining_unchecked_entry,
+    GrowableObjectArray* record_yield_positions)
     : BaseFlowGraphBuilder(parsed_function,
                            first_block_id - 1,
                            osr_id,
@@ -68,6 +69,7 @@ FlowGraphBuilder::FlowGraphBuilder(
       catch_block_(NULL) {
   const Script& script =
       Script::Handle(Z, parsed_function->function().script());
+  record_yield_positions_ = record_yield_positions;
   H.InitFromScript(script);
 }
 
@@ -226,7 +228,6 @@ Fragment FlowGraphBuilder::CatchBlockEntry(const Array& handler_types,
   LocalVariable* raw_stacktrace_var = CurrentRawStackTrace();
 
   CatchBlockEntryInstr* entry = new (Z) CatchBlockEntryInstr(
-      TokenPosition::kNoSource,  // Token position of catch block.
       is_synthesized,  // whether catch block was synthesized by FE compiler
       AllocateBlockId(), CurrentTryIndex(), graph_entry_, handler_types,
       handler_index, needs_stacktrace, GetNextDeoptId(), exception_var,
@@ -643,7 +644,7 @@ FlowGraph* FlowGraphBuilder::BuildGraph() {
   // TODO(alexmarkov): refactor this - StreamingFlowGraphBuilder should not be
   //  used for bytecode functions.
   StreamingFlowGraphBuilder streaming_flow_graph_builder(
-      this, kernel_data, kernel_data_program_offset);
+      this, kernel_data, kernel_data_program_offset, record_yield_positions_);
   return streaming_flow_graph_builder.BuildGraph();
 }
 
@@ -2397,6 +2398,7 @@ Fragment FlowGraphBuilder::FfiPointerFromAddress(const Type& result_type) {
   // do not appear in the type arguments to a any Pointer classes in an FFI
   // signature.
   ASSERT(args.IsNull() || args.IsInstantiated());
+  args = args.Canonicalize();
 
   Fragment code;
   code += Constant(args);
@@ -2449,14 +2451,6 @@ Fragment FlowGraphBuilder::FfiConvertArgumentToNative(
     const AbstractType& ffi_type,
     const Representation native_representation) {
   Fragment body;
-
-  // Return 0 for void.
-  if (compiler::ffi::NativeTypeIsVoid(ffi_type)) {
-    body += Drop();
-    body += IntConstant(0);
-    body += UnboxTruncate(kUnboxedFfiIntPtr);
-    return body;
-  }
 
   // Check for 'null'.
   body += LoadLocal(MakeTemporary());
@@ -2614,9 +2608,20 @@ FlowGraph* FlowGraphBuilder::BuildGraphOfFfiCallback(const Function& function) {
                       /*needs_stacktrace=*/false, /*is_synthesized=*/true);
 
   // Return the "exceptional return" value given in 'fromFunction'.
-  catch_body += Constant(
-      Instance::ZoneHandle(Z, function.FfiCallbackExceptionalReturn()));
-  catch_body += FfiConvertArgumentToNative(function, ffi_type, result_rep);
+  //
+  // For pointer and void return types, the exceptional return is always null --
+  // return 0 instead.
+  if (compiler::ffi::NativeTypeIsPointer(ffi_type) ||
+      compiler::ffi::NativeTypeIsVoid(ffi_type)) {
+    ASSERT(function.FfiCallbackExceptionalReturn() == Object::null());
+    catch_body += IntConstant(0);
+    catch_body += UnboxTruncate(kUnboxedFfiIntPtr);
+  } else {
+    catch_body += Constant(
+        Instance::ZoneHandle(Z, function.FfiCallbackExceptionalReturn()));
+    catch_body += FfiConvertArgumentToNative(function, ffi_type, result_rep);
+  }
+
   catch_body += NativeReturn(result_rep);
   --catch_depth_;
 

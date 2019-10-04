@@ -9,6 +9,7 @@
 #include "vm/heap/become.h"
 #include "vm/heap/freelist.h"
 #include "vm/isolate.h"
+#include "vm/isolate_reload.h"
 #include "vm/object.h"
 #include "vm/runtime_entry.h"
 #include "vm/visitor.h"
@@ -57,11 +58,11 @@ void RawObject::Validate(Isolate* isolate) const {
     }
   }
   intptr_t class_id = ClassIdTag::decode(tags);
-  if (!isolate->class_table()->IsValidIndex(class_id)) {
+  if (!isolate->shared_class_table()->IsValidIndex(class_id)) {
     FATAL1("Invalid class id encountered %" Pd "\n", class_id);
   }
-  if ((class_id == kNullCid) &&
-      (isolate->class_table()->At(class_id) == NULL)) {
+  if (class_id == kNullCid &&
+      isolate->shared_class_table()->HasValidClassAt(class_id)) {
     // Null class not yet initialized; skip.
     return;
   }
@@ -212,11 +213,21 @@ intptr_t RawObject::HeapSizeFromClass() const {
       // TODO(koda): Add Size(ClassTable*) interface to allow caching in loops.
       Isolate* isolate = Isolate::Current();
 #if defined(DEBUG)
-      ClassTable* class_table = isolate->class_table();
+      auto class_table = isolate->shared_class_table();
+#if !defined(DART_PRECOMPILED_RUNTIME)
+      auto reload_context = isolate->reload_context();
+      const bool use_saved_class_table =
+          reload_context != nullptr ? reload_context->UseSavedClassTableForGC()
+                                    : false;
+#else
+      const bool use_saved_class_table = false;
+#endif
+
+      ASSERT(use_saved_class_table || class_table->SizeAt(class_id) > 0);
       if (!class_table->IsValidIndex(class_id) ||
-          !class_table->HasValidClassAt(class_id)) {
-        FATAL2("Invalid class id: %" Pd " from tags %x\n", class_id,
-               ptr()->tags_);
+          (!class_table->HasValidClassAt(class_id) && !use_saved_class_table)) {
+        FATAL3("Invalid cid: %" Pd ", obj: %p, tags: %x. Corrupt heap?",
+               class_id, this, ptr()->tags_);
       }
 #endif  // DEBUG
       instance_size = isolate->GetClassSizeForHeapWalkAt(class_id);
@@ -309,6 +320,13 @@ intptr_t RawObject::VisitPointersPredefined(ObjectPointerVisitor* visitor,
         break;
       }
 #undef RAW_VISITPOINTERS
+#define RAW_VISITPOINTERS(clazz) case k##clazz##Cid:
+      CLASS_LIST_WASM(RAW_VISITPOINTERS) {
+        // These wasm types do not have any fields or type arguments.
+        size = HeapSize();
+        break;
+      }
+#undef RAW_VISITPOINTERS
     case kFreeListElement: {
       uword addr = RawObject::ToAddr(this);
       FreeListElement* element = reinterpret_cast<FreeListElement*>(addr);
@@ -325,8 +343,8 @@ intptr_t RawObject::VisitPointersPredefined(ObjectPointerVisitor* visitor,
       size = HeapSize();
       break;
     default:
-      OS::PrintErr("Class Id: %" Pd "\n", class_id);
-      UNREACHABLE();
+      FATAL3("Invalid cid: %" Pd ", obj: %p, tags: %x. Corrupt heap?", class_id,
+             this, ptr()->tags_);
       break;
   }
 
@@ -636,5 +654,30 @@ DEFINE_LEAF_RUNTIME_ENTRY(void,
   HeapPage::Of(object)->RememberCard(slot);
 }
 END_LEAF_RUNTIME_ENTRY
+
+const char* RawPcDescriptors::KindToCString(Kind k) {
+  switch (k) {
+#define ENUM_CASE(name, init)                                                  \
+  case Kind::k##name:                                                          \
+    return #name;
+    FOR_EACH_RAW_PC_DESCRIPTOR(ENUM_CASE)
+#undef ENUM_CASE
+    default:
+      return nullptr;
+  }
+}
+
+bool RawPcDescriptors::ParseKind(const char* cstr, Kind* out) {
+  ASSERT(cstr != nullptr && out != nullptr);
+#define ENUM_CASE(name, init)                                                  \
+  if (strcmp(#name, cstr) == 0) {                                              \
+    *out = Kind::k##name;                                                      \
+    return true;                                                               \
+  }
+  FOR_EACH_RAW_PC_DESCRIPTOR(ENUM_CASE)
+#undef ENUM_CASE
+  return false;
+}
+#undef PREFIXED_NAME
 
 }  // namespace dart

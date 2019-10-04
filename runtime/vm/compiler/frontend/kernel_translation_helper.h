@@ -317,6 +317,7 @@ class TypeParameterHelper {
     kStart,  // tag.
     kFlags,
     kAnnotations,
+    kVariance,
     kName,
     kBound,
     kDefaultType,
@@ -689,12 +690,12 @@ class ClassHelper {
   void SetNext(Field field) { next_read_ = field; }
   void SetJustRead(Field field) { next_read_ = field + 1; }
 
-  bool is_abstract() const { return flags_ & Flag::kIsAbstract; }
+  bool is_abstract() const { return (flags_ & Flag::kIsAbstract) != 0; }
 
-  bool is_enum_class() const { return flags_ & Flag::kIsEnumClass; }
+  bool is_enum_class() const { return (flags_ & Flag::kIsEnumClass) != 0; }
 
   bool is_transformed_mixin_application() const {
-    return flags_ & Flag::kIsEliminatedMixin;
+    return (flags_ & Flag::kIsEliminatedMixin) != 0;
   }
 
   NameIndex canonical_name_;
@@ -1036,12 +1037,6 @@ class KernelReaderHelper {
     USE(id);
   }
 
-  virtual void RecordYieldPosition(TokenPosition position) {
-    // Do nothing by default.
-    // This is overridden in KernelTokenPositionCollector.
-    USE(position);
-  }
-
   virtual void RecordTokenPosition(TokenPosition position) {
     // Do nothing by default.
     // This is overridden in KernelTokenPositionCollector.
@@ -1093,6 +1088,7 @@ class KernelReaderHelper {
   Tag ReadTag(uint8_t* payload = NULL);
   uint8_t ReadFlags() { return reader_.ReadFlags(); }
   Nullability ReadNullability();
+  Variance ReadVariance();
 
   intptr_t SourceTableSize();
   intptr_t GetOffsetForSourceInfo(intptr_t index);

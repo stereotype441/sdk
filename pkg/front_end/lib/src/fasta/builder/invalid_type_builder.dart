@@ -4,11 +4,11 @@
 
 library fasta.invalid_type_builder;
 
-import 'package:kernel/ast.dart' show DartType, InvalidType;
+import 'package:kernel/ast.dart' show DartType, InvalidType, Nullability;
 
 import '../fasta_codes.dart' show LocatedMessage;
 
-import 'builder.dart' show TypeDeclarationBuilder;
+import 'builder.dart' show NullabilityBuilder, TypeDeclarationBuilder;
 
 import '../kernel/kernel_builder.dart' show TypeBuilder, LibraryBuilder;
 
@@ -28,13 +28,14 @@ class InvalidTypeBuilder extends TypeDeclarationBuilder {
   @override
   InvalidType get target => const InvalidType();
 
-  DartType buildType(LibraryBuilder library, List<TypeBuilder> arguments) {
-    return buildTypesWithBuiltArguments(library, null);
+  DartType buildType(LibraryBuilder library,
+      NullabilityBuilder nullabilityBuilder, List<TypeBuilder> arguments) {
+    return buildTypesWithBuiltArguments(library, null, null);
   }
 
   /// [Arguments] have already been built.
-  DartType buildTypesWithBuiltArguments(
-      LibraryBuilder library, List<DartType> arguments) {
+  DartType buildTypesWithBuiltArguments(LibraryBuilder library,
+      Nullability nullability, List<DartType> arguments) {
     if (!suppressMessage) {
       library.addProblem(message.messageObject, message.charOffset,
           message.length, message.uri,

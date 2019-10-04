@@ -60,10 +60,10 @@ import '../fasta_codes.dart'
         templateConstEvalInvalidStringInterpolationOperand,
         templateConstEvalInvalidSymbolName,
         templateConstEvalKeyImplementsEqual,
-        templateConstEvalNegativeShift,
-        templateConstEvalNonConstantLiteral,
         templateConstEvalNonConstantVariableGet,
         templateConstEvalZeroDivisor;
+
+import 'constant_int_folder.dart';
 
 part 'constant_collection_builders.dart';
 
@@ -114,22 +114,6 @@ void transformLibraries(
   for (final Library library in libraries) {
     constantsTransformer.convertLibrary(library);
   }
-}
-
-class JavaScriptIntConstant extends DoubleConstant {
-  final BigInt bigIntValue;
-  JavaScriptIntConstant(int value) : this.fromBigInt(new BigInt.from(value));
-  JavaScriptIntConstant.fromDouble(double value)
-      : bigIntValue = new BigInt.from(value),
-        super(value);
-  JavaScriptIntConstant.fromBigInt(this.bigIntValue)
-      : super(bigIntValue.toDouble());
-  JavaScriptIntConstant.fromUInt64(int value)
-      : this.fromBigInt(new BigInt.from(value).toUnsigned(64));
-
-  DartType getType(TypeEnvironment types) => types.intType;
-
-  String toString() => '$bigIntValue';
 }
 
 class ConstantsTransformer extends Transformer {
@@ -213,7 +197,7 @@ class ConstantsTransformer extends Transformer {
   Procedure visitProcedure(Procedure node) {
     constantEvaluator.withNewEnvironment(() {
       transformAnnotations(node.annotations, node);
-      node.function = node.function.accept(this)..parent = node;
+      node.function = node.function.accept<TreeNode>(this)..parent = node;
     });
     return node;
   }
@@ -223,7 +207,7 @@ class ConstantsTransformer extends Transformer {
     constantEvaluator.withNewEnvironment(() {
       transformAnnotations(node.annotations, node);
       transformList(node.initializers, this, node);
-      node.function = node.function.accept(this)..parent = node;
+      node.function = node.function.accept<TreeNode>(this)..parent = node;
     });
     return node;
   }
@@ -296,7 +280,7 @@ class ConstantsTransformer extends Transformer {
       }
     }
     if (node.body != null) {
-      node.body = node.body.accept(this)..parent = node;
+      node.body = node.body.accept<TreeNode>(this)..parent = node;
     }
     return node;
   }
@@ -322,7 +306,8 @@ class ConstantsTransformer extends Transformer {
           }
         }
       } else {
-        node.initializer = node.initializer.accept(this)..parent = node;
+        node.initializer = node.initializer.accept<TreeNode>(this)
+          ..parent = node;
       }
     }
     return node;
@@ -344,7 +329,8 @@ class ConstantsTransformer extends Transformer {
       } else {
         transformAnnotations(node.annotations, node);
         if (node.initializer != null) {
-          node.initializer = node.initializer.accept(this)..parent = node;
+          node.initializer = node.initializer.accept<TreeNode>(this)
+            ..parent = node;
         }
       }
       return node;
@@ -497,6 +483,7 @@ class ConstantsTransformer extends Transformer {
 class ConstantEvaluator extends RecursiveVisitor<Constant> {
   final ConstantsBackend backend;
   final NumberSemantics numberSemantics;
+  ConstantIntFolder intFolder;
   Map<String, String> environmentDefines;
   final bool errorOnUnevaluatedConstant;
   final CoreTypes coreTypes;
@@ -550,6 +537,7 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
           "No 'environmentDefines' passed to the constant evaluator but the "
           "ConstantsBackend does not support unevaluated constants.");
     }
+    intFolder = new ConstantIntFolder.forSemantics(this, numberSemantics);
     primitiveEqualCache = <Class, bool>{
       coreTypes.boolClass: true,
       coreTypes.doubleClass: false,
@@ -590,8 +578,12 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
     lazyDepth = 0;
     try {
       Constant result = _evaluateSubexpression(node);
-      if (errorOnUnevaluatedConstant && result is UnevaluatedConstant) {
-        return report(node, messageConstEvalUnevaluated);
+      if (result is UnevaluatedConstant) {
+        if (errorOnUnevaluatedConstant) {
+          return report(node, messageConstEvalUnevaluated);
+        }
+        return new UnevaluatedConstant(
+            removeRedundantFileUriExpressions(result.expression));
       }
       return result;
     } on _AbortDueToError catch (e) {
@@ -621,13 +613,8 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
       }
       return new UnevaluatedConstant(new InvalidExpression(e.message.message));
     } on _AbortDueToInvalidExpression catch (e) {
-      // TODO(askesc): Copy position from erroneous node.
-      // Currently not possible, as it might be in a different file.
-      // Can be done if we add an explicit URI to InvalidExpression.
-      InvalidExpression invalid = new InvalidExpression(e.message);
-      if (invalid.fileOffset == TreeNode.noOffset) {
-        invalid.fileOffset = node.fileOffset;
-      }
+      InvalidExpression invalid = new InvalidExpression(e.message)
+        ..fileOffset = node.fileOffset;
       errorReporter.reportInvalidExpression(invalid);
       return new UnevaluatedConstant(invalid);
     }
@@ -647,8 +634,13 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
   /// Produce an unevaluated constant node for an expression.
   Constant unevaluated(Expression original, Expression replacement) {
     replacement.fileOffset = original.fileOffset;
-    // TODO(askesc,johnniwinther): Preserve fileUri on [replacement].
-    return new UnevaluatedConstant(replacement);
+    return new UnevaluatedConstant(
+        new FileUriExpression(replacement, getFileUri(original))
+          ..fileOffset = original.fileOffset);
+  }
+
+  Expression removeRedundantFileUriExpressions(Expression node) {
+    return node.accept(new RedundantFileUriExpressionRemover()) as Expression;
   }
 
   /// Extract an expression from a (possibly unevaluated) constant to become
@@ -773,6 +765,11 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
   }
 
   @override
+  Constant visitFileUriExpression(FileUriExpression node) {
+    return _evaluateSubexpression(node.expression);
+  }
+
+  @override
   Constant visitNullLiteral(NullLiteral node) => nullConstant;
 
   @override
@@ -784,14 +781,12 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
   Constant visitIntLiteral(IntLiteral node) {
     // The frontend ensures that integer literals are valid according to the
     // target representation.
-    return targetingJavaScript
-        ? canonicalize(new JavaScriptIntConstant.fromUInt64(node.value))
-        : canonicalize(new IntConstant(node.value));
+    return canonicalize(intFolder.makeIntConstant(node.value, unsigned: true));
   }
 
   @override
   Constant visitDoubleLiteral(DoubleLiteral node) {
-    return canonicalize(makeDoubleConstant(node.value));
+    return canonicalize(new DoubleConstant(node.value));
   }
 
   @override
@@ -813,14 +808,6 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
       result = runInsideContext(constant.expression, () {
         return _evaluateSubexpression(constant.expression);
       });
-    } else if (targetingJavaScript) {
-      if (constant is DoubleConstant) {
-        double value = constant.value;
-        // TODO(askesc, fishythefish): Handle infinite integers.
-        if (value.isFinite && value.truncateToDouble() == value) {
-          result = new JavaScriptIntConstant.fromDouble(value);
-        }
-      }
     }
     // If there were already constants in the AST then we make sure we
     // re-canonicalize them.  After running the transformer we will therefore
@@ -832,8 +819,7 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
   @override
   Constant visitListLiteral(ListLiteral node) {
     if (!node.isConst) {
-      return report(
-          node, templateConstEvalNonConstantLiteral.withArguments('List'));
+      return reportInvalid(node, "Non-constant list literal");
     }
     final ListConstantBuilder builder =
         new ListConstantBuilder(node, node.typeArgument, this);
@@ -856,8 +842,7 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
   @override
   Constant visitSetLiteral(SetLiteral node) {
     if (!node.isConst) {
-      return report(
-          node, templateConstEvalNonConstantLiteral.withArguments('Set'));
+      return reportInvalid(node, "Non-constant set literal");
     }
     final SetConstantBuilder builder =
         new SetConstantBuilder(node, node.typeArgument, this);
@@ -880,8 +865,7 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
   @override
   Constant visitMapLiteral(MapLiteral node) {
     if (!node.isConst) {
-      return report(
-          node, templateConstEvalNonConstantLiteral.withArguments('Map'));
+      return reportInvalid(node, "Non-constant map literal");
     }
     final MapConstantBuilder builder =
         new MapConstantBuilder(node, node.keyType, node.valueType, this);
@@ -903,8 +887,7 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
 
   @override
   Constant visitFunctionExpression(FunctionExpression node) {
-    return report(
-        node, templateConstEvalNonConstantLiteral.withArguments('Function'));
+    return reportInvalid(node, "Function literal");
   }
 
   @override
@@ -1242,15 +1225,17 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
               statement.message,
               templateConstEvalInvalidType.withArguments(
                   message,
-                  typeEnvironment.stringType,
+                  typeEnvironment.coreTypes.stringLegacyRawType,
                   message.getType(typeEnvironment)));
         }
       }
     } else {
       report(
           statement.condition,
-          templateConstEvalInvalidType.withArguments(condition,
-              typeEnvironment.boolType, condition.getType(typeEnvironment)));
+          templateConstEvalInvalidType.withArguments(
+              condition,
+              typeEnvironment.coreTypes.boolLegacyRawType,
+              condition.getType(typeEnvironment)));
     }
   }
 
@@ -1282,25 +1267,16 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
     if (arguments.length == 1 && op == '==') {
       final Constant right = arguments[0];
 
-      // [DoubleConstant] uses [identical] to determine equality, so we need two
-      // special cases:
-      // Two NaNs are always unequal even if [identical] returns `true`.
-      if (isNaN(receiver) || isNaN(right)) {
-        return falseConstant;
-      }
-
-      // Two zero values are always equal regardless of sign.
-      if (isZero(receiver)) {
-        return makeBoolConstant(isZero(right));
-      }
-
       if (receiver is NullConstant ||
           receiver is BoolConstant ||
           receiver is IntConstant ||
           receiver is DoubleConstant ||
           receiver is StringConstant ||
           right is NullConstant) {
-        return makeBoolConstant(receiver == right);
+        // [DoubleConstant] uses [identical] to determine equality, so we need
+        // to take the special cases into account.
+        return doubleSpecialCases(receiver, right) ??
+            makeBoolConstant(receiver == right);
       } else {
         return report(
             node,
@@ -1324,116 +1300,18 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
                 templateConstEvalInvalidBinaryOperandType.withArguments(
                     '+',
                     receiver,
-                    typeEnvironment.stringType,
+                    typeEnvironment.coreTypes.stringLegacyRawType,
                     other.getType(typeEnvironment)));
         }
       }
-    } else if (receiver is IntConstant || receiver is JavaScriptIntConstant) {
+    } else if (intFolder.isInt(receiver)) {
       if (arguments.length == 0) {
-        switch (op) {
-          case 'unary-':
-            if (targetingJavaScript) {
-              BigInt value = (receiver as JavaScriptIntConstant).bigIntValue;
-              if (value == BigInt.zero) {
-                return canonicalize(new DoubleConstant(-0.0));
-              }
-              return canonicalize(new JavaScriptIntConstant.fromBigInt(-value));
-            }
-            int value = (receiver as IntConstant).value;
-            return canonicalize(new IntConstant(-value));
-          case '~':
-            if (targetingJavaScript) {
-              BigInt value = (receiver as JavaScriptIntConstant).bigIntValue;
-              return canonicalize(new JavaScriptIntConstant.fromBigInt(
-                  (~value).toUnsigned(32)));
-            }
-            int value = (receiver as IntConstant).value;
-            return canonicalize(new IntConstant(~value));
-        }
+        return canonicalize(intFolder.foldUnaryOperator(node, op, receiver));
       } else if (arguments.length == 1) {
         final Constant other = arguments[0];
-        if (other is IntConstant || other is JavaScriptIntConstant) {
-          if ((op == '<<' || op == '>>' || op == '>>>')) {
-            Object receiverValue = receiver is IntConstant
-                ? receiver.value
-                : (receiver as JavaScriptIntConstant).bigIntValue;
-            int otherValue = other is IntConstant
-                ? other.value
-                : (other as JavaScriptIntConstant).bigIntValue.toInt();
-            if (otherValue < 0) {
-              return report(
-                  node.arguments.positional.first,
-                  // TODO(askesc): Change argument types in template to
-                  // constants.
-                  templateConstEvalNegativeShift.withArguments(
-                      op, '${receiverValue}', '${otherValue}'));
-            }
-          }
-
-          if ((op == '%' || op == '~/')) {
-            Object receiverValue = receiver is IntConstant
-                ? receiver.value
-                : (receiver as JavaScriptIntConstant).bigIntValue;
-            int otherValue = other is IntConstant
-                ? other.value
-                : (other as JavaScriptIntConstant).bigIntValue.toInt();
-            if (otherValue == 0) {
-              return report(
-                  node.arguments.positional.first,
-                  // TODO(askesc): Change argument type in template to constant.
-                  templateConstEvalZeroDivisor.withArguments(
-                      op, '${receiverValue}'));
-            }
-          }
-
-          switch (op) {
-            case '|':
-            case '&':
-            case '^':
-              int receiverValue = receiver is IntConstant
-                  ? receiver.value
-                  : (receiver as JavaScriptIntConstant)
-                      .bigIntValue
-                      .toUnsigned(32)
-                      .toInt();
-              int otherValue = other is IntConstant
-                  ? other.value
-                  : (other as JavaScriptIntConstant)
-                      .bigIntValue
-                      .toUnsigned(32)
-                      .toInt();
-              return evaluateBinaryBitOperation(
-                  op, receiverValue, otherValue, node);
-            case '<<':
-            case '>>':
-            case '>>>':
-              bool negative = false;
-              int receiverValue;
-              if (receiver is IntConstant) {
-                receiverValue = receiver.value;
-              } else {
-                BigInt bigIntValue =
-                    (receiver as JavaScriptIntConstant).bigIntValue;
-                receiverValue = bigIntValue.toUnsigned(32).toInt();
-                negative = bigIntValue.isNegative;
-              }
-              int otherValue = other is IntConstant
-                  ? other.value
-                  : (other as JavaScriptIntConstant).bigIntValue.toInt();
-
-              return evaluateBinaryShiftOperation(
-                  op, receiverValue, otherValue, node,
-                  negativeReceiver: negative);
-            default:
-              num receiverValue = receiver is IntConstant
-                  ? receiver.value
-                  : (receiver as DoubleConstant).value;
-              num otherValue = other is IntConstant
-                  ? other.value
-                  : (other as DoubleConstant).value;
-              return evaluateBinaryNumericOperation(
-                  op, receiverValue, otherValue, node);
-          }
+        if (intFolder.isInt(other)) {
+          return canonicalize(
+              intFolder.foldBinaryOperator(node, op, receiver, other));
         } else if (other is DoubleConstant) {
           if ((op == '|' || op == '&' || op == '^') ||
               (op == '<<' || op == '>>' || op == '>>>')) {
@@ -1442,21 +1320,19 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
                 templateConstEvalInvalidBinaryOperandType.withArguments(
                     op,
                     other,
-                    typeEnvironment.intType,
+                    typeEnvironment.coreTypes.intLegacyRawType,
                     other.getType(typeEnvironment)));
           }
-          num receiverValue = receiver is IntConstant
-              ? receiver.value
-              : (receiver as DoubleConstant).value;
-          return evaluateBinaryNumericOperation(
-              op, receiverValue, other.value, node);
+          num receiverValue = (receiver as PrimitiveConstant<num>).value;
+          return canonicalize(evaluateBinaryNumericOperation(
+              op, receiverValue, other.value, node));
         }
         return report(
             node,
             templateConstEvalInvalidBinaryOperandType.withArguments(
                 op,
                 receiver,
-                typeEnvironment.numType,
+                typeEnvironment.coreTypes.numLegacyRawType,
                 other.getType(typeEnvironment)));
       }
     } else if (receiver is DoubleConstant) {
@@ -1467,30 +1343,28 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
             templateConstEvalInvalidBinaryOperandType.withArguments(
                 op,
                 receiver,
-                typeEnvironment.intType,
+                typeEnvironment.coreTypes.intLegacyRawType,
                 receiver.getType(typeEnvironment)));
       }
       if (arguments.length == 0) {
         switch (op) {
           case 'unary-':
-            return canonicalize(makeDoubleConstant(-receiver.value));
+            return canonicalize(new DoubleConstant(-receiver.value));
         }
       } else if (arguments.length == 1) {
         final Constant other = arguments[0];
 
         if (other is IntConstant || other is DoubleConstant) {
-          final num value = (other is IntConstant)
-              ? other.value
-              : (other as DoubleConstant).value;
-          return evaluateBinaryNumericOperation(
-              op, receiver.value, value, node);
+          final num value = (other as PrimitiveConstant<num>).value;
+          return canonicalize(
+              evaluateBinaryNumericOperation(op, receiver.value, value, node));
         }
         return report(
             node,
             templateConstEvalInvalidBinaryOperandType.withArguments(
                 op,
                 receiver,
-                typeEnvironment.numType,
+                typeEnvironment.coreTypes.numLegacyRawType,
                 other.getType(typeEnvironment)));
       }
     } else if (receiver is BoolConstant) {
@@ -1543,7 +1417,7 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
               templateConstEvalInvalidBinaryOperandType.withArguments(
                   node.operator,
                   left,
-                  typeEnvironment.boolType,
+                  typeEnvironment.coreTypes.boolLegacyRawType,
                   right.getType(typeEnvironment)));
         }
         return report(
@@ -1564,7 +1438,7 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
               templateConstEvalInvalidBinaryOperandType.withArguments(
                   node.operator,
                   left,
-                  typeEnvironment.boolType,
+                  typeEnvironment.coreTypes.boolLegacyRawType,
                   right.getType(typeEnvironment)));
         }
         return report(
@@ -1602,8 +1476,10 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
     } else {
       return report(
           node.condition,
-          templateConstEvalInvalidType.withArguments(condition,
-              typeEnvironment.boolType, condition.getType(typeEnvironment)));
+          templateConstEvalInvalidType.withArguments(
+              condition,
+              typeEnvironment.coreTypes.boolLegacyRawType,
+              condition.getType(typeEnvironment)));
     }
   }
 
@@ -1625,10 +1501,7 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
 
     final Constant receiver = _evaluateSubexpression(node.receiver);
     if (receiver is StringConstant && node.name.name == 'length') {
-      if (targetingJavaScript) {
-        return canonicalize(new JavaScriptIntConstant(receiver.value.length));
-      }
-      return canonicalize(new IntConstant(receiver.value.length));
+      return canonicalize(intFolder.makeIntConstant(receiver.value.length));
     } else if (shouldBeUnevaluated) {
       return unevaluated(node,
           new PropertyGet(extract(receiver), node.name, node.interfaceTarget));
@@ -1706,7 +1579,12 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
     for (int i = 0; i < node.expressions.length; i++) {
       Constant constant = _evaluateSubexpression(node.expressions[i]);
       if (constant is PrimitiveConstant<Object>) {
-        String value = constant.toString();
+        String value;
+        if (constant is DoubleConstant && intFolder.isInt(constant)) {
+          value = new BigInt.from(constant.value).toString();
+        } else {
+          value = constant.toString();
+        }
         Object last = concatenated.last;
         if (last is StringBuffer) {
           last.write(value);
@@ -1782,16 +1660,17 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
               return boolConstant;
             } else if (target.enclosingClass == coreTypes.intClass) {
               int intValue = value != null ? int.tryParse(value) : null;
-              intValue ??= defaultValue is IntConstant
-                  ? defaultValue.value
-                  : defaultValue is JavaScriptIntConstant
-                      ? defaultValue.bigIntValue.toInt()
-                      : null;
-              if (intValue == null) return nullConstant;
-              if (targetingJavaScript) {
-                return canonicalize(new JavaScriptIntConstant(intValue));
+              Constant intConstant;
+              if (intValue != null) {
+                bool negated = value.startsWith('-');
+                intConstant =
+                    intFolder.makeIntConstant(intValue, unsigned: !negated);
+              } else if (intFolder.isInt(defaultValue)) {
+                intConstant = defaultValue;
+              } else {
+                intConstant = nullConstant;
               }
-              return canonicalize(new IntConstant(intValue));
+              return canonicalize(intConstant);
             } else if (target.enclosingClass == coreTypes.stringClass) {
               value ??=
                   defaultValue is StringConstant ? defaultValue.value : null;
@@ -1818,16 +1697,10 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
         final Constant right = positionals[1];
 
         if (targetingJavaScript) {
-          // In JavaScript, we lower [identical] to `===`, so any comparison
-          // against NaN yields `false`.
-          if (isNaN(left) || isNaN(right)) {
-            return falseConstant;
-          }
-
-          // In JavaScript, `-0.0 === 0.0`.
-          if (isZero(left)) {
-            return makeBoolConstant(isZero(right));
-          }
+          // In JavaScript, we lower [identical] to `===`, so we need to take
+          // the double special cases into account.
+          return doubleSpecialCases(left, right) ??
+              makeBoolConstant(identical(left, right));
         }
 
         // Since we canonicalize constants during the evaluation, we can use
@@ -1836,12 +1709,6 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
       }
     }
 
-    // TODO(kmillikin) For an invalid factory invocation we should adopt a
-    // better message.  This will show something like:
-    //
-    // "The invocation of 'List' is not allowed within a const context."
-    //
-    // Which is not quite right when the code was "new List()".
     String name = target.name.name;
     if (target is Procedure && target.isFactory) {
       if (name.isEmpty) {
@@ -1850,8 +1717,7 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
         name = '${target.enclosingClass.name}.${name}';
       }
     }
-    return report(
-        node, templateConstEvalInvalidStaticInvocation.withArguments(name));
+    return reportInvalid(node, "Invocation of $name");
   }
 
   @override
@@ -1872,7 +1738,7 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
     }
     if (constant is NullConstant) {
       return makeBoolConstant(node.type == typeEnvironment.nullType ||
-          node.type == typeEnvironment.objectType ||
+          node.type == typeEnvironment.coreTypes.objectLegacyRawType ||
           node.type is DynamicType);
     }
     return makeBoolConstant(
@@ -1890,8 +1756,10 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
     }
     return report(
         node,
-        templateConstEvalInvalidType.withArguments(constant,
-            typeEnvironment.boolType, constant.getType(typeEnvironment)));
+        templateConstEvalInvalidType.withArguments(
+            constant,
+            typeEnvironment.coreTypes.boolLegacyRawType,
+            constant.getType(typeEnvironment)));
   }
 
   @override
@@ -1937,16 +1805,19 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
 
   // Helper methods:
 
-  bool isZero(Constant value) =>
-      (value is IntConstant && value.value == 0) ||
-      (value is JavaScriptIntConstant && value.bigIntValue == BigInt.zero) ||
-      (value is DoubleConstant && value.value == 0);
-
-  bool isNaN(Constant value) => value is DoubleConstant && value.value.isNaN;
+  /// If both constants are DoubleConstant whose values would give different
+  /// results from == and [identical], return the result of ==. Otherwise
+  /// return null.
+  Constant doubleSpecialCases(Constant a, Constant b) {
+    if (a is DoubleConstant && b is DoubleConstant) {
+      if (a.value.isNaN && b.value.isNaN) return falseConstant;
+      if (a.value == 0.0 && b.value == 0.0) return trueConstant;
+    }
+    return null;
+  }
 
   bool hasPrimitiveEqual(Constant constant) {
-    // TODO(askesc, fishythefish): Make sure the correct class is inferred
-    // when we clean up JavaScript int constant handling.
+    if (intFolder.isInt(constant)) return true;
     DartType type = constant.getType(typeEnvironment);
     return !(type is InterfaceType && !classHasPrimitiveEqual(type.classNode));
   }
@@ -1970,29 +1841,17 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
   BoolConstant makeBoolConstant(bool value) =>
       value ? trueConstant : falseConstant;
 
-  DoubleConstant makeDoubleConstant(double value) {
-    if (targetingJavaScript) {
-      // Convert to an integer when possible (matching the runtime behavior
-      // of `is int`).
-      if (value.isFinite && !identical(value, -0.0)) {
-        int i = value.toInt();
-        if (value == i.toDouble()) return new JavaScriptIntConstant(i);
-      }
-    }
-    return new DoubleConstant(value);
-  }
-
   bool isSubtype(Constant constant, DartType type) {
     DartType constantType = constant.getType(typeEnvironment);
     if (targetingJavaScript) {
-      if (constantType == typeEnvironment.intType &&
-          type == typeEnvironment.doubleType) {
+      if (constantType == typeEnvironment.coreTypes.intLegacyRawType &&
+          type == typeEnvironment.coreTypes.doubleLegacyRawType) {
         // With JS semantics, an integer is also a double.
         return true;
       }
 
-      if (constantType == typeEnvironment.doubleType &&
-          type == typeEnvironment.intType) {
+      if (constantType == typeEnvironment.coreTypes.doubleLegacyRawType &&
+          type == typeEnvironment.coreTypes.intLegacyRawType) {
         double value = (constant as DoubleConstant).value;
         if (value.isFinite && value == value.truncateToDouble()) {
           return true;
@@ -2095,88 +1954,26 @@ class ConstantEvaluator extends RecursiveVisitor<Constant> {
     }
   }
 
-  Constant evaluateBinaryBitOperation(String op, int a, int b, TreeNode node) {
-    int result;
-    switch (op) {
-      case '|':
-        result = a | b;
-        break;
-      case '&':
-        result = a & b;
-        break;
-      case '^':
-        result = a ^ b;
-        break;
-    }
-
-    if (targetingJavaScript) {
-      return canonicalize(new JavaScriptIntConstant(result));
-    }
-    return canonicalize(new IntConstant(result));
-  }
-
-  Constant evaluateBinaryShiftOperation(String op, int a, int b, TreeNode node,
-      {negativeReceiver: false}) {
-    int result;
-    switch (op) {
-      case '<<':
-        result = a << b;
-        break;
-      case '>>':
-        if (targetingJavaScript) {
-          if (negativeReceiver) {
-            const int signBit = 0x80000000;
-            a -= (a & signBit) << 1;
-          }
-          result = a >> b;
-        } else {
-          result = a >> b;
-        }
-        break;
-      case '>>>':
-        // TODO(fishythefish): Implement JS semantics for `>>>`.
-        result = b >= 64 ? 0 : (a >> b) & ((1 << (64 - b)) - 1);
-        break;
-    }
-
-    if (targetingJavaScript) {
-      return canonicalize(new JavaScriptIntConstant(result.toUnsigned(32)));
-    }
-    return canonicalize(new IntConstant(result));
-  }
-
+  /// Binary operation between two operands, at least one of which is a double.
   Constant evaluateBinaryNumericOperation(
       String op, num a, num b, TreeNode node) {
-    num result;
     switch (op) {
       case '+':
-        result = a + b;
-        break;
+        return new DoubleConstant(a + b);
       case '-':
-        result = a - b;
-        break;
+        return new DoubleConstant(a - b);
       case '*':
-        result = a * b;
-        break;
+        return new DoubleConstant(a * b);
       case '/':
-        result = a / b;
-        break;
+        return new DoubleConstant(a / b);
       case '~/':
-        result = a ~/ b;
-        break;
+        if (b == 0) {
+          return report(
+              node, templateConstEvalZeroDivisor.withArguments(op, '$a'));
+        }
+        return intFolder.truncatingDivide(a, b);
       case '%':
-        result = a % b;
-        break;
-    }
-
-    if (result is int) {
-      if (targetingJavaScript) {
-        return canonicalize(new JavaScriptIntConstant(result));
-      }
-      return canonicalize(new IntConstant(result.toSigned(64)));
-    }
-    if (result is double) {
-      return canonicalize(makeDoubleConstant(result));
+        return new DoubleConstant(a % b);
     }
 
     switch (op) {
@@ -2307,6 +2104,23 @@ class EvaluationEnvironment {
   DartType substituteType(DartType type) {
     if (_typeVariables.isEmpty) return type;
     return substitute(type, _typeVariables);
+  }
+}
+
+class RedundantFileUriExpressionRemover extends Transformer {
+  Uri currentFileUri = null;
+
+  TreeNode visitFileUriExpression(FileUriExpression node) {
+    if (node.fileUri == currentFileUri) {
+      return node.expression.accept(this);
+    } else {
+      Uri oldFileUri = currentFileUri;
+      currentFileUri = node.fileUri;
+      node.expression = node.expression.accept(this) as Expression
+        ..parent = node;
+      currentFileUri = oldFileUri;
+      return node;
+    }
   }
 }
 

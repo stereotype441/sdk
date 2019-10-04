@@ -134,7 +134,7 @@ abstract class _Invocation extends _DependencyTracker
     final nsmArgs = new Args<Type>([
       receiver,
       new Type.cone(
-          typeFlowAnalysis.environment.coreTypes.invocationClass.rawType)
+          typeFlowAnalysis.environment.coreTypes.invocationLegacyRawType)
     ]);
 
     final nsmInvocation =
@@ -438,8 +438,9 @@ class _DispatchableInvocation extends _Invocation {
     }
 
     if (selector is InterfaceSelector) {
-      final staticReceiverType =
-          new Type.fromStatic(selector.member.enclosingClass.rawType);
+      final staticReceiverType = new Type.fromStatic(typeFlowAnalysis
+          .environment.coreTypes
+          .legacyRawType(selector.member.enclosingClass));
       receiver = receiver.intersection(
           staticReceiverType, typeFlowAnalysis.hierarchyCache);
       assertx(receiver is! NullableType);
@@ -1092,10 +1093,10 @@ class _ClassHierarchyCache implements TypeHierarchy {
 
     // TODO(alexmarkov): handle function types properly
     if (subType is FunctionType) {
-      subType = _typeFlowAnalysis.environment.rawFunctionType;
+      subType = _typeFlowAnalysis.environment.functionLegacyRawType;
     }
     if (superType is FunctionType) {
-      superType = _typeFlowAnalysis.environment.rawFunctionType;
+      superType = _typeFlowAnalysis.environment.functionLegacyRawType;
     }
     // TODO(alexmarkov): handle generic types properly.
     assertx(subType is! TypeParameterType);
@@ -1139,7 +1140,7 @@ class _ClassHierarchyCache implements TypeHierarchy {
 
     // TODO(alexmarkov): handle function types properly
     if (base is FunctionType) {
-      base = _typeFlowAnalysis.environment.rawFunctionType;
+      base = _typeFlowAnalysis.environment.functionLegacyRawType;
     }
 
     if (base is TypeParameterType) {
@@ -1155,7 +1156,7 @@ class _ClassHierarchyCache implements TypeHierarchy {
     // subtypes is too large
 
     if (base == const DynamicType() ||
-        base == _typeFlowAnalysis.environment.objectType ||
+        base == _typeFlowAnalysis.environment.coreTypes.objectLegacyRawType ||
         // TODO(alexmarkov): handle FutureOr more precisely (requires generics).
         baseClass == _typeFlowAnalysis.environment.futureOrClass) {
       return const AnyType();
@@ -1239,6 +1240,7 @@ class _ClassHierarchyCache implements TypeHierarchy {
   Class get futureOrClass => environment.coreTypes.futureOrClass;
   Class get futureClass => environment.coreTypes.futureClass;
   Class get functionClass => environment.coreTypes.functionClass;
+  CoreTypes get coreTypes => environment.coreTypes;
 }
 
 class _WorkList {

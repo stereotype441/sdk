@@ -9,9 +9,10 @@ import 'package:kernel/ast.dart'
         AsExpression,
         Class,
         Component,
+        DartType,
         ExpressionStatement,
         Field,
-        Let,
+        FunctionType,
         Library,
         Member,
         Procedure,
@@ -19,7 +20,8 @@ import 'package:kernel/ast.dart'
         SuperMethodInvocation,
         SuperPropertyGet,
         SuperPropertySet,
-        TreeNode;
+        TreeNode,
+        TypeParameter;
 
 import 'package:kernel/transformations/flags.dart' show TransformerFlag;
 
@@ -32,9 +34,7 @@ import '../fasta_codes.dart'
 
 import '../severity.dart' show Severity;
 
-import '../type_inference/type_schema.dart' show TypeSchemaVisitor, UnknownType;
-
-import 'kernel_shadow_ast.dart' show SyntheticExpressionJudgment;
+import '../type_inference/type_schema.dart' show UnknownType;
 
 import 'redirecting_factory_body.dart'
     show RedirectingFactoryBody, getRedirectingFactoryBody;
@@ -47,8 +47,7 @@ List<LocatedMessage> verifyComponent(Component component,
   return verifier.errors;
 }
 
-class FastaVerifyingVisitor extends VerifyingVisitor
-    implements TypeSchemaVisitor<void> {
+class FastaVerifyingVisitor extends VerifyingVisitor {
   final List<LocatedMessage> errors = <LocatedMessage>[];
 
   Uri fileUri;
@@ -138,14 +137,6 @@ class FastaVerifyingVisitor extends VerifyingVisitor
   }
 
   @override
-  visitLet(Let node) {
-    if (node is SyntheticExpressionJudgment) {
-      problem(node, "Leaking shadow node: ${node.runtimeType}");
-    }
-    super.visitLet(node);
-  }
-
-  @override
   visitLibrary(Library node) {
     // Issue(http://dartbug.com/32530)
     if (skipPlatform && node.importUri.scheme == 'dart') {
@@ -174,9 +165,26 @@ class FastaVerifyingVisitor extends VerifyingVisitor
   }
 
   @override
-  visitUnknownType(UnknownType node) {
-    // Note: we can't pass [node] to [problem] because it's not a [TreeNode].
-    problem(null, "Unexpected appearance of the unknown type.");
+  defaultDartType(DartType node) {
+    if (node is UnknownType) {
+      // Note: we can't pass [node] to [problem] because it's not a [TreeNode].
+      problem(null, "Unexpected appearance of the unknown type.");
+    }
+    super.defaultDartType(node);
+  }
+
+  @override
+  visitFunctionType(FunctionType node) {
+    if (node.typeParameters.isNotEmpty) {
+      for (TypeParameter typeParameter in node.typeParameters) {
+        if (typeParameter.parent != null) {
+          problem(
+              null,
+              "Type parameters of function types shouldn't have parents: "
+              "$node.");
+        }
+      }
+    }
   }
 
   @override

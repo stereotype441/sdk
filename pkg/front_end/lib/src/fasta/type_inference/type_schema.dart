@@ -10,6 +10,7 @@ import 'package:kernel/ast.dart'
         FunctionType,
         InterfaceType,
         NamedType,
+        Nullability,
         TypedefType,
         Visitor;
 
@@ -17,8 +18,6 @@ import 'package:kernel/import_table.dart' show ImportTable;
 
 import 'package:kernel/text/ast_to_text.dart'
     show Annotator, NameSystem, Printer, globalDebuggingNames;
-
-import '../problems.dart' show unsupported;
 
 /// Determines whether a type schema contains `?` somewhere inside it.
 bool isKnown(DartType schema) => schema.accept(new _IsKnownVisitor());
@@ -32,7 +31,7 @@ String typeSchemaToString(DartType schema) {
 }
 
 /// Extension of [Printer] that represents the unknown type as `?`.
-class TypeSchemaPrinter extends Printer implements TypeSchemaVisitor<Null> {
+class TypeSchemaPrinter extends Printer {
   TypeSchemaPrinter(StringSink sink,
       {NameSystem syntheticNames,
       bool showExternal,
@@ -47,15 +46,9 @@ class TypeSchemaPrinter extends Printer implements TypeSchemaVisitor<Null> {
             annotator: annotator);
 
   @override
-  visitUnknownType(UnknownType node) {
+  defaultDartType(covariant UnknownType node) {
     writeWord('?');
   }
-}
-
-/// Extension of [DartTypeVisitor] which can visit [UnknownType].
-class TypeSchemaVisitor<R> extends DartTypeVisitor<R> {
-  /// Called when [UnknownType] is visited.
-  R visitUnknownType(UnknownType node) => defaultDartType(node);
 }
 
 /// The unknown type (denoted `?`) is an object which can appear anywhere that
@@ -66,7 +59,7 @@ class TypeSchemaVisitor<R> extends DartTypeVisitor<R> {
 /// purely part of the local inference process.
 class UnknownType extends DartType {
   @override
-  get nullability => unsupported("nullability", -1, null);
+  Nullability get nullability => null;
 
   const UnknownType();
 
@@ -77,31 +70,25 @@ class UnknownType extends DartType {
   }
 
   @override
-  accept(DartTypeVisitor<dynamic> v) {
-    if (v is TypeSchemaVisitor<dynamic>) {
-      return v.visitUnknownType(this);
-    } else {
-      // Note: in principle it seems like this should throw, since any visitor
-      // that operates on a type schema ought to inherit from TypeSchemaVisitor.
-      // However, that would make it impossible to use toString() on any type
-      // schema, since toString() uses the kernel's Printer visitor, which can't
-      // possibly inherit from TypeSchemaVisitor since it's inside kernel.
-      return v.defaultDartType(this);
-    }
+  R accept<R>(DartTypeVisitor<R> v) {
+    return v.defaultDartType(this);
   }
 
   @override
-  accept1(DartTypeVisitor1<dynamic, dynamic> v, arg) =>
+  R accept1<R, A>(DartTypeVisitor1<R, A> v, arg) =>
       v.defaultDartType(this, arg);
 
   @override
   visitChildren(Visitor<dynamic> v) {}
+
+  @override
+  UnknownType withNullability(Nullability nullability) => this;
 }
 
 /// Visitor that computes [isKnown].
-class _IsKnownVisitor extends TypeSchemaVisitor<bool> {
+class _IsKnownVisitor extends DartTypeVisitor<bool> {
   @override
-  bool defaultDartType(DartType node) => true;
+  bool defaultDartType(DartType node) => node is! UnknownType;
 
   @override
   bool visitFunctionType(FunctionType node) {
@@ -130,7 +117,4 @@ class _IsKnownVisitor extends TypeSchemaVisitor<bool> {
     }
     return true;
   }
-
-  @override
-  bool visitUnknownType(UnknownType node) => false;
 }

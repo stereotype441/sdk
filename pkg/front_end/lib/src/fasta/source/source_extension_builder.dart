@@ -4,6 +4,7 @@
 
 import 'dart:core' hide MapEntry;
 import 'package:kernel/ast.dart';
+import '../../base/common.dart';
 import '../builder/declaration.dart';
 import '../builder/extension_builder.dart';
 import '../builder/library_builder.dart';
@@ -12,21 +13,25 @@ import '../builder/procedure_builder.dart';
 import '../builder/type_builder.dart';
 import '../builder/type_variable_builder.dart';
 import '../scope.dart';
-import 'source_library_builder.dart';
 import '../kernel/kernel_builder.dart';
-
 import '../problems.dart';
-
 import '../fasta_codes.dart'
     show
+        messagePatchDeclarationMismatch,
+        messagePatchDeclarationOrigin,
         noLength,
         templateConflictsWithMember,
         templateConflictsWithMemberWarning,
         templateConflictsWithSetter,
-        templateConflictsWithSetterWarning;
+        templateConflictsWithSetterWarning,
+        templateExtensionMemberConflictsWithObjectMember;
+import 'source_library_builder.dart';
 
 class SourceExtensionBuilder extends ExtensionBuilder {
   final Extension _extension;
+
+  SourceExtensionBuilder _origin;
+  SourceExtensionBuilder patchForTesting;
 
   SourceExtensionBuilder(
       List<MetadataBuilder> metadata,
@@ -48,12 +53,36 @@ class SourceExtensionBuilder extends ExtensionBuilder {
         super(metadata, modifiers, name, parent, nameOffset, scope,
             typeParameters, onType);
 
-  Extension get extension => _extension;
+  @override
+  SourceExtensionBuilder get origin => _origin ?? this;
 
+  Extension get extension => isPatch ? origin._extension : _extension;
+
+  /// Builds the [Extension] for this extension build and inserts the members
+  /// into the [Library] of [libraryBuilder].
+  ///
+  /// [addMembersToLibrary] is `true` if the extension members should be added
+  /// to the library. This is `false` if the extension is in conflict with
+  /// another library member. In this case, the extension member should not be
+  /// added to the library to avoid name clashes with other members in the
+  /// library.
   Extension build(
-      SourceLibraryBuilder libraryBuilder, LibraryBuilder coreLibrary) {
+      SourceLibraryBuilder libraryBuilder, LibraryBuilder coreLibrary,
+      {bool addMembersToLibrary}) {
+    ClassBuilder objectClassBuilder =
+        coreLibrary.lookupLocalMember('Object', required: true);
     void buildBuilders(String name, Builder declaration) {
       do {
+        Builder objectGetter = objectClassBuilder.lookupLocalMember(name);
+        Builder objectSetter =
+            objectClassBuilder.lookupLocalMember(name, setter: true);
+        if (objectGetter != null || objectSetter != null) {
+          addProblem(
+              templateExtensionMemberConflictsWithObjectMember
+                  .withArguments(name),
+              declaration.charOffset,
+              name.length);
+        }
         if (declaration.parent != this) {
           if (fileUri != declaration.parent.fileUri) {
             unexpected("$fileUri", "${declaration.parent.fileUri}", charOffset,
@@ -64,48 +93,52 @@ class SourceExtensionBuilder extends ExtensionBuilder {
           }
         } else if (declaration is FieldBuilder) {
           Field field = declaration.build(libraryBuilder);
-          libraryBuilder.library.addMember(field);
-          _extension.members.add(new ExtensionMemberDescriptor(
-              name: new Name(declaration.name, libraryBuilder.library),
-              member: field.reference,
-              isStatic: declaration.isStatic,
-              kind: ExtensionMemberKind.Field));
+          if (addMembersToLibrary && declaration.next == null) {
+            libraryBuilder.library.addMember(field);
+            extension.members.add(new ExtensionMemberDescriptor(
+                name: new Name(declaration.name, libraryBuilder.library),
+                member: field.reference,
+                isStatic: declaration.isStatic,
+                kind: ExtensionMemberKind.Field));
+          }
         } else if (declaration is ProcedureBuilder) {
           Member function = declaration.build(libraryBuilder);
-          libraryBuilder.library.addMember(function);
-          ExtensionMemberKind kind;
-          switch (declaration.kind) {
-            case ProcedureKind.Method:
-              kind = ExtensionMemberKind.Method;
-              break;
-            case ProcedureKind.Getter:
-              kind = ExtensionMemberKind.Getter;
-              break;
-            case ProcedureKind.Setter:
-              kind = ExtensionMemberKind.Setter;
-              break;
-            case ProcedureKind.Operator:
-              kind = ExtensionMemberKind.Operator;
-              break;
-            case ProcedureKind.Factory:
-              unsupported("Extension method kind: ${declaration.kind}",
-                  declaration.charOffset, declaration.fileUri);
-          }
-          _extension.members.add(new ExtensionMemberDescriptor(
-              name: new Name(declaration.name, libraryBuilder.library),
-              member: function.reference,
-              isStatic: declaration.isStatic,
-              isExternal: declaration.isExternal,
-              kind: kind));
-          Procedure tearOff = declaration.extensionTearOff;
-          if (tearOff != null) {
-            libraryBuilder.library.addMember(tearOff);
-            _extension.members.add(new ExtensionMemberDescriptor(
+          if (addMembersToLibrary &&
+              !declaration.isPatch &&
+              declaration.next == null) {
+            libraryBuilder.library.addMember(function);
+            ExtensionMemberKind kind;
+            switch (declaration.kind) {
+              case ProcedureKind.Method:
+                kind = ExtensionMemberKind.Method;
+                break;
+              case ProcedureKind.Getter:
+                kind = ExtensionMemberKind.Getter;
+                break;
+              case ProcedureKind.Setter:
+                kind = ExtensionMemberKind.Setter;
+                break;
+              case ProcedureKind.Operator:
+                kind = ExtensionMemberKind.Operator;
+                break;
+              case ProcedureKind.Factory:
+                unsupported("Extension method kind: ${declaration.kind}",
+                    declaration.charOffset, declaration.fileUri);
+            }
+            extension.members.add(new ExtensionMemberDescriptor(
                 name: new Name(declaration.name, libraryBuilder.library),
-                member: tearOff.reference,
-                isStatic: false,
-                isExternal: false,
-                kind: ExtensionMemberKind.TearOff));
+                member: function.reference,
+                isStatic: declaration.isStatic,
+                kind: kind));
+            Procedure tearOff = declaration.extensionTearOff;
+            if (tearOff != null) {
+              libraryBuilder.library.addMember(tearOff);
+              _extension.members.add(new ExtensionMemberDescriptor(
+                  name: new Name(declaration.name, libraryBuilder.library),
+                  member: tearOff.reference,
+                  isStatic: false,
+                  kind: ExtensionMemberKind.TearOff));
+            }
           }
         } else {
           unhandled("${declaration.runtimeType}", "buildBuilders",
@@ -143,5 +176,47 @@ class SourceExtensionBuilder extends ExtensionBuilder {
     _extension.onType = onType?.build(libraryBuilder);
 
     return _extension;
+  }
+
+  @override
+  void applyPatch(Builder patch) {
+    if (patch is SourceExtensionBuilder) {
+      patch._origin = this;
+      if (retainDataForTesting) {
+        patchForTesting = patch;
+      }
+      scope.local.forEach((String name, Builder member) {
+        Builder memberPatch = patch.scope.local[name];
+        if (memberPatch != null) {
+          member.applyPatch(memberPatch);
+        }
+      });
+      scope.setters.forEach((String name, Builder member) {
+        Builder memberPatch = patch.scope.setters[name];
+        if (memberPatch != null) {
+          member.applyPatch(memberPatch);
+        }
+      });
+
+      // TODO(johnniwinther): Check that type parameters and on-type match
+      // with origin declaration.
+    } else {
+      library.addProblem(messagePatchDeclarationMismatch, patch.charOffset,
+          noLength, patch.fileUri, context: [
+        messagePatchDeclarationOrigin.withLocation(
+            fileUri, charOffset, noLength)
+      ]);
+    }
+  }
+
+  @override
+  int finishPatch() {
+    if (!isPatch) return 0;
+
+    int count = 0;
+    scope.forEach((String name, Builder declaration) {
+      count += declaration.finishPatch();
+    });
+    return count;
   }
 }

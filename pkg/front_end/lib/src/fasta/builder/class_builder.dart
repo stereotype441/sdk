@@ -21,6 +21,7 @@ import 'package:kernel/ast.dart'
         Member,
         MethodInvocation,
         Name,
+        Nullability,
         Procedure,
         ProcedureKind,
         RedirectingFactoryConstructor,
@@ -43,6 +44,7 @@ import 'package:kernel/core_types.dart' show CoreTypes;
 
 import 'package:kernel/src/bounds_checks.dart'
     show TypeArgumentIssue, findTypeArgumentIssues, getGenericTypeName;
+import 'package:kernel/text/text_serialization_verifier.dart';
 
 import 'package:kernel/type_algebra.dart' show Substitution, substitute;
 
@@ -50,6 +52,8 @@ import 'package:kernel/type_algebra.dart' as type_algebra
     show getSubstitutionMap;
 
 import 'package:kernel/type_environment.dart' show TypeEnvironment;
+
+import '../../base/common.dart';
 
 import '../dill/dill_member_builder.dart' show DillMemberBuilder;
 
@@ -60,6 +64,7 @@ import 'builder.dart'
         LibraryBuilder,
         MemberBuilder,
         MetadataBuilder,
+        NullabilityBuilder,
         Scope,
         ScopeBuilder,
         TypeBuilder,
@@ -82,19 +87,17 @@ import '../fasta_codes.dart'
         noLength,
         templateDuplicatedDeclarationUse,
         templateGenericFunctionTypeInferredAsActualTypeArgument,
-        templateIllegalMixinDueToConstructors,
-        templateIllegalMixinDueToConstructorsCause,
         templateImplementsRepeated,
         templateImplementsSuperClass,
-        templateImplicitMixinOverrideContext,
+        templateImplicitMixinOverride,
         templateIncompatibleRedirecteeFunctionType,
         templateIncorrectTypeArgument,
         templateIncorrectTypeArgumentInSupertype,
         templateIncorrectTypeArgumentInSupertypeInferred,
-        templateInterfaceCheckContext,
+        templateInterfaceCheck,
         templateInternalProblemNotFoundIn,
         templateMixinApplicationIncompatibleSupertype,
-        templateNamedMixinOverrideContext,
+        templateNamedMixinOverride,
         templateOverriddenMethodCause,
         templateOverrideFewerNamedArguments,
         templateOverrideFewerPositionalArguments,
@@ -102,6 +105,7 @@ import '../fasta_codes.dart'
         templateOverrideMoreRequiredArguments,
         templateOverrideTypeMismatchParameter,
         templateOverrideTypeMismatchReturnType,
+        templateOverrideTypeMismatchSetter,
         templateOverrideTypeVariablesMismatch,
         templateRedirectingFactoryIncompatibleTypeArgument,
         templateRedirectionTargetNotFound,
@@ -163,6 +167,8 @@ abstract class ClassBuilder extends DeclarationBuilder {
   Map<String, ConstructorRedirection> redirectingConstructors;
 
   ClassBuilder actualOrigin;
+
+  ClassBuilder patchForTesting;
 
   ClassBuilder(
       List<MetadataBuilder> metadata,
@@ -390,6 +396,10 @@ abstract class ClassBuilder extends DeclarationBuilder {
   /// For a patch class the origin class is returned.
   Class get cls;
 
+  InterfaceType _legacyRawType;
+  InterfaceType _nullableRawType;
+  InterfaceType _nonNullableRawType;
+
   // Deliberately unrelated return type to statically detect more accidental
   // use until Builder.target is fully retired.
   UnrelatedTarget get target => unsupported(
@@ -406,11 +416,51 @@ abstract class ClassBuilder extends DeclarationBuilder {
   @override
   InterfaceType get thisType => cls.thisType;
 
+  InterfaceType get legacyRawType {
+    // TODO(dmitryas): Use computeBound instead of DynamicType here?
+    return _legacyRawType ??= new InterfaceType(
+        cls,
+        new List<DartType>.filled(typeVariablesCount, const DynamicType()),
+        Nullability.legacy);
+  }
+
+  InterfaceType get nullableRawType {
+    // TODO(dmitryas): Use computeBound instead of DynamicType here?
+    return _nullableRawType ??= new InterfaceType(
+        cls,
+        new List<DartType>.filled(typeVariablesCount, const DynamicType()),
+        Nullability.nullable);
+  }
+
+  InterfaceType get nonNullableRawType {
+    // TODO(dmitryas): Use computeBound instead of DynamicType here?
+    return _nonNullableRawType ??= new InterfaceType(
+        cls,
+        new List<DartType>.filled(typeVariablesCount, const DynamicType()),
+        Nullability.nonNullable);
+  }
+
+  InterfaceType rawType(Nullability nullability) {
+    switch (nullability) {
+      case Nullability.legacy:
+        return legacyRawType;
+      case Nullability.nullable:
+        return nullableRawType;
+      case Nullability.nonNullable:
+        return nonNullableRawType;
+      case Nullability.neither:
+      default:
+        return unhandled("$nullability", "rawType", noOffset, noUri);
+    }
+  }
+
   /// [arguments] have already been built.
-  InterfaceType buildTypesWithBuiltArguments(
-      LibraryBuilder library, List<DartType> arguments) {
+  InterfaceType buildTypesWithBuiltArguments(LibraryBuilder library,
+      Nullability nullability, List<DartType> arguments) {
     assert(arguments == null || cls.typeParameters.length == arguments.length);
-    return arguments == null ? cls.rawType : new InterfaceType(cls, arguments);
+    return arguments == null
+        ? rawType(nullability)
+        : new InterfaceType(cls, arguments, nullability);
   }
 
   @override
@@ -434,11 +484,11 @@ abstract class ClassBuilder extends DeclarationBuilder {
       return result;
     }
 
-    if (arguments != null && arguments.length != (typeVariables?.length ?? 0)) {
+    if (arguments != null && arguments.length != typeVariablesCount) {
       // That should be caught and reported as a compile-time error earlier.
       return unhandled(
           templateTypeArgumentMismatch
-              .withArguments(typeVariables.length)
+              .withArguments(typeVariablesCount)
               .message,
           "buildTypeArguments",
           -1,
@@ -455,9 +505,12 @@ abstract class ClassBuilder extends DeclarationBuilder {
   }
 
   /// If [arguments] are null, the default types for the variables are used.
-  InterfaceType buildType(LibraryBuilder library, List<TypeBuilder> arguments) {
+  InterfaceType buildType(LibraryBuilder library,
+      NullabilityBuilder nullabilityBuilder, List<TypeBuilder> arguments) {
     return buildTypesWithBuiltArguments(
-        library, buildTypeArguments(library, arguments));
+        library,
+        nullabilityBuilder.build(library),
+        buildTypeArguments(library, arguments));
   }
 
   Supertype buildSupertype(
@@ -1021,7 +1074,9 @@ abstract class ClassBuilder extends DeclarationBuilder {
     }
     if (declaredFunction?.typeParameters?.length !=
         interfaceFunction?.typeParameters?.length) {
-      library.addProblem(
+      reportInvalidOverride(
+          isInterfaceCheck,
+          declaredMember,
           templateOverrideTypeVariablesMismatch.withArguments(
               "${declaredMember.enclosingClass.name}."
                   "${declaredMember.name.name}",
@@ -1029,16 +1084,13 @@ abstract class ClassBuilder extends DeclarationBuilder {
                   "${interfaceMember.name.name}"),
           declaredMember.fileOffset,
           noLength,
-          declaredMember.fileUri,
           context: [
-                templateOverriddenMethodCause
-                    .withArguments(interfaceMember.name.name)
-                    .withLocation(_getMemberUri(interfaceMember),
-                        interfaceMember.fileOffset, noLength)
-              ] +
-              inheritedContext(isInterfaceCheck, declaredMember));
-    } else if (!library.loader.target.backendTarget.legacyMode &&
-        declaredFunction?.typeParameters != null) {
+            templateOverriddenMethodCause
+                .withArguments(interfaceMember.name.name)
+                .withLocation(_getMemberUri(interfaceMember),
+                    interfaceMember.fileOffset, noLength)
+          ]);
+    } else if (declaredFunction?.typeParameters != null) {
       Map<TypeParameter, DartType> substitutionMap =
           <TypeParameter, DartType>{};
       for (int i = 0; i < declaredFunction.typeParameters.length; ++i) {
@@ -1058,7 +1110,9 @@ abstract class ClassBuilder extends DeclarationBuilder {
                 interfaceSubstitution.substituteType(interfaceBound);
           }
           if (declaredBound != substitution.substituteType(interfaceBound)) {
-            library.addProblem(
+            reportInvalidOverride(
+                isInterfaceCheck,
+                declaredMember,
                 templateOverrideTypeVariablesMismatch.withArguments(
                     "${declaredMember.enclosingClass.name}."
                         "${declaredMember.name.name}",
@@ -1066,14 +1120,12 @@ abstract class ClassBuilder extends DeclarationBuilder {
                         "${interfaceMember.name.name}"),
                 declaredMember.fileOffset,
                 noLength,
-                declaredMember.fileUri,
                 context: [
-                      templateOverriddenMethodCause
-                          .withArguments(interfaceMember.name.name)
-                          .withLocation(_getMemberUri(interfaceMember),
-                              interfaceMember.fileOffset, noLength)
-                    ] +
-                    inheritedContext(isInterfaceCheck, declaredMember));
+                  templateOverriddenMethodCause
+                      .withArguments(interfaceMember.name.name)
+                      .withLocation(_getMemberUri(interfaceMember),
+                          interfaceMember.fileOffset, noLength)
+                ]);
           }
         }
       }
@@ -1106,8 +1158,6 @@ abstract class ClassBuilder extends DeclarationBuilder {
       VariableDeclaration declaredParameter,
       bool isInterfaceCheck,
       {bool asIfDeclaredParameter = false}) {
-    if (library.loader.target.backendTarget.legacyMode) return;
-
     if (interfaceSubstitution != null) {
       interfaceType = interfaceSubstitution.substituteType(interfaceType);
     }
@@ -1136,11 +1186,20 @@ abstract class ClassBuilder extends DeclarationBuilder {
       Message message;
       int fileOffset;
       if (declaredParameter == null) {
-        message = templateOverrideTypeMismatchReturnType.withArguments(
-            declaredMemberName,
-            declaredType,
-            interfaceType,
-            interfaceMemberName);
+        if (asIfDeclaredParameter) {
+          // Setter overridden by field
+          message = templateOverrideTypeMismatchSetter.withArguments(
+              declaredMemberName,
+              declaredType,
+              interfaceType,
+              interfaceMemberName);
+        } else {
+          message = templateOverrideTypeMismatchReturnType.withArguments(
+              declaredMemberName,
+              declaredType,
+              interfaceType,
+              interfaceMemberName);
+        }
         fileOffset = declaredMember.fileOffset;
       } else {
         message = templateOverrideTypeMismatchParameter.withArguments(
@@ -1151,14 +1210,14 @@ abstract class ClassBuilder extends DeclarationBuilder {
             interfaceMemberName);
         fileOffset = declaredParameter.fileOffset;
       }
-      library.addProblem(message, fileOffset, noLength, declaredMember.fileUri,
+      reportInvalidOverride(
+          isInterfaceCheck, declaredMember, message, fileOffset, noLength,
           context: [
-                templateOverriddenMethodCause
-                    .withArguments(interfaceMember.name.name)
-                    .withLocation(_getMemberUri(interfaceMember),
-                        interfaceMember.fileOffset, noLength)
-              ] +
-              inheritedContext(isInterfaceCheck, declaredMember));
+            templateOverriddenMethodCause
+                .withArguments(interfaceMember.name.name)
+                .withLocation(_getMemberUri(interfaceMember),
+                    interfaceMember.fileOffset, noLength)
+          ]);
     }
   }
 
@@ -1196,7 +1255,9 @@ abstract class ClassBuilder extends DeclarationBuilder {
         isInterfaceCheck);
     if (declaredFunction.positionalParameters.length <
         interfaceFunction.positionalParameters.length) {
-      library.addProblem(
+      reportInvalidOverride(
+          isInterfaceCheck,
+          declaredMember,
           templateOverrideFewerPositionalArguments.withArguments(
               "${declaredMember.enclosingClass.name}."
                   "${declaredMember.name.name}",
@@ -1204,18 +1265,18 @@ abstract class ClassBuilder extends DeclarationBuilder {
                   "${interfaceMember.name.name}"),
           declaredMember.fileOffset,
           noLength,
-          declaredMember.fileUri,
           context: [
-                templateOverriddenMethodCause
-                    .withArguments(interfaceMember.name.name)
-                    .withLocation(interfaceMember.fileUri,
-                        interfaceMember.fileOffset, noLength)
-              ] +
-              inheritedContext(isInterfaceCheck, declaredMember));
+            templateOverriddenMethodCause
+                .withArguments(interfaceMember.name.name)
+                .withLocation(interfaceMember.fileUri,
+                    interfaceMember.fileOffset, noLength)
+          ]);
     }
     if (interfaceFunction.requiredParameterCount <
         declaredFunction.requiredParameterCount) {
-      library.addProblem(
+      reportInvalidOverride(
+          isInterfaceCheck,
+          declaredMember,
           templateOverrideMoreRequiredArguments.withArguments(
               "${declaredMember.enclosingClass.name}."
                   "${declaredMember.name.name}",
@@ -1223,14 +1284,12 @@ abstract class ClassBuilder extends DeclarationBuilder {
                   "${interfaceMember.name.name}"),
           declaredMember.fileOffset,
           noLength,
-          declaredMember.fileUri,
           context: [
-                templateOverriddenMethodCause
-                    .withArguments(interfaceMember.name.name)
-                    .withLocation(interfaceMember.fileUri,
-                        interfaceMember.fileOffset, noLength)
-              ] +
-              inheritedContext(isInterfaceCheck, declaredMember));
+            templateOverriddenMethodCause
+                .withArguments(interfaceMember.name.name)
+                .withLocation(interfaceMember.fileUri,
+                    interfaceMember.fileOffset, noLength)
+          ]);
     }
     for (int i = 0;
         i < declaredFunction.positionalParameters.length &&
@@ -1259,7 +1318,9 @@ abstract class ClassBuilder extends DeclarationBuilder {
     }
     if (declaredFunction.namedParameters.length <
         interfaceFunction.namedParameters.length) {
-      library.addProblem(
+      reportInvalidOverride(
+          isInterfaceCheck,
+          declaredMember,
           templateOverrideFewerNamedArguments.withArguments(
               "${declaredMember.enclosingClass.name}."
                   "${declaredMember.name.name}",
@@ -1267,14 +1328,12 @@ abstract class ClassBuilder extends DeclarationBuilder {
                   "${interfaceMember.name.name}"),
           declaredMember.fileOffset,
           noLength,
-          declaredMember.fileUri,
           context: [
-                templateOverriddenMethodCause
-                    .withArguments(interfaceMember.name.name)
-                    .withLocation(interfaceMember.fileUri,
-                        interfaceMember.fileOffset, noLength)
-              ] +
-              inheritedContext(isInterfaceCheck, declaredMember));
+            templateOverriddenMethodCause
+                .withArguments(interfaceMember.name.name)
+                .withLocation(interfaceMember.fileUri,
+                    interfaceMember.fileOffset, noLength)
+          ]);
     }
     int compareNamedParameters(VariableDeclaration p0, VariableDeclaration p1) {
       return p0.name.compareTo(p1.name);
@@ -1296,7 +1355,9 @@ abstract class ClassBuilder extends DeclarationBuilder {
       while (declaredNamedParameters.current.name !=
           interfaceNamedParameters.current.name) {
         if (!declaredNamedParameters.moveNext()) {
-          library.addProblem(
+          reportInvalidOverride(
+              isInterfaceCheck,
+              declaredMember,
               templateOverrideMismatchNamedParameter.withArguments(
                   "${declaredMember.enclosingClass.name}."
                       "${declaredMember.name.name}",
@@ -1305,14 +1366,12 @@ abstract class ClassBuilder extends DeclarationBuilder {
                       "${interfaceMember.name.name}"),
               declaredMember.fileOffset,
               noLength,
-              declaredMember.fileUri,
               context: [
-                    templateOverriddenMethodCause
-                        .withArguments(interfaceMember.name.name)
-                        .withLocation(interfaceMember.fileUri,
-                            interfaceMember.fileOffset, noLength)
-                  ] +
-                  inheritedContext(isInterfaceCheck, declaredMember));
+                templateOverriddenMethodCause
+                    .withArguments(interfaceMember.name.name)
+                    .withLocation(interfaceMember.fileUri,
+                        interfaceMember.fileOffset, noLength)
+              ]);
           break outer;
         }
       }
@@ -1388,38 +1447,52 @@ abstract class ClassBuilder extends DeclarationBuilder {
     return isCovariant;
   }
 
-  // Extra context on override messages when the overriding member is inherited
-  List<LocatedMessage> inheritedContext(
-      bool isInterfaceCheck, Member declaredMember) {
+  // When the overriding member is inherited, report the class containing
+  // the conflict as the main error.
+  void reportInvalidOverride(bool isInterfaceCheck, Member declaredMember,
+      Message message, int fileOffset, int length,
+      {List<LocatedMessage> context}) {
     if (declaredMember.enclosingClass == cls) {
       // Ordinary override
-      return const [];
-    }
-    if (isInterfaceCheck) {
-      // Interface check
-      return [
-        templateInterfaceCheckContext
-            .withArguments(cls.name)
-            .withLocation(cls.fileUri, cls.fileOffset, cls.name.length)
-      ];
+      library.addProblem(message, fileOffset, length, declaredMember.fileUri,
+          context: context);
     } else {
-      if (cls.isAnonymousMixin) {
-        // Implicit mixin application class
-        String baseName = cls.superclass.demangledName;
-        String mixinName = cls.mixedInClass.name;
-        int classNameLength = cls.nameAsMixinApplicationSubclass.length;
-        return [
-          templateImplicitMixinOverrideContext
-              .withArguments(mixinName, baseName)
-              .withLocation(cls.fileUri, cls.fileOffset, classNameLength)
-        ];
+      context = [
+        message.withLocation(declaredMember.fileUri, fileOffset, length),
+        ...?context
+      ];
+      if (isInterfaceCheck) {
+        // Interface check
+        library.addProblem(
+            templateInterfaceCheck.withArguments(
+                declaredMember.name.name, cls.name),
+            cls.fileOffset,
+            cls.name.length,
+            cls.fileUri,
+            context: context);
       } else {
-        // Named mixin application class
-        return [
-          templateNamedMixinOverrideContext
-              .withArguments(cls.name)
-              .withLocation(cls.fileUri, cls.fileOffset, cls.name.length)
-        ];
+        if (cls.isAnonymousMixin) {
+          // Implicit mixin application class
+          String baseName = cls.superclass.demangledName;
+          String mixinName = cls.mixedInClass.name;
+          int classNameLength = cls.nameAsMixinApplicationSubclass.length;
+          library.addProblem(
+              templateImplicitMixinOverride.withArguments(
+                  mixinName, baseName, declaredMember.name.name),
+              cls.fileOffset,
+              classNameLength,
+              cls.fileUri,
+              context: context);
+        } else {
+          // Named mixin application class
+          library.addProblem(
+              templateNamedMixinOverride.withArguments(
+                  cls.name, declaredMember.name.name),
+              cls.fileOffset,
+              cls.name.length,
+              cls.fileUri,
+              context: context);
+        }
       }
     }
   }
@@ -1428,26 +1501,6 @@ abstract class ClassBuilder extends DeclarationBuilder {
     return isMixinApplication && !isNamedMixinApplication
         ? "${supertype.fullNameForErrors} with ${mixedInType.fullNameForErrors}"
         : name;
-  }
-
-  void checkMixinDeclaration() {
-    assert(cls.isMixinDeclaration);
-    for (Builder constructor in constructors.local.values) {
-      if (!constructor.isSynthetic &&
-          (constructor.isFactory || constructor.isConstructor)) {
-        addProblem(
-            templateIllegalMixinDueToConstructors
-                .withArguments(fullNameForErrors),
-            charOffset,
-            noLength,
-            context: [
-              templateIllegalMixinDueToConstructorsCause
-                  .withArguments(fullNameForErrors)
-                  .withLocation(
-                      constructor.fileUri, constructor.charOffset, noLength)
-            ]);
-      }
-    }
   }
 
   void checkMixinApplication(ClassHierarchy hierarchy) {
@@ -1474,6 +1527,9 @@ abstract class ClassBuilder extends DeclarationBuilder {
   void applyPatch(Builder patch) {
     if (patch is ClassBuilder) {
       patch.actualOrigin = this;
+      if (retainDataForTesting) {
+        patchForTesting = patch;
+      }
       // TODO(ahe): Complain if `patch.supertype` isn't null.
       scope.local.forEach((String name, Builder member) {
         Builder memberPatch = patch.scope.local[name];
@@ -1627,7 +1683,7 @@ abstract class ClassBuilder extends DeclarationBuilder {
     // its enclosing class, because constructors cannot specify type parameters
     // of their own.
     FunctionType factoryType =
-        factory.procedure.function.functionType.withoutTypeParameters;
+        factory.procedure.function.thisFunctionType.withoutTypeParameters;
     FunctionType redirecteeType =
         computeRedirecteeType(factory, typeEnvironment);
 

@@ -4,7 +4,7 @@
 
 library fasta.outline_builder;
 
-import 'package:kernel/ast.dart' show ProcedureKind;
+import 'package:kernel/ast.dart' show ProcedureKind, Variance;
 
 import '../builder/builder.dart';
 
@@ -19,13 +19,11 @@ import '../fasta_codes.dart'
         Message,
         messageConstConstructorWithBody,
         messageConstInstanceField,
-        messageConstMethod,
         messageConstructorWithReturnType,
         messageConstructorWithTypeParameters,
         messageExpectedBlockToSkip,
         messageInterpolationInUri,
         messageOperatorWithOptionalFormals,
-        messageStaticConstructor,
         messageTypedefNotFunction,
         Template,
         templateCycleInTypeVariables,
@@ -46,6 +44,8 @@ import '../kernel/kernel_builder.dart'
         MixinApplicationBuilder,
         NamedTypeBuilder,
         TypeBuilder;
+
+import '../kernel/type_algorithms.dart';
 
 import '../modifier.dart'
     show
@@ -454,7 +454,7 @@ class OutlineBuilder extends StackListener {
   }
 
   @override
-  void beginClassOrNamedMixinApplication(Token token) {
+  void beginClassOrNamedMixinApplicationPrelude(Token token) {
     debugEvent("beginClassOrNamedMixinApplication");
     library.beginNestedDeclaration(
         TypeParameterScopeKind.classOrNamedMixinApplication,
@@ -490,6 +490,8 @@ class OutlineBuilder extends StackListener {
       if (extensionThisType is TypeBuilder) {
         library.currentTypeParameterScopeBuilder
             .registerExtensionThisType(extensionThisType);
+      } else {
+        // TODO(johnniwinther): Supply an invalid type as the extension on type.
       }
     }
     debugEvent("beginClassOrMixinBody");
@@ -633,12 +635,18 @@ class OutlineBuilder extends StackListener {
   }
 
   @override
+  void beginExtensionDeclarationPrelude(Token extensionKeyword) {
+    assert(checkState(extensionKeyword, [ValueKind.MetadataListOrNull]));
+    debugEvent("beginExtensionDeclaration");
+    library.beginNestedDeclaration(
+        TypeParameterScopeKind.extensionDeclaration, "extension");
+  }
+
+  @override
   void beginExtensionDeclaration(Token extensionKeyword, Token nameToken) {
     assert(checkState(extensionKeyword,
         [ValueKind.TypeVariableListOrNull, ValueKind.MetadataListOrNull]));
     debugEvent("beginExtensionDeclaration");
-    library.beginNestedDeclaration(
-        TypeParameterScopeKind.extensionDeclaration, "extension");
     List<TypeVariableBuilder> typeVariables = pop();
     int offset = nameToken?.charOffset ?? extensionKeyword.charOffset;
     String name = nameToken?.lexeme ??
@@ -809,10 +817,7 @@ class OutlineBuilder extends StackListener {
       modifiers.add(External);
     }
     if (staticToken != null) {
-      if (inConstructor) {
-        handleRecoverableError(
-            messageStaticConstructor, staticToken, staticToken);
-      } else {
+      if (!inConstructor) {
         modifiers ??= <Modifier>[];
         modifiers.add(Static);
       }
@@ -965,17 +970,15 @@ class OutlineBuilder extends StackListener {
         // We synthesize the names of the generated [TypeParameter]s, i.e.
         // rename 'T' to '#T'. We cannot do it on the builders because their
         // names are used to create the scope.
-        // TODO(johnniwinther): Handle shadowing of extension type variables.
         List<TypeVariableBuilder> synthesizedTypeVariables = library
             .copyTypeVariables(extension.typeVariables, declarationBuilder,
-                // TODO(johnniwinther): The synthesized names show up in
-                // messages. Move synthesizing of names later to avoid this.
-                synthesizeTypeParameterNames: true);
+                isExtensionTypeParameter: true);
         substitution = {};
         for (int i = 0; i < synthesizedTypeVariables.length; i++) {
           substitution[extension.typeVariables[i]] =
               new NamedTypeBuilder.fromTypeDeclarationBuilder(
-                  synthesizedTypeVariables[i]);
+                  synthesizedTypeVariables[i],
+                  const NullabilityBuilder.omitted());
         }
         if (typeVariables != null) {
           typeVariables = synthesizedTypeVariables..addAll(typeVariables);
@@ -986,11 +989,18 @@ class OutlineBuilder extends StackListener {
       List<FormalParameterBuilder> synthesizedFormals = [];
       TypeBuilder thisType = extension.extensionThisType;
       if (substitution != null) {
-        thisType = thisType.subst(substitution);
-        declarationBuilder.addType(new UnresolvedType(thisType, -1, null));
+        List<TypeBuilder> unboundTypes = [];
+        List<TypeVariableBuilder> unboundTypeVariables = [];
+        thisType = substitute(thisType, substitution,
+            unboundTypes: unboundTypes,
+            unboundTypeVariables: unboundTypeVariables);
+        for (TypeBuilder unboundType in unboundTypes) {
+          extension.addType(new UnresolvedType(unboundType, -1, null));
+        }
+        library.boundlessTypeVariables.addAll(unboundTypeVariables);
       }
       synthesizedFormals.add(new FormalParameterBuilder(
-          null, finalMask, thisType, "#this", null, charOffset));
+          null, finalMask, thisType, "#this", null, charOffset, uri));
       if (formals != null) {
         synthesizedFormals.addAll(formals);
       }
@@ -1028,7 +1038,8 @@ class OutlineBuilder extends StackListener {
           beginInitializers: beginInitializers);
     } else {
       if (isConst) {
-        addProblem(messageConstMethod, varFinalOrConstOffset, 5);
+        // TODO(danrubel): consider removing this
+        // because it is an error to have a const method.
         modifiers &= ~constMask;
       }
       final int startCharOffset =
@@ -1133,13 +1144,18 @@ class OutlineBuilder extends StackListener {
     if (!library.loader.target.enableNonNullable) {
       reportErrorIfNullableType(questionMark);
     }
+    bool isMarkedAsNullable = questionMark != null;
     List<TypeBuilder> arguments = pop();
     int charOffset = pop();
     Object name = pop();
     if (name is ParserRecovery) {
       push(name);
     } else {
-      push(library.addNamedType(name, arguments, charOffset));
+      push(library.addNamedType(
+          name,
+          library.nullableBuilderIfTrue(isMarkedAsNullable),
+          arguments,
+          charOffset));
     }
   }
 
@@ -1380,7 +1396,11 @@ class OutlineBuilder extends StackListener {
     TypeBuilder returnType = pop();
     List<TypeVariableBuilder> typeVariables = pop();
     push(library.addFunctionType(
-        returnType, typeVariables, formals, functionToken.charOffset));
+        returnType,
+        typeVariables,
+        formals,
+        library.nullableBuilderIfTrue(questionMark != null),
+        functionToken.charOffset));
   }
 
   @override
@@ -1393,8 +1413,8 @@ class OutlineBuilder extends StackListener {
     if (!library.loader.target.enableNonNullable) {
       reportErrorIfNullableType(question);
     }
-    push(library.addFunctionType(
-        returnType, typeVariables, formals, formalsOffset));
+    push(library.addFunctionType(returnType, typeVariables, formals,
+        library.nullableBuilderIfTrue(question != null), formalsOffset));
   }
 
   @override
@@ -1424,8 +1444,9 @@ class OutlineBuilder extends StackListener {
       library.beginNestedDeclaration(
           TypeParameterScopeKind.functionType, "#function_type",
           hasMembers: false);
-      functionType =
-          library.addFunctionType(returnType, null, formals, charOffset);
+      // TODO(dmitryas): Make sure that RHS of typedefs can't have '?'.
+      functionType = library.addFunctionType(returnType, null, formals,
+          const NullabilityBuilder.omitted(), charOffset);
     } else {
       Object type = pop();
       typeVariables = pop();
@@ -1553,13 +1574,17 @@ class OutlineBuilder extends StackListener {
   }
 
   @override
-  void endTypeVariable(Token token, int index, Token extendsOrSuper) {
+  void endTypeVariable(
+      Token token, int index, Token extendsOrSuper, Token variance) {
     debugEvent("endTypeVariable");
     TypeBuilder bound = nullIfParserRecovery(pop());
     // Peek to leave type parameters on top of stack.
     List<TypeVariableBuilder> typeParameters = peek();
     if (typeParameters != null) {
       typeParameters[index].bound = bound;
+      if (variance != null) {
+        typeParameters[index].variance = Variance.fromString(variance.lexeme);
+      }
     }
   }
 
@@ -1610,7 +1635,8 @@ class OutlineBuilder extends StackListener {
                 : templateCycleInTypeVariables.withArguments(
                     builder.name, via.join("', '"));
             addProblem(message, builder.charOffset, builder.name.length);
-            builder.bound = new NamedTypeBuilder(builder.name, null)
+            builder.bound = new NamedTypeBuilder(
+                builder.name, const NullabilityBuilder.omitted(), null)
               ..bind(new InvalidTypeBuilder(
                   builder.name,
                   message.withLocation(
@@ -1624,6 +1650,13 @@ class OutlineBuilder extends StackListener {
       addProblem(messageConstructorWithTypeParameters,
           offsetForToken(beginToken), lengthOfSpan(beginToken, endToken));
       inConstructorName = false;
+    }
+  }
+
+  @override
+  void handleVarianceModifier(Token variance) {
+    if (!library.loader.target.enableVariance) {
+      reportVarianceModifierNotEnabled(variance);
     }
   }
 

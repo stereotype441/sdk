@@ -12,6 +12,7 @@
 #include "vm/compiler/backend/flow_graph.h"
 #include "vm/compiler/backend/il.h"
 #include "vm/compiler/backend/sexpression.h"
+#include "vm/hash_table.h"
 #include "vm/object.h"
 #include "vm/zone.h"
 
@@ -72,6 +73,7 @@ class FlowGraphSerializer : ValueObject {
   SExpression* ArrayToSExp(const Array& arr);
   SExpression* ClassToSExp(const Class& cls);
   SExpression* ClosureToSExp(const Closure& c);
+  SExpression* ContextToSExp(const Context& c);
   SExpression* CodeToSExp(const Code& c);
   SExpression* FieldToSExp(const Field& f);
   SExpression* FunctionToSExp(const Function& f);
@@ -94,6 +96,7 @@ class FlowGraphSerializer : ValueObject {
   // Methods for serializing IL-specific values.
   SExpression* LocalVariableToSExp(const LocalVariable& v);
   SExpression* SlotToSExp(const Slot& s);
+  SExpression* ICDataToSExp(const ICData* ic_data);
 
   // Helper methods for adding atoms to S-expression lists
   void AddBool(SExpList* sexp, bool b);
@@ -106,26 +109,10 @@ class FlowGraphSerializer : ValueObject {
   void AddExtraSymbol(SExpList* sexp, const char* label, const char* cstr);
 
  private:
-  FlowGraphSerializer(Zone* zone, const FlowGraph* flow_graph)
-      : flow_graph_(ASSERT_NOTNULL(flow_graph)),
-        zone_(zone),
-        tmp_string_(String::Handle(zone_)),
-        closure_function_(Function::Handle(zone_)),
-        closure_type_args_(TypeArguments::Handle(zone_)),
-        code_owner_(Object::Handle(zone_)),
-        function_type_args_(TypeArguments::Handle(zone_)),
-        instance_field_(Field::Handle(zone_)),
-        instance_type_args_(TypeArguments::Handle(zone_)),
-        serialize_library_(Library::Handle(zone_)),
-        serialize_owner_(Class::Handle(zone_)),
-        serialize_parent_(Function::Handle(zone_)),
-        type_arguments_elem_(AbstractType::Handle(zone_)),
-        type_class_(Class::Handle(zone_)),
-        type_ref_type_(AbstractType::Handle(zone_)) {
-    // Double-check that the zone in the flow graph is a parent of the
-    // zone we'll be using for serialization.
-    ASSERT(flow_graph->zone()->ContainsNestedZone(zone));
-  }
+  friend class Precompiler;  // For LLVMConstantsMap.
+
+  FlowGraphSerializer(Zone* zone, const FlowGraph* flow_graph);
+  ~FlowGraphSerializer();
 
   static const char* const initial_indent;
 
@@ -137,6 +124,32 @@ class FlowGraphSerializer : ValueObject {
 
   const FlowGraph* const flow_graph_;
   Zone* const zone_;
+  ObjectStore* const object_store_;
+
+  // A map of currently open (being serialized) recursive types. We use this
+  // to determine whether to serialize the referred types in TypeRefs.
+  IntMap<const Type*> open_recursive_types_;
+
+  // Used for --populate-llvm-constant-pool in ConstantPoolToSExp.
+  class LLVMConstantMapKeyEqualsTraits : public AllStatic {
+   public:
+    static const char* Name() { return "LLVMConstantMapKeyEqualsTraits"; }
+    static bool ReportStats() { return false; }
+
+    static bool IsMatch(const Object& a, const Object& b) {
+      return a.raw() == b.raw();
+    }
+    static uword Hash(const Object& obj) {
+      if (obj.IsSmi()) return reinterpret_cast<uword>(obj.raw());
+      if (obj.IsInstance()) return Instance::Cast(obj).CanonicalizeHash();
+      return obj.GetClassId();
+    }
+  };
+  typedef UnorderedHashMap<LLVMConstantMapKeyEqualsTraits> LLVMConstantsMap;
+
+  GrowableObjectArray& llvm_pool_;
+  LLVMConstantsMap llvm_map_;
+  Smi& llvm_index_;
 
   // Handles used across functions, where the contained value is used
   // immediately and does not need to live across calls to other serializer
@@ -152,10 +165,16 @@ class FlowGraphSerializer : ValueObject {
   // DartValueToSExp with a sub-element of type Object, but any call to a
   // FlowGraphSerializer method that may eventually enter one of the methods
   // listed below should be examined with care.
+  TypeArguments& array_type_args_;     // ArrayToSExp
+  Context& closure_context_;           // ClosureToSExp
   Function& closure_function_;         // ClosureToSExp
   TypeArguments& closure_type_args_;   // ClosureToSExp
   Object& code_owner_;                 // CodeToSExp
+  Context& context_parent_;            // ContextToSExp
+  Object& context_elem_;               // ContextToSExp
   TypeArguments& function_type_args_;  // FunctionToSExp
+  Function& ic_data_target_;           // ICDataToSExp
+  AbstractType& ic_data_type_;         // ICDataToSExp
   Field& instance_field_;              // InstanceToSExp
   TypeArguments& instance_type_args_;  // InstanceToSExp
   Library& serialize_library_;         // SerializeCanonicalName
@@ -163,6 +182,7 @@ class FlowGraphSerializer : ValueObject {
   Function& serialize_parent_;         // SerializeCanonicalName
   AbstractType& type_arguments_elem_;  // TypeArgumentsToSExp
   Class& type_class_;                  // AbstractTypeToSExp
+  Function& type_function_;            // AbstractTypeToSExp
   AbstractType& type_ref_type_;        // AbstractTypeToSExp
 };
 

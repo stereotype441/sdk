@@ -65,6 +65,14 @@ DECLARE_FLAG(bool, timing);
 DECLARE_FLAG(bool, trace_service);
 DECLARE_FLAG(bool, warn_on_pause_with_no_debugger);
 
+// TODO(bkonyi): remove this flag around Nov 2019 after UX studies are
+// complete. See issue 38535.
+DEFINE_FLAG(int,
+            object_id_ring_size,
+            ObjectIdRing::kDefaultCapacity,
+            "(EXPERIMENTAL) Manually set the size of the service protocol's "
+            "object ID ring buffer. Set to be removed by Nov 2019.");
+
 // Reload flags.
 DECLARE_FLAG(int, reload_every);
 #if !defined(PRODUCT) && !defined(DART_PRECOMPILED_RUNTIME)
@@ -79,11 +87,6 @@ static void DeterministicModeHandler(bool value) {
     FLAG_concurrent_mark = false;         // Timing dependent.
     FLAG_concurrent_sweep = false;        // Timing dependent.
     FLAG_random_seed = 0x44617274;        // "Dart"
-#if !defined(PRODUCT) && !defined(DART_PRECOMPILED_RUNTIME)
-    FLAG_load_deferred_eagerly = true;
-#else
-    COMPILE_ASSERT(FLAG_load_deferred_eagerly);
-#endif
   }
 }
 
@@ -137,17 +140,17 @@ static RawInstance* DeserializeMessage(Thread* thread, Message* message) {
 
 IsolateGroup::IsolateGroup(std::unique_ptr<IsolateGroupSource> source,
                            void* embedder_data)
-    : source_(std::move(source)),
-      embedder_data_(embedder_data),
+    : embedder_data_(embedder_data),
+      isolates_rwlock_(new RwLock()),
+      isolates_(),
+      source_(std::move(source)),
       thread_registry_(new ThreadRegistry()),
-      safepoint_handler_(new SafepointHandler(this)),
-      isolates_monitor_(new Monitor()),
-      isolates_() {}
+      safepoint_handler_(new SafepointHandler(this)) {}
 
 IsolateGroup::~IsolateGroup() {}
 
 void IsolateGroup::RegisterIsolate(Isolate* isolate) {
-  MonitorLocker ml(isolates_monitor_.get());
+  WriteRwLocker wl(ThreadState::Current(), isolates_rwlock_.get());
   isolates_.Append(isolate);
   isolate_count_++;
 }
@@ -155,7 +158,7 @@ void IsolateGroup::RegisterIsolate(Isolate* isolate) {
 void IsolateGroup::UnregisterIsolate(Isolate* isolate) {
   bool is_last_isolate = false;
   {
-    MonitorLocker ml(isolates_monitor_.get());
+    WriteRwLocker wl(ThreadState::Current(), isolates_rwlock_.get());
     isolates_.Remove(isolate);
     isolate_count_--;
     is_last_isolate = isolate_count_ == 0;
@@ -676,7 +679,7 @@ void IsolateMessageHandler::MessageNotify(Message::Priority priority) {
     I->ScheduleInterrupts(Thread::kMessageInterrupt);
   }
   Dart_MessageNotifyCallback callback = I->message_notify_callback();
-  if (callback) {
+  if (callback != nullptr) {
     // Allow the embedder to handle message notification.
     (*callback)(Api::CastIsolate(I));
   }
@@ -1055,7 +1058,8 @@ Isolate::Isolate(IsolateGroup* isolate_group,
       current_tag_(UserTag::null()),
       default_tag_(UserTag::null()),
       ic_miss_code_(Code::null()),
-      class_table_(),
+      shared_class_table_(new SharedClassTable()),
+      class_table_(shared_class_table_.get()),
       store_buffer_(new StoreBuffer()),
 #if !defined(TARGET_ARCH_DBC) && !defined(DART_PRECOMPILED_RUNTIME)
       native_callback_trampolines_(),
@@ -1300,7 +1304,12 @@ Isolate* Isolate::InitIsolate(const char* name_prefix,
 
 #ifndef PRODUCT
   if (FLAG_support_service) {
-    ObjectIdRing::Init(result);
+    if (FLAG_object_id_ring_size != ObjectIdRing::kDefaultCapacity) {
+      OS::Print(
+          "WARNING: this flag is temporary, is not supported, and should"
+          " only be used for UX studies. Use at your own risk!\n");
+    }
+    ObjectIdRing::Init(result, FLAG_object_id_ring_size);
   }
 #endif  // !PRODUCT
 
@@ -2230,6 +2239,30 @@ void Isolate::DisableIncrementalBarrier() {
   ASSERT(!Thread::Current()->is_marking());
 }
 
+void IsolateGroup::RunWithStoppedMutators(
+    std::function<void()> single_current_mutator,
+    std::function<void()> otherwise,
+    bool use_force_growth_in_otherwise) {
+  auto thread = Thread::Current();
+
+  ReadRwLocker wl(thread, isolates_rwlock_.get());
+  const bool only_one_isolate = isolates_.First() == isolates_.Last();
+  if (thread->IsMutatorThread() && only_one_isolate) {
+    single_current_mutator();
+  } else {
+    // We use the more strict safepoint operation scope here (which ensures that
+    // all other threads, including auxiliary threads are at a safepoint), even
+    // though we only need to ensure that the mutator threads are stopped.
+    if (use_force_growth_in_otherwise) {
+      ForceGrowthSafepointOperationScope safepoint_scope(thread);
+      otherwise();
+    } else {
+      SafepointOperationScope safepoint_scope(thread);
+      otherwise();
+    }
+  }
+}
+
 RawClass* Isolate::GetClassForHeapWalkAt(intptr_t cid) {
   RawClass* raw_class = nullptr;
 #if !defined(PRODUCT) && !defined(DART_PRECOMPILED_RUNTIME)
@@ -2819,7 +2852,7 @@ void Isolate::VisitIsolates(IsolateVisitor* visitor) {
   // SafepointMonitorLocker to ensure the lock has safepoint checks.
   SafepointMonitorLocker ml(isolates_list_monitor_);
   Isolate* current = isolates_list_head_;
-  while (current) {
+  while (current != nullptr) {
     visitor->VisitIsolate(current);
     current = current->next_;
   }
@@ -2887,7 +2920,7 @@ void Isolate::RemoveIsolateFromList(Isolate* isolate) {
   }
   Isolate* previous = nullptr;
   Isolate* current = isolates_list_head_;
-  while (current) {
+  while (current != nullptr) {
     if (current == isolate) {
       ASSERT(previous != nullptr);
       previous->next_ = current->next_;

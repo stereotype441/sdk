@@ -2,29 +2,36 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'dart:core' hide MapEntry;
 import 'dart:collection';
+import 'dart:core' hide MapEntry;
+
 import 'package:analyzer/dart/element/element.dart' as a;
 import 'package:analyzer/dart/element/type.dart' as a;
 import 'package:analyzer/file_system/physical_file_system.dart' as a;
 import 'package:analyzer/src/context/context.dart' as a;
+import 'package:analyzer/src/dart/analysis/restricted_analysis_context.dart'
+    as a;
 import 'package:analyzer/src/dart/element/element.dart' as a;
 import 'package:analyzer/src/dart/element/member.dart' as a;
 import 'package:analyzer/src/dart/element/type.dart' as a;
 import 'package:analyzer/src/generated/constant.dart' as a;
 import 'package:analyzer/src/generated/engine.dart' as a;
+import 'package:analyzer/src/generated/resolver.dart' as a
+    show NamespaceBuilder, TypeProvider;
 import 'package:analyzer/src/generated/source.dart' as a;
 import 'package:analyzer/src/generated/type_system.dart' as a;
 import 'package:analyzer/src/summary/idl.dart' as a;
 import 'package:analyzer/src/summary/package_bundle_reader.dart' as a;
 import 'package:analyzer/src/summary/summary_sdk.dart' as a;
-import 'package:analyzer/src/generated/resolver.dart' as a
-    show NamespaceBuilder, TypeProvider;
+import 'package:analyzer/src/summary2/linked_bundle_context.dart' as a;
+import 'package:analyzer/src/summary2/linked_element_factory.dart' as a;
+import 'package:analyzer/src/summary2/reference.dart' as a;
 import 'package:front_end/src/api_unstable/ddc.dart'
     show RedirectingFactoryBody;
 import 'package:kernel/kernel.dart';
 import 'package:kernel/type_algebra.dart';
 
+import '../analyzer/type_utilities.dart' hide freeTypeParameters;
 import 'type_table.dart';
 
 /// Converts an Analyzer summary file to a Kernel [Component].
@@ -70,7 +77,7 @@ import 'type_table.dart';
 /// Analyzer and modify it to resynthesize directly into Kernel trees, if we
 /// ever need to support a mix of Kernel and Analyzer summary files.
 class AnalyzerToKernel {
-  final a.StoreBasedSummaryResynthesizer _resynth;
+  final a.LinkedElementFactory _resynth;
   final a.SummaryDataStore _summaryData;
   final a.TypeProvider types;
   final a.Dart2TypeSystem rules;
@@ -80,8 +87,8 @@ class AnalyzerToKernel {
   final _namespaceBuilder = a.NamespaceBuilder();
 
   AnalyzerToKernel._(this._resynth, this._summaryData)
-      : types = _resynth.typeProvider,
-        rules = _resynth.typeSystem as a.Dart2TypeSystem;
+      : types = _resynth.analysisContext.typeProvider,
+        rules = _resynth.analysisContext.typeSystem as a.Dart2TypeSystem;
 
   /// Create an Analyzer summary to Kernel tree converter, using the provided
   /// [analyzerSdkSummary] and [summaryPaths].
@@ -121,9 +128,6 @@ class AnalyzerToKernel {
     return result;
   }
 
-  /// Dispose the Analysis Context used for summary conversion.
-  void dispose() => _resynth.context.dispose();
-
   void verifyReferences() {
     _references.forEach((element, reference) {
       // Ensure each reference has a corresponding node.
@@ -156,13 +160,12 @@ class AnalyzerToKernel {
     }
 
     for (var uri in bundle.unlinkedUnitUris) {
-      var unitInfo = _resynth.getUnlinkedSummary(uri);
-      if (unitInfo.isPartOf) {
+      if (_summaryData.isPartUnit(uri)) {
         // Library parts are handled by their corresponding library.
         continue;
       }
 
-      var element = _resynth.getLibraryElement(uri);
+      var element = _resynth.libraryOfUri(uri);
       libraries.add(visitLibraryElement(element));
       addCompilationUnit(element.definingCompilationUnit);
       element.parts.forEach(addCompilationUnit);
@@ -474,7 +477,8 @@ class AnalyzerToKernel {
       if (typeParams.isNotEmpty) {
         // Skip past the type formals, we'll add them back below, so these
         // type parameter names will end up in scope in the generated JS.
-        type = type.instantiate(typeParams.map((f) => f.type).toList());
+        type = type.instantiate(
+            typeParams.map((f) => getLegacyTypeParameterType(f)).toList());
       }
     }
     t.typeParameters.addAll(typeParams.map(visitTypeParameterElement));
@@ -735,7 +739,8 @@ class AnalyzerToKernel {
   }
 
   bool _isGenericCovariant(a.ClassElement c, a.DartType type) {
-    var classUpperBound = rules.instantiateToBounds(c.type) as a.InterfaceType;
+    var classUpperBound =
+        rules.instantiateToBounds(getLegacyRawClassType(c)) as a.InterfaceType;
     var typeUpperBound = type.substitute2(classUpperBound.typeArguments,
         a.TypeParameterTypeImpl.getTypes(classUpperBound.typeParameters));
     // Is it safe to assign the upper bound of the field/parameter to it?
@@ -799,11 +804,11 @@ class AnalyzerToKernel {
       return TypeLiteral(_visitDartType(obj.toTypeValue()));
     }
     if (type is a.InterfaceType) {
-      if (type.element == types.listType.element) {
+      if (type.element == types.listElement) {
         return ListLiteral(obj.toListValue().map(_visitConstant).toList(),
             typeArgument: _visitDartType(type.typeArguments[0]), isConst: true);
       }
-      if (type.element == types.mapType.element) {
+      if (type.element == types.mapElement) {
         var entries = obj
             .toMapValue()
             .entries
@@ -871,14 +876,23 @@ AsyncMarker _getAsyncMarker(a.ExecutableElement e) {
       : (e.isAsynchronous ? AsyncMarker.Async : AsyncMarker.Sync);
 }
 
-a.StoreBasedSummaryResynthesizer _createSummaryResynthesizer(
+a.LinkedElementFactory _createSummaryResynthesizer(
     a.SummaryDataStore summaryData, String dartSdkPath) {
   var context = _createContextForSummaries(summaryData, dartSdkPath);
-  var resynthesizer = a.StoreBasedSummaryResynthesizer(
-      context, null, context.sourceFactory, /*strongMode*/ true, summaryData);
-  resynthesizer.finishCoreAsyncLibraries();
-  context.typeProvider = resynthesizer.typeProvider;
-  return resynthesizer;
+
+  var elementFactory = a.LinkedElementFactory(
+    context,
+    null,
+    a.Reference.root(),
+  );
+
+  for (var bundle in summaryData.bundles) {
+    elementFactory.addBundle(
+      a.LinkedBundleContext(elementFactory, bundle.bundle2),
+    );
+  }
+
+  return elementFactory;
 }
 
 /// Creates a dummy Analyzer context so we can use summary resynthesizer.
@@ -898,7 +912,6 @@ a.AnalysisContextImpl _createContextForSummaries(
       as a.AnalysisContextImpl;
   context.sourceFactory = a.SourceFactory(
       [a.DartUriResolver(sdk), a.InSummaryUriResolver(null, summaryData)]);
-  context.useSdkCachePartition = false;
   // TODO(jmesserly): do we need to set analysisOptions or declaredVariables?
   return context;
 }

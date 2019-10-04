@@ -7,10 +7,10 @@ import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/error/error.dart';
 import 'package:analyzer/error/listener.dart';
 import 'package:analyzer/file_system/file_system.dart';
-import 'package:analyzer/src/dart/analysis/driver.dart';
 import 'package:analyzer/src/dart/analysis/file_state.dart';
 import 'package:analyzer/src/dart/analysis/testing_data.dart';
 import 'package:analyzer/src/dart/ast/ast.dart';
@@ -20,8 +20,8 @@ import 'package:analyzer/src/dart/constant/constant_verifier.dart';
 import 'package:analyzer/src/dart/constant/evaluation.dart';
 import 'package:analyzer/src/dart/constant/utilities.dart';
 import 'package:analyzer/src/dart/element/element.dart';
-import 'package:analyzer/src/dart/element/handle.dart';
 import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
+import 'package:analyzer/src/dart/element/type_provider.dart';
 import 'package:analyzer/src/dart/resolver/ast_rewrite.dart';
 import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
 import 'package:analyzer/src/dart/resolver/legacy_type_asserter.dart';
@@ -66,9 +66,8 @@ class LibraryAnalyzer {
   final InheritanceManager3 _inheritance;
   final bool Function(Uri) _isLibraryUri;
   final AnalysisContext _context;
-  final ElementResynthesizer _resynthesizer;
   final LinkedElementFactory _elementFactory;
-  TypeProvider _typeProvider;
+  TypeProviderImpl _typeProvider;
 
   final TypeSystem _typeSystem;
   LibraryElement _libraryElement;
@@ -98,7 +97,6 @@ class LibraryAnalyzer {
       this._sourceFactory,
       this._isLibraryUri,
       this._context,
-      this._resynthesizer,
       this._elementFactory,
       this._inheritance,
       this._library,
@@ -134,25 +132,16 @@ class LibraryAnalyzer {
     FeatureSet featureSet = units[_library].featureSet;
     _typeProvider = _context.typeProvider;
     if (featureSet.isEnabled(Feature.non_nullable)) {
-      if (_typeProvider is! NonNullableTypeProvider) {
-        _typeProvider = NonNullableTypeProvider.from(_typeProvider);
-      }
+      _typeProvider = _typeProvider.withNullability(NullabilitySuffix.none);
     } else {
-      if (_typeProvider is NonNullableTypeProvider) {
-        _typeProvider = TypeProviderImpl.from(_typeProvider);
-      }
+      _typeProvider = _typeProvider.withNullability(NullabilitySuffix.star);
     }
     units.forEach((file, unit) {
       _validateFeatureSet(unit, featureSet);
       _resolveUriBasedDirectives(file, unit);
     });
 
-    if (_elementFactory != null) {
-      _libraryElement = _elementFactory.libraryOfUri(_library.uriStr);
-    } else {
-      _libraryElement = _resynthesizer
-          .getElement(new ElementLocationImpl.con3([_library.uriStr]));
-    }
+    _libraryElement = _elementFactory.libraryOfUri(_library.uriStr);
     _libraryScope = new LibraryScope(_libraryElement);
 
     timerLibraryAnalyzerResolve.start();
@@ -513,16 +502,12 @@ class LibraryAnalyzer {
     definingCompilationUnit.element = _libraryElement.definingCompilationUnit;
 
     bool matchNodeElement(Directive node, Element element) {
-      if (AnalysisDriver.useSummary2) {
-        return node.keyword.offset == element.nameOffset;
-      } else {
-        return node.offset == element.nameOffset;
-      }
+      return node.keyword.offset == element.nameOffset;
     }
 
     ErrorReporter libraryErrorReporter = _getErrorReporter(_library);
 
-    LibraryIdentifier libraryNameNode = null;
+    LibraryIdentifier libraryNameNode;
     var seenPartSources = new Set<Source>();
     var directivesToResolve = <Directive>[];
     int partIndex = 0;
@@ -659,8 +644,6 @@ class LibraryAnalyzer {
     unit.accept(new AstRewriteVisitor(_context.typeSystem, _libraryElement,
         source, _typeProvider, errorListener,
         nameScope: _libraryScope));
-
-    // TODO(scheglov) remove EnumMemberBuilder class
 
     new TypeParameterBoundsResolver(_context.typeSystem, _libraryElement,
             source, errorListener, unit.featureSet)

@@ -6,6 +6,7 @@ import 'package:analyzer/dart/analysis/session.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/type.dart';
@@ -14,6 +15,7 @@ import 'package:analyzer/src/generated/engine.dart' show AnalysisContext;
 import 'package:analyzer/src/generated/java_engine.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/generated/utilities_dart.dart';
+import 'package:meta/meta.dart';
 
 /**
  * A constructor element defined in a parameterized type where the values of the
@@ -55,7 +57,7 @@ class ConstructorMember extends ExecutableMember implements ConstructorElement {
 
   @override
   ConstructorElement get redirectedConstructor {
-    var definingType = _substitution.substituteType(enclosingElement.type);
+    var definingType = _substitution.substituteType(enclosingElement.thisType);
     return from(baseElement.redirectedConstructor, definingType);
   }
 
@@ -251,6 +253,10 @@ class FieldFormalParameterMember extends ParameterMember
   @override
   FieldElement get field {
     var field = (baseElement as FieldFormalParameterElement).field;
+    if (field == null) {
+      return null;
+    }
+
     return FieldMember(field, _substitution);
   }
 
@@ -339,6 +345,16 @@ class FieldMember extends VariableMember implements FieldElement {
       field,
       Substitution.fromInterfaceType(definingType),
     );
+  }
+
+  static FieldElement from2(
+    FieldElement element,
+    MapSubstitution substitution,
+  ) {
+    if (substitution.map.isEmpty) {
+      return element;
+    }
+    return FieldMember(element, substitution);
   }
 }
 
@@ -592,7 +608,7 @@ class MethodMember extends ExecutableMember implements MethodElement {
       buffer.write('>');
     }
     buffer.write('(');
-    String closing = null;
+    String closing;
     ParameterKind kind = ParameterKind.REQUIRED;
     int parameterCount = parameters.length;
     for (int i = 0; i < parameterCount; i++) {
@@ -642,6 +658,16 @@ class MethodMember extends ExecutableMember implements MethodElement {
       method,
       Substitution.fromInterfaceType(definingType),
     );
+  }
+
+  static MethodElement from2(
+    MethodElement element,
+    MapSubstitution substitution,
+  ) {
+    if (substitution.map.isEmpty) {
+      return element;
+    }
+    return MethodMember(element, substitution);
   }
 }
 
@@ -912,6 +938,13 @@ class TypeParameterMember extends Member implements TypeParameterElement {
   }
 
   @override
+  TypeParameterType instantiate({
+    @required NullabilitySuffix nullabilitySuffix,
+  }) {
+    return TypeParameterTypeImpl(this, nullabilitySuffix: nullabilitySuffix);
+  }
+
+  @override
   String toString() {
     var buffer = StringBuffer();
     appendTo(buffer);
@@ -935,33 +968,39 @@ class TypeParameterMember extends Member implements TypeParameterElement {
   }
 
   static List<TypeParameterElement> from2(
-    List<TypeParameterElement> formals,
+    List<TypeParameterElement> elements,
     MapSubstitution substitution,
   ) {
+    if (substitution.map.isEmpty) {
+      return elements;
+    }
+
     // Create type formals with specialized bounds.
     // For example `<U extends T>` where T comes from an outer scope.
-    var newElements = formals.toList(growable: false);
-    var newTypes = List<TypeParameterType>(formals.length);
+    var newElements = List<TypeParameterElement>(elements.length);
+    var newTypes = List<TypeParameterType>(elements.length);
     for (int i = 0; i < newElements.length; i++) {
-      var formal = newElements[i];
-      DartType bound = formal?.bound;
+      var element = elements[i];
+      var bound = element?.bound;
       if (bound != null) {
         bound = substitution.substituteType(bound);
-        var member = TypeParameterMember(formal, substitution, bound);
-        newElements[i] = member;
+        element = TypeParameterMember(element, substitution, bound);
       }
-      newTypes[i] = newElements[i].type;
+      newElements[i] = element;
+      newTypes[i] = newElements[i].instantiate(
+        nullabilitySuffix: NullabilitySuffix.none,
+      );
     }
 
     // Recursive bounds are allowed too, so make sure these are updated
     // to refer to any new TypeParameterMember we just made, rather than
     // the original type parameter
-    var substitution2 = Substitution.fromPairs(formals, newTypes);
-    for (var formal in newElements) {
-      if (formal is TypeParameterMember) {
+    var substitution2 = Substitution.fromPairs(elements, newTypes);
+    for (var newElement in newElements) {
+      if (newElement is TypeParameterMember) {
         // TODO(jmesserly): this is required so substituting for the
         // type formal will work. Investigate if there's a better solution.
-        formal._bound = substitution2.substituteType(formal.bound);
+        newElement._bound = substitution2.substituteType(newElement.bound);
       }
     }
     return newElements;
