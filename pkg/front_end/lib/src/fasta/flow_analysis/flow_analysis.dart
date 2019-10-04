@@ -686,6 +686,12 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _current = _current.write(variable);
   }
 
+  /// Register an initialized declaration of the given [variable] in the current
+  /// state.  Should also be called for function parameters.
+  void initialize(Variable variable) {
+    _current = _current.write(variable);
+  }
+
   void _conditionalEnd(Expression condition) {
     condition = nodeOperations.unwrapParenthesized(condition);
     if (identical(condition, _condition)) {

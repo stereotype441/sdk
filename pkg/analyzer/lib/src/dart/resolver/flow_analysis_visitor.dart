@@ -159,7 +159,7 @@ class FlowAnalysisHelper {
     var parameters = _enclosingExecutableParameters(node);
     if (parameters != null) {
       for (var parameter in parameters.parameters) {
-        flow.write(parameter.declaredElement);
+        flow.initialize(parameter.declaredElement);
       }
     }
 
@@ -241,7 +241,7 @@ class FlowAnalysisHelper {
       for (var i = 0; i < variables.length; ++i) {
         var variable = variables[i];
         if (variable.initializer != null) {
-          flow.write(variable.declaredElement);
+          flow.initialize(variable.declaredElement);
         }
       }
     }
