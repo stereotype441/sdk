@@ -1477,7 +1477,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
             const AnalyzerNodeOperations(),
             DecoratedTypeOperations(_typeSystem, _variables, _graph),
             _assignedVariables.writtenInNode(node),
-            _assignedVariables.capturedAnywhere);
+            _assignedVariables.capturedInNode(node));
   }
 
   DecoratedType _decorateUpperOrLowerBound(AstNode astNode, DartType type,
