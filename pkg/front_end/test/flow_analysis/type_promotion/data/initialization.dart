@@ -32,3 +32,11 @@ localParameter() {
   };
 }
 
+localVariable() {
+  Object a = 1;
+  if (a is int) {
+    () {
+      /*int*/ a;
+    };
+  }
+}

@@ -18,3 +18,8 @@ localParameter() {
     b;
   };
 }
+
+localVariable() {
+  Object a = 1;
+  a;
+}
