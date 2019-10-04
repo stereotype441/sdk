@@ -40,3 +40,22 @@ localVariable() {
     };
   }
 }
+
+class MyStackTrace implements StackTrace {
+  noSuchMethod(invocation) => super.noSuchMethod(invocation);
+}
+
+catchParameters() {
+  try {} on Object catch (e, st) {
+    if (e is int) {
+      () {
+        /*int*/ e;
+      };
+    }
+    if (st is MyStackTrace) {
+      () {
+        /*MyStackTrace*/ st;
+      };
+    }
+  }
+}
