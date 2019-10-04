@@ -131,7 +131,7 @@ class FlowAnalysisHelper {
     flow.handleContinue(target);
   }
 
-  void executableDeclaration_enter(
+  void executableDeclaration_enter(AstNode node,
       FormalParameterList parameters, FunctionBody body) {
     _executableLevel++;
 
@@ -154,7 +154,7 @@ class FlowAnalysisHelper {
       }
     }
 
-    if (_blockFunctionBodyLevel > 1) {
+    if (_executableLevel > 1) {
       flow.functionExpression_begin(assignedVariables.writtenInNode(node));
     }
   }
@@ -185,8 +185,8 @@ class FlowAnalysisHelper {
   }
 
   void for_conditionBegin(AstNode node, Expression condition) {
-    var assigned = assignedVariables.writtenInNode(node);
-    flow.for_conditionBegin(assigned);
+    flow.for_conditionBegin(assignedVariables.writtenInNode(node),
+    assignedVariables.capturedInNode(node));
   }
 
   void isExpression(IsExpression node) {
