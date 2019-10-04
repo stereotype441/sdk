@@ -268,7 +268,7 @@ main() {
         h.declare(y, initialized: true);
         h.promote(y, 'int');
         flow.for_conditionBegin({x}, {});
-        flow.write(x);
+        flow.initialize(x);
         flow.for_bodyBegin(_Statement(), _Expression());
         flow.for_updaterBegin();
         flow.for_end();
@@ -1175,7 +1175,7 @@ main() {
         h.declare(y, initialized: true);
         h.promote(y, 'int');
         flow.whileStatement_conditionBegin({x}, {});
-        flow.write(x);
+        flow.initialize(x);
         flow.whileStatement_bodyBegin(_Statement(), _Expression());
         flow.whileStatement_end();
       });
@@ -1524,10 +1524,10 @@ main() {
         var s1 = s0.removePromotedAll([a, b], [a, b]);
         var s2 = s0.removePromotedAll([a, c], [a, c]);
         var result = s1.restrict(h, s2, Set());
-        expect(result.variableInfo[a].writeCaptured, true);
-        expect(result.variableInfo[b].writeCaptured, true);
-        expect(result.variableInfo[c].writeCaptured, true);
-        expect(result.variableInfo[d].writeCaptured, false);
+        expect(result.infoFor(a).writeCaptured, true);
+        expect(result.infoFor(b).writeCaptured, true);
+        expect(result.infoFor(c).writeCaptured, true);
+        expect(result.infoFor(d).writeCaptured, false);
       });
 
       test('promotion', () {
@@ -1791,7 +1791,7 @@ class _Harness
 
   void declare(_Var v, {@required bool initialized}) {
     if (initialized) {
-      _flow.write(v);
+      _flow.initialize(v);
     }
   }
 
