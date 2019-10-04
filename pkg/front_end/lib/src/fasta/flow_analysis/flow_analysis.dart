@@ -745,12 +745,6 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
       _wrap('isReachable', () => _wrapped.isReachable, isQuery: true);
 
   @override
-  void add(Variable variable, {bool assigned: false}) {
-    _wrap('add($variable, assigned: $assigned)',
-        () => _wrapped.add(variable, assigned: assigned));
-  }
-
-  @override
   void booleanLiteral(Expression expression, bool value) {
     _wrap('booleanLiteral($expression, $value)',
         () => _wrapped.booleanLiteral(expression, value));
