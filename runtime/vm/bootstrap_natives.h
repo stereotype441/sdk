@@ -353,10 +353,6 @@ namespace dart {
   V(WeakProperty_getValue, 1)                                                  \
   V(WeakProperty_setValue, 2)                                                  \
   V(Uri_isWindowsPlatform, 0)                                                  \
-  V(LibraryPrefix_load, 1)                                                     \
-  V(LibraryPrefix_invalidateDependentCode, 1)                                  \
-  V(LibraryPrefix_loadError, 1)                                                \
-  V(LibraryPrefix_isLoaded, 1)                                                 \
   V(UserTag_new, 2)                                                            \
   V(UserTag_label, 1)                                                          \
   V(UserTag_defaultTag, 0)                                                     \
@@ -385,7 +381,8 @@ namespace dart {
   V(Ffi_cast, 1)                                                               \
   V(Ffi_sizeOf, 0)                                                             \
   V(Ffi_asFunctionInternal, 1)                                                 \
-  V(Ffi_fromFunction, 2)                                                       \
+  V(Ffi_nativeCallbackFunction, 2)                                             \
+  V(Ffi_pointerFromFunction, 1)                                                \
   V(Ffi_dl_open, 1)                                                            \
   V(Ffi_dl_lookup, 2)                                                          \
   V(Ffi_dl_getHandle, 1)                                                       \
@@ -394,6 +391,16 @@ namespace dart {
   V(Ffi_dl_executableLibrary, 0)                                               \
   V(TransferableTypedData_factory, 2)                                          \
   V(TransferableTypedData_materialize, 1)                                      \
+  V(Wasm_initModule, 2)                                                        \
+  V(Wasm_describeModule, 1)                                                    \
+  V(Wasm_initImports, 1)                                                       \
+  V(Wasm_addMemoryImport, 4)                                                   \
+  V(Wasm_addGlobalImport, 6)                                                   \
+  V(Wasm_addFunctionImport, 5)                                                 \
+  V(Wasm_initMemory, 3)                                                        \
+  V(Wasm_growMemory, 2)                                                        \
+  V(Wasm_initInstance, 3)                                                      \
+  V(Wasm_initFunction, 4)                                                      \
   V(Wasm_callFunction, 2)
 
 // List of bootstrap native entry points used in the dart:mirror library.

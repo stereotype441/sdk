@@ -31,6 +31,7 @@ import 'builder.dart'
         Builder,
         Identifier,
         LibraryBuilder,
+        NullabilityBuilder,
         PrefixBuilder,
         QualifiedName,
         Scope,
@@ -54,12 +55,15 @@ class NamedTypeBuilder extends TypeBuilder {
 
   List<TypeBuilder> arguments;
 
+  final NullabilityBuilder nullabilityBuilder;
+
   @override
   TypeDeclarationBuilder declaration;
 
-  NamedTypeBuilder(this.name, this.arguments);
+  NamedTypeBuilder(this.name, this.nullabilityBuilder, this.arguments);
 
-  NamedTypeBuilder.fromTypeDeclarationBuilder(this.declaration,
+  NamedTypeBuilder.fromTypeDeclarationBuilder(
+      this.declaration, this.nullabilityBuilder,
       [this.arguments])
       : this.name = declaration.name;
 
@@ -181,6 +185,7 @@ class NamedTypeBuilder extends TypeBuilder {
       t.printOn(buffer);
     }
     buffer.write(">");
+    nullabilityBuilder.writeNullabilityOn(buffer);
     return buffer;
   }
 
@@ -209,7 +214,7 @@ class NamedTypeBuilder extends TypeBuilder {
 
   DartType build(LibraryBuilder library) {
     assert(declaration != null, "Declaration has not been resolved on $this.");
-    return declaration.buildType(library, arguments);
+    return declaration.buildType(library, nullabilityBuilder, arguments);
   }
 
   Supertype buildSupertype(
@@ -265,7 +270,14 @@ class NamedTypeBuilder extends TypeBuilder {
         i++;
       }
       if (arguments != null) {
-        return new NamedTypeBuilder(name, arguments)..bind(declaration);
+        NamedTypeBuilder result =
+            new NamedTypeBuilder(name, nullabilityBuilder, arguments);
+        if (declaration != null) {
+          result.bind(declaration);
+        } else {
+          throw new UnsupportedError("Unbound type in substitution: $result.");
+        }
+        return result;
       }
     }
     return this;
@@ -279,8 +291,15 @@ class NamedTypeBuilder extends TypeBuilder {
         clonedArguments[i] = arguments[i].clone(newTypes);
       }
     }
-    NamedTypeBuilder newType = new NamedTypeBuilder(name, clonedArguments);
+    NamedTypeBuilder newType =
+        new NamedTypeBuilder(name, nullabilityBuilder, clonedArguments);
     newTypes.add(newType);
     return newType;
+  }
+
+  NamedTypeBuilder withNullabilityBuilder(
+      NullabilityBuilder nullabilityBuilder) {
+    return new NamedTypeBuilder(name, nullabilityBuilder, arguments)
+      ..bind(declaration);
   }
 }

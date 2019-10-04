@@ -4,6 +4,55 @@
 
 ### Language
 
+*   **Breaking change** [#37985](https://github.com/dart-lang/sdk/issues/37985):
+    Inference is changed when using `Null` values in a `FutureOr` context.
+    Namely, constraints of the forms similar to `Null` <: `FutureOr<T>` now
+    yield `Null` as the solution for `T`.  For example, the following code will
+    now print "Null", and it was printing "dynamic" before (note that the
+    anonymous closure `() {}` in the example has `Null` as its return type):
+
+```dart
+import 'dart:async';
+void foo<T>(FutureOr<T> Function() f) { print(T); }
+main() { foo(() {}); }
+```
+
+
+### Core libraries
+
+* Default values of parameters of abstract methods are no longer available
+  via `dart:mirrors`.
+
+### Dart VM
+
+### Tools
+
+#### Pub
+
+#### Linter
+
+The Linter was updated to `0.1.98`, which includes:
+
+* fixed null raw expression accesses in `use_to_and_as_if_applicable`
+* internal migration to using analyzer `InheritanceManager3`
+* internal migration away from using analyzer `resolutionMap`
+* various fixes and improvements to anticipate support for extension-methods
+* new lint: `camel_case_extensions`
+* rule template generation improvements
+* new lint: `avoid_equals_and_hash_code_on_mutable_classes`
+* extended `avoid_slow_async_io` to flag async `Directory` methods
+
+## 2.5.1 - 2019-09-27
+
+This is a patch release that prevents type inference failures in the analyzer
+(Issue [38365][]).
+
+[38365]: https://github.com/dart-lang/sdk/issues/38365
+
+## 2.5.0 - 2019-09-10
+
+### Language
+
 The set of operations allowed in constant expressions has been expanded as
 described in
 the [constant update proposal](https://github.com/dart-lang/language/issues/61).
@@ -124,7 +173,7 @@ const int x = (s == null) ? 0 : s.length;
 
 #### `dart:io`
 
-* **Breaking change** [#37192](https://github.com/dart-lang/sdk/issues/37192): 
+* **Breaking change** [#37192](https://github.com/dart-lang/sdk/issues/37192):
   The `Cookie` class's constructor's `name` and `value`
   optional positional parameters are now mandatory. The
   signature changes from:
@@ -142,7 +191,7 @@ const int x = (s == null) ? 0 : s.length;
   Since code could not previously correctly omit the parameters, this is not
   really a breaking change.
 
-* **Breaking change** [#37192](https://github.com/dart-lang/sdk/issues/37192): 
+* **Breaking change** [#37192](https://github.com/dart-lang/sdk/issues/37192):
   The `Cookie` class's `name` and `value` setters now
   validates that the strings are made from the allowed character set and are not
   null. The constructor already made these checks and this
@@ -161,14 +210,11 @@ const int x = (s == null) ? 0 : s.length;
 
 #### Linter
 
-The Linter was updated to `0.1.97+1`, which includes:
+The Linter was updated to `0.1.96`, which includes:
 
-* internal migration away from using analyzer `resolutionMap`
-* various fixes and improvements to anticipate support for extension-methods
-* new lint: `camel_case_extensions`
-* rule template generation improvements
-* new lint: `avoid_equals_and_hash_code_on_mutable_classes`
-* extended `avoid_slow_async_io` to flag async `Directory` methods
+* fixed false positives in `unnecessary_parens`
+* various changes to migrate to preferred analyzer APIs
+* rule test fixes
 
 #### Dartdoc
 
@@ -190,6 +236,15 @@ well as a potential crash of our AOT compiler.
 
 [37551]: https://github.com/dart-lang/sdk/issues/37551
 [35121]: https://github.com/dart-lang/sdk/issues/35121
+
+### Dart Dev Compiler (DDC)
+
+Callbacks passed to JS and wrapped with `allowInterop` or
+`allowInteropCaptureThis` are now strict about argument counts and argument
+types. This may mean that tests which were previously passing and relying on
+loose argument checking (too many or too few arguments, or arguments with too
+specific types like `List<Something>` instead of `List<dynamic>`) may start
+failing. This changes makes DDC behave more like dart2js with the default flags.
 
 ## 2.4.0 - 2019-06-27
 

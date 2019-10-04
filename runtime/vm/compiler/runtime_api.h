@@ -21,6 +21,7 @@
 #include "platform/globals.h"
 #include "vm/allocation.h"
 #include "vm/bitfield.h"
+#include "vm/bss_relocs.h"
 #include "vm/class_id.h"
 #include "vm/code_entry_kind.h"
 #include "vm/constants.h"
@@ -754,15 +755,22 @@ class Isolate : public AllStatic {
 #endif  // !defined(PRODUCT)
 };
 
+class SharedClassTable : public AllStatic {
+ public:
+  static word class_heap_stats_table_offset();
+};
+
 class ClassTable : public AllStatic {
  public:
   static word table_offset();
+  static word shared_class_table_offset();
 #if !defined(PRODUCT)
   static word ClassOffsetFor(intptr_t cid);
   static word StateOffsetFor(intptr_t cid);
-  static word class_heap_stats_table_offset();
   static word NewSpaceCounterOffsetFor(intptr_t cid);
   static word NewSpaceSizeOffsetFor(intptr_t cid);
+  static word SharedTableOffsetFor();
+  static word SizeOffsetFor(intptr_t cid, bool is_new);
 #endif  // !defined(PRODUCT)
   static const word kSizeOfClassPairLog2;
 };

@@ -777,10 +777,11 @@ class AstTestFactory {
           [List<Combinator> combinators]) =>
       importDirective(null, uri, false, prefix, combinators);
 
-  static IndexExpression indexExpression(Expression array, Expression index) =>
+  static IndexExpression indexExpression(Expression array, Expression index,
+          [TokenType leftBracket = TokenType.OPEN_SQUARE_BRACKET]) =>
       astFactory.indexExpressionForTarget(
           array,
-          TokenFactory.tokenFromType(TokenType.OPEN_SQUARE_BRACKET),
+          TokenFactory.tokenFromType(leftBracket),
           index,
           TokenFactory.tokenFromType(TokenType.CLOSE_SQUARE_BRACKET));
 
@@ -1344,7 +1345,7 @@ class AstTestFactory {
           TokenFactory.tokenFromKeyword(Keyword.EXTENDS), bound);
 
   static TypeParameterList typeParameterList([List<String> typeNames]) {
-    List<TypeParameter> typeParameters = null;
+    List<TypeParameter> typeParameters;
     if (typeNames != null && typeNames.isNotEmpty) {
       typeParameters = new List<TypeParameter>();
       for (String typeName in typeNames) {

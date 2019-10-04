@@ -546,34 +546,35 @@ void Assembler::strex(Register rd, Register rt, Register rn, Condition cond) {
 }
 
 void Assembler::EnterSafepoint(Register addr, Register state) {
+  // We generate the same number of instructions whether or not the slow-path is
+  // forced. This simplifies GenerateJitCallbackTrampolines.
+  Label slow_path, done, retry;
   if (FLAG_use_slow_path || TargetCPUFeatures::arm_version() == ARMv5TE) {
-    EnterSafepointSlowly();
-  } else {
-    Label slow_path, done, retry;
-    LoadImmediate(addr, target::Thread::safepoint_state_offset());
-    add(addr, THR, Operand(addr));
-    Bind(&retry);
-    ldrex(state, addr);
-    cmp(state, Operand(target::Thread::safepoint_state_unacquired()));
-    b(&slow_path, NE);
-
-    mov(state, Operand(target::Thread::safepoint_state_acquired()));
-    strex(TMP, state, addr);
-    cmp(TMP, Operand(0));  // 0 means strex was successful.
-    b(&done, EQ);
-    b(&retry);
-
-    Bind(&slow_path);
-    EnterSafepointSlowly();
-
-    Bind(&done);
+    b(&slow_path);
   }
-}
 
-void Assembler::EnterSafepointSlowly() {
+  LoadImmediate(addr, target::Thread::safepoint_state_offset());
+  add(addr, THR, Operand(addr));
+  Bind(&retry);
+  ldrex(state, addr);
+  cmp(state, Operand(target::Thread::safepoint_state_unacquired()));
+  b(&slow_path, NE);
+
+  mov(state, Operand(target::Thread::safepoint_state_acquired()));
+  strex(TMP, state, addr);
+  cmp(TMP, Operand(0));  // 0 means strex was successful.
+  b(&done, EQ);
+
+  if (!FLAG_use_slow_path && TargetCPUFeatures::arm_version() != ARMv5TE) {
+    b(&retry);
+  }
+
+  Bind(&slow_path);
   ldr(TMP, Address(THR, target::Thread::enter_safepoint_stub_offset()));
   ldr(TMP, FieldAddress(TMP, target::Code::entry_point_offset()));
   blx(TMP);
+
+  Bind(&done);
 }
 
 void Assembler::TransitionGeneratedToNative(Register destination_address,
@@ -597,34 +598,35 @@ void Assembler::TransitionGeneratedToNative(Register destination_address,
 }
 
 void Assembler::ExitSafepoint(Register addr, Register state) {
+  // We generate the same number of instructions whether or not the slow-path is
+  // forced, for consistency with EnterSafepoint.
+  Label slow_path, done, retry;
   if (FLAG_use_slow_path || TargetCPUFeatures::arm_version() == ARMv5TE) {
-    ExitSafepointSlowly();
-  } else {
-    Label slow_path, done, retry;
-    LoadImmediate(addr, target::Thread::safepoint_state_offset());
-    add(addr, THR, Operand(addr));
-    Bind(&retry);
-    ldrex(state, addr);
-    cmp(state, Operand(target::Thread::safepoint_state_acquired()));
-    b(&slow_path, NE);
-
-    mov(state, Operand(target::Thread::safepoint_state_unacquired()));
-    strex(TMP, state, addr);
-    cmp(TMP, Operand(0));  // 0 means strex was successful.
-    b(&done, EQ);
-    b(&retry);
-
-    Bind(&slow_path);
-    ExitSafepointSlowly();
-
-    Bind(&done);
+    b(&slow_path);
   }
-}
 
-void Assembler::ExitSafepointSlowly() {
+  LoadImmediate(addr, target::Thread::safepoint_state_offset());
+  add(addr, THR, Operand(addr));
+  Bind(&retry);
+  ldrex(state, addr);
+  cmp(state, Operand(target::Thread::safepoint_state_acquired()));
+  b(&slow_path, NE);
+
+  mov(state, Operand(target::Thread::safepoint_state_unacquired()));
+  strex(TMP, state, addr);
+  cmp(TMP, Operand(0));  // 0 means strex was successful.
+  b(&done, EQ);
+
+  if (!FLAG_use_slow_path && TargetCPUFeatures::arm_version() != ARMv5TE) {
+    b(&retry);
+  }
+
+  Bind(&slow_path);
   ldr(TMP, Address(THR, target::Thread::exit_safepoint_stub_offset()));
   ldr(TMP, FieldAddress(TMP, target::Code::entry_point_offset()));
   blx(TMP);
+
+  Bind(&done);
 }
 
 void Assembler::TransitionNativeToGenerated(Register addr,
@@ -1984,12 +1986,13 @@ void Assembler::LoadClassId(Register result, Register object, Condition cond) {
 
 void Assembler::LoadClassById(Register result, Register class_id) {
   ASSERT(result != class_id);
+
+  const intptr_t table_offset = target::Isolate::class_table_offset() +
+                                target::ClassTable::table_offset();
+
   LoadIsolate(result);
-  const intptr_t offset = target::Isolate::class_table_offset() +
-                          target::ClassTable::table_offset();
-  LoadFromOffset(kWord, result, result, offset);
-  ldr(result,
-      Address(result, class_id, LSL, target::ClassTable::kSizeOfClassPairLog2));
+  LoadFromOffset(kWord, result, result, table_offset);
+  ldr(result, Address(result, class_id, LSL, target::kWordSizeLog2));
 }
 
 void Assembler::CompareClassId(Register object,
@@ -3511,10 +3514,16 @@ void Assembler::LoadAllocationStatsAddress(Register dest, intptr_t cid) {
   ASSERT(dest != kNoRegister);
   ASSERT(dest != TMP);
   ASSERT(cid > 0);
+
+  const intptr_t shared_table_offset =
+      target::Isolate::class_table_offset() +
+      target::ClassTable::shared_class_table_offset();
+  const intptr_t table_offset =
+      target::SharedClassTable::class_heap_stats_table_offset();
   const intptr_t class_offset = target::ClassTable::ClassOffsetFor(cid);
+
   LoadIsolate(dest);
-  intptr_t table_offset = target::Isolate::class_table_offset() +
-                          target::ClassTable::class_heap_stats_table_offset();
+  ldr(dest, Address(dest, shared_table_offset));
   ldr(dest, Address(dest, table_offset));
   AddImmediate(dest, class_offset);
 }

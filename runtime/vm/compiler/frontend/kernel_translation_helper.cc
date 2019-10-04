@@ -911,6 +911,9 @@ void TypeParameterHelper::ReadUntilExcluding(Field field) {
       case kAnnotations:
         helper_->SkipListOfExpressions();  // read annotations.
         break;
+      case kVariance:
+        helper_->ReadVariance();
+        break;
       case kName:
         name_index_ = helper_->ReadStringReference();  // read name index.
         break;
@@ -1623,8 +1626,8 @@ bool DirectCallMetadataHelper::ReadMetadata(intptr_t node_offset,
     return false;
   }
 
-  AlternativeReadingScope alt(&helper_->reader_, &H.metadata_payloads(),
-                              md_offset);
+  AlternativeReadingScopeWithNewData alt(&helper_->reader_,
+                                         &H.metadata_payloads(), md_offset);
 
   *target_name = helper_->ReadCanonicalNameReference();
   *check_receiver_for_null = helper_->ReadBool();
@@ -1701,8 +1704,8 @@ InferredTypeMetadata InferredTypeMetadataHelper::GetInferredType(
                                 InferredTypeMetadata::kFlagNullable);
   }
 
-  AlternativeReadingScope alt(&helper_->reader_, &H.metadata_payloads(),
-                              md_offset);
+  AlternativeReadingScopeWithNewData alt(&helper_->reader_,
+                                         &H.metadata_payloads(), md_offset);
 
   const NameIndex kernel_name = helper_->ReadCanonicalNameReference();
   const uint8_t flags = helper_->ReadByte();
@@ -1737,8 +1740,8 @@ bool ProcedureAttributesMetadataHelper::ReadMetadata(
     return false;
   }
 
-  AlternativeReadingScope alt(&helper_->reader_, &H.metadata_payloads(),
-                              md_offset);
+  AlternativeReadingScopeWithNewData alt(&helper_->reader_,
+                                         &H.metadata_payloads(), md_offset);
 
   const int kDynamicUsesBit = 1 << 0;
   const int kNonThisUsesBit = 1 << 1;
@@ -1771,8 +1774,8 @@ void ObfuscationProhibitionsMetadataHelper::ReadMetadata(intptr_t node_offset) {
     return;
   }
 
-  AlternativeReadingScope alt(&helper_->reader_, &H.metadata_payloads(),
-                              md_offset);
+  AlternativeReadingScopeWithNewData alt(&helper_->reader_,
+                                         &H.metadata_payloads(), md_offset);
   Obfuscator O(Thread::Current(), String::Handle());
 
   intptr_t len = helper_->ReadUInt32();
@@ -1797,8 +1800,8 @@ bool CallSiteAttributesMetadataHelper::ReadMetadata(
     return false;
   }
 
-  AlternativeReadingScope alt(&helper_->reader_, &H.metadata_payloads(),
-                              md_offset);
+  AlternativeReadingScopeWithNewData alt(&helper_->reader_,
+                                         &H.metadata_payloads(), md_offset);
 
   metadata->receiver_type = &type_translator_.BuildType();
   return true;
@@ -2229,6 +2232,10 @@ void KernelReaderHelper::SkipExpression() {
     case kNot:
       SkipExpression();  // read expression.
       return;
+    case kNullCheck:
+      ReadPosition();    // read position.
+      SkipExpression();  // read expression.
+      return;
     case kLogicalExpression:
       SkipExpression();  // read left.
       SkipBytes(1);      // read operator.
@@ -2248,8 +2255,9 @@ void KernelReaderHelper::SkipExpression() {
     case kSetConcatenation:
     case kMapConcatenation:
     case kInstanceCreation:
-      // Collection concatenation and instance creation operations are removed
-      // by the constant evaluator.
+    case kFileUriExpression:
+      // Collection concatenation, instance creation operations and
+      // in-expression URI changes are removed by the constant evaluator.
       UNREACHABLE();
       break;
     case kIsExpression:
@@ -2474,8 +2482,7 @@ void KernelReaderHelper::SkipStatement() {
       SkipStatement();  // read finalizer.
       return;
     case kYieldStatement: {
-      TokenPosition position = ReadPosition();  // read position.
-      RecordYieldPosition(position);
+      ReadPosition();    // read position.
       ReadByte();        // read flags.
       SkipExpression();  // read expression.
       return;
@@ -2806,6 +2813,9 @@ void TypeTranslator::BuildInterfaceType(bool simple) {
 
   const Class& klass = Class::Handle(Z, H.LookupClassByKernelClass(klass_name));
   ASSERT(!klass.IsNull());
+  if (klass.is_declared_in_bytecode()) {
+    klass.EnsureDeclarationLoaded();
+  }
   if (simple) {
     if (finalize_ || klass.is_type_finalized()) {
       // Fast path for non-generic types: retrieve or populate the class's only

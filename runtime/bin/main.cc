@@ -275,7 +275,7 @@ static bool OnIsolateInitialize(void** child_callback_data, char** error) {
     }
   } else {
     result = DartUtils::ResolveScript(Dart_NewStringFromCString(script_uri));
-    if (Dart_IsError(result)) return result;
+    if (Dart_IsError(result)) return result != nullptr;
 
     if (isolate_group_data->kernel_buffer().get() != nullptr) {
       // Various core-library parts will send requests to the Loader to resolve
@@ -284,7 +284,7 @@ static bool OnIsolateInitialize(void** child_callback_data, char** error) {
       // bypasses normal source code loading paths that initialize it.
       const char* resolved_script_uri = NULL;
       result = Dart_StringToCString(result, &resolved_script_uri);
-      if (Dart_IsError(result)) return result;
+      if (Dart_IsError(result)) return result != nullptr;
       Loader::InitForSnapshot(resolved_script_uri, isolate_data);
     }
   }
@@ -597,7 +597,8 @@ static Dart_Isolate CreateAndSetupServiceIsolate(const char* script_uri,
   if (!VmService::Setup(
           Options::vm_service_server_ip(), Options::vm_service_server_port(),
           Options::vm_service_dev_mode(), Options::vm_service_auth_disabled(),
-          Options::trace_loading(), Options::deterministic())) {
+          Options::vm_write_service_info_filename(), Options::trace_loading(),
+          Options::deterministic())) {
     *error = strdup(VmService::GetErrorMessage());
     return NULL;
   }
@@ -661,7 +662,7 @@ static Dart_Isolate CreateIsolateGroupAndSetupHelper(
     }
   }
 
-  if (flags->copy_parent_code && callback_data) {
+  if (flags->copy_parent_code && callback_data != nullptr) {
     auto parent_isolate_group_data =
         reinterpret_cast<IsolateData*>(callback_data)->isolate_group_data();
     parent_kernel_buffer = parent_isolate_group_data->kernel_buffer();
@@ -1081,29 +1082,48 @@ void main(int argc, char** argv) {
   }
   vm_options.AddArgument("--new_gen_growth_factor=4");
 
-  // Parse command line arguments.
-  if (Options::ParseArguments(argc, argv, vm_run_app_snapshot, &vm_options,
-                              &script_name, &dart_options, &print_flags_seen,
-                              &verbose_debug_seen) < 0) {
-    if (Options::help_option()) {
-      Options::PrintUsage();
-      Platform::Exit(0);
-    } else if (Options::version_option()) {
-      Options::PrintVersion();
-      Platform::Exit(0);
-    } else if (print_flags_seen) {
-      // Will set the VM flags, print them out and then we exit as no
-      // script was specified on the command line.
-      char* error = Dart_SetVMFlags(vm_options.count(), vm_options.arguments());
-      if (error != NULL) {
-        Syslog::PrintErr("Setting VM flags failed: %s\n", error);
-        free(error);
+  // If the executable binary contains the runtime together with an appended
+  // snapshot, load and run that.
+  // Any arguments passed to such an executable are meant for the actual
+  // application so skip all Dart VM flag parsing.
+  AppSnapshot* app_snapshot =
+      Snapshot::TryReadAppendedAppSnapshotBlobs(argv[0]);
+  if (app_snapshot != nullptr) {
+    script_name = argv[0];
+
+    // Store the executable name.
+    Platform::SetExecutableName(argv[0]);
+
+    // Parse out options to be passed to dart main.
+    for (int i = 1; i < argc; i++) {
+      dart_options.AddArgument(argv[i]);
+    }
+  } else {
+    // Parse command line arguments.
+    if (Options::ParseArguments(argc, argv, vm_run_app_snapshot, &vm_options,
+                                &script_name, &dart_options, &print_flags_seen,
+                                &verbose_debug_seen) < 0) {
+      if (Options::help_option()) {
+        Options::PrintUsage();
+        Platform::Exit(0);
+      } else if (Options::version_option()) {
+        Options::PrintVersion();
+        Platform::Exit(0);
+      } else if (print_flags_seen) {
+        // Will set the VM flags, print them out and then we exit as no
+        // script was specified on the command line.
+        char* error =
+            Dart_SetVMFlags(vm_options.count(), vm_options.arguments());
+        if (error != NULL) {
+          Syslog::PrintErr("Setting VM flags failed: %s\n", error);
+          free(error);
+          Platform::Exit(kErrorExitCode);
+        }
+        Platform::Exit(0);
+      } else {
+        Options::PrintUsage();
         Platform::Exit(kErrorExitCode);
       }
-      Platform::Exit(0);
-    } else {
-      Options::PrintUsage();
-      Platform::Exit(kErrorExitCode);
     }
   }
   DartUtils::SetEnvironment(Options::environment());
@@ -1131,20 +1151,15 @@ void main(int argc, char** argv) {
     shared_blobs->SetBuffers(&ignored, &ignored, &app_isolate_shared_data,
                              &app_isolate_shared_instructions);
   }
-  AppSnapshot* app_snapshot = Snapshot::TryReadAppSnapshot(script_name);
-  if (app_snapshot != NULL) {
+  if (app_snapshot == nullptr) {
+    app_snapshot = Snapshot::TryReadAppSnapshot(script_name);
+  }
+  if (app_snapshot != nullptr) {
     vm_run_app_snapshot = true;
     app_snapshot->SetBuffers(&vm_snapshot_data, &vm_snapshot_instructions,
                              &app_isolate_snapshot_data,
                              &app_isolate_snapshot_instructions);
   }
-
-#if !defined(PRODUCT) && !defined(DART_PRECOMPILED_RUNTIME)
-  // Constant true if PRODUCT or DART_PRECOMPILED_RUNTIME.
-  if ((Options::gen_snapshot_kind() != kNone) || vm_run_app_snapshot) {
-    vm_options.AddArgument("--load_deferred_eagerly");
-  }
-#endif
 
   if (Options::gen_snapshot_kind() == kAppJIT) {
     vm_options.AddArgument("--fields_may_be_reset");
@@ -1161,7 +1176,7 @@ void main(int argc, char** argv) {
 
   char* error = nullptr;
   if (!dart::embedder::InitOnce(&error)) {
-    Syslog::PrintErr("Stanalone embedder initialization failed: %s\n", error);
+    Syslog::PrintErr("Standalone embedder initialization failed: %s\n", error);
     free(error);
     Platform::Exit(kErrorExitCode);
   }

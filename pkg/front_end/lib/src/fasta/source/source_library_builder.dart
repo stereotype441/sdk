@@ -72,6 +72,7 @@ import '../builder/builder.dart'
         NameIterator,
         PrefixBuilder,
         FunctionBuilder,
+        NullabilityBuilder,
         QualifiedName,
         Scope,
         TypeBuilder,
@@ -194,6 +195,7 @@ import '../kernel/metadata_collector.dart';
 import '../kernel/type_algorithms.dart'
     show
         calculateBounds,
+        computeVariance,
         findGenericFunctionTypes,
         getNonSimplicityIssuesForDeclaration,
         getNonSimplicityIssuesForTypeVariables;
@@ -254,8 +256,6 @@ class SourceLibraryBuilder extends LibraryBuilder {
 
   final List<Object> accessors = <Object>[];
 
-  final bool legacyMode;
-
   String documentationComment;
 
   String name;
@@ -299,6 +299,13 @@ class SourceLibraryBuilder extends LibraryBuilder {
   // TODO(dmitryas):  Find a way to mark inferred types.
   final Set<DartType> inferredTypes = new Set<DartType>.identity();
 
+  // While the bounds of type parameters aren't compiled yet, we can't tell the
+  // default nullability of the corresponding type-parameter types.  This list
+  // is used to collect such type-parameter types in order to set the
+  // nullability after the bounds are built.
+  final List<TypeParameterType> pendingNullabilities =
+      new List<TypeParameterType>();
+
   // A library to use for Names generated when compiling code in this library.
   // This allows code generated in one library to use the private namespace of
   // another, for example during expression compilation (debugging).
@@ -315,8 +322,6 @@ class SourceLibraryBuilder extends LibraryBuilder {
   /// Otherwise, this represents an error (an ambiguous export). In this case,
   /// the error message is the corresponding value in the map.
   Map<String, String> unserializableExports;
-
-  List<FormalParameterBuilder> untypedInitializingFormals;
 
   List<FieldBuilder> implicitlyTypedFields;
 
@@ -345,7 +350,6 @@ class SourceLibraryBuilder extends LibraryBuilder {
       this.library,
       this._nameOrigin)
       : currentTypeParameterScopeBuilder = libraryDeclaration,
-        legacyMode = loader.target.legacyMode,
         super(
             fileUri, libraryDeclaration.toScope(importScope), new Scope.top());
 
@@ -622,8 +626,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
       bool isFinal = modifiers & finalMask != 0;
       bool potentiallyNeedInitializerInOutline = isConst || isFinal;
       Token startToken;
-      if (potentiallyNeedInitializerInOutline ||
-          (type == null && !legacyMode)) {
+      if (potentiallyNeedInitializerInOutline || type == null) {
         startToken = info.initializerToken;
       }
       if (startToken != null) {
@@ -725,8 +728,10 @@ class SourceLibraryBuilder extends LibraryBuilder {
                 .withLocation(
                     existing.fileUri, existing.charOffset, fullName.length)
           ]);
-    }
-    if (declaration.isExtension) {
+    } else if (declaration.isExtension) {
+      // We add the extension declaration to the extension scope only if its
+      // name is unique. Only the first of duplicate extensions is accessible
+      // by name or by resolution and the remaining are dropped for the output.
       currentTypeParameterScopeBuilder.extensions.add(declaration);
     }
     return members[name] = declaration;
@@ -1095,11 +1100,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
     int typeCount = types.length;
     for (UnresolvedType t in types) {
       t.resolveIn(scope, this);
-      if (!loader.target.legacyMode) {
-        t.checkType(this);
-      } else {
-        t.normalizeType();
-      }
+      t.checkType(this);
     }
     types.clear();
     return typeCount;
@@ -1162,9 +1163,10 @@ class SourceLibraryBuilder extends LibraryBuilder {
         "dynamic", new DynamicTypeBuilder(const DynamicType(), this, -1), -1);
   }
 
-  TypeBuilder addNamedType(
-      Object name, List<TypeBuilder> arguments, int charOffset) {
-    return addType(new NamedTypeBuilder(name, arguments), charOffset);
+  TypeBuilder addNamedType(Object name, NullabilityBuilder nullabilityBuilder,
+      List<TypeBuilder> arguments, int charOffset) {
+    return addType(
+        new NamedTypeBuilder(name, nullabilityBuilder, arguments), charOffset);
   }
 
   TypeBuilder addMixinApplication(
@@ -1173,7 +1175,9 @@ class SourceLibraryBuilder extends LibraryBuilder {
   }
 
   TypeBuilder addVoidType(int charOffset) {
-    return addNamedType("void", null, charOffset)
+    // 'void' is always nullable.
+    return addNamedType(
+        "void", const NullabilityBuilder.nullable(), null, charOffset)
       ..bind(new VoidTypeBuilder(const VoidType(), this, charOffset));
   }
 
@@ -1383,14 +1387,21 @@ class SourceLibraryBuilder extends LibraryBuilder {
     for (TypeVariableBuilder tv in typeVariables) {
       TypeVariableBuilder existing = typeVariablesByName[tv.name];
       if (existing != null) {
-        addProblem(messageTypeVariableDuplicatedName, tv.charOffset,
-            tv.name.length, fileUri,
-            context: [
-              templateTypeVariableDuplicatedNameCause
-                  .withArguments(tv.name)
-                  .withLocation(
-                      fileUri, existing.charOffset, existing.name.length)
-            ]);
+        if (existing.isExtensionTypeParameter) {
+          // The type parameter from the extension is shadowed by the type
+          // parameter from the member. Rename the shadowed type parameter.
+          existing.parameter.name = '#${existing.name}';
+          typeVariablesByName[tv.name] = tv;
+        } else {
+          addProblem(messageTypeVariableDuplicatedName, tv.charOffset,
+              tv.name.length, fileUri,
+              context: [
+                templateTypeVariableDuplicatedNameCause
+                    .withArguments(tv.name)
+                    .withLocation(
+                        fileUri, existing.charOffset, existing.name.length)
+              ]);
+        }
       } else {
         typeVariablesByName[tv.name] = tv;
         if (owner is ClassBuilder) {
@@ -1646,13 +1657,14 @@ class SourceLibraryBuilder extends LibraryBuilder {
 
             applicationTypeArguments = <TypeBuilder>[];
             for (TypeVariableBuilder typeVariable in typeVariables) {
-              applicationTypeArguments
-                  .add(addNamedType(typeVariable.name, null, charOffset)..bind(
-                      // The type variable types passed as arguments to the
-                      // generic class representing the anonymous mixin
-                      // application should refer back to the type variables of
-                      // the class that extend the anonymous mixin application.
-                      typeVariable));
+              applicationTypeArguments.add(addNamedType(typeVariable.name,
+                  const NullabilityBuilder.omitted(), null, charOffset)
+                ..bind(
+                    // The type variable types passed as arguments to the
+                    // generic class representing the anonymous mixin
+                    // application should refer back to the type variables of
+                    // the class that extend the anonymous mixin application.
+                    typeVariable));
             }
           }
         }
@@ -1697,8 +1709,8 @@ class SourceLibraryBuilder extends LibraryBuilder {
         // handle that :(
         application.cls.isAnonymousMixin = !isNamedMixinApplication;
         addBuilder(fullname, application, charOffset);
-        supertype =
-            addNamedType(fullname, applicationTypeArguments, charOffset);
+        supertype = addNamedType(fullname, const NullabilityBuilder.omitted(),
+            applicationTypeArguments, charOffset);
       }
       return supertype;
     } else {
@@ -1749,7 +1761,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
         metadata, type, name, modifiers, this, charOffset, charEndOffset);
     fieldBuilder.constInitializerToken = constInitializerToken;
     addBuilder(name, fieldBuilder, charOffset);
-    if (!legacyMode && type == null && initializerToken != null) {
+    if (type == null && initializerToken != null) {
       fieldBuilder.field.type =
           new ImplicitFieldType(fieldBuilder, initializerToken);
       (implicitlyTypedFields ??= <FieldBuilder>[]).add(fieldBuilder);
@@ -1866,6 +1878,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
       String nativeMethodName) {
     TypeBuilder returnType = addNamedType(
         currentTypeParameterScopeBuilder.parent.name,
+        const NullabilityBuilder.omitted(),
         <TypeBuilder>[],
         charOffset);
     // Nested declaration began in `OutlineBuilder.beginFactoryMethod`.
@@ -1932,7 +1945,8 @@ class SourceLibraryBuilder extends LibraryBuilder {
     currentTypeParameterScopeBuilder = factoryDeclaration;
     for (TypeVariableBuilder tv in procedureBuilder.typeVariables) {
       NamedTypeBuilder t = procedureBuilder.returnType;
-      t.arguments.add(addNamedType(tv.name, null, procedureBuilder.charOffset));
+      t.arguments.add(addNamedType(tv.name, const NullabilityBuilder.omitted(),
+          null, procedureBuilder.charOffset));
     }
     currentTypeParameterScopeBuilder = savedDeclaration;
 
@@ -1966,6 +1980,12 @@ class SourceLibraryBuilder extends LibraryBuilder {
       List<TypeVariableBuilder> typeVariables,
       FunctionTypeBuilder type,
       int charOffset) {
+    if (typeVariables != null) {
+      for (int i = 0; i < typeVariables.length; ++i) {
+        TypeVariableBuilder variable = typeVariables[i];
+        variable.variance = computeVariance(variable, type);
+      }
+    }
     TypeAliasBuilder typedefBuilder = new TypeAliasBuilder(
         metadata, name, typeVariables, type, this, charOffset);
     loader.target.metadataCollector
@@ -1981,9 +2001,10 @@ class SourceLibraryBuilder extends LibraryBuilder {
       TypeBuilder returnType,
       List<TypeVariableBuilder> typeVariables,
       List<FormalParameterBuilder> formals,
+      NullabilityBuilder nullabilityBuilder,
       int charOffset) {
-    FunctionTypeBuilder builder =
-        new FunctionTypeBuilder(returnType, typeVariables, formals);
+    FunctionTypeBuilder builder = new FunctionTypeBuilder(
+        returnType, typeVariables, formals, nullabilityBuilder);
     checkTypeVariables(typeVariables, null);
     // Nested declaration began in `OutlineBuilder.beginFunctionType` or
     // `OutlineBuilder.beginFunctionTypedFormalParameter`.
@@ -2004,11 +2025,8 @@ class SourceLibraryBuilder extends LibraryBuilder {
       modifiers |= initializingFormalMask;
     }
     FormalParameterBuilder formal = new FormalParameterBuilder(
-        metadata, modifiers, type, name, this, charOffset);
+        metadata, modifiers, type, name, this, charOffset, uri);
     formal.initializerToken = initializerToken;
-    if (legacyMode && hasThis && type == null) {
-      (untypedInitializingFormals ??= <FormalParameterBuilder>[]).add(formal);
-    }
     return formal;
   }
 
@@ -2033,7 +2051,8 @@ class SourceLibraryBuilder extends LibraryBuilder {
     if (declaration is SourceClassBuilder) {
       cls = declaration.build(this, coreLibrary);
     } else if (declaration is SourceExtensionBuilder) {
-      extension = declaration.build(this, coreLibrary);
+      extension = declaration.build(this, coreLibrary,
+          addMembersToLibrary: declaration.next == null);
     } else if (declaration is FieldBuilder) {
       member = declaration.build(this)..isStatic = true;
     } else if (declaration is ProcedureBuilder) {
@@ -2333,14 +2352,14 @@ class SourceLibraryBuilder extends LibraryBuilder {
   /// [TypeParameter] are prefix with '#' to indicate that their synthesized.
   List<TypeVariableBuilder> copyTypeVariables(
       List<TypeVariableBuilder> original, TypeParameterScopeBuilder declaration,
-      {bool synthesizeTypeParameterNames: false}) {
+      {bool isExtensionTypeParameter: false}) {
     List<TypeBuilder> newTypes = <TypeBuilder>[];
     List<TypeVariableBuilder> copy = <TypeVariableBuilder>[];
     for (TypeVariableBuilder variable in original) {
       TypeVariableBuilder newVariable = new TypeVariableBuilder(
           variable.name, this, variable.charOffset,
           bound: variable.bound?.clone(newTypes),
-          synthesizeTypeParameterName: synthesizeTypeParameterNames);
+          isExtensionTypeParameter: isExtensionTypeParameter);
       copy.add(newVariable);
       boundlessTypeVariables.add(newVariable);
     }
@@ -2356,6 +2375,10 @@ class SourceLibraryBuilder extends LibraryBuilder {
       builder.finish(this, object, dynamicType);
     }
     boundlessTypeVariables.clear();
+
+    TypeVariableBuilder.finishNullabilities(this, pendingNullabilities);
+    pendingNullabilities.clear();
+
     return count;
   }
 
@@ -2363,12 +2386,12 @@ class SourceLibraryBuilder extends LibraryBuilder {
       ClassBuilder objectClass) {
     int count = 0;
 
-    int computeDefaultTypesForVariables(
-        List<TypeVariableBuilder> variables, bool legacyMode) {
+    int computeDefaultTypesForVariables(List<TypeVariableBuilder> variables,
+        {bool inErrorRecovery}) {
       if (variables == null) return 0;
 
       bool haveErroneousBounds = false;
-      if (!legacyMode) {
+      if (!inErrorRecovery) {
         for (int i = 0; i < variables.length; ++i) {
           TypeVariableBuilder variable = variables[i];
           List<TypeBuilder> genericFunctionTypes = <TypeBuilder>[];
@@ -2390,8 +2413,8 @@ class SourceLibraryBuilder extends LibraryBuilder {
         }
       }
 
-      if (legacyMode || haveErroneousBounds) {
-        // In Dart 1, put `dynamic` everywhere.
+      if (inErrorRecovery || haveErroneousBounds) {
+        // Use dynamic in case of errors.
         for (int i = 0; i < variables.length; ++i) {
           variables[i].defaultType = dynamicType;
         }
@@ -2412,47 +2435,37 @@ class SourceLibraryBuilder extends LibraryBuilder {
       }
     }
 
-    bool legacyMode = loader.target.legacyMode;
     for (Builder declaration in libraryDeclaration.members.values) {
       if (declaration is ClassBuilder) {
         {
-          List<Object> issues = legacyMode
-              ? const <Object>[]
-              : getNonSimplicityIssuesForDeclaration(declaration,
-                  performErrorRecovery: true);
+          List<Object> issues = getNonSimplicityIssuesForDeclaration(
+              declaration,
+              performErrorRecovery: true);
           reportIssues(issues);
-          // In case of issues, use legacy mode for error recovery.
-          count += computeDefaultTypesForVariables(
-              declaration.typeVariables, legacyMode || issues.isNotEmpty);
+          count += computeDefaultTypesForVariables(declaration.typeVariables,
+              inErrorRecovery: issues.isNotEmpty);
         }
         declaration.forEach((String name, Builder member) {
           if (member is ProcedureBuilder) {
-            List<Object> issues = legacyMode
-                ? const <Object>[]
-                : getNonSimplicityIssuesForTypeVariables(member.typeVariables);
+            List<Object> issues =
+                getNonSimplicityIssuesForTypeVariables(member.typeVariables);
             reportIssues(issues);
-            // In case of issues, use legacy mode for error recovery.
-            count += computeDefaultTypesForVariables(
-                member.typeVariables, legacyMode || issues.isNotEmpty);
+            count += computeDefaultTypesForVariables(member.typeVariables,
+                inErrorRecovery: issues.isNotEmpty);
           }
         });
       } else if (declaration is TypeAliasBuilder) {
-        List<Object> issues = legacyMode
-            ? const <Object>[]
-            : getNonSimplicityIssuesForDeclaration(declaration,
-                performErrorRecovery: true);
+        List<Object> issues = getNonSimplicityIssuesForDeclaration(declaration,
+            performErrorRecovery: true);
         reportIssues(issues);
-        // In case of issues, use legacy mode for error recovery.
-        count += computeDefaultTypesForVariables(
-            declaration.typeVariables, legacyMode || issues.isNotEmpty);
+        count += computeDefaultTypesForVariables(declaration.typeVariables,
+            inErrorRecovery: issues.isNotEmpty);
       } else if (declaration is FunctionBuilder) {
-        List<Object> issues = legacyMode
-            ? const <Object>[]
-            : getNonSimplicityIssuesForTypeVariables(declaration.typeVariables);
+        List<Object> issues =
+            getNonSimplicityIssuesForTypeVariables(declaration.typeVariables);
         reportIssues(issues);
-        // In case of issues, use legacy mode for error recovery.
-        count += computeDefaultTypesForVariables(
-            declaration.typeVariables, legacyMode || issues.isNotEmpty);
+        count += computeDefaultTypesForVariables(declaration.typeVariables,
+            inErrorRecovery: issues.isNotEmpty);
       }
     }
 
@@ -2617,7 +2630,6 @@ class SourceLibraryBuilder extends LibraryBuilder {
   }
 
   void checkBoundsInField(Field field, TypeEnvironment typeEnvironment) {
-    if (loader.target.legacyMode) return;
     checkBoundsInType(
         field.type, typeEnvironment, field.fileUri, field.fileOffset,
         allowSuperBounded: true);
@@ -2629,7 +2641,6 @@ class SourceLibraryBuilder extends LibraryBuilder {
       List<VariableDeclaration> positionalParameters,
       List<VariableDeclaration> namedParameters,
       DartType returnType}) {
-    if (loader.target.legacyMode) return;
     if (typeParameters != null) {
       for (TypeParameter parameter in typeParameters) {
         checkBoundsInType(
@@ -2684,7 +2695,6 @@ class SourceLibraryBuilder extends LibraryBuilder {
 
   void checkBoundsInFunctionNode(
       FunctionNode function, TypeEnvironment typeEnvironment, Uri fileUri) {
-    if (loader.target.legacyMode) return;
     checkBoundsInFunctionNodeParts(
         typeEnvironment, fileUri, function.fileOffset,
         typeParameters: function.typeParameters,
@@ -2696,7 +2706,6 @@ class SourceLibraryBuilder extends LibraryBuilder {
   void checkBoundsInListLiteral(
       ListLiteral node, TypeEnvironment typeEnvironment, Uri fileUri,
       {bool inferred = false}) {
-    if (loader.target.legacyMode) return;
     checkBoundsInType(
         node.typeArgument, typeEnvironment, fileUri, node.fileOffset,
         inferred: inferred, allowSuperBounded: true);
@@ -2705,7 +2714,6 @@ class SourceLibraryBuilder extends LibraryBuilder {
   void checkBoundsInSetLiteral(
       SetLiteral node, TypeEnvironment typeEnvironment, Uri fileUri,
       {bool inferred = false}) {
-    if (loader.target.legacyMode) return;
     checkBoundsInType(
         node.typeArgument, typeEnvironment, fileUri, node.fileOffset,
         inferred: inferred, allowSuperBounded: true);
@@ -2714,7 +2722,6 @@ class SourceLibraryBuilder extends LibraryBuilder {
   void checkBoundsInMapLiteral(
       MapLiteral node, TypeEnvironment typeEnvironment, Uri fileUri,
       {bool inferred = false}) {
-    if (loader.target.legacyMode) return;
     checkBoundsInType(node.keyType, typeEnvironment, fileUri, node.fileOffset,
         inferred: inferred, allowSuperBounded: true);
     checkBoundsInType(node.valueType, typeEnvironment, fileUri, node.fileOffset,
@@ -2724,7 +2731,6 @@ class SourceLibraryBuilder extends LibraryBuilder {
   void checkBoundsInType(
       DartType type, TypeEnvironment typeEnvironment, Uri fileUri, int offset,
       {bool inferred, bool allowSuperBounded = true}) {
-    if (loader.target.legacyMode) return;
     List<TypeArgumentIssue> issues = findTypeArgumentIssues(
         type, typeEnvironment,
         allowSuperBounded: allowSuperBounded);
@@ -2736,7 +2742,6 @@ class SourceLibraryBuilder extends LibraryBuilder {
   void checkBoundsInVariableDeclaration(
       VariableDeclaration node, TypeEnvironment typeEnvironment, Uri fileUri,
       {bool inferred = false}) {
-    if (loader.target.legacyMode) return;
     if (node.type == null) return;
     checkBoundsInType(node.type, typeEnvironment, fileUri, node.fileOffset,
         inferred: inferred, allowSuperBounded: true);
@@ -2745,7 +2750,6 @@ class SourceLibraryBuilder extends LibraryBuilder {
   void checkBoundsInConstructorInvocation(
       ConstructorInvocation node, TypeEnvironment typeEnvironment, Uri fileUri,
       {bool inferred = false}) {
-    if (loader.target.legacyMode) return;
     if (node.arguments.types.isEmpty) return;
     Constructor constructor = node.target;
     Class klass = constructor.enclosingClass;
@@ -2758,7 +2762,6 @@ class SourceLibraryBuilder extends LibraryBuilder {
   void checkBoundsInFactoryInvocation(
       StaticInvocation node, TypeEnvironment typeEnvironment, Uri fileUri,
       {bool inferred = false}) {
-    if (loader.target.legacyMode) return;
     if (node.arguments.types.isEmpty) return;
     Procedure factory = node.target;
     assert(factory.isFactory);
@@ -2772,7 +2775,9 @@ class SourceLibraryBuilder extends LibraryBuilder {
   void checkBoundsInStaticInvocation(
       StaticInvocation node, TypeEnvironment typeEnvironment, Uri fileUri,
       {bool inferred = false}) {
-    if (loader.target.legacyMode) return;
+    // TODO(johnniwinther): Handle partially inferred type arguments in
+    // extension method calls. Currently all are considered inferred in the
+    // error messages.
     if (node.arguments.types.isEmpty) return;
     Class klass = node.target.enclosingClass;
     List<TypeParameter> parameters = node.target.function.typeParameters;
@@ -2805,7 +2810,6 @@ class SourceLibraryBuilder extends LibraryBuilder {
       Uri fileUri,
       int offset,
       {bool inferred = false}) {
-    if (loader.target.legacyMode) return;
     if (arguments.types.isEmpty) return;
     Class klass;
     List<DartType> receiverTypeArguments;
@@ -2856,7 +2860,6 @@ class SourceLibraryBuilder extends LibraryBuilder {
   }
 
   void checkBoundsInOutline(TypeEnvironment typeEnvironment) {
-    if (loader.target.legacyMode) return;
     Iterator<Builder> iterator = this.iterator;
     while (iterator.moveNext()) {
       Builder declaration = iterator.current;
@@ -2870,16 +2873,6 @@ class SourceLibraryBuilder extends LibraryBuilder {
       }
     }
     inferredTypes.clear();
-  }
-
-  int finalizeInitializingFormals() {
-    if (!legacyMode || untypedInitializingFormals == null) return 0;
-    for (int i = 0; i < untypedInitializingFormals.length; i++) {
-      untypedInitializingFormals[i].finalizeInitializingFormal();
-    }
-    int count = untypedInitializingFormals.length;
-    untypedInitializingFormals = null;
-    return count;
   }
 
   @override

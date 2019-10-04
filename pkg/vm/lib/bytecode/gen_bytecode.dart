@@ -19,6 +19,8 @@ import 'package:kernel/core_types.dart' show CoreTypes;
 import 'package:kernel/external_name.dart'
     show getExternalName, getNativeExtensionUris;
 import 'package:kernel/library_index.dart' show LibraryIndex;
+import 'package:kernel/text/ast_to_text.dart'
+    show globalDebuggingNames, NameSystem;
 import 'package:kernel/type_algebra.dart'
     show Substitution, containsTypeVariable;
 import 'package:kernel/type_environment.dart' show TypeEnvironment;
@@ -53,6 +55,7 @@ import 'source_positions.dart' show LineStarts, SourcePositions;
 import '../metadata/bytecode.dart';
 
 import 'dart:convert' show utf8;
+import 'dart:developer';
 import 'dart:math' as math;
 
 // This symbol is used as the name in assert assignable's to indicate it comes
@@ -67,25 +70,39 @@ void generateBytecode(
   CoreTypes coreTypes,
   ClassHierarchy hierarchy,
 }) {
-  options ??= new BytecodeOptions();
-  verifyBytecodeInstructionDeclarations();
-  coreTypes ??= new CoreTypes(component);
-  void ignoreAmbiguousSupertypes(Class cls, Supertype a, Supertype b) {}
-  hierarchy ??= new ClassHierarchy(component,
-      onAmbiguousSupertypes: ignoreAmbiguousSupertypes);
-  final typeEnvironment = new TypeEnvironment(coreTypes, hierarchy);
-  libraries ??= component.libraries;
-  try {
-    final bytecodeGenerator = new BytecodeGenerator(
-        component, coreTypes, hierarchy, typeEnvironment, options);
-    for (var library in libraries) {
-      bytecodeGenerator.visitLibrary(library);
+  Timeline.timeSync("generateBytecode", () {
+    options ??= new BytecodeOptions();
+    verifyBytecodeInstructionDeclarations();
+    coreTypes ??= new CoreTypes(component);
+    void ignoreAmbiguousSupertypes(Class cls, Supertype a, Supertype b) {}
+    hierarchy ??= new ClassHierarchy(component,
+        onAmbiguousSupertypes: ignoreAmbiguousSupertypes);
+    final typeEnvironment = new TypeEnvironment(coreTypes, hierarchy);
+    libraries ??= component.libraries;
+
+    // Save/restore global NameSystem to avoid accumulating garbage.
+    // NameSystem holds the whole AST as it is strongly connected due to
+    // parent pointers. Objects are added to NameSystem when toString()
+    // is called from AST nodes.  Bytecode generator widely uses
+    // Expression.getStaticType, which calls Expression.getStaticTypeAsInstanceOf,
+    // which uses toString() when it crashes due to http://dartbug.com/34496.
+    final savedGlobalDebuggingNames = globalDebuggingNames;
+    globalDebuggingNames = new NameSystem();
+
+    try {
+      final bytecodeGenerator = new BytecodeGenerator(
+          component, coreTypes, hierarchy, typeEnvironment, options);
+      for (var library in libraries) {
+        bytecodeGenerator.visitLibrary(library);
+      }
+    } on IllegalRecursiveTypeException catch (e) {
+      CompilerContext.current.options.report(
+          templateIllegalRecursiveType.withArguments(e.type).withoutLocation(),
+          Severity.error);
+    } finally {
+      globalDebuggingNames = savedGlobalDebuggingNames;
     }
-  } on IllegalRecursiveTypeException catch (e) {
-    CompilerContext.current.options.report(
-        templateIllegalRecursiveType.withArguments(e.type).withoutLocation(),
-        Severity.error);
-  }
+  });
 }
 
 class BytecodeGenerator extends RecursiveVisitor<Null> {
@@ -1366,6 +1383,29 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       }
       return;
     }
+    if (condition is MethodInvocation &&
+        condition.name.name == '==' &&
+        (condition.receiver is NullLiteral ||
+            condition.arguments.positional.single is NullLiteral)) {
+      if (condition.receiver is NullLiteral) {
+        _generateNode(condition.arguments.positional.single);
+      } else {
+        _generateNode(condition.receiver);
+      }
+      if (options.emitDebuggerStops &&
+          condition.fileOffset != TreeNode.noOffset) {
+        final savedSourcePosition = asm.currentSourcePosition;
+        _recordSourcePosition(condition.fileOffset);
+        asm.emitDebugCheck();
+        asm.currentSourcePosition = savedSourcePosition;
+      }
+      if (value) {
+        asm.emitJumpIfNull(dest);
+      } else {
+        asm.emitJumpIfNotNull(dest);
+      }
+      return;
+    }
     bool negated = _genCondition(condition);
     if (value) {
       _genJumpIfTrue(negated, dest);
@@ -1522,10 +1562,14 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
     if (!hasErrors) {
       Code code;
       if (hasCode) {
-        if (options.emitLocalVarInfo && node.function != null) {
-          // Leave the scope which was entered in _setupInitialContext.
-          asm.localVariableTable
-              .leaveScope(asm.offset, node.function.fileEndOffset);
+        if (options.emitLocalVarInfo) {
+          // Leave the scopes which were entered in _genPrologue and
+          // _setupInitialContext.
+          asm.localVariableTable.leaveAllScopes(
+              asm.offset,
+              node.function != null
+                  ? node.function.fileEndOffset
+                  : node.fileEndOffset);
         }
 
         List<int> parameterFlags = null;
@@ -1650,46 +1694,74 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       asm.emitPopLocal(locals.contextVarIndexInFrame);
     }
 
-    // CheckStack must see a properly initialized context when stress-testing
-    // stack trace collection.
-    asm.emitCheckStack(0);
+    if (locals.hasFunctionTypeArgsVar && function.typeParameters.isNotEmpty) {
+      assert(!(node is Procedure && node.isFactory));
 
-    if (locals.hasFunctionTypeArgsVar) {
-      if (function.typeParameters.isNotEmpty) {
-        assert(!(node is Procedure && node.isFactory));
-
-        Label done = new Label();
-
-        if (isClosure) {
-          _handleDelayedTypeArguments(done);
-        }
-
-        asm.emitCheckFunctionTypeArgs(function.typeParameters.length,
-            locals.functionTypeArgsVarIndexInFrame);
-
-        _handleDefaultTypeArguments(function, done);
-
-        asm.bind(done);
-      }
+      Label done = new Label();
 
       if (isClosure) {
-        if (function.typeParameters.isNotEmpty) {
-          final int numParentTypeArgs = locals.numParentTypeArguments;
-          asm.emitPush(locals.functionTypeArgsVarIndexInFrame);
-          asm.emitPush(locals.closureVarIndexInFrame);
-          asm.emitLoadFieldTOS(
-              cp.addInstanceField(closureFunctionTypeArguments));
-          _genPushInt(numParentTypeArgs);
-          _genPushInt(numParentTypeArgs + function.typeParameters.length);
-          _genDirectCall(
-              prependTypeArguments, objectTable.getArgDescHandle(4), 4);
-          asm.emitPopLocal(locals.functionTypeArgsVarIndexInFrame);
-        } else {
-          asm.emitPush(locals.closureVarIndexInFrame);
-          asm.emitLoadFieldTOS(
-              cp.addInstanceField(closureFunctionTypeArguments));
-          asm.emitPopLocal(locals.functionTypeArgsVarIndexInFrame);
+        _handleDelayedTypeArguments(done);
+      }
+
+      asm.emitCheckFunctionTypeArgs(function.typeParameters.length,
+          locals.functionTypeArgsVarIndexInFrame);
+
+      _handleDefaultTypeArguments(function, done);
+
+      asm.bind(done);
+    }
+
+    // Open initial scope before the first CheckStack, as VM might
+    // need to know context level.
+    if (options.emitLocalVarInfo && function != null) {
+      asm.localVariableTable.enterScope(
+          asm.offset,
+          isClosure ? locals.contextLevelAtEntry : locals.currentContextLevel,
+          function.fileOffset);
+      if (locals.hasContextVar) {
+        asm.localVariableTable
+            .recordContextVariable(asm.offset, locals.contextVarIndexInFrame);
+      }
+      if (locals.hasReceiver) {
+        _declareLocalVariable(locals.receiverVar, function.fileOffset);
+      }
+      for (var v in function.positionalParameters) {
+        if (!locals.isCaptured(v)) {
+          _declareLocalVariable(v, function.fileOffset);
         }
+      }
+      for (var v in locals.sortedNamedParameters) {
+        if (!locals.isCaptured(v)) {
+          _declareLocalVariable(v, function.fileOffset);
+        }
+      }
+      if (locals.hasFunctionTypeArgsVar) {
+        _declareLocalVariable(locals.functionTypeArgsVar, function.fileOffset);
+      }
+    }
+
+    // CheckStack must see a properly initialized context when stress-testing
+    // stack trace collection.
+    // Also, simdbc doesn't support arguments descriptor SpecialDbcRegister as
+    // a source location for deopt info, so CheckStack should be generated
+    // after the code which uses arguments descriptor.
+    asm.emitCheckStack(0);
+
+    if (locals.hasFunctionTypeArgsVar && isClosure) {
+      if (function.typeParameters.isNotEmpty) {
+        final int numParentTypeArgs = locals.numParentTypeArguments;
+        asm.emitPush(locals.functionTypeArgsVarIndexInFrame);
+        asm.emitPush(locals.closureVarIndexInFrame);
+        asm.emitLoadFieldTOS(cp.addInstanceField(closureFunctionTypeArguments));
+        _genPushInt(numParentTypeArgs);
+        _genPushInt(numParentTypeArgs + function.typeParameters.length);
+        _genDirectCall(
+            prependTypeArguments, objectTable.getArgDescHandle(4), 4);
+        asm.emitPopLocal(locals.functionTypeArgsVarIndexInFrame);
+      } else {
+        asm.emitPush(locals.closureVarIndexInFrame);
+        asm.emitLoadFieldTOS(cp.addInstanceField(closureFunctionTypeArguments));
+        asm.emitPopLocal(locals.functionTypeArgsVarIndexInFrame);
       }
     }
   }
@@ -1738,26 +1810,10 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
   void _setupInitialContext(FunctionNode function) {
     _allocateContextIfNeeded();
 
-    if (options.emitLocalVarInfo && function != null) {
-      // Open scope after allocating context.
-      asm.localVariableTable.enterScope(
-          asm.offset, locals.currentContextLevel, function.fileOffset);
-      if (locals.hasContextVar) {
-        asm.localVariableTable
-            .recordContextVariable(asm.offset, locals.contextVarIndexInFrame);
-      }
-      if (locals.hasReceiver) {
-        _declareLocalVariable(locals.receiverVar, function.fileOffset);
-      }
-      for (var v in function.positionalParameters) {
-        _declareLocalVariable(v, function.fileOffset);
-      }
-      for (var v in locals.sortedNamedParameters) {
-        _declareLocalVariable(v, function.fileOffset);
-      }
-      if (locals.hasFunctionTypeArgsVar) {
-        _declareLocalVariable(locals.functionTypeArgsVar, function.fileOffset);
-      }
+    if (options.emitLocalVarInfo && locals.currentContextSize > 0) {
+      // Open a new scope after allocating context.
+      asm.localVariableTable.enterScope(asm.offset, locals.currentContextLevel,
+          function != null ? function.fileOffset : enclosingMember.fileOffset);
     }
 
     if (locals.hasCapturedParameters) {
@@ -1772,8 +1828,10 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
           _genStoreVar(locals.capturedReceiverVar);
         }
       }
-      function.positionalParameters.forEach(_copyParamIfCaptured);
-      locals.sortedNamedParameters.forEach(_copyParamIfCaptured);
+      if (function != null) {
+        function.positionalParameters.forEach(_copyParamIfCaptured);
+        locals.sortedNamedParameters.forEach(_copyParamIfCaptured);
+      }
     }
   }
 
@@ -1802,6 +1860,9 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
 
   void _copyParamIfCaptured(VariableDeclaration variable) {
     if (locals.isCaptured(variable)) {
+      if (options.emitLocalVarInfo) {
+        _declareLocalVariable(variable, enclosingFunction.fileOffset);
+      }
       _genPushContextForVariable(variable);
       asm.emitPush(locals.getOriginalParamSlotIndex(variable));
       _genStoreVar(variable);
@@ -2081,7 +2142,8 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
     asm.emitPushConstant(cp.addType(type));
     _genPushInstantiatorAndFunctionTypeArguments([type]);
     asm.emitPushConstant(cp.addString(name));
-    bool isIntOk = typeEnvironment.isSubtypeOf(typeEnvironment.intType, type);
+    bool isIntOk = typeEnvironment.isSubtypeOf(
+        typeEnvironment.coreTypes.intLegacyRawType, type);
     int subtypeTestCacheCpIndex = cp.addSubtypeTestCache();
     asm.emitAssertAssignable(isIntOk ? 1 : 0, subtypeTestCacheCpIndex);
   }
@@ -2168,8 +2230,9 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
     }
 
     if (options.emitLocalVarInfo) {
-      // Leave the scope which was entered in _setupInitialContext.
-      asm.localVariableTable.leaveScope(asm.offset, function.fileEndOffset);
+      // Leave the scopes which were entered in _genPrologue and
+      // _setupInitialContext.
+      asm.localVariableTable.leaveAllScopes(asm.offset, function.fileEndOffset);
     }
 
     cp.addEndClosureFunctionScope();
@@ -2223,6 +2286,7 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
         flags |= ClosureDeclaration.isSyncStarFlag;
         break;
       default:
+        flags |= ClosureDeclaration.isDebuggableFlag;
         break;
     }
 
@@ -3096,6 +3160,10 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       }
     }
     tryCatches[tryCatch].needsStackTrace = true;
+
+    if (options.emitDebuggerStops) {
+      asm.emitDebugCheck(); // Allow breakpoint on explicit rethrow statement.
+    }
     _genRethrow(tryCatch);
   }
 
@@ -3186,6 +3254,10 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
 
     final target = node.target;
     if (target is Field) {
+      if (options.emitDebuggerStops &&
+          _variableSetNeedsDebugCheck(node.value)) {
+        asm.emitDebugCheck();
+      }
       int cpIndex = cp.addStaticField(target);
       asm.emitStoreStaticTOS(cpIndex);
     } else {
@@ -4113,7 +4185,7 @@ ast.Component createFreshComponentWithBytecode(ast.Component component) {
   final newRepository = new BytecodeMetadataRepository();
   newComponent.addMetadataRepository(newRepository);
 
-  final oldRepository = component.metadata[newRepository.tag];
+  final oldRepository = component.metadata.remove(newRepository.tag);
   final metadata = oldRepository.mapping[component];
   newRepository.mapping[newComponent] = metadata;
 

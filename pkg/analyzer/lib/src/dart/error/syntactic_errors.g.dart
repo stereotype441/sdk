@@ -101,6 +101,10 @@ final fastaAnalyzerErrorCodes = <ErrorCode>[
   _ANNOTATION_WITH_TYPE_ARGUMENTS,
   _EXTENSION_DECLARES_CONSTRUCTOR,
   _EXTENSION_DECLARES_INSTANCE_FIELD,
+  _EXTENSION_DECLARES_ABSTRACT_MEMBER,
+  _MIXIN_DECLARES_CONSTRUCTOR,
+  _NULL_AWARE_CASCADE_OUT_OF_ORDER,
+  _MULTIPLE_VARIANCE_MODIFIERS,
 ];
 
 const ParserErrorCode _ABSTRACT_CLASS_MEMBER = const ParserErrorCode(
@@ -246,15 +250,23 @@ const ParserErrorCode _EXPORT_DIRECTIVE_AFTER_PART_DIRECTIVE =
         correction:
             "Try moving the export directives before the part directives.");
 
+const ParserErrorCode _EXTENSION_DECLARES_ABSTRACT_MEMBER =
+    const ParserErrorCode('EXTENSION_DECLARES_ABSTRACT_MEMBER',
+        r"Extensions can't declare abstract members.",
+        correction: "Try providing an implementation for the member.",
+        hasPublishedDocs: true);
+
 const ParserErrorCode _EXTENSION_DECLARES_CONSTRUCTOR = const ParserErrorCode(
     'EXTENSION_DECLARES_CONSTRUCTOR', r"Extensions can't declare constructors.",
-    correction: "Try removing the constructor declaration.");
+    correction: "Try removing the constructor declaration.",
+    hasPublishedDocs: true);
 
 const ParserErrorCode _EXTENSION_DECLARES_INSTANCE_FIELD =
     const ParserErrorCode('EXTENSION_DECLARES_INSTANCE_FIELD',
         r"Extensions can't declare instance fields",
         correction:
-            "Try removing the field declaration or making it a static field");
+            "Try removing the field declaration or making it a static field",
+        hasPublishedDocs: true);
 
 const ParserErrorCode _EXTERNAL_CLASS = const ParserErrorCode(
     'EXTERNAL_CLASS', r"Classes can't be declared to be 'external'.",
@@ -434,6 +446,9 @@ const ParserErrorCode _MISSING_PREFIX_IN_DEFERRED_IMPORT =
 const ParserErrorCode _MISSING_STATEMENT =
     const ParserErrorCode('MISSING_STATEMENT', r"Expected a statement.");
 
+const ParserErrorCode _MIXIN_DECLARES_CONSTRUCTOR = const ParserErrorCode(
+    'MIXIN_DECLARES_CONSTRUCTOR', r"Mixins can't declare constructors.");
+
 const ParserErrorCode _MODIFIER_OUT_OF_ORDER = const ParserErrorCode(
     'MODIFIER_OUT_OF_ORDER',
     r"The modifier '#string' should be before the modifier '#string2'.",
@@ -460,6 +475,11 @@ const ParserErrorCode _MULTIPLE_PART_OF_DIRECTIVES = const ParserErrorCode(
     r"Only one part-of directive may be declared in a file.",
     correction: "Try removing all but one of the part-of directives.");
 
+const ParserErrorCode _MULTIPLE_VARIANCE_MODIFIERS = const ParserErrorCode(
+    'MULTIPLE_VARIANCE_MODIFIERS',
+    r"Each type parameter can have at most one variance modifier.",
+    correction: "Use at most one of the 'in', 'out', or 'inout' modifiers.");
+
 const ParserErrorCode _MULTIPLE_WITH_CLAUSES = const ParserErrorCode(
     'MULTIPLE_WITH_CLAUSES',
     r"Each class definition can have at most one with clause.",
@@ -470,6 +490,12 @@ const ParserErrorCode _NATIVE_CLAUSE_SHOULD_BE_ANNOTATION = const ParserErrorCod
     r"Native clause in this form is deprecated.",
     correction:
         "Try removing this native clause and adding @native() or @native('native-name') before the declaration.");
+
+const ParserErrorCode _NULL_AWARE_CASCADE_OUT_OF_ORDER = const ParserErrorCode(
+    'NULL_AWARE_CASCADE_OUT_OF_ORDER',
+    r"The '?..' cascade operator must be first in the cascade sequence.",
+    correction:
+        "Try moving the '?..' operator to be the first cascade operator in the sequence.");
 
 const ParserErrorCode _PREFIX_AFTER_COMBINATOR = const ParserErrorCode(
     'PREFIX_AFTER_COMBINATOR',

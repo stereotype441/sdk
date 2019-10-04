@@ -9,6 +9,7 @@ import 'package:analyzer/src/dart/element/handle.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/source.dart';
+import 'package:nnbd_migration/instrumentation.dart';
 import 'package:nnbd_migration/src/already_migrated_code_decorator.dart';
 import 'package:nnbd_migration/src/conditional_discard.dart';
 import 'package:nnbd_migration/src/decorated_type.dart';
@@ -33,7 +34,9 @@ class Variables implements VariableRecorder, VariableRepository {
 
   final AlreadyMigratedCodeDecorator _alreadyMigratedCodeDecorator;
 
-  Variables(this._graph, TypeProvider typeProvider)
+  final NullabilityMigrationInstrumentation /*?*/ instrumentation;
+
+  Variables(this._graph, TypeProvider typeProvider, {this.instrumentation})
       : _alreadyMigratedCodeDecorator =
             AlreadyMigratedCodeDecorator(_graph, typeProvider);
 
@@ -142,6 +145,7 @@ class Variables implements VariableRecorder, VariableRepository {
 
   void recordDecoratedTypeAnnotation(Source source, TypeAnnotation node,
       DecoratedType type, PotentiallyAddQuestionSuffix potentialModification) {
+    instrumentation?.explicitTypeNullability(source, node, type.node);
     if (potentialModification != null)
       _addPotentialModification(source, potentialModification);
     (_decoratedTypeAnnotations[source] ??=
@@ -160,8 +164,8 @@ class Variables implements VariableRecorder, VariableRepository {
 
   @override
   void recordExpressionChecks(
-      Source source, Expression expression, ExpressionChecks checks) {
-    _addPotentialModification(source, checks);
+      Source source, Expression expression, ExpressionChecksOrigin origin) {
+    _addPotentialModification(source, origin.checks);
   }
 
   @override
@@ -169,53 +173,6 @@ class Variables implements VariableRecorder, VariableRepository {
       Source source, DefaultFormalParameter parameter, NullabilityNode node) {
     var modification = PotentiallyAddRequired(parameter, node);
     _addPotentialModification(source, modification);
-    _addPotentialImport(
-        source, parameter, modification, 'package:meta/meta.dart');
-  }
-
-  void _addPotentialImport(Source source, AstNode node,
-      PotentialModification usage, String importPath) {
-    // Get the compilation unit - assume not null
-    while (node is! CompilationUnit) {
-      node = node.parent;
-    }
-    var unit = node as CompilationUnit;
-
-    // Find an existing import
-    for (var directive in unit.directives) {
-      if (directive is ImportDirective) {
-        if (directive.uri.stringValue == importPath) {
-          return;
-        }
-      }
-    }
-
-    // Add the usage to an existing modification if possible
-    for (var modification in (_potentialModifications[source] ??= [])) {
-      if (modification is PotentiallyAddImport) {
-        if (modification.importPath == importPath) {
-          modification.addUsage(usage);
-          return;
-        }
-      }
-    }
-
-    // Create a new import modification
-    AstNode beforeNode;
-    for (var directive in unit.directives) {
-      if (directive is ImportDirective || directive is ExportDirective) {
-        beforeNode = directive;
-        break;
-      }
-    }
-    if (beforeNode == null) {
-      for (var declaration in unit.declarations) {
-        beforeNode = declaration;
-        break;
-      }
-    }
-    _addPotentialModification(
-        source, PotentiallyAddImport(beforeNode, importPath, usage));
   }
 
   void _addPotentialModification(
@@ -232,14 +189,15 @@ class Variables implements VariableRecorder, VariableRepository {
     }
 
     DecoratedType decoratedType;
-    if (element is ExecutableElement) {
+    if (element is FunctionTypedElement) {
       decoratedType = _alreadyMigratedCodeDecorator.decorate(element.type);
-    } else if (element is TopLevelVariableElement) {
+    } else if (element is VariableElement) {
       decoratedType = _alreadyMigratedCodeDecorator.decorate(element.type);
     } else {
       // TODO(paulberry)
       throw UnimplementedError('Decorating ${element.runtimeType}');
     }
+    instrumentation?.externalDecoratedType(element, decoratedType);
     return decoratedType;
   }
 
@@ -248,9 +206,8 @@ class Variables implements VariableRecorder, VariableRepository {
   Map<ClassElement, DecoratedType> _decorateDirectSupertypes(
       ClassElement class_) {
     var result = <ClassElement, DecoratedType>{};
-    for (var supertype in class_.allSupertypes) {
-      var decoratedSupertype =
-          _alreadyMigratedCodeDecorator.decorate(supertype);
+    for (var decoratedSupertype
+        in _alreadyMigratedCodeDecorator.getImmediateSupertypes(class_)) {
       assert(identical(decoratedSupertype.node, _graph.never));
       var class_ = (decoratedSupertype.type as InterfaceType).element;
       if (class_ is ClassElementHandle) {

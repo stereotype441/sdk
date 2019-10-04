@@ -825,7 +825,8 @@ abstract class BreakStatement implements Statement {
 ///        [Expression] cascadeSection*
 ///
 ///    cascadeSection ::=
-///        '..'  (cascadeSelector arguments*) (assignableSelector arguments*)*
+///        ('..' | '?..') (cascadeSelector arguments*)
+///        (assignableSelector arguments*)*
 ///        (assignmentOperator expressionWithoutCascade)?
 ///
 ///    cascadeSelector ::=
@@ -3302,6 +3303,9 @@ abstract class IndexExpression
   /// ancestor that is a [CascadeExpression].
   bool get isCascaded;
 
+  /// Whether this index expression is null aware (as opposed to non-null).
+  bool get isNullAware;
+
   /// Return the left square bracket.
   Token get leftBracket;
 
@@ -3862,6 +3866,9 @@ abstract class MethodInvocation implements InvocationExpression {
   /// ancestor that is a [CascadeExpression].
   bool get isCascaded;
 
+  /// Whether this method invocation is null aware (as opposed to non-null).
+  bool get isNullAware;
+
   /// Return the name of the method being invoked.
   SimpleIdentifier get methodName;
 
@@ -4410,6 +4417,9 @@ abstract class PropertyAccess implements Expression {
   /// ancestor that is a [CascadeExpression].
   bool get isCascaded;
 
+  /// Whether this property access is null aware (as opposed to non-null).
+  bool get isNullAware;
+
   /// Return the property access operator.
   Token get operator;
 
@@ -4784,6 +4794,9 @@ abstract class SingleStringLiteral implements StringLiteral {
 abstract class SpreadElement implements CollectionElement {
   /// The expression used to compute the collection being spread.
   Expression get expression;
+
+  /// Whether this is a null-aware spread, as opposed to a non-null spread.
+  bool get isNullAware;
 
   /// The spread operator, either '...' or '...?'.
   Token get spreadOperator;

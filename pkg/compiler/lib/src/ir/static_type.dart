@@ -180,7 +180,7 @@ abstract class StaticTypeVisitor extends StaticTypeBase {
     // subtypes of Object (not just interface types), and function types are
     // considered subtypes of Function.
     if (superclass.typeParameters.isEmpty) {
-      return superclass.rawType;
+      return typeEnvironment.coreTypes.legacyRawType(superclass);
     }
     while (type is ir.TypeParameterType) {
       type = (type as ir.TypeParameterType).parameter.bound;
@@ -196,7 +196,7 @@ abstract class StaticTypeVisitor extends StaticTypeBase {
       return superclass.bottomType;
     }
     // TODO(johnniwinther): Should we assert that this doesn't happen?
-    return superclass.rawType;
+    return typeEnvironment.coreTypes.legacyRawType(superclass);
   }
 
   /// Computes the result type of the property access [node] on a receiver of
@@ -220,9 +220,9 @@ abstract class StaticTypeVisitor extends StaticTypeBase {
     // Treat the properties of Object specially.
     String nameString = node.name.name;
     if (nameString == 'hashCode') {
-      return typeEnvironment.intType;
+      return typeEnvironment.coreTypes.intLegacyRawType;
     } else if (nameString == 'runtimeType') {
-      return typeEnvironment.typeType;
+      return typeEnvironment.coreTypes.typeLegacyRawType;
     }
     return const ir.DynamicType();
   }
@@ -382,7 +382,7 @@ abstract class StaticTypeVisitor extends StaticTypeBase {
 
   ir.Procedure _objectEquals;
   ir.Procedure get objectEquals =>
-      _objectEquals ??= _getMember(typeEnvironment.objectType.classNode, '==');
+      _objectEquals ??= _getMember(typeEnvironment.coreTypes.objectClass, '==');
 
   /// Returns [receiverType] narrowed to enclosing class of [interfaceTarget].
   ///
@@ -434,7 +434,7 @@ abstract class StaticTypeVisitor extends StaticTypeBase {
     /// [type].
     bool isTypeApplicable(ir.DartType type) {
       if (type is ir.DynamicType) return true;
-      if (type == typeEnvironment.rawFunctionType) return true;
+      if (type == typeEnvironment.coreTypes.functionLegacyRawType) return true;
       if (type is ir.FunctionType) {
         return isFunctionTypeApplicable(
             type.typeParameters.length,
@@ -636,7 +636,7 @@ abstract class StaticTypeVisitor extends StaticTypeBase {
     }
     if (node.name.name == '==') {
       // We use this special case to simplify generation of '==' checks.
-      return typeEnvironment.boolType;
+      return typeEnvironment.coreTypes.boolLegacyRawType;
     }
     return const ir.DynamicType();
   }
@@ -781,7 +781,8 @@ abstract class StaticTypeVisitor extends StaticTypeBase {
   ir.DartType visitConstructorInvocation(ir.ConstructorInvocation node) {
     ArgumentTypes argumentTypes = _visitArguments(node.arguments);
     ir.DartType resultType = node.arguments.types.isEmpty
-        ? new ExactInterfaceType.from(node.target.enclosingClass.rawType)
+        ? new ExactInterfaceType.from(
+            typeEnvironment.coreTypes.legacyRawType(node.target.enclosingClass))
         : new ExactInterfaceType(
             node.target.enclosingClass, node.arguments.types);
     _expressionTypeCache[node] = resultType;

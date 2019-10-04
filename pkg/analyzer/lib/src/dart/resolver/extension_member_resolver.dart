@@ -31,26 +31,30 @@ class ExtensionMemberResolver {
   TypeSystem get _typeSystem => _resolver.typeSystem;
 
   /// Return the most specific extension in the current scope for this [type],
-  /// that defines the member with the the [name] and [kind].
+  /// that defines the member with the given [name].
   ///
-  /// If no applicable extensions, return `null`.
+  /// If no applicable extensions, return [ResolutionResult.none].
   ///
-  /// If the match is ambiguous, report an error and return `null`.
+  /// If the match is ambiguous, report an error and return
+  /// [ResolutionResult.ambiguous].
   ResolutionResult findExtension(
-      DartType type, String name, Expression target, ElementKind kind) {
-    var extensions = _getApplicable(type, name, kind);
+    DartType type,
+    String name,
+    Expression target,
+  ) {
+    var extensions = _getApplicable(type, name);
 
     if (extensions.isEmpty) {
       return ResolutionResult.none;
     }
 
     if (extensions.length == 1) {
-      return ResolutionResult(extensions[0].instantiatedMember);
+      return extensions[0].asResolutionResult;
     }
 
     var extension = _chooseMostSpecific(extensions);
     if (extension != null) {
-      return ResolutionResult(extension.instantiatedMember);
+      return extension.asResolutionResult;
     }
 
     _errorReporter.reportErrorForNode(
@@ -58,37 +62,45 @@ class ExtensionMemberResolver {
       target,
       [
         name,
-        extensions[0].element.name,
-        extensions[1].element.name,
+        extensions[0].extension.name,
+        extensions[1].extension.name,
       ],
     );
     return ResolutionResult.ambiguous;
   }
 
-  /// Return the member with the [name] (without `=`) of the given [kind].
+  /// Resolve the [name] (without `=`) to the corresponding getter and setter
+  /// members of the extension [node].
   ///
   /// The [node] is fully resolved, and its type arguments are set.
-  ExecutableElement getOverrideMember(
-      ExtensionOverride node, String name, ElementKind kind) {
+  ResolutionResult getOverrideMember(ExtensionOverride node, String name) {
     ExtensionElement element = node.extensionName.staticElement;
 
-    ExecutableElement member;
-    if (kind == ElementKind.GETTER) {
-      member = element.getGetter(name);
-    } else if (kind == ElementKind.METHOD) {
-      member = element.getMethod(name);
-    } else if (kind == ElementKind.SETTER) {
-      member = element.getSetter(name);
+    ExecutableElement getter;
+    ExecutableElement setter;
+    if (name == '[]') {
+      getter = element.getMethod('[]');
+      setter = element.getMethod('[]=');
+    } else {
+      getter = element.getGetter(name) ?? element.getMethod(name);
+      setter = element.getSetter(name);
     }
-    if (member == null) return null;
 
-    return ExecutableMember.from2(
-      member,
-      Substitution.fromPairs(
-        element.typeParameters,
-        node.typeArgumentTypes,
-      ),
+    if (getter == null && setter == null) {
+      return ResolutionResult.none;
+    }
+
+    var substitution = Substitution.fromPairs(
+      element.typeParameters,
+      node.typeArgumentTypes,
     );
+
+    var getterMember =
+        getter != null ? ExecutableMember.from2(getter, substitution) : null;
+    var setterMember =
+        setter != null ? ExecutableMember.from2(setter, substitution) : null;
+
+    return ResolutionResult(getter: getterMember, setter: setterMember);
   }
 
   /// Perform upward inference for the override.
@@ -211,27 +223,6 @@ class ExtensionMemberResolver {
   /// identified.
   _InstantiatedExtension _chooseMostSpecific(
       List<_InstantiatedExtension> extensions) {
-    //
-    // https://github.com/dart-lang/language/blob/master/accepted/future-releases/static-extension-methods/feature-specification.md#extension-conflict-resolution:
-    //
-    // If more than one extension applies to a specific member invocation, then
-    // we resort to a heuristic to choose one of the extensions to apply. If
-    // exactly one of them is "more specific" than all the others, that one is
-    // chosen. Otherwise it is a compile-time error.
-    //
-    // An extension with on type clause T1 is more specific than another
-    // extension with on type clause T2 iff
-    //
-    // 1. T2 is declared in a platform library, and T1 is not, or
-    // 2. they are both declared in platform libraries or both declared in
-    //    non-platform libraries, and
-    // 3. the instantiated type (the type after applying type inference from the
-    //    receiver) of T1 is a subtype of the instantiated type of T2 and either
-    //    not vice versa, or
-    // 4. the instantiate-to-bounds type of T1 is a subtype of the
-    //    instantiate-to-bounds type of T2 and not vice versa.
-    //
-
     for (var i = 0; i < extensions.length; i++) {
       var e1 = extensions[i];
       var isMoreSpecific = true;
@@ -253,9 +244,8 @@ class ExtensionMemberResolver {
 
   /// Return extensions for the [type] that match the given [name] in the
   /// current scope.
-  List<_InstantiatedExtension> _getApplicable(
-      DartType type, String name, ElementKind kind) {
-    var candidates = _getExtensionsWithMember(name, kind);
+  List<_InstantiatedExtension> _getApplicable(DartType type, String name) {
+    var candidates = _getExtensionsWithMember(name);
 
     var instantiatedExtensions = <_InstantiatedExtension>[];
     for (var candidate in candidates) {
@@ -287,14 +277,7 @@ class ExtensionMemberResolver {
       }
 
       instantiatedExtensions.add(
-        _InstantiatedExtension(
-          candidate.extension,
-          extendedType,
-          ExecutableMember.from2(
-            candidate.member,
-            substitution,
-          ),
-        ),
+        _InstantiatedExtension(candidate, substitution, extendedType),
       );
     }
 
@@ -302,52 +285,46 @@ class ExtensionMemberResolver {
   }
 
   /// Return extensions from the current scope, that define a member with the
-  /// given[name].
-  List<_CandidateExtension> _getExtensionsWithMember(
-    String name,
-    ElementKind kind,
-  ) {
+  /// given [name].
+  List<_CandidateExtension> _getExtensionsWithMember(String name) {
     var candidates = <_CandidateExtension>[];
-
-    /// Return `true` if the [elementName] matches the target [name], taking
-    /// into account the `=` on the end of the names of setters.
-    bool matchesName(String elementName) {
-      if (elementName.endsWith('=') && !name.endsWith('=')) {
-        elementName = elementName.substring(0, elementName.length - 1);
-      }
-      return elementName == name;
-    }
 
     /// Add the given [extension] to the list of [candidates] if it defined a
     /// member whose name matches the target [name].
     void checkExtension(ExtensionElement extension) {
-      if (kind == ElementKind.GETTER) {
-        for (var accessor in extension.accessors) {
-          if (accessor.isGetter && matchesName(accessor.name)) {
-            candidates.add(_CandidateExtension(extension, accessor));
-            return;
-          }
+      for (var field in extension.fields) {
+        if (field.name == name) {
+          candidates.add(
+            _CandidateExtension(
+              extension,
+              getter: field.getter,
+              setter: field.setter,
+            ),
+          );
+          return;
         }
-      } else if (kind == ElementKind.SETTER) {
-        for (var accessor in extension.accessors) {
-          if (accessor.isSetter && matchesName(accessor.name)) {
-            candidates.add(_CandidateExtension(extension, accessor));
-            return;
-          }
-        }
-      } else if (kind == ElementKind.METHOD) {
+      }
+      if (name == '[]') {
+        ExecutableElement getter;
+        ExecutableElement setter;
         for (var method in extension.methods) {
-          if (matchesName(method.name)) {
-            candidates.add(_CandidateExtension(extension, method));
-            return;
+          if (method.name == '[]') {
+            getter = method;
+          } else if (method.name == '[]=') {
+            setter = method;
           }
         }
-        // Check for a getter that matches a function type.
-        for (var accessor in extension.accessors) {
-          if (accessor.type is FunctionType &&
-              accessor.isGetter &&
-              matchesName(accessor.name)) {
-            candidates.add(_CandidateExtension(extension, accessor));
+        if (getter != null || setter != null) {
+          candidates.add(
+            _CandidateExtension(extension, getter: getter, setter: setter),
+          );
+        }
+      } else {
+        for (var method in extension.methods) {
+          if (method.name == name) {
+            candidates.add(
+              _CandidateExtension(extension, getter: method),
+            );
             return;
           }
         }
@@ -418,42 +395,39 @@ class ExtensionMemberResolver {
   /// Return `true` is [e1] is more specific than [e2].
   bool _isMoreSpecific(_InstantiatedExtension e1, _InstantiatedExtension e2) {
     // 1. The latter extension is declared in a platform library, and the
-    // former extension is not.
-    var e1_isInSdk = e1.element.library.isInSdk;
-    var e2_isInSdk = e2.element.library.isInSdk;
+    //    former extension is not.
+    // 2. They are both declared in platform libraries, or both declared in
+    //    non-platform libraries.
+    var e1_isInSdk = e1.extension.library.isInSdk;
+    var e2_isInSdk = e2.extension.library.isInSdk;
     if (e1_isInSdk && !e2_isInSdk) {
       return false;
     } else if (!e1_isInSdk && e2_isInSdk) {
       return true;
     }
 
-    var extendedType1 = e1._extendedType;
-    var extendedType2 = e2._extendedType;
+    var extendedType1 = e1.extendedType;
+    var extendedType2 = e2.extendedType;
 
-    // 2. they are both declared in platform libraries or both declared in
-    //    non-platform libraries, and
-    if (_isSubtypeAndNotViceVersa(extendedType1, extendedType2)) {
-      // 3. the instantiated type (the type after applying type inference from
-      //    the receiver) of T1 is a subtype of the instantiated type of T2 and
-      //    either not vice versa
+    // 3. The instantiated type (the type after applying type inference from
+    //    the receiver) of T1 is a subtype of the instantiated type of T2,
+    //    and either...
+    if (!_isSubtypeOf(extendedType1, extendedType2)) {
+      return false;
+    }
+
+    // 4. ...not vice versa, or...
+    if (!_isSubtypeOf(extendedType2, extendedType1)) {
       return true;
     }
 
+    // 5. ...the instantiate-to-bounds type of T1 is a subtype of the
+    //    instantiate-to-bounds type of T2 and not vice versa.
     // TODO(scheglov) store instantiated types
-    var extendedTypeBound1 = _instantiateToBounds(e1.element);
-    var extendedTypeBound2 = _instantiateToBounds(e2.element);
-    if (_isSubtypeAndNotViceVersa(extendedTypeBound1, extendedTypeBound2)) {
-      // or:
-      // 4. the instantiate-to-bounds type of T1 is a subtype of the
-      //    instantiate-to-bounds type of T2 and not vice versa.
-      return true;
-    }
-
-    return false;
-  }
-
-  bool _isSubtypeAndNotViceVersa(DartType t1, DartType t2) {
-    return _isSubtypeOf(t1, t2) && !_isSubtypeOf(t2, t1);
+    var extendedTypeBound1 = _instantiateToBounds(e1.extension);
+    var extendedTypeBound2 = _instantiateToBounds(e2.extension);
+    return _isSubtypeOf(extendedTypeBound1, extendedTypeBound2) &&
+        !_isSubtypeOf(extendedTypeBound2, extendedTypeBound1);
   }
 
   /// Ask the type system for a subtype check.
@@ -469,6 +443,7 @@ class ExtensionMemberResolver {
   static bool _isValidContext(ExtensionOverride node) {
     AstNode parent = node.parent;
     return parent is BinaryExpression && parent.leftOperand == node ||
+        parent is CascadeExpression && parent.target == node ||
         parent is FunctionExpressionInvocation && parent.function == node ||
         parent is IndexExpression && parent.target == node ||
         parent is MethodInvocation && parent.target == node ||
@@ -479,19 +454,37 @@ class ExtensionMemberResolver {
 
 class _CandidateExtension {
   final ExtensionElement extension;
-  final ExecutableElement member;
+  final ExecutableElement getter;
+  final ExecutableElement setter;
 
-  _CandidateExtension(this.extension, this.member);
+  _CandidateExtension(this.extension, {this.getter, this.setter})
+      : assert(getter != null || setter != null);
 }
 
 class _InstantiatedExtension {
-  final ExtensionElement element;
-  final DartType _extendedType;
-  final ExecutableElement instantiatedMember;
+  final _CandidateExtension candidate;
+  final MapSubstitution substitution;
+  final DartType extendedType;
 
-  _InstantiatedExtension(
-    this.element,
-    this._extendedType,
-    this.instantiatedMember,
-  );
+  _InstantiatedExtension(this.candidate, this.substitution, this.extendedType);
+
+  ResolutionResult get asResolutionResult {
+    return ResolutionResult(getter: getter, setter: setter);
+  }
+
+  ExtensionElement get extension => candidate.extension;
+
+  ExecutableElement get getter {
+    if (candidate.getter == null) {
+      return null;
+    }
+    return ExecutableMember.from2(candidate.getter, substitution);
+  }
+
+  ExecutableElement get setter {
+    if (candidate.setter == null) {
+      return null;
+    }
+    return ExecutableMember.from2(candidate.setter, substitution);
+  }
 }

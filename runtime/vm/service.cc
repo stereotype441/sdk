@@ -146,7 +146,7 @@ bool Service::ListenStream(const char* stream_id) {
       return true;
     }
   }
-  if (stream_listen_callback_) {
+  if (stream_listen_callback_ != nullptr) {
     Thread* T = Thread::Current();
     TransitionVMToNative transition(T);
     return (*stream_listen_callback_)(stream_id);
@@ -165,7 +165,7 @@ void Service::CancelStream(const char* stream_id) {
       return;
     }
   }
-  if (stream_cancel_callback_) {
+  if (stream_cancel_callback_ != nullptr) {
     Thread* T = Thread::Current();
     TransitionVMToNative transition(T);
     return (*stream_cancel_callback_)(stream_id);
@@ -950,7 +950,8 @@ void Service::SendEvent(const char* stream_id,
   Thread* thread = Thread::Current();
   Isolate* isolate = thread->isolate();
   ASSERT(isolate != NULL);
-  ASSERT(!Isolate::IsVMInternalIsolate(isolate));
+  ASSERT(FLAG_show_invisible_isolates ||
+         !Isolate::IsVMInternalIsolate(isolate));
 
   if (FLAG_trace_service) {
     OS::PrintErr(
@@ -1409,70 +1410,6 @@ static bool GetScripts(Thread* thread, JSONStream* js) {
         script ^= scripts.At(j);
         ASSERT(!script.IsNull());
         script_array.AddValue(script);
-      }
-    }
-  }
-  return true;
-}
-
-static const MethodParameter* get_unused_changes_in_last_reload_params[] = {
-    ISOLATE_PARAMETER, NULL,
-};
-
-static bool GetUnusedChangesInLastReload(Thread* thread, JSONStream* js) {
-  if (CheckCompilerDisabled(thread, js)) {
-    return true;
-  }
-
-  const GrowableObjectArray& changed_in_last_reload =
-      GrowableObjectArray::Handle(
-          thread->isolate()->object_store()->changed_in_last_reload());
-  if (changed_in_last_reload.IsNull()) {
-    js->PrintError(kIsolateMustHaveReloaded, "No change to compare with.");
-    return true;
-  }
-  JSONObject jsobj(js);
-  jsobj.AddProperty("type", "UnusedChangesInLastReload");
-  JSONArray jsarr(&jsobj, "unused");
-  Object& changed = Object::Handle();
-  Function& function = Function::Handle();
-  Field& field = Field::Handle();
-  Class& cls = Class::Handle();
-  Array& functions = Array::Handle();
-  Array& fields = Array::Handle();
-  for (intptr_t i = 0; i < changed_in_last_reload.Length(); i++) {
-    changed = changed_in_last_reload.At(i);
-    if (changed.IsFunction()) {
-      function ^= changed.raw();
-      if (!function.WasExecuted()) {
-        jsarr.AddValue(function);
-      }
-    } else if (changed.IsField()) {
-      field ^= changed.raw();
-      if (field.IsUninitialized() ||
-          field.initializer_changed_after_initialization()) {
-        jsarr.AddValue(field);
-      }
-    } else if (changed.IsClass()) {
-      cls ^= changed.raw();
-      if (!cls.is_finalized()) {
-        // Not used at all.
-        jsarr.AddValue(cls);
-      } else {
-        functions = cls.functions();
-        for (intptr_t j = 0; j < functions.Length(); j++) {
-          function ^= functions.At(j);
-          if (!function.WasExecuted()) {
-            jsarr.AddValue(function);
-          }
-        }
-        fields = cls.fields();
-        for (intptr_t j = 0; j < fields.Length(); j++) {
-          field ^= fields.At(j);
-          if (field.IsUninitialized()) {
-            jsarr.AddValue(field);
-          }
-        }
       }
     }
   }
@@ -2041,7 +1978,7 @@ static Breakpoint* LookupBreakpoint(Isolate* isolate,
     Breakpoint* bpt = NULL;
     if (GetIntegerId(rest, &bpt_id)) {
       bpt = isolate->debugger()->GetBreakpointById(bpt_id);
-      if (bpt) {
+      if (bpt != nullptr) {
         *result = ObjectIdRing::kValid;
         return bpt;
       }
@@ -3828,100 +3765,30 @@ static bool GetTagProfile(Thread* thread, JSONStream* js) {
   return true;
 }
 
-static const char* const tags_enum_names[] = {
-    "None", "UserVM", "UserOnly", "VMUser", "VMOnly", NULL,
-};
-
-static const Profile::TagOrder tags_enum_values[] = {
-    Profile::kNoTags, Profile::kUserVM, Profile::kUser,
-    Profile::kVMUser, Profile::kVM,
-    Profile::kNoTags,  // Default value.
-};
-
-static const MethodParameter* get_cpu_profile_params[] = {
+static const MethodParameter* get_cpu_samples_params[] = {
     RUNNABLE_ISOLATE_PARAMETER,
-    new EnumParameter("tags", true, tags_enum_names),
-    new BoolParameter("_codeTransitionTags", false),
     new Int64Parameter("timeOriginMicros", false),
     new Int64Parameter("timeExtentMicros", false),
     NULL,
 };
 
-// TODO(johnmccutchan): Rename this to GetCpuSamples.
-static bool GetCpuProfile(Thread* thread, JSONStream* js) {
-  if (CheckProfilerDisabled(thread, js)) {
-    return true;
-  }
-
-  Profile::TagOrder tag_order =
-      EnumMapper(js->LookupParam("tags"), tags_enum_names, tags_enum_values);
-  intptr_t extra_tags = 0;
-  if (BoolParameter::Parse(js->LookupParam("_codeTransitionTags"))) {
-    extra_tags |= ProfilerService::kCodeTransitionTagsBit;
-  }
+static bool GetCpuSamples(Thread* thread, JSONStream* js) {
   int64_t time_origin_micros =
       Int64Parameter::Parse(js->LookupParam("timeOriginMicros"));
   int64_t time_extent_micros =
       Int64Parameter::Parse(js->LookupParam("timeExtentMicros"));
-  ProfilerService::PrintJSON(js, tag_order, extra_tags, time_origin_micros,
-                             time_extent_micros);
-  return true;
-}
-
-static const MethodParameter* get_cpu_profile_timeline_params[] = {
-    RUNNABLE_ISOLATE_PARAMETER,
-    new EnumParameter("tags", true, tags_enum_names),
-    new Int64Parameter("timeOriginMicros", false),
-    new Int64Parameter("timeExtentMicros", false),
-    NULL,
-};
-
-static bool GetCpuProfileTimeline(Thread* thread, JSONStream* js) {
+  const bool include_code_samples =
+      BoolParameter::Parse(js->LookupParam("_code"), false);
   if (CheckProfilerDisabled(thread, js)) {
     return true;
   }
-
-  Profile::TagOrder tag_order =
-      EnumMapper(js->LookupParam("tags"), tags_enum_names, tags_enum_values);
-  int64_t time_origin_micros =
-      Int64Parameter::Parse(js->LookupParam("timeOriginMicros"));
-  int64_t time_extent_micros =
-      Int64Parameter::Parse(js->LookupParam("timeExtentMicros"));
-  bool code_trie = BoolParameter::Parse(js->LookupParam("code"), false);
-  ProfilerService::PrintTimelineJSON(js, tag_order, time_origin_micros,
-                                     time_extent_micros, code_trie);
-  return true;
-}
-
-static const MethodParameter* write_cpu_profile_timeline_params[] = {
-    RUNNABLE_ISOLATE_PARAMETER,
-    new EnumParameter("tags", true, tags_enum_names),
-    new Int64Parameter("timeOriginMicros", false),
-    new Int64Parameter("timeExtentMicros", false),
-    NULL,
-};
-
-static bool WriteCpuProfileTimeline(Thread* thread, JSONStream* js) {
-  if (CheckProfilerDisabled(thread, js)) {
-    return true;
-  }
-
-  Profile::TagOrder tag_order =
-      EnumMapper(js->LookupParam("tags"), tags_enum_names, tags_enum_values);
-  int64_t time_origin_micros =
-      Int64Parameter::Parse(js->LookupParam("timeOriginMicros"));
-  int64_t time_extent_micros =
-      Int64Parameter::Parse(js->LookupParam("timeExtentMicros"));
-  bool code_trie = BoolParameter::Parse(js->LookupParam("code"), true);
-  ProfilerService::AddToTimeline(tag_order, time_origin_micros,
-                                 time_extent_micros, code_trie);
-  PrintSuccess(js);  // The "result" is a side-effect in the timeline.
+  ProfilerService::PrintJSON(js, time_origin_micros, time_extent_micros,
+                             include_code_samples);
   return true;
 }
 
 static const MethodParameter* get_allocation_samples_params[] = {
     RUNNABLE_ISOLATE_PARAMETER,
-    new EnumParameter("tags", true, tags_enum_names),
     new IdParameter("classId", false),
     new Int64Parameter("timeOriginMicros", false),
     new Int64Parameter("timeExtentMicros", false),
@@ -3929,8 +3796,6 @@ static const MethodParameter* get_allocation_samples_params[] = {
 };
 
 static bool GetAllocationSamples(Thread* thread, JSONStream* js) {
-  Profile::TagOrder tag_order =
-      EnumMapper(js->LookupParam("tags"), tags_enum_names, tags_enum_values);
   int64_t time_origin_micros =
       Int64Parameter::Parse(js->LookupParam("timeOriginMicros"));
   int64_t time_extent_micros =
@@ -3940,8 +3805,11 @@ static bool GetAllocationSamples(Thread* thread, JSONStream* js) {
   GetPrefixedIntegerId(class_id, "classes/", &cid);
   Isolate* isolate = thread->isolate();
   if (IsValidClassId(isolate, cid)) {
+    if (CheckProfilerDisabled(thread, js)) {
+      return true;
+    }
     const Class& cls = Class::Handle(GetClassForId(isolate, cid));
-    ProfilerService::PrintAllocationJSON(js, tag_order, cls, time_origin_micros,
+    ProfilerService::PrintAllocationJSON(js, cls, time_origin_micros,
                                          time_extent_micros);
   } else {
     PrintInvalidParamError(js, "classId");
@@ -3951,32 +3819,38 @@ static bool GetAllocationSamples(Thread* thread, JSONStream* js) {
 
 static const MethodParameter* get_native_allocation_samples_params[] = {
     NO_ISOLATE_PARAMETER,
-    new EnumParameter("tags", true, tags_enum_names),
     new Int64Parameter("timeOriginMicros", false),
     new Int64Parameter("timeExtentMicros", false),
     NULL,
 };
 
 static bool GetNativeAllocationSamples(Thread* thread, JSONStream* js) {
-  Profile::TagOrder tag_order =
-      EnumMapper(js->LookupParam("tags"), tags_enum_names, tags_enum_values);
   int64_t time_origin_micros =
       Int64Parameter::Parse(js->LookupParam("timeOriginMicros"));
   int64_t time_extent_micros =
       Int64Parameter::Parse(js->LookupParam("timeExtentMicros"));
+  bool include_code_samples =
+      BoolParameter::Parse(js->LookupParam("_code"), false);
 #if defined(DEBUG)
   Isolate::Current()->heap()->CollectAllGarbage();
 #endif
-  ProfilerService::PrintNativeAllocationJSON(js, tag_order, time_origin_micros,
-                                             time_extent_micros);
+  if (CheckProfilerDisabled(thread, js)) {
+    return true;
+  }
+  ProfilerService::PrintNativeAllocationJSON(
+      js, time_origin_micros, time_extent_micros, include_code_samples);
   return true;
 }
 
-static const MethodParameter* clear_cpu_profile_params[] = {
-    RUNNABLE_ISOLATE_PARAMETER, NULL,
+static const MethodParameter* clear_cpu_samples_params[] = {
+    RUNNABLE_ISOLATE_PARAMETER,
+    NULL,
 };
 
-static bool ClearCpuProfile(Thread* thread, JSONStream* js) {
+static bool ClearCpuSamples(Thread* thread, JSONStream* js) {
+  if (CheckProfilerDisabled(thread, js)) {
+    return true;
+  }
   ProfilerService::ClearSamples();
   PrintSuccess(js);
   return true;
@@ -4006,7 +3880,7 @@ static bool GetAllocationProfileImpl(Thread* thread,
   Isolate* isolate = thread->isolate();
   if (should_reset_accumulator) {
     isolate->UpdateLastAllocationProfileAccumulatorResetTimestamp();
-    isolate->class_table()->ResetAllocationAccumulators();
+    isolate->shared_class_table()->ResetAllocationAccumulators();
   }
   if (should_collect) {
     isolate->UpdateLastAllocationProfileGCTimestamp();
@@ -4030,7 +3904,8 @@ static bool GetAllocationProfile(Thread* thread, JSONStream* js) {
 }
 
 static const MethodParameter* collect_all_garbage_params[] = {
-    RUNNABLE_ISOLATE_PARAMETER, NULL,
+    RUNNABLE_ISOLATE_PARAMETER,
+    NULL,
 };
 
 static bool CollectAllGarbage(Thread* thread, JSONStream* js) {
@@ -4292,6 +4167,7 @@ static bool GetObject(Thread* thread, JSONStream* js) {
     // load the source before sending the response.
     if (obj.IsScript()) {
       const Script& script = Script::Cast(obj);
+      script.LookupSourceAndLineStarts(thread->zone());
       if (!script.HasSource() && script.IsPartOfDartColonLibrary() &&
           Service::HasDartLibraryKernelForSources()) {
         const uint8_t* kernel_buffer = Service::dart_library_kernel();
@@ -4405,7 +4281,7 @@ class ServiceIsolateVisitor : public IsolateVisitor {
   virtual ~ServiceIsolateVisitor() {}
 
   void VisitIsolate(Isolate* isolate) {
-    if (!IsVMInternalIsolate(isolate)) {
+    if (FLAG_show_invisible_isolates || !IsVMInternalIsolate(isolate)) {
       jsarr_->AddValue(isolate);
     }
   }
@@ -4778,8 +4654,8 @@ static const ServiceMethodDescriptor service_methods_[] = {
     add_breakpoint_at_activation_params },
   { "_buildExpressionEvaluationScope", BuildExpressionEvaluationScope,
     build_expression_evaluation_scope_params },
-  { "_clearCpuProfile", ClearCpuProfile,
-    clear_cpu_profile_params },
+  { "clearCpuSamples", ClearCpuSamples,
+    clear_cpu_samples_params },
   { "clearVMTimeline", ClearVMTimeline,
     clear_vm_timeline_params, },
   { "_compileExpression", CompileExpression, compile_expression_params },
@@ -4799,12 +4675,8 @@ static const ServiceMethodDescriptor service_methods_[] = {
       get_native_allocation_samples_params },
   { "getClassList", GetClassList,
     get_class_list_params },
-  { "_getCpuProfile", GetCpuProfile,
-    get_cpu_profile_params },
-  { "_getCpuProfileTimeline", GetCpuProfileTimeline,
-    get_cpu_profile_timeline_params },
-  { "_writeCpuProfileTimeline", WriteCpuProfileTimeline,
-    write_cpu_profile_timeline_params },
+  { "getCpuSamples", GetCpuSamples,
+    get_cpu_samples_params },
   { "getFlagList", GetFlagList,
     get_flag_list_params },
   { "_getHeapMap", GetHeapMap,
@@ -4841,8 +4713,6 @@ static const ServiceMethodDescriptor service_methods_[] = {
     get_source_report_params },
   { "getStack", GetStack,
     get_stack_params },
-  { "_getUnusedChangesInLastReload", GetUnusedChangesInLastReload,
-    get_unused_changes_in_last_reload_params },
   { "_getTagProfile", GetTagProfile,
     get_tag_profile_params },
   { "_getTypeArgumentsList", GetTypeArgumentsList,

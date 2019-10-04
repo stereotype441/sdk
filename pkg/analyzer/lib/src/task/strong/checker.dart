@@ -12,6 +12,7 @@ import 'package:analyzer/dart/ast/token.dart' show TokenType;
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/error/error.dart';
 import 'package:analyzer/error/listener.dart';
@@ -139,6 +140,14 @@ class CodeChecker extends RecursiveAstVisitor {
 
   bool get failure => _failure;
 
+  NullabilitySuffix get _noneOrStarSuffix {
+    return _nonNullableEnabled
+        ? NullabilitySuffix.none
+        : NullabilitySuffix.star;
+  }
+
+  bool get _nonNullableEnabled => _featureSet.isEnabled(Feature.non_nullable);
+
   void checkArgument(Expression arg, DartType expectedType) {
     // Preserve named argument structure, so their immediate parent is the
     // method invocation.
@@ -184,13 +193,12 @@ class CodeChecker extends RecursiveAstVisitor {
     } else if (element is SpreadElement) {
       // Spread expression may be dynamic in which case it's implicitly downcast
       // to Iterable<dynamic>
-      DartType expressionCastType =
-          typeProvider.iterableType.instantiate([DynamicTypeImpl.instance]);
+      DartType expressionCastType = typeProvider.iterableDynamicType;
       checkAssignment(element.expression, expressionCastType);
 
       var exprType = element.expression.staticType;
       var asIterableType = exprType is InterfaceTypeImpl
-          ? exprType.asInstanceOf(typeProvider.iterableType.element)
+          ? exprType.asInstanceOf(typeProvider.iterableElement)
           : null;
       var elementType =
           asIterableType == null ? null : asIterableType.typeArguments[0];
@@ -223,13 +231,13 @@ class CodeChecker extends RecursiveAstVisitor {
     } else if (element is SpreadElement) {
       // Spread expression may be dynamic in which case it's implicitly downcast
       // to Map<dynamic, dynamic>
-      DartType expressionCastType = typeProvider.mapType
-          .instantiate([DynamicTypeImpl.instance, DynamicTypeImpl.instance]);
+      DartType expressionCastType = typeProvider.mapType2(
+          DynamicTypeImpl.instance, DynamicTypeImpl.instance);
       checkAssignment(element.expression, expressionCastType);
 
       var exprType = element.expression.staticType;
       var asMapType = exprType is InterfaceTypeImpl
-          ? exprType.asInstanceOf(typeProvider.mapType.element)
+          ? exprType.asInstanceOf(typeProvider.mapElement)
           : null;
 
       var elementKeyType =
@@ -350,6 +358,7 @@ class CodeChecker extends RecursiveAstVisitor {
     node.visitChildren(this);
   }
 
+  // Check invocations
   /// Check constructor declaration to ensure correct super call placement.
   @override
   void visitConstructorDeclaration(ConstructorDeclaration node) {
@@ -373,7 +382,6 @@ class CodeChecker extends RecursiveAstVisitor {
     node.visitChildren(this);
   }
 
-  // Check invocations
   @override
   void visitDefaultFormalParameter(DefaultFormalParameter node) {
     // Check that defaults have the proper subtype.
@@ -892,11 +900,18 @@ class CodeChecker extends RecursiveAstVisitor {
 
       // The member may be from a superclass, so we need to ensure the type
       // parameters are properly substituted.
-      var classType = targetType.element.type;
-      var classLowerBound = classType.instantiate(new List.filled(
-          classType.typeParameters.length, BottomTypeImpl.instance));
+      var classElement = targetType.element;
+      var classLowerBound = classElement.instantiate(
+        typeArguments: List.filled(
+          classElement.typeParameters.length,
+          BottomTypeImpl.instance,
+        ),
+        nullabilitySuffix: NullabilitySuffix.none,
+      );
       var memberLowerBound = inheritance.getMember(
-          classLowerBound, Name(element.librarySource.uri, element.name));
+        classLowerBound,
+        Name(element.librarySource.uri, element.name),
+      );
       if (memberLowerBound == null &&
           element.enclosingElement is ExtensionElement) {
         return;
@@ -997,22 +1012,22 @@ class CodeChecker extends RecursiveAstVisitor {
 
     var type = functionType.returnType;
 
-    InterfaceType expectedType = null;
+    ClassElement expectedElement;
     if (body.isAsynchronous) {
       if (body.isGenerator) {
         // Stream<T> -> T
-        expectedType = typeProvider.streamType;
+        expectedElement = typeProvider.streamElement;
       } else {
         // Future<T> -> FutureOr<T>
-        var typeArg = (type.element == typeProvider.futureType.element)
+        var typeArg = (type.element == typeProvider.futureElement)
             ? (type as InterfaceType).typeArguments[0]
             : typeProvider.dynamicType;
-        return typeProvider.futureOrType.instantiate([typeArg]);
+        return typeProvider.futureOrType2(typeArg);
       }
     } else {
       if (body.isGenerator) {
         // Iterable<T> -> T
-        expectedType = typeProvider.iterableType;
+        expectedElement = typeProvider.iterableElement;
       } else {
         // T -> T
         return type;
@@ -1021,7 +1036,10 @@ class CodeChecker extends RecursiveAstVisitor {
     if (yieldStar) {
       if (type.isDynamic) {
         // Ensure it's at least a Stream / Iterable.
-        return expectedType.instantiate([typeProvider.dynamicType]);
+        return expectedElement.instantiate(
+          typeArguments: [typeProvider.dynamicType],
+          nullabilitySuffix: _noneOrStarSuffix,
+        );
       } else {
         // Analyzer will provide a separate error if expected type
         // is not compatible with type.
@@ -1030,7 +1048,7 @@ class CodeChecker extends RecursiveAstVisitor {
     }
     if (type.isDynamic) {
       return type;
-    } else if (type is InterfaceType && type.element == expectedType.element) {
+    } else if (type is InterfaceType && type.element == expectedElement) {
       return type.typeArguments[0];
     } else {
       // Malformed type - fallback on analyzer error.
@@ -1128,7 +1146,7 @@ class CodeChecker extends RecursiveAstVisitor {
     // In this case, we're more permissive than assignability.
     if (to.isDartAsyncFutureOr) {
       var to1 = (to as InterfaceType).typeArguments[0];
-      var to2 = typeProvider.futureType.instantiate([to1]);
+      var to2 = typeProvider.futureType2(to1);
       return _needsImplicitCast(expr, to1, from: from) == true ||
           _needsImplicitCast(expr, to2, from: from) == true;
     }
@@ -1353,19 +1371,20 @@ class CodeChecker extends RecursiveAstVisitor {
           'Unexpected parent of ForEachParts: ${parent.runtimeType}');
     }
     // Find the element type of the sequence.
-    var sequenceInterface = awaitKeyword != null
-        ? typeProvider.streamType
-        : typeProvider.iterableType;
+    var sequenceElement = awaitKeyword != null
+        ? typeProvider.streamElement
+        : typeProvider.iterableElement;
     var iterableType = _getExpressionType(node.iterable);
-    var elementType =
-        _getInstanceTypeArgument(iterableType, sequenceInterface.element);
+    var elementType = _getInstanceTypeArgument(iterableType, sequenceElement);
 
     // If the sequence is not an Iterable (or Stream for await for) but is a
     // supertype of it, do an implicit downcast to Iterable<dynamic>. Then
     // we'll do a separate cast of the dynamic element to the variable's type.
     if (elementType == null) {
-      var sequenceType =
-          sequenceInterface.instantiate([DynamicTypeImpl.instance]);
+      var sequenceType = sequenceElement.instantiate(
+        typeArguments: [typeProvider.dynamicType],
+        nullabilitySuffix: _noneOrStarSuffix,
+      );
 
       if (rules.isSubtypeOf(sequenceType, iterableType)) {
         _recordImplicitCast(node.iterable, sequenceType, from: iterableType);
@@ -1393,7 +1412,7 @@ class _OverrideChecker {
 
   void check(Declaration node) {
     var element = node.declaredElement as ClassElement;
-    if (element.type.isObject) {
+    if (element.isDartCoreObject) {
       return;
     }
     _checkForCovariantGenerics(node, element);
@@ -1453,11 +1472,11 @@ class _OverrideChecker {
     // Find all generic interfaces that could be used to call into members of
     // this class. This will help us identify which parameters need checks
     // for soundness.
-    var allCovariant = _findAllGenericInterfaces(element.type);
+    var allCovariant = _findAllGenericInterfaces(element);
     if (allCovariant.isEmpty) return;
 
     var seenConcreteMembers = new HashSet<String>();
-    var members = _getConcreteMembers(element.type, seenConcreteMembers);
+    var members = _getConcreteMembers(element.thisType, seenConcreteMembers);
 
     // For members on this class, check them against all generic interfaces.
     var checks = _findCovariantChecks(members, allCovariant);
@@ -1634,7 +1653,7 @@ class _OverrideChecker {
     void visitImmediateSuper(InterfaceType type) {
       // For members of mixins/supertypes, check them against new interfaces,
       // and also record any existing checks they already had.
-      var oldCovariant = _findAllGenericInterfaces(type);
+      var oldCovariant = _findAllGenericInterfaces(type.element);
       var newCovariant = allCovariant.difference(oldCovariant);
       if (newCovariant.isEmpty) return;
 
@@ -1676,32 +1695,40 @@ class _OverrideChecker {
     return x == y;
   }
 
-  /// Find all generic interfaces that are implemented by [type], including
-  /// [type] itself if it is generic.
+  /// Find all generic interfaces that are implemented by [element], including
+  /// [element] itself if it is generic.
   ///
   /// This represents the complete set of unsafe covariant interfaces that could
-  /// be used to call members of [type].
+  /// be used to call members of [element].
   ///
   /// Because we're going to instantiate these to their upper bound, we don't
   /// have to track type parameters.
-  static Set<ClassElement> _findAllGenericInterfaces(InterfaceType type) {
-    var visited = new HashSet<ClassElement>();
-    var genericSupertypes = new Set<ClassElement>();
+  static Set<ClassElement> _findAllGenericInterfaces(ClassElement element) {
+    var visited = <ClassElement>{};
+    var genericSupertypes = <ClassElement>{};
 
-    void visitTypeAndSupertypes(InterfaceType type) {
-      var element = type.element;
+    void visitClassAndSupertypes(ClassElement element) {
       if (visited.add(element)) {
         if (element.typeParameters.isNotEmpty) {
           genericSupertypes.add(element);
         }
+
         var supertype = element.supertype;
-        if (supertype != null) visitTypeAndSupertypes(supertype);
-        element.mixins.forEach(visitTypeAndSupertypes);
-        element.interfaces.forEach(visitTypeAndSupertypes);
+        if (supertype != null) {
+          visitClassAndSupertypes(supertype.element);
+        }
+
+        for (var interface in element.mixins) {
+          visitClassAndSupertypes(interface.element);
+        }
+
+        for (var interface in element.interfaces) {
+          visitClassAndSupertypes(interface.element);
+        }
       }
     }
 
-    visitTypeAndSupertypes(type);
+    visitClassAndSupertypes(element);
 
     return genericSupertypes;
   }

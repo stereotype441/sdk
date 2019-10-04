@@ -242,6 +242,13 @@ bool FlowGraphCompiler::CanOSRFunction() const {
   return isolate()->use_osr() && CanOptimizeFunction() && !is_optimizing();
 }
 
+void FlowGraphCompiler::InsertBSSRelocation(BSS::Relocation reloc) {
+  const intptr_t offset = assembler()->InsertAlignedRelocation(reloc);
+  AddDescriptor(RawPcDescriptors::kBSSRelocation, /*pc_offset=*/offset,
+                /*deopt_id=*/DeoptId::kNone, TokenPosition::kNoSource,
+                /*try_index=*/-1);
+}
+
 bool FlowGraphCompiler::ForceSlowPathForStackOverflow() const {
 #if !defined(PRODUCT)
   if ((FLAG_stacktrace_every > 0) || (FLAG_deoptimize_every > 0) ||
@@ -715,12 +722,11 @@ void FlowGraphCompiler::GenerateDeferredCode() {
 void FlowGraphCompiler::AddExceptionHandler(intptr_t try_index,
                                             intptr_t outer_try_index,
                                             intptr_t pc_offset,
-                                            TokenPosition token_pos,
                                             bool is_generated,
                                             const Array& handler_types,
                                             bool needs_stacktrace) {
   exception_handlers_list_->AddHandler(try_index, outer_try_index, pc_offset,
-                                       token_pos, is_generated, handler_types,
+                                       is_generated, handler_types,
                                        needs_stacktrace);
 }
 
@@ -1401,7 +1407,9 @@ void FlowGraphCompiler::GenerateStaticCall(intptr_t deopt_id,
                                : ic_data.arguments_descriptor());
   ASSERT(ArgumentsDescriptor(arguments_descriptor).TypeArgsLen() ==
          args_info.type_args_len);
-  if (is_optimizing() && !ForcedOptimization()) {
+  // Force-optimized functions lack the deopt info which allows patching of
+  // optimized static calls.
+  if (is_optimizing() && (!ForcedOptimization() || FLAG_precompiled_mode)) {
     EmitOptimizedStaticCall(function, arguments_descriptor,
                             args_info.count_with_type_args, deopt_id, token_pos,
                             locs, entry_kind);

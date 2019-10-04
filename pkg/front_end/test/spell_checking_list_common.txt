@@ -98,6 +98,7 @@ also
 alternating
 alternative
 alternatively
+alternatives
 although
 always
 ambiguous
@@ -250,6 +251,7 @@ best
 bets
 better
 between
+beyond
 big
 bigint
 binaries
@@ -277,6 +279,7 @@ bottom
 bound
 boundary
 bounded
+boundedness
 boundless
 bounds
 box
@@ -318,6 +321,7 @@ calculate
 calculated
 calculates
 calculation
+calculator
 call
 callback
 called
@@ -460,6 +464,7 @@ comparable
 compare
 comparing
 comparison
+comparisons
 compatibility
 compatible
 compilation
@@ -517,6 +522,7 @@ connected
 connection
 consequence
 consequently
+conservative
 conservatively
 consider
 considered
@@ -681,6 +687,7 @@ delegate
 delegates
 delegation
 delete
+deleted
 deliberately
 delimited
 delimiter
@@ -737,6 +744,7 @@ developers
 development
 devices
 devise
+dfs
 diagnostic
 diagnostics
 did
@@ -809,6 +817,7 @@ downwards
 drive
 driver
 drop
+dropped
 dropping
 due
 dump
@@ -902,6 +911,7 @@ environment
 equal
 equality
 equals
+equivalence
 equivalent
 equivalents
 erroneous
@@ -911,6 +921,7 @@ escape
 escaped
 escapes
 escaping
+especially
 essence
 essentials
 etc
@@ -938,6 +949,7 @@ examples
 exceeded
 except
 exception
+exceptional
 exceptions
 exclamation
 exclude
@@ -1251,6 +1263,7 @@ ignored
 ignores
 ignoring
 illegal
+imaginary
 imitation
 immediate
 immediately
@@ -1348,6 +1361,7 @@ inlined
 inlining
 inner
 innermost
+inout
 input
 inputs
 insert
@@ -1620,6 +1634,7 @@ matched
 matcher
 matches
 matching
+material
 math
 mathematical
 matter
@@ -1717,6 +1732,7 @@ mutable
 mutate
 mutated
 mutates
+mutating
 mutation
 mutations
 mutual
@@ -1831,6 +1847,7 @@ operations
 operator
 operators
 opposed
+opted
 optimistically
 optimization
 optimize
@@ -1849,6 +1866,7 @@ original
 originally
 originate
 originated
+originates
 originating
 origins
 orphan
@@ -1870,6 +1888,7 @@ outlining
 output
 outside
 over
+overall
 overflow
 overloadable
 overloaded
@@ -1951,6 +1970,7 @@ place
 placed
 placeholder
 placeholders
+places
 plain
 plan
 platform
@@ -1977,6 +1997,7 @@ positionals
 positions
 positive
 positives
+possibilities
 possible
 possibly
 post
@@ -1997,6 +2018,7 @@ precisely
 precision
 preclude
 precondition
+predefined
 predicate
 preemptively
 prefer
@@ -2006,6 +2028,7 @@ preferred
 prefix
 prefixed
 prefixes
+prelude
 prepare
 prepared
 preparing
@@ -2136,6 +2159,7 @@ realized
 really
 reason
 reasonable
+reasoning
 reasons
 receive
 receiver
@@ -2215,6 +2239,7 @@ remains
 remember
 remembered
 remembers
+reminder
 remote
 remove
 removed
@@ -2276,6 +2301,7 @@ restored
 restores
 restrict
 restricted
+restrictive
 result
 resulting
 results
@@ -2295,6 +2321,7 @@ returns
 retype
 reuse
 reused
+reuses
 reusing
 reverse
 reversed
@@ -2327,6 +2354,7 @@ runs
 runtime
 safe
 safely
+safety
 said
 sake
 same
@@ -2516,6 +2544,7 @@ stage
 stamps
 standalone
 standard
+stands
 star
 start
 started
@@ -2573,6 +2602,7 @@ substitutions
 substring
 substrings
 substructures
+subterm
 subterms
 subtly
 subtract
@@ -2593,6 +2623,7 @@ suffice
 sufficient
 sufficiently
 suffix
+suffixes
 suggested
 suitable
 summaries
@@ -2713,6 +2744,7 @@ throws
 thumb
 thus
 time
+timeline
 times
 tip
 to
@@ -2799,6 +2831,7 @@ unambiguous
 unary
 unbalanced
 unbind
+uncertain
 unchanged
 unclaimed
 unclear
@@ -2901,6 +2934,7 @@ values
 var
 variable
 variables
+variance
 various
 verbose
 verification
@@ -2918,6 +2952,7 @@ vertices
 very
 via
 view
+viewed
 violate
 violates
 violation

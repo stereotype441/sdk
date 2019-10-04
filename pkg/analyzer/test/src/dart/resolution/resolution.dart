@@ -49,9 +49,9 @@ mixin ResolutionTest implements ResourceProviderMixin {
 
   InterfaceType get intType => typeProvider.intType;
 
-  ClassElement get listElement => typeProvider.listType.element;
+  ClassElement get listElement => typeProvider.listElement;
 
-  ClassElement get mapElement => typeProvider.mapType.element;
+  ClassElement get mapElement => typeProvider.mapElement;
 
   ClassElement get numElement => typeProvider.numType.element;
 
@@ -167,14 +167,6 @@ mixin ResolutionTest implements ResourceProviderMixin {
 
   void assertEnclosingElement(Element element, Element expectedEnclosing) {
     expect(element.enclosingElement, expectedEnclosing);
-  }
-
-  @Deprecated('Use assertErrorsInCode')
-  Future<void> assertErrorCodesInCode(
-      String code, List<ErrorCode> errors) async {
-    addTestFile(code);
-    await resolveTestFile();
-    assertTestErrorsWithCodes(errors);
   }
 
   Future<void> assertErrorsInCode(
@@ -512,6 +504,12 @@ mixin ResolutionTest implements ResourceProviderMixin {
       ExpectedMessage(convertPath(filePath), offset, length);
 
   Future<ResolvedUnitResult> resolveFile(String path);
+
+  /// Put the [code] into the test file, and resolve it.
+  Future<void> resolveTestCode(String code) async {
+    addTestFile(code);
+    await resolveTestFile();
+  }
 
   Future<void> resolveTestFile() async {
     var path = convertPath('/test/lib/test.dart');

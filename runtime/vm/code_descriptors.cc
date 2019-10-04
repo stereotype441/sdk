@@ -15,10 +15,13 @@ void DescriptorList::AddDescriptor(RawPcDescriptors::Kind kind,
                                    TokenPosition token_pos,
                                    intptr_t try_index) {
   ASSERT((kind == RawPcDescriptors::kRuntimeCall) ||
+         (kind == RawPcDescriptors::kBSSRelocation) ||
          (kind == RawPcDescriptors::kOther) || (deopt_id != DeoptId::kNone));
 
-  // When precompiling, we only use pc descriptors for exceptions.
-  if (!FLAG_precompiled_mode || try_index != -1) {
+  // When precompiling, we only use pc descriptors for exceptions and
+  // relocations.
+  if (!FLAG_precompiled_mode || try_index != -1 ||
+      kind == RawPcDescriptors::kBSSRelocation) {
     int32_t merged_kind_try =
         RawPcDescriptors::MergedKindTry::Encode(kind, try_index);
 
@@ -99,13 +102,13 @@ RawExceptionHandlers* ExceptionHandlerList::FinalizeExceptionHandlers(
              (list_[i].pc_offset == ExceptionHandlers::kInvalidPcOffset));
       handlers.SetHandlerInfo(i, list_[i].outer_try_index, list_[i].pc_offset,
                               list_[i].needs_stacktrace, has_catch_all,
-                              list_[i].token_pos, list_[i].is_generated);
+                              list_[i].is_generated);
       handlers.SetHandledTypes(i, Array::empty_array());
     } else {
       const bool has_catch_all = ContainsDynamic(*list_[i].handler_types);
       handlers.SetHandlerInfo(i, list_[i].outer_try_index, list_[i].pc_offset,
                               list_[i].needs_stacktrace, has_catch_all,
-                              list_[i].token_pos, list_[i].is_generated);
+                              list_[i].is_generated);
       handlers.SetHandledTypes(i, *list_[i].handler_types);
     }
   }

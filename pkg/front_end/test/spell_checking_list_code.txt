@@ -14,6 +14,8 @@ accounting
 accounts
 accumulated
 accumulating
+acon
+acov
 across
 affecting
 afterwards
@@ -21,6 +23,7 @@ agree
 ahe
 ai
 aiki
+ainv
 aka
 alexmarkov
 aligned
@@ -102,6 +105,7 @@ bump
 bypassing
 c
 caches
+calculations
 callee
 caller's
 callers
@@ -229,6 +233,8 @@ digests
 dijkstra's
 directed
 directions
+dirtify
+dirtifying
 dirty
 disallow
 disambiguator
@@ -296,15 +302,19 @@ fangorn
 fasta
 favoring
 fc
+fcon
+fcov
 fe
 feff
 ff
 fff
 ffff
 fffff
+ffffffff
 ffi
 file's
 filenames
+finv
 firsts
 fishy
 fishythefish
@@ -327,6 +337,7 @@ freely
 frontend
 frontends
 fs
+fsource
 function's
 fuse
 futured
@@ -373,6 +384,7 @@ https
 human
 i
 i'll
+i2b
 id
 identifies
 identifying
@@ -434,13 +446,14 @@ json
 juxtaposition
 juxtapositions
 k
-k’s
+kallentu
 kernel's
 kernel2kernel
 klass
 kmillikin
 kustermann
 kv
+k’s
 l
 lacks
 lang
@@ -496,6 +509,7 @@ monomorphic
 moves
 msg
 murmur
+mus
 n
 na
 nameless
@@ -617,13 +631,13 @@ queries
 quick
 quoted
 r
+r'$creation
 r'\f
 r'\r
 r'\s
 r'\t
 r'\u
 r'\v
-r'$creation
 radix
 raises
 ran
@@ -638,6 +652,8 @@ realign
 reassigned
 rebind
 rebuild
+recalculating
+recalculation
 recall
 received
 recompiled
@@ -666,6 +682,7 @@ relaxes
 remapped
 remedy
 removal
+remover
 reparse
 replacer
 replaces
@@ -996,6 +1013,7 @@ xxxx
 xxxxxx
 xxxxxxx
 y
+y`s
 yaml
 yet
 yielding

@@ -140,6 +140,8 @@ class DartFixKind {
       appliedTogetherMessage: "Add all casts in file");
   static const ADD_CONST =
       const FixKind('ADD_CONST', 50, "Add 'const' modifier");
+  static const ADD_CURLY_BRACES =
+      const FixKind('ADD_CURLY_BRACES', 50, "Add curly braces");
   static const ADD_FIELD_FORMAL_PARAMETERS = const FixKind(
       'ADD_FIELD_FORMAL_PARAMETERS', 70, "Add final field formal parameters");
   static const ADD_MISSING_ENUM_CASE_CLAUSES = const FixKind(
@@ -166,6 +168,8 @@ class DartFixKind {
       'ADD_SUPER_CONSTRUCTOR_INVOCATION',
       50,
       "Add super constructor {0} invocation");
+  static const ADD_TYPE_ANNOTATION =
+      const FixKind('ADD_TYPE_ANNOTATION', 50, "Add type annotation");
   static const CHANGE_ARGUMENT_NAME =
       const FixKind('CHANGE_ARGUMENT_NAME', 60, "Change to '{0}'");
   static const CHANGE_TO = const FixKind('CHANGE_TO', 51, "Change to '{0}'");
@@ -181,8 +185,26 @@ class DartFixKind {
       const FixKind('CONVERT_FLUTTER_CHILD', 50, "Convert to children:");
   static const CONVERT_FLUTTER_CHILDREN =
       const FixKind('CONVERT_FLUTTER_CHILDREN', 50, "Convert to child:");
+  static const CONVERT_INTO_EXPRESSION_BODY = const FixKind(
+      'CONVERT_INTO_EXPRESSION_BODY', 50, "Convert to expression body");
+  static const CONVERT_TO_FOR_ELEMENT =
+      const FixKind('CONVERT_TO_FOR_ELEMENT', 50, "Convert to a 'for' element");
+  static const CONVERT_TO_IF_ELEMENT =
+      const FixKind('CONVERT_TO_IF_ELEMENT', 50, "Convert to an 'if' element");
+  static const CONVERT_TO_INT_LITERAL =
+      const FixKind('CONVERT_TO_INT_LITERAL', 50, "Convert to an int literal");
+  static const CONVERT_TO_LINE_COMMENT = const FixKind(
+      'CONVERT_TO_LINE_COMMENT', 50, "Convert to line documentation comment");
   static const CONVERT_TO_NAMED_ARGUMENTS = const FixKind(
       'CONVERT_TO_NAMED_ARGUMENTS', 50, "Convert to named arguments");
+  static const CONVERT_TO_NULL_AWARE =
+      const FixKind('CONVERT_TO_NULL_AWARE', 50, "Convert to use '?.'");
+  static const CONVERT_TO_PACKAGE_IMPORT = const FixKind(
+      'CONVERT_TO_PACKAGE_IMPORT', 50, "Convert to 'package:' import");
+  static const CONVERT_TO_SINGLE_QUOTED_STRING = const FixKind(
+      'CONVERT_TO_SINGLE_QUOTED_STRING', 50, "Convert to single quoted string");
+  static const CONVERT_TO_SPREAD =
+      const FixKind('CONVERT_TO_SPREAD', 50, "Convert to a spread");
   static const CREATE_CLASS =
       const FixKind('CREATE_CLASS', 50, "Create class '{0}'");
   static const CREATE_CONSTRUCTOR =
@@ -211,6 +233,8 @@ class DartFixKind {
       const FixKind('CREATE_MIXIN', 50, "Create mixin '{0}'");
   static const CREATE_NO_SUCH_METHOD = const FixKind(
       'CREATE_NO_SUCH_METHOD', 49, "Create 'noSuchMethod' method");
+  static const CREATE_SETTER =
+      const FixKind('CREATE_SETTER', 50, "Create setter '{0}'");
   static const EXTEND_CLASS_FOR_MIXIN =
       const FixKind('EXTEND_CLASS_FOR_MIXIN', 50, "Extend the class '{0}'");
   static const IMPORT_ASYNC =
@@ -227,6 +251,8 @@ class DartFixKind {
       const FixKind('IMPORT_LIBRARY_SDK', 54, "Import library '{0}'");
   static const IMPORT_LIBRARY_SHOW =
       const FixKind('IMPORT_LIBRARY_SHOW', 55, "Update library '{0}' import");
+  static const INLINE_INVOCATION =
+      const FixKind('INLINE_INVOCATION', 30, "Inline invocation of '{0}'");
   static const INSERT_SEMICOLON =
       const FixKind('INSERT_SEMICOLON', 50, "Insert ';'");
   static const MAKE_CLASS_ABSTRACT =
@@ -240,6 +266,8 @@ class DartFixKind {
       "Move type arguments to after class name");
   static const MAKE_VARIABLE_NOT_FINAL = const FixKind(
       'MAKE_VARIABLE_NOT_FINAL', 50, "Make variable '{0}' not final");
+  static const QUALIFY_REFERENCE =
+      const FixKind('QUALIFY_REFERENCE', 50, "Use '{0}'");
   static const REMOVE_ANNOTATION =
       const FixKind('REMOVE_ANNOTATION', 50, "Remove the '{0}' annotation");
   static const REMOVE_AWAIT = const FixKind('REMOVE_AWAIT', 50, "Remove await");
@@ -284,15 +312,23 @@ class DartFixKind {
       appliedTogetherMessage: "Remove all unnecessary casts in file");
   static const REMOVE_UNNECESSARY_CONST = const FixKind(
       'REMOVE_UNNECESSARY_CONST', 50, "Remove unnecessary const keyword");
+  static const REMOVE_UNNECESSARY_NEW = const FixKind(
+      'REMOVE_UNNECESSARY_NEW', 50, "Remove unnecessary new keyword");
   static const REMOVE_UNUSED_CATCH_CLAUSE = const FixKind(
       'REMOVE_UNUSED_CATCH_CLAUSE', 50, "Remove unused 'catch' clause");
   static const REMOVE_UNUSED_CATCH_STACK = const FixKind(
       'REMOVE_UNUSED_CATCH_STACK', 50, "Remove unused stack trace variable");
+  static const REMOVE_UNUSED_ELEMENT =
+      const FixKind('REMOVE_UNUSED_ELEMENT', 50, "Remove unused element");
+  static const REMOVE_UNUSED_FIELD =
+      const FixKind('REMOVE_UNUSED_FIELD', 50, "Remove unused field");
   static const REMOVE_UNUSED_IMPORT = const FixKind(
       'REMOVE_UNUSED_IMPORT', 50, "Remove unused import",
       appliedTogetherMessage: "Remove all unused imports in this file");
-  static const REMOVE_UNNECESSARY_NEW = const FixKind(
-      'REMOVE_UNNECESSARY_NEW', 50, "Remove unnecessary new keyword");
+  static const REMOVE_UNUSED_LABEL =
+      const FixKind('REMOVE_UNUSED_LABEL', 50, "Remove unused label");
+  static const REMOVE_UNUSED_LOCAL_VARIABLE = const FixKind(
+      'REMOVE_UNUSED_LOCAL_VARIABLE', 50, "Remove unused local variable");
   static const RENAME_TO_CAMEL_CASE =
       const FixKind('RENAME_TO_CAMEL_CASE', 50, "Rename to '{0}'");
   static const REPLACE_BOOLEAN_WITH_BOOL = const FixKind(
@@ -316,6 +352,8 @@ class DartFixKind {
       const FixKind('REPLACE_WITH_BRACKETS', 50, "Replace with { }");
   static const REPLACE_WITH_CONDITIONAL_ASSIGNMENT = const FixKind(
       'REPLACE_WITH_CONDITIONAL_ASSIGNMENT', 50, "Replace with ??=");
+  static const REPLACE_WITH_EXTENSION_NAME =
+      const FixKind('REPLACE_WITH_EXTENSION_NAME', 50, "Replace with '{0}'");
   static const REPLACE_WITH_IDENTIFIER =
       const FixKind('REPLACE_WITH_IDENTIFIER', 50, "Replace with identifier");
   static const REPLACE_WITH_IS_EMPTY =
@@ -328,6 +366,10 @@ class DartFixKind {
       "Replace the '.' with a '?.' in the invocation");
   static const REPLACE_WITH_TEAR_OFF = const FixKind(
       'REPLACE_WITH_TEAR_OFF', 50, "Replace function literal with tear-off");
+  static const SORT_CHILD_PROPERTY_LAST = const FixKind(
+      'SORT_CHILD_PROPERTY_LAST',
+      50,
+      "Move child property to end of arguments");
   static const UPDATE_SDK_CONSTRAINTS =
       const FixKind('UPDATE_SDK_CONSTRAINTS', 50, "Update the SDK constraints");
   static const USE_CONST = const FixKind('USE_CONST', 50, "Change to constant");

@@ -892,9 +892,9 @@ class NamespaceBuilder {
         }
       }
       _addAllFromNamespace(
-          definedNames,
-          (library.context as InternalAnalysisContext)
-              .getPublicNamespace(library));
+        definedNames,
+        createPublicNamespaceForLibrary(library),
+      );
       return definedNames;
     } finally {
       visitedElements.remove(library);
@@ -1035,7 +1035,7 @@ abstract class Scope {
    * A table mapping names that are defined in this scope to the element
    * representing the thing declared with that name.
    */
-  Map<String, Element> _definedNames = null;
+  Map<String, Element> _definedNames;
 
   /**
    * Return the scope in which this scope is lexically enclosed.

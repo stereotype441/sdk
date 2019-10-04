@@ -13,6 +13,7 @@ import 'dartfuzz.dart';
 const debug = false;
 const sigkill = 9;
 const timeout = 60; // in seconds
+const dartHeapSize = 128; // in Mb
 
 // Status of divergence report.
 enum ReportStatus { reported, ignored, rerun, no_divergence }
@@ -138,16 +139,15 @@ abstract class TestRunner {
     if (mode.endsWith('debug-x64')) return 'DebugX64';
     if (mode.endsWith('debug-arm32')) return 'DebugSIMARM';
     if (mode.endsWith('debug-arm64')) return 'DebugSIMARM64';
-    if (mode.endsWith('debug-dbc32')) return 'DebugSIMDBC';
-    if (mode.endsWith('debug-dbc64')) return 'DebugSIMDBC64';
     if (mode.endsWith('ia32')) return 'ReleaseIA32';
     if (mode.endsWith('x64')) return 'ReleaseX64';
     if (mode.endsWith('arm32')) return 'ReleaseSIMARM';
     if (mode.endsWith('arm64')) return 'ReleaseSIMARM64';
-    if (mode.endsWith('dbc32')) return 'ReleaseSIMDBC';
-    if (mode.endsWith('dbc64')) return 'ReleaseSIMDBC64';
     throw ('unknown tag in mode: $mode');
   }
+
+  // Print steps to reproduce build and run.
+  void printReproductionCommand();
 }
 
 /// Concrete test runner of Dart JIT.
@@ -156,12 +156,19 @@ class TestRunnerJIT implements TestRunner {
       this.fileName, List<String> extraFlags) {
     description = '$prefix-$tag';
     dart = '$top/out/$tag/dart';
-    cmd = [dart, ...extraFlags, fileName];
+    cmd = [
+      dart,
+      ...extraFlags,
+      '--old_gen_heap_size=${dartHeapSize}',
+      fileName
+    ];
   }
 
   TestResult run() {
     return runCommand(cmd, env);
   }
+
+  void printReproductionCommand() => print(cmd.join(" "));
 
   String description;
   String dart;
@@ -188,7 +195,14 @@ class TestRunnerAOT implements TestRunner {
     if (result.exitCode != 0) {
       return result;
     }
-    return runCommand([dart, snapshot], env);
+    return runCommand(
+        [dart, '--old_gen_heap_size=${dartHeapSize}', snapshot], env);
+  }
+
+  void printReproductionCommand() {
+    print(
+        ["DART_CONFIGURATION=${env['DART_CONFIGURATION']}", ...cmd].join(" "));
+    print([dart, snapshot].join(" "));
   }
 
   String description;
@@ -207,12 +221,17 @@ class TestRunnerKBC implements TestRunner {
     description = '$prefix-$tag';
     dart = '$top/out/$tag/dart';
     if (kbcSrc) {
-      cmd = [dart, ...extraFlags, fileName];
+      cmd = [
+        dart,
+        ...extraFlags,
+        '--old_gen_heap_size=${dartHeapSize}',
+        fileName
+      ];
     } else {
       generate = '$top/pkg/vm/tool/gen_kernel';
       platform = '--platform=$top/out/$tag/vm_platform_strong.dill';
       dill = '$tmp/out.dill';
-      cmd = [dart, ...extraFlags, dill];
+      cmd = [dart, ...extraFlags, '--old_gen_heap_size=${dartHeapSize}', dill];
     }
   }
 
@@ -225,6 +244,14 @@ class TestRunnerKBC implements TestRunner {
       }
     }
     return runCommand(cmd, env);
+  }
+
+  void printReproductionCommand() {
+    if (generate != null) {
+      print([generate, '--gen-bytecode', platform, '-o', dill, fileName]
+          .join(" "));
+    }
+    print(cmd.join(" "));
   }
 
   String description;
@@ -252,6 +279,11 @@ class TestRunnerDJS implements TestRunner {
       return result;
     }
     return runCommand(['nodejs', js], env);
+  }
+
+  void printReproductionCommand() {
+    print([dart2js, fileName, '-o', js].join(" "));
+    print(['nodejs', js].join(" "));
   }
 
   String description;
@@ -291,6 +323,14 @@ class DartFuzzTest {
     print('\n${isolate}: done');
     showStatistics();
     print('');
+    if (timeoutSeeds.isNotEmpty) {
+      print('\n${isolate} timeout: ' + timeoutSeeds.join(", "));
+      print('');
+    }
+    if (skippedSeeds.isNotEmpty) {
+      print('\n${isolate} skipped: ' + skippedSeeds.join(", "));
+      print('');
+    }
 
     cleanup();
     return numDivergences;
@@ -320,9 +360,12 @@ class DartFuzzTest {
 
     numTests = 0;
     numSuccess = 0;
-    numNotRun = 0;
-    numTimeOut = 0;
+    numSkipped = 0;
+    numRerun = 0;
+    numTimeout = 0;
     numDivergences = 0;
+    timeoutSeeds = {};
+    skippedSeeds = {};
   }
 
   bool samePrecision(String mode1, String mode2) =>
@@ -354,8 +397,9 @@ class DartFuzzTest {
   }
 
   void showStatistics() {
-    stdout.write('\rTests: $numTests Success: $numSuccess Not-Run: '
-        '$numNotRun: Time-Out: $numTimeOut Divergences: $numDivergences');
+    stdout.write('\rTests: $numTests Success: $numSuccess (Rerun: $numRerun) '
+        'Skipped: $numSkipped Timeout: $numTimeout '
+        'Divergences: $numDivergences');
   }
 
   void generateTest() {
@@ -367,14 +411,21 @@ class DartFuzzTest {
   void runTest() {
     TestResult result1 = runner1.run();
     TestResult result2 = runner2.run();
-    if (checkDivergence(result1, result2) == ReportStatus.rerun && rerun) {
+    var report = checkDivergence(result1, result2);
+    if (report == ReportStatus.rerun && rerun) {
       print("\nCommencing re-run .... \n");
       numDivergences--;
       result1 = runner1.run();
       result2 = runner2.run();
-      if (checkDivergence(result1, result2) == ReportStatus.no_divergence) {
+      report = checkDivergence(result1, result2);
+      if (report == ReportStatus.no_divergence) {
         print("\nNo error on re-run\n");
+        numRerun++;
       }
+    }
+    if (report == ReportStatus.reported ||
+        (!rerun && report == ReportStatus.rerun)) {
+      showReproduce();
     }
   }
 
@@ -393,20 +444,29 @@ class DartFuzzTest {
           break;
         case -sigkill:
           // Both had a time out.
-          numTimeOut++;
+          numTimeout++;
+          timeoutSeeds.add(seed);
           break;
         default:
           // Both had an error.
-          numNotRun++;
+          numSkipped++;
+          skippedSeeds.add(seed);
           break;
       }
     } else {
       // Divergence in result code.
       if (trueDivergence) {
         // When only true divergences are requested, any divergence
-        // with at least one time out is treated as a regular time out.
+        // with at least one time out or out of memory error is
+        // treated as a regular time out or skipped test, respectively.
         if (result1.exitCode == -sigkill || result2.exitCode == -sigkill) {
-          numTimeOut++;
+          numTimeout++;
+          timeoutSeeds.add(seed);
+          return ReportStatus.ignored;
+        } else if (result1.exitCode == DartFuzz.oomExitCode ||
+            result2.exitCode == DartFuzz.oomExitCode) {
+          numSkipped++;
+          skippedSeeds.add(seed);
           return ReportStatus.ignored;
         }
       }
@@ -452,6 +512,17 @@ class DartFuzzTest {
     }
   }
 
+  void showReproduce() {
+    print("\n-- BEGIN REPRODUCE  --\n");
+    print("dartfuzz.dart --${ffi ? "" : "no-"}ffi --${fp ? "" : "no-"}fp "
+        "--seed ${seed} $fileName");
+    print("\n-- RUN 1 --\n");
+    runner1.printReproductionCommand();
+    print("\n-- RUN 2 --\n");
+    runner2.printReproductionCommand();
+    print("\n-- END REPRODUCE  --\n");
+  }
+
   // Context.
   final Map<String, String> env;
   final int repeat;
@@ -483,9 +554,12 @@ class DartFuzzTest {
   // Stats.
   int numTests;
   int numSuccess;
-  int numNotRun;
-  int numTimeOut;
+  int numSkipped;
+  int numRerun;
+  int numTimeout;
   int numDivergences;
+  Set<int> timeoutSeeds;
+  Set<int> skippedSeeds;
 }
 
 /// Class to start fuzz testing session.
@@ -641,11 +715,6 @@ class DartFuzzTestSession {
 
   // Modes not used on cluster runs because they have outstanding issues.
   static const List<String> nonClusterModes = [
-    // Deprecated.
-    'jit-debug-dbc32',
-    'jit-debug-dbc64',
-    'jit-dbc32',
-    'jit-dbc64',
     // Times out often:
     'aot-debug-arm32',
     'aot-debug-arm64',

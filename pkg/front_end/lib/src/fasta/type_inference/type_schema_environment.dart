@@ -102,7 +102,7 @@ class TypeSchemaEnvironment extends HierarchyBasedTypeEnvironment
 
   InterfaceType getLegacyLeastUpperBound(
       InterfaceType type1, InterfaceType type2) {
-    return hierarchy.getLegacyLeastUpperBound(type1, type2);
+    return hierarchy.getLegacyLeastUpperBound(type1, type2, this.coreTypes);
   }
 
   /// Modify the given [constraint]'s lower bound to include [lower].
@@ -120,11 +120,11 @@ class TypeSchemaEnvironment extends HierarchyBasedTypeEnvironment
     // TODO(paulberry): this matches what is defined in the spec.  It would be
     // nice if we could change kernel to match the spec and not have to
     // override.
-    if (type1 == intType) {
-      if (type2 == intType) return type2;
-      if (type2 == doubleType) return type2;
+    if (type1 == coreTypes.intLegacyRawType) {
+      if (type2 == coreTypes.intLegacyRawType) return type2;
+      if (type2 == coreTypes.doubleLegacyRawType) return type2;
     }
-    return numType;
+    return coreTypes.numLegacyRawType;
   }
 
   /// Infers a generic type, function, method, or list/map literal
@@ -405,12 +405,12 @@ class TypeSchemaEnvironment extends HierarchyBasedTypeEnvironment
 class TypeVariableEliminator extends Substitution {
   final CoreTypes _coreTypes;
 
+  // TODO(dmitryas): Instead of a CoreTypes object pass null and an Object type
+  // explicitly, with the suitable nullability on the latter.
   TypeVariableEliminator(this._coreTypes);
 
   @override
   DartType getSubstitute(TypeParameter parameter, bool upperBound) {
-    return upperBound
-        ? _coreTypes.nullClass.rawType
-        : _coreTypes.objectClass.rawType;
+    return upperBound ? _coreTypes.nullType : _coreTypes.objectLegacyRawType;
   }
 }

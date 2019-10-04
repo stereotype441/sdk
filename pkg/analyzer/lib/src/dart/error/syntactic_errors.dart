@@ -207,9 +207,79 @@ class ParserErrorCode extends ErrorCode {
   static const ParserErrorCode EXPORT_DIRECTIVE_AFTER_PART_DIRECTIVE =
       _EXPORT_DIRECTIVE_AFTER_PART_DIRECTIVE;
 
+  /**
+   * No parameters.
+   */
+  // #### Description
+  //
+  // The analyzer produces this diagnostic when an abstract declaration is
+  // declared in an extension. Extensions can declare only concrete members.
+  //
+  // #### Example
+  //
+  // The following code produces this diagnostic:
+  //
+  // ```dart
+  // extension E on String {
+  //   int [!a!]();
+  // }
+  // ```
+  //
+  // #### Common fixes
+  //
+  // Either provide an implementation for the member or remove it.
+  static const ParserErrorCode EXTENSION_DECLARES_ABSTRACT_MEMBER =
+      _EXTENSION_DECLARES_ABSTRACT_MEMBER;
+
+  /**
+   * No parameters.
+   */
+  // #### Description
+  //
+  // The analyzer produces this diagnostic when a constructor declaration is
+  // found in an extension. It isn't valid to define a constructor because
+  // extensions aren't classes, and it isn't possible to create an instance of
+  // an extension.
+  //
+  // #### Example
+  //
+  // The following code produces this diagnostic:
+  //
+  // ```dart
+  // extension E on String {
+  //   [!E!]() : super();
+  // }
+  // ```
+  //
+  // #### Common fixes
+  //
+  // Remove the constructor or replace it with a static method.
   static const ParserErrorCode EXTENSION_DECLARES_CONSTRUCTOR =
       _EXTENSION_DECLARES_CONSTRUCTOR;
 
+  /**
+   * No parameters.
+   */
+  // #### Description
+  //
+  // The analyzer produces this diagnostic when an instance field declaration is
+  // found in an extension. It isn't valid to define an instance field because
+  // extensions can only add behavior, not state.
+  //
+  // #### Example
+  //
+  // The following code produces this diagnostic:
+  //
+  // ```dart
+  // extension E on String {
+  //   String [!s!];
+  // }
+  // ```
+  //
+  // #### Common fixes
+  //
+  // Remove the field, make it a static field, or convert it to be a getter,
+  // setter, or method.
   static const ParserErrorCode EXTENSION_DECLARES_INSTANCE_FIELD =
       _EXTENSION_DECLARES_INSTANCE_FIELD;
 
@@ -536,6 +606,9 @@ class ParserErrorCode extends ErrorCode {
       "Can't have both positional and named parameters in a single parameter list.",
       correction: "Try choosing a single style of optional parameters.");
 
+  static const ParserErrorCode MIXIN_DECLARES_CONSTRUCTOR =
+      _MIXIN_DECLARES_CONSTRUCTOR;
+
   static const ParserErrorCode MODIFIER_OUT_OF_ORDER = _MODIFIER_OUT_OF_ORDER;
 
   static const ParserErrorCode MULTIPLE_EXTENDS_CLAUSES =
@@ -576,6 +649,9 @@ class ParserErrorCode extends ErrorCode {
               "the 'in', but {0} were found.",
           correction:
               "Try moving all but one of the declarations inside the loop body.");
+
+  static const ParserErrorCode MULTIPLE_VARIANCE_MODIFIERS =
+      _MULTIPLE_VARIANCE_MODIFIERS;
 
   static const ParserErrorCode MULTIPLE_WITH_CLAUSES = _MULTIPLE_WITH_CLAUSES;
 
@@ -645,6 +721,9 @@ class ParserErrorCode extends ErrorCode {
           "Normal parameters must occur before optional parameters.",
           correction:
               "Try moving all of the normal parameters before the optional parameters.");
+
+  static const ErrorCode NULL_AWARE_CASCADE_OUT_OF_ORDER =
+      _NULL_AWARE_CASCADE_OUT_OF_ORDER;
 
   static const ParserErrorCode POSITIONAL_AFTER_NAMED_ARGUMENT =
       const ParserErrorCode('POSITIONAL_AFTER_NAMED_ARGUMENT',
@@ -773,8 +852,11 @@ class ParserErrorCode extends ErrorCode {
    * template. The correction associated with the error will be created from the
    * given [correction] template.
    */
-  const ParserErrorCode(String name, String message, {String correction})
-      : super.temporary(name, message, correction: correction);
+  const ParserErrorCode(String name, String message,
+      {String correction, bool hasPublishedDocs})
+      : super.temporary(name, message,
+            correction: correction,
+            hasPublishedDocs: hasPublishedDocs ?? false);
 
   @override
   ErrorSeverity get errorSeverity => ErrorSeverity.ERROR;

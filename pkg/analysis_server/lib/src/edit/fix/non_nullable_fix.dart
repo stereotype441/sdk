@@ -2,17 +2,26 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+import 'package:analysis_server/protocol/protocol_generated.dart';
 import 'package:analysis_server/src/edit/fix/dartfix_listener.dart';
 import 'package:analysis_server/src/edit/fix/dartfix_registrar.dart';
 import 'package:analysis_server/src/edit/fix/fix_code_task.dart';
+import 'package:analysis_server/src/edit/nnbd_migration/info_builder.dart';
+import 'package:analysis_server/src/edit/nnbd_migration/instrumentation_listener.dart';
+import 'package:analysis_server/src/edit/nnbd_migration/instrumentation_renderer.dart';
+import 'package:analysis_server/src/edit/nnbd_migration/highlight_js.dart';
+import 'package:analysis_server/src/edit/nnbd_migration/highlight_css.dart';
+import 'package:analysis_server/src/edit/nnbd_migration/migration_info.dart';
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/file_system/file_system.dart';
+import 'package:analyzer/file_system/overlay_file_system.dart';
 import 'package:analyzer/src/dart/analysis/experiments.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/task/options.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart';
 import 'package:nnbd_migration/nnbd_migration.dart';
+import 'package:path/path.dart' as path;
 import 'package:source_span/source_span.dart';
 import 'package:yaml/yaml.dart';
 
@@ -26,17 +35,38 @@ class NonNullableFix extends FixCodeTask {
 
   final DartFixListener listener;
 
-  final NullabilityMigration migration;
+  /// The root of the included paths.
+  ///
+  /// The included paths may contain absolute and relative paths, non-canonical
+  /// paths, and directory and file paths. The "root" is the deepest directory
+  /// which all included paths share.
+  ///
+  /// If instrumentation files are written to [outputDir], they will be written
+  /// as if in a directory structure rooted at [includedRoot].
+  final String includedRoot;
+
+  final String outputDir;
+
+  InstrumentationListener instrumentationListener;
+
+  NullabilityMigration migration;
 
   /// If this flag has a value of `false`, then something happened to prevent
   /// at least one package from being marked as non-nullable.
   /// If this occurs, then don't update any code.
   bool _packageIsNNBD = true;
 
-  NonNullableFix(this.listener)
-      : migration = new NullabilityMigration(
-            new NullabilityMigrationAdapter(listener),
-            permissive: _usePermissiveMode);
+  NonNullableFix(this.listener, this.outputDir,
+      {List<String> included = const []})
+      : this.includedRoot =
+            _getIncludedRoot(included, listener.server.resourceProvider) {
+    instrumentationListener =
+        outputDir == null ? null : InstrumentationListener();
+    migration = new NullabilityMigration(
+        new NullabilityMigrationAdapter(listener),
+        permissive: _usePermissiveMode,
+        instrumentation: instrumentationListener);
+  }
 
   @override
   int get numPhases => 2;
@@ -44,6 +74,14 @@ class NonNullableFix extends FixCodeTask {
   @override
   Future<void> finish() async {
     migration.finish();
+    if (outputDir != null) {
+      OverlayResourceProvider provider = listener.server.resourceProvider;
+      Folder outputFolder = provider.getFolder(outputDir);
+      if (!outputFolder.exists) {
+        outputFolder.create();
+      }
+      await _generateOutput(provider, outputFolder);
+    }
   }
 
   /// If the package contains an analysis_options.yaml file, then update the
@@ -176,8 +214,73 @@ analyzer:
     _packageIsNNBD = false;
   }
 
-  static void task(DartFixRegistrar registrar, DartFixListener listener) {
-    registrar.registerCodeTask(new NonNullableFix(listener));
+  /// Generate output into the given [folder].
+  void _generateOutput(OverlayResourceProvider provider, Folder folder) async {
+    List<LibraryInfo> libraryInfos =
+        await InfoBuilder(instrumentationListener.data, listener)
+            .explainMigration();
+    var pathContext = provider.pathContext;
+    MigrationInfo migrationInfo =
+        MigrationInfo(libraryInfos, pathContext, includedRoot);
+    for (LibraryInfo info in libraryInfos) {
+      assert(info.units.isNotEmpty);
+      String libraryPath =
+          pathContext.setExtension(info.units.first.path, '.html');
+      String relativePath =
+          pathContext.relative(libraryPath, from: includedRoot);
+      List<String> directories =
+          pathContext.split(pathContext.dirname(relativePath));
+      for (int i = 0; i < directories.length; i++) {
+        String directory = pathContext.joinAll(directories.sublist(0, i + 1));
+        folder.getChildAssumingFolder(directory).create();
+      }
+      File output =
+          provider.getFile(pathContext.join(folder.path, relativePath));
+      String rendered = InstrumentationRenderer(info, migrationInfo).render();
+      output.writeAsStringSync(rendered);
+    }
+    // Generate resource files:
+    File highlightJsOutput =
+        provider.getFile(pathContext.join(folder.path, 'highlight.pack.js'));
+    highlightJsOutput.writeAsStringSync(decodeHighlightJs());
+    File highlightCssOutput =
+        provider.getFile(pathContext.join(folder.path, 'androidstudio.css'));
+    highlightCssOutput.writeAsStringSync(decodeHighlightCss());
+  }
+
+  static void task(DartFixRegistrar registrar, DartFixListener listener,
+      EditDartfixParams params) {
+    registrar.registerCodeTask(new NonNullableFix(listener, params.outputDir,
+        included: params.included));
+  }
+
+  /// Get the "root" of all [included] paths. See [includedRoot] for its
+  /// definition.
+  static String _getIncludedRoot(
+      List<String> included, OverlayResourceProvider provider) {
+    path.Context context = provider.pathContext;
+    // This step looks like it may be expensive (`getResource`, splitting up
+    // all of the paths, comparing parts, joining one path back together). In
+    // practice, this should be cheap because typically only one path is given
+    // to dartfix.
+    List<String> rootParts = included
+        .map((p) => context.absolute(context.canonicalize(p)))
+        .map((p) => provider.getResource(p) is File ? context.dirname(p) : p)
+        .map((p) => context.split(p))
+        .reduce((value, parts) {
+      List<String> shorterPath = value.length < parts.length ? value : parts;
+      int length = shorterPath.length;
+      for (int i = 0; i < length; i++) {
+        if (value[i] != parts[i]) {
+          // [value] and [parts] are the same, only up to part [i].
+          return value.sublist(0, i);
+        }
+      }
+      // [value] and [parts] are the same up to the full length of the shorter
+      // of the two, so just return that.
+      return shorterPath;
+    });
+    return context.joinAll(rootParts);
   }
 }
 

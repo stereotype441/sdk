@@ -392,7 +392,7 @@ class Assembler : public AssemblerBase {
 #endif  // TESTING || DEBUG
 
   // Debugging and bringup support.
-  void Breakpoint() { bkpt(0); }
+  void Breakpoint() override { bkpt(0); }
   void Stop(const char* message) override;
 
   static void InitializeMemoryWithBreakpoints(uword data, intptr_t length);
@@ -1336,9 +1336,6 @@ class Assembler : public AssemblerBase {
                              Label* label,
                              CanBeSmi can_be_smi,
                              BarrierFilterMode barrier_filter_mode);
-
-  void EnterSafepointSlowly();
-  void ExitSafepointSlowly();
 
   friend class dart::FlowGraphCompiler;
   std::function<void(Condition, Register)>

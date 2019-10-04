@@ -590,7 +590,7 @@ class DeclarationsTracker {
         file.path,
         file.uri,
         file.isLibraryDeprecated,
-        file.exportedDeclarations,
+        file.exportedDeclarations ?? const [],
       );
       _idToLibrary[file.id] = library;
       _changesController.add(
@@ -735,7 +735,7 @@ class DeclarationsTracker {
           libraryFile.path,
           libraryFile.uri,
           libraryFile.isLibraryDeprecated,
-          libraryFile.exportedDeclarations,
+          libraryFile.exportedDeclarations ?? const [],
         );
         _idToLibrary[library.id] = library;
         changedLibraries.add(library);
@@ -1266,8 +1266,8 @@ class _File {
       }
     }
 
-    String docComplete = null;
-    String docSummary = null;
+    String docComplete;
+    String docSummary;
 
     void setDartDoc(AnnotatedNode node) {
       if (node.documentationComment != null) {

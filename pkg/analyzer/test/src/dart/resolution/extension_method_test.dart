@@ -3,6 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'package:analyzer/dart/analysis/features.dart';
+import 'package:analyzer/src/dart/error/syntactic_errors.dart';
 import 'package:analyzer/src/error/codes.dart';
 import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/test_utilities/mock_sdk.dart';
@@ -47,6 +48,31 @@ extension E on Object {
 '''),
         ])
       ];
+
+  test_constructor() async {
+    await assertErrorsInCode('''
+extension E {
+  E() {}
+}
+''', [
+      error(ParserErrorCode.EXPECTED_TOKEN, 10, 1),
+      error(ParserErrorCode.EXPECTED_TYPE_NAME, 12, 1),
+      error(ParserErrorCode.EXTENSION_DECLARES_CONSTRUCTOR, 16, 1),
+    ]);
+  }
+
+  test_factory() async {
+    await assertErrorsInCode('''
+extension E {
+  factory S() {}
+}
+''', [
+      error(ParserErrorCode.EXPECTED_TOKEN, 10, 1),
+      error(CompileTimeErrorCode.UNDEFINED_CLASS, 12, 0),
+      error(ParserErrorCode.EXPECTED_TYPE_NAME, 12, 1),
+      error(ParserErrorCode.EXTENSION_DECLARES_CONSTRUCTOR, 16, 7),
+    ]);
+  }
 
   test_fromPlatform() async {
     await assertNoErrorsInCode('''
@@ -620,27 +646,6 @@ f(B b) {
     assertType(access, 'int');
   }
 
-  test_instance_getter_with_setter() async {
-    await assertNoErrorsInCode('''
-class C {}
-
-extension E on C {
-  int get a => 1;
-}
-
-extension E2 on C {
-  set a(int v) { }
-}
-
-f(C c) {
-  print(c.a);
-}
-''');
-    var access = findNode.prefixed('c.a');
-    assertElement(access, findElement.getter('a'));
-    assertType(access, 'int');
-  }
-
   test_instance_getterInvoked_fromExtension_functionType() async {
     await assertNoErrorsInCode('''
 extension E on int Function(int) {
@@ -1099,27 +1104,6 @@ f(C c) {
 ''');
     var access = findNode.prefixed('c.a');
     assertElement(access, findElement.setter('a'));
-  }
-
-  test_instance_setter_with_getter() async {
-    await assertNoErrorsInCode('''
-class C {}
-
-extension E on C {
-  int get a => 1;
-}
-
-extension E2 on C {
-  set a(int v) { }
-}
-
-f(C c) {
-  print(c.a = 1);
-}
-''');
-    var access = findNode.prefixed('c.a');
-    assertElement(access, findElement.setter('a'));
-    assertType(access, 'int');
   }
 
   test_instance_tearoff_fromExtension_functionType() async {

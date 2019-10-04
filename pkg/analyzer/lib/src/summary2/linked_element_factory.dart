@@ -289,7 +289,10 @@ class _ElementRequest {
 
     var libraryContext = elementFactory.libraryMap[uriStr];
     if (libraryContext == null) {
-      throw ArgumentError('Missing library: $uriStr');
+      throw ArgumentError(
+        'Missing library: $uriStr\n'
+        'Available libraries: ${elementFactory.libraryMap.keys.toList()}',
+      );
     }
     var libraryNode = libraryContext.node;
     var hasName = libraryNode.name.isNotEmpty;
@@ -378,8 +381,14 @@ class _ElementRequest {
     _indexUnitDeclarations(unitContext, unitRef, unitNode);
   }
 
-  MethodElementImpl _method(ClassElementImpl enclosing, Reference reference) {
-    enclosing.methods;
+  MethodElementImpl _method(ElementImpl enclosing, Reference reference) {
+    if (enclosing is ClassElementImpl) {
+      enclosing.methods;
+    } else if (enclosing is ExtensionElementImpl) {
+      enclosing.methods;
+    } else {
+      throw StateError('${enclosing.runtimeType}');
+    }
     // Requesting methods sets elements for all of them.
     assert(reference.element != null);
     return reference.element;

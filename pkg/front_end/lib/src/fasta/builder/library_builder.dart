@@ -4,7 +4,7 @@
 
 library fasta.library_builder;
 
-import 'package:kernel/ast.dart' show Library;
+import 'package:kernel/ast.dart' show Library, Nullability;
 
 import '../combinator.dart' show Combinator;
 
@@ -32,6 +32,7 @@ import 'builder.dart'
         FieldBuilder,
         ModifierBuilder,
         NameIterator,
+        NullabilityBuilder,
         PrefixBuilder,
         Scope,
         ScopeBuilder,
@@ -58,8 +59,6 @@ abstract class LibraryBuilder extends ModifierBuilder {
       : scopeBuilder = new ScopeBuilder(scope),
         exportScopeBuilder = new ScopeBuilder(exportScope),
         super(null, -1, fileUri);
-
-  bool get legacyMode => false;
 
   bool get isSynthetic => false;
 
@@ -104,6 +103,9 @@ abstract class LibraryBuilder extends ModifierBuilder {
   /// Returns the [Library] built by this builder.
   Library get library;
 
+  /// Returns the import uri for the library.
+  ///
+  /// This is the canonical uri for the library, for instance 'dart:core'.
   Uri get uri;
 
   Iterator<Builder> get iterator {
@@ -272,6 +274,42 @@ abstract class LibraryBuilder extends ModifierBuilder {
   void buildOutlineExpressions() {}
 
   List<FieldBuilder> takeImplicitlyTypedFields() => null;
+
+  // TODO(38287): Compute the predicate using the library version instead.
+  bool get isNonNullableByDefault => loader.target.enableNonNullable;
+
+  Nullability get nullable {
+    return isNonNullableByDefault ? Nullability.nullable : Nullability.legacy;
+  }
+
+  Nullability get nonNullable {
+    return isNonNullableByDefault
+        ? Nullability.nonNullable
+        : Nullability.legacy;
+  }
+
+  Nullability nullableIfTrue(bool isNullable) {
+    if (isNonNullableByDefault) {
+      return isNullable ? Nullability.nullable : Nullability.nonNullable;
+    }
+    return Nullability.legacy;
+  }
+
+  NullabilityBuilder get nullableBuilder {
+    return isNonNullableByDefault
+        ? const NullabilityBuilder.nullable()
+        : const NullabilityBuilder.omitted();
+  }
+
+  NullabilityBuilder get nonNullableBuilder {
+    return const NullabilityBuilder.omitted();
+  }
+
+  NullabilityBuilder nullableBuilderIfTrue(bool isNullable) {
+    return isNullable
+        ? const NullabilityBuilder.nullable()
+        : const NullabilityBuilder.omitted();
+  }
 }
 
 class LibraryLocalDeclarationIterator implements Iterator<Builder> {

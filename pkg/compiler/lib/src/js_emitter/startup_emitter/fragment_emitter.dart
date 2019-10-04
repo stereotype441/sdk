@@ -589,9 +589,12 @@ class FragmentEmitter {
   RecipeEncoder _recipeEncoder;
   RulesetEncoder _rulesetEncoder;
 
+  ClassHierarchy get _classHierarchy => _closedWorld.classHierarchy;
+  CommonElements get _commonElements => _closedWorld.commonElements;
   DartTypes get _dartTypes => _closedWorld.dartTypes;
   JElementEnvironment get _elementEnvironment =>
       _closedWorld.elementEnvironment;
+  NativeData get _nativeData => _closedWorld.nativeData;
 
   js.Name _call0Name, _call1Name, _call2Name;
   js.Name get call0Name =>
@@ -1942,24 +1945,50 @@ class FragmentEmitter {
   js.Statement emitTypeRules(Fragment fragment) {
     if (!_options.experimentNewRti) return js.EmptyStatement();
 
+    bool addJsObjectRedirections = false;
+    ClassEntity jsObjectClass = _commonElements.jsJavaScriptObjectClass;
+    InterfaceType jsObjectType = _elementEnvironment.getThisType(jsObjectClass);
+
     Ruleset ruleset = Ruleset.empty();
     Iterable<Class> classes =
         fragment.libraries.expand((Library library) => library.classes);
     classes.forEach((Class cls) {
       if (cls.classChecksNewRti == null) return;
       InterfaceType targetType = _elementEnvironment.getThisType(cls.element);
-      Iterable<InterfaceType> supertypes = cls.classChecksNewRti.checks.map(
-          (TypeCheck check) => _dartTypes.asInstanceOf(targetType, check.cls));
+      bool isInterop = _nativeData.isJsInteropClass(cls.element);
+
+      Iterable<TypeCheck> checks = cls.classChecksNewRti.checks;
+      Iterable<InterfaceType> supertypes = isInterop
+          ? checks
+              .map((check) => _elementEnvironment.getJsInteropType(check.cls))
+          : checks
+              .map((check) => _dartTypes.asInstanceOf(targetType, check.cls));
+
       Map<TypeVariableType, DartType> typeVariables = {};
       for (TypeVariableType typeVariable in cls.namedTypeVariablesNewRti) {
         TypeVariableEntity element = typeVariable.element;
-        InterfaceType supertype =
-            _dartTypes.asInstanceOf(targetType, element.typeDeclaration);
+        InterfaceType supertype = isInterop
+            ? _elementEnvironment.getJsInteropType(element.typeDeclaration)
+            : _dartTypes.asInstanceOf(targetType, element.typeDeclaration);
         List<DartType> supertypeArguments = supertype.typeArguments;
         typeVariables[typeVariable] = supertypeArguments[element.index];
       }
-      ruleset.add(targetType, supertypes, typeVariables);
+
+      if (isInterop) {
+        ruleset.addEntry(jsObjectType, supertypes, typeVariables);
+        addJsObjectRedirections = true;
+      } else {
+        ruleset.addEntry(targetType, supertypes, typeVariables);
+      }
     });
+
+    if (addJsObjectRedirections) {
+      _classHierarchy
+          .strictSubtypesOf(jsObjectClass)
+          .forEach((ClassEntity subtype) {
+        ruleset.addRedirection(subtype, jsObjectClass);
+      });
+    }
 
     FunctionEntity method = _closedWorld.commonElements.rtiAddRulesMethod;
     return js.js.statement('#(init.#,JSON.parse(#));', [

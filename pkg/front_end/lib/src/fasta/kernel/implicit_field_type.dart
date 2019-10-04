@@ -5,7 +5,7 @@
 library fasta.implicit_type;
 
 import 'package:kernel/ast.dart'
-    show DartType, DartTypeVisitor, DartTypeVisitor1, Visitor;
+    show DartType, DartTypeVisitor, DartTypeVisitor1, Nullability, Visitor;
 
 import '../../scanner/token.dart' show Token;
 
@@ -18,20 +18,24 @@ class ImplicitFieldType extends DartType {
   Token initializerToken;
   bool isStarted = false;
 
-  get nullability =>
-      unsupported("nullability", member.charOffset, member.fileUri);
-
   ImplicitFieldType(this.member, this.initializerToken);
 
-  accept(DartTypeVisitor<Object> v) {
-    unsupported("accept", member.charOffset, member.fileUri);
+  Nullability get nullability =>
+      unsupported("nullability", member.charOffset, member.fileUri);
+
+  R accept<R>(DartTypeVisitor<R> v) {
+    throw unsupported("accept", member.charOffset, member.fileUri);
   }
 
-  accept1(DartTypeVisitor1<Object, Object> v, arg) {
-    unsupported("accept1", member.charOffset, member.fileUri);
+  R accept1<R, A>(DartTypeVisitor1<R, A> v, arg) {
+    throw unsupported("accept1", member.charOffset, member.fileUri);
   }
 
   visitChildren(Visitor<Object> v) {
     unsupported("visitChildren", member.charOffset, member.fileUri);
+  }
+
+  ImplicitFieldType withNullability(Nullability nullability) {
+    return unsupported("withNullability", member.charOffset, member.fileUri);
   }
 }

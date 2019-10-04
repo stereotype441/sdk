@@ -22,6 +22,7 @@ approval
 approximation
 asserter
 auth
+auto
 autobianchi
 b0x
 b1x
@@ -210,6 +211,7 @@ la
 lc
 ld
 le
+lengths
 lightly
 likewise
 linebreaks
@@ -312,6 +314,7 @@ segment
 shipped
 shot
 signalled
+somehow
 spans
 spell
 spellcheck
@@ -350,6 +353,8 @@ triangle
 trigger
 triggers
 trimming
+tripped
+tripping
 trivially
 truncated
 tt

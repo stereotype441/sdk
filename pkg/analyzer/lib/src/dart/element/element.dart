@@ -10,6 +10,7 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/error/error.dart';
 import 'package:analyzer/src/dart/ast/utilities.dart';
@@ -34,6 +35,7 @@ import 'package:analyzer/src/summary/idl.dart';
 import 'package:analyzer/src/summary2/linked_unit_context.dart';
 import 'package:analyzer/src/summary2/reference.dart';
 import 'package:analyzer/src/util/comment.dart';
+import 'package:meta/meta.dart';
 
 /// Assert that the given [object] is null, which in the places where this
 /// function is called means that the element is not resynthesized.
@@ -48,6 +50,9 @@ void _assertNotResynthesized(Object object) {
 /// A concrete implementation of a [ClassElement].
 abstract class AbstractClassElementImpl extends ElementImpl
     implements ClassElement {
+  /// The type defined by the class.
+  InterfaceType _thisType;
+
   /// A list containing all of the accessors (getters and setters) contained in
   /// this class.
   List<PropertyAccessorElement> _accessors;
@@ -102,6 +107,9 @@ abstract class AbstractClassElementImpl extends ElementImpl
   }
 
   @override
+  bool get isDartCoreObject => false;
+
+  @override
   bool get isEnum => false;
 
   @override
@@ -112,6 +120,29 @@ abstract class AbstractClassElementImpl extends ElementImpl
 
   @override
   List<InterfaceType> get superclassConstraints => const <InterfaceType>[];
+
+  @override
+  InterfaceType get thisType {
+    if (_thisType == null) {
+      // TODO(scheglov) `library` is null in low-level unit tests
+      var nullabilitySuffix = library?.isNonNullableByDefault == true
+          ? NullabilitySuffix.none
+          : NullabilitySuffix.star;
+      List<DartType> typeArguments;
+      if (typeParameters.isNotEmpty) {
+        typeArguments = typeParameters.map<DartType>((t) {
+          return t.instantiate(nullabilitySuffix: nullabilitySuffix);
+        }).toList();
+      } else {
+        typeArguments = const <DartType>[];
+      }
+      return _thisType = instantiate(
+        typeArguments: typeArguments,
+        nullabilitySuffix: nullabilitySuffix,
+      );
+    }
+    return _thisType;
+  }
 
   @override
   T accept<T>(ElementVisitor<T> visitor) => visitor.visitClassElement(this);
@@ -186,6 +217,23 @@ abstract class AbstractClassElementImpl extends ElementImpl
   @override
   PropertyAccessorElement getSetter(String setterName) {
     return getSetterFromAccessors(setterName, accessors);
+  }
+
+  @override
+  InterfaceType instantiate({
+    @required List<DartType> typeArguments,
+    @required NullabilitySuffix nullabilitySuffix,
+  }) {
+    if (typeArguments.length != typeParameters.length) {
+      var ta = 'typeArguments.length (${typeArguments.length})';
+      var tp = 'typeParameters.length (${typeParameters.length})';
+      throw ArgumentError('$ta != $tp');
+    }
+    return InterfaceTypeImpl.explicit(
+      this,
+      typeArguments,
+      nullabilitySuffix: nullabilitySuffix,
+    );
   }
 
   @override
@@ -511,7 +559,7 @@ class ClassElementImpl extends AbstractClassElementImpl
   @override
   List<InterfaceType> get allSupertypes {
     List<InterfaceType> list = new List<InterfaceType>();
-    collectAllSupertypes(list, type, type);
+    collectAllSupertypes(list, thisType, thisType);
     return list;
   }
 
@@ -728,7 +776,7 @@ class ClassElementImpl extends AbstractClassElementImpl
     MethodElement method = lookUpConcreteMethod(
         FunctionElement.NO_SUCH_METHOD_METHOD_NAME, library);
     ClassElement definingClass = method?.enclosingElement;
-    return definingClass != null && !definingClass.type.isObject;
+    return definingClass != null && !definingClass.isDartCoreObject;
   }
 
   @override
@@ -824,6 +872,9 @@ class ClassElementImpl extends AbstractClassElementImpl
     _assertNotResynthesized(_unlinkedClass);
     setModifier(Modifier.ABSTRACT, isAbstract);
   }
+
+  @override
+  bool get isDartCoreObject => !isMixin && supertype == null;
 
   @override
   bool get isMixinApplication {
@@ -1221,7 +1272,7 @@ class ClassElementImpl extends AbstractClassElementImpl
   /// application classes which have been visited on the way to reaching this
   /// one (this is used to detect circularities).
   List<ConstructorElement> _computeMixinAppConstructors(
-      [List<ClassElementImpl> visitedClasses = null]) {
+      [List<ClassElementImpl> visitedClasses]) {
     // First get the list of constructors of the superclass which need to be
     // forwarded to this class.
     Iterable<ConstructorElement> constructorsToForward;
@@ -1603,7 +1654,7 @@ class CompilationUnitElementImpl extends UriReferencedElementImpl
   /// A table mapping the offset of a directive to the annotations associated
   /// with that directive, or `null` if none of the annotations in the
   /// compilation unit have annotations.
-  Map<int, List<ElementAnnotation>> annotationMap = null;
+  Map<int, List<ElementAnnotation>> annotationMap;
 
   /// A list containing all of the top-level accessors (getters and setters)
   /// contained in this compilation unit.
@@ -1897,7 +1948,7 @@ class CompilationUnitElementImpl extends UriReferencedElementImpl
   }
 
   @override
-  String get identifier => source.encoding;
+  String get identifier => '${source.uri}';
 
   @override
   ElementKind get kind => ElementKind.COMPILATION_UNIT;
@@ -2392,7 +2443,7 @@ class ConstFieldElementImpl_EnumValue extends ConstFieldElementImpl_ofEnum {
   }
 
   @override
-  InterfaceType get type => _enum.type;
+  InterfaceType get type => _enum.thisType;
 }
 
 /// The synthetic `values` field of an enum.
@@ -2423,8 +2474,7 @@ class ConstFieldElementImpl_EnumValues extends ConstFieldElementImpl_ofEnum {
   @override
   InterfaceType get type {
     if (_type == null) {
-      InterfaceType listType = context.typeProvider.listType;
-      return _type = listType.instantiate(<DartType>[_enum.type]);
+      return _type = context.typeProvider.listType2(_enum.thisType);
     }
     return _type;
   }
@@ -2744,7 +2794,7 @@ class ConstructorElementImpl extends ExecutableElementImpl
   }
 
   @override
-  DartType get returnType => enclosingElement.type;
+  DartType get returnType => enclosingElement.thisType;
 
   void set returnType(DartType returnType) {
     assert(false);
@@ -2784,6 +2834,16 @@ class ConstructorElementImpl extends ExecutableElementImpl
       name = '$name.$constructorName';
     }
     appendToWithName(buffer, name);
+  }
+
+  /// Ensures that dependencies of this constructor, such as default values
+  /// of formal parameters, are evaluated.
+  void computeConstantDependencies() {
+    if (!isConstantEvaluated) {
+      AnalysisOptionsImpl analysisOptions = context.analysisOptions;
+      computeConstants(context.typeProvider, context.typeSystem,
+          context.declaredVariables, [this], analysisOptions.experimentStatus);
+    }
   }
 
   @deprecated
@@ -2996,9 +3056,6 @@ class DynamicElementImpl extends ElementImpl implements TypeDefiningElement {
   static DynamicElementImpl get instance =>
       DynamicTypeImpl.instance.element as DynamicElementImpl;
 
-  @override
-  DynamicTypeImpl type;
-
   /// Initialize a newly created instance of this class. Instances of this class
   /// should <b>not</b> be created except as part of creating the type
   /// associated with this element. The single instance of this class should be
@@ -3009,6 +3066,9 @@ class DynamicElementImpl extends ElementImpl implements TypeDefiningElement {
 
   @override
   ElementKind get kind => ElementKind.DYNAMIC;
+
+  @override
+  DartType get type => DynamicTypeImpl.instance;
 
   @override
   T accept<T>(ElementVisitor<T> visitor) => null;
@@ -3699,7 +3759,9 @@ abstract class ElementImpl implements Element {
 
   @deprecated
   @override
-  CompilationUnit get unit => context.resolveCompilationUnit(source, library);
+  CompilationUnit get unit {
+    throw UnimplementedError();
+  }
 
   @override
   bool operator ==(Object object) {
@@ -4704,7 +4766,7 @@ abstract class ExecutableElementImpl extends ElementImpl
         buffer.write('>');
       }
       buffer.write('(');
-      String closing = null;
+      String closing;
       ParameterKind kind = ParameterKind.REQUIRED;
       int parameterCount = parameters.length;
       for (int i = 0; i < parameterCount; i++) {
@@ -6369,6 +6431,18 @@ class GenericTypeAliasElementImpl extends ElementImpl
   }
 
   @override
+  FunctionType instantiate2({
+    @required List<DartType> typeArguments,
+    @required NullabilitySuffix nullabilitySuffix,
+  }) {
+    // TODO(scheglov) Replace with strict function type.
+    return FunctionTypeImpl.forTypedef(
+      this,
+      nullabilitySuffix: nullabilitySuffix,
+    ).instantiate(typeArguments);
+  }
+
+  @override
   void visitChildren(ElementVisitor visitor) {
     super.visitChildren(visitor);
     safelyVisitChildren(typeParameters, visitor);
@@ -6402,7 +6476,7 @@ class GenericTypeAliasElementImpl extends ElementImpl
 
     if (typeArguments == null ||
         parameterElements.length != typeArguments.length) {
-      DartType dynamicType = DynamicElementImpl.instance.type;
+      DartType dynamicType = element.context.typeProvider.dynamicType;
       typeArguments = new List<DartType>.filled(parameterCount, dynamicType);
     }
 
@@ -6891,7 +6965,7 @@ class LibraryElementImpl extends ElementImpl implements LibraryElement {
   /// if not present.  If _libraryCycle is set, then the _libraryCycle field
   /// for all libraries reachable from this library in the import/export graph
   /// is also set.
-  List<LibraryElement> _libraryCycle = null;
+  List<LibraryElement> _libraryCycle;
 
   /// A list containing all of the compilation units that are included in this
   /// library using a `part` directive.
@@ -7172,7 +7246,7 @@ class LibraryElementImpl extends ElementImpl implements LibraryElement {
   }
 
   @override
-  String get identifier => _definingCompilationUnit.source.encoding;
+  String get identifier => '${_definingCompilationUnit.source.uri}';
 
   @override
   List<LibraryElement> get importedLibraries {
@@ -7360,7 +7434,7 @@ class LibraryElementImpl extends ElementImpl implements LibraryElement {
         // Pop the elements, and share the component across all
         // of the elements.
         List<LibraryElement> component = <LibraryElement>[];
-        LibraryElementImpl cur = null;
+        LibraryElementImpl cur;
         do {
           cur = stack.removeLast();
           active.remove(cur);
@@ -7524,50 +7598,6 @@ class LibraryElementImpl extends ElementImpl implements LibraryElement {
   @override
   ClassElement getType(String className) {
     return getTypeFromParts(className, _definingCompilationUnit, _parts);
-  }
-
-  /// Given an update to this library which may have added or deleted edges
-  /// in the import/export graph originating from this node only, remove any
-  /// cached library cycles in the element model which may have been
-  /// invalidated.
-  void invalidateLibraryCycles() {
-    // If we have pre-computed library cycle information, then we must
-    // invalidate the information both on this element, and on certain
-    // other elements.  Edges originating at this node may have been
-    // added or deleted.  A deleted edge that points outside of this cycle
-    // cannot change the cycle information for anything outside of this cycle,
-    // and so it is sufficient to delete the cached library information on this
-    // cycle.  An added edge which points to another node within the cycle
-    // only invalidates the cycle.  An added edge which points to a node earlier
-    // in the topological sort of cycles induces no invalidation (since there
-    // are by definition no back edges from earlier cycles in the topological
-    // order, and hence no possible cycle can have been introduced.  The only
-    // remaining case is that we have added an edge to a node which is later
-    // in the topological sort of cycles.  This can induce cycles, since it
-    // represents a new back edge.  It would be sufficient to invalidate the
-    // cycle information for all nodes that are between the target and the
-    // node in the topological order.  For simplicity, we simply invalidate
-    // all nodes which are reachable from the source node.
-    // Note that in the invalidation phase, we do not cut off when we encounter
-    // a node with no library cycle information, since we do not know whether
-    // we are in the case where invalidation has already been performed, or we
-    // are in the case where library cycles have simply never been computed from
-    // a newly reachable node.
-    Set<LibraryElementImpl> active = new HashSet();
-    void invalidate(LibraryElement element) {
-      LibraryElementImpl library =
-          element is LibraryElementHandle ? element.actualElement : element;
-      if (active.add(library)) {
-        if (library._libraryCycle != null) {
-          library._libraryCycle.forEach(invalidate);
-          library._libraryCycle = null;
-        }
-        library.exportedLibraries.forEach(invalidate);
-        library.importedLibraries.forEach(invalidate);
-      }
-    }
-
-    invalidate(this);
   }
 
   /// Set whether the library has the given [capability] to
@@ -8402,9 +8432,6 @@ class NeverElementImpl extends ElementImpl implements TypeDefiningElement {
   static NeverElementImpl get instance =>
       BottomTypeImpl.instance.element as NeverElementImpl;
 
-  @override
-  BottomTypeImpl type;
-
   /// Initialize a newly created instance of this class. Instances of this class
   /// should <b>not</b> be created except as part of creating the type
   /// associated with this element. The single instance of this class should be
@@ -8417,7 +8444,26 @@ class NeverElementImpl extends ElementImpl implements TypeDefiningElement {
   ElementKind get kind => ElementKind.NEVER;
 
   @override
+  DartType get type {
+    throw StateError('Should not be accessed.');
+  }
+
+  @override
   T accept<T>(ElementVisitor<T> visitor) => null;
+
+  DartType instantiate({
+    @required NullabilitySuffix nullabilitySuffix,
+  }) {
+    switch (nullabilitySuffix) {
+      case NullabilitySuffix.question:
+        return BottomTypeImpl.instanceNullable;
+      case NullabilitySuffix.star:
+        return BottomTypeImpl.instanceLegacy;
+      case NullabilitySuffix.none:
+        return BottomTypeImpl.instance;
+    }
+    throw StateError('Unsupported nullability: $nullabilitySuffix');
+  }
 }
 
 /// A [VariableElementImpl], which is not a parameter.
@@ -10192,6 +10238,13 @@ class TypeParameterElementImpl extends ElementImpl
       buffer.write(bound);
     }
   }
+
+  @override
+  TypeParameterType instantiate({
+    @required NullabilitySuffix nullabilitySuffix,
+  }) {
+    return TypeParameterTypeImpl(this, nullabilitySuffix: nullabilitySuffix);
+  }
 }
 
 /// Mixin representing an element which can have type parameters.
@@ -10256,7 +10309,8 @@ mixin TypeParameterizedElementMixin
   /// element's type parameters.
   List<TypeParameterType> get typeParameterTypes {
     return _typeParameterTypes ??= typeParameters
-        .map((TypeParameterElement e) => e.type)
+        .map((TypeParameterElement e) =>
+            e.instantiate(nullabilitySuffix: NullabilitySuffix.star))
         .toList(growable: false);
   }
 

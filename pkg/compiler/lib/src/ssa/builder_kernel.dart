@@ -4040,6 +4040,7 @@ class KernelSsaGraphBuilder extends ir.Visitor {
     List<DartType> typeArguments = <DartType>[];
 
     if (options.experimentNewRti) {
+      closedWorld.registerExtractTypeArguments(cls);
       HInstruction instanceType =
           HInstanceEnvironment(object, _abstractValueDomain.dynamicType);
       add(instanceType);
@@ -4697,8 +4698,9 @@ class KernelSsaGraphBuilder extends ir.Visitor {
         InterfaceType(_commonElements.jsArrayClass, [DynamicType()]);
     SourceInformation sourceInformation =
         _sourceInformationBuilder.buildCall(invocation, invocation);
-    HInstruction rti = HLoadType(interopType, _abstractValueDomain.dynamicType)
-      ..sourceInformation = sourceInformation;
+    HInstruction rti =
+        HLoadType.type(interopType, _abstractValueDomain.dynamicType)
+          ..sourceInformation = sourceInformation;
     push(rti);
   }
 

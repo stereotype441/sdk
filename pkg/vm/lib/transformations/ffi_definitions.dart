@@ -85,6 +85,12 @@ class _FfiDefinitionTransformer extends FfiTransformer {
       : super(index, coreTypes, hierarchy, diagnosticReporter) {}
 
   @override
+  visitExtension(Extension node) {
+    // The extension and it's members are only metadata.
+    return node;
+  }
+
+  @override
   visitClass(Class node) {
     if (!hierarchy.isSubclassOf(node, structClass) || node == structClass) {
       return node;
@@ -122,7 +128,7 @@ class _FfiDefinitionTransformer extends FfiTransformer {
     }
 
     // A struct classes "C" must extend "Struct<C>".
-    DartType structTypeArg = node.supertype.typeArguments[0];
+    final DartType structTypeArg = node.supertype.typeArguments[0];
     if (structTypeArg != InterfaceType(node)) {
       diagnosticReporter.report(
           templateFfiWrongStructInheritance.withArguments(node.name),
@@ -141,7 +147,7 @@ class _FfiDefinitionTransformer extends FfiTransformer {
 
   bool _checkFieldAnnotations(Class node) {
     bool success = true;
-    for (Field f in node.fields) {
+    for (final Field f in node.fields) {
       if (f.initializer is! NullLiteral) {
         diagnosticReporter.report(
             templateFfiFieldInitializer.withArguments(f.name.name),
@@ -191,8 +197,8 @@ class _FfiDefinitionTransformer extends FfiTransformer {
 
     // Constructors cannot have initializers because initializers refer to
     // fields, and the fields were replaced with getter/setter pairs.
-    for (Constructor c in node.constructors) {
-      for (Initializer i in c.initializers) {
+    for (final Constructor c in node.constructors) {
+      for (final Initializer i in c.initializers) {
         if (i is FieldInitializer) {
           toRemove.add(i);
           diagnosticReporter.report(
@@ -204,7 +210,7 @@ class _FfiDefinitionTransformer extends FfiTransformer {
       }
     }
     // Remove initializers referring to fields to prevent cascading errors.
-    for (Initializer i in toRemove) {
+    for (final Initializer i in toRemove) {
       i.remove();
     }
 
@@ -229,14 +235,14 @@ class _FfiDefinitionTransformer extends FfiTransformer {
     final fields = <Field>[];
     final types = <NativeType>[];
 
-    for (Field f in node.fields) {
+    for (final Field f in node.fields) {
       if (_isPointerType(f)) {
         fields.add(f);
         types.add(NativeType.kPointer);
       } else {
         final nativeTypeAnnos = _getNativeTypeAnnotations(f).toList();
         if (nativeTypeAnnos.length == 1) {
-          NativeType t = nativeTypeAnnos.first;
+          final NativeType t = nativeTypeAnnos.first;
           fields.add(f);
           types.add(t);
         }
@@ -244,7 +250,7 @@ class _FfiDefinitionTransformer extends FfiTransformer {
     }
 
     final sizeAndOffsets = <Abi, SizeAndOffsets>{};
-    for (Abi abi in Abi.values) {
+    for (final Abi abi in Abi.values) {
       sizeAndOffsets[abi] = _calculateSizeAndOffsets(types, abi);
     }
 
@@ -256,7 +262,7 @@ class _FfiDefinitionTransformer extends FfiTransformer {
       methods.forEach((p) => node.addMember(p));
     }
 
-    for (Field f in fields) {
+    for (final Field f in fields) {
       f.remove();
     }
 
@@ -385,7 +391,7 @@ class _FfiDefinitionTransformer extends FfiTransformer {
   SizeAndOffsets _calculateSizeAndOffsets(List<NativeType> types, Abi abi) {
     int offset = 0;
     final offsets = <int>[];
-    for (NativeType t in types) {
+    for (final NativeType t in types) {
       final int size = _sizeInBytes(t, abi);
       final int alignment = _alignmentOf(t, abi);
       offset = _alignOffset(offset, alignment);

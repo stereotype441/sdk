@@ -222,6 +222,8 @@ void StubCodeCompiler::GenerateEnterSafepointStub(Assembler* assembler) {
 
   __ PopRegisters(all_registers);
   __ LeaveFrame();
+
+  __ mov(CSP, SP);
   __ Ret();
 }
 
@@ -249,6 +251,8 @@ void StubCodeCompiler::GenerateExitSafepointStub(Assembler* assembler) {
 
   __ PopRegisters(all_registers);
   __ LeaveFrame();
+
+  __ mov(CSP, SP);
   __ Ret();
 }
 
@@ -395,7 +399,7 @@ void StubCodeCompiler::GenerateJITCallbackTrampolines(
 
   // EnterSafepoint clobbers TMP, TMP2 and R8 -- all volatile and not holding
   // return values.
-  __ EnterSafepoint(R8);
+  __ EnterSafepoint(/*scratch=*/R8);
 
   // Pop LR and THR from the real stack (CSP).
   __ ldp(THR, LR, Address(CSP, 2 * target::kWordSize, Address::PairPostIndex));
@@ -872,7 +876,7 @@ static void PushArrayOfArguments(Assembler* assembler) {
   __ AddImmediate(R1, -target::kWordSize);
   __ AddImmediate(R3, target::kWordSize);
   __ AddImmediateSetFlags(R2, R2, -target::ToRawSmi(1));
-  __ str(R7, Address(R3, -target::kWordSize));
+  __ StoreIntoObject(R0, Address(R3, -target::kWordSize), R7);
   __ b(&loop, GE);
   __ Bind(&loop_exit);
 }
@@ -2796,12 +2800,8 @@ static void GenerateSubtypeNTestCacheStub(Assembler* assembler, int n) {
   // Non-Closure handling.
   {
     __ Bind(&not_closure);
-    if (n == 1) {
-      __ SmiTag(kInstanceCidOrFunction);
-    } else {
-      ASSERT(n >= 2);
+    if (n >= 2) {
       Label has_no_type_arguments;
-      // [LoadClassById] also tags [kInstanceCidOrFunction] as a side-effect.
       __ LoadClassById(R5, kInstanceCidOrFunction);
       __ mov(kInstanceInstantiatorTypeArgumentsReg, kNullReg);
       __ LoadFieldFromOffset(
@@ -2818,6 +2818,7 @@ static void GenerateSubtypeNTestCacheStub(Assembler* assembler, int n) {
         __ mov(kInstanceDelayedFunctionTypeArgumentsReg, kNullReg);
       }
     }
+    __ SmiTag(kInstanceCidOrFunction);
   }
 
   Label found, not_found, next_iteration;

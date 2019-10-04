@@ -84,7 +84,6 @@ DEFINE_FLAG(bool,
 
 DECLARE_FLAG(bool, dual_map_code);
 DECLARE_FLAG(bool, intrinsify);
-DECLARE_FLAG(bool, show_invisible_frames);
 DECLARE_FLAG(bool, trace_deoptimization);
 DECLARE_FLAG(bool, trace_deoptimization_verbose);
 DECLARE_FLAG(bool, trace_reload);
@@ -553,19 +552,19 @@ void Object::Init(Isolate* isolate) {
   }
 
   // Allocate and initialize the null class.
-  cls = Class::New<Instance>(kNullCid);
+  cls = Class::New<Instance>(kNullCid, isolate);
   cls.set_num_type_arguments(0);
   isolate->object_store()->set_null_class(cls);
 
   // Allocate and initialize the free list element class.
-  cls = Class::New<FreeListElement::FakeInstance>(kFreeListElement);
+  cls = Class::New<FreeListElement::FakeInstance>(kFreeListElement, isolate);
   cls.set_num_type_arguments(0);
   cls.set_is_finalized();
   cls.set_is_declaration_loaded();
   cls.set_is_type_finalized();
 
   // Allocate and initialize the forwarding corpse class.
-  cls = Class::New<ForwardingCorpse::FakeInstance>(kForwardingCorpse);
+  cls = Class::New<ForwardingCorpse::FakeInstance>(kForwardingCorpse, isolate);
   cls.set_num_type_arguments(0);
   cls.set_is_finalized();
   cls.set_is_declaration_loaded();
@@ -589,138 +588,138 @@ void Object::Init(Isolate* isolate) {
   }
 
   // Allocate the remaining VM internal classes.
-  cls = Class::New<TypeArguments>();
+  cls = Class::New<TypeArguments>(isolate);
   type_arguments_class_ = cls.raw();
 
-  cls = Class::New<PatchClass>();
+  cls = Class::New<PatchClass>(isolate);
   patch_class_class_ = cls.raw();
 
-  cls = Class::New<Function>();
+  cls = Class::New<Function>(isolate);
   function_class_ = cls.raw();
 
-  cls = Class::New<ClosureData>();
+  cls = Class::New<ClosureData>(isolate);
   closure_data_class_ = cls.raw();
 
-  cls = Class::New<SignatureData>();
+  cls = Class::New<SignatureData>(isolate);
   signature_data_class_ = cls.raw();
 
-  cls = Class::New<RedirectionData>();
+  cls = Class::New<RedirectionData>(isolate);
   redirection_data_class_ = cls.raw();
 
-  cls = Class::New<FfiTrampolineData>();
+  cls = Class::New<FfiTrampolineData>(isolate);
   ffi_trampoline_data_class_ = cls.raw();
 
-  cls = Class::New<Field>();
+  cls = Class::New<Field>(isolate);
   field_class_ = cls.raw();
 
-  cls = Class::New<Script>();
+  cls = Class::New<Script>(isolate);
   script_class_ = cls.raw();
 
-  cls = Class::New<Library>();
+  cls = Class::New<Library>(isolate);
   library_class_ = cls.raw();
 
-  cls = Class::New<Namespace>();
+  cls = Class::New<Namespace>(isolate);
   namespace_class_ = cls.raw();
 
-  cls = Class::New<KernelProgramInfo>();
+  cls = Class::New<KernelProgramInfo>(isolate);
   kernel_program_info_class_ = cls.raw();
 
-  cls = Class::New<Code>();
+  cls = Class::New<Code>(isolate);
   code_class_ = cls.raw();
 
-  cls = Class::New<Bytecode>();
+  cls = Class::New<Bytecode>(isolate);
   bytecode_class_ = cls.raw();
 
-  cls = Class::New<Instructions>();
+  cls = Class::New<Instructions>(isolate);
   instructions_class_ = cls.raw();
 
-  cls = Class::New<ObjectPool>();
+  cls = Class::New<ObjectPool>(isolate);
   object_pool_class_ = cls.raw();
 
-  cls = Class::New<PcDescriptors>();
+  cls = Class::New<PcDescriptors>(isolate);
   pc_descriptors_class_ = cls.raw();
 
-  cls = Class::New<CodeSourceMap>();
+  cls = Class::New<CodeSourceMap>(isolate);
   code_source_map_class_ = cls.raw();
 
-  cls = Class::New<StackMap>();
+  cls = Class::New<StackMap>(isolate);
   stackmap_class_ = cls.raw();
 
-  cls = Class::New<LocalVarDescriptors>();
+  cls = Class::New<LocalVarDescriptors>(isolate);
   var_descriptors_class_ = cls.raw();
 
-  cls = Class::New<ExceptionHandlers>();
+  cls = Class::New<ExceptionHandlers>(isolate);
   exception_handlers_class_ = cls.raw();
 
-  cls = Class::New<Context>();
+  cls = Class::New<Context>(isolate);
   context_class_ = cls.raw();
 
-  cls = Class::New<ContextScope>();
+  cls = Class::New<ContextScope>(isolate);
   context_scope_class_ = cls.raw();
 
-  cls = Class::New<ParameterTypeCheck>();
+  cls = Class::New<ParameterTypeCheck>(isolate);
   dyncalltypecheck_class_ = cls.raw();
 
-  cls = Class::New<SingleTargetCache>();
+  cls = Class::New<SingleTargetCache>(isolate);
   singletargetcache_class_ = cls.raw();
 
-  cls = Class::New<UnlinkedCall>();
+  cls = Class::New<UnlinkedCall>(isolate);
   unlinkedcall_class_ = cls.raw();
 
-  cls = Class::New<ICData>();
+  cls = Class::New<ICData>(isolate);
   icdata_class_ = cls.raw();
 
-  cls = Class::New<MegamorphicCache>();
+  cls = Class::New<MegamorphicCache>(isolate);
   megamorphic_cache_class_ = cls.raw();
 
-  cls = Class::New<SubtypeTestCache>();
+  cls = Class::New<SubtypeTestCache>(isolate);
   subtypetestcache_class_ = cls.raw();
 
-  cls = Class::New<ApiError>();
+  cls = Class::New<ApiError>(isolate);
   api_error_class_ = cls.raw();
 
-  cls = Class::New<LanguageError>();
+  cls = Class::New<LanguageError>(isolate);
   language_error_class_ = cls.raw();
 
-  cls = Class::New<UnhandledException>();
+  cls = Class::New<UnhandledException>(isolate);
   unhandled_exception_class_ = cls.raw();
 
-  cls = Class::New<UnwindError>();
+  cls = Class::New<UnwindError>(isolate);
   unwind_error_class_ = cls.raw();
 
   ASSERT(class_class() != null_);
 
   // Pre-allocate classes in the vm isolate so that we can for example create a
   // symbol table and populate it with some frequently used strings as symbols.
-  cls = Class::New<Array>();
+  cls = Class::New<Array>(isolate);
   isolate->object_store()->set_array_class(cls);
   cls.set_type_arguments_field_offset(Array::type_arguments_offset());
   cls.set_num_type_arguments(1);
-  cls = Class::New<Array>(kImmutableArrayCid);
+  cls = Class::New<Array>(kImmutableArrayCid, isolate);
   isolate->object_store()->set_immutable_array_class(cls);
   cls.set_type_arguments_field_offset(Array::type_arguments_offset());
   cls.set_num_type_arguments(1);
-  cls = Class::New<GrowableObjectArray>();
+  cls = Class::New<GrowableObjectArray>(isolate);
   isolate->object_store()->set_growable_object_array_class(cls);
   cls.set_type_arguments_field_offset(
       GrowableObjectArray::type_arguments_offset());
   cls.set_num_type_arguments(1);
-  cls = Class::NewStringClass(kOneByteStringCid);
+  cls = Class::NewStringClass(kOneByteStringCid, isolate);
   isolate->object_store()->set_one_byte_string_class(cls);
-  cls = Class::NewStringClass(kTwoByteStringCid);
+  cls = Class::NewStringClass(kTwoByteStringCid, isolate);
   isolate->object_store()->set_two_byte_string_class(cls);
-  cls = Class::New<Mint>();
+  cls = Class::New<Mint>(isolate);
   isolate->object_store()->set_mint_class(cls);
-  cls = Class::New<Double>();
+  cls = Class::New<Double>(isolate);
   isolate->object_store()->set_double_class(cls);
 
   // Ensure that class kExternalTypedDataUint8ArrayCid is registered as we
   // need it when reading in the token stream of bootstrap classes in the VM
   // isolate.
-  Class::NewExternalTypedDataClass(kExternalTypedDataUint8ArrayCid);
+  Class::NewExternalTypedDataClass(kExternalTypedDataUint8ArrayCid, isolate);
 
   // Needed for object pools of VM isolate stubs.
-  Class::NewTypedDataClass(kTypedDataInt8ArrayCid);
+  Class::NewTypedDataClass(kTypedDataInt8ArrayCid, isolate);
 
   // Allocate and initialize the empty_array instance.
   {
@@ -833,7 +832,7 @@ void Object::Init(Isolate* isolate) {
   // as we do not have any VM isolate snapshot at this time.
   *vm_isolate_snapshot_object_table_ = Object::empty_array().raw();
 
-  cls = Class::New<Instance>(kDynamicCid);
+  cls = Class::New<Instance>(kDynamicCid, isolate);
   cls.set_is_abstract();
   cls.set_num_type_arguments(0);
   cls.set_is_finalized();
@@ -841,14 +840,14 @@ void Object::Init(Isolate* isolate) {
   cls.set_is_type_finalized();
   dynamic_class_ = cls.raw();
 
-  cls = Class::New<Instance>(kVoidCid);
+  cls = Class::New<Instance>(kVoidCid, isolate);
   cls.set_num_type_arguments(0);
   cls.set_is_finalized();
   cls.set_is_declaration_loaded();
   cls.set_is_type_finalized();
   void_class_ = cls.raw();
 
-  cls = Class::New<Type>();
+  cls = Class::New<Type>(isolate);
   cls.set_is_finalized();
   cls.set_is_declaration_loaded();
   cls.set_is_type_finalized();
@@ -869,7 +868,7 @@ void Object::Init(Isolate* isolate) {
   cls.SetFunctions(Object::empty_array());
 
   // Allocate and initialize singleton true and false boolean objects.
-  cls = Class::New<Bool>();
+  cls = Class::New<Bool>(isolate);
   isolate->object_store()->set_bool_class(cls);
   *bool_true_ = Bool::New(true);
   *bool_false_ = Bool::New(false);
@@ -1399,7 +1398,7 @@ RawError* Object::Init(Isolate* isolate,
 
     // All RawArray fields will be initialized to an empty array, therefore
     // initialize array class first.
-    cls = Class::New<Array>();
+    cls = Class::New<Array>(isolate);
     object_store->set_array_class(cls);
 
     // VM classes that are parameterized (Array, ImmutableArray,
@@ -1412,7 +1411,7 @@ RawError* Object::Init(Isolate* isolate,
 
     // Set up the growable object array class (Has to be done after the array
     // class is setup as one of its field is an array object).
-    cls = Class::New<GrowableObjectArray>();
+    cls = Class::New<GrowableObjectArray>(isolate);
     object_store->set_growable_object_array_class(cls);
     cls.set_type_arguments_field_offset(
         GrowableObjectArray::type_arguments_offset());
@@ -1431,19 +1430,20 @@ RawError* Object::Init(Isolate* isolate,
     object_store->set_canonical_type_arguments(array);
 
     // Setup type class early in the process.
-    const Class& type_cls = Class::Handle(zone, Class::New<Type>());
-    const Class& type_ref_cls = Class::Handle(zone, Class::New<TypeRef>());
+    const Class& type_cls = Class::Handle(zone, Class::New<Type>(isolate));
+    const Class& type_ref_cls =
+        Class::Handle(zone, Class::New<TypeRef>(isolate));
     const Class& type_parameter_cls =
-        Class::Handle(zone, Class::New<TypeParameter>());
+        Class::Handle(zone, Class::New<TypeParameter>(isolate));
     const Class& library_prefix_cls =
-        Class::Handle(zone, Class::New<LibraryPrefix>());
+        Class::Handle(zone, Class::New<LibraryPrefix>(isolate));
 
     // Pre-allocate the OneByteString class needed by the symbol table.
-    cls = Class::NewStringClass(kOneByteStringCid);
+    cls = Class::NewStringClass(kOneByteStringCid, isolate);
     object_store->set_one_byte_string_class(cls);
 
     // Pre-allocate the TwoByteString class needed by the symbol table.
-    cls = Class::NewStringClass(kTwoByteStringCid);
+    cls = Class::NewStringClass(kTwoByteStringCid, isolate);
     object_store->set_two_byte_string_class(cls);
 
     // Setup the symbol table for the symbols created in the isolate.
@@ -1487,7 +1487,7 @@ RawError* Object::Init(Isolate* isolate,
     RegisterPrivateClass(cls, Symbols::_GrowableList(), core_lib);
     pending_classes.Add(cls);
 
-    cls = Class::New<Array>(kImmutableArrayCid);
+    cls = Class::New<Array>(kImmutableArrayCid, isolate);
     object_store->set_immutable_array_class(cls);
     cls.set_type_arguments_field_offset(Array::type_arguments_offset());
     cls.set_num_type_arguments(1);
@@ -1505,12 +1505,12 @@ RawError* Object::Init(Isolate* isolate,
     RegisterPrivateClass(cls, Symbols::TwoByteString(), core_lib);
     pending_classes.Add(cls);
 
-    cls = Class::NewStringClass(kExternalOneByteStringCid);
+    cls = Class::NewStringClass(kExternalOneByteStringCid, isolate);
     object_store->set_external_one_byte_string_class(cls);
     RegisterPrivateClass(cls, Symbols::ExternalOneByteString(), core_lib);
     pending_classes.Add(cls);
 
-    cls = Class::NewStringClass(kExternalTwoByteStringCid);
+    cls = Class::NewStringClass(kExternalTwoByteStringCid, isolate);
     object_store->set_external_two_byte_string_class(cls);
     RegisterPrivateClass(cls, Symbols::ExternalTwoByteString(), core_lib);
     pending_classes.Add(cls);
@@ -1528,29 +1528,30 @@ RawError* Object::Init(Isolate* isolate,
     ASSERT(!isolate_lib.IsNull());
     ASSERT(isolate_lib.raw() == Library::IsolateLibrary());
 
-    cls = Class::New<Capability>();
+    cls = Class::New<Capability>(isolate);
     RegisterPrivateClass(cls, Symbols::_CapabilityImpl(), isolate_lib);
     pending_classes.Add(cls);
 
-    cls = Class::New<ReceivePort>();
+    cls = Class::New<ReceivePort>(isolate);
     RegisterPrivateClass(cls, Symbols::_RawReceivePortImpl(), isolate_lib);
     pending_classes.Add(cls);
 
-    cls = Class::New<SendPort>();
+    cls = Class::New<SendPort>(isolate);
     RegisterPrivateClass(cls, Symbols::_SendPortImpl(), isolate_lib);
     pending_classes.Add(cls);
 
-    cls = Class::New<TransferableTypedData>();
+    cls = Class::New<TransferableTypedData>(isolate);
     RegisterPrivateClass(cls, Symbols::_TransferableTypedDataImpl(),
                          isolate_lib);
     pending_classes.Add(cls);
 
-    const Class& stacktrace_cls = Class::Handle(zone, Class::New<StackTrace>());
+    const Class& stacktrace_cls =
+        Class::Handle(zone, Class::New<StackTrace>(isolate));
     RegisterPrivateClass(stacktrace_cls, Symbols::_StackTrace(), core_lib);
     pending_classes.Add(stacktrace_cls);
     // Super type set below, after Object is allocated.
 
-    cls = Class::New<RegExp>();
+    cls = Class::New<RegExp>(isolate);
     RegisterPrivateClass(cls, Symbols::_RegExp(), core_lib);
     pending_classes.Add(cls);
 
@@ -1560,7 +1561,7 @@ RawError* Object::Init(Isolate* isolate,
     // The script and token index of these pre-allocated classes is set up in
     // the parser when the corelib script is compiled (see
     // Parser::ParseClassDefinition).
-    cls = Class::New<Instance>(kInstanceCid);
+    cls = Class::New<Instance>(kInstanceCid, isolate);
     object_store->set_object_class(cls);
     cls.set_name(Symbols::Object());
     cls.set_num_type_arguments(0);
@@ -1570,12 +1571,12 @@ RawError* Object::Init(Isolate* isolate,
     type = Type::NewNonParameterizedType(cls);
     object_store->set_object_type(type);
 
-    cls = Class::New<Bool>();
+    cls = Class::New<Bool>(isolate);
     object_store->set_bool_class(cls);
     RegisterClass(cls, Symbols::Bool(), core_lib);
     pending_classes.Add(cls);
 
-    cls = Class::New<Instance>(kNullCid);
+    cls = Class::New<Instance>(kNullCid, isolate);
     object_store->set_null_class(cls);
     cls.set_num_type_arguments(0);
     cls.set_is_prefinalized();
@@ -1597,33 +1598,33 @@ RawError* Object::Init(Isolate* isolate,
                          core_lib);
     pending_classes.Add(type_parameter_cls);
 
-    cls = Class::New<Integer>();
+    cls = Class::New<Integer>(isolate);
     object_store->set_integer_implementation_class(cls);
     RegisterPrivateClass(cls, Symbols::_IntegerImplementation(), core_lib);
     pending_classes.Add(cls);
 
-    cls = Class::New<Smi>();
+    cls = Class::New<Smi>(isolate);
     object_store->set_smi_class(cls);
     RegisterPrivateClass(cls, Symbols::_Smi(), core_lib);
     pending_classes.Add(cls);
 
-    cls = Class::New<Mint>();
+    cls = Class::New<Mint>(isolate);
     object_store->set_mint_class(cls);
     RegisterPrivateClass(cls, Symbols::_Mint(), core_lib);
     pending_classes.Add(cls);
 
-    cls = Class::New<Double>();
+    cls = Class::New<Double>(isolate);
     object_store->set_double_class(cls);
     RegisterPrivateClass(cls, Symbols::_Double(), core_lib);
     pending_classes.Add(cls);
 
     // Class that represents the Dart class _Closure and C++ class Closure.
-    cls = Class::New<Closure>();
+    cls = Class::New<Closure>(isolate);
     object_store->set_closure_class(cls);
     RegisterPrivateClass(cls, Symbols::_Closure(), core_lib);
     pending_classes.Add(cls);
 
-    cls = Class::New<WeakProperty>();
+    cls = Class::New<WeakProperty>(isolate);
     object_store->set_weak_property_class(cls);
     RegisterPrivateClass(cls, Symbols::_WeakProperty(), core_lib);
 
@@ -1640,7 +1641,7 @@ RawError* Object::Init(Isolate* isolate,
     ASSERT(!lib.IsNull());
     ASSERT(lib.raw() == Library::MirrorsLibrary());
 
-    cls = Class::New<MirrorReference>();
+    cls = Class::New<MirrorReference>(isolate);
     RegisterPrivateClass(cls, Symbols::_MirrorReference(), lib);
 #endif
 
@@ -1656,7 +1657,7 @@ RawError* Object::Init(Isolate* isolate,
     object_store->set_bootstrap_library(ObjectStore::kCollection, lib);
     ASSERT(!lib.IsNull());
     ASSERT(lib.raw() == Library::CollectionLibrary());
-    cls = Class::New<LinkedHashMap>();
+    cls = Class::New<LinkedHashMap>(isolate);
     object_store->set_linked_hash_map_class(cls);
     cls.set_type_arguments_field_offset(LinkedHashMap::type_arguments_offset());
     cls.set_num_type_arguments(2);
@@ -1674,7 +1675,7 @@ RawError* Object::Init(Isolate* isolate,
     object_store->set_bootstrap_library(ObjectStore::kDeveloper, lib);
     ASSERT(!lib.IsNull());
     ASSERT(lib.raw() == Library::DeveloperLibrary());
-    cls = Class::New<UserTag>();
+    cls = Class::New<UserTag>(isolate);
     RegisterPrivateClass(cls, Symbols::_UserTag(), lib);
     pending_classes.Add(cls);
 
@@ -1695,66 +1696,69 @@ RawError* Object::Init(Isolate* isolate,
     ASSERT(!lib.IsNull());
     ASSERT(lib.raw() == Library::TypedDataLibrary());
 #define REGISTER_TYPED_DATA_CLASS(clazz)                                       \
-  cls = Class::NewTypedDataClass(kTypedData##clazz##ArrayCid);                 \
+  cls = Class::NewTypedDataClass(kTypedData##clazz##ArrayCid, isolate);        \
   RegisterPrivateClass(cls, Symbols::_##clazz##List(), lib);
 
     DART_CLASS_LIST_TYPED_DATA(REGISTER_TYPED_DATA_CLASS);
 #undef REGISTER_TYPED_DATA_CLASS
 #define REGISTER_TYPED_DATA_VIEW_CLASS(clazz)                                  \
-  cls = Class::NewTypedDataViewClass(kTypedData##clazz##ViewCid);              \
+  cls = Class::NewTypedDataViewClass(kTypedData##clazz##ViewCid, isolate);     \
   RegisterPrivateClass(cls, Symbols::_##clazz##View(), lib);                   \
   pending_classes.Add(cls);
 
     CLASS_LIST_TYPED_DATA(REGISTER_TYPED_DATA_VIEW_CLASS);
 
-    cls = Class::NewTypedDataViewClass(kByteDataViewCid);
+    cls = Class::NewTypedDataViewClass(kByteDataViewCid, isolate);
     RegisterPrivateClass(cls, Symbols::_ByteDataView(), lib);
     pending_classes.Add(cls);
 
 #undef REGISTER_TYPED_DATA_VIEW_CLASS
 #define REGISTER_EXT_TYPED_DATA_CLASS(clazz)                                   \
-  cls = Class::NewExternalTypedDataClass(kExternalTypedData##clazz##Cid);      \
+  cls = Class::NewExternalTypedDataClass(kExternalTypedData##clazz##Cid,       \
+                                         isolate);                             \
   RegisterPrivateClass(cls, Symbols::_External##clazz(), lib);
 
-    cls = Class::New<Instance>(kByteBufferCid);
+    cls =
+        Class::New<Instance>(kByteBufferCid, isolate, /*register_class=*/false);
     cls.set_instance_size(0);
     cls.set_next_field_offset(-kWordSize);
+    isolate->RegisterClass(cls);
     RegisterPrivateClass(cls, Symbols::_ByteBuffer(), lib);
     pending_classes.Add(cls);
 
     CLASS_LIST_TYPED_DATA(REGISTER_EXT_TYPED_DATA_CLASS);
 #undef REGISTER_EXT_TYPED_DATA_CLASS
     // Register Float32x4, Int32x4, and Float64x2 in the object store.
-    cls = Class::New<Float32x4>();
+    cls = Class::New<Float32x4>(isolate);
     RegisterPrivateClass(cls, Symbols::_Float32x4(), lib);
     pending_classes.Add(cls);
     object_store->set_float32x4_class(cls);
 
-    cls = Class::New<Instance>(kIllegalCid);
+    cls = Class::New<Instance>(kIllegalCid, isolate);
     RegisterClass(cls, Symbols::Float32x4(), lib);
     cls.set_num_type_arguments(0);
     cls.set_is_prefinalized();
     type = Type::NewNonParameterizedType(cls);
     object_store->set_float32x4_type(type);
 
-    cls = Class::New<Int32x4>();
+    cls = Class::New<Int32x4>(isolate);
     RegisterPrivateClass(cls, Symbols::_Int32x4(), lib);
     pending_classes.Add(cls);
     object_store->set_int32x4_class(cls);
 
-    cls = Class::New<Instance>(kIllegalCid);
+    cls = Class::New<Instance>(kIllegalCid, isolate);
     RegisterClass(cls, Symbols::Int32x4(), lib);
     cls.set_num_type_arguments(0);
     cls.set_is_prefinalized();
     type = Type::NewNonParameterizedType(cls);
     object_store->set_int32x4_type(type);
 
-    cls = Class::New<Float64x2>();
+    cls = Class::New<Float64x2>(isolate);
     RegisterPrivateClass(cls, Symbols::_Float64x2(), lib);
     pending_classes.Add(cls);
     object_store->set_float64x2_class(cls);
 
-    cls = Class::New<Instance>(kIllegalCid);
+    cls = Class::New<Instance>(kIllegalCid, isolate);
     RegisterClass(cls, Symbols::Float64x2(), lib);
     cls.set_num_type_arguments(0);
     cls.set_is_prefinalized();
@@ -1768,7 +1772,7 @@ RawError* Object::Init(Isolate* isolate,
 
     // Abstract class that represents the Dart class Type.
     // Note that this class is implemented by Dart class _AbstractType.
-    cls = Class::New<Instance>(kIllegalCid);
+    cls = Class::New<Instance>(kIllegalCid, isolate);
     cls.set_num_type_arguments(0);
     cls.set_is_prefinalized();
     RegisterClass(cls, Symbols::Type(), core_lib);
@@ -1777,7 +1781,7 @@ RawError* Object::Init(Isolate* isolate,
     object_store->set_type_type(type);
 
     // Abstract class that represents the Dart class Function.
-    cls = Class::New<Instance>(kIllegalCid);
+    cls = Class::New<Instance>(kIllegalCid, isolate);
     cls.set_num_type_arguments(0);
     cls.set_is_prefinalized();
     RegisterClass(cls, Symbols::Function(), core_lib);
@@ -1785,13 +1789,13 @@ RawError* Object::Init(Isolate* isolate,
     type = Type::NewNonParameterizedType(cls);
     object_store->set_function_type(type);
 
-    cls = Class::New<Number>();
+    cls = Class::New<Number>(isolate);
     RegisterClass(cls, Symbols::Number(), core_lib);
     pending_classes.Add(cls);
     type = Type::NewNonParameterizedType(cls);
     object_store->set_number_type(type);
 
-    cls = Class::New<Instance>(kIllegalCid);
+    cls = Class::New<Instance>(kIllegalCid, isolate);
     RegisterClass(cls, Symbols::Int(), core_lib);
     cls.set_num_type_arguments(0);
     cls.set_is_prefinalized();
@@ -1799,7 +1803,7 @@ RawError* Object::Init(Isolate* isolate,
     type = Type::NewNonParameterizedType(cls);
     object_store->set_int_type(type);
 
-    cls = Class::New<Instance>(kIllegalCid);
+    cls = Class::New<Instance>(kIllegalCid, isolate);
     RegisterClass(cls, Symbols::Double(), core_lib);
     cls.set_num_type_arguments(0);
     cls.set_is_prefinalized();
@@ -1808,7 +1812,7 @@ RawError* Object::Init(Isolate* isolate,
     object_store->set_double_type(type);
 
     name = Symbols::_String().raw();
-    cls = Class::New<Instance>(kIllegalCid);
+    cls = Class::New<Instance>(kIllegalCid, isolate);
     RegisterClass(cls, name, core_lib);
     cls.set_num_type_arguments(0);
     cls.set_is_prefinalized();
@@ -1884,7 +1888,7 @@ RawError* Object::Init(Isolate* isolate,
     }
     object_store->set_bootstrap_library(ObjectStore::kFfi, lib);
 
-    cls = Class::New<Instance>(kFfiNativeTypeCid);
+    cls = Class::New<Instance>(kFfiNativeTypeCid, isolate);
     cls.set_num_type_arguments(0);
     cls.set_is_prefinalized();
     pending_classes.Add(cls);
@@ -1892,7 +1896,7 @@ RawError* Object::Init(Isolate* isolate,
     RegisterClass(cls, Symbols::FfiNativeType(), lib);
 
 #define REGISTER_FFI_TYPE_MARKER(clazz)                                        \
-  cls = Class::New<Instance>(kFfi##clazz##Cid);                                \
+  cls = Class::New<Instance>(kFfi##clazz##Cid, isolate);                       \
   cls.set_num_type_arguments(0);                                               \
   cls.set_is_prefinalized();                                                   \
   pending_classes.Add(cls);                                                    \
@@ -1900,19 +1904,19 @@ RawError* Object::Init(Isolate* isolate,
     CLASS_LIST_FFI_TYPE_MARKER(REGISTER_FFI_TYPE_MARKER);
 #undef REGISTER_FFI_TYPE_MARKER
 
-    cls = Class::New<Instance>(kFfiNativeFunctionCid);
+    cls = Class::New<Instance>(kFfiNativeFunctionCid, isolate);
     cls.set_type_arguments_field_offset(Pointer::type_arguments_offset());
     cls.set_num_type_arguments(1);
     cls.set_is_prefinalized();
     pending_classes.Add(cls);
     RegisterClass(cls, Symbols::FfiNativeFunction(), lib);
 
-    cls = Class::NewPointerClass(kFfiPointerCid);
+    cls = Class::NewPointerClass(kFfiPointerCid, isolate);
     object_store->set_ffi_pointer_class(cls);
     pending_classes.Add(cls);
     RegisterClass(cls, Symbols::FfiPointer(), lib);
 
-    cls = Class::New<DynamicLibrary>(kFfiDynamicLibraryCid);
+    cls = Class::New<DynamicLibrary>(kFfiDynamicLibraryCid, isolate);
     cls.set_instance_size(DynamicLibrary::InstanceSize());
     cls.set_is_prefinalized();
     pending_classes.Add(cls);
@@ -1925,6 +1929,15 @@ RawError* Object::Init(Isolate* isolate,
       lib.Register(thread);
     }
     object_store->set_bootstrap_library(ObjectStore::kWasm, lib);
+
+#define REGISTER_WASM_TYPE(clazz)                                              \
+  cls = Class::New<Instance>(k##clazz##Cid, isolate);                          \
+  cls.set_num_type_arguments(0);                                               \
+  cls.set_is_prefinalized();                                                   \
+  pending_classes.Add(cls);                                                    \
+  RegisterClass(cls, Symbols::clazz(), lib);
+    CLASS_LIST_WASM(REGISTER_WASM_TYPE);
+#undef REGISTER_WASM_TYPE
 
     // Finish the initialization by compiling the bootstrap scripts containing
     // the base interfaces and the implementation of the internal classes.
@@ -1968,112 +1981,122 @@ RawError* Object::Init(Isolate* isolate,
     // stored in the object store. Yet we still need to create their Class
     // object so that they get put into the class_table (as a side effect of
     // Class::New()).
-    cls = Class::New<Instance>(kInstanceCid);
+    cls = Class::New<Instance>(kInstanceCid, isolate);
     object_store->set_object_class(cls);
 
-    cls = Class::New<LibraryPrefix>();
-    cls = Class::New<Type>();
-    cls = Class::New<TypeRef>();
-    cls = Class::New<TypeParameter>();
+    cls = Class::New<LibraryPrefix>(isolate);
+    cls = Class::New<Type>(isolate);
+    cls = Class::New<TypeRef>(isolate);
+    cls = Class::New<TypeParameter>(isolate);
 
-    cls = Class::New<Array>();
+    cls = Class::New<Array>(isolate);
     object_store->set_array_class(cls);
 
-    cls = Class::New<Array>(kImmutableArrayCid);
+    cls = Class::New<Array>(kImmutableArrayCid, isolate);
     object_store->set_immutable_array_class(cls);
 
-    cls = Class::New<GrowableObjectArray>();
+    cls = Class::New<GrowableObjectArray>(isolate);
     object_store->set_growable_object_array_class(cls);
 
-    cls = Class::New<LinkedHashMap>();
+    cls = Class::New<LinkedHashMap>(isolate);
     object_store->set_linked_hash_map_class(cls);
 
-    cls = Class::New<Float32x4>();
+    cls = Class::New<Float32x4>(isolate);
     object_store->set_float32x4_class(cls);
 
-    cls = Class::New<Int32x4>();
+    cls = Class::New<Int32x4>(isolate);
     object_store->set_int32x4_class(cls);
 
-    cls = Class::New<Float64x2>();
+    cls = Class::New<Float64x2>(isolate);
     object_store->set_float64x2_class(cls);
 
 #define REGISTER_TYPED_DATA_CLASS(clazz)                                       \
-  cls = Class::NewTypedDataClass(kTypedData##clazz##Cid);
+  cls = Class::NewTypedDataClass(kTypedData##clazz##Cid, isolate);
     CLASS_LIST_TYPED_DATA(REGISTER_TYPED_DATA_CLASS);
 #undef REGISTER_TYPED_DATA_CLASS
 #define REGISTER_TYPED_DATA_VIEW_CLASS(clazz)                                  \
-  cls = Class::NewTypedDataViewClass(kTypedData##clazz##ViewCid);
+  cls = Class::NewTypedDataViewClass(kTypedData##clazz##ViewCid, isolate);
     CLASS_LIST_TYPED_DATA(REGISTER_TYPED_DATA_VIEW_CLASS);
 #undef REGISTER_TYPED_DATA_VIEW_CLASS
-    cls = Class::NewTypedDataViewClass(kByteDataViewCid);
+    cls = Class::NewTypedDataViewClass(kByteDataViewCid, isolate);
 #define REGISTER_EXT_TYPED_DATA_CLASS(clazz)                                   \
-  cls = Class::NewExternalTypedDataClass(kExternalTypedData##clazz##Cid);
+  cls = Class::NewExternalTypedDataClass(kExternalTypedData##clazz##Cid,       \
+                                         isolate);
     CLASS_LIST_TYPED_DATA(REGISTER_EXT_TYPED_DATA_CLASS);
 #undef REGISTER_EXT_TYPED_DATA_CLASS
 
-    cls = Class::New<Instance>(kFfiNativeTypeCid);
+    cls = Class::New<Instance>(kFfiNativeTypeCid, isolate);
     object_store->set_ffi_native_type_class(cls);
 
-#define REGISTER_FFI_CLASS(clazz) cls = Class::New<Instance>(kFfi##clazz##Cid);
+#define REGISTER_FFI_CLASS(clazz)                                              \
+  cls = Class::New<Instance>(kFfi##clazz##Cid, isolate);
     CLASS_LIST_FFI_TYPE_MARKER(REGISTER_FFI_CLASS);
 #undef REGISTER_FFI_CLASS
 
-    cls = Class::New<Instance>(kFfiNativeFunctionCid);
+#define REGISTER_WASM_CLASS(clazz)                                             \
+  cls = Class::New<Instance>(k##clazz##Cid, isolate);
+    CLASS_LIST_WASM(REGISTER_WASM_CLASS);
+#undef REGISTER_WASM_CLASS
 
-    cls = Class::NewPointerClass(kFfiPointerCid);
+    cls = Class::New<Instance>(kFfiNativeFunctionCid, isolate);
+
+    cls = Class::NewPointerClass(kFfiPointerCid, isolate);
     object_store->set_ffi_pointer_class(cls);
 
-    cls = Class::New<DynamicLibrary>(kFfiDynamicLibraryCid);
+    cls = Class::New<DynamicLibrary>(kFfiDynamicLibraryCid, isolate);
 
-    cls = Class::New<Instance>(kByteBufferCid);
+    cls = Class::New<Instance>(kByteBufferCid, isolate,
+                               /*register_isolate=*/false);
+    cls.set_instance_size_in_words(0);
+    isolate->RegisterClass(cls);
 
-    cls = Class::New<Integer>();
+    cls = Class::New<Integer>(isolate);
     object_store->set_integer_implementation_class(cls);
 
-    cls = Class::New<Smi>();
+    cls = Class::New<Smi>(isolate);
     object_store->set_smi_class(cls);
 
-    cls = Class::New<Mint>();
+    cls = Class::New<Mint>(isolate);
     object_store->set_mint_class(cls);
 
-    cls = Class::New<Double>();
+    cls = Class::New<Double>(isolate);
     object_store->set_double_class(cls);
 
-    cls = Class::New<Closure>();
+    cls = Class::New<Closure>(isolate);
     object_store->set_closure_class(cls);
 
-    cls = Class::NewStringClass(kOneByteStringCid);
+    cls = Class::NewStringClass(kOneByteStringCid, isolate);
     object_store->set_one_byte_string_class(cls);
 
-    cls = Class::NewStringClass(kTwoByteStringCid);
+    cls = Class::NewStringClass(kTwoByteStringCid, isolate);
     object_store->set_two_byte_string_class(cls);
 
-    cls = Class::NewStringClass(kExternalOneByteStringCid);
+    cls = Class::NewStringClass(kExternalOneByteStringCid, isolate);
     object_store->set_external_one_byte_string_class(cls);
 
-    cls = Class::NewStringClass(kExternalTwoByteStringCid);
+    cls = Class::NewStringClass(kExternalTwoByteStringCid, isolate);
     object_store->set_external_two_byte_string_class(cls);
 
-    cls = Class::New<Bool>();
+    cls = Class::New<Bool>(isolate);
     object_store->set_bool_class(cls);
 
-    cls = Class::New<Instance>(kNullCid);
+    cls = Class::New<Instance>(kNullCid, isolate);
     object_store->set_null_class(cls);
 
-    cls = Class::New<Capability>();
-    cls = Class::New<ReceivePort>();
-    cls = Class::New<SendPort>();
-    cls = Class::New<StackTrace>();
-    cls = Class::New<RegExp>();
-    cls = Class::New<Number>();
+    cls = Class::New<Capability>(isolate);
+    cls = Class::New<ReceivePort>(isolate);
+    cls = Class::New<SendPort>(isolate);
+    cls = Class::New<StackTrace>(isolate);
+    cls = Class::New<RegExp>(isolate);
+    cls = Class::New<Number>(isolate);
 
-    cls = Class::New<WeakProperty>();
+    cls = Class::New<WeakProperty>(isolate);
     object_store->set_weak_property_class(cls);
 
-    cls = Class::New<MirrorReference>();
-    cls = Class::New<UserTag>();
+    cls = Class::New<MirrorReference>(isolate);
+    cls = Class::New<UserTag>(isolate);
 
-    cls = Class::New<TransferableTypedData>();
+    cls = Class::New<TransferableTypedData>(isolate);
   }
   return Error::null();
 }
@@ -2192,7 +2215,7 @@ RawObject* Object::Allocate(intptr_t cls_id, intptr_t size, Heap::Space space) {
     }
   }
 #ifndef PRODUCT
-  ClassTable* class_table = thread->isolate()->class_table();
+  auto class_table = thread->isolate()->shared_class_table();
   if (space == Heap::kNew) {
     class_table->UpdateAllocatedNew(cls_id, size);
   } else {
@@ -2321,7 +2344,7 @@ RawAbstractType* Class::RareType() const {
 }
 
 template <class FakeObject>
-RawClass* Class::New() {
+RawClass* Class::New(Isolate* isolate, bool register_class) {
   ASSERT(Object::class_class() != Class::null());
   Class& result = Class::Handle();
   {
@@ -2357,7 +2380,9 @@ RawClass* Class::New() {
   NOT_IN_PRECOMPILED(result.set_is_declared_in_bytecode(false));
   NOT_IN_PRECOMPILED(result.set_binary_declaration_offset(0));
   result.InitEmptyFields();
-  Isolate::Current()->RegisterClass(result);
+  if (register_class) {
+    isolate->RegisterClass(result);
+  }
   return result.raw();
 }
 
@@ -2986,7 +3011,7 @@ RawFunction* Function::CreateMethodExtractor(const String& getter_name) const {
   // Initialize signature: receiver is a single fixed parameter.
   const intptr_t kNumParameters = 1;
   extractor.set_num_fixed_parameters(kNumParameters);
-  extractor.SetNumOptionalParameters(0, 0);
+  extractor.SetNumOptionalParameters(0, false);
   extractor.set_parameter_types(Object::extractor_parameter_types());
   extractor.set_parameter_names(Object::extractor_parameter_names());
   extractor.set_result_type(Object::dynamic_type());
@@ -3161,16 +3186,6 @@ RawFunction* Function::GetDynamicInvocationForwarder(
   return result.raw();
 }
 
-RawFunction* Function::GetTargetOfDynamicInvocationForwarder() const {
-  ASSERT(IsDynamicInvocationForwarder());
-  auto& func_name = String::Handle(name());
-  func_name = DemangleDynamicInvocationForwarderName(func_name);
-  const auto& owner = Class::Handle(Owner());
-  RawFunction* target = owner.LookupDynamicFunction(func_name);
-  ASSERT(target != Function::null());
-  return target;
-}
-
 #endif
 
 bool AbstractType::InstantiateAndTestSubtype(
@@ -3286,7 +3301,7 @@ void Class::DisableAllCHAOptimizedCode() {
 
 bool Class::TraceAllocation(Isolate* isolate) const {
 #ifndef PRODUCT
-  ClassTable* class_table = isolate->class_table();
+  auto class_table = isolate->shared_class_table();
   return class_table->TraceAllocationFor(id());
 #else
   return false;
@@ -3298,7 +3313,7 @@ void Class::SetTraceAllocation(bool trace_allocation) const {
   Isolate* isolate = Isolate::Current();
   const bool changed = trace_allocation != this->TraceAllocation(isolate);
   if (changed) {
-    ClassTable* class_table = isolate->class_table();
+    auto class_table = isolate->shared_class_table();
     class_table->SetTraceAllocationFor(id(), trace_allocation);
     DisableAllocationStub();
   }
@@ -3736,9 +3751,11 @@ RawClass* Class::NewCommon(intptr_t index) {
 }
 
 template <class FakeInstance>
-RawClass* Class::New(intptr_t index) {
+RawClass* Class::New(intptr_t index, Isolate* isolate, bool register_class) {
   Class& result = Class::Handle(NewCommon<FakeInstance>(index));
-  Isolate::Current()->RegisterClass(result);
+  if (register_class) {
+    isolate->RegisterClass(result);
+  }
   return result.raw();
 }
 
@@ -3752,6 +3769,12 @@ RawClass* Class::New(const Library& lib,
   result.set_name(name);
   result.set_script(script);
   result.set_token_pos(token_pos);
+
+  // The size gets initialized to 0. Once the class gets finalized the class
+  // finalizer will set the correct size.
+  ASSERT(!result.is_finalized() && !result.is_prefinalized());
+  result.set_instance_size_in_words(0);
+
   if (register_class) {
     Isolate::Current()->RegisterClass(result);
   }
@@ -3759,7 +3782,7 @@ RawClass* Class::New(const Library& lib,
 }
 
 RawClass* Class::NewInstanceClass() {
-  return Class::New<Instance>(kIllegalCid);
+  return Class::New<Instance>(kIllegalCid, Isolate::Current());
 }
 
 RawClass* Class::NewNativeWrapper(const Library& library,
@@ -3789,7 +3812,7 @@ RawClass* Class::NewNativeWrapper(const Library& library,
   }
 }
 
-RawClass* Class::NewStringClass(intptr_t class_id) {
+RawClass* Class::NewStringClass(intptr_t class_id, Isolate* isolate) {
   intptr_t instance_size;
   if (class_id == kOneByteStringCid) {
     instance_size = OneByteString::InstanceSize();
@@ -3801,51 +3824,62 @@ RawClass* Class::NewStringClass(intptr_t class_id) {
     ASSERT(class_id == kExternalTwoByteStringCid);
     instance_size = ExternalTwoByteString::InstanceSize();
   }
-  Class& result = Class::Handle(New<String>(class_id));
+  Class& result =
+      Class::Handle(New<String>(class_id, isolate, /*register_class=*/false));
   result.set_instance_size(instance_size);
   result.set_next_field_offset(String::NextFieldOffset());
   result.set_is_prefinalized();
+  isolate->RegisterClass(result);
   return result.raw();
 }
 
-RawClass* Class::NewTypedDataClass(intptr_t class_id) {
+RawClass* Class::NewTypedDataClass(intptr_t class_id, Isolate* isolate) {
   ASSERT(RawObject::IsTypedDataClassId(class_id));
   intptr_t instance_size = TypedData::InstanceSize();
-  Class& result = Class::Handle(New<TypedData>(class_id));
+  Class& result = Class::Handle(
+      New<TypedData>(class_id, isolate, /*register_class=*/false));
   result.set_instance_size(instance_size);
   result.set_next_field_offset(TypedData::NextFieldOffset());
   result.set_is_prefinalized();
+  isolate->RegisterClass(result);
   return result.raw();
 }
 
-RawClass* Class::NewTypedDataViewClass(intptr_t class_id) {
+RawClass* Class::NewTypedDataViewClass(intptr_t class_id, Isolate* isolate) {
   ASSERT(RawObject::IsTypedDataViewClassId(class_id));
   const intptr_t instance_size = TypedDataView::InstanceSize();
-  Class& result = Class::Handle(New<TypedDataView>(class_id));
+  Class& result = Class::Handle(
+      New<TypedDataView>(class_id, isolate, /*register_class=*/false));
   result.set_instance_size(instance_size);
   result.set_next_field_offset(TypedDataView::NextFieldOffset());
   result.set_is_prefinalized();
+  isolate->RegisterClass(result);
   return result.raw();
 }
 
-RawClass* Class::NewExternalTypedDataClass(intptr_t class_id) {
+RawClass* Class::NewExternalTypedDataClass(intptr_t class_id,
+                                           Isolate* isolate) {
   ASSERT(RawObject::IsExternalTypedDataClassId(class_id));
   intptr_t instance_size = ExternalTypedData::InstanceSize();
-  Class& result = Class::Handle(New<ExternalTypedData>(class_id));
+  Class& result = Class::Handle(
+      New<ExternalTypedData>(class_id, isolate, /*register_class=*/false));
   result.set_instance_size(instance_size);
   result.set_next_field_offset(ExternalTypedData::NextFieldOffset());
   result.set_is_prefinalized();
+  isolate->RegisterClass(result);
   return result.raw();
 }
 
-RawClass* Class::NewPointerClass(intptr_t class_id) {
+RawClass* Class::NewPointerClass(intptr_t class_id, Isolate* isolate) {
   ASSERT(RawObject::IsFfiPointerClassId(class_id));
   intptr_t instance_size = Pointer::InstanceSize();
-  Class& result = Class::Handle(New<Pointer>(class_id));
+  Class& result =
+      Class::Handle(New<Pointer>(class_id, isolate, /*register_class=*/false));
   result.set_instance_size(instance_size);
   result.set_type_arguments_field_offset(Pointer::type_arguments_offset());
   result.set_next_field_offset(Pointer::NextFieldOffset());
   result.set_is_prefinalized();
+  isolate->RegisterClass(result);
   return result.raw();
 }
 
@@ -6211,66 +6245,7 @@ RawType* Function::RedirectionType() const {
 }
 
 const char* Function::KindToCString(RawFunction::Kind kind) {
-  switch (kind) {
-    case RawFunction::kRegularFunction:
-      return "RegularFunction";
-      break;
-    case RawFunction::kClosureFunction:
-      return "ClosureFunction";
-      break;
-    case RawFunction::kImplicitClosureFunction:
-      return "ImplicitClosureFunction";
-      break;
-    case RawFunction::kSignatureFunction:
-      return "SignatureFunction";
-      break;
-    case RawFunction::kGetterFunction:
-      return "GetterFunction";
-      break;
-    case RawFunction::kSetterFunction:
-      return "SetterFunction";
-      break;
-    case RawFunction::kConstructor:
-      return "Constructor";
-      break;
-    case RawFunction::kImplicitGetter:
-      return "ImplicitGetter";
-      break;
-    case RawFunction::kImplicitSetter:
-      return "ImplicitSetter";
-      break;
-    case RawFunction::kImplicitStaticGetter:
-      return "ImplicitStaticGetter";
-      break;
-    case RawFunction::kFieldInitializer:
-      return "FieldInitializer";
-      break;
-    case RawFunction::kMethodExtractor:
-      return "MethodExtractor";
-      break;
-    case RawFunction::kNoSuchMethodDispatcher:
-      return "NoSuchMethodDispatcher";
-      break;
-    case RawFunction::kInvokeFieldDispatcher:
-      return "InvokeFieldDispatcher";
-      break;
-    case RawFunction::kIrregexpFunction:
-      return "IrregexpFunction";
-      break;
-    case RawFunction::kDynamicInvocationForwarder:
-      return "DynamicInvocationForwarder";
-      break;
-    case RawFunction::kFfiTrampoline:
-      return "FfiTrampoline";
-      break;
-  }
-  // When you add a case to this switch, please also update the observatory.
-  // - runtime/observatory/lib/src/models/objects/function.dart (FunctionKind)
-  // - runtime/observatory/lib/src/elements/function_view.dart
-  //   (_functionKindToString)
-  // - runtime/observatory/lib/src/service/object.dart (stringToFunctionKind)
-  UNREACHABLE();
-  return NULL;
+  return RawFunction::KindToCString(kind);
 }
 
 void Function::SetRedirectionType(const Type& type) const {
@@ -8132,21 +8107,31 @@ void Function::SetDeoptReasonForAll(intptr_t deopt_id,
 }
 
 bool Function::CheckSourceFingerprint(const char* prefix, int32_t fp) const {
-  // TODO(36376): Restore checking fingerprints of recognized methods.
-  // '(kernel_offset() <= 0)' looks like an impossible condition, fix this and
-  //  re-enable fingerprints checking.
-  if (!Isolate::Current()->obfuscate() && !is_declared_in_bytecode() &&
-      (kernel_offset() <= 0) && (SourceFingerprint() != fp)) {
+  if (Isolate::Current()->obfuscate() || FLAG_precompiled_mode ||
+      (Dart::vm_snapshot_kind() != Snapshot::kNone)) {
+    return true;  // The kernel structure has been altered, skip checking.
+  }
+
+  if (is_declared_in_bytecode()) {
+    // AST and bytecode compute different fingerprints, and we only track one
+    // fingerprint set.
+    return true;
+  }
+
+  if (SourceFingerprint() != fp) {
     const bool recalculatingFingerprints = false;
     if (recalculatingFingerprints) {
       // This output can be copied into a file, then used with sed
       // to replace the old values.
-      // sed -i.bak -f /tmp/newkeys runtime/vm/compiler/method_recognizer.h
+      // sed -i.bak -f /tmp/newkeys \
+      //    runtime/vm/compiler/recognized_methods_list.h
       THR_Print("s/0x%08x/0x%08x/\n", fp, SourceFingerprint());
     } else {
       THR_Print(
-          "FP mismatch while recognizing method %s:"
-          " expecting 0x%08x found 0x%08x\n",
+          "FP mismatch while recognizing method %s: expecting 0x%08x found "
+          "0x%08x.\nIf the behavior of this function has changed, then changes "
+          "are also needed in the VM's compiler. Otherwise the fingerprint can "
+          "simply be updated in recognized_methods_list.h\n",
           ToFullyQualifiedCString(), fp, SourceFingerprint());
       return false;
     }
@@ -9390,13 +9375,12 @@ RawTypedData* Script::kernel_string_offsets() const {
 
 void Script::LookupSourceAndLineStarts(Zone* zone) const {
 #if !defined(DART_PRECOMPILED_RUNTIME)
-  if (Source() == String::null()) {
-    // This is a script without source info.
+  if (!IsLazyLookupSourceAndLineStarts()) {
     return;
   }
   const String& uri = String::Handle(zone, resolved_url());
   ASSERT(uri.IsSymbol());
-  if (uri.Length() > 0 && Source() == Symbols::Empty().raw()) {
+  if (uri.Length() > 0) {
     // Entry included only to provide URI - actual source should already exist
     // in the VM, so try to find it.
     Library& lib = Library::Handle(zone);
@@ -9406,18 +9390,18 @@ void Script::LookupSourceAndLineStarts(Zone* zone) const {
     for (intptr_t i = 0; i < libs.Length(); i++) {
       lib ^= libs.At(i);
       script = lib.LookupScript(uri, /* useResolvedUri = */ true);
-      if (!script.IsNull() && script.kind() == RawScript::kKernelTag &&
-          script.Source() != Symbols::Empty().raw()) {
-        set_source(String::Handle(zone, script.Source()));
-        set_line_starts(TypedData::Handle(zone, script.line_starts()));
-        // Note that we may find a script without source info (null source).
-        // We will not repeat the lookup in this case.
-        return;
+      if (!script.IsNull() && script.kind() == RawScript::kKernelTag) {
+        const auto& source = String::Handle(zone, script.Source());
+        const auto& line_starts = TypedData::Handle(zone, script.line_starts());
+        if (!source.IsNull() || !line_starts.IsNull()) {
+          set_source(source);
+          set_line_starts(line_starts);
+          break;
+        }
       }
     }
-    set_source(Object::null_string());
-    // No script found. Set source to null to prevent further lookup.
   }
+  SetLazyLookupSourceAndLineStarts(false);
 #endif  // !defined(DART_PRECOMPILED_RUNTIME)
 }
 
@@ -9521,14 +9505,26 @@ void Script::set_yield_positions(const Array& value) const {
 }
 
 RawArray* Script::yield_positions() const {
-#if !defined(DART_PRECOMPILED_RUNTIME)
-  Array& yields = Array::Handle(raw_ptr()->yield_positions_);
-  if (yields.IsNull() && kind() == RawScript::kKernelTag) {
-    // This is created lazily. Now we need it.
-    kernel::CollectTokenPositionsFor(*this);
-  }
-#endif  // !defined(DART_PRECOMPILED_RUNTIME)
   return raw_ptr()->yield_positions_;
+}
+
+RawGrowableObjectArray* Script::GetYieldPositions(
+    const Function& function) const {
+  if (!function.IsAsyncClosure() && !function.IsAsyncGenClosure())
+    return GrowableObjectArray::null();
+  ASSERT(!function.is_declared_in_bytecode());
+  Compiler::ComputeYieldPositions(function);
+  UnorderedHashMap<SmiTraits> function_map(raw_ptr()->yield_positions_);
+  const auto& key = Smi::Handle(Smi::New(function.token_pos().value()));
+  intptr_t entry = function_map.FindKey(key);
+  GrowableObjectArray& array = GrowableObjectArray::Handle();
+  if (entry < 0) {
+    array ^= GrowableObjectArray::null();
+  } else {
+    array ^= function_map.GetPayload(entry, 0);
+  }
+  function_map.Release();
+  return array.raw();
 }
 
 RawTypedData* Script::line_starts() const {
@@ -9547,7 +9543,22 @@ RawArray* Script::debug_positions() const {
 }
 
 void Script::set_kind(RawScript::Kind value) const {
-  StoreNonPointer(&raw_ptr()->kind_, value);
+  set_kind_and_tags(
+      RawScript::KindBits::update(value, raw_ptr()->kind_and_tags_));
+}
+
+void Script::set_kind_and_tags(uint8_t value) const {
+  StoreNonPointer(&raw_ptr()->kind_and_tags_, value);
+}
+
+void Script::SetLazyLookupSourceAndLineStarts(bool value) const {
+  set_kind_and_tags(RawScript::LazyLookupSourceAndLineStartsBit::update(
+      value, raw_ptr()->kind_and_tags_));
+}
+
+bool Script::IsLazyLookupSourceAndLineStarts() const {
+  return RawScript::LazyLookupSourceAndLineStartsBit::decode(
+      raw_ptr()->kind_and_tags_);
 }
 
 void Script::set_load_timestamp(int64_t value) const {
@@ -9823,6 +9834,7 @@ RawScript* Script::New(const String& url,
       String::Handle(zone, Symbols::New(thread, resolved_url)));
   result.set_source(source);
   result.SetLocationOffset(0, 0);
+  result.set_kind_and_tags(0);
   result.set_kind(kind);
   result.set_kernel_script_index(0);
   result.set_load_timestamp(
@@ -9992,60 +10004,6 @@ void Library::SetLoaded() const {
   // Should not be already loaded or just allocated.
   ASSERT(LoadInProgress() || LoadRequested());
   StoreNonPointer(&raw_ptr()->load_state_, RawLibrary::kLoaded);
-}
-
-void Library::SetLoadError(const Instance& error) const {
-  // Should not be already successfully loaded or just allocated.
-  ASSERT(LoadInProgress() || LoadRequested() || LoadFailed());
-  StoreNonPointer(&raw_ptr()->load_state_, RawLibrary::kLoadError);
-  StorePointer(&raw_ptr()->load_error_, error.raw());
-}
-
-// Traits for looking up Libraries by url in a hash set.
-class LibraryUrlTraits {
- public:
-  static const char* Name() { return "LibraryUrlTraits"; }
-  static bool ReportStats() { return false; }
-
-  // Called when growing the table.
-  static bool IsMatch(const Object& a, const Object& b) {
-    ASSERT(a.IsLibrary() && b.IsLibrary());
-    // Library objects are always canonical.
-    return a.raw() == b.raw();
-  }
-  static uword Hash(const Object& key) { return Library::Cast(key).UrlHash(); }
-};
-typedef UnorderedHashSet<LibraryUrlTraits> LibraryLoadErrorSet;
-
-RawInstance* Library::TransitiveLoadError() const {
-  if (LoadError() != Instance::null()) {
-    return LoadError();
-  }
-  Thread* thread = Thread::Current();
-  Isolate* isolate = thread->isolate();
-  Zone* zone = thread->zone();
-  ObjectStore* object_store = isolate->object_store();
-  LibraryLoadErrorSet set(object_store->library_load_error_table());
-  bool present = false;
-  if (set.GetOrNull(*this, &present) != Object::null()) {
-    object_store->set_library_load_error_table(set.Release());
-    return Instance::null();
-  }
-  // Ensure we don't repeatedly visit the same library again.
-  set.Insert(*this);
-  object_store->set_library_load_error_table(set.Release());
-  intptr_t num_imp = num_imports();
-  Library& lib = Library::Handle(zone);
-  Instance& error = Instance::Handle(zone);
-  for (intptr_t i = 0; i < num_imp; i++) {
-    HANDLESCOPE(thread);
-    lib = ImportLibraryAt(i);
-    error = lib.TransitiveLoadError();
-    if (!error.IsNull()) {
-      break;
-    }
-  }
-  return error.raw();
 }
 
 static RawString* MakeClassMetaName(Thread* thread,
@@ -11123,7 +11081,6 @@ RawLibrary* Library::NewLibraryHelper(const String& url, bool import_core_lib) {
   result.StorePointer(&result.raw_ptr()->imports_, Object::empty_array().raw());
   result.StorePointer(&result.raw_ptr()->exports_, Object::empty_array().raw());
   result.StorePointer(&result.raw_ptr()->loaded_scripts_, Array::null());
-  result.StorePointer(&result.raw_ptr()->load_error_, Instance::null());
   result.set_native_entry_resolver(NULL);
   result.set_native_entry_symbol_resolver(NULL);
   result.set_is_in_fullsnapshot(false);
@@ -11472,8 +11429,10 @@ static RawObject* EvaluateCompiledExpressionHelper(
     const String& klass,
     const Array& arguments,
     const TypeArguments& type_arguments) {
+  Zone* zone = Thread::Current()->zone();
 #if defined(DART_PRECOMPILED_RUNTIME)
   const String& error_str = String::Handle(
+      zone,
       String::New("Expression evaluation not available in precompiled mode."));
   return ApiError::New(error_str);
 #else
@@ -11482,36 +11441,51 @@ static RawObject* EvaluateCompiledExpressionHelper(
 
   if (kernel_pgm == NULL) {
     return ApiError::New(String::Handle(
-        String::New("Kernel isolate returned ill-formed kernel.")));
+        zone, String::New("Kernel isolate returned ill-formed kernel.")));
   }
 
   kernel::KernelLoader loader(kernel_pgm.get(),
                               /*uri_to_source_table=*/nullptr);
-  const Object& result = Object::Handle(
-      loader.LoadExpressionEvaluationFunction(library_url, klass));
+  auto& result = Object::Handle(
+      zone, loader.LoadExpressionEvaluationFunction(library_url, klass));
   kernel_pgm.reset();
 
   if (result.IsError()) return result.raw();
 
-  const Function& callee = Function::Cast(result);
+  const auto& callee = Function::CheckedHandle(zone, result.raw());
 
   // type_arguments is null if all type arguments are dynamic.
   if (type_definitions.Length() == 0 || type_arguments.IsNull()) {
-    return DartEntry::InvokeFunction(callee, arguments);
+    result = DartEntry::InvokeFunction(callee, arguments);
+  } else {
+    intptr_t num_type_args = type_arguments.Length();
+    Array& real_arguments =
+        Array::Handle(zone, Array::New(arguments.Length() + 1));
+    real_arguments.SetAt(0, type_arguments);
+    Object& arg = Object::Handle(zone);
+    for (intptr_t i = 0; i < arguments.Length(); ++i) {
+      arg = arguments.At(i);
+      real_arguments.SetAt(i + 1, arg);
+    }
+
+    const Array& args_desc = Array::Handle(
+        zone, ArgumentsDescriptor::New(num_type_args, arguments.Length()));
+    result = DartEntry::InvokeFunction(callee, real_arguments, args_desc);
   }
 
-  intptr_t num_type_args = type_arguments.Length();
-  Array& real_arguments = Array::Handle(Array::New(arguments.Length() + 1));
-  real_arguments.SetAt(0, type_arguments);
-  Object& arg = Object::Handle();
-  for (intptr_t i = 0; i < arguments.Length(); ++i) {
-    arg = arguments.At(i);
-    real_arguments.SetAt(i + 1, arg);
+  if (callee.is_declared_in_bytecode()) {
+    // Expression evaluation binary expires immediately after evaluation is
+    // finished. However, hot reload may still find corresponding
+    // KernelProgramInfo object in the heap and it would try to patch it.
+    // To prevent accessing stale kernel binary in ResetObjectTable, bytecode
+    // component of the callee's KernelProgramInfo is reset here.
+    const auto& script = Script::Handle(zone, callee.script());
+    const auto& info =
+        KernelProgramInfo::Handle(zone, script.kernel_program_info());
+    info.set_bytecode_component(Object::null_array());
   }
 
-  const Array& args_desc = Array::Handle(
-      ArgumentsDescriptor::New(num_type_args, arguments.Length()));
-  return DartEntry::InvokeFunction(callee, real_arguments, args_desc);
+  return result.raw();
 #endif
 }
 
@@ -11774,49 +11748,6 @@ RawLibrary* LibraryPrefix::GetLibrary(int index) const {
   return Library::null();
 }
 
-RawInstance* LibraryPrefix::LoadError() const {
-  Thread* thread = Thread::Current();
-  Isolate* isolate = thread->isolate();
-  Zone* zone = thread->zone();
-  ObjectStore* object_store = isolate->object_store();
-  GrowableObjectArray& libs =
-      GrowableObjectArray::Handle(zone, object_store->libraries());
-  ASSERT(!libs.IsNull());
-  LibraryLoadErrorSet set(HashTables::New<LibraryLoadErrorSet>(libs.Length()));
-  object_store->set_library_load_error_table(set.Release());
-  Library& lib = Library::Handle(zone);
-  Instance& error = Instance::Handle(zone);
-  for (int32_t i = 0; i < num_imports(); i++) {
-    lib = GetLibrary(i);
-    ASSERT(!lib.IsNull());
-    HANDLESCOPE(thread);
-    error = lib.TransitiveLoadError();
-    if (!error.IsNull()) {
-      break;
-    }
-  }
-  object_store->set_library_load_error_table(Object::empty_array());
-  return error.raw();
-}
-
-bool LibraryPrefix::ContainsLibrary(const Library& library) const {
-  int32_t num_current_imports = num_imports();
-  if (num_current_imports > 0) {
-    Library& lib = Library::Handle();
-    const String& url = String::Handle(library.url());
-    String& lib_url = String::Handle();
-    for (int32_t i = 0; i < num_current_imports; i++) {
-      lib = GetLibrary(i);
-      ASSERT(!lib.IsNull());
-      lib_url = lib.url();
-      if (url.Equals(lib_url)) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
 void LibraryPrefix::AddImport(const Namespace& import) const {
   intptr_t num_current_imports = num_imports();
 
@@ -11837,9 +11768,6 @@ void LibraryPrefix::AddImport(const Namespace& import) const {
 }
 
 RawObject* LibraryPrefix::LookupObject(const String& name) const {
-  if (!is_loaded() && !FLAG_load_deferred_eagerly) {
-    return Object::null();
-  }
   Array& imports = Array::Handle(this->imports());
   Object& obj = Object::Handle();
   Namespace& import = Namespace::Handle();
@@ -11908,116 +11836,6 @@ RawClass* LibraryPrefix::LookupClass(const String& class_name) const {
   return Class::null();
 }
 
-void LibraryPrefix::set_is_loaded() const {
-  StoreNonPointer(&raw_ptr()->is_loaded_, true);
-}
-
-bool LibraryPrefix::LoadLibrary() const {
-  // Non-deferred prefixes are loaded.
-  ASSERT(is_deferred_load() || is_loaded());
-  if (is_loaded()) {
-    return true;  // Load request has already completed.
-  }
-  ASSERT(is_deferred_load());
-  ASSERT(num_imports() == 1);
-  if (Dart::vm_snapshot_kind() == Snapshot::kFullAOT) {
-    // The library list was tree-shaken away.
-    this->set_is_loaded();
-    return true;
-  }
-  // This is a prefix for a deferred library. If the library is not loaded
-  // yet and isn't being loaded, call the library tag handler to schedule
-  // loading. Once all outstanding load requests have completed, the embedder
-  // will call the core library to:
-  // - invalidate dependent code of this prefix;
-  // - mark this prefixes as loaded;
-  // - complete the future associated with this prefix.
-  const Library& deferred_lib = Library::Handle(GetLibrary(0));
-  if (deferred_lib.Loaded()) {
-    this->set_is_loaded();
-    return true;
-  } else if (deferred_lib.LoadNotStarted()) {
-    Thread* thread = Thread::Current();
-    Isolate* isolate = thread->isolate();
-    Zone* zone = thread->zone();
-    deferred_lib.SetLoadRequested();
-    const GrowableObjectArray& pending_deferred_loads =
-        GrowableObjectArray::Handle(
-            isolate->object_store()->pending_deferred_loads());
-    pending_deferred_loads.Add(deferred_lib);
-    const String& lib_url = String::Handle(zone, deferred_lib.url());
-    const Object& obj = Object::Handle(
-        zone, isolate->CallTagHandler(
-                  Dart_kImportTag, Library::Handle(zone, importer()), lib_url));
-    if (obj.IsError()) {
-      Exceptions::PropagateError(Error::Cast(obj));
-    }
-  } else {
-    // Another load request is in flight or previously failed.
-    ASSERT(deferred_lib.LoadRequested() || deferred_lib.LoadFailed());
-  }
-  return false;  // Load request not yet completed.
-}
-
-RawArray* LibraryPrefix::dependent_code() const {
-  return raw_ptr()->dependent_code_;
-}
-
-void LibraryPrefix::set_dependent_code(const Array& array) const {
-  StorePointer(&raw_ptr()->dependent_code_, array.raw());
-}
-
-class PrefixDependentArray : public WeakCodeReferences {
- public:
-  explicit PrefixDependentArray(const LibraryPrefix& prefix)
-      : WeakCodeReferences(Array::Handle(prefix.dependent_code())),
-        prefix_(prefix) {}
-
-  virtual void UpdateArrayTo(const Array& value) {
-    prefix_.set_dependent_code(value);
-  }
-
-  virtual void ReportDeoptimization(const Code& code) {
-    // This gets called when the code object is on the stack
-    // while nuking code that depends on a prefix. We don't expect
-    // this to happen, so make sure we die loudly if we find
-    // ourselves here.
-    UNIMPLEMENTED();
-  }
-
-  virtual void ReportSwitchingCode(const Code& code) {
-    if (FLAG_trace_deoptimization || FLAG_trace_deoptimization_verbose) {
-      THR_Print("Prefix '%s': disabling %s code for %s function '%s'\n",
-                String::Handle(prefix_.name()).ToCString(),
-                code.is_optimized() ? "optimized" : "unoptimized",
-                code.IsDisabled() ? "'patched'" : "'unpatched'",
-                Function::Handle(code.function()).ToCString());
-    }
-  }
-
- private:
-  const LibraryPrefix& prefix_;
-  DISALLOW_COPY_AND_ASSIGN(PrefixDependentArray);
-};
-
-void LibraryPrefix::RegisterDependentCode(const Code& code) const {
-  ASSERT(is_deferred_load());
-  // In background compilation, a library can be loaded while we are compiling.
-  // The generated code will be rejected in that case,
-  ASSERT(!is_loaded() || Compiler::IsBackgroundCompilation());
-  PrefixDependentArray a(*this);
-  a.Register(code);
-}
-
-void LibraryPrefix::InvalidateDependentCode() const {
-  PrefixDependentArray a(*this);
-  if (FLAG_trace_deoptimization && a.HasCodes()) {
-    THR_Print("Deopt for lazy load (prefix %s)\n", ToCString());
-  }
-  a.DisableCode();
-  set_is_loaded();
-}
-
 RawLibraryPrefix* LibraryPrefix::New() {
   RawObject* raw = Object::Allocate(LibraryPrefix::kClassId,
                                     LibraryPrefix::InstanceSize(), Heap::kOld);
@@ -12033,7 +11851,6 @@ RawLibraryPrefix* LibraryPrefix::New(const String& name,
   result.set_num_imports(0);
   result.set_importer(importer);
   result.StoreNonPointer(&result.raw_ptr()->is_deferred_load_, deferred_load);
-  result.StoreNonPointer(&result.raw_ptr()->is_loaded_, !deferred_load);
   result.set_imports(Array::Handle(Array::New(kInitialSize)));
   result.AddImport(import);
   return result.raw();
@@ -12667,8 +12484,8 @@ RawInstructions* Instructions::New(intptr_t size,
     result ^= raw;
     result.SetSize(size);
     result.SetHasSingleEntryPoint(has_single_entry_point);
-    result.set_stats(nullptr);
     result.set_unchecked_entrypoint_pc_offset(unchecked_entrypoint_pc_offset);
+    result.set_stats(nullptr);
   }
   return result.raw();
 }
@@ -12871,6 +12688,8 @@ const char* PcDescriptors::KindAsStr(RawPcDescriptors::Kind kind) {
       return "osr-entry    ";
     case RawPcDescriptors::kRewind:
       return "rewind       ";
+    case RawPcDescriptors::kBSSRelocation:
+      return "bss reloc    ";
     case RawPcDescriptors::kOther:
       return "other        ";
     case RawPcDescriptors::kAnyKind:
@@ -12995,7 +12814,7 @@ bool StackMap::GetBit(intptr_t bit_index) const {
   int bit_remainder = bit_index & (kBitsPerByte - 1);
   uint8_t byte_mask = 1U << bit_remainder;
   uint8_t byte = raw_ptr()->data()[byte_index];
-  return (byte & byte_mask);
+  return (byte & byte_mask) != 0;
 }
 
 void StackMap::SetBit(intptr_t bit_index, bool value) const {
@@ -13247,7 +13066,6 @@ void ExceptionHandlers::SetHandlerInfo(intptr_t try_index,
                                        uword handler_pc_offset,
                                        bool needs_stacktrace,
                                        bool has_catch_all,
-                                       TokenPosition token_pos,
                                        bool is_generated) const {
   ASSERT((try_index >= 0) && (try_index < num_entries()));
   NoSafepointScope no_safepoint;
@@ -13259,9 +13077,9 @@ void ExceptionHandlers::SetHandlerInfo(intptr_t try_index,
   ASSERT((handler_pc_offset == static_cast<uword>(kMaxUint32)) ||
          (handler_pc_offset < static_cast<uword>(kMaxUint32)));
   info->handler_pc_offset = handler_pc_offset;
-  info->needs_stacktrace = needs_stacktrace;
-  info->has_catch_all = has_catch_all;
-  info->is_generated = is_generated;
+  info->needs_stacktrace = static_cast<int8_t>(needs_stacktrace);
+  info->has_catch_all = static_cast<int8_t>(has_catch_all);
+  info->is_generated = static_cast<int8_t>(is_generated);
 }
 
 void ExceptionHandlers::GetHandlerInfo(intptr_t try_index,
@@ -13283,17 +13101,17 @@ intptr_t ExceptionHandlers::OuterTryIndex(intptr_t try_index) const {
 
 bool ExceptionHandlers::NeedsStackTrace(intptr_t try_index) const {
   ASSERT((try_index >= 0) && (try_index < num_entries()));
-  return raw_ptr()->data()[try_index].needs_stacktrace;
+  return raw_ptr()->data()[try_index].needs_stacktrace != 0;
 }
 
 bool ExceptionHandlers::IsGenerated(intptr_t try_index) const {
   ASSERT((try_index >= 0) && (try_index < num_entries()));
-  return raw_ptr()->data()[try_index].is_generated;
+  return raw_ptr()->data()[try_index].is_generated != 0;
 }
 
 bool ExceptionHandlers::HasCatchAll(intptr_t try_index) const {
   ASSERT((try_index >= 0) && (try_index < num_entries()));
-  return raw_ptr()->data()[try_index].has_catch_all;
+  return raw_ptr()->data()[try_index].has_catch_all != 0;
 }
 
 void ExceptionHandlers::SetHandledTypes(intptr_t try_index,
@@ -13380,7 +13198,7 @@ const char* ExceptionHandlers::ToCString() const {
         handled_types.IsNull() ? 0 : handled_types.Length();
     len += Utils::SNPrint(NULL, 0, FORMAT1, i, info.handler_pc_offset,
                           num_types, info.outer_try_index,
-                          info.is_generated ? "(generated)" : "");
+                          info.is_generated != 0 ? "(generated)" : "");
     for (int k = 0; k < num_types; k++) {
       type ^= handled_types.At(k);
       ASSERT(!type.IsNull());
@@ -13399,7 +13217,7 @@ const char* ExceptionHandlers::ToCString() const {
     num_chars +=
         Utils::SNPrint((buffer + num_chars), (len - num_chars), FORMAT1, i,
                        info.handler_pc_offset, num_types, info.outer_try_index,
-                       info.is_generated ? "(generated)" : "");
+                       info.is_generated != 0 ? "(generated)" : "");
     for (int k = 0; k < num_types; k++) {
       type ^= handled_types.At(k);
       num_chars += Utils::SNPrint((buffer + num_chars), (len - num_chars),
@@ -13636,7 +13454,7 @@ const char* ICData::RebindRuleToCString(RebindRule r) {
   }
 }
 
-bool ICData::RebindRuleFromCString(const char* str, RebindRule* out) {
+bool ICData::ParseRebindRule(const char* str, RebindRule* out) {
 #define RULE_CASE(Name)                                                        \
   if (strcmp(str, #Name) == 0) {                                               \
     *out = RebindRule::k##Name;                                                \
@@ -14616,6 +14434,39 @@ void Code::Comments::SetCommentAt(intptr_t idx, const String& comment) {
 
 Code::Comments::Comments(const Array& comments) : comments_(comments) {}
 
+const char* Code::EntryKindToCString(EntryKind kind) {
+  switch (kind) {
+    case EntryKind::kNormal:
+      return "Normal";
+    case EntryKind::kUnchecked:
+      return "Unchecked";
+    case EntryKind::kMonomorphic:
+      return "Monomorphic";
+    case EntryKind::kMonomorphicUnchecked:
+      return "MonomorphicUnchecked";
+    default:
+      UNREACHABLE();
+      return nullptr;
+  }
+}
+
+bool Code::ParseEntryKind(const char* str, EntryKind* out) {
+  if (strcmp(str, "Normal") == 0) {
+    *out = EntryKind::kNormal;
+    return true;
+  } else if (strcmp(str, "Unchecked") == 0) {
+    *out = EntryKind::kUnchecked;
+    return true;
+  } else if (strcmp(str, "Monomorphic") == 0) {
+    *out = EntryKind::kMonomorphic;
+    return true;
+  } else if (strcmp(str, "MonomorphicUnchecked") == 0) {
+    *out = EntryKind::kMonomorphicUnchecked;
+    return true;
+  }
+  return false;
+}
+
 RawLocalVarDescriptors* Code::GetLocalVarDescriptors() const {
   const LocalVarDescriptors& v = LocalVarDescriptors::Handle(var_descriptors());
   if (v.IsNull()) {
@@ -15396,6 +15247,25 @@ void Code::DumpSourcePositions() const {
   reader.DumpSourcePositions(PayloadStart());
 }
 
+bool Code::VerifyBSSRelocations() const {
+  const auto& descriptors = PcDescriptors::Handle(pc_descriptors());
+  const auto& insns = Instructions::Handle(instructions());
+  PcDescriptors::Iterator iterator(descriptors,
+                                   RawPcDescriptors::kBSSRelocation);
+  while (iterator.MoveNext()) {
+    const uword reloc = insns.PayloadStart() + iterator.PcOffset();
+    const word target = *reinterpret_cast<word*>(reloc);
+    // The relocation is in its original unpatched form -- the addend
+    // representing the target symbol itself.
+    if (target >= 0 &&
+        target <
+            BSS::RelocationIndex(BSS::Relocation::NumRelocations) * kWordSize) {
+      return false;
+    }
+  }
+  return true;
+}
+
 void Bytecode::Disassemble(DisassemblyFormatter* formatter) const {
 #if !defined(PRODUCT) || defined(FORCE_INCLUDE_DISASSEMBLER)
 #if !defined(DART_PRECOMPILED_RUNTIME)
@@ -15431,9 +15301,7 @@ RawBytecode* Bytecode::New(uword instructions,
     result.set_pc_descriptors(Object::empty_descriptors());
     result.set_instructions_binary_offset(instructions_offset);
     result.set_source_positions_binary_offset(0);
-#if !defined(PRODUCT)
     result.set_local_variables_binary_offset(0);
-#endif
   }
   return result.raw();
 }
@@ -18806,6 +18674,10 @@ RawInteger* Integer::NewCanonical(const String& str) {
     // Out of range.
     return Integer::null();
   }
+  return NewCanonical(value);
+}
+
+RawInteger* Integer::NewCanonical(int64_t value) {
   if (Smi::IsValid(value)) {
     return Smi::New(static_cast<intptr_t>(value));
   }

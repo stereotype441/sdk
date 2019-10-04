@@ -1835,10 +1835,22 @@ TEST_CASE(ArrayLengthNegativeOne) {
 TEST_CASE(ArrayLengthSmiMin) {
   TestIllegalArrayLength(kSmiMin);
 }
+
 TEST_CASE(ArrayLengthOneTooMany) {
   const intptr_t kOneTooMany = Array::kMaxElements + 1;
   ASSERT(kOneTooMany >= 0);
-  TestIllegalArrayLength(kOneTooMany);
+
+  char buffer[1024];
+  Utils::SNPrint(buffer, sizeof(buffer),
+                 "main() {\n"
+                 "  return new List(%" Pd
+                 ");\n"
+                 "}\n",
+                 kOneTooMany);
+  Dart_Handle lib = TestCase::LoadTestScript(buffer, NULL);
+  EXPECT_VALID(lib);
+  Dart_Handle result = Dart_Invoke(lib, NewString("main"), 0, NULL);
+  EXPECT_ERROR(result, "Out of Memory");
 }
 
 TEST_CASE(ArrayLengthMaxElements) {
@@ -1876,7 +1888,7 @@ static void TestIllegalTypedDataLength(const char* class_name,
   EXPECT_VALID(lib);
   Dart_Handle result = Dart_Invoke(lib, NewString("main"), 0, NULL);
   Utils::SNPrint(buffer, sizeof(buffer), "%" Pd, length);
-  EXPECT_ERROR(result, "Invalid argument(s)");
+  EXPECT_ERROR(result, "RangeError (length): Invalid value");
   EXPECT_ERROR(result, buffer);
 }
 
@@ -1890,7 +1902,19 @@ TEST_CASE(Int8ListLengthOneTooMany) {
   const intptr_t kOneTooMany =
       TypedData::MaxElements(kTypedDataInt8ArrayCid) + 1;
   ASSERT(kOneTooMany >= 0);
-  TestIllegalTypedDataLength("Int8List", kOneTooMany);
+
+  char buffer[1024];
+  Utils::SNPrint(buffer, sizeof(buffer),
+                 "import 'dart:typed_data';\n"
+                 "main() {\n"
+                 "  return new Int8List(%" Pd
+                 ");\n"
+                 "}\n",
+                 kOneTooMany);
+  Dart_Handle lib = TestCase::LoadTestScript(buffer, NULL);
+  EXPECT_VALID(lib);
+  Dart_Handle result = Dart_Invoke(lib, NewString("main"), 0, NULL);
+  EXPECT_ERROR(result, "Out of Memory");
 }
 
 TEST_CASE(Int8ListLengthMaxElements) {
@@ -2644,14 +2668,10 @@ ISOLATE_UNIT_TEST_CASE(ExceptionHandlers) {
   exception_handlers ^= ExceptionHandlers::New(kNumEntries);
   const bool kNeedsStackTrace = true;
   const bool kNoStackTrace = false;
-  exception_handlers.SetHandlerInfo(0, -1, 20u, kNeedsStackTrace, false,
-                                    TokenPosition::kNoSource, true);
-  exception_handlers.SetHandlerInfo(1, 0, 30u, kNeedsStackTrace, false,
-                                    TokenPosition::kNoSource, true);
-  exception_handlers.SetHandlerInfo(2, -1, 40u, kNoStackTrace, true,
-                                    TokenPosition::kNoSource, true);
-  exception_handlers.SetHandlerInfo(3, 1, 150u, kNoStackTrace, true,
-                                    TokenPosition::kNoSource, true);
+  exception_handlers.SetHandlerInfo(0, -1, 20u, kNeedsStackTrace, false, true);
+  exception_handlers.SetHandlerInfo(1, 0, 30u, kNeedsStackTrace, false, true);
+  exception_handlers.SetHandlerInfo(2, -1, 40u, kNoStackTrace, true, true);
+  exception_handlers.SetHandlerInfo(3, 1, 150u, kNoStackTrace, true, true);
 
   extern void GenerateIncrement(compiler::Assembler * assembler);
   compiler::ObjectPoolBuilder object_pool_builder;

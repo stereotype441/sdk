@@ -130,12 +130,6 @@ class AssignedVariables<Node, Variable> {
 }
 
 class FlowAnalysis<Statement, Expression, Variable, Type> {
-  static bool get _assertionsEnabled {
-    bool result = false;
-    assert(result = true);
-    return result;
-  }
-
   final List<Variable> _variablesWrittenAnywhere;
 
   final List<Variable> _variablesCapturedAnywhere;
@@ -155,9 +149,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// states.
   final Map<Statement, int> _statementToStackIndex = {};
 
-  /// List of all variables passed to [add].
-  final List<Variable> _addedVariables = [];
-
   FlowModel<Variable, Type> _current;
 
   /// The last boolean condition, for [_conditionTrue] and [_conditionFalse].
@@ -168,19 +159,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   /// The state when [_condition] evaluates to `false`.
   FlowModel<Variable, Type> _conditionFalse;
-
-  /// If assertions are enabled, keeps track of all variables that have been
-  /// passed into the API (other than through a call to [add]).  The [finish]
-  /// method uses this to verify that the caller doesn't forget to pass a
-  /// variable to [add].
-  ///
-  /// Note: the reason we have to keep track of this set (rather than simply
-  /// checking each variable at the time it is passed into the API) is because
-  /// the client doesn't call `add` until a variable is declared, and in
-  /// erroneous code, it's possible that a variable might be used before its
-  /// declaration.
-  final Set<Variable> _referencedVariables =
-      _assertionsEnabled ? new Set<Variable>() : null;
 
   int _functionNestingLevel = 0;
 
@@ -200,12 +178,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   /// Return `true` if the current state is reachable.
   bool get isReachable => _current.reachable;
-
-  /// Add a new [variable], which might be already [assigned].
-  void add(Variable variable, {bool assigned: false}) {
-    _addedVariables.add(variable);
-    _current = _current.add(typeOperations, variable, assigned: assigned);
-  }
 
   void booleanLiteral(Expression expression, bool value) {
     _condition = expression;
@@ -265,7 +237,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// `null`.
   void conditionEqNull(Expression binaryExpression, Variable variable,
       {bool notEqual: false}) {
-    _variableReferenced(variable);
     _condition = binaryExpression;
     FlowModel<Variable, Type> currentModel =
         _current.markNonNullable(typeOperations, variable);
@@ -280,8 +251,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   void doStatement_bodyBegin(Statement doStatement,
       Iterable<Variable> loopAssigned, Iterable<Variable> loopCaptured) {
-    _current = _current.removePromotedAll(
-        loopAssigned, loopCaptured, _referencedVariables);
+    _current = _current.removePromotedAll(loopAssigned, loopCaptured);
 
     _statementToStackIndex[doStatement] = _stack.length;
     _stack.add(null); // break
@@ -309,15 +279,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// This method should be called at the conclusion of flow analysis for a top
   /// level function or method.  Performs assertion checks.
   void finish() {
-    return;
     assert(_stack.isEmpty);
-    assert(() {
-      Set<Variable> variablesNotAdded = _referencedVariables
-          .difference(new Set<Variable>.from(_addedVariables));
-      assert(variablesNotAdded.isEmpty,
-          'Variables not passed to add: $variablesNotAdded');
-      return true;
-    }());
   }
 
   /// Call this method just before visiting the body of a conventional "for"
@@ -377,8 +339,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// in the loop's condition, updaters, or body.
   void for_conditionBegin(
       Set<Variable> loopAssigned, Set<Variable> loopCaptured) {
-    _current = _current.removePromotedAll(
-        loopAssigned, loopCaptured, _referencedVariables);
+    _current = _current.removePromotedAll(loopAssigned, loopCaptured);
   }
 
   /// Call this method just after visiting the updaters of a conventional "for"
@@ -412,12 +373,16 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// - Call [forEach_end].
   ///
   /// [loopAssigned] should be the set of variables that are assigned anywhere
-  /// in the loop's body.
-  void forEach_bodyBegin(
-      Iterable<Variable> loopAssigned, Iterable<Variable> loopCaptured) {
+  /// in the loop's body.  [loopVariable] should be the loop variable, if it's a
+  /// local variable, or `null` otherwise.
+  void forEach_bodyBegin(Iterable<Variable> loopAssigned,
+      Iterable<Variable> loopCaptured, Variable loopVariable) {
     _stack.add(_current);
-    _current = _current.removePromotedAll(
-        loopAssigned, loopCaptured, _referencedVariables);
+    _current = _current.removePromotedAll(loopAssigned, loopCaptured);
+    if (loopVariable != null) {
+      assert(loopAssigned.contains(loopVariable));
+      _current = _current.write(loopVariable);
+    }
   }
 
   /// Call this method just before visiting the body of a "for-in" statement or
@@ -429,10 +394,10 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   void functionExpression_begin(Iterable<Variable> writeCaptured) {
     ++_functionNestingLevel;
-    _current = _current.writeCapture(writeCaptured, _referencedVariables);
+    _current = _current.removePromotedAll(const [], writeCaptured);
     _stack.add(_current);
     _current = _current.removePromotedAll(
-        _variablesWrittenAnywhere, _variablesCapturedAnywhere, null);
+        _variablesWrittenAnywhere, _variablesCapturedAnywhere);
   }
 
   void functionExpression_end() {
@@ -503,22 +468,11 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   /// Return whether the [variable] is definitely assigned in the current state.
   bool isAssigned(Variable variable) {
-    _variableReferenced(variable);
-    VariableModel<Type> variableInfo = _current.variableInfo[variable];
-    if (variableInfo == null) {
-      // In error-free code, variables should always be registered with flow
-      // analysis before they're used.  But this can't be relied on when the
-      // analyzer is doing error recovery.  So if we encounter a variable that
-      // hasn't been registered with flow analysis yet, assume it's unassigned.
-      return false;
-    } else {
-      return variableInfo.assigned;
-    }
+    return _current.infoFor(variable).assigned;
   }
 
   void isExpression_end(
       Expression isExpression, Variable variable, bool isNot, Type type) {
-    _variableReferenced(variable);
     _condition = isExpression;
     if (isNot) {
       _conditionTrue = _current;
@@ -586,8 +540,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// Retrieves the type that the [variable] is promoted to, if the [variable]
   /// is currently promoted.  Otherwise returns `null`.
   Type promotedType(Variable variable) {
-    _variableReferenced(variable);
-    return _current.variableInfo[variable]?.promotedType;
+    return _current.infoFor(variable).promotedType;
   }
 
   /// Call this method just before visiting one of the cases in the body of a
@@ -600,8 +553,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   void switchStatement_beginCase(bool hasLabel, Iterable<Variable> notPromoted,
       Iterable<Variable> captured) {
     if (hasLabel) {
-      _current = _stack.last
-          .removePromotedAll(notPromoted, captured, _referencedVariables);
+      _current = _stack.last.removePromotedAll(notPromoted, captured);
     } else {
       _current = _stack.last;
     }
@@ -652,8 +604,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   void tryCatchStatement_bodyEnd(
       Iterable<Variable> assignedInBody, Iterable<Variable> capturedInBody) {
     FlowModel<Variable, Type> beforeBody = _stack.removeLast();
-    FlowModel<Variable, Type> beforeCatch = beforeBody.removePromotedAll(
-        assignedInBody, capturedInBody, _referencedVariables);
+    FlowModel<Variable, Type> beforeCatch =
+        beforeBody.removePromotedAll(assignedInBody, capturedInBody);
     _stack.add(beforeCatch);
     _stack.add(_current); // afterBodyAndCatches
     // Tail of the stack: beforeCatch, afterBodyAndCatches
@@ -680,7 +632,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   }
 
   void tryFinallyStatement_end(Set<Variable> assignedInFinally) {
-    _variablesReferenced(assignedInFinally);
     FlowModel<Variable, Type> afterBody = _stack.removeLast();
     _current = _current.restrict(typeOperations, afterBody, assignedInFinally);
   }
@@ -691,9 +642,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     FlowModel<Variable, Type> afterBody = _current;
     _stack.add(afterBody);
     _current = _join(
-        afterBody,
-        beforeTry.removePromotedAll(
-            assignedInBody, capturedInBody, _referencedVariables));
+        afterBody, beforeTry.removePromotedAll(assignedInBody, capturedInBody));
   }
 
   void whileStatement_bodyBegin(
@@ -712,8 +661,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   void whileStatement_conditionBegin(
       Iterable<Variable> loopAssigned, Iterable<Variable> loopCaptured) {
-    _current = _current.removePromotedAll(
-        loopAssigned, loopCaptured, _referencedVariables);
+    _current = _current.removePromotedAll(loopAssigned, loopCaptured);
   }
 
   void whileStatement_end() {
@@ -726,7 +674,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   /// Register write of the given [variable] in the current state.
   void write(Variable variable) {
-    _variableReferenced(variable);
     assert(
         _variablesWrittenAnywhere.contains(variable),
         "Variable is written to, but was not included in "
@@ -736,7 +683,13 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
             _variablesCapturedAnywhere.contains(variable),
         "Variable is captured by a local function, but was not included in "
         "_variablesCapturedAnywhere");
-    _current = _current.write(typeOperations, variable);
+    _current = _current.write(variable);
+  }
+
+  /// Register an initialized declaration of the given [variable] in the current
+  /// state.  Should also be called for function parameters.
+  void initialize(Variable variable) {
+    _current = _current.write(variable);
   }
 
   void _conditionalEnd(Expression condition) {
@@ -764,26 +717,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   FlowModel<Variable, Type> _join(
           FlowModel<Variable, Type> first, FlowModel<Variable, Type> second) =>
       FlowModel.join(typeOperations, first, second);
-
-  /// If assertions are enabled, records that the given variable has been
-  /// referenced.  The [finish] method will verify that all referenced variables
-  /// were eventually passed to [add].
-  void _variableReferenced(Variable variable) {
-    assert(() {
-      _referencedVariables.add(variable);
-      return true;
-    }());
-  }
-
-  /// If assertions are enabled, records that the given variables have been
-  /// referenced.  The [finish] method will verify that all referenced variables
-  /// were eventually passed to [add].
-  void _variablesReferenced(Iterable<Variable> variables) {
-    assert(() {
-      _referencedVariables.addAll(variables);
-      return true;
-    }());
-  }
 }
 
 class FlowAnalysisDebug<Statement, Expression, Variable, Type>
@@ -985,6 +918,9 @@ class FlowModel<Variable, Type> {
   /// variable that is no longer in scope.
   final Map<Variable, VariableModel<Type> /*!*/ > variableInfo;
 
+  /// Variable model for variables that have never been seen before.
+  final VariableModel<Type> _freshVariableInfo;
+
   /// Creates a state object with the given [reachable] status.  All variables
   /// are assumed to be unpromoted and already assigned, so joining another
   /// state with this one will have no effect on it.
@@ -994,7 +930,8 @@ class FlowModel<Variable, Type> {
           const {},
         );
 
-  FlowModel._(this.reachable, this.variableInfo) {
+  FlowModel._(this.reachable, this.variableInfo)
+      : _freshVariableInfo = new VariableModel.fresh() {
     assert(() {
       for (VariableModel<Type> value in variableInfo.values) {
         assert(value != null);
@@ -1003,24 +940,9 @@ class FlowModel<Variable, Type> {
     }());
   }
 
-  /// Updates the state to track a newly declared local [variable].  The
-  /// optional [assigned] boolean indicates whether the variable is assigned at
-  /// the point of declaration.
-  FlowModel<Variable, Type> add(
-      TypeOperations<Variable, Type> typeOperations, Variable variable,
-      {bool assigned: false}) {
-    var prevInfo = variableInfo[variable];
-    if (prevInfo == null) {
-      Map<Variable, VariableModel<Type>> newVariableInfo =
-          Map<Variable, VariableModel<Type>>.from(variableInfo);
-      newVariableInfo[variable] = VariableModel<Type>(null, assigned, false);
-      return new FlowModel<Variable, Type>._(reachable, newVariableInfo);
-    } else if (assigned) {
-      return write(typeOperations, variable);
-    } else {
-      return this;
-    }
-  }
+  /// Gets the info for the given [variable], creating it if it doesn't exist.
+  VariableModel<Type> infoFor(Variable variable) =>
+      variableInfo[variable] ?? _freshVariableInfo;
 
   /// Updates the state to indicate that the given [variable] has been
   /// determined to contain a non-null value.
@@ -1029,7 +951,7 @@ class FlowModel<Variable, Type> {
   /// assigned?  Does it matter?
   FlowModel<Variable, Type> markNonNullable(
       TypeOperations<Variable, Type> typeOperations, Variable variable) {
-    VariableModel<Type> info = variableInfo[variable];
+    VariableModel<Type> info = infoFor(variable);
     if (info.writeCaptured) return this;
     Type previousType = info.promotedType;
     previousType ??= typeOperations.variableType(variable);
@@ -1052,12 +974,7 @@ class FlowModel<Variable, Type> {
     Variable variable,
     Type type,
   ) {
-    VariableModel<Type> info = variableInfo[variable];
-    if (info == null) {
-      return this
-          .add(typeOperations, variable, assigned: false)
-          .promote(typeOperations, variable, type);
-    }
+    VariableModel<Type> info = infoFor(variable);
     if (info.writeCaptured) return this;
     Type previousType = info.promotedType;
     previousType ??= typeOperations.variableType(variable);
@@ -1071,10 +988,6 @@ class FlowModel<Variable, Type> {
 
   /// Updates the state to indicate that the given [writtenVariables] are no
   /// longer promoted; they are presumed to have their declared types.
-  ///
-  /// If assertions are enabled and [referencedVariables] is not `null`, all
-  /// variables in [writtenVariables] will be stored in [referencedVariables] as
-  /// a side effect of this call.
   ///
   /// This is used at the top of loops to conservatively cancel the promotion of
   /// variables that are modified within the loop, so that we correctly analyze
@@ -1094,16 +1007,11 @@ class FlowModel<Variable, Type> {
   /// be able to remove this method.
   FlowModel<Variable, Type> removePromotedAll(
       Iterable<Variable> writtenVariables,
-      Iterable<Variable> capturedVariables,
-      Set<Variable> referencedVariables) {
+      Iterable<Variable> capturedVariables) {
     Map<Variable, VariableModel<Type>> newVariableInfo;
     for (Variable variable in writtenVariables) {
-      assert(() {
-        referencedVariables?.add(variable);
-        return true;
-      }());
-      VariableModel<Type> info = variableInfo[variable];
-      if (info?.promotedType != null) {
+      VariableModel<Type> info = infoFor(variable);
+      if (info.promotedType != null) {
         (newVariableInfo ??= new Map<Variable, VariableModel<Type>>.from(
             variableInfo))[variable] = info.withPromotedType(null);
       }
@@ -1151,26 +1059,38 @@ class FlowModel<Variable, Type> {
     Map<Variable, VariableModel<Type>> newVariableInfo =
         <Variable, VariableModel<Type>>{};
     bool variableInfoMatchesThis = true;
-    bool variableInfoMatchesOther =
-        other.variableInfo.length == variableInfo.length;
+    bool variableInfoMatchesOther = true;
     for (MapEntry<Variable, VariableModel<Type>> entry
         in variableInfo.entries) {
       Variable variable = entry.key;
-      VariableModel<Type> otherModel = other.variableInfo[variable];
-      VariableModel<Type> restricted = entry.value;
-      if (otherModel != null) {
-        restricted = restricted.restrict(
-            typeOperations, otherModel, unsafe.contains(variable));
+      VariableModel<Type> thisModel = entry.value;
+      VariableModel<Type> otherModel = other.infoFor(variable);
+      VariableModel<Type> restricted = thisModel.restrict(
+          typeOperations, otherModel, unsafe.contains(variable));
+      if (!identical(restricted, _freshVariableInfo)) {
+        newVariableInfo[variable] = restricted;
       }
-      newVariableInfo[variable] = restricted;
-      if (!identical(restricted, entry.value)) variableInfoMatchesThis = false;
+      if (!identical(restricted, thisModel)) variableInfoMatchesThis = false;
+      if (!identical(restricted, otherModel)) variableInfoMatchesOther = false;
+    }
+    for (MapEntry<Variable, VariableModel<Type>> entry
+        in other.variableInfo.entries) {
+      Variable variable = entry.key;
+      if (variableInfo.containsKey(variable)) continue;
+      VariableModel<Type> thisModel = _freshVariableInfo;
+      VariableModel<Type> otherModel = entry.value;
+      VariableModel<Type> restricted = thisModel.restrict(
+          typeOperations, otherModel, unsafe.contains(variable));
+      if (!identical(restricted, _freshVariableInfo)) {
+        newVariableInfo[variable] = restricted;
+      }
+      if (!identical(restricted, thisModel)) variableInfoMatchesThis = false;
       if (!identical(restricted, otherModel)) variableInfoMatchesOther = false;
     }
     assert(variableInfoMatchesThis ==
-        _variableInfosEqual(typeOperations, newVariableInfo, variableInfo));
+        _variableInfosEqual(newVariableInfo, variableInfo));
     assert(variableInfoMatchesOther ==
-        _variableInfosEqual(
-            typeOperations, newVariableInfo, other.variableInfo));
+        _variableInfosEqual(newVariableInfo, other.variableInfo));
     if (variableInfoMatchesThis) {
       newVariableInfo = variableInfo;
     } else if (variableInfoMatchesOther) {
@@ -1196,40 +1116,11 @@ class FlowModel<Variable, Type> {
   /// previous type promotion is removed.
   ///
   /// TODO(paulberry): allow for writes that preserve type promotions.
-  FlowModel<Variable, Type> write(
-      TypeOperations<Variable, Type> typeOperations, Variable variable) {
-    VariableModel<Type> infoForVar = variableInfo[variable];
+  FlowModel<Variable, Type> write(Variable variable) {
+    VariableModel<Type> infoForVar = infoFor(variable);
     VariableModel<Type> newInfoForVar = infoForVar.write();
     if (identical(newInfoForVar, infoForVar)) return this;
     return _updateVariableInfo(variable, newInfoForVar);
-  }
-
-  /// Updates the state to indicate that the given [variables] have been
-  /// write-captured.
-  ///
-  /// If assertions are enabled and [referencedVariables] is not `null`, all
-  /// variables in [variables] will be stored in [referencedVariables] as a side
-  /// effect of this call.
-  FlowModel<Variable, Type> writeCapture(
-      Iterable<Variable> variables, Set<Variable> referencedVariables) {
-    Map<Variable, VariableModel<Type>> newVariableInfo;
-    for (Variable variable in variables) {
-      assert(() {
-        referencedVariables?.add(variable);
-        return true;
-      }());
-      VariableModel<Type> info = variableInfo[variable];
-      if (info == null) {
-        (newVariableInfo ??= Map<Variable, VariableModel<Type>>.from(
-                variableInfo))[variable] =
-            new VariableModel<Type>(null, false, true);
-      } else if (!info.writeCaptured) {
-        (newVariableInfo ??= Map<Variable, VariableModel<Type>>.from(
-            variableInfo))[variable] = info.writeCapture();
-      }
-    }
-    if (newVariableInfo == null) return this;
-    return FlowModel<Variable, Type>._(reachable, newVariableInfo);
   }
 
   /// Returns a new [FlowModel] where the information for [variable] is replaced
@@ -1325,8 +1216,10 @@ class FlowModel<Variable, Type> {
   }
 
   /// Determines whether the given "variableInfo" maps are equivalent.
+  ///
+  /// The equivalence check is shallow; if two variables' models are not
+  /// identical, we return `false`.
   static bool _variableInfosEqual<Variable, Type>(
-      TypeOperations<Variable, Type> typeOperations,
       Map<Variable, VariableModel<Type>> p1,
       Map<Variable, VariableModel<Type>> p2) {
     if (p1.length != p2.length) return false;
@@ -1334,14 +1227,8 @@ class FlowModel<Variable, Type> {
     for (MapEntry<Variable, VariableModel<Type>> entry in p1.entries) {
       VariableModel<Type> p1Value = entry.value;
       VariableModel<Type> p2Value = p2[entry.key];
-      if (p1Value == null) {
-        if (p2Value != null) return false;
-      } else {
-        if (p2Value == null) return false;
-        if (!VariableModel._variableModelsEqual<Type>(
-            typeOperations, p1Value, p2Value)) {
-          return false;
-        }
+      if (!identical(p1Value, p2Value)) {
+        return false;
       }
     }
     return true;
@@ -1356,9 +1243,6 @@ abstract class NodeOperations<Expression> {
 
 /// Operations on types, abstracted from concrete type interfaces.
 abstract class TypeOperations<Variable, Type> {
-  /// Return `true` if the [variable] is a local variable, not a parameter.
-  bool isLocalVariable(Variable variable);
-
   /// Returns `true` if [type1] and [type2] are the same type.
   bool isSameType(Type type1, Type type2);
 
@@ -1397,6 +1281,13 @@ class VariableModel<Type> {
     assert(!writeCaptured || promotedType == null,
         "Write-captured vars can't be promoted");
   }
+
+  /// Creates a [VariableModel] representing a variable that's never been seen
+  /// before.
+  VariableModel.fresh()
+      : promotedType = null,
+        assigned = false,
+        writeCaptured = false;
 
   @override
   bool operator ==(Object other) {
@@ -1494,23 +1385,5 @@ class VariableModel<Type> {
       return VariableModel<Type>(
           newPromotedType, newAssigned, newWriteCaptured);
     }
-  }
-
-  /// Determines whether the given variable models are equivalent.
-  static bool _variableModelsEqual<Type>(
-      TypeOperations<Object, Type> typeOperations,
-      VariableModel<Type> model1,
-      VariableModel<Type> model2) {
-    Type p1Type = model1.promotedType;
-    Type p2Type = model2.promotedType;
-    if (p1Type == null) {
-      if (p2Type != null) return false;
-    } else {
-      if (p2Type == null) return false;
-      if (!typeOperations.isSameType(p1Type, p2Type)) return false;
-    }
-    if (model1.assigned != model2.assigned) return false;
-    if (model1.writeCaptured != model2.writeCaptured) return false;
-    return true;
   }
 }

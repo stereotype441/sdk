@@ -1,7 +1,7 @@
 // Copyright (c) 2019, the Dart project authors.  Please see the AUTHORS file
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
-import 'test_file.dart';
+import 'static_error.dart';
 
 /// Matches leading indentation in a string.
 final _indentationRegExp = RegExp(r"^(\s*)");
@@ -19,7 +19,7 @@ String updateErrorExpectations(String source, List<StaticError> errors,
   removeAnalyzer ??= true;
   removeCfe ??= true;
 
-  var existingErrors = ErrorExpectationParser.parse(source);
+  var existingErrors = StaticError.parseExpectations(source);
   var lines = source.split("\n");
 
   // Keep track of the indentation on any existing expectation markers. If
@@ -96,8 +96,9 @@ String updateErrorExpectations(String source, List<StaticError> errors,
 
       var comment = (" " * indent) + "//";
 
-      // If the error can't fit in a line comment, use an explicit location.
-      if (error.column <= 2) {
+      // If the error can't fit in a line comment, or no source location is
+      // sepcified, use an explicit location.
+      if (error.column <= 2 || error.length == 0) {
         if (error.length == null) {
           result.add("$comment [error line $codeLine, column "
               "${error.column}]");

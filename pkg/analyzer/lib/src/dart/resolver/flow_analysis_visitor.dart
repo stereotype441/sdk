@@ -31,16 +31,16 @@ class FlowAnalysisHelper {
   final NodeOperations<Expression> _nodeOperations;
 
   /// The reused instance for creating new [FlowAnalysis] instances.
-  final _TypeSystemTypeOperations _typeOperations;
+  final TypeSystemTypeOperations _typeOperations;
 
   /// Precomputed sets of potentially assigned variables.
-  final AssignedVariables<AstNode, VariableElement> assignedVariables;
+  final AssignedVariables<AstNode, PromotableElement> assignedVariables;
 
   /// The result for post-resolution stages of analysis.
   final FlowAnalysisResult result;
 
   /// The current flow, when resolving a function body, or `null` otherwise.
-  FlowAnalysis<Statement, Expression, VariableElement, DartType> flow;
+  FlowAnalysis<Statement, Expression, PromotableElement, DartType> flow;
 
   int _blockFunctionBodyLevel = 0;
 
@@ -48,7 +48,7 @@ class FlowAnalysisHelper {
       TypeSystem typeSystem, AstNode node, bool retainDataForTesting) {
     return FlowAnalysisHelper._(
         const AnalyzerNodeOperations(),
-        _TypeSystemTypeOperations(typeSystem),
+        TypeSystemTypeOperations(typeSystem),
         computeAssignedVariables(node),
         retainDataForTesting ? FlowAnalysisResult() : null);
   }
@@ -149,7 +149,7 @@ class FlowAnalysisHelper {
       // TODO(paulberry): test that the right thing is passed in for
       // assignedVariables.writtenInNode(node) for top level functions, methods,
       // initializers, and constructors.
-      flow = FlowAnalysis<Statement, Expression, VariableElement, DartType>(
+      flow = FlowAnalysis<Statement, Expression, PromotableElement, DartType>(
           _nodeOperations,
           _typeOperations,
           assignedVariables.writtenInNode(node),
@@ -159,7 +159,7 @@ class FlowAnalysisHelper {
     var parameters = _enclosingExecutableParameters(node);
     if (parameters != null) {
       for (var parameter in parameters.parameters) {
-        flow.add(parameter.declaredElement, assigned: true);
+        //flow.initialize(parameter.declaredElement); TODO(paulberry): HACK
       }
     }
 
@@ -235,19 +235,14 @@ class FlowAnalysisHelper {
     return false;
   }
 
-  void loopVariable(DeclaredIdentifier loopVariable) {
-    if (loopVariable != null) {
-      flow.add(loopVariable.declaredElement, assigned: true);
-    }
-  }
-
   void variableDeclarationList(VariableDeclarationList node) {
     if (flow != null) {
       var variables = node.variables;
       for (var i = 0; i < variables.length; ++i) {
         var variable = variables[i];
-        flow.add(variable.declaredElement,
-            assigned: variable.initializer != null);
+        if (variable.initializer != null) {
+          flow.initialize(variable.declaredElement);
+        }
       }
     }
   }
@@ -267,9 +262,9 @@ class FlowAnalysisHelper {
   }
 
   /// Computes the [AssignedVariables] map for the given [node].
-  static AssignedVariables<AstNode, VariableElement> computeAssignedVariables(
+  static AssignedVariables<AstNode, PromotableElement> computeAssignedVariables(
       AstNode node) {
-    var assignedVariables = AssignedVariables<AstNode, VariableElement>();
+    var assignedVariables = AssignedVariables<AstNode, PromotableElement>();
     node.accept(_AssignedVariablesVisitor(assignedVariables));
     return assignedVariables;
   }
@@ -324,38 +319,39 @@ class FlowAnalysisResult {
   final List<AstNode> unassignedNodes = [];
 }
 
+class TypeSystemTypeOperations
+    implements TypeOperations<PromotableElement, DartType> {
+  final TypeSystem typeSystem;
+
+  TypeSystemTypeOperations(this.typeSystem);
+
+  @override
+  bool isSameType(covariant TypeImpl type1, covariant TypeImpl type2) {
+    return type1 == type2;
+  }
+
+  @override
+  bool isSubtypeOf(DartType leftType, DartType rightType) {
+    return typeSystem.isSubtypeOf(leftType, rightType);
+  }
+
+  @override
+  DartType promoteToNonNull(DartType type) {
+    return typeSystem.promoteToNonNull(type);
+  }
+
+  @override
+  DartType variableType(PromotableElement variable) {
+    return variable.type;
+  }
+}
+
 /// The visitor that gathers local variables that are potentially assigned
 /// in corresponding statements, such as loops, `switch` and `try`.
-class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
+class _AssignedVariablesVisitor extends GeneralizingAstVisitor<void> {
   final AssignedVariables assignedVariables;
 
   _AssignedVariablesVisitor(this.assignedVariables);
-
-  @override
-  void visitBlockFunctionBody(BlockFunctionBody node) {
-    bool isClosure;
-    var parent = node.parent;
-    if (parent is FunctionExpression) {
-      var grandParent = parent.parent;
-      if (grandParent is FunctionDeclaration) {
-        var greatGrandParent = grandParent.parent;
-        if (greatGrandParent is CompilationUnit) {
-          isClosure = false;
-        } else if (greatGrandParent is FunctionDeclarationStatement) {
-          isClosure = true;
-        } else {
-          throw UnimplementedError('TODO(paulberry)');
-        }
-      } else {
-        isClosure = true;
-      }
-    } else {
-      throw UnimplementedError('TODO(paulberry)');
-    }
-    assignedVariables.beginNode(isClosure: isClosure);
-    super.visitBlockFunctionBody(node);
-    assignedVariables.endNode(node, isClosure: isClosure);
-  }
 
   @override
   void visitAssignmentExpression(AssignmentExpression node) {
@@ -386,6 +382,35 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
   @override
   void visitForStatement(ForStatement node) {
     _handleFor(node, node.forLoopParts, node.body);
+  }
+
+  @override
+  void visitFunctionBody(FunctionBody node) {
+    bool isClosure;
+    var parent = node.parent;
+    if (parent is FunctionExpression) {
+      var grandParent = parent.parent;
+      if (grandParent is FunctionDeclaration) {
+        var greatGrandParent = grandParent.parent;
+        if (greatGrandParent is CompilationUnit) {
+          isClosure = false;
+        } else if (greatGrandParent is FunctionDeclarationStatement) {
+          isClosure = true;
+        } else {
+          throw UnimplementedError('TODO(paulberry)');
+        }
+      } else {
+        isClosure = true;
+      }
+    } else if (parent is MethodDeclaration ||
+        parent is ConstructorDeclaration) {
+      isClosure = false;
+    } else {
+      throw UnimplementedError('TODO(paulberry)');
+    }
+    assignedVariables.beginNode(isClosure: isClosure);
+    super.visitFunctionBody(node);
+    assignedVariables.endNode(node, isClosure: isClosure);
   }
 
   @override
@@ -444,6 +469,16 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
       iterable.accept(this);
 
       assignedVariables.beginNode();
+      if (forLoopParts is ForEachPartsWithIdentifier) {
+        var element = forLoopParts.identifier.staticElement;
+        if (element is VariableElement) {
+          assignedVariables.write(element);
+        }
+      } else if (forLoopParts is ForEachPartsWithDeclaration) {
+        assignedVariables.write(forLoopParts.loopVariable.declaredElement);
+      } else {
+        throw new StateError('Unrecognized for loop parts');
+      }
       body.accept(this);
       assignedVariables.endNode(node);
     } else {
@@ -463,37 +498,5 @@ class _LocalVariableTypeProvider implements LocalVariableTypeProvider {
     var variable = node.staticElement as VariableElement;
     var promotedType = _manager.flow?.promotedType(variable);
     return promotedType ?? variable.type;
-  }
-}
-
-class _TypeSystemTypeOperations
-    implements TypeOperations<VariableElement, DartType> {
-  final TypeSystem typeSystem;
-
-  _TypeSystemTypeOperations(this.typeSystem);
-
-  @override
-  bool isLocalVariable(VariableElement element) {
-    return element is LocalVariableElement;
-  }
-
-  @override
-  bool isSameType(covariant TypeImpl type1, covariant TypeImpl type2) {
-    return type1 == type2;
-  }
-
-  @override
-  bool isSubtypeOf(DartType leftType, DartType rightType) {
-    return typeSystem.isSubtypeOf(leftType, rightType);
-  }
-
-  @override
-  DartType promoteToNonNull(DartType type) {
-    return typeSystem.promoteToNonNull(type);
-  }
-
-  @override
-  DartType variableType(VariableElement variable) {
-    return variable.type;
   }
 }

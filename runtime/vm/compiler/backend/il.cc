@@ -767,6 +767,30 @@ StaticTypeExactnessState CallTargets::MonomorphicExactness() const {
   return TargetAt(0)->exactness;
 }
 
+const char* AssertAssignableInstr::KindToCString(Kind kind) {
+  switch (kind) {
+#define KIND_CASE(name)                                                        \
+  case k##name:                                                                \
+    return #name;
+    FOR_EACH_ASSERT_ASSIGNABLE_KIND(KIND_CASE)
+#undef KIND_CASE
+    default:
+      UNREACHABLE();
+      return nullptr;
+  }
+}
+
+bool AssertAssignableInstr::ParseKind(const char* str, Kind* out) {
+#define KIND_CASE(name)                                                        \
+  if (strcmp(str, #name) == 0) {                                               \
+    *out = Kind::k##name;                                                      \
+    return true;                                                               \
+  }
+  FOR_EACH_ASSERT_ASSIGNABLE_KIND(KIND_CASE)
+#undef KIND_CASE
+  return false;
+}
+
 CheckClassInstr::CheckClassInstr(Value* value,
                                  intptr_t deopt_id,
                                  const Cids& cids,
@@ -1027,8 +1051,38 @@ ConstantInstr::ConstantInstr(const Object& value, TokenPosition token_pos)
     : value_(value), token_pos_(token_pos) {
   // Check that the value is not an incorrect Integer representation.
   ASSERT(!value.IsMint() || !Smi::IsValid(Mint::Cast(value).AsInt64Value()));
+  // Check that clones of fields are not stored as constants.
   ASSERT(!value.IsField() || Field::Cast(value).IsOriginal());
+  // Check that all non-Smi objects are heap allocated and in old space.
   ASSERT(value.IsSmi() || value.IsOld());
+#if defined(DEBUG)
+  // Generally, instances in the flow graph should be canonical. Smis and
+  // null values are canonical by construction and so we skip them here.
+  if (!value.IsNull() && !value.IsSmi() && value.IsInstance() &&
+      !value.IsCanonical()) {
+    // The only allowed type for which IsCanonical() never answers true is
+    // TypeParameter. (They are treated as canonical due to how they are
+    // created, but there is no way to canonicalize a new TypeParameter
+    // instance containing the same information as an existing instance.)
+    //
+    // Arrays in ConstantInstrs are usually immutable and canonicalized, but
+    // there are at least a couple of cases where one or both is not true:
+    //
+    // * The Arrays created as backing for ArgumentsDescriptors may not be
+    //   canonicalized for space reasons when inlined in the IL. However, they
+    //   are still immutable.
+    // * The backtracking stack for IRRegExps is put into a ConstantInstr for
+    //   immediate use as an argument to the operations on that stack. In this
+    //   case, the Array representing it is neither immutable or canonical.
+    //
+    // In addition to complicating the story for Arrays, IRRegExp compilation
+    // also uses other non-canonical values as "constants". For example, the bit
+    // tables used for certain character classes are represented as TypedData,
+    // and so those values are also neither immutable (as there are no immutable
+    // TypedData values) or canonical.
+    ASSERT(value.IsTypeParameter() || value.IsArray() || value.IsTypedData());
+  }
+#endif
 }
 
 bool ConstantInstr::AttributesEqual(Instruction* other) const {
@@ -1075,7 +1129,10 @@ GraphEntryInstr::GraphEntryInstr(const ParsedFunction& parsed_function,
 GraphEntryInstr::GraphEntryInstr(const ParsedFunction& parsed_function,
                                  intptr_t osr_id,
                                  intptr_t deopt_id)
-    : BlockEntryWithInitialDefs(0, kInvalidTryIndex, deopt_id),
+    : BlockEntryWithInitialDefs(0,
+                                kInvalidTryIndex,
+                                deopt_id,
+                                /*stack_depth*/ 0),
       parsed_function_(parsed_function),
       catch_entries_(),
       indirect_entries_(),
@@ -1302,8 +1359,7 @@ void Value::RemoveFromUseList() {
   } else if (this == def->env_use_list()) {
     def->set_env_use_list(next);
     if (next != NULL) next->set_previous_use(NULL);
-  } else {
-    Value* prev = previous_use();
+  } else if (Value* prev = previous_use()) {
     prev->set_next_use(next);
     if (next != NULL) next->set_previous_use(prev);
   }
@@ -1603,14 +1659,15 @@ bool BlockEntryInstr::FindOsrEntryAndRelink(GraphEntryInstr* graph_entry,
       // we can simply jump to the beginning of the block.
       ASSERT(instr->previous() == this);
 
-      const intptr_t stack_depth = instr->AsCheckStackOverflow()->stack_depth();
+      ASSERT(stack_depth() == instr->AsCheckStackOverflow()->stack_depth());
       auto normal_entry = graph_entry->normal_entry();
-      auto osr_entry = new OsrEntryInstr(graph_entry, normal_entry->block_id(),
-                                         normal_entry->try_index(),
-                                         normal_entry->deopt_id(), stack_depth);
+      auto osr_entry = new OsrEntryInstr(
+          graph_entry, normal_entry->block_id(), normal_entry->try_index(),
+          normal_entry->deopt_id(), stack_depth());
 
       auto goto_join = new GotoInstr(AsJoinEntry(),
                                      CompilerState::Current().GetNextDeoptId());
+      ASSERT(parent != nullptr);
       goto_join->CopyDeoptIdFrom(*parent);
       osr_entry->LinkTo(goto_join);
 
@@ -1981,6 +2038,26 @@ static int64_t RepresentationMask(Representation r) {
                               (64 - RepresentationBits(r)));
 }
 
+static int64_t TruncateTo(int64_t v, Representation r) {
+  switch (r) {
+    case kTagged: {
+      // Smi occupies word minus kSmiTagShift bits.
+      const intptr_t kTruncateBits =
+          (kBitsPerInt64 - kBitsPerWord) + kSmiTagShift;
+      return Utils::ShiftLeftWithTruncation(v, kTruncateBits) >> kTruncateBits;
+    }
+    case kUnboxedInt32:
+      return Utils::ShiftLeftWithTruncation(v, kBitsPerInt32) >> kBitsPerInt32;
+    case kUnboxedUint32:
+      return v & kMaxUint32;
+    case kUnboxedInt64:
+      return v;
+    default:
+      UNREACHABLE();
+      return 0;
+  }
+}
+
 static bool ToIntegerConstant(Value* value, int64_t* result) {
   if (!value->BindsToConstant()) {
     UnboxInstr* unbox = value->definition()->AsUnbox();
@@ -1992,7 +2069,7 @@ static bool ToIntegerConstant(Value* value, int64_t* result) {
 
         case kUnboxedUint32:
           if (ToIntegerConstant(unbox->value(), result)) {
-            *result &= RepresentationMask(kUnboxedUint32);
+            *result = TruncateTo(*result, kUnboxedUint32);
             return true;
           }
           break;
@@ -2340,8 +2417,8 @@ RawInteger* BinaryIntegerOpInstr::Evaluate(const Integer& left,
 
   if (!result.IsNull()) {
     if (is_truncating()) {
-      int64_t truncated = result.AsTruncatedInt64Value();
-      truncated &= RepresentationMask(representation());
+      const int64_t truncated =
+          TruncateTo(result.AsTruncatedInt64Value(), representation());
       result = Integer::New(truncated, Heap::kOld);
       ASSERT(IsRepresentable(result, representation()));
     } else if (!IsRepresentable(result, representation())) {
@@ -2474,7 +2551,6 @@ Definition* BinaryIntegerOpInstr::Canonicalize(FlowGraph* flow_graph) {
     return this;
   }
 
-  const int64_t range_mask = RepresentationMask(representation());
   if (is_truncating()) {
     switch (op_kind()) {
       case Token::kMUL:
@@ -2483,7 +2559,7 @@ Definition* BinaryIntegerOpInstr::Canonicalize(FlowGraph* flow_graph) {
       case Token::kBIT_AND:
       case Token::kBIT_OR:
       case Token::kBIT_XOR:
-        rhs = (rhs & range_mask);
+        rhs = TruncateTo(rhs, representation());
         break;
       default:
         break;
@@ -2526,21 +2602,21 @@ Definition* BinaryIntegerOpInstr::Canonicalize(FlowGraph* flow_graph) {
     case Token::kBIT_AND:
       if (rhs == 0) {
         return right()->definition();
-      } else if (rhs == range_mask) {
+      } else if (rhs == RepresentationMask(representation())) {
         return left()->definition();
       }
       break;
     case Token::kBIT_OR:
       if (rhs == 0) {
         return left()->definition();
-      } else if (rhs == range_mask) {
+      } else if (rhs == RepresentationMask(representation())) {
         return right()->definition();
       }
       break;
     case Token::kBIT_XOR:
       if (rhs == 0) {
         return left()->definition();
-      } else if (rhs == range_mask) {
+      } else if (rhs == RepresentationMask(representation())) {
         UnaryIntegerOpInstr* bit_not = UnaryIntegerOpInstr::Make(
             representation(), Token::kBIT_NOT, left()->CopyWithType(),
             GetDeoptId(), range());
@@ -3101,7 +3177,7 @@ Definition* BoxInt64Instr::Canonicalize(FlowGraph* flow_graph) {
 
   // Find a more precise box instruction.
   if (auto conv = value()->definition()->AsIntConverter()) {
-    Definition* replacement = this;
+    Definition* replacement;
     switch (conv->from()) {
       case kUnboxedInt32:
         replacement = new BoxInt32Instr(conv->value()->CopyWithType());
@@ -3113,9 +3189,7 @@ Definition* BoxInt64Instr::Canonicalize(FlowGraph* flow_graph) {
         UNREACHABLE();
         break;
     }
-    if (replacement != this) {
-      flow_graph->InsertBefore(this, replacement, NULL, FlowGraph::kValue);
-    }
+    flow_graph->InsertBefore(this, replacement, NULL, FlowGraph::kValue);
     return replacement;
   }
 
@@ -4265,8 +4339,8 @@ const char* SpecialParameterInstr::KindToCString(SpecialParameterKind k) {
   return nullptr;
 }
 
-bool SpecialParameterInstr::KindFromCString(const char* str,
-                                            SpecialParameterKind* out) {
+bool SpecialParameterInstr::ParseKind(const char* str,
+                                      SpecialParameterKind* out) {
   ASSERT(str != nullptr && out != nullptr);
 #define KIND_CASE(Name)                                                        \
   if (strcmp(str, #Name) == 0) {                                               \
@@ -5074,6 +5148,10 @@ void UnboxInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
       EmitLoadFromBox(compiler);
     } else if (CanConvertSmi() && (value_cid == kSmiCid)) {
       EmitSmiConversion(compiler);
+    } else if (representation() == kUnboxedInt32 && value()->Type()->IsInt()) {
+      EmitLoadInt32FromBoxOrSmi(compiler);
+    } else if (representation() == kUnboxedInt64 && value()->Type()->IsInt()) {
+      EmitLoadInt64FromBoxOrSmi(compiler);
     } else {
       ASSERT(CanDeoptimize());
       EmitLoadFromBoxWithDeopt(compiler);

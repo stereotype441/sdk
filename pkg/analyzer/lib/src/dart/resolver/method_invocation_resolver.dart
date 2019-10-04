@@ -3,7 +3,6 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'package:analyzer/dart/ast/ast.dart';
-import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/ast/ast.dart';
@@ -312,7 +311,7 @@ class MethodInvocationResolver {
       ClassElement classElement, SimpleIdentifier propertyName) {
     // TODO(scheglov) Replace with class hierarchy.
     String name = propertyName.name;
-    Element element = null;
+    Element element;
     if (propertyName.inSetterContext()) {
       element = classElement.getSetter(name);
     }
@@ -342,7 +341,6 @@ class MethodInvocationResolver {
       receiverType,
       name,
       nameNode,
-      ElementKind.METHOD,
     );
 
     if (!result.isSingle) {
@@ -350,7 +348,7 @@ class MethodInvocationResolver {
       return result;
     }
 
-    ExecutableElement member = result.element;
+    ExecutableElement member = result.getter;
     nameNode.staticElement = member;
 
     if (member.isStatic) {
@@ -392,10 +390,8 @@ class MethodInvocationResolver {
 
   void _resolveExtensionOverride(MethodInvocation node,
       ExtensionOverride override, SimpleIdentifier nameNode, String name) {
-    var member = _extensionResolver.getOverrideMember(
-            override, name, ElementKind.METHOD) ??
-        _extensionResolver.getOverrideMember(
-            override, name, ElementKind.GETTER);
+    var result = _extensionResolver.getOverrideMember(override, name);
+    var member = result.getter;
 
     if (member == null) {
       _setDynamicResolution(node);
@@ -415,8 +411,9 @@ class MethodInvocationResolver {
     }
 
     if (node.isCascaded) {
-      // TODO(brianwilkerson) Report this error and decide how to recover.
-      throw new UnsupportedError('cascaded extension override');
+      // Report this error and recover by treating it like a non-cascade.
+      _resolver.errorReporter.reportErrorForToken(
+          CompileTimeErrorCode.EXTENSION_OVERRIDE_WITH_CASCADE, node.operator);
     }
 
     nameNode.staticElement = member;
@@ -439,11 +436,11 @@ class MethodInvocationResolver {
       return;
     }
 
-    ResolutionResult result = _extensionResolver.findExtension(
-        receiverType, name, nameNode, ElementKind.METHOD);
+    ResolutionResult result =
+        _extensionResolver.findExtension(receiverType, name, nameNode);
     if (result.isSingle) {
-      nameNode.staticElement = result.element;
-      var calleeType = _getCalleeType(node, result.element);
+      nameNode.staticElement = result.getter;
+      var calleeType = _getCalleeType(node, result.getter);
       return _setResolution(node, calleeType);
     } else if (result.isAmbiguous) {
       return;
@@ -556,7 +553,7 @@ class MethodInvocationResolver {
       }
       enclosingClass = receiverType.element;
     } else {
-      receiverType = enclosingClass.type;
+      receiverType = enclosingClass.thisType;
     }
     var target = _inheritance.getMember(receiverType, _currentName);
 
@@ -570,18 +567,25 @@ class MethodInvocationResolver {
     if (targetElement != null && targetElement.isStatic) {
       nameNode.staticElement = targetElement;
       _setDynamicResolution(node);
-      _resolver.errorReporter.reportErrorForNode(
-        StaticTypeWarningCode.UNQUALIFIED_REFERENCE_TO_NON_LOCAL_STATIC_MEMBER,
-        nameNode,
-        [receiverType.displayName],
-      );
+      if (_resolver.enclosingExtension != null) {
+        _resolver.errorReporter.reportErrorForNode(
+            CompileTimeErrorCode
+                .UNQUALIFIED_REFERENCE_TO_STATIC_MEMBER_OF_EXTENDED_TYPE,
+            nameNode,
+            [targetElement.enclosingElement.displayName]);
+      } else {
+        _resolver.errorReporter.reportErrorForNode(
+            StaticTypeWarningCode
+                .UNQUALIFIED_REFERENCE_TO_NON_LOCAL_STATIC_MEMBER,
+            nameNode,
+            [targetElement.enclosingElement.displayName]);
+      }
       return;
     }
 
-    var result = _extensionResolver.findExtension(
-        receiverType, name, nameNode, ElementKind.METHOD);
+    var result = _extensionResolver.findExtension(receiverType, name, nameNode);
     if (result.isSingle) {
-      var target = result.element;
+      var target = result.getter;
       if (target != null) {
         nameNode.staticElement = target;
         var calleeType = _getCalleeType(node, target);
@@ -595,9 +599,7 @@ class MethodInvocationResolver {
 
   void _resolveReceiverPrefix(MethodInvocation node, SimpleIdentifier receiver,
       PrefixElement prefix, SimpleIdentifier nameNode, String name) {
-    if (node.operator.type == TokenType.QUESTION_PERIOD) {
-      _reportPrefixIdentifierNotFollowedByDot(receiver);
-    }
+    // Note: prefix?.bar is reported as an error in ElementResolver.
 
     if (name == FunctionElement.LOAD_LIBRARY_NAME) {
       var imports = _definingLibrary.getImportsWithPrefix(prefix);
@@ -638,7 +640,7 @@ class MethodInvocationResolver {
       return;
     }
 
-    var receiverType = enclosingClass.type;
+    var receiverType = enclosingClass.thisType;
     var target = _inheritance.getMember(
       receiverType,
       _currentName,
@@ -744,9 +746,9 @@ class MethodInvocationResolver {
       var call = _inheritance.getMember(type, _nameCall);
       if (call == null) {
         var result = _extensionResolver.findExtension(
-            type, _nameCall.name, node.methodName, ElementKind.METHOD);
+            type, _nameCall.name, node.methodName);
         if (result.isSingle) {
-          call = result.element;
+          call = result.getter;
         } else if (result.isAmbiguous) {
           return;
         }

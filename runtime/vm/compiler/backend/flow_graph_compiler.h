@@ -428,6 +428,8 @@ class FlowGraphCompiler : public ValueObject {
   bool CanOSRFunction() const;
   bool is_optimizing() const { return is_optimizing_; }
 
+  void InsertBSSRelocation(BSS::Relocation reloc);
+
   // The function was fully intrinsified, so the body is unreachable.
   //
   // We still need to compile the body in unoptimized mode because the
@@ -728,7 +730,6 @@ class FlowGraphCompiler : public ValueObject {
   void AddExceptionHandler(intptr_t try_index,
                            intptr_t outer_try_index,
                            intptr_t pc_offset,
-                           TokenPosition token_pos,
                            bool is_generated,
                            const Array& handler_types,
                            bool needs_stacktrace);

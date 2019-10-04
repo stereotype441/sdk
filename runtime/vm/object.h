@@ -78,48 +78,46 @@ class Symbols;
   using RawObjectType = Raw##object;                                           \
   Raw##object* raw() const { return reinterpret_cast<Raw##object*>(raw_); }    \
   bool Is##object() const { return true; }                                     \
-  static object& Handle(Zone* zone, Raw##object* raw_ptr) {                    \
-    object* obj = reinterpret_cast<object*>(VMHandles::AllocateHandle(zone));  \
-    initializeHandle(obj, raw_ptr);                                            \
-    return *obj;                                                               \
+  DART_NOINLINE static object& Handle() {                                      \
+    return HandleImpl(Thread::Current()->zone(), object::null());              \
   }                                                                            \
-  static object& Handle() {                                                    \
-    return Handle(Thread::Current()->zone(), object::null());                  \
+  DART_NOINLINE static object& Handle(Zone* zone) {                            \
+    return HandleImpl(zone, object::null());                                   \
   }                                                                            \
-  static object& Handle(Zone* zone) { return Handle(zone, object::null()); }   \
-  static object& Handle(Raw##object* raw_ptr) {                                \
-    return Handle(Thread::Current()->zone(), raw_ptr);                         \
+  DART_NOINLINE static object& Handle(Raw##object* raw_ptr) {                  \
+    return HandleImpl(Thread::Current()->zone(), raw_ptr);                     \
   }                                                                            \
-  static object& CheckedHandle(Zone* zone, RawObject* raw_ptr) {               \
-    object* obj = reinterpret_cast<object*>(VMHandles::AllocateHandle(zone));  \
-    initializeHandle(obj, raw_ptr);                                            \
-    if (!obj->Is##object()) {                                                  \
-      FATAL2("Handle check failed: saw %s expected %s", obj->ToCString(),      \
-             #object);                                                         \
-    }                                                                          \
-    return *obj;                                                               \
+  DART_NOINLINE static object& Handle(Zone* zone, Raw##object* raw_ptr) {      \
+    return HandleImpl(zone, raw_ptr);                                          \
   }                                                                            \
-  static object& ZoneHandle(Zone* zone, Raw##object* raw_ptr) {                \
-    object* obj =                                                              \
-        reinterpret_cast<object*>(VMHandles::AllocateZoneHandle(zone));        \
-    initializeHandle(obj, raw_ptr);                                            \
-    return *obj;                                                               \
+  DART_NOINLINE static object& ZoneHandle() {                                  \
+    return ZoneHandleImpl(Thread::Current()->zone(), object::null());          \
   }                                                                            \
-  static object* ReadOnlyHandle() {                                            \
+  DART_NOINLINE static object& ZoneHandle(Zone* zone) {                        \
+    return ZoneHandleImpl(zone, object::null());                               \
+  }                                                                            \
+  DART_NOINLINE static object& ZoneHandle(Raw##object* raw_ptr) {              \
+    return ZoneHandleImpl(Thread::Current()->zone(), raw_ptr);                 \
+  }                                                                            \
+  DART_NOINLINE static object& ZoneHandle(Zone* zone, Raw##object* raw_ptr) {  \
+    return ZoneHandleImpl(zone, raw_ptr);                                      \
+  }                                                                            \
+  DART_NOINLINE static object* ReadOnlyHandle() {                              \
     object* obj = reinterpret_cast<object*>(Dart::AllocateReadOnlyHandle());   \
     initializeHandle(obj, object::null());                                     \
     return obj;                                                                \
   }                                                                            \
-  static object& ZoneHandle(Zone* zone) {                                      \
-    return ZoneHandle(zone, object::null());                                   \
+  DART_NOINLINE static object& CheckedHandle(Zone* zone, RawObject* raw_ptr) { \
+    object* obj = reinterpret_cast<object*>(VMHandles::AllocateHandle(zone));  \
+    initializeHandle(obj, raw_ptr);                                            \
+    if (!obj->Is##object()) {                                                  \
+      FATAL2("Handle check failed: saw %s expected %s", obj->ToCString(),      \
+             #object);                                                         \
+    }                                                                          \
+    return *obj;                                                               \
   }                                                                            \
-  static object& ZoneHandle() {                                                \
-    return ZoneHandle(Thread::Current()->zone(), object::null());              \
-  }                                                                            \
-  static object& ZoneHandle(Raw##object* raw_ptr) {                            \
-    return ZoneHandle(Thread::Current()->zone(), raw_ptr);                     \
-  }                                                                            \
-  static object& CheckedZoneHandle(Zone* zone, RawObject* raw_ptr) {           \
+  DART_NOINLINE static object& CheckedZoneHandle(Zone* zone,                   \
+                                                 RawObject* raw_ptr) {         \
     object* obj =                                                              \
         reinterpret_cast<object*>(VMHandles::AllocateZoneHandle(zone));        \
     initializeHandle(obj, raw_ptr);                                            \
@@ -129,7 +127,7 @@ class Symbols;
     }                                                                          \
     return *obj;                                                               \
   }                                                                            \
-  static object& CheckedZoneHandle(RawObject* raw_ptr) {                       \
+  DART_NOINLINE static object& CheckedZoneHandle(RawObject* raw_ptr) {         \
     return CheckedZoneHandle(Thread::Current()->zone(), raw_ptr);              \
   }                                                                            \
   /* T::Cast cannot be applied to a null Object, because the object vtable */  \
@@ -150,6 +148,17 @@ class Symbols;
   static const ClassId kClassId = k##object##Cid;                              \
                                                                                \
  private: /* NOLINT */                                                         \
+  static object& HandleImpl(Zone* zone, Raw##object* raw_ptr) {                \
+    object* obj = reinterpret_cast<object*>(VMHandles::AllocateHandle(zone));  \
+    initializeHandle(obj, raw_ptr);                                            \
+    return *obj;                                                               \
+  }                                                                            \
+  static object& ZoneHandleImpl(Zone* zone, Raw##object* raw_ptr) {            \
+    object* obj =                                                              \
+        reinterpret_cast<object*>(VMHandles::AllocateZoneHandle(zone));        \
+    initializeHandle(obj, raw_ptr);                                            \
+    return *obj;                                                               \
+  }                                                                            \
   /* Initialize the handle based on the raw_ptr in the presence of null. */    \
   static void initializeHandle(object* obj, RawObject* raw_ptr) {              \
     if (raw_ptr != Object::null()) {                                           \
@@ -1345,7 +1354,7 @@ class Class : public Object {
 
   // Allocate a class used for VM internal objects.
   template <class FakeObject>
-  static RawClass* New();
+  static RawClass* New(Isolate* isolate, bool register_class = true);
 
   // Allocate instance classes.
   static RawClass* New(const Library& lib,
@@ -1358,19 +1367,20 @@ class Class : public Object {
                                     int num_fields);
 
   // Allocate the raw string classes.
-  static RawClass* NewStringClass(intptr_t class_id);
+  static RawClass* NewStringClass(intptr_t class_id, Isolate* isolate);
 
   // Allocate the raw TypedData classes.
-  static RawClass* NewTypedDataClass(intptr_t class_id);
+  static RawClass* NewTypedDataClass(intptr_t class_id, Isolate* isolate);
 
   // Allocate the raw TypedDataView/ByteDataView classes.
-  static RawClass* NewTypedDataViewClass(intptr_t class_id);
+  static RawClass* NewTypedDataViewClass(intptr_t class_id, Isolate* isolate);
 
   // Allocate the raw ExternalTypedData classes.
-  static RawClass* NewExternalTypedDataClass(intptr_t class_id);
+  static RawClass* NewExternalTypedDataClass(intptr_t class_id,
+                                             Isolate* isolate);
 
   // Allocate the raw Pointer classes.
-  static RawClass* NewPointerClass(intptr_t class_id);
+  static RawClass* NewPointerClass(intptr_t class_id, Isolate* isolate);
 
   // Register code that has used CHA for optimization.
   // TODO(srdjan): Also register kind of CHA optimization (e.g.: leaf class,
@@ -1525,7 +1535,9 @@ class Class : public Object {
 
   // Allocate an instance class which has a VM implementation.
   template <class FakeInstance>
-  static RawClass* New(intptr_t id);
+  static RawClass* New(intptr_t id,
+                       Isolate* isolate,
+                       bool register_class = true);
 
   // Helper that calls 'Class::New<Instance>(kIllegalCid)'.
   static RawClass* NewInstanceClass();
@@ -1798,7 +1810,7 @@ class ICData : public Object {
         kNumRebindRules,
   };
   static const char* RebindRuleToCString(RebindRule r);
-  static bool RebindRuleFromCString(const char* str, RebindRule* out);
+  static bool ParseRebindRule(const char* str, RebindRule* out);
   RebindRule rebind_rule() const;
   void set_rebind_rule(uint32_t rebind_rule) const;
 
@@ -2005,6 +2017,8 @@ class ICData : public Object {
   }
 
  private:
+  friend class FlowGraphSerializer;  // For is_megamorphic()
+
   static RawICData* New();
 
   // Grows the array and also sets the argument to the index that should be used
@@ -2978,8 +2992,6 @@ class Function : public Object {
 
   RawFunction* GetDynamicInvocationForwarder(const String& mangled_name,
                                              bool allow_add = true) const;
-
-  RawFunction* GetTargetOfDynamicInvocationForwarder() const;
 #endif
 
   // Slow function, use in asserts to track changes in important library
@@ -3828,9 +3840,11 @@ class Script : public Object {
 
   void LookupSourceAndLineStarts(Zone* zone) const;
   RawGrowableObjectArray* GenerateLineNumberArray() const;
+
   RawScript::Kind kind() const {
-    return static_cast<RawScript::Kind>(raw_ptr()->kind_);
+    return RawScript::KindBits::decode(raw_ptr()->kind_and_tags_);
   }
+
   const char* GetKindAsCString() const;
   intptr_t line_offset() const { return raw_ptr()->line_offset_; }
   intptr_t col_offset() const { return raw_ptr()->col_offset_; }
@@ -3864,6 +3878,8 @@ class Script : public Object {
   void set_yield_positions(const Array& value) const;
 
   RawArray* yield_positions() const;
+
+  RawGrowableObjectArray* GetYieldPositions(const Function& function) const;
 
   RawLibrary* FindLibrary() const;
   RawString* GetLine(intptr_t line_number,
@@ -3908,10 +3924,14 @@ class Script : public Object {
                             intptr_t kernel_buffer_len) const;
 #endif  // !defined(DART_PRECOMPILED_RUNTIME)
 
+  void SetLazyLookupSourceAndLineStarts(bool value) const;
+  bool IsLazyLookupSourceAndLineStarts() const;
+
  private:
   void set_resolved_url(const String& value) const;
   void set_source(const String& value) const;
   void set_kind(RawScript::Kind value) const;
+  void set_kind_and_tags(uint8_t value) const;
   void set_load_timestamp(int64_t value) const;
   RawArray* debug_positions() const;
 
@@ -4000,12 +4020,6 @@ class Library : public Object {
   void SetLoadInProgress() const;
   bool Loaded() const { return raw_ptr()->load_state_ == RawLibrary::kLoaded; }
   void SetLoaded() const;
-  bool LoadFailed() const {
-    return raw_ptr()->load_state_ == RawLibrary::kLoadError;
-  }
-  RawInstance* LoadError() const { return raw_ptr()->load_error_; }
-  void SetLoadError(const Instance& error) const;
-  RawInstance* TransitiveLoadError() const;
 
   static intptr_t InstanceSize() {
     return RoundedAllocationSize(sizeof(RawLibrary));
@@ -4785,11 +4799,9 @@ class Instructions : public Object {
   }
 
   static intptr_t HeaderSize() {
-    intptr_t alignment = OS::PreferredCodeAlignment();
-    intptr_t aligned_size = Utils::RoundUp(sizeof(RawInstructions), alignment);
-#if !defined(IS_SIMARM_X64)
-    ASSERT(aligned_size == alignment);
-#endif  // !defined(IS_SIMARM_X64)
+    const intptr_t alignment = OS::PreferredCodeAlignment();
+    const intptr_t aligned_size =
+        Utils::RoundUp(sizeof(RawInstructions), alignment);
     return aligned_size;
   }
 
@@ -5162,7 +5174,6 @@ class ExceptionHandlers : public Object {
                       uword handler_pc_offset,
                       bool needs_stacktrace,
                       bool has_catch_all,
-                      TokenPosition token_pos,
                       bool is_generated) const;
 
   RawArray* GetHandledTypes(intptr_t try_index) const;
@@ -5225,6 +5236,9 @@ class Code : public Object {
   }
 
   using EntryKind = CodeEntryKind;
+
+  static const char* EntryKindToCString(EntryKind kind);
+  static bool ParseEntryKind(const char* str, EntryKind* out);
 
   static intptr_t entry_point_offset(EntryKind kind = EntryKind::kNormal) {
     switch (kind) {
@@ -5402,6 +5416,9 @@ class Code : public Object {
   void SetStubCallTargetCodeAt(uword pc, const Code& code) const;
 
   void Disassemble(DisassemblyFormatter* formatter = NULL) const;
+
+  // Returns true if all BSS relocations in the code have been patched.
+  bool VerifyBSSRelocations() const;
 
   class Comments : public ZoneAllocated {
    public:
@@ -5798,7 +5815,6 @@ class Bytecode : public Object {
     return (source_positions_binary_offset() != 0);
   }
 
-#if !defined(PRODUCT)
   intptr_t local_variables_binary_offset() const {
     return raw_ptr()->local_variables_binary_offset_;
   }
@@ -5808,7 +5824,6 @@ class Bytecode : public Object {
   bool HasLocalVariablesInfo() const {
     return (local_variables_binary_offset() != 0);
   }
-#endif  // !defined(PRODUCT)
 
   RawLocalVarDescriptors* var_descriptors() const {
 #if defined(PRODUCT)
@@ -6500,27 +6515,12 @@ class LibraryPrefix : public Instance {
   intptr_t num_imports() const { return raw_ptr()->num_imports_; }
   RawLibrary* importer() const { return raw_ptr()->importer_; }
 
-  RawInstance* LoadError() const;
-
-  bool ContainsLibrary(const Library& library) const;
   RawLibrary* GetLibrary(int index) const;
   void AddImport(const Namespace& import) const;
   RawObject* LookupObject(const String& name) const;
   RawClass* LookupClass(const String& class_name) const;
 
   bool is_deferred_load() const { return raw_ptr()->is_deferred_load_; }
-  bool is_loaded() const { return raw_ptr()->is_loaded_; }
-  bool LoadLibrary() const;
-
-  // Return the list of code objects that were compiled when this
-  // prefix was not yet loaded. These code objects will be invalidated
-  // when the prefix is loaded.
-  RawArray* dependent_code() const;
-  void set_dependent_code(const Array& array) const;
-
-  // Add the given code object to the list of dependent ones.
-  void RegisterDependentCode(const Code& code) const;
-  void InvalidateDependentCode() const;
 
   static intptr_t InstanceSize() {
     return RoundedAllocationSize(sizeof(RawLibraryPrefix));
@@ -6539,7 +6539,6 @@ class LibraryPrefix : public Instance {
   void set_imports(const Array& value) const;
   void set_num_imports(intptr_t value) const;
   void set_importer(const Library& value) const;
-  void set_is_loaded() const;
 
   static RawLibraryPrefix* New();
 
@@ -7301,6 +7300,7 @@ class Integer : public Number {
   // Returns a canonical Integer object allocated in the old gen space.
   // Returns null if integer is out of range.
   static RawInteger* NewCanonical(const String& str);
+  static RawInteger* NewCanonical(int64_t value);
 
   static RawInteger* New(int64_t value, Heap::Space space = Heap::kNew);
 
@@ -7386,8 +7386,8 @@ class Smi : public Integer {
   static intptr_t InstanceSize() { return 0; }
 
   static RawSmi* New(intptr_t value) {
-    RawSmi* raw_smi =
-        reinterpret_cast<RawSmi*>((value << kSmiTagShift) | kSmiTag);
+    RawSmi* raw_smi = reinterpret_cast<RawSmi*>(
+        (static_cast<uintptr_t>(value) << kSmiTagShift) | kSmiTag);
     ASSERT(ValueFromRawSmi(raw_smi) == value);
     return raw_smi;
   }

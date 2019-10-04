@@ -485,7 +485,7 @@ class Assembler : public AssemblerBase {
   void set_use_far_branches(bool b) { use_far_branches_ = b; }
 
   // Debugging and bringup support.
-  void Breakpoint() { brk(0); }
+  void Breakpoint() override { brk(0); }
   void Stop(const char* message) override;
 
   static void InitializeMemoryWithBreakpoints(uword data, intptr_t length);
@@ -1526,7 +1526,6 @@ class Assembler : public AssemblerBase {
   void CompareObject(Register reg, const Object& object);
 
   void LoadClassId(Register result, Register object);
-  // Overwrites class_id register (it will be tagged afterwards).
   void LoadClassById(Register result, Register class_id);
   void CompareClassId(Register object,
                       intptr_t class_id,
@@ -1543,8 +1542,8 @@ class Assembler : public AssemblerBase {
 
   // Emit code to transition between generated mode and native mode.
   //
-  // These require that CSP and SP are equal and aligned and require a scratch
-  // register (in addition to TMP/TMP2).
+  // These require and ensure that CSP and SP are equal and aligned and require
+  // a scratch register (in addition to TMP/TMP2).
 
   void TransitionGeneratedToNative(Register destination_address,
                                    Register new_exit_frame,
