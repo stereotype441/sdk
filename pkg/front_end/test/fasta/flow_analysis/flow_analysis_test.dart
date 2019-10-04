@@ -8,16 +8,6 @@ import 'package:test/test.dart';
 
 main() {
   group('API', () {
-    test('add handles already-added variable', () {
-      var h = _Harness();
-      var x = h.addVar('x', 'int?', hasWrites: true);
-      h.run((flow) {
-        flow.write(x);
-        flow.add(x);
-        expect(flow.isAssigned(x), isTrue);
-      });
-    });
-
     test('conditional_thenBegin promotes true branch', () {
       var h = _Harness();
       var x = h.addVar('x', 'int?');
@@ -388,7 +378,7 @@ main() {
         h.declare(x, initialized: true);
         h.promote(x, 'int');
         expect(flow.promotedType(x).type, 'int');
-        flow.forEach_bodyBegin({x}, {});
+        flow.forEach_bodyBegin({x}, {}, null);
         expect(flow.promotedType(x), isNull);
         flow.write(x);
         flow.forEach_end();
@@ -418,7 +408,7 @@ main() {
       h.run((flow) {
         h.declare(x, initialized: false);
         expect(flow.isAssigned(x), false);
-        flow.forEach_bodyBegin({x}, x);
+        flow.forEach_bodyBegin({x}, {}, x);
         expect(flow.isAssigned(x), true);
         flow.forEach_end();
         expect(flow.isAssigned(x), false);
@@ -1430,7 +1420,8 @@ main() {
         var s2 = s1.markNonNullable(h, intQVar);
         expect(s2.reachable, true);
         _Type.allowComparisons(() {
-          expect(s2.infoFor(intQVar), VariableModel(_Type('int'), false, false));
+          expect(
+              s2.infoFor(intQVar), VariableModel(_Type('int'), false, false));
         });
       });
 
@@ -1460,7 +1451,7 @@ main() {
         var h = _Harness();
         var s1 =
             FlowModel<_Var, _Type>(true).promote(h, objectQVar, _Type('int'));
-        var s2 = s1.removePromotedAll([intQVar]);
+        var s2 = s1.removePromotedAll([intQVar], []);
         expect(s2, same(s1));
       });
 
@@ -1482,11 +1473,9 @@ main() {
       test('write captured', () {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
-            .add(h, objectQVar)
-            .add(h, intQVar)
             .promote(h, objectQVar, _Type('int'))
             .promote(h, intQVar, _Type('int'));
-        var s2 = s1.removePromotedAll([], [intQVar], null);
+        var s2 = s1.removePromotedAll([], [intQVar]);
         expect(s2.reachable, true);
         _Type.allowComparisons(() {
           expect(s2.variableInfo, {
@@ -1530,14 +1519,10 @@ main() {
         var b = _Var('b', _Type('int'));
         var c = _Var('c', _Type('int'));
         var d = _Var('d', _Type('int'));
-        var s0 = FlowModel<_Var, _Type>(true)
-            .add(h, a)
-            .add(h, b)
-            .add(h, c)
-            .add(h, d);
+        var s0 = FlowModel<_Var, _Type>(true);
         // In s1, a and b are write captured.  In s2, a and c are.
-        var s1 = s0.removePromotedAll([a, b], [a, b], null);
-        var s2 = s0.removePromotedAll([a, c], [a, c], null);
+        var s1 = s0.removePromotedAll([a, b], [a, b]);
+        var s2 = s0.removePromotedAll([a, c], [a, c]);
         var result = s1.restrict(h, s2, Set());
         expect(result.variableInfo[a].writeCaptured, true);
         expect(result.variableInfo[b].writeCaptured, true);

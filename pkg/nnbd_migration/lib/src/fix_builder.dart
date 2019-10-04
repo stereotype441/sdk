@@ -85,7 +85,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
 
   /// If we are visiting a function body or initializer, assigned variable
   /// information  used in flow analysis.  Otherwise `null`.
-  AssignedVariables<AstNode, VariableElement> _assignedVariables;
+  AssignedVariables<AstNode, PromotableElement> _assignedVariables;
 
   /// If we are visiting a subexpression, the context type used for type
   /// inference.  This is used to determine when `!` needs to be inserted.
@@ -107,12 +107,13 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   void createFlowAnalysis(AstNode node) {
     assert(_flowAnalysis == null);
     assert(_assignedVariables == null);
+    _assignedVariables = FlowAnalysisHelper.computeAssignedVariables(node);
     _flowAnalysis =
         FlowAnalysis<Statement, Expression, PromotableElement, DartType>(
             const AnalyzerNodeOperations(),
             TypeSystemTypeOperations(_typeSystem),
-            AnalyzerFunctionBodyAccess(node is FunctionBody ? node : null));
-    _assignedVariables = FlowAnalysisHelper.computeAssignedVariables(node);
+            _assignedVariables.writtenInNode(node),
+            _assignedVariables.capturedAnywhere);
   }
 
   @override

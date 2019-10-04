@@ -251,8 +251,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   void doStatement_bodyBegin(Statement doStatement,
       Iterable<Variable> loopAssigned, Iterable<Variable> loopCaptured) {
-    _current = _current.removePromotedAll(
-        loopAssigned, loopCaptured);
+    _current = _current.removePromotedAll(loopAssigned, loopCaptured);
 
     _statementToStackIndex[doStatement] = _stack.length;
     _stack.add(null); // break
@@ -340,8 +339,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// in the loop's condition, updaters, or body.
   void for_conditionBegin(
       Set<Variable> loopAssigned, Set<Variable> loopCaptured) {
-    _current = _current.removePromotedAll(
-        loopAssigned, loopCaptured);
+    _current = _current.removePromotedAll(loopAssigned, loopCaptured);
   }
 
   /// Call this method just after visiting the updaters of a conventional "for"
@@ -377,11 +375,10 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// [loopAssigned] should be the set of variables that are assigned anywhere
   /// in the loop's body.  [loopVariable] should be the loop variable, if it's a
   /// local variable, or `null` otherwise.
-  void forEach_bodyBegin(
-      Iterable<Variable> loopAssigned, Iterable<Variable> loopCaptured, Variable loopVariable) {
+  void forEach_bodyBegin(Iterable<Variable> loopAssigned,
+      Iterable<Variable> loopCaptured, Variable loopVariable) {
     _stack.add(_current);
-    _current = _current.removePromotedAll(
-        loopAssigned, loopCaptured);
+    _current = _current.removePromotedAll(loopAssigned, loopCaptured);
     if (loopVariable != null) {
       assert(loopAssigned.contains(loopVariable));
       _current = _current.write(loopVariable);
@@ -397,8 +394,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   void functionExpression_begin(Iterable<Variable> writeCaptured) {
     ++_functionNestingLevel;
-    _current = _current
-        .removePromotedAll(const [], writeCaptured, _referencedVariables);
+    _current = _current.removePromotedAll(const [], writeCaptured);
     _stack.add(_current);
     _current = _current.removePromotedAll(
         _variablesWrittenAnywhere, _variablesCapturedAnywhere);
@@ -557,8 +553,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   void switchStatement_beginCase(bool hasLabel, Iterable<Variable> notPromoted,
       Iterable<Variable> captured) {
     if (hasLabel) {
-      _current = _stack.last
-          .removePromotedAll(notPromoted, captured);
+      _current = _stack.last.removePromotedAll(notPromoted, captured);
     } else {
       _current = _stack.last;
     }
@@ -609,8 +604,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   void tryCatchStatement_bodyEnd(
       Iterable<Variable> assignedInBody, Iterable<Variable> capturedInBody) {
     FlowModel<Variable, Type> beforeBody = _stack.removeLast();
-    FlowModel<Variable, Type> beforeCatch = beforeBody.removePromotedAll(
-        assignedInBody, capturedInBody);
+    FlowModel<Variable, Type> beforeCatch =
+        beforeBody.removePromotedAll(assignedInBody, capturedInBody);
     _stack.add(beforeCatch);
     _stack.add(_current); // afterBodyAndCatches
     // Tail of the stack: beforeCatch, afterBodyAndCatches
@@ -647,9 +642,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     FlowModel<Variable, Type> afterBody = _current;
     _stack.add(afterBody);
     _current = _join(
-        afterBody,
-        beforeTry.removePromotedAll(
-            assignedInBody, capturedInBody));
+        afterBody, beforeTry.removePromotedAll(assignedInBody, capturedInBody));
   }
 
   void whileStatement_bodyBegin(
@@ -668,8 +661,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   void whileStatement_conditionBegin(
       Iterable<Variable> loopAssigned, Iterable<Variable> loopCaptured) {
-    _current = _current.removePromotedAll(
-        loopAssigned, loopCaptured);
+    _current = _current.removePromotedAll(loopAssigned, loopCaptured);
   }
 
   void whileStatement_end() {
@@ -791,11 +783,6 @@ class FlowModel<Variable, Type> {
     Type type,
   ) {
     VariableModel<Type> info = infoFor(variable);
-    if (info == null) {
-      return this
-          .add(typeOperations, variable, assigned: false)
-          .promote(typeOperations, variable, type);
-    }
     if (info.writeCaptured) return this;
     Type previousType = info.promotedType;
     previousType ??= typeOperations.variableType(variable);
@@ -1107,7 +1094,8 @@ class VariableModel<Type> {
   /// before.
   VariableModel.fresh()
       : promotedType = null,
-        assigned = false;
+        assigned = false,
+        writeCaptured = false;
 
   @override
   bool operator ==(Object other) {
