@@ -159,7 +159,7 @@ class FlowAnalysisHelper {
     var parameters = _enclosingExecutableParameters(node);
     if (parameters != null) {
       for (var parameter in parameters.parameters) {
-        //flow.initialize(parameter.declaredElement); TODO(paulberry): HACK
+        flow.initialize(parameter.declaredElement);
       }
     }
 
