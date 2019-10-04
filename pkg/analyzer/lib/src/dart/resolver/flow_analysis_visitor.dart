@@ -348,38 +348,10 @@ class TypeSystemTypeOperations
 
 /// The visitor that gathers local variables that are potentially assigned
 /// in corresponding statements, such as loops, `switch` and `try`.
-class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
+class _AssignedVariablesVisitor extends GeneralizingAstVisitor<void> {
   final AssignedVariables assignedVariables;
 
   _AssignedVariablesVisitor(this.assignedVariables);
-
-  @override
-  void visitBlockFunctionBody(BlockFunctionBody node) {
-    bool isClosure;
-    var parent = node.parent;
-    if (parent is FunctionExpression) {
-      var grandParent = parent.parent;
-      if (grandParent is FunctionDeclaration) {
-        var greatGrandParent = grandParent.parent;
-        if (greatGrandParent is CompilationUnit) {
-          isClosure = false;
-        } else if (greatGrandParent is FunctionDeclarationStatement) {
-          isClosure = true;
-        } else {
-          throw UnimplementedError('TODO(paulberry)');
-        }
-      } else {
-        isClosure = true;
-      }
-    } else if (parent is MethodDeclaration || parent is ConstructorDeclaration) {
-      isClosure = false;
-    } else {
-      throw UnimplementedError('TODO(paulberry)');
-    }
-    assignedVariables.beginNode(isClosure: isClosure);
-    super.visitBlockFunctionBody(node);
-    assignedVariables.endNode(node, isClosure: isClosure);
-  }
 
   @override
   void visitAssignmentExpression(AssignmentExpression node) {
@@ -410,6 +382,35 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
   @override
   void visitForStatement(ForStatement node) {
     _handleFor(node, node.forLoopParts, node.body);
+  }
+
+  @override
+  void visitFunctionBody(FunctionBody node) {
+    bool isClosure;
+    var parent = node.parent;
+    if (parent is FunctionExpression) {
+      var grandParent = parent.parent;
+      if (grandParent is FunctionDeclaration) {
+        var greatGrandParent = grandParent.parent;
+        if (greatGrandParent is CompilationUnit) {
+          isClosure = false;
+        } else if (greatGrandParent is FunctionDeclarationStatement) {
+          isClosure = true;
+        } else {
+          throw UnimplementedError('TODO(paulberry)');
+        }
+      } else {
+        isClosure = true;
+      }
+    } else if (parent is MethodDeclaration ||
+        parent is ConstructorDeclaration) {
+      isClosure = false;
+    } else {
+      throw UnimplementedError('TODO(paulberry)');
+    }
+    assignedVariables.beginNode(isClosure: isClosure);
+    super.visitFunctionBody(node);
+    assignedVariables.endNode(node, isClosure: isClosure);
   }
 
   @override
