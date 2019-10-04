@@ -647,7 +647,7 @@ bool _f(dynamic d, bool b) => d && b;
       Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
     var fixBuilder = _FixBuilder(
         decoratedClassHierarchy, typeProvider, typeSystem, variables);
-    fixBuilder.createFlowAnalysis(node.thisOrAncestorOfType<FunctionBody>());
+    fixBuilder.createFlowAnalysis(node.thisOrAncestorOfType<FunctionDeclaration>());
     var targetInfo = fixBuilder.visitAssignmentTarget(node);
     expect((targetInfo.readType as TypeImpl).toString(withNullability: true),
         expectedReadType);
@@ -664,7 +664,7 @@ bool _f(dynamic d, bool b) => d && b;
     contextType ??= dynamicType;
     var fixBuilder = _FixBuilder(
         decoratedClassHierarchy, typeProvider, typeSystem, variables);
-    fixBuilder.createFlowAnalysis(node.thisOrAncestorOfType<FunctionBody>());
+    fixBuilder.createFlowAnalysis(node.thisOrAncestorOfType<FunctionDeclaration>());
     var type = fixBuilder.visitSubexpression(node, contextType);
     expect((type as TypeImpl).toString(withNullability: true), expectedType);
     expect(fixBuilder.nullCheckedExpressions, nullChecked);
