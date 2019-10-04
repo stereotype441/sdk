@@ -59,7 +59,7 @@ class FlowAnalysisHelper {
   /// The current flow, when resolving a function body, or `null` otherwise.
   FlowAnalysis<Statement, Expression, PromotableElement, DartType> flow;
 
-  int _blockFunctionBodyLevel = 0;
+  int _executableLevel = 0;
 
   factory FlowAnalysisHelper(
       TypeSystem typeSystem, AstNode node, bool retainDataForTesting) {
@@ -148,29 +148,20 @@ class FlowAnalysisHelper {
     flow.handleContinue(target);
   }
 
-  void for_bodyBegin(AstNode node, Expression condition) {
-    flow.for_bodyBegin(node is Statement ? node : null, condition);
-  }
+  void executableDeclaration_enter(
+      FormalParameterList parameters, FunctionBody body) {
+    _executableLevel++;
 
-  void for_conditionBegin(AstNode node, Expression condition) {
-    var assigned = assignedVariables.writtenInNode(node);
-    flow.for_conditionBegin(assigned);
-  }
-
-  void functionBody_enter(FunctionBody node) {
-    _blockFunctionBodyLevel++;
-
-    if (_blockFunctionBodyLevel > 1) {
+    if (_executableLevel > 1) {
       assert(flow != null);
     } else {
       flow = FlowAnalysis<Statement, Expression, PromotableElement, DartType>(
         _nodeOperations,
         _typeOperations,
-        AnalyzerFunctionBodyAccess(node),
+        AnalyzerFunctionBodyAccess(body),
       );
     }
 
-    var parameters = _enclosingExecutableParameters(node);
     if (parameters != null) {
       for (var parameter in parameters.parameters) {
         flow.write(parameter.declaredElement);
@@ -178,10 +169,10 @@ class FlowAnalysisHelper {
     }
   }
 
-  void functionBody_exit(FunctionBody node) {
-    _blockFunctionBodyLevel--;
+  void executableDeclaration_exit(FunctionBody body) {
+    _executableLevel--;
 
-    if (_blockFunctionBodyLevel > 0) {
+    if (_executableLevel > 0) {
       return;
     }
 
@@ -192,10 +183,19 @@ class FlowAnalysisHelper {
     this.flow = null;
 
     if (!flow.isReachable) {
-      result?.functionBodiesThatDontComplete?.add(node);
+      result?.functionBodiesThatDontComplete?.add(body);
     }
 
     flow.finish();
+  }
+
+  void for_bodyBegin(AstNode node, Expression condition) {
+    flow.for_bodyBegin(node is Statement ? node : null, condition);
+  }
+
+  void for_conditionBegin(AstNode node, Expression condition) {
+    var assigned = assignedVariables.writtenInNode(node);
+    flow.for_conditionBegin(assigned);
   }
 
   void isExpression(IsExpression node) {
@@ -254,20 +254,6 @@ class FlowAnalysisHelper {
         }
       }
     }
-  }
-
-  FormalParameterList _enclosingExecutableParameters(FunctionBody node) {
-    var parent = node.parent;
-    if (parent is ConstructorDeclaration) {
-      return parent.parameters;
-    }
-    if (parent is FunctionExpression) {
-      return parent.parameters;
-    }
-    if (parent is MethodDeclaration) {
-      return parent.parameters;
-    }
-    return null;
   }
 
   /// Computes the [AssignedVariables] map for the given [node].

@@ -3495,12 +3495,10 @@ class ResolverVisitor extends ScopedVisitor {
   @override
   void visitBlockFunctionBody(BlockFunctionBody node) {
     try {
-      _flowAnalysis?.functionBody_enter(node);
       inferenceContext.pushReturnContext(node);
       super.visitBlockFunctionBody(node);
     } finally {
       inferenceContext.popReturnContext(node);
-      _flowAnalysis?.functionBody_exit(node);
     }
   }
 
@@ -3636,12 +3634,14 @@ class ResolverVisitor extends ScopedVisitor {
   void visitConstructorDeclaration(ConstructorDeclaration node) {
     ExecutableElement outerFunction = _enclosingFunction;
     try {
+      _flowAnalysis?.executableDeclaration_enter(node.parameters, node.body);
       _promoteManager.enterFunctionBody(node.body);
       _enclosingFunction = node.declaredElement;
       FunctionType type = _enclosingFunction.type;
       InferenceContext.setType(node.body, type.returnType);
       super.visitConstructorDeclaration(node);
     } finally {
+      _flowAnalysis?.executableDeclaration_exit(node.body);
       _promoteManager.exitFunctionBody();
       _enclosingFunction = outerFunction;
     }
@@ -3779,7 +3779,6 @@ class ResolverVisitor extends ScopedVisitor {
       return;
     }
     try {
-      _flowAnalysis?.functionBody_enter(node);
       InferenceContext.setTypeFromNode(node.expression, node);
       inferenceContext.pushReturnContext(node);
       super.visitExpressionFunctionBody(node);
@@ -3793,7 +3792,6 @@ class ResolverVisitor extends ScopedVisitor {
       }
     } finally {
       inferenceContext.popReturnContext(node);
-      _flowAnalysis?.functionBody_exit(node);
     }
   }
 
@@ -3987,12 +3985,14 @@ class ResolverVisitor extends ScopedVisitor {
     ExecutableElement outerFunction = _enclosingFunction;
     try {
       SimpleIdentifier functionName = node.name;
+      _flowAnalysis?.executableDeclaration_enter(node.functionExpression.parameters, node.functionExpression.body);
       _promoteManager.enterFunctionBody(node.functionExpression.body);
       _enclosingFunction = functionName.staticElement as ExecutableElement;
       InferenceContext.setType(
           node.functionExpression, _enclosingFunction.type);
       super.visitFunctionDeclaration(node);
     } finally {
+      _flowAnalysis?.executableDeclaration_exit(node.functionExpression.body);
       _promoteManager.exitFunctionBody();
       _enclosingFunction = outerFunction;
     }
@@ -4196,6 +4196,7 @@ class ResolverVisitor extends ScopedVisitor {
   void visitMethodDeclaration(MethodDeclaration node) {
     ExecutableElement outerFunction = _enclosingFunction;
     try {
+      _flowAnalysis?.executableDeclaration_enter(node.parameters, node.body);
       _promoteManager.enterFunctionBody(node.body);
       _enclosingFunction = node.declaredElement;
       DartType returnType =
@@ -4203,6 +4204,7 @@ class ResolverVisitor extends ScopedVisitor {
       InferenceContext.setType(node.body, returnType);
       super.visitMethodDeclaration(node);
     } finally {
+      _flowAnalysis?.executableDeclaration_exit(node.body);
       _promoteManager.exitFunctionBody();
       _enclosingFunction = outerFunction;
     }
