@@ -18,3 +18,15 @@ localParameter() {
     b;
   };
 }
+
+localVariable() {
+  Object a = 1;
+  a;
+}
+
+catchParameters() {
+  try {} on Object catch (e, st) {
+    e;
+    st;
+  }
+}

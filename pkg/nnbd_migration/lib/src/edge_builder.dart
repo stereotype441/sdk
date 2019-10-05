@@ -648,7 +648,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       // This is a local function.
       node.functionExpression.accept(this);
     } else {
-      _createFlowAnalysis(node.functionExpression.body);
+      _createFlowAnalysis(node);
       // Initialize a new postDominator scope that contains only the parameters.
       try {
         node.functionExpression.accept(this);
@@ -1477,7 +1477,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
             const AnalyzerNodeOperations(),
             DecoratedTypeOperations(_typeSystem, _variables, _graph),
             _assignedVariables.writtenInNode(node),
-            _assignedVariables.capturedAnywhere);
+            _assignedVariables.capturedInNode(node));
   }
 
   DecoratedType _decorateUpperOrLowerBound(AstNode astNode, DartType type,
@@ -1729,7 +1729,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     assert(_currentFunctionType == null);
     metadata.accept(this);
     returnType?.accept(this);
-    _createFlowAnalysis(body);
+    _createFlowAnalysis(node);
     parameters?.accept(this);
     _currentFunctionType = _variables.decoratedElementType(declaredElement);
     _addParametersToFlowAnalysis(parameters);

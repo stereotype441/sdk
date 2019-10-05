@@ -113,7 +113,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
             const AnalyzerNodeOperations(),
             TypeSystemTypeOperations(_typeSystem),
             _assignedVariables.writtenInNode(node),
-            _assignedVariables.capturedAnywhere);
+            _assignedVariables.capturedInNode(node));
   }
 
   @override

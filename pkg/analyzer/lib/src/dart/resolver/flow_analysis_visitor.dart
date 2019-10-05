@@ -42,7 +42,7 @@ class FlowAnalysisHelper {
   /// The current flow, when resolving a function body, or `null` otherwise.
   FlowAnalysis<Statement, Expression, PromotableElement, DartType> flow;
 
-  int _blockFunctionBodyLevel = 0;
+  int _executableLevel = 0;
 
   factory FlowAnalysisHelper(
       TypeSystem typeSystem, AstNode node, bool retainDataForTesting) {
@@ -131,19 +131,11 @@ class FlowAnalysisHelper {
     flow.handleContinue(target);
   }
 
-  void for_bodyBegin(AstNode node, Expression condition) {
-    flow.for_bodyBegin(node is Statement ? node : null, condition);
-  }
+  void executableDeclaration_enter(AstNode node,
+      FormalParameterList parameters, FunctionBody body) {
+    _executableLevel++;
 
-  void for_conditionBegin(AstNode node, Expression condition) {
-    flow.for_conditionBegin(assignedVariables.writtenInNode(node),
-        assignedVariables.capturedInNode(node));
-  }
-
-  void functionBody_enter(FunctionBody node) {
-    _blockFunctionBodyLevel++;
-
-    if (_blockFunctionBodyLevel > 1) {
+    if (_executableLevel > 1) {
       assert(flow != null);
     } else {
       // TODO(paulberry): test that the right thing is passed in for
@@ -156,23 +148,22 @@ class FlowAnalysisHelper {
           assignedVariables.capturedInNode(node));
     }
 
-    var parameters = _enclosingExecutableParameters(node);
     if (parameters != null) {
       for (var parameter in parameters.parameters) {
-        //flow.initialize(parameter.declaredElement); TODO(paulberry): HACK
+        flow.initialize(parameter.declaredElement);
       }
     }
 
-    if (_blockFunctionBodyLevel > 1) {
+    if (_executableLevel > 1) {
       flow.functionExpression_begin(assignedVariables.writtenInNode(node));
     }
   }
 
-  void functionBody_exit(FunctionBody node) {
-    _blockFunctionBodyLevel--;
+  void executableDeclaration_exit(FunctionBody body) {
+    _executableLevel--;
 
     var flow = this.flow;
-    if (_blockFunctionBodyLevel > 0) {
+    if (_executableLevel > 0) {
       flow.functionExpression_end();
       return;
     }
@@ -183,10 +174,19 @@ class FlowAnalysisHelper {
     this.flow = null;
 
     if (!flow.isReachable) {
-      result?.functionBodiesThatDontComplete?.add(node);
+      result?.functionBodiesThatDontComplete?.add(body);
     }
 
     flow.finish();
+  }
+
+  void for_bodyBegin(AstNode node, Expression condition) {
+    flow.for_bodyBegin(node is Statement ? node : null, condition);
+  }
+
+  void for_conditionBegin(AstNode node, Expression condition) {
+    flow.for_conditionBegin(assignedVariables.writtenInNode(node),
+    assignedVariables.capturedInNode(node));
   }
 
   void isExpression(IsExpression node) {
@@ -245,20 +245,6 @@ class FlowAnalysisHelper {
         }
       }
     }
-  }
-
-  FormalParameterList _enclosingExecutableParameters(FunctionBody node) {
-    var parent = node.parent;
-    if (parent is ConstructorDeclaration) {
-      return parent.parameters;
-    }
-    if (parent is FunctionExpression) {
-      return parent.parameters;
-    }
-    if (parent is MethodDeclaration) {
-      return parent.parameters;
-    }
-    return null;
   }
 
   /// Computes the [AssignedVariables] map for the given [node].
@@ -368,6 +354,13 @@ class _AssignedVariablesVisitor extends GeneralizingAstVisitor<void> {
   }
 
   @override
+  void visitConstructorDeclaration(ConstructorDeclaration node) {
+    assignedVariables.beginNode();
+    super.visitConstructorDeclaration(node);
+    assignedVariables.endNode(node);
+  }
+
+  @override
   void visitDoStatement(DoStatement node) {
     assignedVariables.beginNode();
     super.visitDoStatement(node);
@@ -385,32 +378,25 @@ class _AssignedVariablesVisitor extends GeneralizingAstVisitor<void> {
   }
 
   @override
-  void visitFunctionBody(FunctionBody node) {
-    bool isClosure;
-    var parent = node.parent;
-    if (parent is FunctionExpression) {
-      var grandParent = parent.parent;
-      if (grandParent is FunctionDeclaration) {
-        var greatGrandParent = grandParent.parent;
-        if (greatGrandParent is CompilationUnit) {
-          isClosure = false;
-        } else if (greatGrandParent is FunctionDeclarationStatement) {
-          isClosure = true;
-        } else {
-          throw UnimplementedError('TODO(paulberry)');
-        }
-      } else {
-        isClosure = true;
-      }
-    } else if (parent is MethodDeclaration ||
-        parent is ConstructorDeclaration) {
-      isClosure = false;
-    } else {
-      throw UnimplementedError('TODO(paulberry)');
-    }
+  void visitFunctionDeclaration(FunctionDeclaration node) {
+    bool isClosure = node.parent is! CompilationUnit;
     assignedVariables.beginNode(isClosure: isClosure);
-    super.visitFunctionBody(node);
+    super.visitFunctionDeclaration(node);
     assignedVariables.endNode(node, isClosure: isClosure);
+  }
+
+  @override
+  void visitFunctionExpression(FunctionExpression node) {
+    assignedVariables.beginNode(isClosure: true);
+    super.visitFunctionExpression(node);
+    assignedVariables.endNode(node, isClosure: true);
+  }
+
+  @override
+  void visitMethodDeclaration(MethodDeclaration node) {
+    assignedVariables.beginNode();
+    super.visitMethodDeclaration(node);
+    assignedVariables.endNode(node);
   }
 
   @override
