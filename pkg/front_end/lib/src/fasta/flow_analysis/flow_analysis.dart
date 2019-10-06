@@ -742,6 +742,25 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
   }
 
   @override
+  void conditional_elseBegin(Expression thenExpression) {
+    _wrap('conditional_elseBegin($thenExpression',
+        () => _wrapped.conditional_elseBegin(thenExpression));
+  }
+
+  @override
+  void conditional_end(
+      Expression conditionalExpression, Expression elseExpression) {
+    _wrap('conditional_end($conditionalExpression, $elseExpression',
+        () => _wrapped.conditional_end(conditionalExpression, elseExpression));
+  }
+
+  @override
+  void conditional_thenBegin(Expression condition) {
+    _wrap('conditional_thenBegin($condition)',
+        () => _wrapped.conditional_thenBegin(condition));
+  }
+
+  @override
   void conditionEqNull(Expression binaryExpression, Variable variable,
       {bool notEqual: false}) {
     _wrap(
@@ -758,6 +777,29 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
       print('finish()');
       _wrapped.finish();
     }
+  }
+
+  @override
+  void for_bodyBegin(Statement node, Expression condition) {
+    _wrap('for_bodyBegin($node, $condition)',
+        () => _wrapped.for_bodyBegin(node, condition));
+  }
+
+  @override
+  void for_conditionBegin(
+      Set<Variable> loopAssigned, Set<Variable> loopCaptured) {
+    _wrap('for_conditionBegin($loopAssigned, $loopCaptured)',
+        () => _wrapped.for_conditionBegin(loopAssigned, loopCaptured));
+  }
+
+  @override
+  void for_end() {
+    _wrap('for_end()', () => _wrapped.for_end());
+  }
+
+  @override
+  void for_updaterBegin() {
+    _wrap('for_updaterBegin()', () => _wrapped.for_updaterBegin());
   }
 
   @override
