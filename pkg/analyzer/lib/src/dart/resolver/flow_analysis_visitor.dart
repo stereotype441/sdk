@@ -141,7 +141,7 @@ class FlowAnalysisHelper {
       // TODO(paulberry): test that the right thing is passed in for
       // assignedVariables.writtenInNode(node) for top level functions, methods,
       // initializers, and constructors.
-      flow = FlowAnalysisDebug<Statement, Expression, PromotableElement, DartType>(
+      flow = FlowAnalysis<Statement, Expression, PromotableElement, DartType>(
           _nodeOperations,
           _typeOperations,
           assignedVariables.writtenInNode(node),
