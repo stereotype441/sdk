@@ -43,7 +43,7 @@ class TypePromotionManager {
 
   void exitFunctionBody() {
     if (_functionBodyStack.isEmpty) {
-      //assert(false, 'exitFunctionBody without a matching enterFunctionBody');
+      assert(false, 'exitFunctionBody without a matching enterFunctionBody');
     } else {
       _currentFunctionBody = _functionBodyStack.removeLast();
     }
