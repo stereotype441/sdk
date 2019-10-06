@@ -4011,11 +4011,14 @@ class ResolverVisitor extends ScopedVisitor {
   @override
   void visitFunctionExpression(FunctionExpression node) {
     ExecutableElement outerFunction = _enclosingFunction;
+    bool isFunctionDeclaration = node.parent is FunctionDeclaration;
     try {
       if (_flowAnalysis != null) {
-        // TODO(paulberry): test the value of _flowAnalysis.assignedVariables.capturedInNode(node)
-        _flowAnalysis.flow?.functionExpression_begin(
-            _flowAnalysis.assignedVariables.writtenInNode(node.body));
+        if (!isFunctionDeclaration) {
+          // TODO(paulberry): test the value of _flowAnalysis.assignedVariables.capturedInNode(node)
+          _flowAnalysis.flow?.functionExpression_begin(
+              _flowAnalysis.assignedVariables.writtenInNode(node.body));
+        }
       } else {
         _promoteManager.enterFunctionBody(node.body);
       }
@@ -4034,7 +4037,9 @@ class ResolverVisitor extends ScopedVisitor {
       super.visitFunctionExpression(node);
     } finally {
       if (_flowAnalysis != null) {
-        _flowAnalysis.flow?.functionExpression_end();
+        if (!isFunctionDeclaration) {
+          _flowAnalysis.flow?.functionExpression_end();
+        }
       } else {
         _promoteManager.exitFunctionBody();
       }
