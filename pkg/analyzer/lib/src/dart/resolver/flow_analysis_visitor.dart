@@ -354,6 +354,13 @@ class _AssignedVariablesVisitor extends GeneralizingAstVisitor<void> {
   }
 
   @override
+  void visitConstructorDeclaration(ConstructorDeclaration node) {
+    assignedVariables.beginNode();
+    super.visitConstructorDeclaration(node);
+    assignedVariables.endNode(node);
+  }
+
+  @override
   void visitDoStatement(DoStatement node) {
     assignedVariables.beginNode();
     super.visitDoStatement(node);
@@ -371,32 +378,25 @@ class _AssignedVariablesVisitor extends GeneralizingAstVisitor<void> {
   }
 
   @override
-  void visitFunctionBody(FunctionBody node) {
-    bool isClosure;
-    var parent = node.parent;
-    if (parent is FunctionExpression) {
-      var grandParent = parent.parent;
-      if (grandParent is FunctionDeclaration) {
-        var greatGrandParent = grandParent.parent;
-        if (greatGrandParent is CompilationUnit) {
-          isClosure = false;
-        } else if (greatGrandParent is FunctionDeclarationStatement) {
-          isClosure = true;
-        } else {
-          throw UnimplementedError('TODO(paulberry)');
-        }
-      } else {
-        isClosure = true;
-      }
-    } else if (parent is MethodDeclaration ||
-        parent is ConstructorDeclaration) {
-      isClosure = false;
-    } else {
-      throw UnimplementedError('TODO(paulberry)');
-    }
+  void visitFunctionDeclaration(FunctionDeclaration node) {
+    bool isClosure = node.parent is! CompilationUnit;
     assignedVariables.beginNode(isClosure: isClosure);
-    super.visitFunctionBody(node);
+    super.visitFunctionDeclaration(node);
     assignedVariables.endNode(node, isClosure: isClosure);
+  }
+
+  @override
+  void visitFunctionExpression(FunctionExpression node) {
+    assignedVariables.beginNode(isClosure: true);
+    super.visitFunctionExpression(node);
+    assignedVariables.endNode(node, isClosure: true);
+  }
+
+  @override
+  void visitMethodDeclaration(MethodDeclaration node) {
+    assignedVariables.beginNode();
+    super.visitMethodDeclaration(node);
+    assignedVariables.endNode(node);
   }
 
   @override
