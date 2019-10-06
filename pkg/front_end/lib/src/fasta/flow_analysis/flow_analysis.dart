@@ -139,16 +139,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// states.
   final Map<Statement, int> _statementToStackIndex = {};
 
-  FlowModel<Variable, Type> __current;
-
-  FlowModel<Variable, Type> get _current => __current;
-
-  void set _current(FlowModel<Variable, Type> value) {
-    if (!__current.reachable && value.reachable) {
-      print('becoming reachable, wut');
-    }
-    __current = value;
-  }
+  FlowModel<Variable, Type> _current;
 
   /// The last boolean condition, for [_conditionTrue] and [_conditionFalse].
   Expression _condition;
@@ -168,7 +159,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   }
 
   FlowAnalysis._(this.nodeOperations, this.typeOperations, this.functionBody) {
-    __current = new FlowModel<Variable, Type>(true);
+    _current = new FlowModel<Variable, Type>(true);
   }
 
   /// Return `true` if the current state is reachable.
