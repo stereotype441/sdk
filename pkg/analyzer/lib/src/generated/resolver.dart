@@ -4007,7 +4007,8 @@ class ResolverVisitor extends ScopedVisitor {
     ExecutableElement outerFunction = _enclosingFunction;
     try {
       SimpleIdentifier functionName = node.name;
-      _flowAnalysis?.executableDeclaration_enter(node.functionExpression.parameters, node.functionExpression.body);
+      _flowAnalysis?.executableDeclaration_enter(
+          node.functionExpression.parameters, node.functionExpression.body);
       _promoteManager.enterFunctionBody(node.functionExpression.body);
       _enclosingFunction = functionName.staticElement as ExecutableElement;
       InferenceContext.setType(
