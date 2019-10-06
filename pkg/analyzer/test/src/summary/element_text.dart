@@ -69,15 +69,17 @@ void checkElementText(
   bool annotateNullability: false,
 }) {
   var writer = new _ElementWriter(
-      withCodeRanges: withCodeRanges,
-      withConstElements: withConstElements,
-      withExportScope: withExportScope,
-      withFullyResolvedAst: withFullyResolvedAst,
-      withOffsets: withOffsets,
-      withSyntheticAccessors: withSyntheticAccessors,
-      withSyntheticFields: withSyntheticFields,
-      withTypes: withTypes,
-      annotateNullability: annotateNullability);
+    selfUriStr: '${library.source.uri}',
+    withCodeRanges: withCodeRanges,
+    withConstElements: withConstElements,
+    withExportScope: withExportScope,
+    withFullyResolvedAst: withFullyResolvedAst,
+    withOffsets: withOffsets,
+    withSyntheticAccessors: withSyntheticAccessors,
+    withSyntheticFields: withSyntheticFields,
+    withTypes: withTypes,
+    annotateNullability: annotateNullability,
+  );
   writer.writeLibraryElement(library);
 
   String actualText = writer.buffer.toString();
@@ -138,6 +140,7 @@ void checkElementText(
  * Writes the canonical text presentation of elements.
  */
 class _ElementWriter {
+  final String selfUriStr;
   final bool withCodeRanges;
   final bool withExportScope;
   final bool withFullyResolvedAst;
@@ -151,16 +154,18 @@ class _ElementWriter {
 
   String indent = '';
 
-  _ElementWriter(
-      {this.withCodeRanges,
-      this.withConstElements: true,
-      this.withExportScope: false,
-      this.withFullyResolvedAst: false,
-      this.withOffsets: false,
-      this.withSyntheticAccessors: false,
-      this.withSyntheticFields: false,
-      this.withTypes: false,
-      this.annotateNullability: false});
+  _ElementWriter({
+    this.selfUriStr,
+    this.withCodeRanges,
+    this.withConstElements: true,
+    this.withExportScope: false,
+    this.withFullyResolvedAst: false,
+    this.withOffsets: false,
+    this.withSyntheticAccessors: false,
+    this.withSyntheticFields: false,
+    this.withTypes: false,
+    this.annotateNullability: false,
+  });
 
   bool isDynamicType(DartType type) => type is DynamicTypeImpl;
 
@@ -250,6 +255,13 @@ class _ElementWriter {
     });
 
     buffer.writeln('}');
+
+    if (withFullyResolvedAst) {
+      _withIndent(() {
+        _writeResolvedMetadata(e.metadata);
+        _writeResolvedTypeParameters(e.typeParameters);
+      });
+    }
   }
 
   void writeCodeRange(Element e) {
@@ -380,6 +392,13 @@ class _ElementWriter {
     });
 
     buffer.writeln('}');
+
+    if (withFullyResolvedAst) {
+      _withIndent(() {
+        _writeResolvedMetadata(e.metadata);
+        _writeResolvedTypeParameters(e.typeParameters);
+      });
+    }
   }
 
   void writeFunctionElement(FunctionElement e) {
@@ -544,6 +563,13 @@ class _ElementWriter {
       buffer.writeln(';');
     } else {
       buffer.writeln(' {}');
+    }
+
+    if (withFullyResolvedAst) {
+      _withIndent(() {
+        _writeResolvedTypeParameters(e.typeParameters);
+        _writeResolvedMetadata(e.metadata);
+      });
     }
   }
 
@@ -1075,7 +1101,9 @@ class _ElementWriter {
   }
 
   void writeTypeParameterElements(List<TypeParameterElement> elements) {
-    writeList('<', '>', elements, ', ', writeTypeParameterElement);
+    if (!withFullyResolvedAst) {
+      writeList('<', '>', elements, ', ', writeTypeParameterElement);
+    }
   }
 
   void writeUnitElement(CompilationUnitElement e) {
@@ -1216,11 +1244,27 @@ class _ElementWriter {
     buffer.write(indent);
     node.accept(
       ResolvedAstPrinter(
-        selfUriStr: 'file:///test.dart',
+        selfUriStr: selfUriStr,
         sink: buffer,
         indent: indent,
       ),
     );
+  }
+
+  void _writeResolvedTypeParameters(List<TypeParameterElement> elements) {
+    if (elements.isNotEmpty) {
+      _writelnWithIndent('typeParameters');
+      _withIndent(() {
+        for (TypeParameterElementImpl e in elements) {
+          _writelnWithIndent(e.name);
+          _withIndent(() {
+            _writelnWithIndent('bound: ${e.bound}');
+            _writelnWithIndent('defaultType: ${e.defaultType}');
+            _writeResolvedMetadata(e.metadata);
+          });
+        }
+      });
+    }
   }
 }
 
