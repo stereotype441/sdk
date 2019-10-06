@@ -457,6 +457,12 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _current = trueCondition;
   }
 
+  /// Register an initialized declaration of the given [variable] in the current
+  /// state.  Should also be called for function parameters.
+  void initialize(Variable variable) {
+    _current = _current.write(variable);
+  }
+
   /// Return whether the [variable] is definitely assigned in the current state.
   bool isAssigned(Variable variable) {
     return _current.infoFor(variable).assigned;
@@ -677,12 +683,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _current = _current.write(variable);
   }
 
-  /// Register an initialized declaration of the given [variable] in the current
-  /// state.  Should also be called for function parameters.
-  void initialize(Variable variable) {
-    _current = _current.write(variable);
-  }
-
   void _conditionalEnd(Expression condition) {
     condition = nodeOperations.unwrapParenthesized(condition);
     if (identical(condition, _condition)) {
@@ -796,6 +796,11 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
   void ifStatement_thenBegin(Expression condition) {
     _wrap('ifStatement_thenBegin($condition)',
         () => _wrapped.ifStatement_thenBegin(condition));
+  }
+
+  @override
+  void initialize(Variable variable) {
+    _wrap('initialize($variable)', () => _wrapped.initialize(variable));
   }
 
   @override
