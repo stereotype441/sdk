@@ -381,7 +381,9 @@ class _AssignedVariablesVisitor extends GeneralizingAstVisitor<void> {
   void visitFunctionDeclaration(FunctionDeclaration node) {
     bool isClosure = node.parent is! CompilationUnit;
     assignedVariables.beginNode(isClosure: isClosure);
-    super.visitFunctionDeclaration(node);
+    // Note: we bypass this.visitFunctionExpression so that the function
+    // expression isn't mistaken for a closure.
+    super.visitFunctionExpression(node.functionExpression);
     assignedVariables.endNode(node, isClosure: isClosure);
   }
 
