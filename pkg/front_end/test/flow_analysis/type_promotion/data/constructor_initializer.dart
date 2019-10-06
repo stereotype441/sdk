@@ -4,14 +4,13 @@
 
 class C {
   int y;
-  C.normalInitializer(Object x)
-  : y = x is int ? /*int*/x : throw 'foo' {
-    /*int*/x;
+  C.normalInitializer(Object x) : y = x is int ? /*int*/ x : throw 'foo' {
+    /*int*/ x;
   }
   C.assertInitializer(Object x)
-  : y = 0,
-  assert((x is int ? /*int*/x : throw 'foo') == 0) {
+      : y = 0,
+        assert((x is int ? /*int*/ x : throw 'foo') == 0) {
     // Note: not promoted because the assertion doesn't execute in release mode.
-    /*int*/x;
+    /*int*/ x;
   }
 }
