@@ -20,6 +20,8 @@ class LintNames {
   static const String await_only_futures = 'await_only_futures';
   static const String curly_braces_in_flow_control_structures =
       'curly_braces_in_flow_control_structures';
+  static const String diagnostic_describe_all_properties =
+      'diagnostic_describe_all_properties';
   static const String empty_catches = 'empty_catches';
   static const String empty_constructor_bodies = 'empty_constructor_bodies';
   static const String empty_statements = 'empty_statements';
@@ -48,6 +50,7 @@ class LintNames {
   static const String prefer_is_not_empty = 'prefer_is_not_empty';
   static const String prefer_null_aware_operators =
       'prefer_null_aware_operators';
+  static const String prefer_relative_imports = 'prefer_relative_imports';
   static const String prefer_single_quotes = 'prefer_single_quotes';
   static const String prefer_spread_collections = 'prefer_spread_collections';
   static const String slash_for_doc_comments = 'slash_for_doc_comments';
