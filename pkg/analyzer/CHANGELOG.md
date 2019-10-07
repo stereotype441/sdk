@@ -1,4 +1,4 @@
-## 0.38.5-dev
+## 0.38.5
 * Added the interface `PromotableElement`, which representing
   variables that can be type promoted (local variables and parameters,
   but not fields).
