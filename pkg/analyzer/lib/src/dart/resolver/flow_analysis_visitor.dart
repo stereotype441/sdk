@@ -59,8 +59,6 @@ class FlowAnalysisHelper {
   /// The current flow, when resolving a function body, or `null` otherwise.
   FlowAnalysis<Statement, Expression, PromotableElement, DartType> flow;
 
-  int _executableLevel = 0;
-
   factory FlowAnalysisHelper(
       TypeSystem typeSystem, AstNode node, bool retainDataForTesting) {
     return FlowAnalysisHelper._(
@@ -148,20 +146,7 @@ class FlowAnalysisHelper {
     flow.handleContinue(target);
   }
 
-  void executableDeclaration_enter(
-      FormalParameterList parameters, FunctionBody body) {
-    _executableLevel++;
-
-    if (_executableLevel > 1) {
-      assert(flow != null);
-    } else {
-      flow = FlowAnalysis<Statement, Expression, PromotableElement, DartType>(
-        _nodeOperations,
-        _typeOperations,
-        AnalyzerFunctionBodyAccess(body),
-      );
-    }
-
+  void executableDeclaration_enter(FormalParameterList parameters) {
     if (parameters != null) {
       for (var parameter in parameters.parameters) {
         flow.write(parameter.declaredElement);
@@ -170,23 +155,9 @@ class FlowAnalysisHelper {
   }
 
   void executableDeclaration_exit(FunctionBody body) {
-    _executableLevel--;
-
-    if (_executableLevel > 0) {
-      return;
-    }
-
-    // Set this.flow to null before doing any clean-up so that if an exception
-    // is raised, the state is already updated correctly, and we don't have
-    // cascading failures.
-    var flow = this.flow;
-    this.flow = null;
-
     if (!flow.isReachable) {
       result?.functionBodiesThatDontComplete?.add(body);
     }
-
-    flow.finish();
   }
 
   void for_bodyBegin(AstNode node, Expression condition) {
@@ -242,6 +213,25 @@ class FlowAnalysisHelper {
     }
 
     return false;
+  }
+
+  void topLevelExecutableDeclaration_enter(FunctionBody body) {
+    assert(flow == null);
+    flow = FlowAnalysis<Statement, Expression, PromotableElement, DartType>(
+      _nodeOperations,
+      _typeOperations,
+      AnalyzerFunctionBodyAccess(body),
+    );
+  }
+
+  void topLevelExecutableDeclaration_exit() {
+    // Set this.flow to null before doing any clean-up so that if an exception
+    // is raised, the state is already updated correctly, and we don't have
+    // cascading failures.
+    var flow = this.flow;
+    this.flow = null;
+
+    flow.finish();
   }
 
   void variableDeclarationList(VariableDeclarationList node) {

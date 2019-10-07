@@ -3656,7 +3656,8 @@ class ResolverVisitor extends ScopedVisitor {
   void visitConstructorDeclaration(ConstructorDeclaration node) {
     ExecutableElement outerFunction = _enclosingFunction;
     try {
-      _flowAnalysis?.executableDeclaration_enter(node.parameters, node.body);
+      _flowAnalysis?.topLevelExecutableDeclaration_enter(node.body);
+      _flowAnalysis?.executableDeclaration_enter(node.parameters);
       _promoteManager.enterFunctionBody(node.body);
       _enclosingFunction = node.declaredElement;
       FunctionType type = _enclosingFunction.type;
@@ -3664,6 +3665,7 @@ class ResolverVisitor extends ScopedVisitor {
       super.visitConstructorDeclaration(node);
     } finally {
       _flowAnalysis?.executableDeclaration_exit(node.body);
+      _flowAnalysis?.topLevelExecutableDeclaration_exit();
       _promoteManager.exitFunctionBody();
       _enclosingFunction = outerFunction;
     }
@@ -4005,17 +4007,34 @@ class ResolverVisitor extends ScopedVisitor {
   @override
   void visitFunctionDeclaration(FunctionDeclaration node) {
     ExecutableElement outerFunction = _enclosingFunction;
+    bool isFunctionDeclarationStatement =
+        node.parent is FunctionDeclarationStatement;
     try {
       SimpleIdentifier functionName = node.name;
-      _flowAnalysis?.executableDeclaration_enter(
-          node.functionExpression.parameters, node.functionExpression.body);
+      if (_flowAnalysis != null) {
+        if (isFunctionDeclarationStatement) {
+          _flowAnalysis.flow.functionExpression_begin();
+        } else {
+          _flowAnalysis.topLevelExecutableDeclaration_enter(
+              node.functionExpression.body);
+        }
+        _flowAnalysis
+            .executableDeclaration_enter(node.functionExpression.parameters);
+      }
       _promoteManager.enterFunctionBody(node.functionExpression.body);
       _enclosingFunction = functionName.staticElement as ExecutableElement;
       InferenceContext.setType(
           node.functionExpression, _enclosingFunction.type);
       super.visitFunctionDeclaration(node);
     } finally {
-      _flowAnalysis?.executableDeclaration_exit(node.functionExpression.body);
+      if (_flowAnalysis != null) {
+        _flowAnalysis.executableDeclaration_exit(node.functionExpression.body);
+        if (isFunctionDeclarationStatement) {
+          _flowAnalysis.flow.functionExpression_end();
+        } else {
+          _flowAnalysis.topLevelExecutableDeclaration_exit();
+        }
+      }
       _promoteManager.exitFunctionBody();
       _enclosingFunction = outerFunction;
     }
@@ -4034,7 +4053,7 @@ class ResolverVisitor extends ScopedVisitor {
     try {
       if (_flowAnalysis != null) {
         if (!isFunctionDeclaration) {
-          _flowAnalysis.flow?.functionExpression_begin();
+          _flowAnalysis.flow.functionExpression_begin();
         }
       } else {
         _promoteManager.enterFunctionBody(node.body);
@@ -4224,7 +4243,8 @@ class ResolverVisitor extends ScopedVisitor {
   void visitMethodDeclaration(MethodDeclaration node) {
     ExecutableElement outerFunction = _enclosingFunction;
     try {
-      _flowAnalysis?.executableDeclaration_enter(node.parameters, node.body);
+      _flowAnalysis?.topLevelExecutableDeclaration_enter(node.body);
+      _flowAnalysis?.executableDeclaration_enter(node.parameters);
       _promoteManager.enterFunctionBody(node.body);
       _enclosingFunction = node.declaredElement;
       DartType returnType =
@@ -4233,6 +4253,7 @@ class ResolverVisitor extends ScopedVisitor {
       super.visitMethodDeclaration(node);
     } finally {
       _flowAnalysis?.executableDeclaration_exit(node.body);
+      _flowAnalysis?.topLevelExecutableDeclaration_exit();
       _promoteManager.exitFunctionBody();
       _enclosingFunction = outerFunction;
     }
