@@ -42,8 +42,6 @@ class FlowAnalysisHelper {
   /// The current flow, when resolving a function body, or `null` otherwise.
   FlowAnalysis<Statement, Expression, PromotableElement, DartType> flow;
 
-  int _executableLevel = 0;
-
   factory FlowAnalysisHelper(
       TypeSystem typeSystem, AstNode node, bool retainDataForTesting) {
     return FlowAnalysisHelper._(
@@ -131,53 +129,25 @@ class FlowAnalysisHelper {
     flow.handleContinue(target);
   }
 
-  void executableDeclaration_enter(AstNode node,
-      FormalParameterList parameters, FunctionBody body) {
-    _executableLevel++;
-
-    if (_executableLevel > 1) {
-      assert(flow != null);
-    } else {
-      // TODO(paulberry): test that the right thing is passed in for
-      // assignedVariables.writtenInNode(node) for top level functions, methods,
-      // initializers, and constructors.
-      flow = FlowAnalysis<Statement, Expression, PromotableElement, DartType>(
-          _nodeOperations,
-          _typeOperations,
-          assignedVariables.writtenInNode(node),
-          assignedVariables.capturedInNode(node));
-    }
-
+  void executableDeclaration_enter(FormalParameterList parameters, bool isClosure) {
     if (parameters != null) {
       for (var parameter in parameters.parameters) {
         flow.initialize(parameter.declaredElement);
       }
     }
 
-    if (_executableLevel > 1) {
+    if (isClosure) {
       flow.functionExpression_begin(assignedVariables.writtenInNode(node));
     }
   }
 
   void executableDeclaration_exit(FunctionBody body) {
-    _executableLevel--;
-
-    var flow = this.flow;
-    if (_executableLevel > 0) {
+    if (isClosure) {
       flow.functionExpression_end();
-      return;
-    }
-
-    // Set this.flow to null before doing any clean-up so that if an exception
-    // is raised, the state is already updated correctly, and we don't have
-    // cascading failures.
-    this.flow = null;
-
+    }      
     if (!flow.isReachable) {
       result?.functionBodiesThatDontComplete?.add(body);
     }
-
-    flow.finish();
   }
 
   void for_bodyBegin(AstNode node, Expression condition) {
@@ -233,6 +203,25 @@ class FlowAnalysisHelper {
     }
 
     return false;
+  }
+
+  void topLevelDeclaration_enter(AstNode node, bool HACK) {
+    assert(flow == null);
+    flow = FlowAnalysis<Statement, Expression, PromotableElement, DartType>(
+      _nodeOperations,
+      _typeOperations,
+          assignedVariables.writtenInNode(node),
+          assignedVariables.capturedInNode(node));
+  }
+
+  void topLevelDeclaration_exit() {
+    // Set this.flow to null before doing any clean-up so that if an exception
+    // is raised, the state is already updated correctly, and we don't have
+    // cascading failures.
+    var flow = this.flow;
+    this.flow = null;
+
+    flow.finish();
   }
 
   void variableDeclarationList(VariableDeclarationList node) {
@@ -484,7 +473,10 @@ class _LocalVariableTypeProvider implements LocalVariableTypeProvider {
   @override
   DartType getType(SimpleIdentifier node) {
     var variable = node.staticElement as VariableElement;
-    var promotedType = _manager.flow?.promotedType(variable);
-    return promotedType ?? variable.type;
+    if (variable is PromotableElement) {
+      var promotedType = _manager.flow?.promotedType(variable);
+      if (promotedType != null) return promotedType;
+    }
+    return variable.type;
   }
 }
