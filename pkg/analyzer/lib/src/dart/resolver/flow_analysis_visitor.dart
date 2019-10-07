@@ -215,7 +215,7 @@ class FlowAnalysisHelper {
     return false;
   }
 
-  void topLevelExecutableDeclaration_enter(FunctionBody body) {
+  void topLevelDeclaration_enter(FunctionBody body) {
     assert(flow == null);
     flow = FlowAnalysis<Statement, Expression, PromotableElement, DartType>(
       _nodeOperations,
@@ -224,7 +224,7 @@ class FlowAnalysisHelper {
     );
   }
 
-  void topLevelExecutableDeclaration_exit() {
+  void topLevelDeclaration_exit() {
     // Set this.flow to null before doing any clean-up so that if an exception
     // is raised, the state is already updated correctly, and we don't have
     // cascading failures.
@@ -483,7 +483,10 @@ class _LocalVariableTypeProvider implements LocalVariableTypeProvider {
   @override
   DartType getType(SimpleIdentifier node) {
     var variable = node.staticElement as VariableElement;
-    var promotedType = _manager.flow?.promotedType(variable);
-    return promotedType ?? variable.type;
+    if (variable is PromotableElement) {
+      var promotedType = _manager.flow.promotedType(variable);
+      if (promotedType != null) return promotedType;
+    }
+    return variable.type;
   }
 }
