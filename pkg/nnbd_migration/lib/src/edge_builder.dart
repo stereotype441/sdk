@@ -602,14 +602,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   @override
   DecoratedType visitFieldDeclaration(FieldDeclaration node) {
     node.metadata.accept(this);
-    _createFlowAnalysis(node);
-    try {
-      node.fields.accept(this);
-    } finally {
-      _flowAnalysis.finish();
-      _flowAnalysis = null;
-      _assignedVariables = null;
-    }
+    node.fields.accept(this);
     return null;
   }
 
@@ -1285,14 +1278,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   DecoratedType visitTopLevelVariableDeclaration(
       TopLevelVariableDeclaration node) {
     node.metadata.accept(this);
-    _createFlowAnalysis(node);
-    try {
-      node.variables.accept(this);
-    } finally {
-      _flowAnalysis.finish();
-      _flowAnalysis = null;
-      _assignedVariables = null;
-    }
+    node.variables.accept(this);
     return null;
   }
 
@@ -1367,26 +1353,39 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   @override
   DecoratedType visitVariableDeclarationList(VariableDeclarationList node) {
     node.metadata.accept(this);
+    var parent = node.parent;
+    bool isTopLevel =
+        parent is TopLevelVariableDeclaration || parent is FieldDeclaration;
     var typeAnnotation = node.type;
     for (var variable in node.variables) {
       variable.metadata.accept(this);
       var initializer = variable.initializer;
-      var declaredElement = variable.declaredElement;
-      if (declaredElement is PromotableElement && initializer != null) {
-        _flowAnalysis.initialize(declaredElement);
-      }
       if (initializer != null) {
-        var destinationType = getOrComputeElementType(declaredElement);
-        if (typeAnnotation == null) {
-          var initializerType = initializer.accept(this);
-          if (initializerType == null) {
-            throw StateError('No type computed for ${initializer.runtimeType} '
-                '(${initializer.toSource()}) offset=${initializer.offset}');
+        if (isTopLevel) _createFlowAnalysis(variable);
+        try {
+          var declaredElement = variable.declaredElement;
+          if (declaredElement is PromotableElement) {
+            _flowAnalysis.initialize(declaredElement);
           }
-          _unionDecoratedTypes(initializerType, destinationType,
-              InitializerInferenceOrigin(source, variable));
-        } else {
-          _handleAssignment(initializer, destinationType: destinationType);
+          var destinationType = getOrComputeElementType(declaredElement);
+          if (typeAnnotation == null) {
+            var initializerType = initializer.accept(this);
+            if (initializerType == null) {
+              throw StateError(
+                  'No type computed for ${initializer.runtimeType} '
+                  '(${initializer.toSource()}) offset=${initializer.offset}');
+            }
+            _unionDecoratedTypes(initializerType, destinationType,
+                InitializerInferenceOrigin(source, variable));
+          } else {
+            _handleAssignment(initializer, destinationType: destinationType);
+          }
+        } finally {
+          if (isTopLevel) {
+            _flowAnalysis.finish();
+            _flowAnalysis = null;
+            _assignedVariables = null;
+          }
         }
       }
     }

@@ -207,6 +207,7 @@ class FlowAnalysisHelper {
   }
 
   void topLevelDeclaration_enter(Declaration node) {
+    assert(node != null);
     assert(flow == null);
     flow = FlowAnalysis<Statement, Expression, PromotableElement, DartType>(
         _nodeOperations,
@@ -416,6 +417,20 @@ class _AssignedVariablesVisitor extends GeneralizingAstVisitor<void> {
       assignedVariables.beginNode();
       finallyBlock.accept(this);
       assignedVariables.endNode(finallyBlock);
+    }
+  }
+
+  @override
+  void visitVariableDeclaration(VariableDeclaration node) {
+    var grandParent = node.parent.parent;
+    bool isTopLevel = grandParent is TopLevelVariableDeclaration ||
+        grandParent is FieldDeclaration;
+    if (isTopLevel) {
+      assignedVariables.beginNode();
+    }
+    super.visitVariableDeclaration(node);
+    if (isTopLevel) {
+      assignedVariables.endNode(node);
     }
   }
 
