@@ -441,13 +441,13 @@ main() {
         expect(flow.promotedType(x).type, 'int');
         expect(flow.promotedType(y).type, 'int');
         flow.functionExpression_begin({x});
-        // x is de-promoted within the local function
+        // x is unpromoted within the local function
         expect(flow.promotedType(x), isNull);
         expect(flow.promotedType(y).type, 'int');
         flow.write(x);
         h.promote(x, 'int');
         flow.functionExpression_end();
-        // x is de-promoted after the local function too
+        // x is unpromoted after the local function too
         expect(flow.promotedType(x), isNull);
         expect(flow.promotedType(y).type, 'int');
       });
@@ -466,7 +466,7 @@ main() {
         expect(flow.promotedType(x).type, 'int');
         expect(flow.promotedType(y).type, 'int');
         flow.functionExpression_begin({});
-        // x is de-promoted within the local function, because the write
+        // x is unpromoted within the local function, because the write
         // might have been captured by the time the local function executes.
         expect(flow.promotedType(x), isNull);
         expect(flow.promotedType(y).type, 'int');
@@ -481,13 +481,13 @@ main() {
         expect(flow.promotedType(x).type, 'int');
         expect(flow.promotedType(y).type, 'int');
         flow.functionExpression_begin({x});
-        // x is de-promoted inside this local function too.
+        // x is unpromoted inside this local function too.
         expect(flow.promotedType(x), isNull);
         expect(flow.promotedType(y).type, 'int');
         flow.write(x);
         flow.functionExpression_end();
         // And since the second local function captured x, it remains
-        // de-promoted.
+        // unpromoted.
         expect(flow.promotedType(x), isNull);
         expect(flow.promotedType(y).type, 'int');
       });
@@ -505,7 +505,7 @@ main() {
         expect(flow.promotedType(x).type, 'int');
         expect(flow.promotedType(y).type, 'int');
         flow.functionExpression_begin({});
-        // x is de-promoted within the local function, because the write
+        // x is unpromoted within the local function, because the write
         // might have happened by the time the local function executes.
         expect(flow.promotedType(x), isNull);
         expect(flow.promotedType(y).type, 'int');
@@ -519,7 +519,7 @@ main() {
         expect(flow.promotedType(x).type, 'int');
         expect(flow.promotedType(y).type, 'int');
         flow.write(x);
-        // x is de-promoted now.
+        // x is unpromoted now.
         expect(flow.promotedType(x), isNull);
         expect(flow.promotedType(y).type, 'int');
       });

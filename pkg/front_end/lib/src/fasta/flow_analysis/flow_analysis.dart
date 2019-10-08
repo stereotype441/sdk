@@ -82,7 +82,7 @@ class AssignedVariables<Node, Variable> {
   /// local function or closure inside the [node].
   Set<Variable> capturedInNode(Node node) {
     return _capturedInNode[node] ??
-        (throw StateError('No information for $node'));
+        (throw new StateError('No information for $node'));
   }
 
   /// This method should be called during pre-traversal, to mark the end of a
@@ -118,7 +118,7 @@ class AssignedVariables<Node, Variable> {
   /// [node].
   Set<Variable> writtenInNode(Node node) {
     return _writtenInNode[node] ??
-        (throw StateError('No information for $node'));
+        (throw new StateError('No information for $node'));
   }
 }
 
@@ -160,13 +160,13 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
       TypeOperations<Variable, Type> typeOperations,
       Iterable<Variable> variablesWrittenAnywhere,
       Iterable<Variable> variablesCapturedAnywhere) {
-    return FlowAnalysis._(nodeOperations, typeOperations,
+    return new FlowAnalysis._(nodeOperations, typeOperations,
         variablesWrittenAnywhere.toList(), variablesCapturedAnywhere.toList());
   }
 
   FlowAnalysis._(this.nodeOperations, this.typeOperations,
       this._variablesWrittenAnywhere, this._variablesCapturedAnywhere) {
-    _current = FlowModel<Variable, Type>(true);
+    _current = new FlowModel<Variable, Type>(true);
   }
 
   /// Return `true` if the current state is reachable.
@@ -827,7 +827,7 @@ class FlowModel<Variable, Type> {
       VariableModel<Type> info = variableInfo[variable];
       if (info == null) {
         (newVariableInfo ??= new Map<Variable, VariableModel<Type>>.from(
-            variableInfo))[variable] = VariableModel<Type>(null, false, true);
+            variableInfo))[variable] = new VariableModel<Type>(null, false, true);
       } else if (!info.writeCaptured) {
         (newVariableInfo ??= new Map<Variable, VariableModel<Type>>.from(
             variableInfo))[variable] = info.writeCapture();
@@ -1132,19 +1132,19 @@ class VariableModel<Type> {
   /// Returns a new [VariableModel] where the promoted type is replaced with
   /// [promotedType].
   VariableModel<Type> withPromotedType(Type promotedType) =>
-      VariableModel<Type>(promotedType, assigned, writeCaptured);
+      new VariableModel<Type>(promotedType, assigned, writeCaptured);
 
   /// Returns a new [VariableModel] reflecting the fact that the variable was
   /// just written to.
   VariableModel<Type> write() {
     if (promotedType == null && assigned) return this;
-    return VariableModel<Type>(null, true, writeCaptured);
+    return new VariableModel<Type>(null, true, writeCaptured);
   }
 
-  /// Returns a wne [VariableModel] reflecting the fact that the variable has
+  /// Returns a new [VariableModel] reflecting the fact that the variable has
   /// been write-captured.
   VariableModel<Type> writeCapture() {
-    return VariableModel<Type>(null, assigned, true);
+    return new VariableModel<Type>(null, assigned, true);
   }
 
   /// Joins two variable models.  See [FlowModel.join] for details.
@@ -1189,7 +1189,7 @@ class VariableModel<Type> {
         second.writeCaptured == newWriteCaptured) {
       return second;
     } else {
-      return VariableModel<Type>(
+      return new VariableModel<Type>(
           newPromotedType, newAssigned, newWriteCaptured);
     }
   }
