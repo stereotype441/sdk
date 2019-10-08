@@ -21,9 +21,7 @@ import '../fasta_codes.dart'
         messagePatchDeclarationOrigin,
         noLength,
         templateConflictsWithMember,
-        templateConflictsWithMemberWarning,
         templateConflictsWithSetter,
-        templateConflictsWithSetterWarning,
         templateExtensionMemberConflictsWithObjectMember;
 import 'source_library_builder.dart';
 
@@ -152,23 +150,26 @@ class SourceExtensionBuilder extends ExtensionBuilderImpl {
 
     scope.setters.forEach((String name, Builder setter) {
       Builder member = scopeBuilder[name];
-      if (member == null ||
-          !(member.isField && !member.isFinal && !member.isConst ||
-              member.isRegularMethod && member.isStatic && setter.isStatic)) {
+      if (member == null) {
+        // Setter without getter.
         return;
       }
-      if (member.isDeclarationInstanceMember ==
-          setter.isDeclarationInstanceMember) {
+      bool conflict = member.isDeclarationInstanceMember !=
+          setter.isDeclarationInstanceMember;
+      if (member.isField) {
+        if (!member.isConst && !member.isFinal) {
+          // Setter with writable field.
+          conflict = true;
+        }
+      } else if (member.isRegularMethod) {
+        // Setter with method.
+        conflict = true;
+      }
+      if (conflict) {
         addProblem(templateConflictsWithMember.withArguments(name),
             setter.charOffset, noLength);
         // TODO(ahe): Context argument to previous message?
         addProblem(templateConflictsWithSetter.withArguments(name),
-            member.charOffset, noLength);
-      } else {
-        addProblem(templateConflictsWithMemberWarning.withArguments(name),
-            setter.charOffset, noLength);
-        // TODO(ahe): Context argument to previous message?
-        addProblem(templateConflictsWithSetterWarning.withArguments(name),
             member.charOffset, noLength);
       }
     });

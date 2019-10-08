@@ -188,10 +188,6 @@ abstract class ClassBuilder implements DeclarationBuilder {
 
   void forEach(void f(String name, Builder builder));
 
-  @override
-  Builder lookupLocalMember(String name,
-      {bool setter: false, bool required: false});
-
   /// Find the first member of this class with [name]. This method isn't
   /// suitable for scope lookups as it will throw an error if the name isn't
   /// declared. The [scope] should be used for that. This method is used to
@@ -503,25 +499,21 @@ abstract class ClassBuilderImpl extends DeclarationBuilderImpl
                 declaration.setRedirectingFactoryBody(
                     targetBuilder.member, typeArguments);
               } else if (targetBuilder is AmbiguousBuilder) {
-                Message message = templateDuplicatedDeclarationUse
-                    .withArguments(redirectionTarget.fullNameForErrors);
-                if (declaration.isConst) {
-                  addProblem(message, declaration.charOffset, noLength);
-                } else {
-                  addProblem(message, declaration.charOffset, noLength);
-                }
+                addProblem(
+                    templateDuplicatedDeclarationUse
+                        .withArguments(redirectionTarget.fullNameForErrors),
+                    redirectionTarget.charOffset,
+                    noLength);
                 // CoreTypes aren't computed yet, and this is the outline
                 // phase. So we can't and shouldn't create a method body.
                 declaration.body = new RedirectingFactoryBody.unresolved(
                     redirectionTarget.fullNameForErrors);
               } else {
-                Message message = templateRedirectionTargetNotFound
-                    .withArguments(redirectionTarget.fullNameForErrors);
-                if (declaration.isConst) {
-                  addProblem(message, declaration.charOffset, noLength);
-                } else {
-                  addProblem(message, declaration.charOffset, noLength);
-                }
+                addProblem(
+                    templateRedirectionTargetNotFound
+                        .withArguments(redirectionTarget.fullNameForErrors),
+                    redirectionTarget.charOffset,
+                    noLength);
                 // CoreTypes aren't computed yet, and this is the outline
                 // phase. So we can't and shouldn't create a method body.
                 declaration.body = new RedirectingFactoryBody.unresolved(

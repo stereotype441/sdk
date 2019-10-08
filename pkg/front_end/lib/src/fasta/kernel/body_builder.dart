@@ -1044,15 +1044,11 @@ class BodyBuilder extends ScopeListener<JumpTarget>
           // that it is unresolved.
           assert(redirectingFactoryBody.isUnresolved);
           String errorName = redirectingFactoryBody.unresolvedName;
-
-          replacementNode = throwNoSuchMethodError(
-              forest.createNullLiteral(invocation.fileOffset),
-              errorName,
-              forest.createArguments(
-                  noLocation, invocation.arguments.positional,
-                  types: invocation.arguments.types,
-                  named: invocation.arguments.named),
-              initialTarget.fileOffset);
+          replacementNode = buildProblem(
+              fasta.templateMethodNotFound.withArguments(errorName),
+              invocation.fileOffset,
+              noLength,
+              suppressMessage: true);
         } else {
           Substitution substitution = Substitution.fromPairs(
               initialTarget.function.typeParameters,
@@ -1875,14 +1871,24 @@ class BodyBuilder extends ScopeListener<JumpTarget>
       Builder setter =
           _getCorrespondingSetterBuilder(scope, declaration, name, charOffset);
       // TODO(johnniwinther): Check for constantContext like below?
+      if (declaration.isField) {
+        declaration = null;
+      }
+      if (setter != null && (setter.isField || setter.isStatic)) {
+        setter = null;
+      }
+      if (declaration == null && setter == null) {
+        return new UnresolvedNameGenerator(
+            this, token, new Name(name, libraryBuilder.nameOrigin));
+      }
       return new ExtensionInstanceAccessGenerator.fromBuilder(
           this,
+          token,
           extensionBuilder.extension,
           name,
           extensionThis,
           extensionTypeParameters,
           declaration,
-          token,
           setter);
     } else if (declaration.isRegularMethod) {
       assert(declaration.isStatic || declaration.isTopLevel);
@@ -4909,7 +4915,7 @@ class BodyBuilder extends ScopeListener<JumpTarget>
       {List<LocatedMessage> context}) {
     int charOffset = expression.fileOffset;
     Severity severity = message.code.severity;
-    if (severity == Severity.error || severity == Severity.errorLegacyWarning) {
+    if (severity == Severity.error) {
       return wrapInLocatedProblem(
           expression, message.withLocation(uri, charOffset, length),
           context: context);
