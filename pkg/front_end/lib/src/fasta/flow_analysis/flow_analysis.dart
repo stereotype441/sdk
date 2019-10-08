@@ -39,8 +39,17 @@ class AssignedVariables<Node, Variable> {
   /// a node is left.
   final List<Set<Variable>> _writtenStack = [new Set<Variable>.identity()];
 
+  /// Stack of sets accumulating variables that are declared.
+  ///
+  /// A set is pushed onto the stack when a node is entered, and popped when
+  /// a node is left.
   final List<Set<Variable>> _declaredStack = [new Set<Variable>.identity()];
 
+  /// Stack of sets accumulating variables for which a potential write is
+  /// captured by a local function or closure.
+  ///
+  /// A set is pushed onto the stack when a node is entered, and popped when
+  /// a node is left.
   final List<Set<Variable>> _capturedStack = [new Set<Variable>.identity()];
 
   AssignedVariables();
@@ -69,6 +78,11 @@ class AssignedVariables<Node, Variable> {
     return _capturedInNode[node] ?? const {};
   }
 
+  /// This method should be called during pre-traversal, to indicate that the
+  /// declaration of a variable has been found.
+  ///
+  /// It is not required for the declaration to be seen prior to its use (this
+  /// is to allow for error recovery in the analyzer).
   void declare(Variable variable) {
     _declaredStack.last.add(variable);
   }
