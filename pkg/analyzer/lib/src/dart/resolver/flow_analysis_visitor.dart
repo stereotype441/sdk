@@ -209,7 +209,7 @@ class FlowAnalysisHelper {
   void topLevelDeclaration_enter(Declaration node) {
     assert(node != null);
     assert(flow == null);
-    flow = FlowAnalysisDebug<Statement, Expression, PromotableElement, DartType>(
+    flow = FlowAnalysis<Statement, Expression, PromotableElement, DartType>(
         _nodeOperations,
         _typeOperations,
         assignedVariables.writtenInNode(node),
