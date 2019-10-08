@@ -877,6 +877,7 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
   @override
   noSuchMethod(Invocation invocation) {
     _exceptionOccurred = true;
+    print('No such method: $invocation');
     return super.noSuchMethod(invocation);
   }
 
@@ -919,7 +920,9 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
     T result;
     try {
       result = callback();
-    } catch (e) {
+    } catch (e, st) {
+      print('  => EXCEPTION $e');
+      print('    ' + st.toString().replaceAll('\n', '\n    '));
       _exceptionOccurred = true;
       rethrow;
     }
