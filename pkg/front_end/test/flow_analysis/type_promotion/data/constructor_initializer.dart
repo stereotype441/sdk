@@ -10,7 +10,9 @@ class C {
   C.assertInitializer(Object x)
       : y = 0,
         assert((x is int ? /*int*/ x : throw 'foo') == 0) {
-    // Note: not promoted because the assertion doesn't execute in release mode.
+    // TODO(paulberry): should not be promoted because the assertion won't
+    // execute in release mode.  See
+    // https://github.com/dart-lang/sdk/issues/38761
     /*int*/ x;
   }
 }
