@@ -129,7 +129,7 @@ class FlowAnalysisHelper {
     flow.handleContinue(target);
   }
 
-  void executableDeclaration_enter(FormalParameterList parameters, bool isClosure) {
+  void executableDeclaration_enter(Declaration node, FormalParameterList parameters, bool isClosure) {
     if (parameters != null) {
       for (var parameter in parameters.parameters) {
         flow.initialize(parameter.declaredElement);
@@ -141,7 +141,7 @@ class FlowAnalysisHelper {
     }
   }
 
-  void executableDeclaration_exit(FunctionBody body) {
+  void executableDeclaration_exit(FunctionBody body, bool isClosure) {
     if (isClosure) {
       flow.functionExpression_end();
     }      
@@ -205,7 +205,7 @@ class FlowAnalysisHelper {
     return false;
   }
 
-  void topLevelDeclaration_enter(AstNode node, bool HACK) {
+  void topLevelDeclaration_enter(Declaration node) {
     assert(flow == null);
     flow = FlowAnalysis<Statement, Expression, PromotableElement, DartType>(
       _nodeOperations,
