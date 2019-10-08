@@ -372,9 +372,6 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
   void visitFunctionDeclaration(FunctionDeclaration node) {
     bool isClosure = node.parent is! CompilationUnit;
     assignedVariables.beginNode();
-    if (isClosure) {
-      _declareParameters(node.functionExpression.parameters);
-    }
     // Note: we bypass this.visitFunctionExpression so that the function
     // expression isn't mistaken for a closure.
     super.visitFunctionExpression(node.functionExpression);
@@ -384,7 +381,6 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
   @override
   void visitFunctionExpression(FunctionExpression node) {
     assignedVariables.beginNode();
-    _declareParameters(node.parameters);
     super.visitFunctionExpression(node);
     assignedVariables.endNode(node, isClosure: true);
   }
@@ -443,12 +439,6 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
     assignedVariables.beginNode();
     super.visitWhileStatement(node);
     assignedVariables.endNode(node);
-  }
-
-  void _declareParameters(FormalParameterList parameters) {
-    for (var parameter in parameters.parameters) {
-      assignedVariables.declare(parameter.declaredElement);
-    }
   }
 
   void _handleFor(AstNode node, ForLoopParts forLoopParts, AstNode body) {
