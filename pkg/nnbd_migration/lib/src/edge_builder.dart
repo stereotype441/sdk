@@ -1874,7 +1874,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
               source: elementType, destination: lhsType, hard: false);
         }
       }
-      _flowAnalysis.forEach_bodyBegin(_assignedVariables.writtenInNode(node),
+      _flowAnalysis.forEach_bodyBegin(
+          _assignedVariables.writtenInNode(node),
           _assignedVariables.capturedInNode(node),
           lhsElement is PromotableElement ? lhsElement : null);
     }

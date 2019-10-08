@@ -4015,12 +4015,13 @@ class ResolverVisitor extends ScopedVisitor {
       SimpleIdentifier functionName = node.name;
       if (_flowAnalysis != null) {
         if (isFunctionDeclarationStatement) {
-          _flowAnalysis.flow.functionExpression_begin(_flowAnalysis.assignedVariables.writtenInNode(node));
+          _flowAnalysis.flow.functionExpression_begin(
+              _flowAnalysis.assignedVariables.writtenInNode(node));
         } else {
           _flowAnalysis.topLevelDeclaration_enter(node);
         }
-        _flowAnalysis
-            .executableDeclaration_enter(node, node.functionExpression.parameters, isFunctionDeclarationStatement);
+        _flowAnalysis.executableDeclaration_enter(node,
+            node.functionExpression.parameters, isFunctionDeclarationStatement);
       }
       _promoteManager.enterFunctionBody(node.functionExpression.body);
       _enclosingFunction = functionName.staticElement as ExecutableElement;
@@ -4029,7 +4030,8 @@ class ResolverVisitor extends ScopedVisitor {
       super.visitFunctionDeclaration(node);
     } finally {
       if (_flowAnalysis != null) {
-        _flowAnalysis.executableDeclaration_exit(node.functionExpression.body, isFunctionDeclarationStatement);
+        _flowAnalysis.executableDeclaration_exit(
+            node.functionExpression.body, isFunctionDeclarationStatement);
         if (isFunctionDeclarationStatement) {
           _flowAnalysis.flow.functionExpression_end();
         } else {

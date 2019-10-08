@@ -129,7 +129,8 @@ class FlowAnalysisHelper {
     flow.handleContinue(target);
   }
 
-  void executableDeclaration_enter(Declaration node, FormalParameterList parameters, bool isClosure) {
+  void executableDeclaration_enter(
+      Declaration node, FormalParameterList parameters, bool isClosure) {
     if (parameters != null) {
       for (var parameter in parameters.parameters) {
         flow.initialize(parameter.declaredElement);
@@ -144,7 +145,7 @@ class FlowAnalysisHelper {
   void executableDeclaration_exit(FunctionBody body, bool isClosure) {
     if (isClosure) {
       flow.functionExpression_end();
-    }      
+    }
     if (!flow.isReachable) {
       result?.functionBodiesThatDontComplete?.add(body);
     }
@@ -156,7 +157,7 @@ class FlowAnalysisHelper {
 
   void for_conditionBegin(AstNode node, Expression condition) {
     flow.for_conditionBegin(assignedVariables.writtenInNode(node),
-    assignedVariables.capturedInNode(node));
+        assignedVariables.capturedInNode(node));
   }
 
   void isExpression(IsExpression node) {
@@ -208,10 +209,10 @@ class FlowAnalysisHelper {
   void topLevelDeclaration_enter(Declaration node) {
     assert(flow == null);
     flow = FlowAnalysis<Statement, Expression, PromotableElement, DartType>(
-      _nodeOperations,
-      _typeOperations,
-          assignedVariables.writtenInNode(node),
-          assignedVariables.capturedInNode(node));
+        _nodeOperations,
+        _typeOperations,
+        assignedVariables.writtenInNode(node),
+        assignedVariables.capturedInNode(node));
   }
 
   void topLevelDeclaration_exit() {

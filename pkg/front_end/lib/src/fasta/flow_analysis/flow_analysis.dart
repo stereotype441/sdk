@@ -457,6 +457,12 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _current = trueCondition;
   }
 
+  /// Register an initialized declaration of the given [variable] in the current
+  /// state.  Should also be called for function parameters.
+  void initialize(Variable variable) {
+    _current = _current.write(variable);
+  }
+
   /// Return whether the [variable] is definitely assigned in the current state.
   bool isAssigned(Variable variable) {
     return _current.infoFor(variable).assigned;
@@ -674,12 +680,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
             _variablesCapturedAnywhere.contains(variable),
         "Variable is captured by a local function, but was not included in "
         "_variablesCapturedAnywhere");
-    _current = _current.write(variable);
-  }
-
-  /// Register an initialized declaration of the given [variable] in the current
-  /// state.  Should also be called for function parameters.
-  void initialize(Variable variable) {
     _current = _current.write(variable);
   }
 
