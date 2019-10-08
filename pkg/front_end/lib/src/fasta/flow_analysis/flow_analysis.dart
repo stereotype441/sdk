@@ -37,24 +37,11 @@ class AssignedVariables<Node, Variable> {
   ///
   /// A set is pushed onto the stack when a node is entered, and popped when
   /// a node is left.
-  final List<Set<Variable>> _writtenStack = [];
+  final List<Set<Variable>> _writtenStack = [new Set<Variable>.identity()];
 
-  /// Stack of sets accumulating variables for which a potential write is
-  /// captured by a local function or closure.
-  ///
-  /// A set is pushed onto the stack when a node is entered, and popped when
-  /// a node is left.
-  final List<Set<Variable>> _capturedStack = [];
+  final List<Set<Variable>> _declaredStack = [new Set<Variable>.identity()];
 
-  /// Stack of integers counting the number of entries in [_capturedStack] that
-  /// should be updated when a variable write is seen.
-  ///
-  /// When a closure is entered, the length of [_capturedStack] is pushed onto
-  /// this stack; when a node is left, it is popped.
-  ///
-  /// Each time a write occurs, we consult the top of this stack to determine
-  /// how many elements of [capturedStack] should be updated.
-  final List<int> _closureIndexStack = [];
+  final List<Set<Variable>> _capturedStack = [new Set<Variable>.identity()];
 
   AssignedVariables();
 
@@ -70,11 +57,9 @@ class AssignedVariables<Node, Variable> {
   /// covered, but the initializers should not.  Similarly, in a switch
   /// statement, the body of the switch statement should be covered, but the
   /// switch expression should not.
-  void beginNode({bool isClosure: false}) {
+  void beginNode() {
     _writtenStack.add(new Set<Variable>.identity());
-    if (isClosure) {
-      _closureIndexStack.add(_capturedStack.length);
-    }
+    _declaredStack.add(new Set<Variable>.identity());
     _capturedStack.add(new Set<Variable>.identity());
   }
 
@@ -82,6 +67,10 @@ class AssignedVariables<Node, Variable> {
   /// local function or closure inside the [node].
   Set<Variable> capturedInNode(Node node) {
     return _capturedInNode[node] ?? const {};
+  }
+
+  void declare(Variable variable) {
+    _declaredStack.last.add(variable);
   }
 
   /// This method should be called during pre-traversal, to mark the end of a
@@ -92,25 +81,26 @@ class AssignedVariables<Node, Variable> {
   ///
   /// See [beginNode] for more details.
   void endNode(Node node, {bool isClosure: false}) {
-    _writtenInNode[node] = _writtenStack.removeLast();
-    _capturedInNode[node] = _capturedStack.removeLast();
+    var writtenInThisNode = _writtenStack.removeLast();
+    var declaredInThisNode = _declaredStack.removeLast();
+    var capturedInThisNode = _capturedStack.removeLast();
+    _writtenInNode[node] = writtenInThisNode;
+    _capturedInNode[node] = capturedInThisNode;
+    var writesVisibleToEnclosingNode =
+        writtenInThisNode.difference(declaredInThisNode);
+    _writtenStack.last.addAll(writesVisibleToEnclosingNode);
+    var capturesVisibleToEnclosingNode =
+        capturedInThisNode.difference(declaredInThisNode);
+    _capturedStack.last.addAll(capturesVisibleToEnclosingNode);
     if (isClosure) {
-      _closureIndexStack.removeLast();
+      _capturedStack.last.addAll(writesVisibleToEnclosingNode);
     }
   }
 
   /// This method should be called during pre-traversal, to mark a write to a
   /// variable.
   void write(Variable variable) {
-    for (int i = 0; i < _writtenStack.length; ++i) {
-      _writtenStack[i].add(variable);
-    }
-    if (_closureIndexStack.isNotEmpty) {
-      int closureIndex = _closureIndexStack.last;
-      for (int i = 0; i < closureIndex; ++i) {
-        _capturedStack[i].add(variable);
-      }
-    }
+    _writtenStack.last.add(variable);
   }
 
   /// Queries the set of variables that are potentially written to inside the
