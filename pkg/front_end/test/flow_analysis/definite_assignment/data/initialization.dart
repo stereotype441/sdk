@@ -14,6 +14,7 @@ localParameter() {
   localFunction(int a) {
     a;
   }
+
   (int b) {
     b;
   };

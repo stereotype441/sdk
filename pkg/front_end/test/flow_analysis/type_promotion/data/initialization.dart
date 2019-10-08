@@ -23,6 +23,7 @@ localParameter() {
       };
     }
   }
+
   (Object b) {
     if (b is int) {
       () {

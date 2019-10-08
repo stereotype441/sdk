@@ -12,6 +12,7 @@ ability
 able
 abort
 aborted
+aborting
 aborts
 about
 above
@@ -103,6 +104,7 @@ although
 always
 ambiguous
 among
+amongst
 amount
 ampersand
 an
@@ -331,7 +333,9 @@ calls
 can
 can't
 cancel
+cancellation
 cancelled
+cancels
 candidate
 candidates
 cannot
@@ -568,6 +572,7 @@ continue
 continued
 continues
 continuing
+contraposition
 contrast
 contravariance
 contravariant
@@ -666,6 +671,7 @@ deduced
 deep
 default
 defaults
+defeating
 defensive
 defer
 deferred
@@ -958,6 +964,7 @@ excluding
 exclusive
 executable
 executed
+executes
 execution
 exercise
 exist
@@ -1396,6 +1403,7 @@ interaction
 intercept
 interceptors
 interest
+interesting
 interface
 interfaces
 interferes
@@ -1414,6 +1422,7 @@ interpreter
 interpreting
 intersect
 intersection
+intertwined
 into
 intrinsic
 introduce
@@ -2040,6 +2049,7 @@ presence
 present
 preserve
 preserved
+preserves
 preserving
 presumed
 pretend
@@ -2564,6 +2574,7 @@ step
 steps
 still
 stop
+stopping
 stops
 stopwatch
 store
@@ -2648,6 +2659,7 @@ sure
 surrogate
 surrogates
 surrounding
+survive
 survives
 suspect
 swap
@@ -2699,6 +2711,7 @@ terminates
 terminating
 termination
 terminology
+terms
 ternary
 test
 testcase
@@ -2805,6 +2818,7 @@ triples
 triplet
 triplets
 trivial
+trouble
 true
 truly
 truncate
@@ -2976,6 +2990,7 @@ warnings
 was
 wasn't
 way
+ways
 we
 we'd
 we'll

@@ -10,7 +10,7 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
-import 'package:analyzer/src/dart/element/type.dart';
+import 'package:analyzer/src/dart/element/type_algebra.dart';
 import 'package:analyzer/src/generated/resolver.dart' show TypeProvider;
 import 'package:analyzer/src/summary/format.dart';
 import 'package:analyzer/src/summary/idl.dart';
@@ -154,19 +154,7 @@ class InstanceMemberInferrer {
           parameter, index, overriddenTypes[i].parameters);
       DartType type = matchingParameter?.type ?? typeProvider.dynamicType;
       if (parameterType == null) {
-        if (type is FunctionType &&
-            type.element != null &&
-            type.element is! TypeDefiningElement &&
-            type.element.enclosingElement is! TypeDefiningElement) {
-          // The resulting parameter's type element has an `enclosingElement` of
-          // the overridden parameter. Change it to the overriding parameter.
-          parameterType = new FunctionTypeImpl.fresh(type, force: true);
-          (parameterType.element as ElementImpl).enclosingElement = parameter;
-          // TODO(mfairhurst) handle cases where non-functions contain functions
-          // See test_inferredType_parameter_genericFunctionType_asTypeArgument
-        } else {
-          parameterType = type;
-        }
+        parameterType = type;
       } else if (parameterType != type) {
         if (parameter is ParameterElementImpl && parameter.linkedNode != null) {
           LazyAst.setTypeInferenceError(
@@ -488,16 +476,19 @@ class InstanceMemberInferrer {
    */
   FunctionType _toOverriddenFunctionType(
       ExecutableElement element, ExecutableElement overriddenElement) {
-    List<DartType> typeFormals =
-        TypeParameterTypeImpl.getTypes(element.type.typeFormals);
-    FunctionType overriddenType = overriddenElement.type;
-    if (overriddenType.typeFormals.isNotEmpty) {
-      if (overriddenType.typeFormals.length != typeFormals.length) {
-        return null;
-      }
-      overriddenType = overriddenType.instantiate(typeFormals);
+    var elementTypeParameters = element.typeParameters;
+    var overriddenTypeParameters = overriddenElement.typeParameters;
+
+    if (elementTypeParameters.length != overriddenTypeParameters.length) {
+      return null;
     }
-    return overriddenType;
+
+    var overriddenType = overriddenElement.type;
+    if (elementTypeParameters.isEmpty) {
+      return overriddenType;
+    }
+
+    return replaceTypeParameters(overriddenType, elementTypeParameters);
   }
 
   /**

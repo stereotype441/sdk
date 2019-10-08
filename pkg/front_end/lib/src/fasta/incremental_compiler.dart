@@ -9,11 +9,9 @@ import 'dart:async' show Future;
 import 'package:front_end/src/fasta/dill/dill_class_builder.dart'
     show DillClassBuilder;
 
-import 'package:kernel/binary/ast_from_binary.dart' show BinaryBuilder;
-
 import 'package:kernel/binary/ast_from_binary.dart'
     show
-        BinaryBuilder,
+        BinaryBuilderWithMetadata,
         CanonicalNameError,
         CanonicalNameSdkError,
         InvalidKernelVersionError;
@@ -51,7 +49,9 @@ import '../api_prototype/incremental_kernel_generator.dart'
 
 import '../api_prototype/memory_file_system.dart' show MemoryFileSystem;
 
-import 'builder/builder.dart' show Builder, ClassBuilder, LibraryBuilder;
+import 'builder/class_builder.dart';
+import 'builder/declaration.dart';
+import 'builder/library_builder.dart';
 
 import 'builder_graph.dart' show BuilderGraph;
 
@@ -730,7 +730,7 @@ class IncrementalCompiler implements IncrementalKernelGenerator {
     if (summaryBytes != null) {
       ticker.logMs("Read ${c.options.sdkSummary}");
       data.component = c.options.target.configureComponent(new Component());
-      new BinaryBuilder(summaryBytes,
+      new BinaryBuilderWithMetadata(summaryBytes,
               disableLazyReading: false, disableLazyClassReading: true)
           .readComponent(data.component);
       ticker.logMs("Deserialized ${c.options.sdkSummary}");
@@ -755,7 +755,8 @@ class IncrementalCompiler implements IncrementalKernelGenerator {
 
         // We're going to output all we read here so lazy loading it
         // doesn't make sense.
-        new BinaryBuilder(initializationBytes, disableLazyReading: true)
+        new BinaryBuilderWithMetadata(initializationBytes,
+                disableLazyReading: true)
             .readComponent(data.component, checkCanonicalNames: true);
 
         // Check the any package-urls still point to the same file

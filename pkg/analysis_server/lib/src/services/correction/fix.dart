@@ -142,6 +142,10 @@ class DartFixKind {
       const FixKind('ADD_CONST', 50, "Add 'const' modifier");
   static const ADD_CURLY_BRACES =
       const FixKind('ADD_CURLY_BRACES', 50, "Add curly braces");
+  static const ADD_DIAGNOSTIC_PROPERTY_REFERENCE = const FixKind(
+      'ADD_DIAGNOSTIC_PROPERTY_REFERENCE',
+      50,
+      "Add a debug reference to this property");
   static const ADD_FIELD_FORMAL_PARAMETERS = const FixKind(
       'ADD_FIELD_FORMAL_PARAMETERS', 70, "Add final field formal parameters");
   static const ADD_MISSING_ENUM_CASE_CLAUSES = const FixKind(
@@ -201,6 +205,8 @@ class DartFixKind {
       const FixKind('CONVERT_TO_NULL_AWARE', 50, "Convert to use '?.'");
   static const CONVERT_TO_PACKAGE_IMPORT = const FixKind(
       'CONVERT_TO_PACKAGE_IMPORT', 50, "Convert to 'package:' import");
+  static const CONVERT_TO_RELATIVE_IMPORT = const FixKind(
+      'CONVERT_TO_RELATIVE_IMPORT', 50, "Convert to relative import");
   static const CONVERT_TO_SINGLE_QUOTED_STRING = const FixKind(
       'CONVERT_TO_SINGLE_QUOTED_STRING', 50, "Convert to single quoted string");
   static const CONVERT_TO_SPREAD =

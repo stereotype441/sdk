@@ -531,7 +531,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
     ClassElementImpl outerClass = _enclosingClass;
     try {
       _isInNativeClass = node.nativeClause != null;
-      _enclosingClass = AbstractClassElementImpl.getImpl(node.declaredElement);
+      _enclosingClass = node.declaredElement;
 
       List<ClassMember> members = node.members;
       _duplicateDefinitionVerifier.checkClass(node);
@@ -569,7 +569,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
         node.name, CompileTimeErrorCode.BUILT_IN_IDENTIFIER_AS_TYPEDEF_NAME);
     ClassElementImpl outerClassElement = _enclosingClass;
     try {
-      _enclosingClass = AbstractClassElementImpl.getImpl(node.declaredElement);
+      _enclosingClass = node.declaredElement;
       _checkClassInheritance(
           node, node.superclass, node.withClause, node.implementsClause);
       _checkForWrongTypeParameterVarianceInSuperinterfaces();
@@ -1111,7 +1111,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
     // TODO(scheglov) Verify for all mixin errors.
     ClassElementImpl outerClass = _enclosingClass;
     try {
-      _enclosingClass = AbstractClassElementImpl.getImpl(node.declaredElement);
+      _enclosingClass = node.declaredElement;
 
       List<ClassMember> members = node.members;
       _duplicateDefinitionVerifier.checkMixin(node);
@@ -3904,8 +3904,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
   /// implementations of all the super-invoked members of the [mixinElement].
   bool _checkForMixinSuperInvokedMembers(int mixinIndex, TypeName mixinName,
       ClassElement mixinElement, InterfaceType mixinType) {
-    ClassElementImpl mixinElementImpl =
-        AbstractClassElementImpl.getImpl(mixinElement);
+    ClassElementImpl mixinElementImpl = mixinElement;
     if (mixinElementImpl.superInvokedNames.isEmpty) {
       return false;
     }
@@ -4538,7 +4537,8 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
    * redirected constructor invocation(s), super constructor invocations and
    * field initializers.
    *
-   * See [CompileTimeErrorCode.DEFAULT_VALUE_IN_REDIRECTING_FACTORY_CONSTRUCTOR],
+   * See [CompileTimeErrorCode.ASSERT_IN_REDIRECTING_CONSTRUCTOR],
+   * [CompileTimeErrorCode.DEFAULT_VALUE_IN_REDIRECTING_FACTORY_CONSTRUCTOR],
    * [CompileTimeErrorCode.FIELD_INITIALIZER_REDIRECTING_CONSTRUCTOR],
    * [CompileTimeErrorCode.MULTIPLE_REDIRECTING_CONSTRUCTOR_INVOCATIONS],
    * [CompileTimeErrorCode.SUPER_IN_REDIRECTING_CONSTRUCTOR], and
@@ -4604,6 +4604,11 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
         if (initializer is ConstructorFieldInitializer) {
           _errorReporter.reportErrorForNode(
               CompileTimeErrorCode.FIELD_INITIALIZER_REDIRECTING_CONSTRUCTOR,
+              initializer);
+        }
+        if (initializer is AssertInitializer) {
+          _errorReporter.reportErrorForNode(
+              CompileTimeErrorCode.ASSERT_IN_REDIRECTING_CONSTRUCTOR,
               initializer);
         }
       }
@@ -5426,11 +5431,12 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
               // Try to pattern match matchingInterfaceType against
               // mixinSupertypeConstraint to find the correct set of type
               // parameters to apply to the mixin.
-              var matchedType = _typeSystem.matchSupertypeConstraints(
-                  mixinElement,
-                  mixinSupertypeConstraints,
-                  matchingInterfaceTypes);
-              if (matchedType == null) {
+              var inferredTypeArguments = _typeSystem.matchSupertypeConstraints(
+                mixinElement,
+                mixinSupertypeConstraints,
+                matchingInterfaceTypes,
+              );
+              if (inferredTypeArguments == null) {
                 _errorReporter.reportErrorForToken(
                     CompileTimeErrorCode
                         .MIXIN_INFERENCE_NO_POSSIBLE_SUBSTITUTION,
@@ -5490,10 +5496,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
       Token keyword = parameter.covariantKeyword;
       if (keyword != null) {
         if (_enclosingExtension != null) {
-          _errorReporter.reportErrorForToken(
-            CompileTimeErrorCode.INVALID_USE_OF_COVARIANT_IN_EXTENSION,
-            keyword,
-          );
+          // Reported by the parser.
         } else {
           _errorReporter.reportErrorForToken(
             CompileTimeErrorCode.INVALID_USE_OF_COVARIANT,

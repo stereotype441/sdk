@@ -7,7 +7,6 @@ import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
-import 'package:analyzer/src/dart/element/handle.dart';
 import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
 import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/dart/element/type.dart';
@@ -459,9 +458,6 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     var classElement = node.declaredElement;
     var supertype = classElement.supertype;
     var superElement = supertype.element;
-    if (superElement is ClassElementHandle) {
-      superElement = (superElement as ClassElementHandle).actualElement;
-    }
     for (var constructorElement in classElement.constructors) {
       assert(constructorElement.isSynthetic);
       var superConstructorElement =
@@ -563,7 +559,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     } else {
       _handleAssignment(defaultValue,
           destinationType: getOrComputeElementType(node.declaredElement),
-          canInsertChecks: false);
+          fromDefaultValue: true);
     }
     return null;
   }
@@ -595,21 +591,15 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
           '(parent is ${node.parent.runtimeType})');
     }
     _handleAssignment(node.expression,
-        destinationType: _currentFunctionType.returnType);
+        destinationType: _currentFunctionType.returnType,
+        wrapFuture: node.isAsynchronous);
     return null;
   }
 
   @override
   DecoratedType visitFieldDeclaration(FieldDeclaration node) {
     node.metadata.accept(this);
-    _createFlowAnalysis(node);
-    try {
-      node.fields.accept(this);
-    } finally {
-      _flowAnalysis.finish();
-      _flowAnalysis = null;
-      _assignedVariables = null;
-    }
+    node.fields.accept(this);
     return null;
   }
 
@@ -1086,19 +1076,15 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   DecoratedType visitReturnStatement(ReturnStatement node) {
     DecoratedType returnType = _currentFunctionType.returnType;
     Expression returnValue = node.expression;
-    // TODO(danrubel): This does not handle situations where the returnType
-    // or the returnValue's type extends or implements dart:async Future.
-    if ((returnType.type.isDartAsyncFuture ||
-            returnType.type.isDartAsyncFutureOr) &&
-        node.thisOrAncestorOfType<FunctionBody>().isAsynchronous &&
-        !returnValue.staticType.isDartAsyncFuture) {
-      returnType = returnType.typeArguments.first;
-    }
+    final isAsync = node.thisOrAncestorOfType<FunctionBody>().isAsynchronous;
     if (returnValue == null) {
       _checkAssignment(null,
-          source: _nullType, destination: returnType, hard: false);
+          source: isAsync ? _futureOf(_nullType) : _nullType,
+          destination: returnType,
+          hard: false);
     } else {
-      _handleAssignment(returnValue, destinationType: returnType);
+      _handleAssignment(returnValue,
+          destinationType: returnType, wrapFuture: isAsync);
     }
 
     _flowAnalysis.handleExit();
@@ -1285,14 +1271,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   DecoratedType visitTopLevelVariableDeclaration(
       TopLevelVariableDeclaration node) {
     node.metadata.accept(this);
-    _createFlowAnalysis(node);
-    try {
-      node.variables.accept(this);
-    } finally {
-      _flowAnalysis.finish();
-      _flowAnalysis = null;
-      _assignedVariables = null;
-    }
+    node.variables.accept(this);
     return null;
   }
 
@@ -1367,26 +1346,39 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   @override
   DecoratedType visitVariableDeclarationList(VariableDeclarationList node) {
     node.metadata.accept(this);
+    var parent = node.parent;
+    bool isTopLevel =
+        parent is TopLevelVariableDeclaration || parent is FieldDeclaration;
     var typeAnnotation = node.type;
     for (var variable in node.variables) {
       variable.metadata.accept(this);
       var initializer = variable.initializer;
-      var declaredElement = variable.declaredElement;
-      if (declaredElement is PromotableElement && initializer != null) {
-        _flowAnalysis.initialize(declaredElement);
-      }
       if (initializer != null) {
-        var destinationType = getOrComputeElementType(declaredElement);
-        if (typeAnnotation == null) {
-          var initializerType = initializer.accept(this);
-          if (initializerType == null) {
-            throw StateError('No type computed for ${initializer.runtimeType} '
-                '(${initializer.toSource()}) offset=${initializer.offset}');
+        if (isTopLevel) _createFlowAnalysis(variable);
+        try {
+          var declaredElement = variable.declaredElement;
+          if (declaredElement is PromotableElement) {
+            _flowAnalysis.initialize(declaredElement);
           }
-          _unionDecoratedTypes(initializerType, destinationType,
-              InitializerInferenceOrigin(source, variable));
-        } else {
-          _handleAssignment(initializer, destinationType: destinationType);
+          var destinationType = getOrComputeElementType(declaredElement);
+          if (typeAnnotation == null) {
+            var initializerType = initializer.accept(this);
+            if (initializerType == null) {
+              throw StateError(
+                  'No type computed for ${initializer.runtimeType} '
+                  '(${initializer.toSource()}) offset=${initializer.offset}');
+            }
+            _unionDecoratedTypes(initializerType, destinationType,
+                InitializerInferenceOrigin(source, variable));
+          } else {
+            _handleAssignment(initializer, destinationType: destinationType);
+          }
+        } finally {
+          if (isTopLevel) {
+            _flowAnalysis.finish();
+            _flowAnalysis = null;
+            _assignedVariables = null;
+          }
         }
       }
     }
@@ -1578,6 +1570,10 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     }
   }
 
+  DecoratedType _futureOf(DecoratedType type) => DecoratedType.forImplicitType(
+      _typeProvider, _typeProvider.futureType2(type.type), _graph,
+      typeArguments: [type]);
+
   @override
   DecoratedType _getTypeParameterTypeBound(DecoratedType type) {
     // TODO(paulberry): once we've wired up flow analysis, return promoted
@@ -1593,12 +1589,15 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   /// [destinationType].  In this case, then the type comes from visiting the
   /// destination expression.  If the destination expression refers to a local
   /// variable, we mark it as assigned in flow analysis at the proper time.
+  ///
+  /// Set [wrapFuture] to true to handle assigning Future<flatten(T)> to R.
   DecoratedType _handleAssignment(Expression expression,
       {DecoratedType destinationType,
       Expression destinationExpression,
       AssignmentExpression compoundOperatorInfo,
       Expression questionAssignNode,
-      bool canInsertChecks = true}) {
+      bool fromDefaultValue = false,
+      bool wrapFuture = false}) {
     assert(
         (destinationExpression == null) != (destinationType == null),
         'Either destinationExpression or destinationType should be supplied, '
@@ -1617,22 +1616,32 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         destinationType = destinationExpression.accept(this);
       }
     }
+
     if (questionAssignNode != null) {
       _guards.add(destinationType.node);
     }
     DecoratedType sourceType;
     try {
       sourceType = expression.accept(this);
+      if (wrapFuture) {
+        sourceType = _wrapFuture(sourceType);
+      }
       if (sourceType == null) {
         throw StateError('No type computed for ${expression.runtimeType} '
             '(${expression.toSource()}) offset=${expression.offset}');
       }
-      ExpressionChecksOrigin expressionChecksOrigin;
-      if (canInsertChecks && !sourceType.type.isDynamic) {
-        expressionChecksOrigin = ExpressionChecksOrigin(
-            source, expression, ExpressionChecks(expression.end));
-        _variables.recordExpressionChecks(
-            source, expression, expressionChecksOrigin);
+      EdgeOrigin edgeOrigin;
+      if (!sourceType.type.isDynamic) {
+        if (fromDefaultValue) {
+          edgeOrigin = DefaultValueOrigin(source, expression);
+        } else {
+          ExpressionChecksOrigin expressionChecksOrigin =
+              ExpressionChecksOrigin(
+                  source, expression, ExpressionChecks(expression.end));
+          _variables.recordExpressionChecks(
+              source, expression, expressionChecksOrigin);
+          edgeOrigin = expressionChecksOrigin;
+        }
       }
       if (compoundOperatorInfo != null) {
         var compoundOperatorMethod = compoundOperatorInfo.staticElement;
@@ -1643,10 +1652,11 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
               destination: _notNullType,
               hard: _postDominatedLocals
                   .isReferenceInScope(destinationExpression));
-          DecoratedType compoundOperatorType =
-              getOrComputeElementType(compoundOperatorMethod);
+          DecoratedType compoundOperatorType = getOrComputeElementType(
+              compoundOperatorMethod,
+              targetType: destinationType);
           assert(compoundOperatorType.positionalParameters.length > 0);
-          _checkAssignment(expressionChecksOrigin,
+          _checkAssignment(edgeOrigin,
               source: sourceType,
               destination: compoundOperatorType.positionalParameters[0],
               hard: _postDominatedLocals.isReferenceInScope(expression));
@@ -1661,10 +1671,11 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
           sourceType = _dynamicType;
         }
       } else {
-        _checkAssignment(expressionChecksOrigin,
+        _checkAssignment(edgeOrigin,
             source: sourceType,
             destination: destinationType,
-            hard: _postDominatedLocals.isReferenceInScope(expression));
+            hard: questionAssignNode == null &&
+                _postDominatedLocals.isReferenceInScope(expression));
       }
       if (questionAssignNode != null) {
         // a ??= b is only nullable if both a and b are nullable.
@@ -1865,7 +1876,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
               source: elementType, destination: lhsType, hard: false);
         }
       }
-      _flowAnalysis.forEach_bodyBegin(_assignedVariables.writtenInNode(node),
+      _flowAnalysis.forEach_bodyBegin(
+          _assignedVariables.writtenInNode(node),
           _assignedVariables.capturedInNode(node),
           lhsElement is PromotableElement ? lhsElement : null);
     }
@@ -2140,6 +2152,18 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       _unionDecoratedTypes(x.returnType, y.returnType, origin);
     }
   }
+
+  /// Produce Future<flatten(T)> for some T, however, we would like to merely
+  /// upcast T to that type if possible, skipping the flatten when not
+  /// necessary.
+  DecoratedType _wrapFuture(DecoratedType type) {
+    if (_typeSystem.isSubtypeOf(type.type, _typeProvider.futureDynamicType)) {
+      return _decoratedClassHierarchy.asInstanceOf(
+          type, _typeProvider.futureDynamicType.element);
+    }
+
+    return _futureOf(type);
+  }
 }
 
 /// Implementation of [_checkAssignment] for [EdgeBuilder].
@@ -2162,6 +2186,21 @@ mixin _AssignmentChecker {
       {@required DecoratedType source,
       @required DecoratedType destination,
       @required bool hard}) {
+    var sourceType = source.type;
+    var destinationType = destination.type;
+    if (!_typeSystem.isSubtypeOf(sourceType, destinationType)) {
+      // Not a proper upcast assignment.
+      if (_typeSystem.isSubtypeOf(destinationType, sourceType)) {
+        // But rather a downcast.
+        _checkDowncast(origin,
+            source: source, destination: destination, hard: hard);
+        return;
+      }
+      // Neither a proper upcast assignment nor an implicit downcast (some
+      // illegal code, or we did something wrong to get here).
+      assert(false, 'side cast not supported: $sourceType to $destinationType');
+      return;
+    }
     _connect(source.node, destination.node, origin, hard: hard);
     _checkAssignment_recursion(origin,
         source: source, destination: destination);
@@ -2174,35 +2213,7 @@ mixin _AssignmentChecker {
       {@required DecoratedType source, @required DecoratedType destination}) {
     var sourceType = source.type;
     var destinationType = destination.type;
-    if (!_typeSystem.isSubtypeOf(sourceType, destinationType)) {
-      // Not a proper upcast assignment.  It is either an implicit downcast or
-      // some illegal code.  It's handled on a "best effort" basis.
-      if (destinationType is TypeParameterType &&
-          sourceType is! TypeParameterType) {
-        // Assume an assignment to the type parameter's bound.
-        _checkAssignment(origin,
-            source: source,
-            destination:
-                _getTypeParameterTypeBound(destination).withNode(_graph.always),
-            hard: false);
-        return;
-      }
-      if (sourceType is InterfaceType && destinationType is InterfaceType) {
-        if (_typeSystem.isSubtypeOf(destinationType, sourceType)) {
-          var rewrittenDestination = _decoratedClassHierarchy.asInstanceOf(
-              destination, sourceType.element);
-          assert(rewrittenDestination.typeArguments.length ==
-              source.typeArguments.length);
-          for (int i = 0; i < rewrittenDestination.typeArguments.length; i++) {
-            _checkAssignment(origin,
-                source: source.typeArguments[i],
-                destination: rewrittenDestination.typeArguments[i],
-                hard: false);
-          }
-        }
-      }
-      return;
-    }
+    assert(_typeSystem.isSubtypeOf(sourceType, destinationType));
     if (destinationType.isDartAsyncFutureOr) {
       var s1 = destination.typeArguments[0];
       if (sourceType.isDartAsyncFutureOr) {
@@ -2333,6 +2344,63 @@ mixin _AssignmentChecker {
       // code.  In either case we don't need to create any additional edges.
     } else {
       throw '$destination <= $source'; // TODO(paulberry)
+    }
+  }
+
+  void _checkDowncast(EdgeOrigin origin,
+      {@required DecoratedType source,
+      @required DecoratedType destination,
+      @required bool hard}) {
+    assert(_typeSystem.isSubtypeOf(destination.type, source.type));
+    // Nullability should narrow to maintain subtype relationship.
+    _connect(source.node, destination.node, origin, hard: hard);
+    if (source.type.isDynamic) {
+      assert(destination.typeFormals?.isEmpty ?? true,
+          'downcast to something with type parameters not yet supported.');
+      assert(destination is! FunctionType,
+          'downcast to function type not yet supported.');
+      if (destination.type is ParameterizedType) {
+        for (final param
+            in (destination.type as ParameterizedType).typeParameters) {
+          assert(param.type.bound.isDynamic,
+              'downcast to type parameters with bounds not supported');
+        }
+      }
+
+      for (final arg in destination.typeArguments) {
+        // We cannot assume we're downcasting to C<T!>. Downcast to C<T?>.
+        _checkDowncast(origin, source: source, destination: arg, hard: false);
+      }
+    } else if (destination.type is TypeParameterType &&
+        source.type is! TypeParameterType) {
+      // Assume an assignment to the type parameter's bound.
+      _checkAssignment(origin,
+          source: source,
+          destination:
+              _getTypeParameterTypeBound(destination).withNode(_graph.always),
+          hard: false);
+    } else if (destination.type is InterfaceTypeImpl) {
+      assert(source.typeArguments.isEmpty,
+          'downcast from interface type with type args not supported.');
+      if (destination.type is ParameterizedType) {
+        for (final param
+            in (destination.type as ParameterizedType).typeParameters) {
+          assert(param.type.bound.isDynamic,
+              'downcast to type parameters with bounds not supported');
+        }
+      }
+      for (final arg in destination.typeArguments) {
+        // We cannot assume we're downcasting to C<T!>. Downcast to C<T?>.
+        _checkDowncast(origin,
+            source: DecoratedType(_typeProvider.dynamicType, _graph.always),
+            destination: arg,
+            hard: false);
+      }
+    } else {
+      assert(
+          false,
+          'downcasting from ${source.type.runtimeType} to '
+          '${destination.type.runtimeType} not supported.');
     }
   }
 

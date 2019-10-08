@@ -27,6 +27,7 @@ import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/resolver/exit_detector.dart';
 import 'package:analyzer/src/dart/resolver/extension_member_resolver.dart';
 import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
+import 'package:analyzer/src/dart/resolver/method_invocation_resolver.dart';
 import 'package:analyzer/src/dart/resolver/scope.dart';
 import 'package:analyzer/src/diagnostic/diagnostic_factory.dart';
 import 'package:analyzer/src/error/codes.dart';
@@ -232,7 +233,7 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
 
   @override
   void visitClassDeclaration(ClassDeclaration node) {
-    var element = AbstractClassElementImpl.getImpl(node.declaredElement);
+    ClassElementImpl element = node.declaredElement;
     _enclosingClass = element;
     _invalidAccessVerifier._enclosingClass = element;
 
@@ -344,6 +345,17 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
   }
 
   @override
+  void visitFunctionExpressionInvocation(FunctionExpressionInvocation node) {
+    var callElement = node.staticElement;
+    if (callElement is MethodElement &&
+        callElement.name == FunctionElement.CALL_METHOD_NAME) {
+      _checkForDeprecatedMemberUse(callElement, node);
+    }
+
+    super.visitFunctionExpressionInvocation(node);
+  }
+
+  @override
   void visitFunctionTypeAlias(FunctionTypeAlias node) {
     _checkStrictInferenceReturnType(node.returnType, node, node.name.name);
     super.visitFunctionTypeAlias(node);
@@ -442,12 +454,6 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
   @override
   void visitMethodInvocation(MethodInvocation node) {
     _checkForNullAwareHints(node, node.operator);
-    DartType staticInvokeType = node.staticInvokeType;
-    Element callElement = staticInvokeType?.element;
-    if (callElement is MethodElement &&
-        callElement.name == FunctionElement.CALL_METHOD_NAME) {
-      _checkForDeprecatedMemberUse(callElement, node);
-    }
     super.visitMethodInvocation(node);
   }
 
@@ -585,12 +591,9 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
     return false;
   }
 
-  /// Given some [Element], look at the associated metadata and report the use
-  /// of the member if it is declared as deprecated.
-  ///
-  /// @param element some element to check for deprecated use of
-  /// @param node the node use for the location of the error
-  /// See [HintCode.DEPRECATED_MEMBER_USE].
+  /// Given some [element], look at the associated metadata and report the use
+  /// of the member if it is declared as deprecated. If a diagnostic is reported
+  /// it should be reported at the given [node].
   void _checkForDeprecatedMemberUse(Element element, AstNode node) {
     bool isDeprecated(Element element) {
       if (element is PropertyAccessorElement && element.isSynthetic) {
@@ -650,10 +653,19 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
       }
       LibraryElement library =
           element is LibraryElement ? element : element.library;
-      HintCode hintCode = _isLibraryInWorkspacePackage(library)
-          ? HintCode.DEPRECATED_MEMBER_USE_FROM_SAME_PACKAGE
-          : HintCode.DEPRECATED_MEMBER_USE;
-      _errorReporter.reportErrorForNode(hintCode, node, [displayName]);
+      String message = _deprecatedMessage(element);
+      if (message == null || message.isEmpty) {
+        HintCode hintCode = _isLibraryInWorkspacePackage(library)
+            ? HintCode.DEPRECATED_MEMBER_USE_FROM_SAME_PACKAGE
+            : HintCode.DEPRECATED_MEMBER_USE;
+        _errorReporter.reportErrorForNode(hintCode, node, [displayName]);
+      } else {
+        HintCode hintCode = _isLibraryInWorkspacePackage(library)
+            ? HintCode.DEPRECATED_MEMBER_USE_FROM_SAME_PACKAGE_WITH_MESSAGE
+            : HintCode.DEPRECATED_MEMBER_USE_WITH_MESSAGE;
+        _errorReporter
+            .reportErrorForNode(hintCode, node, [displayName, message]);
+      }
     }
   }
 
@@ -1232,6 +1244,22 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
       return false;
     }
     return _workspacePackage.contains(library.source);
+  }
+
+  /// Return the message in the deprecated annotation on the given [element], or
+  /// `null` if the element doesn't have a deprecated annotation or if the
+  /// annotation does not have a message.
+  static String _deprecatedMessage(Element element) {
+    ElementAnnotationImpl annotation = element.metadata.firstWhere(
+      (e) => e.isDeprecated,
+      orElse: () => null,
+    );
+    if (annotation == null || annotation.element is PropertyAccessorElement) {
+      return null;
+    }
+    DartObject constantValue = annotation.computeConstantValue();
+    return constantValue?.getField('message')?.toStringValue() ??
+        constantValue?.getField('expires')?.toStringValue();
   }
 
   /// Check for the passed class declaration for the
@@ -3171,7 +3199,7 @@ class ResolverVisitor extends ScopedVisitor {
     }
   }
 
-  NullabilitySuffix get _noneOrStarSuffix {
+  NullabilitySuffix get noneOrStarSuffix {
     return _nonNullableEnabled
         ? NullabilitySuffix.none
         : NullabilitySuffix.star;
@@ -3241,7 +3269,7 @@ class ResolverVisitor extends ScopedVisitor {
     // parameter and return type are in terms of the surrounding context.
     return fnType.instantiate(typeParameters.map((TypeParameter t) {
       return t.declaredElement.instantiate(
-        nullabilitySuffix: _noneOrStarSuffix,
+        nullabilitySuffix: noneOrStarSuffix,
       );
     }).toList());
   }
@@ -3634,15 +3662,16 @@ class ResolverVisitor extends ScopedVisitor {
   void visitConstructorDeclaration(ConstructorDeclaration node) {
     ExecutableElement outerFunction = _enclosingFunction;
     try {
-      _flowAnalysis?.executableDeclaration_enter(
-          node, node.parameters, node.body);
+      _flowAnalysis?.topLevelDeclaration_enter(node);
+      _flowAnalysis?.executableDeclaration_enter(node, node.parameters, false);
       _promoteManager.enterFunctionBody(node.body);
       _enclosingFunction = node.declaredElement;
       FunctionType type = _enclosingFunction.type;
       InferenceContext.setType(node.body, type.returnType);
       super.visitConstructorDeclaration(node);
     } finally {
-      _flowAnalysis?.executableDeclaration_exit(node.body);
+      _flowAnalysis?.executableDeclaration_exit(node.body, false);
+      _flowAnalysis?.topLevelDeclaration_exit();
       _promoteManager.exitFunctionBody();
       _enclosingFunction = outerFunction;
     }
@@ -3986,17 +4015,35 @@ class ResolverVisitor extends ScopedVisitor {
   @override
   void visitFunctionDeclaration(FunctionDeclaration node) {
     ExecutableElement outerFunction = _enclosingFunction;
+    bool isFunctionDeclarationStatement =
+        node.parent is FunctionDeclarationStatement;
     try {
       SimpleIdentifier functionName = node.name;
-      _flowAnalysis?.executableDeclaration_enter(node,
-          node.functionExpression.parameters, node.functionExpression.body);
+      if (_flowAnalysis != null) {
+        if (isFunctionDeclarationStatement) {
+          _flowAnalysis.flow.functionExpression_begin(
+              _flowAnalysis.assignedVariables.writtenInNode(node));
+        } else {
+          _flowAnalysis.topLevelDeclaration_enter(node);
+        }
+        _flowAnalysis.executableDeclaration_enter(node,
+            node.functionExpression.parameters, isFunctionDeclarationStatement);
+      }
       _promoteManager.enterFunctionBody(node.functionExpression.body);
       _enclosingFunction = functionName.staticElement as ExecutableElement;
       InferenceContext.setType(
           node.functionExpression, _enclosingFunction.type);
       super.visitFunctionDeclaration(node);
     } finally {
-      _flowAnalysis?.executableDeclaration_exit(node.functionExpression.body);
+      if (_flowAnalysis != null) {
+        _flowAnalysis.executableDeclaration_exit(
+            node.functionExpression.body, isFunctionDeclarationStatement);
+        if (isFunctionDeclarationStatement) {
+          _flowAnalysis.flow.functionExpression_end();
+        } else {
+          _flowAnalysis.topLevelDeclaration_exit();
+        }
+      }
       _promoteManager.exitFunctionBody();
       _enclosingFunction = outerFunction;
     }
@@ -4015,8 +4062,7 @@ class ResolverVisitor extends ScopedVisitor {
     try {
       if (_flowAnalysis != null) {
         if (!isFunctionDeclaration) {
-          // TODO(paulberry): test the value of _flowAnalysis.assignedVariables.capturedInNode(node)
-          _flowAnalysis.flow?.functionExpression_begin(
+          _flowAnalysis.flow.functionExpression_begin(
               _flowAnalysis.assignedVariables.writtenInNode(node));
         }
       } else {
@@ -4052,9 +4098,7 @@ class ResolverVisitor extends ScopedVisitor {
   void visitFunctionExpressionInvocation(FunctionExpressionInvocation node) {
     node.function?.accept(this);
     node.accept(elementResolver);
-    _inferArgumentTypesForInvocation(node);
-    node.argumentList?.accept(this);
-    node.accept(typeAnalyzer);
+    _visitFunctionExpressionInvocation(node);
   }
 
   @override
@@ -4207,8 +4251,8 @@ class ResolverVisitor extends ScopedVisitor {
   void visitMethodDeclaration(MethodDeclaration node) {
     ExecutableElement outerFunction = _enclosingFunction;
     try {
-      _flowAnalysis?.executableDeclaration_enter(
-          node, node.parameters, node.body);
+      _flowAnalysis?.topLevelDeclaration_enter(node);
+      _flowAnalysis?.executableDeclaration_enter(node, node.parameters, false);
       _promoteManager.enterFunctionBody(node.body);
       _enclosingFunction = node.declaredElement;
       DartType returnType =
@@ -4216,7 +4260,8 @@ class ResolverVisitor extends ScopedVisitor {
       InferenceContext.setType(node.body, returnType);
       super.visitMethodDeclaration(node);
     } finally {
-      _flowAnalysis?.executableDeclaration_exit(node.body);
+      _flowAnalysis?.executableDeclaration_exit(node.body, false);
+      _flowAnalysis?.topLevelDeclaration_exit();
       _promoteManager.exitFunctionBody();
       _enclosingFunction = outerFunction;
     }
@@ -4237,9 +4282,15 @@ class ResolverVisitor extends ScopedVisitor {
     node.target?.accept(this);
     node.typeArguments?.accept(this);
     node.accept(elementResolver);
-    _inferArgumentTypesForInvocation(node);
-    node.argumentList?.accept(this);
-    node.accept(typeAnalyzer);
+
+    var functionRewrite = MethodInvocationResolver.getRewriteResult(node);
+    if (functionRewrite != null) {
+      _visitFunctionExpressionInvocation(functionRewrite);
+    } else {
+      _inferArgumentTypesForInvocation(node);
+      node.argumentList?.accept(this);
+      node.accept(typeAnalyzer);
+    }
   }
 
   @override
@@ -4340,10 +4391,9 @@ class ResolverVisitor extends ScopedVisitor {
 
   @override
   void visitReturnStatement(ReturnStatement node) {
-    Expression e = node.expression;
-    InferenceContext.setType(e, inferenceContext.returnContext);
+    InferenceContext.setType(node.expression, inferenceContext.returnContext);
     super.visitReturnStatement(node);
-    DartType type = e?.staticType;
+    DartType type = node.expression?.staticType;
     // Generators cannot return values, so don't try to do any inference if
     // we're processing erroneous code.
     if (type != null && _enclosingFunction?.isGenerator == false) {
@@ -4549,8 +4599,17 @@ class ResolverVisitor extends ScopedVisitor {
 
   @override
   void visitVariableDeclaration(VariableDeclaration node) {
+    var grandParent = node.parent.parent;
+    bool isTopLevel = grandParent is FieldDeclaration ||
+        grandParent is TopLevelVariableDeclaration;
     InferenceContext.setTypeFromNode(node.initializer, node);
+    if (isTopLevel) {
+      _flowAnalysis?.topLevelDeclaration_enter(node);
+    }
     super.visitVariableDeclaration(node);
+    if (isTopLevel) {
+      _flowAnalysis?.topLevelDeclaration_exit();
+    }
     VariableElement element = node.declaredElement;
     if (element.initializer != null && node.initializer != null) {
       (element.initializer as FunctionElementImpl).returnType =
@@ -4986,6 +5045,14 @@ class ResolverVisitor extends ScopedVisitor {
           keyType: keyType,
           valueType: valueType);
     }
+  }
+
+  /// Continues resolution of the [FunctionExpressionInvocation] node after
+  /// resolving its function.
+  void _visitFunctionExpressionInvocation(FunctionExpressionInvocation node) {
+    _inferArgumentTypesForInvocation(node);
+    node.argumentList?.accept(this);
+    node.accept(typeAnalyzer);
   }
 
   /// Given an [argumentList] and the [parameters] related to the element that
@@ -6222,9 +6289,11 @@ class TypeNameResolver {
         }
       }
       if (element is GenericTypeAliasElementImpl) {
-        type = GenericTypeAliasElementImpl.typeAfterSubstitution(
-                element, typeArguments) ??
-            dynamicType;
+        type = element.instantiate2(
+          typeArguments: typeArguments,
+          nullabilitySuffix: _getNullability(node.question != null),
+        );
+        type ??= dynamicType;
       } else {
         type = typeSystem.instantiateType(type, typeArguments);
       }
@@ -6233,14 +6302,14 @@ class TypeNameResolver {
       );
     } else {
       if (element is GenericTypeAliasElementImpl) {
-        List<DartType> typeArguments =
-            typeSystem.instantiateTypeFormalsToBounds2(element);
-        type = GenericTypeAliasElementImpl.typeAfterSubstitution(
-                element, typeArguments) ??
-            dynamicType;
-        type = (type as TypeImpl).withNullability(
-          _getNullability(node.question != null),
+        var typeArguments = typeSystem.instantiateTypeFormalsToBounds(
+          element.typeParameters,
         );
+        type = element.instantiate2(
+          typeArguments: typeArguments,
+          nullabilitySuffix: _getNullability(node.question != null),
+        );
+        type ??= dynamicType;
       } else {
         type = typeSystem.instantiateToBounds(type);
       }
@@ -7149,7 +7218,6 @@ class TypeResolverVisitor extends ScopedVisitor {
           new CaughtException(new AnalysisException(), null));
     }
     element.declaredReturnType = _computeReturnType(node.returnType);
-    element.type = new FunctionTypeImpl(element);
     _inferSetterReturnType(element);
   }
 
@@ -7220,7 +7288,6 @@ class TypeResolverVisitor extends ScopedVisitor {
     }
 
     element.declaredReturnType = _computeReturnType(node.returnType);
-    element.type = new FunctionTypeImpl(element);
     _inferSetterReturnType(element);
     _inferOperatorReturnType(element);
     if (element is PropertyAccessorElement) {

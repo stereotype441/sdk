@@ -42,8 +42,6 @@ class FlowAnalysisHelper {
   /// The current flow, when resolving a function body, or `null` otherwise.
   FlowAnalysis<Statement, Expression, PromotableElement, DartType> flow;
 
-  int _executableLevel = 0;
-
   factory FlowAnalysisHelper(
       TypeSystem typeSystem, AstNode node, bool retainDataForTesting) {
     return FlowAnalysisHelper._(
@@ -131,53 +129,26 @@ class FlowAnalysisHelper {
     flow.handleContinue(target);
   }
 
-  void executableDeclaration_enter(AstNode node,
-      FormalParameterList parameters, FunctionBody body) {
-    _executableLevel++;
-
-    if (_executableLevel > 1) {
-      assert(flow != null);
-    } else {
-      // TODO(paulberry): test that the right thing is passed in for
-      // assignedVariables.writtenInNode(node) for top level functions, methods,
-      // initializers, and constructors.
-      flow = FlowAnalysis<Statement, Expression, PromotableElement, DartType>(
-          _nodeOperations,
-          _typeOperations,
-          assignedVariables.writtenInNode(node),
-          assignedVariables.capturedInNode(node));
-    }
-
+  void executableDeclaration_enter(
+      Declaration node, FormalParameterList parameters, bool isClosure) {
     if (parameters != null) {
       for (var parameter in parameters.parameters) {
         flow.initialize(parameter.declaredElement);
       }
     }
 
-    if (_executableLevel > 1) {
+    if (isClosure) {
       flow.functionExpression_begin(assignedVariables.writtenInNode(node));
     }
   }
 
-  void executableDeclaration_exit(FunctionBody body) {
-    _executableLevel--;
-
-    var flow = this.flow;
-    if (_executableLevel > 0) {
+  void executableDeclaration_exit(FunctionBody body, bool isClosure) {
+    if (isClosure) {
       flow.functionExpression_end();
-      return;
     }
-
-    // Set this.flow to null before doing any clean-up so that if an exception
-    // is raised, the state is already updated correctly, and we don't have
-    // cascading failures.
-    this.flow = null;
-
     if (!flow.isReachable) {
       result?.functionBodiesThatDontComplete?.add(body);
     }
-
-    flow.finish();
   }
 
   void for_bodyBegin(AstNode node, Expression condition) {
@@ -186,7 +157,7 @@ class FlowAnalysisHelper {
 
   void for_conditionBegin(AstNode node, Expression condition) {
     flow.for_conditionBegin(assignedVariables.writtenInNode(node),
-    assignedVariables.capturedInNode(node));
+        assignedVariables.capturedInNode(node));
   }
 
   void isExpression(IsExpression node) {
@@ -233,6 +204,26 @@ class FlowAnalysisHelper {
     }
 
     return false;
+  }
+
+  void topLevelDeclaration_enter(Declaration node) {
+    assert(node != null);
+    assert(flow == null);
+    flow = FlowAnalysis<Statement, Expression, PromotableElement, DartType>(
+        _nodeOperations,
+        _typeOperations,
+        assignedVariables.writtenInNode(node),
+        assignedVariables.capturedInNode(node));
+  }
+
+  void topLevelDeclaration_exit() {
+    // Set this.flow to null before doing any clean-up so that if an exception
+    // is raised, the state is already updated correctly, and we don't have
+    // cascading failures.
+    var flow = this.flow;
+    this.flow = null;
+
+    flow.finish();
   }
 
   void variableDeclarationList(VariableDeclarationList node) {
@@ -334,7 +325,7 @@ class TypeSystemTypeOperations
 
 /// The visitor that gathers local variables that are potentially assigned
 /// in corresponding statements, such as loops, `switch` and `try`.
-class _AssignedVariablesVisitor extends GeneralizingAstVisitor<void> {
+class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
   final AssignedVariables assignedVariables;
 
   _AssignedVariablesVisitor(this.assignedVariables);
@@ -380,7 +371,7 @@ class _AssignedVariablesVisitor extends GeneralizingAstVisitor<void> {
   @override
   void visitFunctionDeclaration(FunctionDeclaration node) {
     bool isClosure = node.parent is! CompilationUnit;
-    assignedVariables.beginNode(isClosure: isClosure);
+    assignedVariables.beginNode();
     // Note: we bypass this.visitFunctionExpression so that the function
     // expression isn't mistaken for a closure.
     super.visitFunctionExpression(node.functionExpression);
@@ -389,7 +380,7 @@ class _AssignedVariablesVisitor extends GeneralizingAstVisitor<void> {
 
   @override
   void visitFunctionExpression(FunctionExpression node) {
-    assignedVariables.beginNode(isClosure: true);
+    assignedVariables.beginNode();
     super.visitFunctionExpression(node);
     assignedVariables.endNode(node, isClosure: true);
   }
@@ -430,6 +421,20 @@ class _AssignedVariablesVisitor extends GeneralizingAstVisitor<void> {
   }
 
   @override
+  void visitVariableDeclaration(VariableDeclaration node) {
+    var grandParent = node.parent.parent;
+    bool isTopLevel = grandParent is TopLevelVariableDeclaration ||
+        grandParent is FieldDeclaration;
+    if (isTopLevel) {
+      assignedVariables.beginNode();
+    }
+    super.visitVariableDeclaration(node);
+    if (isTopLevel) {
+      assignedVariables.endNode(node);
+    }
+  }
+
+  @override
   void visitWhileStatement(WhileStatement node) {
     assignedVariables.beginNode();
     super.visitWhileStatement(node);
@@ -463,7 +468,9 @@ class _AssignedVariablesVisitor extends GeneralizingAstVisitor<void> {
           assignedVariables.write(element);
         }
       } else if (forLoopParts is ForEachPartsWithDeclaration) {
-        assignedVariables.write(forLoopParts.loopVariable.declaredElement);
+        var variable = forLoopParts.loopVariable.declaredElement;
+        assignedVariables.declare(variable);
+        assignedVariables.write(variable);
       } else {
         throw new StateError('Unrecognized for loop parts');
       }
@@ -484,7 +491,10 @@ class _LocalVariableTypeProvider implements LocalVariableTypeProvider {
   @override
   DartType getType(SimpleIdentifier node) {
     var variable = node.staticElement as VariableElement;
-    var promotedType = _manager.flow?.promotedType(variable);
-    return promotedType ?? variable.type;
+    if (variable is PromotableElement) {
+      var promotedType = _manager.flow?.promotedType(variable);
+      if (promotedType != null) return promotedType;
+    }
+    return variable.type;
   }
 }

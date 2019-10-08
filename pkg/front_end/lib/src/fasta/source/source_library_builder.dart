@@ -58,30 +58,32 @@ import '../../base/resolve_relative_uri.dart' show resolveRelativeUri;
 
 import '../../scanner/token.dart' show Token;
 
-import '../builder/builder.dart'
-    show
-        ClassBuilder,
-        ConstructorReferenceBuilder,
-        Builder,
-        EnumConstantInfo,
-        FormalParameterBuilder,
-        FunctionTypeBuilder,
-        LibraryBuilder,
-        MemberBuilder,
-        MetadataBuilder,
-        NameIterator,
-        PrefixBuilder,
-        FunctionBuilder,
-        NullabilityBuilder,
-        QualifiedName,
-        Scope,
-        TypeBuilder,
-        TypeDeclarationBuilder,
-        TypeVariableBuilder,
-        UnresolvedType,
-        flattenName;
-
+import '../builder/builtin_type_builder.dart';
+import '../builder/class_builder.dart';
+import '../builder/constructor_reference_builder.dart';
+import '../builder/declaration.dart';
+import '../builder/dynamic_type_builder.dart';
+import '../builder/enum_builder.dart';
 import '../builder/extension_builder.dart';
+import '../builder/field_builder.dart';
+import '../builder/formal_parameter_builder.dart';
+import '../builder/procedure_builder.dart';
+import '../builder/function_type_builder.dart';
+import '../builder/invalid_type_declaration_builder.dart';
+import '../builder/library_builder.dart';
+import '../builder/member_builder.dart';
+import '../builder/metadata_builder.dart';
+import '../builder/mixin_application_builder.dart';
+import '../builder/name_iterator.dart';
+import '../builder/named_type_builder.dart';
+import '../builder/nullability_builder.dart';
+import '../builder/prefix_builder.dart';
+import '../builder/type_alias_builder.dart';
+import '../builder/type_builder.dart';
+import '../builder/type_declaration_builder.dart';
+import '../builder/type_variable_builder.dart';
+import '../builder/unresolved_type.dart';
+import '../builder/void_type_builder.dart';
 
 import '../combinator.dart' show Combinator;
 
@@ -150,43 +152,14 @@ import '../fasta_codes.dart'
         templatePatchInjectionFailed,
         templateTypeVariableDuplicatedNameCause;
 
+import '../identifiers.dart' show QualifiedName, flattenName;
+
 import '../import.dart' show Import;
 
 import '../kernel/kernel_builder.dart'
     show
-        AccessErrorBuilder,
-        BuiltinTypeBuilder,
-        ClassBuilder,
-        ConstructorReferenceBuilder,
-        Builder,
-        DynamicTypeBuilder,
-        EnumConstantInfo,
-        FormalParameterBuilder,
-        FunctionTypeBuilder,
         ImplicitFieldType,
-        InvalidTypeBuilder,
-        ConstructorBuilder,
-        EnumBuilder,
-        FunctionBuilder,
-        TypeAliasBuilder,
-        FieldBuilder,
-        MixinApplicationBuilder,
-        NamedTypeBuilder,
-        ProcedureBuilder,
-        RedirectingFactoryBuilder,
-        LibraryBuilder,
         LoadLibraryBuilder,
-        MemberBuilder,
-        MetadataBuilder,
-        NameIterator,
-        PrefixBuilder,
-        QualifiedName,
-        Scope,
-        TypeBuilder,
-        TypeDeclarationBuilder,
-        TypeVariableBuilder,
-        UnresolvedType,
-        VoidTypeBuilder,
         compareProcedures,
         toKernelCombinators;
 
@@ -218,6 +191,8 @@ import '../names.dart' show indexSetName;
 
 import '../problems.dart' show unexpected, unhandled;
 
+import '../scope.dart';
+
 import '../severity.dart' show Severity;
 
 import '../type_inference/type_inferrer.dart' show TypeInferrerImpl;
@@ -228,7 +203,7 @@ import 'source_extension_builder.dart' show SourceExtensionBuilder;
 
 import 'source_loader.dart' show SourceLoader;
 
-class SourceLibraryBuilder extends LibraryBuilder {
+class SourceLibraryBuilder extends LibraryBuilderImpl {
   static const String MALFORMED_URI_SCHEME = "org-dartlang-malformed-uri";
 
   final SourceLoader loader;
@@ -1048,7 +1023,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
             break;
 
           default:
-            if (member is InvalidTypeBuilder) {
+            if (member is InvalidTypeDeclarationBuilder) {
               unserializableExports ??= <String, String>{};
               unserializableExports[name] = member.message.message;
             } else {
@@ -2174,8 +2149,8 @@ class SourceLibraryBuilder extends LibraryBuilder {
       {bool isExport: false, bool isImport: false}) {
     // TODO(ahe): Can I move this to Scope or Prefix?
     if (declaration == other) return declaration;
-    if (declaration is InvalidTypeBuilder) return declaration;
-    if (other is InvalidTypeBuilder) return other;
+    if (declaration is InvalidTypeDeclarationBuilder) return declaration;
+    if (other is InvalidTypeDeclarationBuilder) return other;
     if (declaration is AccessErrorBuilder) {
       AccessErrorBuilder error = declaration;
       declaration = error.builder;
@@ -2264,7 +2239,7 @@ class SourceLibraryBuilder extends LibraryBuilder {
     // We report the error lazily (setting suppressMessage to false) because the
     // spec 18.1 states that 'It is not an error if N is introduced by two or
     // more imports but never referred to.'
-    return new InvalidTypeBuilder(
+    return new InvalidTypeDeclarationBuilder(
         name, message.withLocation(fileUri, charOffset, name.length),
         suppressMessage: false);
   }
@@ -3113,6 +3088,7 @@ class TypeParameterScopeBuilder {
         // parent declaration.
         parent.addType(type);
       } else if (nameOrQualified is QualifiedName) {
+        NamedTypeBuilder builder = type.builder;
         // Attempt to use a member or type variable as a prefix.
         Message message = templateNotAPrefixInTypeAnnotation.withArguments(
             flattenName(
@@ -3120,10 +3096,9 @@ class TypeParameterScopeBuilder {
             nameOrQualified.name);
         library.addProblem(message, type.charOffset,
             nameOrQualified.endCharOffset - type.charOffset, type.fileUri);
-        type.builder.bind(type.builder.buildInvalidType(message.withLocation(
-            type.fileUri,
-            type.charOffset,
-            nameOrQualified.endCharOffset - type.charOffset)));
+        builder.bind(builder.buildInvalidTypeDeclarationBuilder(
+            message.withLocation(type.fileUri, type.charOffset,
+                nameOrQualified.endCharOffset - type.charOffset)));
       } else {
         scope ??= toScope(null).withTypeVariables(typeVariables);
         type.resolveIn(scope, library);

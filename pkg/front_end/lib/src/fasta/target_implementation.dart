@@ -10,7 +10,9 @@ import 'package:kernel/target/targets.dart' as backend show Target;
 
 import '../base/processed_options.dart' show ProcessedOptions;
 
-import 'builder/builder.dart' show Builder, ClassBuilder, LibraryBuilder;
+import 'builder/class_builder.dart';
+import 'builder/declaration.dart';
+import 'builder/library_builder.dart';
 
 import 'compiler_context.dart' show CompilerContext;
 
@@ -156,9 +158,6 @@ abstract class TargetImplementation extends Target {
 
   Severity fixSeverity(Severity severity, Message message, Uri fileUri) {
     severity ??= message.code.severity;
-    if (severity == Severity.errorLegacyWarning) {
-      severity = Severity.error;
-    }
     return rewriteSeverity(severity, message.code, fileUri);
   }
 

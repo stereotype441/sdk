@@ -20,15 +20,16 @@ topLevel_function(Object x, Object y) {
   y = 'foo';
 }
 
-topLevel_function_arrow(Object x, Object y) =>
-  (x is int && y is int) ? [
-    /*int*/ x,
-    /*int*/ y,
-    () {
-      /*int*/ x;
-      y;
-  }] :
-  (y = 'foo');
+topLevel_function_arrow(Object x, Object y) => (x is int && y is int)
+    ? [
+        /*int*/ x,
+        /*int*/ y,
+        () {
+          /*int*/ x;
+          y;
+        }
+      ]
+    : (y = 'foo');
 
 void topLevel_setter(Object x) {
   Object y = f(0);
@@ -43,13 +44,14 @@ void topLevel_setter(Object x) {
   y = 'foo';
 }
 
-void topLevel_setter_arrow(Object y) =>
-  (y is int) ? [
-    /*int*/ y,
-    () {
-      y;
-  }] :
-  (y = 'foo');
+void topLevel_setter_arrow(Object y) => (y is int)
+    ? [
+        /*int*/ y,
+        () {
+          y;
+        }
+      ]
+    : (y = 'foo');
 
 get topLevel_getter {
   Object x = f(0);
@@ -68,7 +70,7 @@ get topLevel_getter {
 
 class C {
   C(Object x);
-    
+
   C.constructor(Object x, Object y) {
     if (x is int && y is int) {
       /*int*/ x;
@@ -81,25 +83,29 @@ class C {
     y = 'foo';
   }
 
-  factory C.constructor_arrow(Object x, Object y) =>
-    C((x is int && y is int) ? [
-      /*int*/ x,
-      /*int*/ y,
-      () {
-        /*int*/ x;
-        y;
-    }] :
-    (y = 'foo'));
+  factory C.constructor_arrow(Object x, Object y) => C((x is int && y is int)
+      ? [
+          /*int*/ x,
+          /*int*/ y,
+          () {
+            /*int*/ x;
+            y;
+          }
+        ]
+      : (y = 'foo'));
 
   C.constructor_semicolon(Object x, Object y)
-  : assert(f((x is int && y is int) ? [
-        /*int*/ x,
-        /*int*/ y, () {
-          /*int*/ x;
-          y;
-      }] :
-      (y = 'foo')));
-  
+      : assert(f((x is int && y is int)
+            ? [
+                /*int*/ x,
+                /*int*/ y,
+                () {
+                  /*int*/ x;
+                  y;
+                }
+              ]
+            : (y = 'foo')));
+
   method(Object x, Object y) {
     if (x is int && y is int) {
       /*int*/ x;
@@ -111,17 +117,18 @@ class C {
     }
     y = 'foo';
   }
-  
-  method_arrow(Object x, Object y) =>
-    (x is int && y is int) ? [
-      /*int*/ x,
-      /*int*/ y,
-      () {
-        /*int*/ x;
-        y;
-    }] :
-    (y = 'foo');
-  
+
+  method_arrow(Object x, Object y) => (x is int && y is int)
+      ? [
+          /*int*/ x,
+          /*int*/ y,
+          () {
+            /*int*/ x;
+            y;
+          }
+        ]
+      : (y = 'foo');
+
   void setter(Object x) {
     Object y = f(0);
     if (x is int && y is int) {
@@ -134,15 +141,16 @@ class C {
     }
     y = 'foo';
   }
-  
-  void setter_arrow(Object y) =>
-    (y is int) ? [
-      /*int*/ y,
-      () {
-        y;
-    }] :
-    (y = 'foo');
-  
+
+  void setter_arrow(Object y) => (y is int)
+      ? [
+          /*int*/ y,
+          () {
+            y;
+          }
+        ]
+      : (y = 'foo');
+
   get getter {
     Object x = f(0);
     Object y = f(0);

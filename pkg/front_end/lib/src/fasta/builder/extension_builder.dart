@@ -9,19 +9,48 @@ import 'package:kernel/ast.dart';
 import '../fasta_codes.dart' show templateInternalProblemNotFoundIn;
 import '../scope.dart';
 import '../problems.dart';
-import 'builder.dart';
+
 import 'declaration.dart';
-import 'declaration_builder.dart';
 import 'library_builder.dart';
+import 'member_builder.dart';
 import 'metadata_builder.dart';
+import 'nullability_builder.dart';
 import 'type_builder.dart';
 import 'type_variable_builder.dart';
+import 'declaration_builder.dart';
 
-abstract class ExtensionBuilder extends DeclarationBuilder {
+abstract class ExtensionBuilder implements DeclarationBuilder {
+  List<TypeVariableBuilder> get typeParameters;
+  TypeBuilder get onType;
+
+  /// Return the [Extension] built by this builder.
+  Extension get extension;
+
+  // Deliberately unrelated return type to statically detect more accidental
+  // use until Builder.target is fully retired.
+  @override
+  UnrelatedTarget get target;
+
+  void buildOutlineExpressions(LibraryBuilder library);
+
+  /// Looks up extension member by [name] taking privacy into account.
+  ///
+  /// If [setter] is `true` the sought member is a setter or assignable field.
+  /// If [required] is `true` and no member is found an internal problem is
+  /// reported.
+  Builder lookupLocalMemberByName(Name name,
+      {bool setter: false, bool required: false});
+}
+
+abstract class ExtensionBuilderImpl extends DeclarationBuilderImpl
+    implements ExtensionBuilder {
+  @override
   final List<TypeVariableBuilder> typeParameters;
+
+  @override
   final TypeBuilder onType;
 
-  ExtensionBuilder(
+  ExtensionBuilderImpl(
       List<MetadataBuilder> metadata,
       int modifiers,
       String name,
@@ -32,10 +61,8 @@ abstract class ExtensionBuilder extends DeclarationBuilder {
       this.onType)
       : super(metadata, modifiers, name, parent, charOffset, scope);
 
-  /// Return the [Extension] built by this builder.
-  Extension get extension;
-
   /// Lookup a static member of this declaration.
+  @override
   Builder findStaticBuilder(
       String name, int charOffset, Uri fileUri, LibraryBuilder accessingLibrary,
       {bool isSetter: false}) {
@@ -51,6 +78,7 @@ abstract class ExtensionBuilder extends DeclarationBuilder {
 
   // Deliberately unrelated return type to statically detect more accidental
   // use until Builder.target is fully retired.
+  @override
   UnrelatedTarget get target => unsupported(
       "ExtensionBuilder.target is deprecated. "
       "Use ExtensionBuilder.extension instead.",
@@ -92,8 +120,20 @@ abstract class ExtensionBuilder extends DeclarationBuilder {
   }
 
   @override
+  Builder lookupLocalMemberByName(Name name,
+      {bool setter: false, bool required: false}) {
+    Builder builder =
+        lookupLocalMember(name.name, setter: setter, required: required);
+    if (builder != null && name.isPrivate && library.library != name.library) {
+      builder = null;
+    }
+    return builder;
+  }
+
+  @override
   String get debugName => "ExtensionBuilder";
 
+  @override
   void buildOutlineExpressions(LibraryBuilder library) {
     void build(String ignore, Builder declaration) {
       MemberBuilder member = declaration;

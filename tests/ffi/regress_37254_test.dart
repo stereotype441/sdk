@@ -15,25 +15,25 @@
 // Note #2: When we switch to extension methods we will _only_ use the static
 //          type of the container.
 //
-// ===== a.store(b) ======
-// Does a.store(b), where a and b have specific static and dynamic types: run
+// ===== a.value = b ======
+// Does a.value = b, where a and b have specific static and dynamic types: run
 // fine, fail at compile time, or fail at runtime?
 // =======================
 //                  b     P<I>//P<I>   P<NT>//P<I>           P<NT>//P<NT>
 // a
 // P<P<I>>//P<P<I>>     1 ok         2 implicit downcast   3 implicit downcast
-//                                     of argument: ok       of argument: fail
-//                                                           at runtime
+//                                     of argument:          of argument:
+//                                     static error          static error
 //
 // P<P<NT>>//P<P<I>>    4 ok         5 ok                  6 fail at runtime
 //
 // P<P<NT>>//P<P<NT>>   7 ok         8 ok                  9 ok
 //
-// ====== final c = a.load() ======
-// What is the (inferred) static type and runtime type of `a.load()`. Note that
+// ====== final c = a.value ======
+// What is the (inferred) static type and runtime type of `a.value`. Note that
 // we assume extension method here: on Pointer<PointerT>> { Pointer<T> load(); }
 // ================================
-// a                    a.load()
+// a                    a.value
 //                      inferred static type*//runtime type
 // P<P<I>>//P<P<I>>     P<I>//P<I>
 //
@@ -43,8 +43,8 @@
 //
 // * The inferred static type when we get extension methods.
 //
-// ====== b = a.load() ======
-// What happens when we try to assign the result of a.load() to variable b with
+// ====== b = a.value ======
+// What happens when we try to assign the result of a.value to variable b with
 // a specific static type: runs fine, fails at compile time, or fails at runtime.
 // ==========================
 //                  b     P<I>                        P<NT>
@@ -64,13 +64,13 @@ import 'dart:ffi';
 
 import "package:expect/expect.dart";
 
-// ===== a.store(b) ======
+// ===== a.value = b ======
 // The tests follow table cells left to right, top to bottom.
 void store1() {
   final Pointer<Pointer<Int8>> a = Pointer<Pointer<Int8>>.allocate();
   final Pointer<Int8> b = Pointer<Int8>.allocate();
 
-  a.store(b);
+  a.value = b;
 
   a.free();
   b.free();
@@ -83,7 +83,7 @@ void store2() {
 
   // Successful implicit downcast of argument at runtime.
   // Should succeed now, should statically be rejected when NNBD lands.
-  a.store(b);
+  a.value = b;
 
   a.free();
   b.free();
@@ -97,7 +97,7 @@ void store3() {
   // Failing implicit downcast of argument at runtime.
   // Should fail now at runtime, should statically be rejected when NNBD lands.
   Expect.throws(() {
-    a.store(b);
+    a.value = b;
   });
 
   a.free();
@@ -110,7 +110,7 @@ void store4() {
 
   final Pointer<Int8> b = Pointer<Int8>.allocate();
 
-  a.store(b);
+  a.value = b;
 
   a.free();
   b.free();
@@ -123,7 +123,7 @@ void store5() {
   final Pointer<NativeType> b =
       Pointer<Int8>.allocate(); // Reified as Pointer<Int8> at runtime.
 
-  a.store(b);
+  a.value = b;
 
   a.free();
   b.free();
@@ -137,7 +137,7 @@ void store6() {
 
   // Fails on type check of argument.
   Expect.throws(() {
-    a.store(b);
+    a.value = b;
   });
 
   a.free();
@@ -149,7 +149,7 @@ void store7() {
       Pointer<Pointer<NativeType>>.allocate();
   final Pointer<Int8> b = Pointer<Int8>.allocate();
 
-  a.store(b);
+  a.value = b;
 
   a.free();
   b.free();
@@ -162,7 +162,7 @@ void store8() {
   // Reified as Pointer<Int8> at runtime.
   final Pointer<NativeType> b = Pointer<Int8>.allocate();
 
-  a.store(b);
+  a.value = b;
 
   a.free();
   b.free();
@@ -174,18 +174,18 @@ void store9() {
   final Pointer<NativeType> b =
       Pointer<Int8>.allocate().cast<Pointer<NativeType>>();
 
-  a.store(b);
+  a.value = b;
 
   a.free();
   b.free();
 }
 
-// ====== b = a.load() ======
+// ====== b = a.value ======
 // The tests follow table cells left to right, top to bottom.
 void load1() {
   final Pointer<Pointer<Int8>> a = Pointer<Pointer<Int8>>.allocate();
 
-  Pointer<Int8> b = a.load();
+  Pointer<Int8> b = a.value;
   Expect.type<Pointer<Int8>>(b);
 
   a.free();
@@ -194,7 +194,7 @@ void load1() {
 void load2() {
   final Pointer<Pointer<Int8>> a = Pointer<Pointer<Int8>>.allocate();
 
-  Pointer<NativeType> b = a.load<Pointer<Int8>>();
+  Pointer<NativeType> b = a.value;
   Expect.type<Pointer<Int8>>(b);
 
   a.free();
@@ -204,7 +204,7 @@ void load3() {
   // Reified as Pointer<Pointer<Int8>> at runtime.
   final Pointer<Pointer<NativeType>> a = Pointer<Pointer<Int8>>.allocate();
 
-  Pointer<Int8> b = a.load<Pointer<NativeType>>();
+  Pointer<Int8> b = a.value;
   Expect.type<Pointer<Int8>>(b);
 
   a.free();
@@ -215,7 +215,7 @@ void load4() {
   final Pointer<Pointer<NativeType>> a = Pointer<Pointer<Int8>>.allocate();
 
   // Return value runtime type is Pointer<Int8>.
-  Pointer<NativeType> b = a.load();
+  Pointer<NativeType> b = a.value;
   Expect.type<Pointer<Int8>>(b);
 
   a.free();
@@ -228,7 +228,7 @@ void load5() {
   // Failing implicit downcast of return value at runtime.
   // Should fail now at runtime, should statically be rejected when NNBD lands.
   Expect.throws(() {
-    Pointer<Int8> b = a.load<Pointer<NativeType>>();
+    Pointer<Int8> b = a.value;
   });
 
   a.free();
@@ -238,26 +238,30 @@ void load6() {
   final Pointer<Pointer<NativeType>> a =
       Pointer<Pointer<NativeType>>.allocate();
 
-  Pointer<NativeType> b = a.load();
+  Pointer<NativeType> b = a.value;
   Expect.type<Pointer<NativeType>>(b);
 
   a.free();
 }
 
 void main() {
-  store1();
-  store2();
-  store3();
-  store4();
-  store5();
-  store6();
-  store7();
-  store8();
-  store9();
-  load1();
-  load2();
-  load3();
-  load4();
-  load5();
-  load6();
+  // Trigger both the runtime entry and the IL in bytecode.
+  for (int i = 0; i < 100; i++) {
+    print(i);
+    store1();
+    store2();
+    store3();
+    store4();
+    store5();
+    store6();
+    store7();
+    store8();
+    store9();
+    load1();
+    load2();
+    load3();
+    load4();
+    load5();
+    load6();
+  }
 }

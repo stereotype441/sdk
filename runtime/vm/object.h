@@ -2726,7 +2726,8 @@ class Function : public Object {
     // On DBC we use native calls instead of IR for the view factories (see
     // kernel_to_il.cc)
 #if !defined(TARGET_ARCH_DBC)
-    if (IsTypedDataViewFactory()) {
+    if (IsTypedDataViewFactory() || IsFfiLoad() || IsFfiStore() ||
+        IsFfiFromAddress() || IsFfiGetAddress()) {
       return true;
     }
 #endif
@@ -2881,6 +2882,28 @@ class Function : public Object {
     NoSafepointScope no_safepoint;
     return KindBits::decode(function->ptr()->kind_tag_) ==
            RawFunction::kFfiTrampoline;
+  }
+
+  bool IsFfiLoad() const {
+    const auto kind = MethodRecognizer::RecognizeKind(*this);
+    return MethodRecognizer::kFfiLoadInt8 <= kind &&
+           kind <= MethodRecognizer::kFfiLoadPointer;
+  }
+
+  bool IsFfiStore() const {
+    const auto kind = MethodRecognizer::RecognizeKind(*this);
+    return MethodRecognizer::kFfiStoreInt8 <= kind &&
+           kind <= MethodRecognizer::kFfiStorePointer;
+  }
+
+  bool IsFfiFromAddress() const {
+    const auto kind = MethodRecognizer::RecognizeKind(*this);
+    return kind == MethodRecognizer::kFfiFromAddress;
+  }
+
+  bool IsFfiGetAddress() const {
+    const auto kind = MethodRecognizer::RecognizeKind(*this);
+    return kind == MethodRecognizer::kFfiGetAddress;
   }
 
   bool IsAsyncFunction() const { return modifier() == RawFunction::kAsync; }
@@ -3102,7 +3125,8 @@ class Function : public Object {
   V(GeneratedBody, is_generated_body)                                          \
   V(PolymorphicTarget, is_polymorphic_target)                                  \
   V(HasPragma, has_pragma)                                                     \
-  V(IsNoSuchMethodForwarder, is_no_such_method_forwarder)
+  V(IsNoSuchMethodForwarder, is_no_such_method_forwarder)                      \
+  V(IsExtensionMember, is_extension_member)
 
 #define DEFINE_ACCESSORS(name, accessor_name)                                  \
   void set_##accessor_name(bool value) const {                                 \
@@ -3372,6 +3396,10 @@ class Field : public Object {
   bool is_instance() const { return !is_static(); }
   bool is_final() const { return FinalBit::decode(raw_ptr()->kind_bits_); }
   bool is_const() const { return ConstBit::decode(raw_ptr()->kind_bits_); }
+  bool is_late() const { return IsLateBit::decode(raw_ptr()->kind_bits_); }
+  bool is_extension_member() const {
+    return IsExtensionMemberBit::decode(raw_ptr()->kind_bits_);
+  }
   bool is_reflectable() const {
     return ReflectableBit::decode(raw_ptr()->kind_bits_);
   }
@@ -3652,6 +3680,12 @@ class Field : public Object {
     kUnknownFixedLength = -1,
     kNoFixedLength = -2,
   };
+  void set_is_late(bool value) const {
+    set_kind_bits(IsLateBit::update(value, raw_ptr()->kind_bits_));
+  }
+  void set_is_extension_member(bool value) const {
+    set_kind_bits(IsExtensionMemberBit::update(value, raw_ptr()->kind_bits_));
+  }
   // Returns false if any value read from this field is guaranteed to be
   // not null.
   // Internally we is_nullable_ field contains either kNullCid (nullable) or
@@ -3762,6 +3796,8 @@ class Field : public Object {
     kHasPragmaBit,
     kCovariantBit,
     kGenericCovariantImplBit,
+    kIsLateBit,
+    kIsExtensionMemberBit,
   };
   class ConstBit : public BitField<uint16_t, bool, kConstBit, 1> {};
   class StaticBit : public BitField<uint16_t, bool, kStaticBit, 1> {};
@@ -3782,6 +3818,9 @@ class Field : public Object {
   class CovariantBit : public BitField<uint16_t, bool, kCovariantBit, 1> {};
   class GenericCovariantImplBit
       : public BitField<uint16_t, bool, kGenericCovariantImplBit, 1> {};
+  class IsLateBit : public BitField<uint16_t, bool, kIsLateBit, 1> {};
+  class IsExtensionMemberBit
+      : public BitField<uint16_t, bool, kIsExtensionMemberBit, 1> {};
 
   // Update guarded cid and guarded length for this field. Returns true, if
   // deoptimization of dependent code is required.
@@ -5095,12 +5134,6 @@ class StackMap : public Object {
 
   intptr_t Length() const { return raw_ptr()->length_; }
 
-  uint32_t PcOffset() const { return raw_ptr()->pc_offset_; }
-  void SetPcOffset(uint32_t value) const {
-    ASSERT(value <= kMaxUint32);
-    StoreNonPointer(&raw_ptr()->pc_offset_, value);
-  }
-
   intptr_t SlowPathBitCount() const { return raw_ptr()->slow_path_bit_count_; }
   void SetSlowPathBitCount(intptr_t bit_count) const {
     ASSERT(bit_count <= kMaxUint16);
@@ -5132,13 +5165,7 @@ class StackMap : public Object {
   static intptr_t InstanceSize(intptr_t length) {
     return RoundedAllocationSize(UnroundedSize(length));
   }
-  static RawStackMap* New(intptr_t pc_offset,
-                          BitmapBuilder* bmap,
-                          intptr_t register_bit_count);
-
-  static RawStackMap* New(intptr_t length,
-                          intptr_t register_bit_count,
-                          intptr_t pc_offset);
+  static RawStackMap* New(BitmapBuilder* bmap, intptr_t slow_path_bit_count);
 
  private:
   void SetLength(intptr_t length) const {
@@ -5288,9 +5315,6 @@ class Code : public Object {
     return ForceOptimizedBit::decode(raw_ptr()->state_bits_);
   }
   void set_is_force_optimized(bool value) const;
-  static bool IsForceOptimized(RawCode* code) {
-    return Code::ForceOptimizedBit::decode(code->ptr()->state_bits_);
-  }
 
   bool is_alive() const { return AliveBit::decode(raw_ptr()->state_bits_); }
   void set_is_alive(bool value) const;

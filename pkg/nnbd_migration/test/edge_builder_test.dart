@@ -189,6 +189,7 @@ class AssignmentCheckerTest extends Object
     assertNoEdge(t.typeArguments[0].node, anyNode);
   }
 
+  @failingTest
   test_generic_to_generic_downcast() {
     var t1 = list(list(object()));
     var t2 = myListOfList(object());
@@ -452,6 +453,7 @@ class C<T extends List<int>> {
     var tType = decoratedTypeAnnotation('T f');
     assertEdge(parameterType.node, tType.node, hard: true);
     assertNoEdge(parameterType.node, boundType.node);
+    // TODO(mfairhurst): Confirm we want this edge.
     assertEdge(
         parameterType.typeArguments[0].node, boundType.typeArguments[0].node,
         hard: false);
@@ -640,6 +642,7 @@ C f(C y, C z) => (y += z);
   }
 
   test_assignmentExpression_compound_withSubstitution() async {
+    // Failing due to a side-cast from incorrectly instantiating the operator.
     var code = '''
 abstract class C<T> {
   C<T> operator+(C<T> x);
@@ -802,9 +805,11 @@ void Function(int) f(void Function(int) x, void Function(int) y) => x ??= y;
 List<int> f(List<int> x, List<int> y) => x ??= y;
 ''');
     var xNullable = decoratedTypeAnnotation('List<int> x').node;
+    var yNullable = decoratedTypeAnnotation('List<int> y').node;
     var xElementNullable = decoratedTypeAnnotation('int> x').node;
     var yElementNullable = decoratedTypeAnnotation('int> y').node;
     var returnElementNullable = decoratedTypeAnnotation('int> f').node;
+    assertEdge(yNullable, xNullable, hard: false, guards: [xNullable]);
     assertEdge(yElementNullable, xElementNullable,
         hard: false, guards: [xNullable]);
     assertEdge(xElementNullable, returnElementNullable, hard: false);
@@ -818,7 +823,7 @@ int f(int x, int y) => (x ??= y);
     var xNullable = decoratedTypeAnnotation('int x').node;
     var returnNullable = decoratedTypeAnnotation('int f').node;
     var glbNode = decoratedExpressionType('(x ??= y)').node;
-    assertEdge(yNullable, xNullable, hard: true, guards: [xNullable]);
+    assertEdge(yNullable, xNullable, hard: false, guards: [xNullable]);
     assertEdge(yNullable, glbNode, hard: false, guards: [xNullable]);
     assertEdge(glbNode, xNullable, hard: false);
     assertEdge(glbNode, yNullable, hard: false);
@@ -4535,6 +4540,46 @@ class C {
         hard: true);
   }
 
+  test_return_from_async_closureBody_future() async {
+    await analyze('''
+Future<int> f() {
+  return () async {
+    return g();
+  }();
+}
+int g() => 1;
+''');
+    assertEdge(
+        decoratedTypeAnnotation('int g').node,
+        assertEdge(anyNode, decoratedTypeAnnotation('int>').node, hard: false)
+            .sourceNode,
+        hard: false);
+  }
+
+  test_return_from_async_closureExpression_future() async {
+    await analyze('''
+Future<int> Function() f() {
+  return () async => g();
+}
+int g() => 1;
+''');
+    assertEdge(
+        decoratedTypeAnnotation('int g').node,
+        assertEdge(anyNode, decoratedTypeAnnotation('int>').node, hard: false)
+            .sourceNode,
+        hard: false);
+  }
+
+  test_return_from_async_expressionBody_future() async {
+    await analyze('''
+Future<int> f() async => g();
+int g() => 1;
+''');
+    assertEdge(decoratedTypeAnnotation('int g').node,
+        decoratedTypeAnnotation('int>').node,
+        hard: false);
+  }
+
   test_return_from_async_future() async {
     await analyze('''
 Future<int> f() async {
@@ -4542,7 +4587,19 @@ Future<int> f() async {
 }
 int g() => 1;
 ''');
-    // No assertions; just checking that it doesn't crash.
+    assertEdge(decoratedTypeAnnotation('int g').node,
+        decoratedTypeAnnotation('int>').node,
+        hard: false);
+  }
+
+  test_return_from_async_future_void() async {
+    await analyze('''
+Future<void> f() async {
+  return;
+}
+int g() => 1;
+''');
+    assertNoEdge(always, decoratedTypeAnnotation('Future').node);
   }
 
   test_return_from_async_futureOr() async {

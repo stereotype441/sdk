@@ -105,6 +105,7 @@ final fastaAnalyzerErrorCodes = <ErrorCode>[
   _MIXIN_DECLARES_CONSTRUCTOR,
   _NULL_AWARE_CASCADE_OUT_OF_ORDER,
   _MULTIPLE_VARIANCE_MODIFIERS,
+  _INVALID_USE_OF_COVARIANT_IN_EXTENSION,
 ];
 
 const ParserErrorCode _ABSTRACT_CLASS_MEMBER = const ParserErrorCode(
@@ -225,8 +226,8 @@ const ParserErrorCode _ENUM_IN_CLASS = const ParserErrorCode(
 
 const ParserErrorCode _EQUALITY_CANNOT_BE_EQUALITY_OPERAND = const ParserErrorCode(
     'EQUALITY_CANNOT_BE_EQUALITY_OPERAND',
-    r"An equality expression can't be an operand of another equality expression.",
-    correction: "Try re-writing the expression.");
+    r"A comparison expression can't be an operand of another comparison expression.",
+    correction: "Try putting parentheses around one of the comparisons.");
 
 const ParserErrorCode _EXPECTED_BODY = const ParserErrorCode(
     'EXPECTED_BODY', r"A #string must have a body, even if it is empty.",
@@ -293,7 +294,8 @@ const ParserErrorCode _EXTERNAL_FACTORY_WITH_BODY = const ParserErrorCode(
 
 const ParserErrorCode _EXTERNAL_FIELD = const ParserErrorCode(
     'EXTERNAL_FIELD', r"Fields can't be declared to be 'external'.",
-    correction: "Try removing the keyword 'external'.");
+    correction:
+        "Try removing the keyword 'external', or replacing the field by an external getter and/or setter.");
 
 const ParserErrorCode _EXTERNAL_METHOD_WITH_BODY = const ParserErrorCode(
     'EXTERNAL_METHOD_WITH_BODY',
@@ -314,7 +316,7 @@ const ParserErrorCode _FACTORY_TOP_LEVEL_DECLARATION = const ParserErrorCode(
 
 const ParserErrorCode _FIELD_INITIALIZED_OUTSIDE_DECLARING_CLASS =
     const ParserErrorCode('FIELD_INITIALIZED_OUTSIDE_DECLARING_CLASS',
-        r"A field can only be initialized in it's declaring class",
+        r"A field can only be initialized in its declaring class",
         correction:
             "Try passing a value into the superclass constructor, or moving the initialization into the constructor body.");
 
@@ -397,6 +399,11 @@ const ParserErrorCode _INVALID_UNICODE_ESCAPE = const ParserErrorCode(
     'INVALID_UNICODE_ESCAPE',
     r"An escape sequence starting with '\u' must be followed by 4 hexadecimal digits or from 1 to 6 digits between '{' and '}'.");
 
+const ParserErrorCode _INVALID_USE_OF_COVARIANT_IN_EXTENSION =
+    const ParserErrorCode('INVALID_USE_OF_COVARIANT_IN_EXTENSION',
+        r"Can't have modifier '#lexeme' in an extension.",
+        correction: "Try removing '#lexeme'.");
+
 const ParserErrorCode _LIBRARY_DIRECTIVE_NOT_FIRST = const ParserErrorCode(
     'LIBRARY_DIRECTIVE_NOT_FIRST',
     r"The library directive must appear before all other directives.",
@@ -405,7 +412,7 @@ const ParserErrorCode _LIBRARY_DIRECTIVE_NOT_FIRST = const ParserErrorCode(
 
 const ParserErrorCode _MISSING_ASSIGNABLE_SELECTOR = const ParserErrorCode(
     'MISSING_ASSIGNABLE_SELECTOR',
-    r"Missing selector such as '.<identifier>' or '[0]'.",
+    r"Missing selector such as '.identifier' or '[0]'.",
     correction: "Try adding a selector.");
 
 const ParserErrorCode _MISSING_ASSIGNMENT_IN_INITIALIZER =
@@ -441,7 +448,8 @@ const ParserErrorCode _MISSING_KEYWORD_OPERATOR = const ParserErrorCode(
 const ParserErrorCode _MISSING_PREFIX_IN_DEFERRED_IMPORT =
     const ParserErrorCode('MISSING_PREFIX_IN_DEFERRED_IMPORT',
         r"Deferred imports should have a prefix.",
-        correction: "Try adding a prefix to the import.");
+        correction:
+            "Try adding a prefix to the import by adding an 'as' clause.");
 
 const ParserErrorCode _MISSING_STATEMENT =
     const ParserErrorCode('MISSING_STATEMENT', r"Expected a statement.");

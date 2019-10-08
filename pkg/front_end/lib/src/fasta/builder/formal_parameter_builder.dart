@@ -4,6 +4,8 @@
 
 library fasta.formal_parameter_builder;
 
+import 'package:kernel/ast.dart' show VariableDeclaration;
+
 import '../parser.dart' show FormalParameterKind;
 
 import '../parser/formal_parameter_kind.dart'
@@ -11,11 +13,6 @@ import '../parser/formal_parameter_kind.dart'
         isMandatoryFormalParameterKind,
         isOptionalNamedFormalParameterKind,
         isOptionalPositionalFormalParameterKind;
-
-import 'builder.dart'
-    show LibraryBuilder, MetadataBuilder, ModifierBuilder, TypeBuilder;
-
-import 'package:kernel/ast.dart' show VariableDeclaration;
 
 import '../constant_context.dart' show ConstantContext;
 
@@ -31,21 +28,20 @@ import '../source/source_loader.dart' show SourceLoader;
 
 import '../kernel/body_builder.dart' show BodyBuilder;
 
-import '../kernel/kernel_builder.dart'
-    show
-        ClassBuilder,
-        Builder,
-        ConstructorBuilder,
-        FieldBuilder,
-        LibraryBuilder,
-        MetadataBuilder,
-        TypeBuilder;
-
 import '../kernel/kernel_shadow_ast.dart' show VariableDeclarationImpl;
+
+import 'class_builder.dart';
+import 'declaration.dart';
+import 'field_builder.dart';
+import 'procedure_builder.dart';
+import 'library_builder.dart';
+import 'metadata_builder.dart';
+import 'modifier_builder.dart';
+import 'type_builder.dart';
 
 /// A builder for a formal parameter, i.e. a parameter on a method or
 /// constructor.
-class FormalParameterBuilder extends ModifierBuilder {
+class FormalParameterBuilder extends ModifierBuilderImpl {
   /// List of metadata builders for the metadata declared on this parameter.
   final List<MetadataBuilder> metadata;
 

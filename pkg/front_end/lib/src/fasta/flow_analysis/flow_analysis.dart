@@ -37,24 +37,20 @@ class AssignedVariables<Node, Variable> {
   ///
   /// A set is pushed onto the stack when a node is entered, and popped when
   /// a node is left.
-  final List<Set<Variable>> _writtenStack = [];
+  final List<Set<Variable>> _writtenStack = [new Set<Variable>.identity()];
+
+  /// Stack of sets accumulating variables that are declared.
+  ///
+  /// A set is pushed onto the stack when a node is entered, and popped when
+  /// a node is left.
+  final List<Set<Variable>> _declaredStack = [new Set<Variable>.identity()];
 
   /// Stack of sets accumulating variables for which a potential write is
   /// captured by a local function or closure.
   ///
   /// A set is pushed onto the stack when a node is entered, and popped when
   /// a node is left.
-  final List<Set<Variable>> _capturedStack = [];
-
-  /// Stack of integers counting the number of entries in [_capturedStack] that
-  /// should be updated when a variable write is seen.
-  ///
-  /// When a closure is entered, the length of [_capturedStack] is pushed onto
-  /// this stack; when a node is left, it is popped.
-  ///
-  /// Each time a write occurs, we consult the top of this stack to determine
-  /// how many elements of [capturedStack] should be updated.
-  final List<int> _closureIndexStack = [];
+  final List<Set<Variable>> _capturedStack = [new Set<Variable>.identity()];
 
   AssignedVariables();
 
@@ -70,18 +66,26 @@ class AssignedVariables<Node, Variable> {
   /// covered, but the initializers should not.  Similarly, in a switch
   /// statement, the body of the switch statement should be covered, but the
   /// switch expression should not.
-  void beginNode({bool isClosure: false}) {
+  void beginNode() {
     _writtenStack.add(new Set<Variable>.identity());
-    if (isClosure) {
-      _closureIndexStack.add(_capturedStack.length);
-    }
+    _declaredStack.add(new Set<Variable>.identity());
     _capturedStack.add(new Set<Variable>.identity());
   }
 
   /// Queries the set of variables for which a potential write is captured by a
   /// local function or closure inside the [node].
   Set<Variable> capturedInNode(Node node) {
-    return _capturedInNode[node] ?? const {};
+    return _capturedInNode[node] ??
+        (throw new StateError('No information for $node'));
+  }
+
+  /// This method should be called during pre-traversal, to indicate that the
+  /// declaration of a variable has been found.
+  ///
+  /// It is not required for the declaration to be seen prior to its use (this
+  /// is to allow for error recovery in the analyzer).
+  void declare(Variable variable) {
+    _declaredStack.last.add(variable);
   }
 
   /// This method should be called during pre-traversal, to mark the end of a
@@ -92,31 +96,33 @@ class AssignedVariables<Node, Variable> {
   ///
   /// See [beginNode] for more details.
   void endNode(Node node, {bool isClosure: false}) {
-    _writtenInNode[node] = _writtenStack.removeLast();
-    _capturedInNode[node] = _capturedStack.removeLast();
+    var writtenInThisNode = _writtenStack.removeLast();
+    var declaredInThisNode = _declaredStack.removeLast();
+    var capturedInThisNode = _capturedStack.removeLast();
+    _writtenInNode[node] = writtenInThisNode;
+    _capturedInNode[node] = capturedInThisNode;
+    var writesVisibleToEnclosingNode =
+        writtenInThisNode.difference(declaredInThisNode);
+    _writtenStack.last.addAll(writesVisibleToEnclosingNode);
+    var capturesVisibleToEnclosingNode =
+        capturedInThisNode.difference(declaredInThisNode);
+    _capturedStack.last.addAll(capturesVisibleToEnclosingNode);
     if (isClosure) {
-      _closureIndexStack.removeLast();
+      _capturedStack.last.addAll(writesVisibleToEnclosingNode);
     }
   }
 
   /// This method should be called during pre-traversal, to mark a write to a
   /// variable.
   void write(Variable variable) {
-    for (int i = 0; i < _writtenStack.length; ++i) {
-      _writtenStack[i].add(variable);
-    }
-    if (_closureIndexStack.isNotEmpty) {
-      int closureIndex = _closureIndexStack.last;
-      for (int i = 0; i < closureIndex; ++i) {
-        _capturedStack[i].add(variable);
-      }
-    }
+    _writtenStack.last.add(variable);
   }
 
   /// Queries the set of variables that are potentially written to inside the
   /// [node].
   Set<Variable> writtenInNode(Node node) {
-    return _writtenInNode[node] ?? const {};
+    return _writtenInNode[node] ??
+        (throw new StateError('No information for $node'));
   }
 }
 
@@ -158,13 +164,13 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
       TypeOperations<Variable, Type> typeOperations,
       Iterable<Variable> variablesWrittenAnywhere,
       Iterable<Variable> variablesCapturedAnywhere) {
-    return FlowAnalysis._(nodeOperations, typeOperations,
+    return new FlowAnalysis._(nodeOperations, typeOperations,
         variablesWrittenAnywhere.toList(), variablesCapturedAnywhere.toList());
   }
 
   FlowAnalysis._(this.nodeOperations, this.typeOperations,
       this._variablesWrittenAnywhere, this._variablesCapturedAnywhere) {
-    _current = FlowModel<Variable, Type>(true);
+    _current = new FlowModel<Variable, Type>(true);
   }
 
   /// Return `true` if the current state is reachable.
@@ -1052,7 +1058,8 @@ class FlowModel<Variable, Type> {
       VariableModel<Type> info = variableInfo[variable];
       if (info == null) {
         (newVariableInfo ??= new Map<Variable, VariableModel<Type>>.from(
-            variableInfo))[variable] = VariableModel<Type>(null, false, true);
+                variableInfo))[variable] =
+            new VariableModel<Type>(null, false, true);
       } else if (!info.writeCaptured) {
         (newVariableInfo ??= new Map<Variable, VariableModel<Type>>.from(
             variableInfo))[variable] = info.writeCapture();
@@ -1311,7 +1318,7 @@ class VariableModel<Type> {
 
   VariableModel(this.promotedType, this.assigned, this.writeCaptured) {
     assert(!writeCaptured || promotedType == null,
-        "Write-captured vars can't be promoted");
+        "Write-captured variables can't be promoted");
   }
 
   /// Creates a [VariableModel] representing a variable that's never been seen
@@ -1357,19 +1364,19 @@ class VariableModel<Type> {
   /// Returns a new [VariableModel] where the promoted type is replaced with
   /// [promotedType].
   VariableModel<Type> withPromotedType(Type promotedType) =>
-      VariableModel<Type>(promotedType, assigned, writeCaptured);
+      new VariableModel<Type>(promotedType, assigned, writeCaptured);
 
   /// Returns a new [VariableModel] reflecting the fact that the variable was
   /// just written to.
   VariableModel<Type> write() {
     if (promotedType == null && assigned) return this;
-    return VariableModel<Type>(null, true, writeCaptured);
+    return new VariableModel<Type>(null, true, writeCaptured);
   }
 
-  /// Returns a wne [VariableModel] reflecting the fact that the variable has
+  /// Returns a new [VariableModel] reflecting the fact that the variable has
   /// been write-captured.
   VariableModel<Type> writeCapture() {
-    return VariableModel<Type>(null, assigned, true);
+    return new VariableModel<Type>(null, assigned, true);
   }
 
   /// Joins two variable models.  See [FlowModel.join] for details.
@@ -1414,7 +1421,7 @@ class VariableModel<Type> {
         second.writeCaptured == newWriteCaptured) {
       return second;
     } else {
-      return VariableModel<Type>(
+      return new VariableModel<Type>(
           newPromotedType, newAssigned, newWriteCaptured);
     }
   }
