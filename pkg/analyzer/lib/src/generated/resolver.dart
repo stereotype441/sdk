@@ -4056,7 +4056,6 @@ class ResolverVisitor extends ScopedVisitor {
     try {
       if (_flowAnalysis != null) {
         if (!isFunctionDeclaration) {
-          // TODO(paulberry): test the value of _flowAnalysis.assignedVariables.capturedInNode(node)
           _flowAnalysis.flow.functionExpression_begin(
               _flowAnalysis.assignedVariables.writtenInNode(node));
         }
