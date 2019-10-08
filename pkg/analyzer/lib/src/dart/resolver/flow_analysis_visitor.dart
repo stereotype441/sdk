@@ -325,7 +325,7 @@ class TypeSystemTypeOperations
 
 /// The visitor that gathers local variables that are potentially assigned
 /// in corresponding statements, such as loops, `switch` and `try`.
-class _AssignedVariablesVisitor extends GeneralizingAstVisitor<void> {
+class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
   final AssignedVariables assignedVariables;
 
   _AssignedVariablesVisitor(this.assignedVariables);
