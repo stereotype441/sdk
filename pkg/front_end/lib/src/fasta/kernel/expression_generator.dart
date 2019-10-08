@@ -11,13 +11,19 @@ import 'package:kernel/ast.dart';
 
 import '../../scanner/token.dart' show Token;
 
-import '../constant_context.dart' show ConstantContext;
-
-import '../builder/builder.dart'
-    show NullabilityBuilder, PrefixBuilder, TypeDeclarationBuilder;
+import '../builder/declaration.dart';
+import '../builder/invalid_type_declaration_builder.dart';
+import '../builder/member_builder.dart';
+import '../builder/named_type_builder.dart';
+import '../builder/nullability_builder.dart';
+import '../builder/prefix_builder.dart';
+import '../builder/type_builder.dart';
+import '../builder/type_declaration_builder.dart';
+import '../builder/unresolved_type.dart';
 import '../builder/declaration_builder.dart';
 import '../builder/extension_builder.dart';
-import '../builder/member_builder.dart';
+
+import '../constant_context.dart' show ConstantContext;
 
 import '../fasta_codes.dart';
 
@@ -69,16 +75,7 @@ import 'kernel_ast_api.dart'
         Procedure,
         VariableDeclaration;
 
-import 'kernel_builder.dart'
-    show
-        AccessErrorBuilder,
-        Builder,
-        InvalidTypeBuilder,
-        LoadLibraryBuilder,
-        NamedTypeBuilder,
-        TypeBuilder,
-        UnlinkedDeclaration,
-        UnresolvedType;
+import 'kernel_builder.dart' show LoadLibraryBuilder, UnlinkedDeclaration;
 
 import 'kernel_shadow_ast.dart';
 
@@ -257,7 +254,7 @@ abstract class Generator {
     Message message = templateNotAType.withArguments(token.lexeme);
     _helper.libraryBuilder
         .addProblem(message, fileOffset, lengthForToken(token), _uri);
-    result.bind(result.buildInvalidType(
+    result.bind(result.buildInvalidTypeDeclarationBuilder(
         message.withLocation(_uri, fileOffset, lengthForToken(token))));
     return result;
   }
@@ -2834,8 +2831,9 @@ class DeferredAccessGenerator extends Generator {
     TypeBuilder type = suffixGenerator.buildTypeWithResolvedArguments(
         nullabilityBuilder, arguments);
     LocatedMessage message;
-    if (type is NamedTypeBuilder && type.declaration is InvalidTypeBuilder) {
-      InvalidTypeBuilder declaration = type.declaration;
+    if (type is NamedTypeBuilder &&
+        type.declaration is InvalidTypeDeclarationBuilder) {
+      InvalidTypeDeclarationBuilder declaration = type.declaration;
       message = declaration.message;
     } else {
       int charOffset = offsetForToken(prefixGenerator.token);
@@ -2850,7 +2848,7 @@ class DeferredAccessGenerator extends Generator {
         new NamedTypeBuilder(name, nullabilityBuilder, null);
     _helper.libraryBuilder.addProblem(
         message.messageObject, message.charOffset, message.length, message.uri);
-    result.bind(result.buildInvalidType(message));
+    result.bind(result.buildInvalidTypeDeclarationBuilder(message));
     return result;
   }
 
@@ -2993,8 +2991,8 @@ class TypeUseGenerator extends ReadOnlyAccessGenerator {
   @override
   Expression get expression {
     if (super.expression == null) {
-      if (declaration is InvalidTypeBuilder) {
-        InvalidTypeBuilder declaration = this.declaration;
+      if (declaration is InvalidTypeDeclarationBuilder) {
+        InvalidTypeDeclarationBuilder declaration = this.declaration;
         super.expression = _helper.buildProblemErrorIfConst(
             declaration.message.messageObject, fileOffset, token.length);
       } else {
@@ -3930,7 +3928,7 @@ class UnexpectedQualifiedUseGenerator extends Generator {
         offsetForToken(prefixGenerator.token),
         lengthOfSpan(prefixGenerator.token, token),
         _uri);
-    result.bind(result.buildInvalidType(message.withLocation(
+    result.bind(result.buildInvalidTypeDeclarationBuilder(message.withLocation(
         _uri,
         offsetForToken(prefixGenerator.token),
         lengthOfSpan(prefixGenerator.token, token))));
@@ -4027,8 +4025,8 @@ class ParserErrorGenerator extends Generator {
     NamedTypeBuilder result =
         new NamedTypeBuilder(token.lexeme, nullabilityBuilder, null);
     _helper.libraryBuilder.addProblem(message, fileOffset, noLength, _uri);
-    result.bind(result
-        .buildInvalidType(message.withLocation(_uri, fileOffset, noLength)));
+    result.bind(result.buildInvalidTypeDeclarationBuilder(
+        message.withLocation(_uri, fileOffset, noLength)));
     return result;
   }
 

@@ -43,7 +43,7 @@ main() {
   test('writtenInNode records assignments in a closure', () {
     var assignedVariables = AssignedVariables<_Node, _Variable>();
     var v1 = _Variable('v1');
-    assignedVariables.beginNode(isClosure: true);
+    assignedVariables.beginNode();
     assignedVariables.write(v1);
     var node = _Node();
     assignedVariables.endNode(node, isClosure: true);
@@ -54,13 +54,13 @@ main() {
     var assignedVariables = AssignedVariables<_Node, _Variable>();
     var v1 = _Variable('v1');
     var v2 = _Variable('v2');
-    assignedVariables.beginNode(isClosure: true);
+    assignedVariables.beginNode();
     assignedVariables.write(v1);
     assignedVariables.endNode(_Node(), isClosure: true);
     assignedVariables.beginNode();
     var node = _Node();
     assignedVariables.endNode(node);
-    assignedVariables.beginNode(isClosure: true);
+    assignedVariables.beginNode();
     assignedVariables.write(v2);
     assignedVariables.endNode(_Node(), isClosure: true);
     expect(assignedVariables.capturedInNode(node), isEmpty);
@@ -70,12 +70,59 @@ main() {
     var assignedVariables = AssignedVariables<_Node, _Variable>();
     var v1 = _Variable('v1');
     assignedVariables.beginNode();
-    assignedVariables.beginNode(isClosure: true);
+    assignedVariables.beginNode();
     assignedVariables.write(v1);
     assignedVariables.endNode(_Node(), isClosure: true);
     var node = _Node();
     assignedVariables.endNode(node);
     expect(assignedVariables.capturedInNode(node), {v1});
+  });
+
+  group('Variables do not percolate beyond the scope they were declared in',
+      () {
+    test('Non-closure scope', () {
+      var assignedVariables = AssignedVariables<_Node, _Variable>();
+      var v1 = _Variable('v1');
+      var v2 = _Variable('v2');
+      assignedVariables.beginNode();
+      assignedVariables.beginNode();
+      assignedVariables.declare(v1);
+      assignedVariables.declare(v2);
+      assignedVariables.write(v1);
+      assignedVariables.beginNode();
+      assignedVariables.write(v2);
+      assignedVariables.endNode(_Node(), isClosure: true);
+      var innerNode = _Node();
+      assignedVariables.endNode(innerNode, isClosure: false);
+      var outerNode = _Node();
+      assignedVariables.endNode(outerNode);
+      expect(assignedVariables.writtenInNode(innerNode), {v1, v2});
+      expect(assignedVariables.capturedInNode(innerNode), {v2});
+      expect(assignedVariables.writtenInNode(outerNode), isEmpty);
+      expect(assignedVariables.capturedInNode(outerNode), isEmpty);
+    });
+
+    test('Closure scope', () {
+      var assignedVariables = AssignedVariables<_Node, _Variable>();
+      var v1 = _Variable('v1');
+      var v2 = _Variable('v2');
+      assignedVariables.beginNode();
+      assignedVariables.beginNode();
+      assignedVariables.declare(v1);
+      assignedVariables.declare(v2);
+      assignedVariables.write(v1);
+      assignedVariables.beginNode();
+      assignedVariables.write(v2);
+      assignedVariables.endNode(_Node(), isClosure: true);
+      var innerNode = _Node();
+      assignedVariables.endNode(innerNode, isClosure: true);
+      var outerNode = _Node();
+      assignedVariables.endNode(outerNode);
+      expect(assignedVariables.writtenInNode(innerNode), {v1, v2});
+      expect(assignedVariables.capturedInNode(innerNode), {v2});
+      expect(assignedVariables.writtenInNode(outerNode), isEmpty);
+      expect(assignedVariables.capturedInNode(outerNode), isEmpty);
+    });
   });
 }
 

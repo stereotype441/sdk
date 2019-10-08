@@ -371,7 +371,7 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
   @override
   void visitFunctionDeclaration(FunctionDeclaration node) {
     bool isClosure = node.parent is! CompilationUnit;
-    assignedVariables.beginNode(isClosure: isClosure);
+    assignedVariables.beginNode();
     // Note: we bypass this.visitFunctionExpression so that the function
     // expression isn't mistaken for a closure.
     super.visitFunctionExpression(node.functionExpression);
@@ -380,7 +380,7 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitFunctionExpression(FunctionExpression node) {
-    assignedVariables.beginNode(isClosure: true);
+    assignedVariables.beginNode();
     super.visitFunctionExpression(node);
     assignedVariables.endNode(node, isClosure: true);
   }
@@ -468,7 +468,9 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
           assignedVariables.write(element);
         }
       } else if (forLoopParts is ForEachPartsWithDeclaration) {
-        assignedVariables.write(forLoopParts.loopVariable.declaredElement);
+        var variable = forLoopParts.loopVariable.declaredElement;
+        assignedVariables.declare(variable);
+        assignedVariables.write(variable);
       } else {
         throw new StateError('Unrecognized for loop parts');
       }
