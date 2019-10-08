@@ -332,7 +332,9 @@ calls
 can
 can't
 cancel
+cancellation
 cancelled
+cancels
 candidate
 candidates
 cannot
@@ -668,6 +670,7 @@ deduced
 deep
 default
 defaults
+defeating
 defensive
 defer
 deferred
@@ -960,6 +963,7 @@ excluding
 exclusive
 executable
 executed
+executes
 execution
 exercise
 exist
@@ -2043,6 +2047,7 @@ presence
 present
 preserve
 preserved
+preserves
 preserving
 presumed
 pretend
@@ -2651,6 +2656,7 @@ sure
 surrogate
 surrogates
 surrounding
+survive
 survives
 suspect
 swap
@@ -2981,6 +2987,7 @@ warnings
 was
 wasn't
 way
+ways
 we
 we'd
 we'll

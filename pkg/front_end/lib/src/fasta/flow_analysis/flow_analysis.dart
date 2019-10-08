@@ -827,7 +827,8 @@ class FlowModel<Variable, Type> {
       VariableModel<Type> info = variableInfo[variable];
       if (info == null) {
         (newVariableInfo ??= new Map<Variable, VariableModel<Type>>.from(
-            variableInfo))[variable] = new VariableModel<Type>(null, false, true);
+                variableInfo))[variable] =
+            new VariableModel<Type>(null, false, true);
       } else if (!info.writeCaptured) {
         (newVariableInfo ??= new Map<Variable, VariableModel<Type>>.from(
             variableInfo))[variable] = info.writeCapture();
@@ -1086,7 +1087,7 @@ class VariableModel<Type> {
 
   VariableModel(this.promotedType, this.assigned, this.writeCaptured) {
     assert(!writeCaptured || promotedType == null,
-        "Write-captured vars can't be promoted");
+        "Write-captured variables can't be promoted");
   }
 
   /// Creates a [VariableModel] representing a variable that's never been seen
