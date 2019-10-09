@@ -453,6 +453,8 @@ class FieldHelper {
     kStatic = 1 << 2,
     kIsCovariant = 1 << 5,
     kIsGenericCovariantImpl = 1 << 6,
+    kIsLate = 1 << 7,
+    kExtensionMember = 1 << 8,
   };
 
   explicit FieldHelper(KernelReaderHelper* helper)
@@ -476,6 +478,8 @@ class FieldHelper {
   bool IsGenericCovariantImpl() {
     return (flags_ & kIsGenericCovariantImpl) != 0;
   }
+  bool IsLate() const { return (flags_ & kIsLate) != 0; }
+  bool IsExtensionMember() const { return (flags_ & kExtensionMember) != 0; }
 
   NameIndex canonical_name_;
   TokenPosition position_;
@@ -535,6 +539,7 @@ class ProcedureHelper {
     // TODO(29841): Remove this line after the issue is resolved.
     kRedirectingFactoryConstructor = 1 << 6,
     kNoSuchMethodForwarder = 1 << 7,
+    kExtensionMember = 1 << 8,
   };
 
   explicit ProcedureHelper(KernelReaderHelper* helper)
@@ -560,6 +565,7 @@ class ProcedureHelper {
   bool IsNoSuchMethodForwarder() const {
     return (flags_ & kNoSuchMethodForwarder) != 0;
   }
+  bool IsExtensionMember() const { return (flags_ & kExtensionMember) != 0; }
 
   NameIndex canonical_name_;
   TokenPosition start_position_;
@@ -749,6 +755,7 @@ class LibraryHelper {
   enum Flag {
     kExternal = 1 << 0,
     kSynthetic = 1 << 1,
+    kIsNonNullableByDefault = 1 << 2,
   };
 
   explicit LibraryHelper(KernelReaderHelper* helper, uint32_t binary_version)
@@ -765,6 +772,9 @@ class LibraryHelper {
 
   bool IsExternal() const { return (flags_ & kExternal) != 0; }
   bool IsSynthetic() const { return (flags_ & kSynthetic) != 0; }
+  bool IsNonNullableByDefault() const {
+    return (flags_ & kIsNonNullableByDefault) != 0;
+  }
 
   uint8_t flags_ = 0;
   NameIndex canonical_name_;

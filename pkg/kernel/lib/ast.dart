@@ -322,7 +322,7 @@ class Library extends NamedNode
       _languageVersionMinor ?? defaultLanguageVersionMinor;
   void setLanguageVersion(int languageVersionMajor, int languageVersionMinor) {
     if (languageVersionMajor == null || languageVersionMinor == null) {
-      throw new StateError("Trying to set langauge version 'null'");
+      throw new StateError("Trying to set language version 'null'");
     }
     _languageVersionMajor = languageVersionMajor;
     _languageVersionMinor = languageVersionMinor;
@@ -6043,6 +6043,30 @@ class Variance {
     if (a == unrelated || b == unrelated) return unrelated;
     if (a == invariant || b == invariant) return invariant;
     return a == b ? covariant : contravariant;
+  }
+
+  /// Returns true if [a] is greater than (above) [b] in the partial order
+  /// induced by the variance lattice.
+  static bool greaterThan(int a, int b) {
+    return greaterThanOrEqual(a, b) && a != b;
+  }
+
+  /// Returns true if [a] is greater than (above) or equal to [b] in the
+  /// partial order induced by the variance lattice.
+  static bool greaterThanOrEqual(int a, int b) {
+    return meet(a, b) == b;
+  }
+
+  /// Returns true if [a] is less than (below) [b] in the partial order
+  /// induced by the variance lattice.
+  static bool lessThan(int a, int b) {
+    return lessThanOrEqual(a, b) && a != b;
+  }
+
+  /// Returns true if [a] is less than (below) or equal to [b] in the
+  /// partial order induced by the variance lattice.
+  static bool lessThanOrEqual(int a, int b) {
+    return meet(a, b) == a;
   }
 
   static int fromString(String variance) {

@@ -38,7 +38,7 @@ vars = {
 
   # co19 is a cipd package. Use tests/co19_2/update.sh to update this hash.
   # It requires access to the dart-build-access group, which EngProd has.
-  "co19_2_rev": "52daae49d7bff80039ff1eea36a24e98c2b9a837",
+  "co19_2_rev": "a8f7aa15ab860a309667168243bda01fda0794df",
 
   # As Flutter does, we use Fuchsia's GN and Clang toolchain. These revision
   # should be kept up to date with the revisions pulled by the Flutter engine.
@@ -84,7 +84,7 @@ vars = {
   # For more details, see https://github.com/dart-lang/sdk/issues/30164
   "dart_style_tag": "1.3.1",  # Please see the note above before updating.
 
-  "dartdoc_tag" : "v0.28.6",
+  "dartdoc_tag" : "v0.28.7",
   "fixnum_tag": "0.10.9",
   "glob_tag": "1.1.7",
   "html_tag" : "0.14.0+1",

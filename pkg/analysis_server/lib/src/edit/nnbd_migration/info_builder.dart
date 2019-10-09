@@ -143,6 +143,8 @@ class InfoBuilder {
         return "This variable is initialized to null";
       }
       return "This variable is initialized to a nullable value";
+    } else if (parent is AsExpression) {
+      return "The value of the expression is nullable";
     }
     if (node is NullLiteral) {
       return "An explicit 'null' is assigned";
@@ -173,6 +175,26 @@ class InfoBuilder {
     return description;
   }
 
+  /// Return a description of the given [origin] associated with the [edge].
+  RegionDetail _buildDetailForOrigin(EdgeOriginInfo origin, EdgeInfo edge) {
+    AstNode node = origin.node;
+    if (origin.kind == EdgeOriginKind.inheritance) {
+      // The node is the method declaration in the subclass and we want to link
+      // to the corresponding parameter in the declaration in the superclass.
+      TypeAnnotation type = info.typeAnnotationForNode(edge.sourceNode);
+      if (type != null) {
+        CompilationUnit unit = type.thisOrAncestorOfType<CompilationUnit>();
+        NavigationTarget target =
+            _targetForNode(unit.declaredElement.source.fullName, type);
+        return RegionDetail(
+            "The corresponding parameter in the overridden method is nullable",
+            target);
+      }
+    }
+    NavigationTarget target = _targetForNode(origin.source.fullName, node);
+    return RegionDetail(_buildDescriptionForOrigin(node), target);
+  }
+
   /// Compute the details for the fix with the given [fixInfo].
   List<RegionDetail> _computeDetails(FixInfo fixInfo) {
     List<RegionDetail> details = [];
@@ -182,12 +204,7 @@ class InfoBuilder {
           if (edge.isTriggered) {
             EdgeOriginInfo origin = info.edgeOrigin[edge];
             if (origin != null) {
-              // TODO(brianwilkerson) If the origin is an InheritanceOrigin then
-              //  the node is the method declaration in the subclass and we want
-              //  to link to the corresponding parameter in the declaration in
-              //  the superclass.
-              details.add(RegionDetail(_buildDescriptionForOrigin(origin.node),
-                  _targetForNode(origin.source.fullName, origin.node)));
+              details.add(_buildDetailForOrigin(origin, edge));
             } else {
               details.add(
                   RegionDetail('upstream edge with no origin ($edge)', null));
@@ -321,7 +338,25 @@ class InfoBuilder {
   /// Return the navigation target corresponding to the given [node] in the file
   /// with the given [filePath].
   NavigationTarget _targetForNode(String filePath, AstNode node) {
-    return _targetFor(filePath, node.offset, node.length);
+    AstNode parent = node.parent;
+    if (node is MethodDeclaration) {
+      // Rather than create a NavigationTarget for an entire method declaration
+      // (starting at its doc comment, ending at `}`, return a target pointing
+      // to the method's name.
+      return _targetFor(filePath, node.name.offset, node.name.length);
+    } else if (parent is ReturnStatement) {
+      // Rather than create a NavigationTarget for an entire expression, return
+      // a target pointing to the `return` token.
+      return _targetFor(
+          filePath, parent.returnKeyword.offset, parent.returnKeyword.length);
+    } else if (parent is ExpressionFunctionBody) {
+      // Rather than create a NavigationTarget for an entire expression function
+      // body, return a target pointing to the `=>` token.
+      return _targetFor(filePath, parent.functionDefinition.offset,
+          parent.functionDefinition.length);
+    } else {
+      return _targetFor(filePath, node.offset, node.length);
+    }
   }
 
   /// Return the unit info for the file at the given [path].

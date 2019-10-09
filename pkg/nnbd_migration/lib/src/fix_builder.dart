@@ -85,7 +85,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
 
   /// If we are visiting a function body or initializer, assigned variable
   /// information  used in flow analysis.  Otherwise `null`.
-  AssignedVariables<AstNode, VariableElement> _assignedVariables;
+  AssignedVariables<AstNode, PromotableElement> _assignedVariables;
 
   /// If we are visiting a subexpression, the context type used for type
   /// inference.  This is used to determine when `!` needs to be inserted.
@@ -104,15 +104,17 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   void addProblem(AstNode node, Problem problem);
 
   /// Initializes flow analysis for a function node.
-  void createFlowAnalysis(AstNode node) {
+  void createFlowAnalysis(Declaration node, FormalParameterList parameters) {
     assert(_flowAnalysis == null);
     assert(_assignedVariables == null);
+    _assignedVariables =
+        FlowAnalysisHelper.computeAssignedVariables(node, parameters);
     _flowAnalysis =
         FlowAnalysis<Statement, Expression, PromotableElement, DartType>(
             const AnalyzerNodeOperations(),
             TypeSystemTypeOperations(_typeSystem),
-            AnalyzerFunctionBodyAccess(node is FunctionBody ? node : null));
-    _assignedVariables = FlowAnalysisHelper.computeAssignedVariables(node);
+            _assignedVariables.writtenAnywhere,
+            _assignedVariables.capturedAnywhere);
   }
 
   @override
@@ -180,14 +182,10 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
       case TokenType.BANG_EQ:
       case TokenType.EQ_EQ:
         visitSubexpression(leftOperand, _typeProvider.dynamicType);
+        _flowAnalysis.equalityOp_rightBegin(leftOperand);
         visitSubexpression(rightOperand, _typeProvider.dynamicType);
-        if (leftOperand is SimpleIdentifier && rightOperand is NullLiteral) {
-          var leftElement = leftOperand.staticElement;
-          if (leftElement is PromotableElement) {
-            _flowAnalysis.conditionEqNull(node, leftElement,
-                notEqual: operatorType == TokenType.BANG_EQ);
-          }
-        }
+        _flowAnalysis.equalityOp_end(node, rightOperand,
+            notEqual: operatorType == TokenType.BANG_EQ);
         return _typeProvider.boolType;
       case TokenType.AMPERSAND_AMPERSAND:
       case TokenType.BAR_BAR:
@@ -247,6 +245,12 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   }
 
   @override
+  DartType visitNullLiteral(NullLiteral node) {
+    _flowAnalysis.nullLiteral(node);
+    return _typeProvider.nullType;
+  }
+
+  @override
   DartType visitParenthesizedExpression(ParenthesizedExpression node) {
     return node.expression.accept(this);
   }
@@ -258,7 +262,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     var element = node.staticElement;
     if (element == null) return _typeProvider.dynamicType;
     if (element is PromotableElement) {
-      var promotedType = _flowAnalysis.promotedType(element);
+      var promotedType = _flowAnalysis.variableRead(node, element);
       if (promotedType != null) return promotedType;
     }
     return _computeMigratedType(element);

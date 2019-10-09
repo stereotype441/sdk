@@ -11,13 +11,19 @@ import 'package:kernel/ast.dart';
 
 import '../../scanner/token.dart' show Token;
 
-import '../constant_context.dart' show ConstantContext;
-
-import '../builder/builder.dart'
-    show NullabilityBuilder, PrefixBuilder, TypeDeclarationBuilder;
+import '../builder/declaration.dart';
+import '../builder/invalid_type_declaration_builder.dart';
+import '../builder/member_builder.dart';
+import '../builder/named_type_builder.dart';
+import '../builder/nullability_builder.dart';
+import '../builder/prefix_builder.dart';
+import '../builder/type_builder.dart';
+import '../builder/type_declaration_builder.dart';
+import '../builder/unresolved_type.dart';
 import '../builder/declaration_builder.dart';
 import '../builder/extension_builder.dart';
-import '../builder/member_builder.dart';
+
+import '../constant_context.dart' show ConstantContext;
 
 import '../fasta_codes.dart';
 
@@ -69,16 +75,7 @@ import 'kernel_ast_api.dart'
         Procedure,
         VariableDeclaration;
 
-import 'kernel_builder.dart'
-    show
-        AccessErrorBuilder,
-        Builder,
-        InvalidTypeBuilder,
-        LoadLibraryBuilder,
-        NamedTypeBuilder,
-        TypeBuilder,
-        UnlinkedDeclaration,
-        UnresolvedType;
+import 'kernel_builder.dart' show LoadLibraryBuilder, UnlinkedDeclaration;
 
 import 'kernel_shadow_ast.dart';
 
@@ -257,7 +254,7 @@ abstract class Generator {
     Message message = templateNotAType.withArguments(token.lexeme);
     _helper.libraryBuilder
         .addProblem(message, fileOffset, lengthForToken(token), _uri);
-    result.bind(result.buildInvalidType(
+    result.bind(result.buildInvalidTypeDeclarationBuilder(
         message.withLocation(_uri, fileOffset, lengthForToken(token))));
     return result;
   }
@@ -1654,38 +1651,55 @@ class ExtensionInstanceAccessGenerator extends Generator {
 
   factory ExtensionInstanceAccessGenerator.fromBuilder(
       ExpressionGeneratorHelper helper,
+      Token token,
       Extension extension,
       String targetName,
       VariableDeclaration extensionThis,
       List<TypeParameter> extensionTypeParameters,
-      Builder declaration,
-      Token token,
-      Builder builderSetter) {
-    if (declaration is AccessErrorBuilder) {
-      AccessErrorBuilder error = declaration;
-      declaration = error.builder;
-      // We should only see an access error here if we've looked up a setter
-      // when not explicitly looking for a setter.
-      assert(declaration.isSetter);
-    } else if (declaration.target == null) {
-      return unhandled(
-          "${declaration.runtimeType}",
-          "InstanceExtensionAccessGenerator.fromBuilder",
-          offsetForToken(token),
-          helper.uri);
-    }
+      Builder getterBuilder,
+      Builder setterBuilder) {
     Procedure readTarget;
     Procedure invokeTarget;
-    if (declaration.isGetter) {
-      readTarget = declaration.target;
-    } else if (declaration.isRegularMethod) {
-      MemberBuilder procedureBuilder = declaration;
-      readTarget = procedureBuilder.extensionTearOff;
-      invokeTarget = procedureBuilder.procedure;
+    if (getterBuilder != null) {
+      if (getterBuilder is AccessErrorBuilder) {
+        AccessErrorBuilder error = getterBuilder;
+        getterBuilder = error.builder;
+        // We should only see an access error here if we've looked up a setter
+        // when not explicitly looking for a setter.
+        assert(getterBuilder.isSetter);
+      } else if (getterBuilder.target == null) {
+        return unhandled(
+            "${getterBuilder.runtimeType}",
+            "ExtensionInstanceAccessGenerator.fromBuilder",
+            offsetForToken(token),
+            helper.uri);
+      }
+      if (getterBuilder.isGetter) {
+        assert(!getterBuilder.isStatic);
+        readTarget = getterBuilder.target;
+      } else if (getterBuilder.isRegularMethod) {
+        assert(!getterBuilder.isStatic);
+        MemberBuilder procedureBuilder = getterBuilder;
+        readTarget = procedureBuilder.extensionTearOff;
+        invokeTarget = procedureBuilder.procedure;
+      }
     }
     Procedure writeTarget;
-    if (builderSetter != null && builderSetter.isSetter) {
-      writeTarget = builderSetter.target;
+    if (setterBuilder != null) {
+      if (setterBuilder is AccessErrorBuilder) {
+        targetName ??= setterBuilder.name;
+      } else if (setterBuilder.isSetter) {
+        assert(!setterBuilder.isStatic);
+        MemberBuilder memberBuilder = setterBuilder;
+        writeTarget = memberBuilder.member;
+        targetName ??= memberBuilder.name;
+      } else {
+        return unhandled(
+            "${setterBuilder.runtimeType}",
+            "ExtensionInstanceAccessGenerator.fromBuilder",
+            offsetForToken(token),
+            helper.uri);
+      }
     }
     return new ExtensionInstanceAccessGenerator(
         helper,
@@ -1965,10 +1979,12 @@ class ExplicitExtensionInstanceAccessGenerator extends Generator {
         // when not explicitly looking for a setter.
         assert(getterBuilder.isSetter);
       } else if (getterBuilder.isGetter) {
+        assert(!getterBuilder.isStatic);
         MemberBuilder memberBuilder = getterBuilder;
         readTarget = memberBuilder.member;
         targetName = memberBuilder.name;
       } else if (getterBuilder.isRegularMethod) {
+        assert(!getterBuilder.isStatic);
         MemberBuilder procedureBuilder = getterBuilder;
         readTarget = procedureBuilder.extensionTearOff;
         invokeTarget = procedureBuilder.procedure;
@@ -1987,6 +2003,7 @@ class ExplicitExtensionInstanceAccessGenerator extends Generator {
       if (setterBuilder is AccessErrorBuilder) {
         targetName ??= setterBuilder.name;
       } else if (setterBuilder.isSetter) {
+        assert(!setterBuilder.isStatic);
         MemberBuilder memberBuilder = setterBuilder;
         writeTarget = memberBuilder.member;
         targetName ??= memberBuilder.name;
@@ -2543,12 +2560,12 @@ class ExplicitExtensionAccessGenerator extends Generator {
   }
 
   Generator _createInstanceAccess(Token token, Name name, {bool isNullAware}) {
-    Builder getter = extensionBuilder.lookupLocalMember(name.name);
-    if (getter != null && getter.isStatic) {
+    Builder getter = extensionBuilder.lookupLocalMemberByName(name);
+    if (getter != null && (getter.isStatic || getter.isField)) {
       getter = null;
     }
     Builder setter =
-        extensionBuilder.lookupLocalMember(name.name, setter: true);
+        extensionBuilder.lookupLocalMemberByName(name, setter: true);
     if (setter != null && setter.isStatic) {
       setter = null;
     }
@@ -2603,8 +2620,8 @@ class ExplicitExtensionAccessGenerator extends Generator {
 
   @override
   Generator buildIndexedAccess(Expression index, Token token) {
-    Builder getter = extensionBuilder.lookupLocalMember(indexGetName.name);
-    Builder setter = extensionBuilder.lookupLocalMember(indexSetName.name);
+    Builder getter = extensionBuilder.lookupLocalMemberByName(indexGetName);
+    Builder setter = extensionBuilder.lookupLocalMemberByName(indexSetName);
     if (getter == null && setter == null) {
       return new UnresolvedNameGenerator(_helper, token, indexGetName);
     }
@@ -2814,8 +2831,9 @@ class DeferredAccessGenerator extends Generator {
     TypeBuilder type = suffixGenerator.buildTypeWithResolvedArguments(
         nullabilityBuilder, arguments);
     LocatedMessage message;
-    if (type is NamedTypeBuilder && type.declaration is InvalidTypeBuilder) {
-      InvalidTypeBuilder declaration = type.declaration;
+    if (type is NamedTypeBuilder &&
+        type.declaration is InvalidTypeDeclarationBuilder) {
+      InvalidTypeDeclarationBuilder declaration = type.declaration;
       message = declaration.message;
     } else {
       int charOffset = offsetForToken(prefixGenerator.token);
@@ -2830,7 +2848,7 @@ class DeferredAccessGenerator extends Generator {
         new NamedTypeBuilder(name, nullabilityBuilder, null);
     _helper.libraryBuilder.addProblem(
         message.messageObject, message.charOffset, message.length, message.uri);
-    result.bind(result.buildInvalidType(message));
+    result.bind(result.buildInvalidTypeDeclarationBuilder(message));
     return result;
   }
 
@@ -2973,8 +2991,8 @@ class TypeUseGenerator extends ReadOnlyAccessGenerator {
   @override
   Expression get expression {
     if (super.expression == null) {
-      if (declaration is InvalidTypeBuilder) {
-        InvalidTypeBuilder declaration = this.declaration;
+      if (declaration is InvalidTypeDeclarationBuilder) {
+        InvalidTypeDeclarationBuilder declaration = this.declaration;
         super.expression = _helper.buildProblemErrorIfConst(
             declaration.message.messageObject, fileOffset, token.length);
       } else {
@@ -3910,7 +3928,7 @@ class UnexpectedQualifiedUseGenerator extends Generator {
         offsetForToken(prefixGenerator.token),
         lengthOfSpan(prefixGenerator.token, token),
         _uri);
-    result.bind(result.buildInvalidType(message.withLocation(
+    result.bind(result.buildInvalidTypeDeclarationBuilder(message.withLocation(
         _uri,
         offsetForToken(prefixGenerator.token),
         lengthOfSpan(prefixGenerator.token, token))));
@@ -4007,8 +4025,8 @@ class ParserErrorGenerator extends Generator {
     NamedTypeBuilder result =
         new NamedTypeBuilder(token.lexeme, nullabilityBuilder, null);
     _helper.libraryBuilder.addProblem(message, fileOffset, noLength, _uri);
-    result.bind(result
-        .buildInvalidType(message.withLocation(_uri, fileOffset, noLength)));
+    result.bind(result.buildInvalidTypeDeclarationBuilder(
+        message.withLocation(_uri, fileOffset, noLength)));
     return result;
   }
 
