@@ -522,16 +522,22 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _current = isAnd ? conditionInfo._ifTrue : conditionInfo._ifFalse;
   }
 
-  void nonNullAssert_end(Expression nonNullAssertExpression, Expression operand) {
-
-  }
-
   void logicalNot_end(Expression notExpression, Expression operand) {
     var conditionInfo = _expressionEnd(operand);
     _storeExpressionInfo(
         notExpression,
         _ExpressionInfo(conditionInfo._after, conditionInfo._ifFalse,
             conditionInfo._ifTrue));
+  }
+
+  /// Call this method just after visiting a non-null assertion (`x!`)
+  /// expression.
+  void nonNullAssert_end(Expression operand) {
+    var operandInfo = _getExpressionInfo(operand);
+    if (operandInfo is _VariableReadInfo<Variable, Type>) {
+      var variable = operandInfo._variable;
+      _current = _current.markNonNullable(typeOperations, variable);
+    }
   }
 
   /// Call this method when encountering an expression that is a `null` literal.
