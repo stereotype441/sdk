@@ -356,6 +356,19 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
   }
 
   @override
+  void visitCatchClause(CatchClause node) {
+    for (var identifier in [
+      node.exceptionParameter,
+      node.stackTraceParameter
+    ]) {
+      if (node != null) {
+        assignedVariables
+            .declare(identifier.staticElement as PromotableElement);
+      }
+    }
+  }
+
+  @override
   void visitConstructorDeclaration(ConstructorDeclaration node) {
     throw StateError('Should not visit top level declarations');
   }
@@ -432,6 +445,16 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
   }
 
   @override
+  void visitVariableDeclaration(VariableDeclaration node) {
+    var grandParent = node.parent.parent;
+    if (grandParent is TopLevelVariableDeclaration ||
+        grandParent is FieldDeclaration) {
+      throw StateError('Should not visit top level declarations');
+    }
+    assignedVariables.declare(node.declaredElement);
+  }
+
+  @override
   void visitWhileStatement(WhileStatement node) {
     assignedVariables.beginNode();
     super.visitWhileStatement(node);
@@ -439,6 +462,7 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
   }
 
   void _declareParameters(FormalParameterList parameters) {
+    if (parameters == null) return;
     for (var parameter in parameters.parameters) {
       assignedVariables.declare(parameter.declaredElement);
     }
