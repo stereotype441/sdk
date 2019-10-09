@@ -597,13 +597,6 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   }
 
   @override
-  DecoratedType visitFieldDeclaration(FieldDeclaration node) {
-    node.metadata.accept(this);
-    node.fields.accept(this);
-    return null;
-  }
-
-  @override
   DecoratedType visitFieldFormalParameter(FieldFormalParameter node) {
     var parameterElement = node.declaredElement as FieldFormalParameterElement;
     var parameterType = _variables.decoratedElementType(parameterElement);
@@ -638,7 +631,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       // This is a local function.
       node.functionExpression.accept(this);
     } else {
-      _createFlowAnalysis(node);
+      _createFlowAnalysis(node, node.functionExpression.parameters);
       // Initialize a new postDominator scope that contains only the parameters.
       try {
         node.functionExpression.accept(this);
@@ -1268,14 +1261,6 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   }
 
   @override
-  DecoratedType visitTopLevelVariableDeclaration(
-      TopLevelVariableDeclaration node) {
-    node.metadata.accept(this);
-    node.variables.accept(this);
-    return null;
-  }
-
-  @override
   DecoratedType visitTryStatement(TryStatement node) {
     var finallyBlock = node.finallyBlock;
     if (finallyBlock != null) {
@@ -1345,18 +1330,23 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   DecoratedType visitVariableDeclarationList(VariableDeclarationList node) {
-    node.metadata.accept(this);
     var parent = node.parent;
     bool isTopLevel =
-        parent is TopLevelVariableDeclaration || parent is FieldDeclaration;
+        parent is FieldDeclaration || parent is TopLevelVariableDeclaration;
+    node.metadata.accept(this);
     var typeAnnotation = node.type;
     for (var variable in node.variables) {
       variable.metadata.accept(this);
       var initializer = variable.initializer;
-      if (initializer != null) {
-        if (isTopLevel) _createFlowAnalysis(variable);
-        try {
-          var declaredElement = variable.declaredElement;
+      var declaredElement = variable.declaredElement;
+      if (isTopLevel) {
+        assert(_flowAnalysis == null);
+        _createFlowAnalysis(variable, null);
+      } else {
+        assert(_flowAnalysis != null);
+      }
+      try {
+        if (initializer != null) {
           if (declaredElement is PromotableElement) {
             _flowAnalysis.initialize(declaredElement);
           }
@@ -1373,12 +1363,12 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
           } else {
             _handleAssignment(initializer, destinationType: destinationType);
           }
-        } finally {
-          if (isTopLevel) {
-            _flowAnalysis.finish();
-            _flowAnalysis = null;
-            _assignedVariables = null;
-          }
+        }
+      } finally {
+        if (isTopLevel) {
+          _flowAnalysis.finish();
+          _flowAnalysis = null;
+          _assignedVariables = null;
         }
       }
     }
@@ -1460,16 +1450,17 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     }
   }
 
-  void _createFlowAnalysis(AstNode node) {
+  void _createFlowAnalysis(Declaration node, FormalParameterList parameters) {
     assert(_flowAnalysis == null);
     assert(_assignedVariables == null);
-    _assignedVariables = FlowAnalysisHelper.computeAssignedVariables(node);
+    _assignedVariables =
+        FlowAnalysisHelper.computeAssignedVariables(node, parameters);
     _flowAnalysis =
         FlowAnalysis<Statement, Expression, PromotableElement, DecoratedType>(
             const AnalyzerNodeOperations(),
             DecoratedTypeOperations(_typeSystem, _variables, _graph),
-            _assignedVariables.writtenInNode(node),
-            _assignedVariables.capturedInNode(node));
+            _assignedVariables.writtenAnywhere,
+            _assignedVariables.capturedAnywhere);
   }
 
   DecoratedType _decorateUpperOrLowerBound(AstNode astNode, DartType type,
@@ -1729,7 +1720,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   }
 
   void _handleExecutableDeclaration(
-      AstNode node,
+      Declaration node,
       ExecutableElement declaredElement,
       NodeList<Annotation> metadata,
       TypeAnnotation returnType,
@@ -1740,7 +1731,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     assert(_currentFunctionType == null);
     metadata.accept(this);
     returnType?.accept(this);
-    _createFlowAnalysis(node);
+    _createFlowAnalysis(node, parameters);
     parameters?.accept(this);
     _currentFunctionType = _variables.decoratedElementType(declaredElement);
     _addParametersToFlowAnalysis(parameters);

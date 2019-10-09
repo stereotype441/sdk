@@ -34,7 +34,7 @@ class FlowAnalysisHelper {
   final TypeSystemTypeOperations _typeOperations;
 
   /// Precomputed sets of potentially assigned variables.
-  final AssignedVariables<AstNode, PromotableElement> assignedVariables;
+  AssignedVariables<AstNode, PromotableElement> assignedVariables;
 
   /// The result for post-resolution stages of analysis.
   final FlowAnalysisResult result;
@@ -42,17 +42,14 @@ class FlowAnalysisHelper {
   /// The current flow, when resolving a function body, or `null` otherwise.
   FlowAnalysis<Statement, Expression, PromotableElement, DartType> flow;
 
-  factory FlowAnalysisHelper(
-      TypeSystem typeSystem, AstNode node, bool retainDataForTesting) {
+  factory FlowAnalysisHelper(TypeSystem typeSystem, bool retainDataForTesting) {
     return FlowAnalysisHelper._(
         const AnalyzerNodeOperations(),
         TypeSystemTypeOperations(typeSystem),
-        computeAssignedVariables(node),
         retainDataForTesting ? FlowAnalysisResult() : null);
   }
 
-  FlowAnalysisHelper._(this._nodeOperations, this._typeOperations,
-      this.assignedVariables, this.result);
+  FlowAnalysisHelper._(this._nodeOperations, this._typeOperations, this.result);
 
   LocalVariableTypeProvider get localVariableTypeProvider {
     return _LocalVariableTypeProvider(this);
@@ -206,14 +203,16 @@ class FlowAnalysisHelper {
     return false;
   }
 
-  void topLevelDeclaration_enter(Declaration node) {
+  void topLevelDeclaration_enter(
+      Declaration node, FormalParameterList parameters, FunctionBody body) {
     assert(node != null);
     assert(flow == null);
+    assignedVariables = computeAssignedVariables(node, parameters);
     flow = FlowAnalysis<Statement, Expression, PromotableElement, DartType>(
         _nodeOperations,
         _typeOperations,
-        assignedVariables.writtenInNode(node),
-        assignedVariables.capturedInNode(node));
+        assignedVariables.writtenAnywhere,
+        assignedVariables.capturedAnywhere);
   }
 
   void topLevelDeclaration_exit() {
@@ -222,6 +221,7 @@ class FlowAnalysisHelper {
     // cascading failures.
     var flow = this.flow;
     this.flow = null;
+    assignedVariables = null;
 
     flow.finish();
   }
@@ -240,9 +240,12 @@ class FlowAnalysisHelper {
 
   /// Computes the [AssignedVariables] map for the given [node].
   static AssignedVariables<AstNode, PromotableElement> computeAssignedVariables(
-      AstNode node) {
+      Declaration node, FormalParameterList parameters) {
     var assignedVariables = AssignedVariables<AstNode, PromotableElement>();
-    node.accept(_AssignedVariablesVisitor(assignedVariables));
+    var assignedVariablesVisitor = _AssignedVariablesVisitor(assignedVariables);
+    assignedVariablesVisitor._declareParameters(parameters);
+    node.visitChildren(assignedVariablesVisitor);
+    assignedVariables.finish();
     return assignedVariables;
   }
 
@@ -345,10 +348,22 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
   }
 
   @override
+  void visitCatchClause(CatchClause node) {
+    for (var identifier in [
+      node.exceptionParameter,
+      node.stackTraceParameter
+    ]) {
+      if (identifier != null) {
+        assignedVariables
+            .declare(identifier.staticElement as PromotableElement);
+      }
+    }
+    super.visitCatchClause(node);
+  }
+
+  @override
   void visitConstructorDeclaration(ConstructorDeclaration node) {
-    assignedVariables.beginNode();
-    super.visitConstructorDeclaration(node);
-    assignedVariables.endNode(node);
+    throw StateError('Should not visit top level declarations');
   }
 
   @override
@@ -370,26 +385,28 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitFunctionDeclaration(FunctionDeclaration node) {
-    bool isClosure = node.parent is! CompilationUnit;
+    if (node.parent is CompilationUnit) {
+      throw StateError('Should not visit top level declarations');
+    }
     assignedVariables.beginNode();
+    _declareParameters(node.functionExpression.parameters);
     // Note: we bypass this.visitFunctionExpression so that the function
     // expression isn't mistaken for a closure.
     super.visitFunctionExpression(node.functionExpression);
-    assignedVariables.endNode(node, isClosure: isClosure);
+    assignedVariables.endNode(node, isClosure: true);
   }
 
   @override
   void visitFunctionExpression(FunctionExpression node) {
     assignedVariables.beginNode();
+    _declareParameters(node.parameters);
     super.visitFunctionExpression(node);
     assignedVariables.endNode(node, isClosure: true);
   }
 
   @override
   void visitMethodDeclaration(MethodDeclaration node) {
-    assignedVariables.beginNode();
-    super.visitMethodDeclaration(node);
-    assignedVariables.endNode(node);
+    throw StateError('Should not visit top level declarations');
   }
 
   @override
@@ -423,15 +440,12 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
   @override
   void visitVariableDeclaration(VariableDeclaration node) {
     var grandParent = node.parent.parent;
-    bool isTopLevel = grandParent is TopLevelVariableDeclaration ||
-        grandParent is FieldDeclaration;
-    if (isTopLevel) {
-      assignedVariables.beginNode();
+    if (grandParent is TopLevelVariableDeclaration ||
+        grandParent is FieldDeclaration) {
+      throw StateError('Should not visit top level declarations');
     }
+    assignedVariables.declare(node.declaredElement);
     super.visitVariableDeclaration(node);
-    if (isTopLevel) {
-      assignedVariables.endNode(node);
-    }
   }
 
   @override
@@ -439,6 +453,13 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
     assignedVariables.beginNode();
     super.visitWhileStatement(node);
     assignedVariables.endNode(node);
+  }
+
+  void _declareParameters(FormalParameterList parameters) {
+    if (parameters == null) return;
+    for (var parameter in parameters.parameters) {
+      assignedVariables.declare(parameter.declaredElement);
+    }
   }
 
   void _handleFor(AstNode node, ForLoopParts forLoopParts, AstNode body) {
