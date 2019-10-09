@@ -366,6 +366,7 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
             .declare(identifier.staticElement as PromotableElement);
       }
     }
+    super.visitCatchClause(node);
   }
 
   @override
