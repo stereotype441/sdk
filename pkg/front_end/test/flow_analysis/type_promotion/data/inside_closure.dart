@@ -10,11 +10,11 @@ void nested_closures(Function([dynamic]) f) {
       x;
     }
     f(() {
-        if (x is String) {
-          f();
-          x;
-        }
-        x = 0;
+      if (x is String) {
+        f();
+        x;
+      }
+      x = 0;
     });
     if (x is String) {
       f();
