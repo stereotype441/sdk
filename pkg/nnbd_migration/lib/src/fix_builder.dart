@@ -245,6 +245,12 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   }
 
   @override
+  DartType visitNullLiteral(NullLiteral node) {
+    _flowAnalysis.nullLiteral(node);
+    return _typeProvider.nullType;
+  }
+
+  @override
   DartType visitParenthesizedExpression(ParenthesizedExpression node) {
     return node.expression.accept(this);
   }
