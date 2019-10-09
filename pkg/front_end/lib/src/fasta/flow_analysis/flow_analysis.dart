@@ -535,8 +535,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   void nonNullAssert_end(Expression operand) {
     var operandInfo = _getExpressionInfo(operand);
     if (operandInfo is _VariableReadInfo<Variable, Type>) {
-      var variable = operandInfo._variable;
-      _current = _current.markNonNullable(typeOperations, variable);
+      _current =
+          _current.markNonNullable(typeOperations, operandInfo._variable);
     }
   }
 
