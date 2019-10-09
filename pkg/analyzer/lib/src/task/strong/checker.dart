@@ -1525,8 +1525,13 @@ class _OverrideChecker {
     if (members.isEmpty) return covariantChecks;
 
     for (var iface in covariantInterfaces) {
-      var unsafeSupertype =
-          rules.instantiateToBounds(iface.type) as InterfaceType;
+      var typeParameters = iface.typeParameters;
+      var defaultTypeArguments =
+          rules.instantiateTypeFormalsToBounds(typeParameters);
+      var unsafeSupertype = iface.instantiate(
+        typeArguments: defaultTypeArguments,
+        nullabilitySuffix: NullabilitySuffix.star,
+      );
       for (var m in members) {
         _findCovariantChecksForMember(m, unsafeSupertype, covariantChecks);
       }
@@ -1870,12 +1875,19 @@ class _TopLevelInitializerValidator extends RecursiveAstVisitor<void> {
 
   @override
   visitFunctionExpressionInvocation(FunctionExpressionInvocation node) {
+    if (node.typeArguments != null) {
+      return;
+    }
+
+    var function = node.function;
+    if (function is PropertyAccess) {
+      var propertyName = function.propertyName;
+      validateIdentifierElement(propertyName, propertyName.staticElement);
+    }
+
     var functionType = node.function.staticType;
-    if (node.typeArguments == null &&
-        functionType is FunctionType &&
-        functionType.typeFormals.isNotEmpty) {
-      // Type inference might depend on the parameters
-      super.visitFunctionExpressionInvocation(node);
+    if (functionType is FunctionType && functionType.typeFormals.isNotEmpty) {
+      node.argumentList.accept(this);
     }
   }
 

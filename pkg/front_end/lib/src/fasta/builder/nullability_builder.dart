@@ -3,10 +3,13 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'dart:core' hide MapEntry;
+
 import 'package:kernel/ast.dart';
+
 import '../kernel/body_builder.dart';
-import '../builder/builder.dart';
 import '../problems.dart';
+
+import 'library_builder.dart';
 
 /// Represents the nullability modifiers encountered while parsing the types.
 ///
@@ -61,8 +64,8 @@ class NullabilityBuilder {
       case SyntacticNullability.omitted:
         return ifOmitted;
     }
-    return unhandled("$_syntacticNullability", "buildNullability",
-        TreeNode.noOffset, noLocation);
+    return unhandled(
+        "$_syntacticNullability", "buildNullability", noLocation, null);
   }
 
   void writeNullabilityOn(StringBuffer sb) {
@@ -77,8 +80,7 @@ class NullabilityBuilder {
         // Do nothing.
         return;
     }
-    unhandled("$_syntacticNullability", "writeNullabilityOn", TreeNode.noOffset,
-        noLocation);
+    unhandled("$_syntacticNullability", "writeNullabilityOn", noLocation, null);
   }
 
   String toString() {

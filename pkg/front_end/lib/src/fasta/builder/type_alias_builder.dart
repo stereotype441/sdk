@@ -21,31 +21,21 @@ import 'package:kernel/type_algebra.dart'
 import '../fasta_codes.dart'
     show noLength, templateCyclicTypedef, templateTypeArgumentMismatch;
 
-import '../kernel/kernel_builder.dart'
-    show
-        FunctionTypeBuilder,
-        FormalParameterBuilder,
-        LibraryBuilder,
-        MetadataBuilder,
-        TypeBuilder,
-        TypeVariableBuilder;
-
 import '../problems.dart' show unhandled, unsupported;
 
 import '../source/source_library_builder.dart' show SourceLibraryBuilder;
 
-import 'builder.dart'
-    show
-        LibraryBuilder,
-        MetadataBuilder,
-        NullabilityBuilder,
-        TypeBuilder,
-        TypeDeclarationBuilder,
-        TypeVariableBuilder;
-
 import 'declaration.dart';
+import 'formal_parameter_builder.dart';
+import 'function_type_builder.dart';
+import 'library_builder.dart';
+import 'metadata_builder.dart';
+import 'nullability_builder.dart';
+import 'type_builder.dart';
+import 'type_declaration_builder.dart';
+import 'type_variable_builder.dart';
 
-class TypeAliasBuilder extends TypeDeclarationBuilder {
+class TypeAliasBuilder extends TypeDeclarationBuilderImpl {
   final TypeBuilder type;
 
   final List<TypeVariableBuilder> typeVariables;

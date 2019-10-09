@@ -14,6 +14,8 @@ import 'package:kernel/core_types.dart' show CoreTypes;
 
 import 'package:kernel/type_algebra.dart';
 
+import 'package:kernel/type_environment.dart';
+
 import 'package:kernel/src/bounds_checks.dart' show calculateBounds;
 
 import '../../base/instrumentation.dart'
@@ -348,8 +350,8 @@ class ClosureContext {
     assert(_needToInferReturnType);
     DartType inferredType =
         inferrer.inferReturnType(_inferredUnwrappedReturnOrYieldType);
-    if (!inferrer.typeSchemaEnvironment
-        .isSubtypeOf(inferredType, returnOrYieldContext)) {
+    if (!inferrer.typeSchemaEnvironment.isSubtypeOf(inferredType,
+        returnOrYieldContext, SubtypeCheckMode.ignoringNullabilities)) {
       // If the inferred return type isn't a subtype of the context, we use the
       // context.
       inferredType = greatestClosure(inferrer.coreTypes, returnOrYieldContext);
@@ -524,8 +526,10 @@ abstract class TypeInferrerImpl extends TypeInferrer {
   }
 
   bool isAssignable(DartType expectedType, DartType actualType) {
-    return typeSchemaEnvironment.isSubtypeOf(expectedType, actualType) ||
-        typeSchemaEnvironment.isSubtypeOf(actualType, expectedType);
+    return typeSchemaEnvironment.isSubtypeOf(
+            expectedType, actualType, SubtypeCheckMode.ignoringNullabilities) ||
+        typeSchemaEnvironment.isSubtypeOf(
+            actualType, expectedType, SubtypeCheckMode.ignoringNullabilities);
   }
 
   /// Checks whether [actualType] can be assigned to the greatest closure of
@@ -601,12 +605,14 @@ abstract class TypeInferrerImpl extends TypeInferrer {
     }
 
     if (expectedType == null ||
-        typeSchemaEnvironment.isSubtypeOf(actualType, expectedType)) {
+        typeSchemaEnvironment.isSubtypeOf(
+            actualType, expectedType, SubtypeCheckMode.ignoringNullabilities)) {
       // Types are compatible.
       return null;
     }
 
-    if (!typeSchemaEnvironment.isSubtypeOf(expectedType, actualType)) {
+    if (!typeSchemaEnvironment.isSubtypeOf(
+        expectedType, actualType, SubtypeCheckMode.ignoringNullabilities)) {
       // Error: not assignable.  Perform error recovery.
       TreeNode parent = expression.parent;
       Expression errorNode = new AsExpression(
@@ -764,9 +770,9 @@ abstract class TypeInferrerImpl extends TypeInferrer {
       List<ExtensionAccessCandidate> noneMoreSpecific = [];
       library.scope.forEachExtension((ExtensionBuilder extensionBuilder) {
         MemberBuilder thisBuilder =
-            extensionBuilder.lookupLocalMember(name.name, setter: setter);
+            extensionBuilder.lookupLocalMemberByName(name, setter: setter);
         MemberBuilder otherBuilder = extensionBuilder
-            .lookupLocalMember(otherName.name, setter: otherIsSetter);
+            .lookupLocalMemberByName(otherName, setter: otherIsSetter);
         if ((thisBuilder != null && !thisBuilder.isStatic) ||
             (otherBuilder != null && !otherBuilder.isStatic)) {
           DartType onType;
@@ -789,7 +795,8 @@ abstract class TypeInferrerImpl extends TypeInferrer {
               DartType typeArgument = inferredTypeArguments[index];
               DartType bound =
                   inferredSubstitution.substituteType(typeParameter.bound);
-              if (!typeSchemaEnvironment.isSubtypeOf(typeArgument, bound)) {
+              if (!typeSchemaEnvironment.isSubtypeOf(typeArgument, bound,
+                  SubtypeCheckMode.ignoringNullabilities)) {
                 return;
               }
             }
@@ -804,11 +811,14 @@ abstract class TypeInferrerImpl extends TypeInferrer {
                 .substituteType(extensionBuilder.extension.onType);
           }
 
-          if (typeSchemaEnvironment.isSubtypeOf(receiverType, onType)) {
+          if (typeSchemaEnvironment.isSubtypeOf(
+              receiverType, onType, SubtypeCheckMode.ignoringNullabilities)) {
             ExtensionAccessCandidate candidate = new ExtensionAccessCandidate(
                 onType,
                 onTypeInstantiateToBounds,
-                thisBuilder != null
+                thisBuilder != null &&
+                        !thisBuilder.isField &&
+                        !thisBuilder.isStatic
                     ? new ObjectAccessTarget.extensionMember(
                         thisBuilder.procedure,
                         thisBuilder.extensionTearOff,
@@ -2641,7 +2651,8 @@ abstract class TypeInferrerImpl extends TypeInferrer {
     }
     if (expectedType is FunctionType) return true;
     if (expectedType == typeSchemaEnvironment.functionLegacyRawType) {
-      if (!typeSchemaEnvironment.isSubtypeOf(actualType, expectedType)) {
+      if (!typeSchemaEnvironment.isSubtypeOf(
+          actualType, expectedType, SubtypeCheckMode.ignoringNullabilities)) {
         return true;
       }
     }
@@ -2942,10 +2953,10 @@ class ExtensionAccessCandidate {
       ExtensionAccessCandidate other) {
     if (this.isPlatform == other.isPlatform) {
       // Both are platform or not platform.
-      bool thisIsSubtype =
-          typeSchemaEnvironment.isSubtypeOf(this.onType, other.onType);
-      bool thisIsSupertype =
-          typeSchemaEnvironment.isSubtypeOf(other.onType, this.onType);
+      bool thisIsSubtype = typeSchemaEnvironment.isSubtypeOf(
+          this.onType, other.onType, SubtypeCheckMode.ignoringNullabilities);
+      bool thisIsSupertype = typeSchemaEnvironment.isSubtypeOf(
+          other.onType, this.onType, SubtypeCheckMode.ignoringNullabilities);
       if (thisIsSubtype && !thisIsSupertype) {
         // This is subtype of other and not vice-versa.
         return true;
@@ -2954,9 +2965,13 @@ class ExtensionAccessCandidate {
         return false;
       } else if (thisIsSubtype || thisIsSupertype) {
         thisIsSubtype = typeSchemaEnvironment.isSubtypeOf(
-            this.onTypeInstantiateToBounds, other.onTypeInstantiateToBounds);
+            this.onTypeInstantiateToBounds,
+            other.onTypeInstantiateToBounds,
+            SubtypeCheckMode.ignoringNullabilities);
         thisIsSupertype = typeSchemaEnvironment.isSubtypeOf(
-            other.onTypeInstantiateToBounds, this.onTypeInstantiateToBounds);
+            other.onTypeInstantiateToBounds,
+            this.onTypeInstantiateToBounds,
+            SubtypeCheckMode.ignoringNullabilities);
         if (thisIsSubtype && !thisIsSupertype) {
           // This is subtype of other and not vice-versa.
           return true;

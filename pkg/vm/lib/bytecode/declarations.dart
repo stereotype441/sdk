@@ -19,6 +19,7 @@ class LibraryDeclaration {
   static const usesDartMirrorsFlag = 1 << 0;
   static const usesDartFfiFlag = 1 << 1;
   static const hasExtensionsFlag = 1 << 2;
+  static const isNonNullableByDefaultFlag = 1 << 3;
 
   ObjectHandle importUri;
   final int flags;
@@ -76,6 +77,9 @@ class LibraryDeclaration {
     }
     if ((flags & hasExtensionsFlag) != 0) {
       sb.writeln('    extensions: $extensionUris');
+    }
+    if ((flags & isNonNullableByDefaultFlag) != 0) {
+      sb.writeln('    is nnbd');
     }
     sb.writeln();
     for (var cls in classes) {
@@ -332,6 +336,9 @@ class FieldDeclaration {
   static const hasPragmaFlag = 1 << 11;
   static const hasCustomScriptFlag = 1 << 12;
   static const hasInitializerCodeFlag = 1 << 13;
+  static const hasAttributesFlag = 1 << 14;
+  static const isLateFlag = 1 << 15;
+  static const isExtensionMemberFlag = 1 << 16;
 
   final int flags;
   final ObjectHandle name;
@@ -344,6 +351,7 @@ class FieldDeclaration {
   final ObjectHandle setterName;
   final Code initializerCode;
   final AnnotationsDeclaration annotations;
+  final ObjectHandle attributes;
 
   FieldDeclaration(
       this.flags,
@@ -356,7 +364,8 @@ class FieldDeclaration {
       this.getterName,
       this.setterName,
       this.initializerCode,
-      this.annotations);
+      this.annotations,
+      this.attributes);
 
   void write(BufferedWriter writer) {
     writer.writePackedUInt30(flags);
@@ -385,6 +394,9 @@ class FieldDeclaration {
     if ((flags & hasAnnotationsFlag) != 0) {
       writer.writeLinkOffset(annotations);
     }
+    if ((flags & hasAttributesFlag) != 0) {
+      writer.writePackedObject(attributes);
+    }
   }
 
   factory FieldDeclaration.read(BufferedReader reader) {
@@ -411,8 +423,21 @@ class FieldDeclaration {
     final annotations = ((flags & hasAnnotationsFlag) != 0)
         ? reader.readLinkOffset<AnnotationsDeclaration>()
         : null;
-    return new FieldDeclaration(flags, name, type, value, script, position,
-        endPosition, getterName, setterName, initializerCode, annotations);
+    final attributes =
+        ((flags & hasAttributesFlag) != 0) ? reader.readPackedObject() : null;
+    return new FieldDeclaration(
+        flags,
+        name,
+        type,
+        value,
+        script,
+        position,
+        endPosition,
+        getterName,
+        setterName,
+        initializerCode,
+        annotations,
+        attributes);
   }
 
   @override
@@ -437,6 +462,12 @@ class FieldDeclaration {
     if ((flags & isFinalFlag) != 0) {
       sb.write(', final');
     }
+    if ((flags & isLateFlag) != 0) {
+      sb.write(', is-late');
+    }
+    if ((flags & isExtensionMemberFlag) != 0) {
+      sb.write(', extension-member');
+    }
     if ((flags & hasPragmaFlag) != 0) {
       sb.write(', has-pragma');
     }
@@ -455,6 +486,9 @@ class FieldDeclaration {
     }
     if ((flags & hasAnnotationsFlag) != 0) {
       sb.write('    annotations $annotations\n');
+    }
+    if ((flags & hasAttributesFlag) != 0) {
+      sb.write('    attributes $attributes\n');
     }
     return sb.toString();
   }
@@ -484,6 +518,8 @@ class FunctionDeclaration {
   static const hasAnnotationsFlag = 1 << 20;
   static const hasPragmaFlag = 1 << 21;
   static const hasCustomScriptFlag = 1 << 22;
+  static const hasAttributesFlag = 1 << 23;
+  static const isExtensionMemberFlag = 1 << 24;
 
   final int flags;
   final ObjectHandle name;
@@ -497,6 +533,7 @@ class FunctionDeclaration {
   final ObjectHandle nativeName;
   final Code code;
   final AnnotationsDeclaration annotations;
+  final ObjectHandle attributes;
 
   FunctionDeclaration(
       this.flags,
@@ -510,7 +547,8 @@ class FunctionDeclaration {
       this.returnType,
       this.nativeName,
       this.code,
-      this.annotations);
+      this.annotations,
+      this.attributes);
 
   void write(BufferedWriter writer) {
     writer.writePackedUInt30(flags);
@@ -542,6 +580,9 @@ class FunctionDeclaration {
     }
     if ((flags & hasAnnotationsFlag) != 0) {
       writer.writeLinkOffset(annotations);
+    }
+    if ((flags & hasAttributesFlag) != 0) {
+      writer.writePackedObject(attributes);
     }
   }
 
@@ -578,6 +619,8 @@ class FunctionDeclaration {
     final annotations = ((flags & hasAnnotationsFlag) != 0)
         ? reader.readLinkOffset<AnnotationsDeclaration>()
         : null;
+    final attributes =
+        ((flags & hasAttributesFlag) != 0) ? reader.readPackedObject() : null;
     return new FunctionDeclaration(
         flags,
         name,
@@ -590,7 +633,8 @@ class FunctionDeclaration {
         returnType,
         nativeName,
         code,
-        annotations);
+        annotations,
+        attributes);
   }
 
   @override
@@ -617,6 +661,9 @@ class FunctionDeclaration {
     }
     if ((flags & isConstFlag) != 0) {
       sb.write(', const');
+    }
+    if ((flags & isExtensionMemberFlag) != 0) {
+      sb.write(', extension-member');
     }
     if ((flags & hasOptionalPositionalParamsFlag) != 0) {
       sb.write(', has-optional-positional-params');
@@ -668,6 +715,9 @@ class FunctionDeclaration {
     sb.write('    return-type $returnType\n');
     if ((flags & hasAnnotationsFlag) != 0) {
       sb.write('    annotations $annotations\n');
+    }
+    if ((flags & hasAttributesFlag) != 0) {
+      sb.write('    attributes $attributes\n');
     }
     if ((flags & isAbstractFlag) == 0 && (flags & isExternalFlag) == 0) {
       sb.write('\n$code\n');

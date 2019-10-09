@@ -1221,6 +1221,20 @@ class RawLibrary : public RawObject {
     kLoaded,          // Library is loaded.
   };
 
+  enum LibraryFlags {
+    kDartSchemeBit = 0,
+    kDebuggableBit,      // True if debugger can stop in library.
+    kInFullSnapshotBit,  // True if library is in a full snapshot.
+    kNnbdBit,            // True if library is non nullable by default.
+    kNumFlagBits,
+  };
+  COMPILE_ASSERT(kNumFlagBits <= (sizeof(uint8_t) * kBitsPerByte));
+  class DartSchemeBit : public BitField<uint8_t, bool, kDartSchemeBit, 1> {};
+  class DebuggableBit : public BitField<uint8_t, bool, kDebuggableBit, 1> {};
+  class InFullSnapshotBit
+      : public BitField<uint8_t, bool, kInFullSnapshotBit, 1> {};
+  class NnbdBit : public BitField<uint8_t, bool, kNnbdBit, 1> {};
+
   RAW_HEAP_OBJECT_IMPLEMENTATION(Library);
 
   VISIT_FROM(RawObject*, name_);
@@ -1259,9 +1273,7 @@ class RawLibrary : public RawObject {
   classid_t index_;       // Library id number.
   uint16_t num_imports_;  // Number of entries in imports_.
   int8_t load_state_;     // Of type LibraryState.
-  bool is_dart_scheme_;
-  bool debuggable_;          // True if debugger can stop in library.
-  bool is_in_fullsnapshot_;  // True if library is in a full snapshot.
+  uint8_t flags_;         // BitField for LibraryFlags.
 
 #if !defined(DART_PRECOMPILED_RUNTIME)
   typedef BitField<uint32_t, bool, 0, 1> IsDeclaredInBytecode;
@@ -1367,6 +1379,8 @@ class RawCode : public RawObject {
     RawTypedData* catch_entry_moves_maps_;
     RawSmi* variables_;
   } catch_entry_;
+  // The stackmaps_ array contains alternating Smi and StackMap values, where
+  // each Smi value is the PC offset for the following StackMap value.
   RawArray* stackmaps_;
   RawArray* inlined_id_to_function_;
   RawCodeSourceMap* code_source_map_;
@@ -1619,10 +1633,6 @@ class RawCodeSourceMap : public RawObject {
 class RawStackMap : public RawObject {
   RAW_HEAP_OBJECT_IMPLEMENTATION(StackMap);
   VISIT_NOTHING();
-
-  // Offset from code entry point corresponding to this stack map
-  // representation.
-  uint32_t pc_offset_;
 
   uint16_t length_;               // Length of payload, in bits.
   uint16_t slow_path_bit_count_;  // Slow path live values, included in length_.

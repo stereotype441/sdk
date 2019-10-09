@@ -715,6 +715,7 @@ intptr_t BytecodeReaderHelper::ReadConstantPool(const Function& function,
     kInterfaceCall,
     kInstantiatedInterfaceCall,
     kDynamicCall,
+    kDirectCallViaDynamicForwarder,
   };
 
   enum InvocationKind {
@@ -914,6 +915,23 @@ intptr_t BytecodeReaderHelper::ReadConstantPool(const Function& function,
         ++i;
         ASSERT(i < obj_count);
         obj = Object::null();
+      } break;
+      case ConstantPoolTag::kDirectCallViaDynamicForwarder: {
+        // DirectCallViaDynamicForwarder constant occupies 2 entries.
+        // The first entry is used for target function.
+        obj = ReadObject();
+        ASSERT(obj.IsFunction());
+        name = Function::Cast(obj).name();
+        name = Function::CreateDynamicInvocationForwarderName(name);
+        obj = Function::Cast(obj).GetDynamicInvocationForwarder(name);
+
+        pool.SetTypeAt(i, ObjectPool::EntryType::kTaggedObject,
+                       ObjectPool::Patchability::kNotPatchable);
+        pool.SetObjectAt(i, obj);
+        ++i;
+        ASSERT(i < obj_count);
+        // The second entry is used for arguments descriptor.
+        obj = ReadObject();
       } break;
       default:
         UNREACHABLE();
@@ -1854,6 +1872,41 @@ RawTypeArguments* BytecodeReaderHelper::ReadTypeArguments() {
   return type_arguments.Canonicalize();
 }
 
+void BytecodeReaderHelper::ReadAttributes(const Object& key) {
+  ASSERT(key.IsFunction() || key.IsField());
+  const auto& value = Object::Handle(Z, ReadObject());
+
+  Array& attributes =
+      Array::Handle(Z, I->object_store()->bytecode_attributes());
+  if (attributes.IsNull()) {
+    attributes = HashTables::New<BytecodeAttributesMap>(16, Heap::kOld);
+  }
+  BytecodeAttributesMap map(attributes.raw());
+  bool present = map.UpdateOrInsert(key, value);
+  ASSERT(!present);
+  I->object_store()->set_bytecode_attributes(map.Release());
+
+  if (key.IsField()) {
+    const Field& field = Field::Cast(key);
+    const auto& inferred_type_attr =
+        Array::CheckedHandle(Z, BytecodeReader::GetBytecodeAttribute(
+                                    key, Symbols::vm_inferred_type_metadata()));
+
+    if (!inferred_type_attr.IsNull() &&
+        (InferredTypeBytecodeAttribute::GetPCAt(inferred_type_attr, 0) ==
+         InferredTypeBytecodeAttribute::kFieldTypePC)) {
+      const InferredTypeMetadata type =
+          InferredTypeBytecodeAttribute::GetInferredTypeAt(
+              Z, inferred_type_attr, 0);
+      if (!type.IsTrivial()) {
+        field.set_guarded_cid(type.cid);
+        field.set_is_nullable(type.IsNullable());
+        field.set_guarded_list_length(Field::kNoFixedLength);
+      }
+    }
+  }
+}
+
 void BytecodeReaderHelper::ReadMembers(const Class& cls, bool discard_fields) {
   ASSERT(Thread::Current()->IsMutatorThread());
   ASSERT(cls.is_type_finalized());
@@ -1887,6 +1940,9 @@ void BytecodeReaderHelper::ReadFieldDeclarations(const Class& cls,
   const int kHasPragmaFlag = 1 << 11;
   const int kHasCustomScriptFlag = 1 << 12;
   const int kHasInitializerCodeFlag = 1 << 13;
+  const int kHasAttributesFlag = 1 << 14;
+  const int kIsLateFlag = 1 << 15;
+  const int kIsExtensionMemberFlag = 1 << 16;
 
   const int num_fields = reader_.ReadListLength();
   if ((num_fields == 0) && !cls.is_enum_class()) {
@@ -1909,6 +1965,7 @@ void BytecodeReaderHelper::ReadFieldDeclarations(const Class& cls,
     const bool is_const = (flags & kIsConstFlag) != 0;
     const bool has_initializer = (flags & kHasInitializerFlag) != 0;
     const bool has_pragma = (flags & kHasPragmaFlag) != 0;
+    const bool is_extension_member = (flags & kIsExtensionMemberFlag) != 0;
 
     name ^= ReadObject();
     type ^= ReadObject();
@@ -1937,6 +1994,8 @@ void BytecodeReaderHelper::ReadFieldDeclarations(const Class& cls,
     field.set_is_generic_covariant_impl((flags & kIsGenericCovariantImplFlag) !=
                                         0);
     field.set_has_initializer(has_initializer);
+    field.set_is_late((flags & kIsLateFlag) != 0);
+    field.set_is_extension_member(is_extension_member);
 
     if (!has_initializer) {
       value ^= ReadObject();
@@ -1988,6 +2047,7 @@ void BytecodeReaderHelper::ReadFieldDeclarations(const Class& cls,
       function.set_is_debuggable(false);
       function.set_accessor_field(field);
       function.set_is_declared_in_bytecode(true);
+      function.set_is_extension_member(is_extension_member);
       if (is_const && has_initializer) {
         function.set_bytecode_offset(field.bytecode_offset());
       }
@@ -2010,6 +2070,7 @@ void BytecodeReaderHelper::ReadFieldDeclarations(const Class& cls,
       function.set_is_debuggable(false);
       function.set_accessor_field(field);
       function.set_is_declared_in_bytecode(true);
+      function.set_is_extension_member(is_extension_member);
       H.SetupFieldAccessorFunction(cls, function, type);
       functions_->SetAt(function_index_++, function);
     }
@@ -2031,6 +2092,10 @@ void BytecodeReaderHelper::ReadFieldDeclarations(const Class& cls,
           library.GetMetadata(field);
         }
       }
+    }
+
+    if ((flags & kHasAttributesFlag) != 0) {
+      ReadAttributes(field);
     }
 
     fields.SetAt(i, field);
@@ -2102,6 +2167,8 @@ void BytecodeReaderHelper::ReadFunctionDeclarations(const Class& cls) {
   const int kHasAnnotationsFlag = 1 << 20;
   const int kHasPragmaFlag = 1 << 21;
   const int kHasCustomScriptFlag = 1 << 22;
+  const int kHasAttributesFlag = 1 << 23;
+  const int kIsExtensionMemberFlag = 1 << 24;
 
   const intptr_t num_functions = reader_.ReadListLength();
   ASSERT(function_index_ + num_functions == functions_->Length());
@@ -2124,6 +2191,7 @@ void BytecodeReaderHelper::ReadFunctionDeclarations(const Class& cls) {
     const bool is_factory = (flags & kIsFactoryFlag) != 0;
     const bool is_native = (flags & kIsNativeFlag) != 0;
     const bool has_pragma = (flags & kHasPragmaFlag) != 0;
+    const bool is_extension_member = (flags & kIsExtensionMemberFlag) != 0;
 
     name ^= ReadObject();
 
@@ -2172,6 +2240,7 @@ void BytecodeReaderHelper::ReadFunctionDeclarations(const Class& cls) {
         (flags & kIsNoSuchMethodForwarderFlag) != 0);
     function.set_is_reflectable((flags & kIsReflectableFlag) != 0);
     function.set_is_debuggable((flags & kIsDebuggableFlag) != 0);
+    function.set_is_extension_member(is_extension_member);
 
     if ((flags & kIsSyncStarFlag) != 0) {
       function.set_modifier(RawFunction::kSyncGen);
@@ -2276,6 +2345,11 @@ void BytecodeReaderHelper::ReadFunctionDeclarations(const Class& cls) {
           }
         }
       }
+    }
+
+    if ((flags & kHasAttributesFlag) != 0) {
+      ASSERT(!is_expression_evaluation);
+      ReadAttributes(function);
     }
 
     if (is_expression_evaluation) {
@@ -2457,6 +2531,7 @@ void BytecodeReaderHelper::ReadLibraryDeclaration(const Library& library,
   const int kUsesDartMirrorsFlag = 1 << 0;
   const int kUsesDartFfiFlag = 1 << 1;
   const int kHasExtensionsFlag = 1 << 2;
+  const int kIsNonNullableByDefaultFlag = 1 << 3;
 
   ASSERT(library.is_declared_in_bytecode());
   ASSERT(!library.Loaded());
@@ -2499,6 +2574,10 @@ void BytecodeReaderHelper::ReadLibraryDeclaration(const Library& library,
       library.AddImport(import_namespace);
     }
     H.AddPotentialExtensionLibrary(library);
+  }
+
+  if ((flags & kIsNonNullableByDefaultFlag) != 0) {
+    library.set_is_nnbd(true);
   }
 
   // The bootstrapper will take care of creating the native wrapper classes,
@@ -2888,6 +2967,12 @@ void BytecodeReaderHelper::ParseForwarderFunction(
       (flags & Code::kHasForwardingStubTargetFlag) != 0;
   const bool has_default_function_type_args =
       (flags & Code::kHasDefaultFunctionTypeArgsFlag) != 0;
+  const auto proc_attrs = kernel::ProcedureAttributesOf(target, Z);
+  // TODO(alexmarkov): fix building of flow graph for implicit closures so
+  // it would include missing checks and remove 'proc_attrs.has_tearoff_uses'
+  // from this condition.
+  const bool body_has_generic_covariant_impl_type_checks =
+      proc_attrs.has_non_this_uses || proc_attrs.has_tearoff_uses;
 
   if (has_parameters_flags) {
     const intptr_t num_params = reader_.ReadUInt();
@@ -2907,7 +2992,8 @@ void BytecodeReaderHelper::ParseForwarderFunction(
       }
 
       const bool checked_in_method_body =
-          is_covariant || is_generic_covariant_impl;
+          is_covariant || (is_generic_covariant_impl &&
+                           body_has_generic_covariant_impl_type_checks);
 
       if (checked_in_method_body) {
         variable->set_type_check_mode(LocalVariable::kSkipTypeCheck);
@@ -3422,6 +3508,45 @@ void BytecodeReader::FinishClassLoading(const Class& cls) {
   const bool discard_fields = cls.InjectCIDFields();
 
   bytecode_reader.ReadMembers(cls, discard_fields);
+}
+
+RawObject* BytecodeReader::GetBytecodeAttribute(const Object& key,
+                                                const String& name) {
+  Thread* thread = Thread::Current();
+  Zone* zone = thread->zone();
+  const auto* object_store = thread->isolate()->object_store();
+  if (object_store->bytecode_attributes() == Object::null()) {
+    return Object::null();
+  }
+  BytecodeAttributesMap map(object_store->bytecode_attributes());
+  const auto& attrs = Array::CheckedHandle(zone, map.GetOrNull(key));
+  ASSERT(map.Release().raw() == object_store->bytecode_attributes());
+  if (attrs.IsNull()) {
+    return Object::null();
+  }
+  auto& obj = Object::Handle(zone);
+  for (intptr_t i = 0, n = attrs.Length(); i + 1 < n; i += 2) {
+    obj = attrs.At(i);
+    if (obj.raw() == name.raw()) {
+      return attrs.At(i + 1);
+    }
+  }
+  return Object::null();
+}
+
+InferredTypeMetadata InferredTypeBytecodeAttribute::GetInferredTypeAt(
+    Zone* zone,
+    const Array& attr,
+    intptr_t index) {
+  ASSERT(index + kNumElements <= attr.Length());
+  const auto& type = AbstractType::CheckedHandle(zone, attr.At(index + 1));
+  const intptr_t flags = Smi::Value(Smi::RawCast(attr.At(index + 2)));
+  if (!type.IsNull()) {
+    intptr_t cid = Type::Cast(type).type_class_id();
+    return InferredTypeMetadata(cid, flags);
+  } else {
+    return InferredTypeMetadata(kDynamicCid, flags);
+  }
 }
 
 #if !defined(PRODUCT)

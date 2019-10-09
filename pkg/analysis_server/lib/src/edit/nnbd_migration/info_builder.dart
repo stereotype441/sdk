@@ -3,6 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'package:analysis_server/src/analysis_server.dart';
+import 'package:analysis_server/src/domains/analysis/navigation_dart.dart';
 import 'package:analysis_server/src/edit/fix/dartfix_listener.dart';
 import 'package:analysis_server/src/edit/nnbd_migration/instrumentation_information.dart';
 import 'package:analysis_server/src/edit/nnbd_migration/migration_info.dart';
@@ -10,9 +11,12 @@ import 'package:analysis_server/src/edit/nnbd_migration/offset_mapper.dart';
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/analysis/session.dart';
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart'
     show Location, SourceEdit, SourceFileEdit;
+import 'package:analyzer_plugin/protocol/protocol_common.dart' as protocol;
+import 'package:analyzer_plugin/src/utilities/navigation/navigation.dart';
 import 'package:nnbd_migration/instrumentation.dart';
 import 'package:nnbd_migration/nnbd_migration.dart';
 
@@ -48,20 +52,147 @@ class InfoBuilder {
 
   /// Return the migration information for all of the libraries that were
   /// migrated.
-  Future<List<LibraryInfo>> explainMigration() async {
-    Map<Source, SourceInformation> sourceInfo = info.sourceInformation;
-    List<LibraryInfo> libraries = [];
-    for (Source source in sourceInfo.keys) {
+  Future<List<UnitInfo>> explainMigration() async {
+    Map<Source, SourceInformation> sourceInfoMap = info.sourceInformation;
+    List<UnitInfo> units = [];
+    for (Source source in sourceInfoMap.keys) {
       String filePath = source.fullName;
       AnalysisSession session =
           server.getAnalysisDriver(filePath).currentSession;
       if (!session.getFile(filePath).isPart) {
-        ParsedLibraryResult result = await session.getParsedLibrary(filePath);
-        libraries
-            .add(_explainLibrary(result, info, sourceInfo[source], listener));
+        ResolvedLibraryResult result =
+            await session.getResolvedLibrary(filePath);
+        SourceInformation sourceInfo = sourceInfoMap[source];
+        for (ResolvedUnitResult unitResult in result.units) {
+          SourceFileEdit edit =
+              listener.sourceChange.getFileEdit(unitResult.path);
+          units.add(_explainUnit(sourceInfo, unitResult, edit));
+        }
       }
     }
-    return libraries;
+    return units;
+  }
+
+  /// Return details for a fix built from the given [edge], or `null` if the
+  /// edge does not have an origin.
+  String _baseDescriptionForOrigin(AstNode node) {
+    if (node is DefaultFormalParameter) {
+      Expression defaultValue = node.defaultValue;
+      if (defaultValue == null) {
+        return "This parameter has an implicit default value of 'null'";
+      } else if (defaultValue is NullLiteral) {
+        return "This parameter has an explicit default value of 'null'";
+      }
+      return "This parameter has a nullable default value";
+    } else if (node is FieldFormalParameter) {
+      AstNode parent = node.parent;
+      if (parent is DefaultFormalParameter) {
+        Expression defaultValue = parent.defaultValue;
+        if (defaultValue == null) {
+          return "This field is initialized by an optional field formal "
+              "parameter that has an implicit default value of 'null'";
+        } else if (defaultValue is NullLiteral) {
+          return "This field is initialized by an optional field formal "
+              "parameter that has an explicit default value of 'null'";
+        }
+        return "This field is initialized by an optional field formal "
+            "parameter that has a nullable default value";
+      }
+      return "This field is initialized by a field formal parameter and a "
+          "nullable value is passed as an argument";
+    }
+    AstNode parent = node.parent;
+    if (parent is ArgumentList) {
+      if (node is NullLiteral) {
+        return "An explicit 'null' is passed as an argument";
+      }
+      return "A nullable value is explicitly passed as an argument";
+    }
+
+    /// If the [node] is the return expression for a function body, return the
+    /// function body. Otherwise return `null`.
+    AstNode findFunctionBody() {
+      if (parent is ExpressionFunctionBody) {
+        return parent;
+      } else if (parent is ReturnStatement &&
+          parent.parent?.parent is BlockFunctionBody) {
+        return parent.parent.parent;
+      }
+      return null;
+    }
+
+    AstNode functionBody = findFunctionBody();
+    if (functionBody != null) {
+      AstNode function = functionBody.parent;
+      if (function is MethodDeclaration) {
+        if (function.isGetter) {
+          return "This getter returns a nullable value";
+        }
+        return "This method returns a nullable value";
+      }
+      return "This function returns a nullable value";
+    } else if (parent is VariableDeclaration) {
+      AstNode grandparent = parent.parent?.parent;
+      if (grandparent is FieldDeclaration) {
+        if (node is NullLiteral) {
+          return "This field is initialized to null";
+        }
+        return "This field is initialized to a nullable value";
+      }
+      if (node is NullLiteral) {
+        return "This variable is initialized to null";
+      }
+      return "This variable is initialized to a nullable value";
+    } else if (parent is AsExpression) {
+      return "The value of the expression is nullable";
+    }
+    if (node is NullLiteral) {
+      return "An explicit 'null' is assigned";
+    }
+    return "A nullable value is assigned";
+  }
+
+  /// Return details for a fix built from the given [edge], or `null` if the
+  /// edge does not have an origin.
+  String _buildDescriptionForDestination(AstNode node) {
+    // Other found types:
+    // - ConstructorDeclaration
+    if (node.parent is FormalParameterList) {
+      return "A nullable value can't be passed as an argument";
+    } else {
+      return "A nullable value can't be used here";
+    }
+  }
+
+  /// Return a description of the given [origin].
+  String _buildDescriptionForOrigin(AstNode origin) {
+    String description = _baseDescriptionForOrigin(origin);
+    if (_inTestCode(origin)) {
+      // TODO(brianwilkerson) Don't add this if the graph node with which the
+      //  origin is associated is also in test code.
+      description += " in test code";
+    }
+    return description;
+  }
+
+  /// Return a description of the given [origin] associated with the [edge].
+  RegionDetail _buildDetailForOrigin(EdgeOriginInfo origin, EdgeInfo edge) {
+    AstNode node = origin.node;
+    if (origin.kind == EdgeOriginKind.inheritance) {
+      // The node is the method declaration in the subclass and we want to link
+      // to the corresponding parameter in the declaration in the superclass.
+      TypeAnnotation type = info.typeAnnotationForNode(edge.sourceNode);
+      if (type != null) {
+        CompilationUnit unit = type.thisOrAncestorOfType<CompilationUnit>();
+        NavigationTarget target =
+            _targetForNode(unit.declaredElement.source.fullName, type);
+        return RegionDetail(
+            "The corresponding parameter in the overridden method is nullable",
+            target);
+      }
+    }
+    NavigationTarget target = _targetForNode(origin.source.fullName, node);
+    return RegionDetail(_buildDescriptionForOrigin(node), target);
   }
 
   /// Compute the details for the fix with the given [fixInfo].
@@ -73,32 +204,23 @@ class InfoBuilder {
           if (edge.isTriggered) {
             EdgeOriginInfo origin = info.edgeOrigin[edge];
             if (origin != null) {
-              AstNode node = origin.node;
-              if (node.parent is ArgumentList) {
-                if (node is NullLiteral) {
-                  details.add(RegionDetail(
-                      "'null' is explicitly passed as an argument",
-                      _targetFor(origin)));
-                } else {
-                  details.add(RegionDetail(
-                      "A nullable value is explicitly passed as an argument",
-                      _targetFor(origin)));
-                }
-              } else {
-                if (node is NullLiteral) {
-                  details.add(RegionDetail(
-                      "'null' is explicitly assigned", _targetFor(origin)));
-                } else {
-                  details.add(RegionDetail(
-                      "A nullable value is assigned", _targetFor(origin)));
-                }
-              }
+              details.add(_buildDetailForOrigin(origin, edge));
+            } else {
+              details.add(
+                  RegionDetail('upstream edge with no origin ($edge)', null));
             }
           }
         }
       } else if (reason is EdgeInfo) {
-        // TODO(brianwilkerson) Implement this after finding an example whose
-        //  reason is an edge that should contribute a detail.
+        NullabilityNodeInfo destination = reason.destinationNode;
+        var nodeInfo = info.nodeInfoFor(destination);
+        if (nodeInfo != null) {
+          details.add(RegionDetail(
+              _buildDescriptionForDestination(nodeInfo.astNode),
+              _targetForNode(nodeInfo.filePath, nodeInfo.astNode)));
+        } else {
+          details.add(RegionDetail('node with no info ($destination)', null));
+        }
       } else {
         throw UnimplementedError(
             'Unexpected class of reason: ${reason.runtimeType}');
@@ -107,24 +229,41 @@ class InfoBuilder {
     return details;
   }
 
-  /// Return the migration information for the given library.
-  LibraryInfo _explainLibrary(
-      ParsedLibraryResult result,
-      InstrumentationInformation info,
-      SourceInformation sourceInfo,
-      DartFixListener listener) {
-    List<UnitInfo> units = [];
-    for (ParsedUnitResult unit in result.units) {
-      SourceFileEdit edit = listener.sourceChange.getFileEdit(unit.path);
-      units.add(_explainUnit(sourceInfo, unit, edit));
-    }
-    return LibraryInfo(units);
+  /// Return the navigation sources for the unit associated with the [result].
+  List<NavigationSource> _computeNavigationSources(ResolvedUnitResult result) {
+    NavigationCollectorImpl collector = new NavigationCollectorImpl();
+    computeDartNavigation(
+        result.session.resourceProvider, collector, result.unit, null, null);
+    collector.createRegions();
+    List<String> files = collector.files;
+    List<protocol.NavigationRegion> regions = collector.regions;
+    List<protocol.NavigationTarget> rawTargets = collector.targets;
+    List<NavigationTarget> convertedTargets =
+        List<NavigationTarget>(rawTargets.length);
+    return regions.map((region) {
+      List<int> targets = region.targets;
+      if (targets.isEmpty) {
+        throw StateError('Targets is empty');
+      }
+      NavigationTarget target = convertedTargets[targets[0]];
+      if (target == null) {
+        protocol.NavigationTarget rawTarget = rawTargets[targets[0]];
+        target = _targetFor(
+            files[rawTarget.fileIndex], rawTarget.offset, rawTarget.length);
+        convertedTargets[targets[0]] = target;
+      }
+      return NavigationSource(region.offset, region.length, target);
+    }).toList();
   }
 
-  /// Return the migration information for the given unit.
-  UnitInfo _explainUnit(SourceInformation sourceInfo, ParsedUnitResult result,
+  /// Return the migration information for the unit associated with the
+  /// [result].
+  UnitInfo _explainUnit(SourceInformation sourceInfo, ResolvedUnitResult result,
       SourceFileEdit fileEdit) {
     UnitInfo unitInfo = _unitForPath(result.path);
+    if (unitInfo.sources == null) {
+      unitInfo.sources = _computeNavigationSources(result);
+    }
     String content = result.content;
     // [fileEdit] is null when a file has no edits.
     if (fileEdit != null) {
@@ -173,15 +312,51 @@ class InfoBuilder {
     return null;
   }
 
-  /// Return the navigation target corresponding to the given [origin].
-  NavigationTarget _targetFor(EdgeOriginInfo origin) {
-    AstNode node = origin.node;
-    String filePath = origin.source.fullName;
+  /// Return `true` if the given [node] is from a compilation unit within the
+  /// 'test' directory of the package.
+  bool _inTestCode(AstNode node) {
+    // TODO(brianwilkerson) Generalize this.
+    CompilationUnit unit = node.thisOrAncestorOfType<CompilationUnit>();
+    CompilationUnitElement unitElement = unit?.declaredElement;
+    if (unitElement == null) {
+      return false;
+    }
+    String filePath = unitElement.source.fullName;
+    var resourceProvider = unitElement.session.resourceProvider;
+    return resourceProvider.pathContext.split(filePath).contains('test');
+  }
+
+  /// Return the navigation target in the file with the given [filePath] at the
+  /// given [offset] ans with the given [length].
+  NavigationTarget _targetFor(String filePath, int offset, int length) {
     UnitInfo unitInfo = _unitForPath(filePath);
-    NavigationTarget target =
-        NavigationTarget(filePath, node.offset, node.length);
+    NavigationTarget target = NavigationTarget(filePath, offset, length);
     unitInfo.targets.add(target);
     return target;
+  }
+
+  /// Return the navigation target corresponding to the given [node] in the file
+  /// with the given [filePath].
+  NavigationTarget _targetForNode(String filePath, AstNode node) {
+    AstNode parent = node.parent;
+    if (node is MethodDeclaration) {
+      // Rather than create a NavigationTarget for an entire method declaration
+      // (starting at its doc comment, ending at `}`, return a target pointing
+      // to the method's name.
+      return _targetFor(filePath, node.name.offset, node.name.length);
+    } else if (parent is ReturnStatement) {
+      // Rather than create a NavigationTarget for an entire expression, return
+      // a target pointing to the `return` token.
+      return _targetFor(
+          filePath, parent.returnKeyword.offset, parent.returnKeyword.length);
+    } else if (parent is ExpressionFunctionBody) {
+      // Rather than create a NavigationTarget for an entire expression function
+      // body, return a target pointing to the `=>` token.
+      return _targetFor(filePath, parent.functionDefinition.offset,
+          parent.functionDefinition.length);
+    } else {
+      return _targetFor(filePath, node.offset, node.length);
+    }
   }
 
   /// Return the unit info for the file at the given [path].

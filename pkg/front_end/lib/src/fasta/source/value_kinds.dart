@@ -4,7 +4,34 @@
 
 import 'package:kernel/ast.dart' as type;
 
-import '../builder/builder.dart' as type;
+import '../builder/builtin_type_builder.dart' as type;
+import '../builder/class_builder.dart' as type;
+import '../builder/constructor_reference_builder.dart' as type;
+import '../builder/declaration.dart' as type;
+import '../builder/dynamic_type_builder.dart' as type;
+import '../builder/enum_builder.dart' as type;
+import '../builder/field_builder.dart' as type;
+import '../builder/formal_parameter_builder.dart' as type;
+import '../builder/procedure_builder.dart' as type;
+import '../builder/function_type_builder.dart' as type;
+import '../builder/invalid_type_declaration_builder.dart' as type;
+import '../builder/library_builder.dart' as type;
+import '../builder/member_builder.dart' as type;
+import '../builder/metadata_builder.dart' as type;
+import '../builder/mixin_application_builder.dart' as type;
+import '../builder/modifier_builder.dart' as type;
+import '../builder/name_iterator.dart' as type;
+import '../builder/named_type_builder.dart' as type;
+import '../builder/nullability_builder.dart' as type;
+import '../builder/prefix_builder.dart' as type;
+import '../builder/type_alias_builder.dart' as type;
+import '../builder/type_builder.dart' as type;
+import '../builder/type_declaration_builder.dart' as type;
+import '../builder/type_variable_builder.dart' as type;
+import '../builder/unresolved_type.dart' as type;
+import '../builder/void_type_builder.dart' as type;
+
+import '../identifiers.dart' as type;
 
 import '../kernel/expression_generator.dart' as type;
 
@@ -37,6 +64,8 @@ abstract class ValueKind {
   static const ValueKind ArgumentsOrNull =
       const _SingleValueKind<type.Arguments>(NullValue.Arguments);
   static const ValueKind Expression = const _SingleValueKind<type.Expression>();
+  static const ValueKind ExpressionOrNull =
+      const _SingleValueKind<type.Expression>(NullValue.Expression);
   static const ValueKind Identifier = const _SingleValueKind<type.Identifier>();
   static const ValueKind IdentifierOrNull =
       const _SingleValueKind<type.Identifier>(NullValue.Identifier);
@@ -65,6 +94,7 @@ abstract class ValueKind {
       const _UnionValueKind([Name, ParserRecovery]);
   static const ValueKind MetadataListOrNull =
       const _SingleValueKind<List<type.MetadataBuilder>>(NullValue.Metadata);
+  static const ValueKind ObjectList = const _SingleValueKind<List<Object>>();
   static const ValueKind Operator = const _SingleValueKind<type.Operator>();
   static const ValueKind ParserRecovery =
       const _SingleValueKind<type.ParserRecovery>();
@@ -72,6 +102,7 @@ abstract class ValueKind {
       const _SingleValueKind<type.ProblemBuilder>();
   static const ValueKind QualifiedName =
       const _SingleValueKind<type.QualifiedName>();
+  static const ValueKind Statement = const _SingleValueKind<type.Statement>();
   static const ValueKind Token = const _SingleValueKind<type.Token>();
   static const ValueKind TokenOrNull =
       const _SingleValueKind<type.Token>(NullValue.Token);

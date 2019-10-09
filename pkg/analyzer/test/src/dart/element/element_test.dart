@@ -8,7 +8,6 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/element.dart';
-import 'package:analyzer/src/dart/element/handle.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/generated/engine.dart' show AnalysisContext;
 import 'package:analyzer/src/generated/resolver.dart';
@@ -35,7 +34,6 @@ main() {
     defineReflectiveTests(ElementLocationImplTest);
     defineReflectiveTests(ElementImplTest);
     defineReflectiveTests(LibraryElementImplTest);
-    defineReflectiveTests(PropertyAccessorElementImplTest);
     defineReflectiveTests(TopLevelVariableElementImplTest);
   });
 }
@@ -1167,9 +1165,9 @@ class FunctionTypeImplTest extends AbstractTypeTest {
     FunctionElement element = ElementFactory.functionElementWithParameters(
         'f', VoidTypeImpl.instance, [
       ElementFactory.requiredParameter2('a', typeProvider.intType),
-      ElementFactory.requiredParameter('b'),
+      ElementFactory.requiredParameter2('b', typeProvider.dynamicType),
       ElementFactory.namedParameter2('c', typeProvider.stringType),
-      ElementFactory.namedParameter('d')
+      ElementFactory.namedParameter2('d', typeProvider.dynamicType)
     ]);
     FunctionTypeImpl type = element.type;
     Map<String, DartType> types = type.namedParameterTypes;
@@ -1183,7 +1181,7 @@ class FunctionTypeImplTest extends AbstractTypeTest {
     FunctionElement element = ElementFactory.functionElementWithParameters(
         'f', VoidTypeImpl.instance, [
       ElementFactory.requiredParameter2('a', typeProvider.intType),
-      ElementFactory.requiredParameter('b'),
+      ElementFactory.requiredParameter2('b', typeProvider.dynamicType),
       ElementFactory.positionalParameter2('c', typeProvider.stringType)
     ]);
     FunctionTypeImpl type = element.type;
@@ -1202,7 +1200,7 @@ class FunctionTypeImplTest extends AbstractTypeTest {
     FunctionElement element = ElementFactory.functionElementWithParameters(
         'f', VoidTypeImpl.instance, [
       ElementFactory.positionalParameter2('c', typeProvider.stringType),
-      ElementFactory.positionalParameter('d')
+      ElementFactory.positionalParameter2('d', typeProvider.dynamicType)
     ]);
     FunctionTypeImpl type = element.type;
     List<DartType> types = type.normalParameterTypes;
@@ -1220,7 +1218,7 @@ class FunctionTypeImplTest extends AbstractTypeTest {
     FunctionElement element = ElementFactory.functionElementWithParameters(
         'f', VoidTypeImpl.instance, [
       ElementFactory.requiredParameter2('a', typeProvider.intType),
-      ElementFactory.requiredParameter('b'),
+      ElementFactory.requiredParameter2('b', typeProvider.dynamicType),
       ElementFactory.positionalParameter2('c', typeProvider.stringType)
     ]);
     FunctionTypeImpl type = element.type;
@@ -1235,9 +1233,9 @@ class FunctionTypeImplTest extends AbstractTypeTest {
     FunctionElement element = ElementFactory.functionElementWithParameters(
         'f', VoidTypeImpl.instance, [
       ElementFactory.requiredParameter2('a', typeProvider.intType),
-      ElementFactory.requiredParameter('b'),
+      ElementFactory.requiredParameter2('b', typeProvider.dynamicType),
       ElementFactory.namedParameter2('c', typeProvider.stringType),
-      ElementFactory.namedParameter('d')
+      ElementFactory.namedParameter2('d', typeProvider.dynamicType)
     ]);
     FunctionTypeImpl type = element.type;
     List<DartType> types = type.optionalParameterTypes;
@@ -1255,9 +1253,9 @@ class FunctionTypeImplTest extends AbstractTypeTest {
     FunctionElement element = ElementFactory.functionElementWithParameters(
         'f', VoidTypeImpl.instance, [
       ElementFactory.requiredParameter2('a', typeProvider.intType),
-      ElementFactory.requiredParameter('b'),
+      ElementFactory.requiredParameter2('b', typeProvider.dynamicType),
       ElementFactory.positionalParameter2('c', typeProvider.stringType),
-      ElementFactory.positionalParameter('d')
+      ElementFactory.positionalParameter2('d', typeProvider.dynamicType)
     ]);
     FunctionTypeImpl type = element.type;
     List<DartType> types = type.optionalParameterTypes;
@@ -1697,121 +1695,13 @@ class FunctionTypeImplTest extends AbstractTypeTest {
     expect(s.isSubtypeOf(t), isFalse);
   }
 
-  void test_namedParameterTypes_pruned_no_type_arguments() {
-    var f = ElementFactory.genericTypeAliasElement('f');
-    var g = ElementFactory.genericTypeAliasElement('g');
-    f.function.parameters = [
-      ElementFactory.namedParameter2('x', functionTypeAliasType(g))
-    ];
-    FunctionTypeImpl paramType =
-        functionTypeAliasType(f).namedParameterTypes['x'];
-    expect(paramType.prunedTypedefs, hasLength(1));
-    expect(paramType.prunedTypedefs[0], same(f));
-  }
-
-  void test_namedParameterTypes_pruned_with_type_arguments() {
-    var f = ElementFactory.genericTypeAliasElement('f');
-    var g = ElementFactory.genericTypeAliasElement('g');
-    f.typeParameters = [ElementFactory.typeParameterElement('T')];
-    f.function.parameters = [
-      ElementFactory.namedParameter2('x', functionTypeAliasType(g))
-    ];
-    FunctionTypeImpl paramType =
-        functionTypeAliasType(f, typeArguments: [typeProvider.intType])
-            .namedParameterTypes['x'];
-    expect(paramType.prunedTypedefs, hasLength(1));
-    expect(paramType.prunedTypedefs[0], same(f));
-  }
-
-  void test_newPrune_no_previous_prune() {
-    var f = ElementFactory.genericTypeAliasElement('f');
-    FunctionTypeImpl type = functionTypeAliasType(f);
-    List<FunctionTypeAliasElement> pruneList = type.newPrune;
-    expect(pruneList, hasLength(1));
-    expect(pruneList[0], same(f));
-  }
-
   void test_newPrune_non_typedef() {
     // No pruning needs to be done for function types that aren't associated
     // with typedefs because those types can't be directly referred to by the
     // user (and hence can't participate in circularities).
     FunctionElementImpl f = ElementFactory.functionElement('f');
     FunctionTypeImpl type = f.type;
-    expect(type.newPrune, isNull);
-  }
-
-  void test_newPrune_synthetic_typedef() {
-    // No pruning needs to be done for function types that are associated with
-    // synthetic typedefs because those types are only created for
-    // function-typed formal parameters, which can't be directly referred to by
-    // the user (and hence can't participate in circularities).
-    var f = ElementFactory.genericTypeAliasElement('f');
-    f.isSynthetic = true;
-    FunctionTypeImpl type = functionTypeAliasType(f);
-    expect(type.newPrune, isNull);
-  }
-
-  void test_newPrune_with_previous_prune() {
-    var f = ElementFactory.genericTypeAliasElement('f');
-    var g = ElementFactory.genericTypeAliasElement('g');
-    FunctionTypeImpl type = functionTypeAliasType(f);
-    FunctionTypeImpl prunedType = type.pruned([g]);
-    List<FunctionTypeAliasElement> pruneList = prunedType.newPrune;
-    expect(pruneList, hasLength(2));
-    expect(pruneList, contains(f));
-    expect(pruneList, contains(g));
-  }
-
-  void test_normalParameterTypes_pruned_no_type_arguments() {
-    var f = ElementFactory.genericTypeAliasElement('f');
-    var g = ElementFactory.genericTypeAliasElement('g');
-    f.function.parameters = [
-      ElementFactory.requiredParameter2('x', functionTypeAliasType(g))
-    ];
-    FunctionTypeImpl paramType =
-        functionTypeAliasType(f).normalParameterTypes[0];
-    expect(paramType.prunedTypedefs, hasLength(1));
-    expect(paramType.prunedTypedefs[0], same(f));
-  }
-
-  void test_normalParameterTypes_pruned_with_type_arguments() {
-    var f = ElementFactory.genericTypeAliasElement('f');
-    var g = ElementFactory.genericTypeAliasElement('g');
-    f.typeParameters = [ElementFactory.typeParameterElement('T')];
-    f.function.parameters = [
-      ElementFactory.requiredParameter2('x', functionTypeAliasType(g))
-    ];
-    FunctionTypeImpl paramType =
-        functionTypeAliasType(f, typeArguments: [typeProvider.intType])
-            .normalParameterTypes[0];
-    expect(paramType.prunedTypedefs, hasLength(1));
-    expect(paramType.prunedTypedefs[0], same(f));
-  }
-
-  void test_optionalParameterTypes_pruned_no_type_arguments() {
-    var f = ElementFactory.genericTypeAliasElement('f');
-    var g = ElementFactory.genericTypeAliasElement('g');
-    f.function.parameters = [
-      ElementFactory.positionalParameter2('x', functionTypeAliasType(g))
-    ];
-    FunctionTypeImpl paramType =
-        functionTypeAliasType(f).optionalParameterTypes[0];
-    expect(paramType.prunedTypedefs, hasLength(1));
-    expect(paramType.prunedTypedefs[0], same(f));
-  }
-
-  void test_optionalParameterTypes_pruned_with_type_arguments() {
-    var f = ElementFactory.genericTypeAliasElement('f');
-    var g = ElementFactory.genericTypeAliasElement('g');
-    f.typeParameters = [ElementFactory.typeParameterElement('T')];
-    f.function.parameters = [
-      ElementFactory.positionalParameter2('x', functionTypeAliasType(g))
-    ];
-    FunctionTypeImpl paramType =
-        functionTypeAliasType(f, typeArguments: [typeProvider.intType])
-            .optionalParameterTypes[0];
-    expect(paramType.prunedTypedefs, hasLength(1));
-    expect(paramType.prunedTypedefs[0], same(f));
+    expect(type.newPrune, []);
   }
 
   void test_resolveToBound() {
@@ -1820,27 +1710,6 @@ class FunctionTypeImplTest extends AbstractTypeTest {
 
     // Returns this.
     expect(type.resolveToBound(null), same(type));
-  }
-
-  void test_returnType_pruned_no_type_arguments() {
-    var f = ElementFactory.genericTypeAliasElement('f');
-    var g = ElementFactory.genericTypeAliasElement('g');
-    f.function.returnType = functionTypeAliasType(g);
-    FunctionTypeImpl paramType = functionTypeAliasType(f).returnType;
-    expect(paramType.prunedTypedefs, hasLength(1));
-    expect(paramType.prunedTypedefs[0], same(f));
-  }
-
-  void test_returnType_pruned_with_type_arguments() {
-    var f = ElementFactory.genericTypeAliasElement('f');
-    var g = ElementFactory.genericTypeAliasElement('g');
-    f.typeParameters = [ElementFactory.typeParameterElement('T')];
-    f.function.returnType = functionTypeAliasType(g);
-    FunctionTypeImpl paramType =
-        functionTypeAliasType(f, typeArguments: [typeProvider.intType])
-            .returnType;
-    expect(paramType.prunedTypedefs, hasLength(1));
-    expect(paramType.prunedTypedefs[0], same(f));
   }
 
   void test_substitute2_equal() {
@@ -1916,7 +1785,10 @@ class FunctionTypeImplTest extends AbstractTypeTest {
     var s = ElementFactory.genericTypeAliasElement("s");
     t.function.returnType = functionTypeAliasType(s);
     s.function.returnType = functionTypeAliasType(t);
-    expect(functionTypeAliasType(t).toString(), '... Function() Function()');
+    expect(
+      functionTypeAliasType(t).toString(),
+      'dynamic Function() Function()',
+    );
   }
 
   void test_toString_recursive_via_interface_type() {
@@ -1926,7 +1798,10 @@ class FunctionTypeImplTest extends AbstractTypeTest {
       typeArguments: [functionTypeAliasType(f)],
       nullabilitySuffix: NullabilitySuffix.star,
     );
-    expect(functionTypeAliasType(f).toString(), 'C<...> Function()');
+    expect(
+      functionTypeAliasType(f).toString(),
+      'dynamic Function()',
+    );
   }
 
   void test_typeParameters_genericLocalFunction_genericMethod_genericClass() {
@@ -3516,55 +3391,6 @@ class LibraryElementImplTest {
     for (int i = 0; i < actualImports.length; i++) {
       expect(actualImports[i], same(expectedImports[i]));
     }
-  }
-}
-
-@reflectiveTest
-class PropertyAccessorElementImplTest {
-  void test_matchesHandle_getter() {
-    CompilationUnitElementImpl compilationUnitElement =
-        ElementFactory.compilationUnit('foo.dart');
-    ElementFactory.library(null, '')
-      ..definingCompilationUnit = compilationUnitElement;
-    PropertyAccessorElementImpl element =
-        ElementFactory.getterElement('x', true, DynamicTypeImpl.instance);
-    compilationUnitElement.accessors = <PropertyAccessorElement>[element];
-    PropertyAccessorElementHandle handle =
-        new PropertyAccessorElementHandle(null, element.location);
-    expect(element.hashCode, handle.hashCode);
-    // ignore: unrelated_type_equality_checks
-    expect(element == handle, isTrue);
-    // ignore: unrelated_type_equality_checks
-    expect(handle == element, isTrue);
-  }
-
-  void test_matchesHandle_setter() {
-    CompilationUnitElementImpl compilationUnitElement =
-        ElementFactory.compilationUnit('foo.dart');
-    ElementFactory.library(null, '')
-      ..definingCompilationUnit = compilationUnitElement;
-    PropertyAccessorElementImpl element =
-        ElementFactory.setterElement('x', true, DynamicTypeImpl.instance);
-    compilationUnitElement.accessors = <PropertyAccessorElement>[element];
-    PropertyAccessorElementHandle handle =
-        new PropertyAccessorElementHandle(null, element.location);
-    expect(element.hashCode, handle.hashCode);
-    // ignore: unrelated_type_equality_checks
-    expect(element == handle, isTrue);
-    // ignore: unrelated_type_equality_checks
-    expect(handle == element, isTrue);
-  }
-}
-
-class TestElementResynthesizer extends ElementResynthesizer {
-  Map<ElementLocation, Element> locationMap;
-
-  TestElementResynthesizer(AnalysisContext context, this.locationMap)
-      : super(context, null);
-
-  @override
-  Element getElement(ElementLocation location) {
-    return locationMap[location];
   }
 }
 

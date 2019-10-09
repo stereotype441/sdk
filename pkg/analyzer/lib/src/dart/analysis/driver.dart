@@ -89,11 +89,16 @@ typedef Future<void> WorkToWaitAfterComputingResult(String path);
 /// TODO(scheglov) Clean up the list of implicitly analyzed files.
 class AnalysisDriver implements AnalysisDriverGeneric {
   /// The version of data format, should be incremented on every format change.
-  static const int DATA_VERSION = 87;
+  static const int DATA_VERSION = 88;
 
   /// The number of exception contexts allowed to write. Once this field is
   /// zero, we stop writing any new exception contexts in this process.
   static int allowedNumberOfContextsToWrite = 10;
+
+  /// Whether summary2 should be used to resynthesize elements.
+  @Deprecated('Clients should assume summary2 is used.  '
+      'Summary1 support has been removed.')
+  static bool get useSummary2 => true;
 
   /// The scheduler that schedules analysis work in this, and possibly other
   /// analysis drivers.

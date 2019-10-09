@@ -10,12 +10,14 @@ import 'dart:collection' show Queue;
 
 import 'package:kernel/ast.dart' show Class, DartType, Library;
 
-import 'builder/builder.dart'
-    show Builder, ClassBuilder, LibraryBuilder, Scope, TypeBuilder;
+import 'scope.dart';
 
-import 'builder/declaration_builder.dart' show DeclarationBuilder;
-
-import 'builder/modifier_builder.dart' show ModifierBuilder;
+import 'builder/class_builder.dart';
+import 'builder/declaration.dart';
+import 'builder/declaration_builder.dart';
+import 'builder/library_builder.dart';
+import 'builder/modifier_builder.dart';
+import 'builder/type_builder.dart';
 
 import 'crash.dart' show firstSourceUri;
 
@@ -149,10 +151,10 @@ abstract class Loader {
             }
 
             hasPackageSpecifiedLanguageVersion = true;
-            String langaugeVersionString = property.substring(5);
+            String languageVersionString = property.substring(5);
 
             // Verify that the version is x.y[whatever]
-            List<String> dotSeparatedParts = langaugeVersionString.split(".");
+            List<String> dotSeparatedParts = languageVersionString.split(".");
             if (dotSeparatedParts.length >= 2) {
               packageSpecifiedLanguageVersionMajor =
                   int.tryParse(dotSeparatedParts[0]);

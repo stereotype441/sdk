@@ -60,6 +60,15 @@ class _ComponentIndex {
   int componentFileSizeInBytes;
 }
 
+class SubComponentView {
+  final List<Library> libraries;
+  final int componentStartOffset;
+  final int componentFileSize;
+
+  SubComponentView(
+      this.libraries, this.componentStartOffset, this.componentFileSize);
+}
+
 class BinaryBuilder {
   final List<VariableDeclaration> variableStack = <VariableDeclaration>[];
   final List<LabeledStatement> labelStack = <LabeledStatement>[];
@@ -454,8 +463,14 @@ class BinaryBuilder {
   /// computed ahead of time.
   ///
   /// The input bytes may contain multiple files concatenated.
-  void readComponent(Component component, {bool checkCanonicalNames: false}) {
-    Timeline.timeSync("BinaryBuilder.readComponent", () {
+  ///
+  /// If [createView] is true, returns a list of [SubComponentView] - one for
+  /// each concatenated dill - each of which knowing where in the combined dill
+  /// it came from. If [createView] is false null will be returned.
+  List<SubComponentView> readComponent(Component component,
+      {bool checkCanonicalNames: false, bool createView: false}) {
+    return Timeline.timeSync<List<SubComponentView>>(
+        "BinaryBuilder.readComponent", () {
       _checkEmptyInput();
 
       // Check that we have a .dill file and it has the correct version before we
@@ -476,14 +491,24 @@ class BinaryBuilder {
         _disableLazyClassReading = true;
       }
       int componentFileIndex = 0;
+      List<SubComponentView> views;
+      if (createView) {
+        views = new List<SubComponentView>();
+      }
       while (_byteOffset < _bytes.length) {
-        _readOneComponent(component, componentFileSizes[componentFileIndex]);
+        SubComponentView view = _readOneComponent(
+            component, componentFileSizes[componentFileIndex],
+            createView: createView);
+        if (createView) {
+          views.add(view);
+        }
         ++componentFileIndex;
       }
 
       if (checkCanonicalNames) {
         _checkCanonicalNameChildren(component.root);
       }
+      return views;
     });
   }
 
@@ -651,7 +676,8 @@ class BinaryBuilder {
     _byteOffset = _componentStartOffset + componentFileSize;
   }
 
-  void _readOneComponent(Component component, int componentFileSize) {
+  SubComponentView _readOneComponent(Component component, int componentFileSize,
+      {bool createView: false}) {
     _componentStartOffset = _byteOffset;
 
     final int magic = readUint32();
@@ -693,9 +719,19 @@ class BinaryBuilder {
     readConstantTable();
 
     int numberOfLibraries = index.libraryCount;
+
+    SubComponentView result;
+    if (createView) {
+      result = new SubComponentView(new List<Library>(numberOfLibraries),
+          _componentStartOffset, componentFileSize);
+    }
+
     for (int i = 0; i < numberOfLibraries; ++i) {
       _byteOffset = index.libraryOffsets[i];
-      readLibrary(component, index.libraryOffsets[i + 1]);
+      Library library = readLibrary(component, index.libraryOffsets[i + 1]);
+      if (createView) {
+        result.libraries[i] = library;
+      }
     }
 
     var mainMethod =
@@ -705,6 +741,8 @@ class BinaryBuilder {
     _byteOffset = _componentStartOffset + componentFileSize;
 
     assert(typeParameterStack.isEmpty);
+
+    return result;
   }
 
   /// Read a list of strings. If the list is empty, [null] is returned.
@@ -956,6 +994,7 @@ class BinaryBuilder {
   void _readAdditionalExports(Library library) {
     int numExportedReference = readUInt();
     if (numExportedReference != 0) {
+      library.additionalExports.clear();
       for (int i = 0; i < numExportedReference; i++) {
         CanonicalName exportedName = readCanonicalNameReference();
         Reference reference = exportedName.getReference();
@@ -1012,7 +1051,9 @@ class BinaryBuilder {
     readAndPushTypeParameterList(node.typeParameters, node);
     var type = readDartType();
     readAndPushTypeParameterList(node.typeParametersOfFunctionType, node);
+    node.positionalParameters.clear();
     node.positionalParameters.addAll(readAndPushVariableDeclarationList());
+    node.namedParameters.clear();
     node.namedParameters.addAll(readAndPushVariableDeclarationList());
     typeParameterStack.length = 0;
     variableStack.length = 0;
@@ -2269,8 +2310,16 @@ class BinaryBuilderWithMetadata extends BinaryBuilder implements BinarySource {
   /// and are awaiting to be parsed and attached to nodes.
   List<_MetadataSubsection> _subsections;
 
-  BinaryBuilderWithMetadata(bytes, [filename])
-      : super(bytes, filename: filename);
+  BinaryBuilderWithMetadata(List<int> bytes,
+      {String filename,
+      bool disableLazyReading = false,
+      bool disableLazyClassReading = false,
+      bool alwaysCreateNewNamedNodes})
+      : super(bytes,
+            filename: filename,
+            disableLazyReading: disableLazyReading,
+            disableLazyClassReading: disableLazyClassReading,
+            alwaysCreateNewNamedNodes: alwaysCreateNewNamedNodes);
 
   @override
   void _readMetadataMappings(
@@ -2380,6 +2429,13 @@ class BinaryBuilderWithMetadata extends BinaryBuilder implements BinarySource {
   Class readClass(int endOffset) {
     final nodeOffset = _byteOffset;
     final result = super.readClass(endOffset);
+    return _associateMetadata(result, nodeOffset);
+  }
+
+  @override
+  Extension readExtension() {
+    final nodeOffset = _byteOffset;
+    final result = super.readExtension();
     return _associateMetadata(result, nodeOffset);
   }
 

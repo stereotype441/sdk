@@ -12,6 +12,7 @@ ability
 able
 abort
 aborted
+aborting
 aborts
 about
 above
@@ -103,6 +104,7 @@ although
 always
 ambiguous
 among
+amongst
 amount
 ampersand
 an
@@ -254,6 +256,7 @@ between
 beyond
 big
 bigint
+bilateral
 binaries
 binary
 bind
@@ -331,7 +334,9 @@ calls
 can
 can't
 cancel
+cancellation
 cancelled
+cancels
 candidate
 candidates
 cannot
@@ -478,6 +483,7 @@ complain
 complete
 completed
 completely
+completeness
 completer
 completion
 complex
@@ -568,6 +574,8 @@ continue
 continued
 continues
 continuing
+continuously
+contraposition
 contrast
 contravariance
 contravariant
@@ -666,6 +674,7 @@ deduced
 deep
 default
 defaults
+defeating
 defensive
 defer
 deferred
@@ -958,6 +967,7 @@ excluding
 exclusive
 executable
 executed
+executes
 execution
 exercise
 exist
@@ -1061,6 +1071,7 @@ finally
 find
 finding
 finds
+fine
 finish
 finished
 finishes
@@ -1323,6 +1334,7 @@ indices
 indirect
 indirectly
 induce
+induced
 infer
 inference
 inferrable
@@ -1396,6 +1408,7 @@ interaction
 intercept
 interceptors
 interest
+interesting
 interface
 interfaces
 interferes
@@ -1414,6 +1427,7 @@ interpreter
 interpreting
 intersect
 intersection
+intertwined
 into
 intrinsic
 introduce
@@ -1424,6 +1438,8 @@ invalid
 invalidate
 invalidated
 invalidates
+invalidating
+invalidation
 invariant
 invariantly
 invert
@@ -1489,7 +1505,6 @@ labels
 lack
 lacking
 lands
-langauge
 language
 large
 larger
@@ -1666,6 +1681,7 @@ merging
 message
 messages
 messaging
+met
 metadata
 method
 methods
@@ -1902,6 +1918,7 @@ own
 owned
 owner
 package
+packaged
 packages
 pad
 padded
@@ -1946,6 +1963,7 @@ pattern
 peek
 pending
 percent
+percolate
 perform
 performance
 performed
@@ -1957,6 +1975,7 @@ periods
 permissible
 permitted
 persistent
+pertaining
 phase
 phased
 phases
@@ -2040,6 +2059,7 @@ presence
 present
 preserve
 preserved
+preserves
 preserving
 presumed
 pretend
@@ -2210,6 +2230,7 @@ regions
 register
 registered
 registers
+registration
 registry
 regress
 regression
@@ -2492,6 +2513,7 @@ slow
 slower
 slows
 small
+smaller
 smallest
 snapshot
 snapshots
@@ -2564,6 +2586,7 @@ step
 steps
 still
 stop
+stopping
 stops
 stopwatch
 store
@@ -2648,6 +2671,7 @@ sure
 surrogate
 surrogates
 surrounding
+survive
 survives
 suspect
 swap
@@ -2699,6 +2723,7 @@ terminates
 terminating
 termination
 terminology
+terms
 ternary
 test
 testcase
@@ -2726,6 +2751,7 @@ these
 they
 they're
 thin
+thing
 things
 think
 third
@@ -2734,6 +2760,7 @@ those
 though
 three
 threshold
+threw
 throttle
 through
 throughout
@@ -2805,6 +2832,7 @@ triples
 triplet
 triplets
 trivial
+trouble
 true
 truly
 truncate
@@ -2835,6 +2863,7 @@ uncertain
 unchanged
 unclaimed
 unclear
+undeclared
 undefined
 under
 underlying
@@ -2953,6 +2982,7 @@ very
 via
 view
 viewed
+views
 violate
 violates
 violation
@@ -2976,6 +3006,7 @@ warnings
 was
 wasn't
 way
+ways
 we
 we'd
 we'll

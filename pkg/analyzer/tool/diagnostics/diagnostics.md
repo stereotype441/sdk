@@ -1307,7 +1307,7 @@ var x;
 
 ### invalid_use_of_covariant_in_extension
 
-_The 'covariant' keyword can't be used in an extension._
+_Can't have modifier '#lexeme' in an extension._
 
 #### Description
 
@@ -1937,7 +1937,7 @@ const int i = [!n as int!];
 #### Common fixes
 
 If you don't need to support older versions of the SDK, then you can
-ncrease the SDK constraint to allow the expression to be used:
+increase the SDK constraint to allow the expression to be used:
 
 ```yaml
 environment:

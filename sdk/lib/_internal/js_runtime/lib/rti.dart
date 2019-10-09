@@ -93,10 +93,15 @@ class Rti {
   // Precomputed derived types. These fields are used to hold derived types that
   // are computed eagerly.
   // TODO(sra): Implement precomputed type optimizations.
+  @pragma('dart2js:noElision')
   dynamic _precomputed1;
   dynamic _precomputed2;
   dynamic _precomputed3;
   dynamic _precomputed4;
+
+  static void _setPrecomputed1(Rti rti, Rti precomputed) {
+    rti._precomputed1 = precomputed;
+  }
 
   // The Type object corresponding to this Rti.
   Object _cachedRuntimeType;
@@ -1495,6 +1500,10 @@ class _Universe {
     Rti._setKind(rti, Rti.kindInterface);
     Rti._setPrimary(rti, name);
     Rti._setRest(rti, typeArguments);
+    int length = _Utils.arrayLength(typeArguments);
+    if (length > 0) {
+      Rti._setPrecomputed1(rti, _castToRti(_Utils.arrayAt(typeArguments, 0)));
+    }
     Rti._setCanonicalRecipe(rti, key);
     return _finishRti(universe, rti);
   }
