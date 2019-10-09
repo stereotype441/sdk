@@ -720,11 +720,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
         _variablesWrittenAnywhere.contains(variable),
         "Variable is written to, but was not included in "
         "_variablesWrittenAnywhere: $variable");
-    assert(
-        _functionNestingLevel == 0 ||
-            _variablesCapturedAnywhere.contains(variable),
-        "Variable is captured by a local function, but was not included in "
-        "_variablesCapturedAnywhere: $variable");
     _current = _current.write(variable);
   }
 
