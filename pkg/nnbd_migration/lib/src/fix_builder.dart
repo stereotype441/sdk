@@ -104,10 +104,11 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   void addProblem(AstNode node, Problem problem);
 
   /// Initializes flow analysis for a function node.
-  void createFlowAnalysis(AstNode node) {
+  void createFlowAnalysis(Declaration node, FormalParameterList parameters) {
     assert(_flowAnalysis == null);
     assert(_assignedVariables == null);
-    _assignedVariables = FlowAnalysisHelper.computeAssignedVariables(node);
+    _assignedVariables =
+        FlowAnalysisHelper.computeAssignedVariables(node, parameters);
     _flowAnalysis =
         FlowAnalysis<Statement, Expression, PromotableElement, DartType>(
             const AnalyzerNodeOperations(),
