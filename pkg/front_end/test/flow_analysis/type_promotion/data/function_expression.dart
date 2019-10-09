@@ -13,7 +13,7 @@ void isType() {
 void isType_mutatedInClosure() {
   void g(Object x) {
     if (x is String) {
-      x;
+      /*String*/ x;
     }
     x = 42;
   }
