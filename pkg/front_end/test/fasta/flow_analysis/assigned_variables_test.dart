@@ -159,8 +159,8 @@ main() {
       var outerNode = _Node();
       assignedVariables.endNode(outerNode);
       assignedVariables.finish();
-      expect(assignedVariables.writtenInNode(innerNode), {v1, v2});
-      expect(assignedVariables.capturedInNode(innerNode), {v2});
+      expect(assignedVariables.writtenInNode(innerNode), isEmpty);
+      expect(assignedVariables.capturedInNode(innerNode), isEmpty);
       expect(assignedVariables.writtenInNode(outerNode), isEmpty);
       expect(assignedVariables.capturedInNode(outerNode), isEmpty);
     });
@@ -182,8 +182,8 @@ main() {
       var outerNode = _Node();
       assignedVariables.endNode(outerNode);
       assignedVariables.finish();
-      expect(assignedVariables.writtenInNode(innerNode), {v1, v2});
-      expect(assignedVariables.capturedInNode(innerNode), {v2});
+      expect(assignedVariables.writtenInNode(innerNode), isEmpty);
+      expect(assignedVariables.capturedInNode(innerNode), isEmpty);
       expect(assignedVariables.writtenInNode(outerNode), isEmpty);
       expect(assignedVariables.capturedInNode(outerNode), isEmpty);
     });
