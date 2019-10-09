@@ -1059,7 +1059,8 @@ class Class : public Object {
 
   static bool IsInFullSnapshot(RawClass* cls) {
     NoSafepointScope no_safepoint;
-    return cls->ptr()->library_->ptr()->is_in_fullsnapshot_;
+    return RawLibrary::InFullSnapshotBit::decode(
+        cls->ptr()->library_->ptr()->flags_);
   }
 
   // Returns true if the type specified by cls and type_arguments is a
@@ -2726,7 +2727,8 @@ class Function : public Object {
     // On DBC we use native calls instead of IR for the view factories (see
     // kernel_to_il.cc)
 #if !defined(TARGET_ARCH_DBC)
-    if (IsTypedDataViewFactory()) {
+    if (IsTypedDataViewFactory() || IsFfiLoad() || IsFfiStore() ||
+        IsFfiFromAddress() || IsFfiGetAddress()) {
       return true;
     }
 #endif
@@ -2881,6 +2883,28 @@ class Function : public Object {
     NoSafepointScope no_safepoint;
     return KindBits::decode(function->ptr()->kind_tag_) ==
            RawFunction::kFfiTrampoline;
+  }
+
+  bool IsFfiLoad() const {
+    const auto kind = MethodRecognizer::RecognizeKind(*this);
+    return MethodRecognizer::kFfiLoadInt8 <= kind &&
+           kind <= MethodRecognizer::kFfiLoadPointer;
+  }
+
+  bool IsFfiStore() const {
+    const auto kind = MethodRecognizer::RecognizeKind(*this);
+    return MethodRecognizer::kFfiStoreInt8 <= kind &&
+           kind <= MethodRecognizer::kFfiStorePointer;
+  }
+
+  bool IsFfiFromAddress() const {
+    const auto kind = MethodRecognizer::RecognizeKind(*this);
+    return kind == MethodRecognizer::kFfiFromAddress;
+  }
+
+  bool IsFfiGetAddress() const {
+    const auto kind = MethodRecognizer::RecognizeKind(*this);
+    return kind == MethodRecognizer::kFfiGetAddress;
   }
 
   bool IsAsyncFunction() const { return modifier() == RawFunction::kAsync; }
@@ -3102,7 +3126,8 @@ class Function : public Object {
   V(GeneratedBody, is_generated_body)                                          \
   V(PolymorphicTarget, is_polymorphic_target)                                  \
   V(HasPragma, has_pragma)                                                     \
-  V(IsNoSuchMethodForwarder, is_no_such_method_forwarder)
+  V(IsNoSuchMethodForwarder, is_no_such_method_forwarder)                      \
+  V(IsExtensionMember, is_extension_member)
 
 #define DEFINE_ACCESSORS(name, accessor_name)                                  \
   void set_##accessor_name(bool value) const {                                 \
@@ -3372,6 +3397,10 @@ class Field : public Object {
   bool is_instance() const { return !is_static(); }
   bool is_final() const { return FinalBit::decode(raw_ptr()->kind_bits_); }
   bool is_const() const { return ConstBit::decode(raw_ptr()->kind_bits_); }
+  bool is_late() const { return IsLateBit::decode(raw_ptr()->kind_bits_); }
+  bool is_extension_member() const {
+    return IsExtensionMemberBit::decode(raw_ptr()->kind_bits_);
+  }
   bool is_reflectable() const {
     return ReflectableBit::decode(raw_ptr()->kind_bits_);
   }
@@ -3652,6 +3681,12 @@ class Field : public Object {
     kUnknownFixedLength = -1,
     kNoFixedLength = -2,
   };
+  void set_is_late(bool value) const {
+    set_kind_bits(IsLateBit::update(value, raw_ptr()->kind_bits_));
+  }
+  void set_is_extension_member(bool value) const {
+    set_kind_bits(IsExtensionMemberBit::update(value, raw_ptr()->kind_bits_));
+  }
   // Returns false if any value read from this field is guaranteed to be
   // not null.
   // Internally we is_nullable_ field contains either kNullCid (nullable) or
@@ -3762,6 +3797,8 @@ class Field : public Object {
     kHasPragmaBit,
     kCovariantBit,
     kGenericCovariantImplBit,
+    kIsLateBit,
+    kIsExtensionMemberBit,
   };
   class ConstBit : public BitField<uint16_t, bool, kConstBit, 1> {};
   class StaticBit : public BitField<uint16_t, bool, kStaticBit, 1> {};
@@ -3782,6 +3819,9 @@ class Field : public Object {
   class CovariantBit : public BitField<uint16_t, bool, kCovariantBit, 1> {};
   class GenericCovariantImplBit
       : public BitField<uint16_t, bool, kGenericCovariantImplBit, 1> {};
+  class IsLateBit : public BitField<uint16_t, bool, kIsLateBit, 1> {};
+  class IsExtensionMemberBit
+      : public BitField<uint16_t, bool, kIsExtensionMemberBit, 1> {};
 
   // Update guarded cid and guarded length for this field. Returns true, if
   // deoptimization of dependent code is required.
@@ -4171,9 +4211,18 @@ class Library : public Object {
                     native_symbol_resolver);
   }
 
-  bool is_in_fullsnapshot() const { return raw_ptr()->is_in_fullsnapshot_; }
+  bool is_in_fullsnapshot() const {
+    return RawLibrary::InFullSnapshotBit::decode(raw_ptr()->flags_);
+  }
   void set_is_in_fullsnapshot(bool value) const {
-    StoreNonPointer(&raw_ptr()->is_in_fullsnapshot_, value);
+    set_flags(RawLibrary::InFullSnapshotBit::update(value, raw_ptr()->flags_));
+  }
+
+  bool is_nnbd() const {
+    return RawLibrary::NnbdBit::decode(raw_ptr()->flags_);
+  }
+  void set_is_nnbd(bool value) const {
+    set_flags(RawLibrary::NnbdBit::update(value, raw_ptr()->flags_));
   }
 
   RawString* PrivateName(const String& name) const;
@@ -4187,14 +4236,18 @@ class Library : public Object {
   static void RegisterLibraries(Thread* thread,
                                 const GrowableObjectArray& libs);
 
-  bool IsDebuggable() const { return raw_ptr()->debuggable_; }
+  bool IsDebuggable() const {
+    return RawLibrary::DebuggableBit::decode(raw_ptr()->flags_);
+  }
   void set_debuggable(bool value) const {
-    StoreNonPointer(&raw_ptr()->debuggable_, value);
+    set_flags(RawLibrary::DebuggableBit::update(value, raw_ptr()->flags_));
   }
 
-  bool is_dart_scheme() const { return raw_ptr()->is_dart_scheme_; }
+  bool is_dart_scheme() const {
+    return RawLibrary::DartSchemeBit::decode(raw_ptr()->flags_);
+  }
   void set_is_dart_scheme(bool value) const {
-    StoreNonPointer(&raw_ptr()->is_dart_scheme_, value);
+    set_flags(RawLibrary::DartSchemeBit::update(value, raw_ptr()->flags_));
   }
 
   // Includes 'dart:async', 'dart:typed_data', etc.
@@ -4357,6 +4410,7 @@ class Library : public Object {
   void set_url(const String& url) const;
 
   void set_num_imports(intptr_t value) const;
+  void set_flags(uint8_t flags) const;
   bool HasExports() const;
   RawArray* loaded_scripts() const { return raw_ptr()->loaded_scripts_; }
   RawGrowableObjectArray* metadata() const { return raw_ptr()->metadata_; }
@@ -5276,9 +5330,6 @@ class Code : public Object {
     return ForceOptimizedBit::decode(raw_ptr()->state_bits_);
   }
   void set_is_force_optimized(bool value) const;
-  static bool IsForceOptimized(RawCode* code) {
-    return Code::ForceOptimizedBit::decode(code->ptr()->state_bits_);
-  }
 
   bool is_alive() const { return AliveBit::decode(raw_ptr()->state_bits_); }
   void set_is_alive(bool value) const;

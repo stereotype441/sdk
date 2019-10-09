@@ -12,6 +12,7 @@ ability
 able
 abort
 aborted
+aborting
 aborts
 about
 above
@@ -332,7 +333,9 @@ calls
 can
 can't
 cancel
+cancellation
 cancelled
+cancels
 candidate
 candidates
 cannot
@@ -668,6 +671,7 @@ deduced
 deep
 default
 defaults
+defeating
 defensive
 defer
 deferred
@@ -960,6 +964,7 @@ excluding
 exclusive
 executable
 executed
+executes
 execution
 exercise
 exist
@@ -1325,6 +1330,7 @@ indices
 indirect
 indirectly
 induce
+induced
 infer
 inference
 inferrable
@@ -1398,6 +1404,7 @@ interaction
 intercept
 interceptors
 interest
+interesting
 interface
 interfaces
 interferes
@@ -1949,6 +1956,7 @@ pattern
 peek
 pending
 percent
+percolate
 perform
 performance
 performed
@@ -2043,6 +2051,7 @@ presence
 present
 preserve
 preserved
+preserves
 preserving
 presumed
 pretend
@@ -2567,6 +2576,7 @@ step
 steps
 still
 stop
+stopping
 stops
 stopwatch
 store
@@ -2651,6 +2661,7 @@ sure
 surrogate
 surrogates
 surrounding
+survive
 survives
 suspect
 swap
@@ -2840,6 +2851,7 @@ uncertain
 unchanged
 unclaimed
 unclear
+undeclared
 undefined
 under
 underlying
@@ -2981,6 +2993,7 @@ warnings
 was
 wasn't
 way
+ways
 we
 we'd
 we'll

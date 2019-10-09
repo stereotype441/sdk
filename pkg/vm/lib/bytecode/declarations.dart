@@ -19,6 +19,7 @@ class LibraryDeclaration {
   static const usesDartMirrorsFlag = 1 << 0;
   static const usesDartFfiFlag = 1 << 1;
   static const hasExtensionsFlag = 1 << 2;
+  static const isNonNullableByDefaultFlag = 1 << 3;
 
   ObjectHandle importUri;
   final int flags;
@@ -76,6 +77,9 @@ class LibraryDeclaration {
     }
     if ((flags & hasExtensionsFlag) != 0) {
       sb.writeln('    extensions: $extensionUris');
+    }
+    if ((flags & isNonNullableByDefaultFlag) != 0) {
+      sb.writeln('    is nnbd');
     }
     sb.writeln();
     for (var cls in classes) {
@@ -333,6 +337,8 @@ class FieldDeclaration {
   static const hasCustomScriptFlag = 1 << 12;
   static const hasInitializerCodeFlag = 1 << 13;
   static const hasAttributesFlag = 1 << 14;
+  static const isLateFlag = 1 << 15;
+  static const isExtensionMemberFlag = 1 << 16;
 
   final int flags;
   final ObjectHandle name;
@@ -456,6 +462,12 @@ class FieldDeclaration {
     if ((flags & isFinalFlag) != 0) {
       sb.write(', final');
     }
+    if ((flags & isLateFlag) != 0) {
+      sb.write(', is-late');
+    }
+    if ((flags & isExtensionMemberFlag) != 0) {
+      sb.write(', extension-member');
+    }
     if ((flags & hasPragmaFlag) != 0) {
       sb.write(', has-pragma');
     }
@@ -507,6 +519,7 @@ class FunctionDeclaration {
   static const hasPragmaFlag = 1 << 21;
   static const hasCustomScriptFlag = 1 << 22;
   static const hasAttributesFlag = 1 << 23;
+  static const isExtensionMemberFlag = 1 << 24;
 
   final int flags;
   final ObjectHandle name;
@@ -648,6 +661,9 @@ class FunctionDeclaration {
     }
     if ((flags & isConstFlag) != 0) {
       sb.write(', const');
+    }
+    if ((flags & isExtensionMemberFlag) != 0) {
+      sb.write(', extension-member');
     }
     if ((flags & hasOptionalPositionalParamsFlag) != 0) {
       sb.write(', has-optional-positional-params');

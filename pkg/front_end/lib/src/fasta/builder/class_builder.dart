@@ -58,23 +58,6 @@ import '../../base/common.dart';
 
 import '../dill/dill_member_builder.dart' show DillMemberBuilder;
 
-import 'builder.dart'
-    show
-        ConstructorReferenceBuilder,
-        Builder,
-        LibraryBuilder,
-        MemberBuilder,
-        MetadataBuilder,
-        NullabilityBuilder,
-        Scope,
-        ScopeBuilder,
-        TypeBuilder,
-        TypeVariableBuilder;
-
-import 'declaration.dart';
-
-import 'declaration_builder.dart';
-
 import '../fasta_codes.dart'
     show
         LocatedMessage,
@@ -112,21 +95,6 @@ import '../fasta_codes.dart'
         templateRedirectionTargetNotFound,
         templateTypeArgumentMismatch;
 
-import '../kernel/kernel_builder.dart'
-    show
-        ConstructorReferenceBuilder,
-        Builder,
-        FunctionBuilder,
-        NamedTypeBuilder,
-        LibraryBuilder,
-        MemberBuilder,
-        MetadataBuilder,
-        ProcedureBuilder,
-        RedirectingFactoryBuilder,
-        Scope,
-        TypeBuilder,
-        TypeVariableBuilder;
-
 import '../kernel/redirecting_factory_body.dart'
     show getRedirectingFactoryBody, RedirectingFactoryBody;
 
@@ -139,11 +107,23 @@ import '../names.dart' show noSuchMethodName;
 import '../problems.dart'
     show internalProblem, unexpected, unhandled, unimplemented, unsupported;
 
-import '../scope.dart' show AmbiguousBuilder;
+import '../scope.dart';
 
 import '../source/source_library_builder.dart' show SourceLibraryBuilder;
 
 import '../type_inference/type_schema.dart' show UnknownType;
+
+import 'constructor_reference_builder.dart';
+import 'declaration.dart';
+import 'declaration_builder.dart';
+import 'library_builder.dart';
+import 'member_builder.dart';
+import 'procedure_builder.dart';
+import 'metadata_builder.dart';
+import 'named_type_builder.dart';
+import 'nullability_builder.dart';
+import 'type_builder.dart';
+import 'type_variable_builder.dart';
 
 abstract class ClassBuilder implements DeclarationBuilder {
   /// The type variables declared on a class, extension or mixin declaration.
@@ -187,10 +167,6 @@ abstract class ClassBuilder implements DeclarationBuilder {
       String name, int charOffset, Uri uri, LibraryBuilder accessingLibrary);
 
   void forEach(void f(String name, Builder builder));
-
-  @override
-  Builder lookupLocalMember(String name,
-      {bool setter: false, bool required: false});
 
   /// Find the first member of this class with [name]. This method isn't
   /// suitable for scope lookups as it will throw an error if the name isn't
@@ -503,25 +479,21 @@ abstract class ClassBuilderImpl extends DeclarationBuilderImpl
                 declaration.setRedirectingFactoryBody(
                     targetBuilder.member, typeArguments);
               } else if (targetBuilder is AmbiguousBuilder) {
-                Message message = templateDuplicatedDeclarationUse
-                    .withArguments(redirectionTarget.fullNameForErrors);
-                if (declaration.isConst) {
-                  addProblem(message, declaration.charOffset, noLength);
-                } else {
-                  addProblem(message, declaration.charOffset, noLength);
-                }
+                addProblem(
+                    templateDuplicatedDeclarationUse
+                        .withArguments(redirectionTarget.fullNameForErrors),
+                    redirectionTarget.charOffset,
+                    noLength);
                 // CoreTypes aren't computed yet, and this is the outline
                 // phase. So we can't and shouldn't create a method body.
                 declaration.body = new RedirectingFactoryBody.unresolved(
                     redirectionTarget.fullNameForErrors);
               } else {
-                Message message = templateRedirectionTargetNotFound
-                    .withArguments(redirectionTarget.fullNameForErrors);
-                if (declaration.isConst) {
-                  addProblem(message, declaration.charOffset, noLength);
-                } else {
-                  addProblem(message, declaration.charOffset, noLength);
-                }
+                addProblem(
+                    templateRedirectionTargetNotFound
+                        .withArguments(redirectionTarget.fullNameForErrors),
+                    redirectionTarget.charOffset,
+                    noLength);
                 // CoreTypes aren't computed yet, and this is the outline
                 // phase. So we can't and shouldn't create a method body.
                 declaration.body = new RedirectingFactoryBody.unresolved(

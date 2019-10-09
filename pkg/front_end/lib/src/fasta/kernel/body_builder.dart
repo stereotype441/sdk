@@ -9,11 +9,27 @@ import 'dart:core' hide MapEntry;
 import 'package:kernel/ast.dart';
 import 'package:kernel/type_environment.dart';
 
+import '../builder/class_builder.dart';
 import '../builder/declaration.dart';
-
 import '../builder/declaration_builder.dart';
-
+import '../builder/enum_builder.dart';
 import '../builder/extension_builder.dart';
+import '../builder/field_builder.dart';
+import '../builder/formal_parameter_builder.dart';
+import '../builder/procedure_builder.dart';
+import '../builder/function_type_builder.dart';
+import '../builder/invalid_type_declaration_builder.dart';
+import '../builder/library_builder.dart';
+import '../builder/member_builder.dart';
+import '../builder/modifier_builder.dart';
+import '../builder/named_type_builder.dart';
+import '../builder/nullability_builder.dart';
+import '../builder/prefix_builder.dart';
+import '../builder/type_builder.dart';
+import '../builder/type_declaration_builder.dart';
+import '../builder/type_variable_builder.dart';
+import '../builder/unresolved_type.dart';
+import '../builder/void_type_builder.dart';
 
 import '../constant_context.dart' show ConstantContext;
 
@@ -22,6 +38,14 @@ import '../dill/dill_library_builder.dart' show DillLibraryBuilder;
 import '../fasta_codes.dart' as fasta;
 
 import '../fasta_codes.dart' show LocatedMessage, Message, noLength, Template;
+
+import '../identifiers.dart'
+    show
+        Identifier,
+        InitializedIdentifier,
+        QualifiedName,
+        deprecated_extractToken,
+        flattenName;
 
 import '../messages.dart' as messages show getLocationFromUri;
 
@@ -59,7 +83,7 @@ import '../scanner.dart' show Token;
 import '../scanner/token.dart'
     show isBinaryOperator, isMinusOperator, isUserDefinableOperator;
 
-import '../scope.dart' show ProblemBuilder;
+import '../scope.dart';
 
 import '../severity.dart' show Severity;
 
@@ -1044,15 +1068,11 @@ class BodyBuilder extends ScopeListener<JumpTarget>
           // that it is unresolved.
           assert(redirectingFactoryBody.isUnresolved);
           String errorName = redirectingFactoryBody.unresolvedName;
-
-          replacementNode = throwNoSuchMethodError(
-              forest.createNullLiteral(invocation.fileOffset),
-              errorName,
-              forest.createArguments(
-                  noLocation, invocation.arguments.positional,
-                  types: invocation.arguments.types,
-                  named: invocation.arguments.named),
-              initialTarget.fileOffset);
+          replacementNode = buildProblem(
+              fasta.templateMethodNotFound.withArguments(errorName),
+              invocation.fileOffset,
+              noLength,
+              suppressMessage: true);
         } else {
           Substitution substitution = Substitution.fromPairs(
               initialTarget.function.typeParameters,
@@ -1875,14 +1895,24 @@ class BodyBuilder extends ScopeListener<JumpTarget>
       Builder setter =
           _getCorrespondingSetterBuilder(scope, declaration, name, charOffset);
       // TODO(johnniwinther): Check for constantContext like below?
+      if (declaration.isField) {
+        declaration = null;
+      }
+      if (setter != null && (setter.isField || setter.isStatic)) {
+        setter = null;
+      }
+      if (declaration == null && setter == null) {
+        return new UnresolvedNameGenerator(
+            this, token, new Name(name, libraryBuilder.nameOrigin));
+      }
       return new ExtensionInstanceAccessGenerator.fromBuilder(
           this,
+          token,
           extensionBuilder.extension,
           name,
           extensionThis,
           extensionTypeParameters,
           declaration,
-          token,
           setter);
     } else if (declaration.isRegularMethod) {
       assert(declaration.isStatic || declaration.isTopLevel);
@@ -2810,7 +2840,7 @@ class BodyBuilder extends ScopeListener<JumpTarget>
         push(new UnresolvedType(
             new NamedTypeBuilder(name,
                 libraryBuilder.nullableBuilderIfTrue(isMarkedAsNullable), null)
-              ..bind(new InvalidTypeBuilder(
+              ..bind(new InvalidTypeDeclarationBuilder(
                   name,
                   message.withLocation(
                       uri, offset, lengthOfSpan(beginToken, suffix)))),
@@ -2832,7 +2862,7 @@ class BodyBuilder extends ScopeListener<JumpTarget>
           name.message, name.charOffset, name.name.length, name.fileUri);
       result = new NamedTypeBuilder(name.name,
           libraryBuilder.nullableBuilderIfTrue(isMarkedAsNullable), null)
-        ..bind(new InvalidTypeBuilder(
+        ..bind(new InvalidTypeDeclarationBuilder(
             name.name,
             name.message.withLocation(
                 name.fileUri, name.charOffset, name.name.length)));
@@ -3803,7 +3833,7 @@ class BodyBuilder extends ScopeListener<JumpTarget>
       } else {
         errorName ??= debugName(type.name, name);
       }
-    } else if (type is InvalidTypeBuilder) {
+    } else if (type is InvalidTypeDeclarationBuilder) {
       LocatedMessage message = type.message;
       return evaluateArgumentsBefore(
           arguments,
@@ -4909,7 +4939,7 @@ class BodyBuilder extends ScopeListener<JumpTarget>
       {List<LocatedMessage> context}) {
     int charOffset = expression.fileOffset;
     Severity severity = message.code.severity;
-    if (severity == Severity.error || severity == Severity.errorLegacyWarning) {
+    if (severity == Severity.error) {
       return wrapInLocatedProblem(
           expression, message.withLocation(uri, charOffset, length),
           context: context);
@@ -5189,7 +5219,8 @@ class BodyBuilder extends ScopeListener<JumpTarget>
       return new UnresolvedType(
           new NamedTypeBuilder(
               typeParameter.name, builder.nullabilityBuilder, null)
-            ..bind(new InvalidTypeBuilder(typeParameter.name, message)),
+            ..bind(
+                new InvalidTypeDeclarationBuilder(typeParameter.name, message)),
           unresolved.charOffset,
           unresolved.fileUri);
     }

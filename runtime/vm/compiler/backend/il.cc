@@ -283,6 +283,10 @@ void HierarchyInfo::BuildRangesForJIT(ClassTable* table,
 
   qsort(cids_array, cids.length(), sizeof(intptr_t),
         [](const void* a, const void* b) {
+          // MSAN seems unaware of allocations inside qsort. The linker flag
+          // -fsanitize=memory should give us a MSAN-aware version of libc...
+          MSAN_UNPOISON(static_cast<const intptr_t*>(a), sizeof(intptr_t));
+          MSAN_UNPOISON(static_cast<const intptr_t*>(b), sizeof(intptr_t));
           return static_cast<int>(*static_cast<const intptr_t*>(a) -
                                   *static_cast<const intptr_t*>(b));
         });
@@ -2776,6 +2780,8 @@ bool LoadFieldInstr::IsImmutableLengthLoad() const {
     case Slot::Kind::kCapturedVariable:
     case Slot::Kind::kDartField:
     case Slot::Kind::kPointer_c_memory_address:
+    case Slot::Kind::kType_arguments:
+    case Slot::Kind::kTypeArgumentsIndex:
       return false;
   }
   UNREACHABLE();
