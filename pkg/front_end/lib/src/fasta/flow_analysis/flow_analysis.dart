@@ -614,8 +614,8 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
       Iterable<Variable> assignedInBody, Iterable<Variable> capturedInBody) {
     var context = _stack.last as _TryContext<Variable, Type>;
     context._afterBodyAndCatches = _current;
-    _current =
-        _join(_current, context._previous.removePromotedAll(assignedInBody, capturedInBody));
+    _current = _join(_current,
+        context._previous.removePromotedAll(assignedInBody, capturedInBody));
   }
 
   void whileStatement_bodyBegin(
