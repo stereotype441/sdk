@@ -62,13 +62,13 @@ class AssignedVariables<Node, Variable> {
 
   AssignedVariables();
 
-  /// Queries the set of variables that are potentially written to anywhere in
-  /// the code being analyzed.
-  Set<Variable> get writtenAnywhere => _writtenAnywhere;
-
   /// Queries the set of variables for which a potential write is captured by a
   /// local function or closure anywhere in the code being analyzed.
   Set<Variable> get capturedAnywhere => _capturedAnywhere;
+
+  /// Queries the set of variables that are potentially written to anywhere in
+  /// the code being analyzed.
+  Set<Variable> get writtenAnywhere => _writtenAnywhere;
 
   /// This method should be called during pre-traversal, to mark the start of a
   /// loop statement, switch statement, try statement, loop collection element,
@@ -111,15 +111,15 @@ class AssignedVariables<Node, Variable> {
   ///
   /// See [beginNode] for more details.
   void endNode(Node node, {bool isClosure: false}) {
-    var writtenInThisNode = _writtenStack.removeLast();
-    var declaredInThisNode = _declaredStack.removeLast();
-    var capturedInThisNode = _capturedStack.removeLast();
+    Set<Variable> writtenInThisNode = _writtenStack.removeLast();
+    Set<Variable> declaredInThisNode = _declaredStack.removeLast();
+    Set<Variable> capturedInThisNode = _capturedStack.removeLast();
     _writtenInNode[node] = writtenInThisNode;
     _capturedInNode[node] = capturedInThisNode;
-    var writesVisibleToEnclosingNode =
+    Set<Variable> writesVisibleToEnclosingNode =
         writtenInThisNode.difference(declaredInThisNode);
     _writtenStack.last.addAll(writesVisibleToEnclosingNode);
-    var capturesVisibleToEnclosingNode =
+    Set<Variable> capturesVisibleToEnclosingNode =
         capturedInThisNode.difference(declaredInThisNode);
     _capturedStack.last.addAll(capturesVisibleToEnclosingNode);
     if (isClosure) {
