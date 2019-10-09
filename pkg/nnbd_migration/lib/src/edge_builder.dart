@@ -631,8 +631,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       // This is a local function.
       node.functionExpression.accept(this);
     } else {
-      _createFlowAnalysis(node, node.functionExpression.parameters,
-          node.functionExpression.body);
+      _createFlowAnalysis(node, node.functionExpression.parameters);
       // Initialize a new postDominator scope that contains only the parameters.
       try {
         node.functionExpression.accept(this);
@@ -1335,9 +1334,6 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     bool isTopLevel =
         parent is FieldDeclaration || parent is TopLevelVariableDeclaration;
     node.metadata.accept(this);
-    var parent = node.parent;
-    bool isTopLevel =
-        parent is TopLevelVariableDeclaration || parent is FieldDeclaration;
     var typeAnnotation = node.type;
     for (var variable in node.variables) {
       variable.metadata.accept(this);
@@ -1345,7 +1341,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       var declaredElement = variable.declaredElement;
       if (isTopLevel) {
         assert(_flowAnalysis == null);
-        _createFlowAnalysis(variable, null, null);
+        _createFlowAnalysis(variable, null);
       } else {
         assert(_flowAnalysis != null);
       }
@@ -1735,7 +1731,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     assert(_currentFunctionType == null);
     metadata.accept(this);
     returnType?.accept(this);
-    _createFlowAnalysis(node, parameters, body);
+    _createFlowAnalysis(node, parameters);
     parameters?.accept(this);
     _currentFunctionType = _variables.decoratedElementType(declaredElement);
     _addParametersToFlowAnalysis(parameters);
