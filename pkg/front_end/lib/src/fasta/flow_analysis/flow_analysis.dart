@@ -682,6 +682,16 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _current = _current.write(variable);
   }
 
+  void _dumpState() {
+    print('  current: $_current');
+    print('  expressionWithInfo: $_expressionWithInfo');
+    print('  expressionInfo: $_expressionInfo');
+    print('  stack:');
+    for (var stackEntry in _stack.reversed) {
+      print('    $stackEntry');
+    }
+  }
+
   /// Gets the [_ExpressionInfo] associated with the [expression] (which should
   /// be the last expression that was traversed).  If there is no
   /// [_ExpressionInfo] associated with the [expression], then a fresh
@@ -700,17 +710,6 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
       return _expressionInfo;
     } else {
       return null;
-    }
-  }
-
-  void _dumpState() {
-    print('  current: $_current');
-    print('  condition: $_condition');
-    print('  conditionTrue: $_conditionTrue');
-    print('  conditionFalse: $_conditionFalse');
-    print('  stack:');
-    for (var stackEntry in _stack.reversed) {
-      print('    $stackEntry');
     }
   }
 
@@ -780,12 +779,18 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
   }
 
   @override
-  void conditionEqNull(Expression binaryExpression, Variable variable,
-      {bool notEqual: false}) {
+  void equalityOp_end(Expression wholeExpression, Expression rightOperand,
+      {bool notEqual = false}) {
     _wrap(
-        'conditionEqNull($binaryExpression, $variable, notEqual: $notEqual)',
-        () => _wrapped.conditionEqNull(binaryExpression, variable,
+        'equalityOp_end($wholeExpression, $rightOperand, notEqual: $notEqual)',
+        () => _wrapped.equalityOp_end(wholeExpression, rightOperand,
             notEqual: notEqual));
+  }
+
+  @override
+  void equalityOp_rightBegin(Expression leftOperand) {
+    _wrap('equalityOp_rightBegin($leftOperand)',
+        () => _wrapped.equalityOp_rightBegin(leftOperand));
   }
 
   @override
@@ -890,8 +895,13 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
   @override
   noSuchMethod(Invocation invocation) {
     _exceptionOccurred = true;
-    print('No such method: $invocation');
+    print('No such method: ${invocation.memberName}');
     return super.noSuchMethod(invocation);
+  }
+
+  @override
+  void nullLiteral(Expression expression) {
+    _wrap('nullLiteral($expression)', () => _wrapped.nullLiteral(expression));
   }
 
   @override
@@ -921,6 +931,13 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
   void switchStatement_expressionEnd(Statement switchStatement) {
     _wrap('switchStatement_expressionEnd($switchStatement)',
         () => _wrapped.switchStatement_expressionEnd(switchStatement));
+  }
+
+  @override
+  Type variableRead(Expression expression, Variable variable) {
+    return _wrap('variableRead($expression, $variable)',
+        () => _wrapped.variableRead(expression, variable),
+        isQuery: true);
   }
 
   @override
