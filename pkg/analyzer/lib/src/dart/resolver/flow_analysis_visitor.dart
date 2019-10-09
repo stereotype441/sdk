@@ -249,7 +249,7 @@ class FlowAnalysisHelper {
   static AssignedVariables<AstNode, PromotableElement> computeAssignedVariables(
       Declaration node) {
     var assignedVariables = AssignedVariables<AstNode, PromotableElement>();
-    node.accept(_AssignedVariablesVisitor(assignedVariables));
+    node.visitChildren(_AssignedVariablesVisitor(assignedVariables));
     return assignedVariables;
   }
 
@@ -353,9 +353,7 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitConstructorDeclaration(ConstructorDeclaration node) {
-    assignedVariables.beginNode();
-    super.visitConstructorDeclaration(node);
-    assignedVariables.endNode(node);
+    throw StateError('Should not visit top level declarations');
   }
 
   @override
@@ -377,15 +375,15 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitFunctionDeclaration(FunctionDeclaration node) {
-    bool isClosure = node.parent is! CompilationUnit;
-    assignedVariables.beginNode();
-    if (isClosure) {
-      _declareParameters(node.functionExpression.parameters);
+    if (node.parent is CompilationUnit) {
+      throw StateError('Should not visit top level declarations');
     }
+    assignedVariables.beginNode();
+    _declareParameters(node.functionExpression.parameters);
     // Note: we bypass this.visitFunctionExpression so that the function
     // expression isn't mistaken for a closure.
     super.visitFunctionExpression(node.functionExpression);
-    assignedVariables.endNode(node, isClosure: isClosure);
+    assignedVariables.endNode(node, isClosure: true);
   }
 
   @override
@@ -398,9 +396,7 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitMethodDeclaration(MethodDeclaration node) {
-    assignedVariables.beginNode();
-    super.visitMethodDeclaration(node);
-    assignedVariables.endNode(node);
+    throw StateError('Should not visit top level declarations');
   }
 
   @override
