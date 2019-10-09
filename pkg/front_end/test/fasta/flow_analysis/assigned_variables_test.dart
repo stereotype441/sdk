@@ -12,11 +12,37 @@ main() {
     var v2 = _Variable('v2');
     var v3 = _Variable('v3');
     assignedVariables.write(v1);
-    assignedVariables.beginNode(isClosure: true);
+    assignedVariables.beginNode();
     assignedVariables.write(v2);
     assignedVariables.endNode(_Node(), isClosure: true);
     assignedVariables.write(v3);
     expect(assignedVariables.capturedAnywhere, {v2});
+  });
+
+  test('capturedAnywhere does not record variables local to a closure', () {
+    var assignedVariables = AssignedVariables<_Node, _Variable>();
+    var v1 = _Variable('v1');
+    var v2 = _Variable('v2');
+    assignedVariables.declare(v1);
+    assignedVariables.beginNode();
+    assignedVariables.declare(v2);
+    assignedVariables.write(v1);
+    assignedVariables.write(v2);
+    assignedVariables.endNode(_Node(), isClosure: true);
+    expect(assignedVariables.capturedAnywhere, {v1});
+  });
+
+  test('writtenAnywhere records all assignments', () {
+    var assignedVariables = AssignedVariables<_Node, _Variable>();
+    var v1 = _Variable('v1');
+    var v2 = _Variable('v2');
+    var v3 = _Variable('v3');
+    assignedVariables.write(v1);
+    assignedVariables.beginNode();
+    assignedVariables.write(v2);
+    assignedVariables.endNode(_Node(), isClosure: true);
+    assignedVariables.write(v3);
+    expect(assignedVariables.writtenAnywhere, {v1, v2, v3});
   });
 
   test('writtenInNode ignores assignments outside the node', () {

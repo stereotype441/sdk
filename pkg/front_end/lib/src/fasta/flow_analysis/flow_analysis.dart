@@ -33,6 +33,10 @@ class AssignedVariables<Node, Variable> {
   /// write is captured by a local function or closure inside that node.
   final Map<Node, Set<Variable>> _capturedInNode = {};
 
+  /// Set of local variables that are potentially written to anywhere in the
+  /// code being analyzed.
+  final Set<Variable> _writtenAnywhere = {};
+
   /// Set of local variables for which a potential write is captured by a local
   /// function or closure anywhere in the code being analyzed.
   final Set<Variable> _capturedAnywhere = {};
@@ -57,6 +61,10 @@ class AssignedVariables<Node, Variable> {
   final List<Set<Variable>> _capturedStack = [new Set<Variable>.identity()];
 
   AssignedVariables();
+
+  /// Queries the set of variables that are potentially written to anywhere in
+  /// the code being analyzed.
+  Set<Variable> get writtenAnywhere => _writtenAnywhere;
 
   /// Queries the set of variables for which a potential write is captured by a
   /// local function or closure anywhere in the code being analyzed.
@@ -116,6 +124,7 @@ class AssignedVariables<Node, Variable> {
     _capturedStack.last.addAll(capturesVisibleToEnclosingNode);
     if (isClosure) {
       _capturedStack.last.addAll(writesVisibleToEnclosingNode);
+      _capturedAnywhere.addAll(writesVisibleToEnclosingNode);
     }
   }
 
@@ -123,6 +132,7 @@ class AssignedVariables<Node, Variable> {
   /// variable.
   void write(Variable variable) {
     _writtenStack.last.add(variable);
+    _writtenAnywhere.add(variable);
   }
 
   /// Queries the set of variables that are potentially written to inside the
