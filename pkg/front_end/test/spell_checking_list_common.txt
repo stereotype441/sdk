@@ -2845,6 +2845,7 @@ uncertain
 unchanged
 unclaimed
 unclear
+undeclared
 undefined
 under
 underlying
