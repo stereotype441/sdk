@@ -361,7 +361,7 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
       node.exceptionParameter,
       node.stackTraceParameter
     ]) {
-      if (node != null) {
+      if (identifier != null) {
         assignedVariables
             .declare(identifier.staticElement as PromotableElement);
       }

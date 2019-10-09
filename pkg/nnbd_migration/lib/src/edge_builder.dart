@@ -1337,7 +1337,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       var declaredElement = variable.declaredElement;
       if (isTopLevel) {
         assert(_flowAnalysis == null);
-        _createFlowAnalysis(variable, null);
+        _createFlowAnalysis(variable, null, null);
       } else {
         assert(_flowAnalysis != null);
       }
