@@ -103,6 +103,7 @@ although
 always
 ambiguous
 among
+amongst
 amount
 ampersand
 an
@@ -568,6 +569,7 @@ continue
 continued
 continues
 continuing
+contraposition
 contrast
 contravariance
 contravariant
@@ -1414,6 +1416,7 @@ interpreter
 interpreting
 intersect
 intersection
+intertwined
 into
 intrinsic
 introduce
@@ -2699,6 +2702,7 @@ terminates
 terminating
 termination
 terminology
+terms
 ternary
 test
 testcase
@@ -2805,6 +2809,7 @@ triples
 triplet
 triplets
 trivial
+trouble
 true
 truly
 truncate

@@ -2269,8 +2269,16 @@ class BinaryBuilderWithMetadata extends BinaryBuilder implements BinarySource {
   /// and are awaiting to be parsed and attached to nodes.
   List<_MetadataSubsection> _subsections;
 
-  BinaryBuilderWithMetadata(bytes, [filename])
-      : super(bytes, filename: filename);
+  BinaryBuilderWithMetadata(List<int> bytes,
+      {String filename,
+      bool disableLazyReading = false,
+      bool disableLazyClassReading = false,
+      bool alwaysCreateNewNamedNodes})
+      : super(bytes,
+            filename: filename,
+            disableLazyReading: disableLazyReading,
+            disableLazyClassReading: disableLazyClassReading,
+            alwaysCreateNewNamedNodes: alwaysCreateNewNamedNodes);
 
   @override
   void _readMetadataMappings(
@@ -2380,6 +2388,13 @@ class BinaryBuilderWithMetadata extends BinaryBuilder implements BinarySource {
   Class readClass(int endOffset) {
     final nodeOffset = _byteOffset;
     final result = super.readClass(endOffset);
+    return _associateMetadata(result, nodeOffset);
+  }
+
+  @override
+  Extension readExtension() {
+    final nodeOffset = _byteOffset;
+    final result = super.readExtension();
     return _associateMetadata(result, nodeOffset);
   }
 

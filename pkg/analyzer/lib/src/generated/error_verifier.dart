@@ -4538,7 +4538,8 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
    * redirected constructor invocation(s), super constructor invocations and
    * field initializers.
    *
-   * See [CompileTimeErrorCode.DEFAULT_VALUE_IN_REDIRECTING_FACTORY_CONSTRUCTOR],
+   * See [CompileTimeErrorCode.ASSERT_IN_REDIRECTING_CONSTRUCTOR],
+   * [CompileTimeErrorCode.DEFAULT_VALUE_IN_REDIRECTING_FACTORY_CONSTRUCTOR],
    * [CompileTimeErrorCode.FIELD_INITIALIZER_REDIRECTING_CONSTRUCTOR],
    * [CompileTimeErrorCode.MULTIPLE_REDIRECTING_CONSTRUCTOR_INVOCATIONS],
    * [CompileTimeErrorCode.SUPER_IN_REDIRECTING_CONSTRUCTOR], and
@@ -4604,6 +4605,11 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
         if (initializer is ConstructorFieldInitializer) {
           _errorReporter.reportErrorForNode(
               CompileTimeErrorCode.FIELD_INITIALIZER_REDIRECTING_CONSTRUCTOR,
+              initializer);
+        }
+        if (initializer is AssertInitializer) {
+          _errorReporter.reportErrorForNode(
+              CompileTimeErrorCode.ASSERT_IN_REDIRECTING_CONSTRUCTOR,
               initializer);
         }
       }
@@ -5426,11 +5432,12 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
               // Try to pattern match matchingInterfaceType against
               // mixinSupertypeConstraint to find the correct set of type
               // parameters to apply to the mixin.
-              var matchedType = _typeSystem.matchSupertypeConstraints(
-                  mixinElement,
-                  mixinSupertypeConstraints,
-                  matchingInterfaceTypes);
-              if (matchedType == null) {
+              var inferredTypeArguments = _typeSystem.matchSupertypeConstraints(
+                mixinElement,
+                mixinSupertypeConstraints,
+                matchingInterfaceTypes,
+              );
+              if (inferredTypeArguments == null) {
                 _errorReporter.reportErrorForToken(
                     CompileTimeErrorCode
                         .MIXIN_INFERENCE_NO_POSSIBLE_SUBSTITUTION,
