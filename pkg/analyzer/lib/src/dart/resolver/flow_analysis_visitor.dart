@@ -445,6 +445,7 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
       throw StateError('Should not visit top level declarations');
     }
     assignedVariables.declare(node.declaredElement);
+    super.visitVariableDeclaration(node);
   }
 
   @override
