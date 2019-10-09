@@ -128,6 +128,27 @@ class AssignedVariables<Node, Variable> {
     }
   }
 
+  /// Call this after visiting the code to be analyzed, to check invariants.
+  void finish() {
+    assert(() {
+      assert(_writtenStack.length == 1);
+      assert(_declaredStack.length == 1);
+      assert(_capturedStack.length == 1);
+      Set<Variable> writtenInThisNode = _writtenStack.last;
+      Set<Variable> declaredInThisNode = _declaredStack.last;
+      Set<Variable> capturedInThisNode = _capturedStack.last;
+      Set<Variable> undeclaredWrites =
+          writtenInThisNode.difference(declaredInThisNode);
+      assert(undeclaredWrites.isEmpty,
+          'Variables written to but not declared: $undeclaredWrites');
+      Set<Variable> undeclaredCaptures =
+          capturedInThisNode.difference(declaredInThisNode);
+      assert(undeclaredCaptures.isEmpty,
+          'Variables captured but not declared: $undeclaredCaptures');
+      return true;
+    }());
+  }
+
   /// This method should be called during pre-traversal, to mark a write to a
   /// variable.
   void write(Variable variable) {

@@ -212,9 +212,10 @@ class FlowAnalysisHelper {
     return false;
   }
 
-  void topLevelDeclaration_enter(Declaration node, FunctionBody body) {
+  void topLevelDeclaration_enter(
+      Declaration node, FormalParameterList parameters, FunctionBody body) {
     assert(flow == null);
-    assignedVariables = computeAssignedVariables(node);
+    assignedVariables = computeAssignedVariables(node, parameters);
     flow = FlowAnalysis<Statement, Expression, PromotableElement, DartType>(
       _nodeOperations,
       _typeOperations,
@@ -247,9 +248,12 @@ class FlowAnalysisHelper {
 
   /// Computes the [AssignedVariables] map for the given [node].
   static AssignedVariables<AstNode, PromotableElement> computeAssignedVariables(
-      Declaration node) {
+      Declaration node, FormalParameterList parameters) {
     var assignedVariables = AssignedVariables<AstNode, PromotableElement>();
-    node.visitChildren(_AssignedVariablesVisitor(assignedVariables));
+    var assignedVariablesVisitor = _AssignedVariablesVisitor(assignedVariables);
+    assignedVariablesVisitor._declareParameters(parameters);
+    node.visitChildren(assignedVariablesVisitor);
+    assignedVariables.finish();
     return assignedVariables;
   }
 

@@ -597,7 +597,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   @override
   DecoratedType visitFieldDeclaration(FieldDeclaration node) {
     node.metadata.accept(this);
-    _createFlowAnalysis(node, null);
+    _createFlowAnalysis(node, null, null);
     try {
       node.fields.accept(this);
     } finally {
@@ -643,7 +643,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       // This is a local function.
       node.functionExpression.accept(this);
     } else {
-      _createFlowAnalysis(node, node.functionExpression.body);
+      _createFlowAnalysis(node, node.functionExpression.parameters,
+          node.functionExpression.body);
       // Initialize a new postDominator scope that contains only the parameters.
       try {
         node.functionExpression.accept(this);
@@ -1275,7 +1276,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   DecoratedType visitTopLevelVariableDeclaration(
       TopLevelVariableDeclaration node) {
     node.metadata.accept(this);
-    _createFlowAnalysis(node, null);
+    _createFlowAnalysis(node, null, null);
     try {
       node.variables.accept(this);
     } finally {
@@ -1455,7 +1456,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     }
   }
 
-  void _createFlowAnalysis(Declaration node, FunctionBody functionBody) {
+  void _createFlowAnalysis(Declaration node, FormalParameterList parameters,
+      FunctionBody functionBody) {
     assert(_flowAnalysis == null);
     assert(_assignedVariables == null);
     _flowAnalysis =
@@ -1463,7 +1465,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
             const AnalyzerNodeOperations(),
             DecoratedTypeOperations(_typeSystem, _variables, _graph),
             AnalyzerFunctionBodyAccess(functionBody));
-    _assignedVariables = FlowAnalysisHelper.computeAssignedVariables(node);
+    _assignedVariables =
+        FlowAnalysisHelper.computeAssignedVariables(node, parameters);
   }
 
   DecoratedType _decorateUpperOrLowerBound(AstNode astNode, DartType type,
@@ -1734,7 +1737,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     assert(_currentFunctionType == null);
     metadata.accept(this);
     returnType?.accept(this);
-    _createFlowAnalysis(node, body);
+    _createFlowAnalysis(node, parameters, body);
     parameters?.accept(this);
     _currentFunctionType = _variables.decoratedElementType(declaredElement);
     _addParametersToFlowAnalysis(parameters);
