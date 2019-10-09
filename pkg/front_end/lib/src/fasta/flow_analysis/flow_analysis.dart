@@ -112,18 +112,20 @@ class AssignedVariables<Node, Variable> {
   ///
   /// See [beginNode] for more details.
   void endNode(Node node, {bool isClosure: false}) {
+    Set<Variable> writtenInThisNode = _writtenStack.removeLast();
     Set<Variable> declaredInThisNode = _declaredStack.removeLast();
-    Set<Variable> writtenInThisNode = _writtenStack.removeLast()
-      ..removeAll(declaredInThisNode);
-    Set<Variable> capturedInThisNode = _capturedStack.removeLast()
-      ..removeAll(declaredInThisNode);
+    Set<Variable> capturedInThisNode = _capturedStack.removeLast();
     _writtenInNode[node] = writtenInThisNode;
     _capturedInNode[node] = capturedInThisNode;
-    _writtenStack.last.addAll(writtenInThisNode);
-    _capturedStack.last.addAll(capturedInThisNode);
+    Set<Variable> writesVisibleToEnclosingNode =
+        writtenInThisNode.difference(declaredInThisNode);
+    _writtenStack.last.addAll(writesVisibleToEnclosingNode);
+    Set<Variable> capturesVisibleToEnclosingNode =
+        capturedInThisNode.difference(declaredInThisNode);
+    _capturedStack.last.addAll(capturesVisibleToEnclosingNode);
     if (isClosure) {
-      _capturedStack.last.addAll(writtenInThisNode);
-      _capturedAnywhere.addAll(writtenInThisNode);
+      _capturedStack.last.addAll(writesVisibleToEnclosingNode);
+      _capturedAnywhere.addAll(writesVisibleToEnclosingNode);
     }
   }
 
@@ -414,6 +416,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _stack.add(_current);
     _current = _current.removePromotedAll(loopAssigned, loopCaptured);
     if (loopVariable != null) {
+      assert(loopAssigned.contains(loopVariable));
       _current = _current.write(loopVariable);
     }
   }
