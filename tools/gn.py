@@ -66,8 +66,9 @@ def GetGNArgs(args):
     return args.split()
 
 
-def GetOutDir(mode, arch, target_os):
-    return utils.GetBuildRoot(HOST_OS, mode, arch, target_os)
+# TODO(38701): Remove use_nnbd once the forked NNBD SDK is merged back in.
+def GetOutDir(mode, arch, target_os, use_nnbd):
+    return utils.GetBuildRoot(HOST_OS, mode, arch, target_os, use_nnbd)
 
 
 def ToCommandLine(gn_args):
@@ -88,7 +89,9 @@ def HostCpuForArch(arch):
             'simarmv5te', 'simdbc', 'armsimdbc', 'simarm_x64'
     ]:
         return 'x86'
-    if arch in ['x64', 'arm64', 'simarm64', 'simdbc64', 'armsimdbc64']:
+    if arch in [
+            'x64', 'arm64', 'simarm64', 'simdbc64', 'armsimdbc64', 'arm_x64'
+    ]:
         return 'x64'
 
 
@@ -102,6 +105,8 @@ def TargetCpuForArch(arch, target_os):
         return 'arm' if target_os == 'android' else 'x86'
     if arch in ['simdbc64']:
         return 'arm64' if target_os == 'android' else 'x64'
+    if arch == 'arm_x64':
+        return 'arm'
     if arch == 'armsimdbc':
         return 'arm'
     if arch == 'armsimdbc64':
@@ -115,7 +120,7 @@ def DartTargetCpuForArch(arch):
         return 'ia32'
     if arch in ['x64']:
         return 'x64'
-    if arch in ['arm', 'simarm', 'simarm_x64']:
+    if arch in ['arm', 'simarm', 'simarm_x64', 'arm_x64']:
         return 'arm'
     if arch in ['armv6', 'simarmv6']:
         return 'armv6'
@@ -166,7 +171,8 @@ def UseSysroot(args, gn_args):
     return True
 
 
-def ToGnArgs(args, mode, arch, target_os):
+# TODO(38701): Remove use_nnbd once the forked NNBD SDK is merged back in.
+def ToGnArgs(args, mode, arch, target_os, use_nnbd):
     gn_args = {}
 
     host_os = HostOsForGn(HOST_OS)
@@ -284,6 +290,8 @@ def ToGnArgs(args, mode, arch, target_os):
         gn_args['dart_debug_optimization_level'] = args.debug_opt_level
         gn_args['debug_optimization_level'] = args.debug_opt_level
 
+    gn_args['use_nnbd'] = use_nnbd
+
     return gn_args
 
 
@@ -309,7 +317,7 @@ def ProcessOptions(args):
             return False
     for arch in args.arch:
         archs = [
-            'ia32', 'x64', 'simarm', 'arm', 'simarmv6', 'armv6', 'simarmv5te',
+            'ia32', 'x64', 'simarm', 'arm', 'arm_x64', 'simarmv6', 'armv6', 'simarmv5te',
             'armv5te', 'simarm64', 'arm64', 'simdbc', 'simdbc64', 'armsimdbc',
             'armsimdbc64', 'simarm_x64'
         ]
@@ -330,7 +338,7 @@ def ProcessOptions(args):
                       % (os_name, HOST_OS))
                 return False
             if not arch in [
-                    'ia32', 'x64', 'arm', 'armv6', 'armv5te', 'arm64', 'simdbc',
+                    'ia32', 'x64', 'arm', 'arm_x64', 'armv6', 'armv5te', 'arm64', 'simdbc',
                     'simdbc64'
             ]:
                 print(
@@ -369,7 +377,7 @@ def parse_args(args):
         '-a',
         type=str,
         help='Target architectures (comma-separated).',
-        metavar='[all,ia32,x64,simarm,arm,simarmv6,armv6,simarmv5te,armv5te,'
+        metavar='[all,ia32,x64,simarm,arm,arm_x64,simarmv6,armv6,simarmv5te,armv5te,'
         'simarm64,arm64,simdbc,armsimdbc,simarm_x64]',
         default='x64')
     common_group.add_argument(
@@ -385,6 +393,12 @@ def parse_args(args):
         help='Target OSs (comma-separated).',
         metavar='[all,host,android]',
         default='host')
+    # TODO(38701): Remove this once the forked NNBD SDK is merged back in.
+    common_group.add_argument(
+        "--nnbd",
+        help='Use the NNBD fork of the SDK.',
+        default=False,
+        action='store_true')
     common_group.add_argument(
         "-v",
         "--verbose",
@@ -533,12 +547,13 @@ def Main(argv):
     for target_os in args.os:
         for mode in args.mode:
             for arch in args.arch:
-                out_dir = GetOutDir(mode, arch, target_os)
+                out_dir = GetOutDir(mode, arch, target_os, args.nnbd)
                 # TODO(infra): Re-enable --check. Many targets fail to use
                 # public_deps to re-expose header files to their dependents.
                 # See dartbug.com/32364
                 command = [gn, 'gen', out_dir]
-                gn_args = ToCommandLine(ToGnArgs(args, mode, arch, target_os))
+                gn_args = ToCommandLine(
+                    ToGnArgs(args, mode, arch, target_os, args.nnbd))
                 gn_args += GetGNArgs(args)
                 if args.verbose:
                     print("gn gen --check in %s" % out_dir)
