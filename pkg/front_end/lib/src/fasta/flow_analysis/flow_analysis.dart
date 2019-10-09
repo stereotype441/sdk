@@ -274,9 +274,10 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// Call this method just after visiting a binary `==` or `!=` expression.
   void equalityOp_end(Expression wholeExpression, Expression rightOperand,
       {bool notEqual = false}) {
-    var context = _stack.removeLast() as _BranchContext<Variable, Type>;
-    var lhsInfo = context._conditionInfo;
-    var rhsInfo = _getExpressionInfo(rightOperand);
+    _BranchContext<Variable, Type> context =
+        _stack.removeLast() as _BranchContext<Variable, Type>;
+    _ExpressionInfo<Variable, Type> lhsInfo = context._conditionInfo;
+    _ExpressionInfo<Variable, Type> rhsInfo = _getExpressionInfo(rightOperand);
     Variable variable;
     if (lhsInfo is _NullInfo<Variable, Type> &&
         rhsInfo is _VariableReadInfo<Variable, Type>) {
@@ -292,14 +293,15 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
     _storeExpressionInfo(
         wholeExpression,
         notEqual
-            ? _ExpressionInfo(_current, ifNotNull, _current)
-            : _ExpressionInfo(_current, _current, ifNotNull));
+            ? new _ExpressionInfo(_current, ifNotNull, _current)
+            : new _ExpressionInfo(_current, _current, ifNotNull));
   }
 
   /// Call this method just after visiting the left hand side of a binary `==`
   /// or `!=` expression.
   void equalityOp_rightBegin(Expression leftOperand) {
-    _stack.add(_BranchContext<Variable, Type>(_getExpressionInfo(leftOperand)));
+    _stack.add(
+        new _BranchContext<Variable, Type>(_getExpressionInfo(leftOperand)));
   }
 
   /// This method should be called at the conclusion of flow analysis for a top
@@ -547,7 +549,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
 
   /// Call this method when encountering an expression that is a `null` literal.
   void nullLiteral(Expression expression) {
-    _storeExpressionInfo(expression, _NullInfo(_current));
+    _storeExpressionInfo(expression, new _NullInfo(_current));
   }
 
   /// Retrieves the type that the [variable] is promoted to, if the [variable]
@@ -673,7 +675,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// If the variable's type is currently promoted, the promoted type is
   /// returned.  Otherwise `null` is returned.
   Type variableRead(Expression expression, Variable variable) {
-    _storeExpressionInfo(expression, _VariableReadInfo(_current, variable));
+    _storeExpressionInfo(expression, new _VariableReadInfo(_current, variable));
     return _current.infoFor(variable).promotedType;
   }
 
