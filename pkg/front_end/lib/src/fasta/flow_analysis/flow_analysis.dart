@@ -1395,8 +1395,19 @@ class VariableModel<Type> {
   }
 
   @override
-  String toString() =>
-      'VariableModel($promotedType, $assigned, $writeCaptured)';
+  String toString() {
+    List<String> parts = [];
+    if (promotedType != null) {
+      parts.add('promotedType: $promotedType');
+    }
+    if (assigned) {
+      parts.add('assigned: true');
+    }
+    if (writeCaptured) {
+      parts.add('writeCaptured: true');
+    }
+    return 'VariableModel(${parts.join(', ')})';
+  }
 
   /// Returns a new [VariableModel] where the promoted type is replaced with
   /// [promotedType].
