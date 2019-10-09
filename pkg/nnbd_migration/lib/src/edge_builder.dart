@@ -1459,8 +1459,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         FlowAnalysis<Statement, Expression, PromotableElement, DecoratedType>(
             const AnalyzerNodeOperations(),
             DecoratedTypeOperations(_typeSystem, _variables, _graph),
-            _assignedVariables.writtenInNode(node),
-            _assignedVariables.capturedInNode(node));
+            _assignedVariables.writtenAnywhere,
+            _assignedVariables.capturedAnywhere);
   }
 
   DecoratedType _decorateUpperOrLowerBound(AstNode astNode, DartType type,

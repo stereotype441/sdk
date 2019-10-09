@@ -211,8 +211,8 @@ class FlowAnalysisHelper {
     flow = FlowAnalysis<Statement, Expression, PromotableElement, DartType>(
         _nodeOperations,
         _typeOperations,
-        assignedVariables.writtenInNode(node),
-        assignedVariables.capturedInNode(node));
+        assignedVariables.writtenAnywhere,
+        assignedVariables.capturedAnywhere);
   }
 
   void topLevelDeclaration_exit() {

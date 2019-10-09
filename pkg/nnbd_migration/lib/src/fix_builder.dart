@@ -113,8 +113,8 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
         FlowAnalysis<Statement, Expression, PromotableElement, DartType>(
             const AnalyzerNodeOperations(),
             TypeSystemTypeOperations(_typeSystem),
-            _assignedVariables.writtenInNode(node),
-            _assignedVariables.capturedInNode(node));
+            _assignedVariables.writtenAnywhere,
+            _assignedVariables.capturedAnywhere);
   }
 
   @override
