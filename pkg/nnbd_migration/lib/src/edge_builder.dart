@@ -966,7 +966,9 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   DecoratedType visitParenthesizedExpression(ParenthesizedExpression node) {
-    return node.expression.accept(this);
+    var result = node.expression.accept(this);
+    _flowAnalysis.parenthesizedExpression(node, node.expression);
+    return result;
   }
 
   @override
