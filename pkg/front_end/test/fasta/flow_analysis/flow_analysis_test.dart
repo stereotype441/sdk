@@ -773,7 +773,7 @@ main() {
       var x = h.addVar('x', 'int?');
       h.run((flow) {
         h.if_(
-            h.parenthesized(h.notEqual(h.parenthesized(h.variableRead(x)),
+            h.parenthesized(h.equal(h.parenthesized(h.variableRead(x)),
                 h.parenthesized(h.nullLiteral))), () {
           expect(flow.promotedType(x).type, 'int');
         });
@@ -1886,11 +1886,11 @@ class _Harness implements TypeOperations<_Var, _Type> {
 
   /// Creates a [LazyExpression] representing an equality check between two
   /// other expressions.
-  LazyExpression notEqual(LazyExpression lhs, LazyExpression rhs) {
+  LazyExpression equal(LazyExpression lhs, LazyExpression rhs) {
     return () {
       var expr = _Expression();
       _flow.equalityOp_rightBegin(lhs());
-      _flow.equalityOp_end(expr, rhs(), notEqual: true);
+      _flow.equalityOp_end(expr, rhs());
       return expr;
     };
   }
