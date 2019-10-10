@@ -244,6 +244,15 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   }
 
   @override
+  DartType visitListLiteral(ListLiteral node) {
+    if (node.typeArguments == null) {
+      throw UnimplementedError('TODO(paulberry)');
+    } else {
+      TODO;
+    }
+  }
+
+  @override
   DartType visitNullLiteral(NullLiteral node) {
     _flowAnalysis.nullLiteral(node);
     return _typeProvider.nullType;
