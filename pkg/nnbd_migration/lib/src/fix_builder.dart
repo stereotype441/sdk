@@ -111,7 +111,6 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
         FlowAnalysisHelper.computeAssignedVariables(node, parameters);
     _flowAnalysis =
         FlowAnalysis<Statement, Expression, PromotableElement, DartType>(
-            const AnalyzerNodeOperations(),
             TypeSystemTypeOperations(_typeSystem),
             _assignedVariables.writtenAnywhere,
             _assignedVariables.capturedAnywhere);
@@ -245,8 +244,16 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   }
 
   @override
+  DartType visitNullLiteral(NullLiteral node) {
+    _flowAnalysis.nullLiteral(node);
+    return _typeProvider.nullType;
+  }
+
+  @override
   DartType visitParenthesizedExpression(ParenthesizedExpression node) {
-    return node.expression.accept(this);
+    var result = node.expression.accept(this);
+    _flowAnalysis.parenthesizedExpression(node, node.expression);
+    return result;
   }
 
   @override

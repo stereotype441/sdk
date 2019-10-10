@@ -347,7 +347,7 @@ _f(bool x, bool y) => x && y;
     visitSubexpression(findNode.binary('&&'), 'bool');
   }
 
-  solo_test_binaryExpression_ampersand_ampersand_flow() async {
+  test_binaryExpression_ampersand_ampersand_flow() async {
     await analyze('''
 _f(bool/*?*/ x) => x != null && x;
 ''');
@@ -541,6 +541,13 @@ f() => null;
 f() => (1);
 ''');
     visitSubexpression(findNode.integerLiteral('1'), 'int');
+  }
+
+  test_parenthesizedExpression_flow() async {
+    await analyze('''
+_f(bool/*?*/ x) => ((x) != (null)) && x;
+''');
+    visitSubexpression(findNode.binary('&&'), 'bool');
   }
 
   test_simpleIdentifier_className() async {

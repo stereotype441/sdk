@@ -42,6 +42,7 @@ account
 accumulate
 accurate
 achieve
+act
 acting
 action
 active
@@ -184,6 +185,7 @@ assignment
 assignments
 associate
 associated
+associates
 associating
 associative
 assume
@@ -292,6 +294,7 @@ bracket
 bracketed
 brackets
 branch
+branched
 branches
 break
 breaking
@@ -398,6 +401,7 @@ chosen
 chunk
 circularities
 circularity
+circumstance
 circumstances
 clashing
 class
@@ -885,6 +889,7 @@ encodes
 encoding
 encounter
 encountered
+encountering
 encounters
 end
 ended
@@ -968,6 +973,7 @@ exclusive
 executable
 executed
 executes
+executing
 execution
 exercise
 exist
@@ -1144,6 +1150,7 @@ fully
 fun
 function
 functionality
+functionally
 functions
 further
 furthermore
