@@ -91,6 +91,8 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   /// inference.  This is used to determine when `!` needs to be inserted.
   DartType _contextType;
 
+  DartType _typeAnnotationType;
+
   FixBuilder(this._decoratedClassHierarchy, TypeProvider typeProvider,
       this._typeSystem, this._variables)
       : _typeProvider = (typeProvider as TypeProviderImpl)
