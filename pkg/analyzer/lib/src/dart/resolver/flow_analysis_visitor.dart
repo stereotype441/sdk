@@ -30,8 +30,7 @@ class FlowAnalysisHelper {
   FlowAnalysis<Statement, Expression, PromotableElement, DartType> flow;
 
   factory FlowAnalysisHelper(TypeSystem typeSystem, bool retainDataForTesting) {
-    return FlowAnalysisHelper._(
-        TypeSystemTypeOperations(typeSystem),
+    return FlowAnalysisHelper._(TypeSystemTypeOperations(typeSystem),
         retainDataForTesting ? FlowAnalysisResult() : null);
   }
 

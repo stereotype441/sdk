@@ -1797,8 +1797,7 @@ typedef _Expression LazyExpression();
 
 class _Expression {}
 
-class _Harness
-    implements TypeOperations<_Var, _Type> {
+class _Harness implements TypeOperations<_Var, _Type> {
   FlowAnalysis<_Statement, _Expression, _Var, _Type> _flow;
 
   final List<_Var> _variablesWrittenAnywhere = [];

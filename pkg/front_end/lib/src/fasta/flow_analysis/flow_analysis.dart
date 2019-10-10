@@ -198,12 +198,12 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
       TypeOperations<Variable, Type> typeOperations,
       Iterable<Variable> variablesWrittenAnywhere,
       Iterable<Variable> variablesCapturedAnywhere) {
-    return new FlowAnalysis._(typeOperations,
-        variablesWrittenAnywhere.toList(), variablesCapturedAnywhere.toList());
+    return new FlowAnalysis._(typeOperations, variablesWrittenAnywhere.toList(),
+        variablesCapturedAnywhere.toList());
   }
 
-  FlowAnalysis._(this.typeOperations,
-      this._variablesWrittenAnywhere, this._variablesCapturedAnywhere) {
+  FlowAnalysis._(this.typeOperations, this._variablesWrittenAnywhere,
+      this._variablesCapturedAnywhere) {
     _current = new FlowModel<Variable, Type>(true);
   }
 
