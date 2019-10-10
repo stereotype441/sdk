@@ -92,6 +92,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   /// inference.  This is used to determine when `!` needs to be inserted.
   DartType _contextType;
 
+  /// The file being analyzed.
   final Source source;
 
   FixBuilder(this.source, this._decoratedClassHierarchy,
@@ -99,6 +100,8 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
       : _typeProvider = (typeProvider as TypeProviderImpl)
             .withNullability(NullabilitySuffix.none);
 
+  /// Called whenever a type annotation is found for which a `?` needs to be
+  /// inserted.
   void addNullable(TypeAnnotation node);
 
   /// Called whenever an expression is found for which a `!` needs to be
