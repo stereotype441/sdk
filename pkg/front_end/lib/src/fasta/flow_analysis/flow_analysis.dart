@@ -740,7 +740,9 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// returned.
   _ExpressionInfo<Variable, Type> _getExpressionInfo(Expression expression) {
     if (identical(expression, _expressionWithInfo)) {
-      return _expressionInfo;
+      _ExpressionInfo<Variable, Type> expressionInfo = _expressionInfo;
+      _expressionInfo = null;
+      return expressionInfo;
     } else {
       return null;
     }

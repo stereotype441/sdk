@@ -529,7 +529,7 @@ f() => 1;
     visitSubexpression(findNode.integerLiteral('1'), 'int');
   }
 
-  solo_test_nullAssertion_promotes() async {
+  test_nullAssertion_promotes() async {
     await analyze('''
 _f(bool/*?*/ x) => x && x;
 ''');
