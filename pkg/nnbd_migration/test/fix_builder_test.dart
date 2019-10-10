@@ -522,6 +522,16 @@ f() => 1.0;
     visitSubexpression(findNode.doubleLiteral('1.0'), 'double');
   }
 
+  test_expressionStatement() async {
+    await analyze('''
+_f(int/*!*/ x, int/*?*/ y) {
+  x = y;
+}
+''');
+    visitStatement(findNode.statement('x = y'),
+        nullChecked: {findNode.simple('y;')});
+  }
+
   test_integerLiteral() async {
     await analyze('''
 f() => 1;
@@ -672,6 +682,16 @@ bool _f(dynamic d, bool b) => d && b;
     expect(fixBuilder.problems, problems);
   }
 
+  void visitStatement(Statement node,
+      {Set<Expression> nullChecked = const <Expression>{},
+      Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
+    _FixBuilder fixBuilder = _createFixBuilder(node);
+    var type = node.accept(fixBuilder);
+    expect(type, null);
+    expect(fixBuilder.nullCheckedExpressions, nullChecked);
+    expect(fixBuilder.problems, problems);
+  }
+
   void visitSubexpression(Expression node, String expectedType,
       {DartType contextType,
       Set<Expression> nullChecked = const <Expression>{},
@@ -684,7 +704,7 @@ bool _f(dynamic d, bool b) => d && b;
     expect(fixBuilder.problems, problems);
   }
 
-  _FixBuilder _createFixBuilder(Expression node) {
+  _FixBuilder _createFixBuilder(AstNode node) {
     var fixBuilder = _FixBuilder(
         decoratedClassHierarchy, typeProvider, typeSystem, variables);
     var body = node.thisOrAncestorOfType<FunctionBody>();

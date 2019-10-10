@@ -231,6 +231,12 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   }
 
   @override
+  DartType visitExpressionStatement(ExpressionStatement node) {
+    visitSubexpression(node.expression, UnknownInferredType.instance);
+    return null;
+  }
+
+  @override
   DartType visitLiteral(Literal node) {
     if (node is AdjacentStrings) {
       // TODO(paulberry): need to visit interpolations
@@ -267,6 +273,12 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
       if (promotedType != null) return promotedType;
     }
     return _computeMigratedType(element);
+  }
+
+  @override
+  DartType visitStatement(Statement node) {
+    // Every statement type needs its own visit method.
+    throw UnimplementedError('No visit method for ${node.runtimeType}');
   }
 
   /// Recursively visits a subexpression, providing a context type.
