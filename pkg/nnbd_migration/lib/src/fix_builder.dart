@@ -94,14 +94,16 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
 
   final Source source;
 
-  FixBuilder(this.source, this._decoratedClassHierarchy, TypeProvider typeProvider,
-      this._typeSystem, this._variables)
+  FixBuilder(this.source, this._decoratedClassHierarchy,
+      TypeProvider typeProvider, this._typeSystem, this._variables)
       : _typeProvider = (typeProvider as TypeProviderImpl)
             .withNullability(NullabilitySuffix.none);
 
   /// Called whenever an expression is found for which a `!` needs to be
   /// inserted.
   void addNullCheck(Expression subexpression);
+
+  void addNullable(TypeAnnotation node);
 
   /// Called whenever code is found that can't be automatically fixed.
   void addProblem(AstNode node, Problem problem);
@@ -307,7 +309,13 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
       // Already nullable.  Nothing to do.
       return decoratedType.type;
     } else {
-      throw UnimplementedError('TODO(paulberry)');
+      var element = decoratedType.type.element as ClassElement;
+      bool isNullable = decoratedType.node.isNullable;
+      if (isNullable) {
+        addNullable(node);
+      }
+      return InterfaceTypeImpl(element,
+          nullabilitySuffix: isNullable ? NullabilitySuffix.question : NullabilitySuffix.none);
     }
   }
 

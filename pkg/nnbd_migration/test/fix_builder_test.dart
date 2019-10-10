@@ -669,6 +669,34 @@ void _f() {
     visitTypeAnnotation((findNode.typeAnnotation('dynamic')), 'dynamic');
   }
 
+  test_typeName_simple_nonNullable() async {
+    await analyze('''
+void _f() {
+  int i = 0;
+}
+''');
+    visitTypeAnnotation((findNode.typeAnnotation('int')), 'int');
+  }
+
+  test_typeName_simple_nullable() async {
+    await analyze('''
+void _f() {
+  int i = null;
+}
+''');
+    var intAnnotation = findNode.typeAnnotation('int');
+    visitTypeAnnotation((intAnnotation), 'int?', nullable: {intAnnotation});
+  }
+
+  test_typeName_void() async {
+    await analyze('''
+void _f() {
+  void v;
+}
+''');
+    visitTypeAnnotation((findNode.typeAnnotation('void v')), 'void');
+  }
+
   test_use_of_dynamic() async {
     // Use of `dynamic` in a context requiring non-null is not explicitly null
     // checked.
@@ -694,34 +722,40 @@ bool _f(dynamic d, bool b) => d && b;
 
   void visitStatement(Statement node,
       {Set<Expression> nullChecked = const <Expression>{},
-      Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
+      Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{},
+      Set<TypeAnnotation> nullable = const <TypeAnnotation>{}}) {
     _FixBuilder fixBuilder = _createFixBuilder(node);
     var type = node.accept(fixBuilder);
     expect(type, null);
     expect(fixBuilder.nullCheckedExpressions, nullChecked);
     expect(fixBuilder.problems, problems);
+    expect(fixBuilder.nullable, nullable);
   }
 
   void visitSubexpression(Expression node, String expectedType,
       {DartType contextType,
       Set<Expression> nullChecked = const <Expression>{},
-      Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
+      Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{},
+      Set<TypeAnnotation> nullable = const <TypeAnnotation>{}}) {
     contextType ??= dynamicType;
     _FixBuilder fixBuilder = _createFixBuilder(node);
     var type = fixBuilder.visitSubexpression(node, contextType);
     expect((type as TypeImpl).toString(withNullability: true), expectedType);
     expect(fixBuilder.nullCheckedExpressions, nullChecked);
     expect(fixBuilder.problems, problems);
+    expect(fixBuilder.nullable, nullable);
   }
 
   void visitTypeAnnotation(TypeAnnotation node, String expectedType,
       {Set<Expression> nullChecked = const <Expression>{},
-      Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
+      Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{},
+      Set<TypeAnnotation> nullable = const <TypeAnnotation>{}}) {
     _FixBuilder fixBuilder = _createFixBuilder(node);
     var type = node.accept(fixBuilder);
     expect((type as TypeImpl).toString(withNullability: true), expectedType);
     expect(fixBuilder.nullCheckedExpressions, nullChecked);
     expect(fixBuilder.problems, problems);
+    expect(fixBuilder.nullable, nullable);
   }
 
   _FixBuilder _createFixBuilder(AstNode node) {
@@ -737,12 +771,20 @@ bool _f(dynamic d, bool b) => d && b;
 class _FixBuilder extends FixBuilder {
   final Set<Expression> nullCheckedExpressions = {};
 
+  final Set<TypeAnnotation> nullable = {};
+
   final Map<AstNode, Set<Problem>> problems = {};
 
   _FixBuilder(Source source, DecoratedClassHierarchy decoratedClassHierarchy,
       TypeProvider typeProvider, TypeSystem typeSystem, Variables variables)
       : super(source, decoratedClassHierarchy, typeProvider, typeSystem,
             variables);
+
+  @override
+  void addNullable(TypeAnnotation node) {
+    var newlyAdded = nullable.add(node);
+    expect(newlyAdded, true);
+  }
 
   @override
   void addNullCheck(Expression subexpression) {
