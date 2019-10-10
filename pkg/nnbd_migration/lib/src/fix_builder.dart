@@ -14,6 +14,7 @@ import 'package:analyzer/src/dart/element/type_algebra.dart';
 import 'package:analyzer/src/dart/element/type_provider.dart';
 import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
 import 'package:analyzer/src/generated/resolver.dart';
+import 'package:analyzer/src/generated/source.dart';
 import 'package:front_end/src/fasta/flow_analysis/flow_analysis.dart';
 import 'package:meta/meta.dart';
 import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
@@ -91,9 +92,9 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   /// inference.  This is used to determine when `!` needs to be inserted.
   DartType _contextType;
 
-  DartType _typeAnnotationType;
+  final Source source;
 
-  FixBuilder(this._decoratedClassHierarchy, TypeProvider typeProvider,
+  FixBuilder(this.source, this._decoratedClassHierarchy, TypeProvider typeProvider,
       this._typeSystem, this._variables)
       : _typeProvider = (typeProvider as TypeProviderImpl)
             .withNullability(NullabilitySuffix.none);
@@ -292,6 +293,21 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
       }
     } finally {
       _contextType = oldContextType;
+    }
+  }
+
+  @override
+  DartType visitTypeName(TypeName node) {
+    var decoratedType = _variables.decoratedTypeAnnotation(source, node);
+    assert(decoratedType != null);
+    if (node.typeArguments != null) {
+      throw UnimplementedError('TODO(paulberry)');
+    }
+    if (decoratedType.type.isDynamic || decoratedType.type.isVoid) {
+      // Already nullable.  Nothing to do.
+      return decoratedType.type;
+    } else {
+      throw UnimplementedError('TODO(paulberry)');
     }
   }
 

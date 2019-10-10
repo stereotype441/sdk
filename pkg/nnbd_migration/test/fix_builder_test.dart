@@ -8,6 +8,7 @@ import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type_provider.dart';
 import 'package:analyzer/src/generated/resolver.dart';
+import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/generated/type_system.dart';
 import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
 import 'package:nnbd_migration/src/fix_builder.dart';
@@ -659,6 +660,15 @@ f() => #foo;
     visitSubexpression(findNode.symbolLiteral('#foo'), 'Symbol');
   }
 
+  test_typeName_dynamic() async {
+    await analyze('''
+void _f() {
+  dynamic d = null;
+}
+''');
+    visitTypeAnnotation((findNode.typeAnnotation('dynamic')), 'dynamic');
+  }
+
   test_use_of_dynamic() async {
     // Use of `dynamic` in a context requiring non-null is not explicitly null
     // checked.
@@ -704,9 +714,19 @@ bool _f(dynamic d, bool b) => d && b;
     expect(fixBuilder.problems, problems);
   }
 
+  void visitTypeAnnotation(TypeAnnotation node, String expectedType,
+      {Set<Expression> nullChecked = const <Expression>{},
+      Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
+    _FixBuilder fixBuilder = _createFixBuilder(node);
+    var type = node.accept(fixBuilder);
+    expect((type as TypeImpl).toString(withNullability: true), expectedType);
+    expect(fixBuilder.nullCheckedExpressions, nullChecked);
+    expect(fixBuilder.problems, problems);
+  }
+
   _FixBuilder _createFixBuilder(AstNode node) {
-    var fixBuilder = _FixBuilder(
-        decoratedClassHierarchy, typeProvider, typeSystem, variables);
+    var fixBuilder = _FixBuilder(testSource, decoratedClassHierarchy,
+        typeProvider, typeSystem, variables);
     var body = node.thisOrAncestorOfType<FunctionBody>();
     var declaration = body.thisOrAncestorOfType<Declaration>();
     fixBuilder.createFlowAnalysis(declaration, null);
@@ -719,9 +739,10 @@ class _FixBuilder extends FixBuilder {
 
   final Map<AstNode, Set<Problem>> problems = {};
 
-  _FixBuilder(DecoratedClassHierarchy decoratedClassHierarchy,
+  _FixBuilder(Source source, DecoratedClassHierarchy decoratedClassHierarchy,
       TypeProvider typeProvider, TypeSystem typeSystem, Variables variables)
-      : super(decoratedClassHierarchy, typeProvider, typeSystem, variables);
+      : super(source, decoratedClassHierarchy, typeProvider, typeSystem,
+            variables);
 
   @override
   void addNullCheck(Expression subexpression) {
