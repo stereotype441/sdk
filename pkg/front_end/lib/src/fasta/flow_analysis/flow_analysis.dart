@@ -768,7 +768,6 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
   bool _exceptionOccurred = false;
 
   factory FlowAnalysisDebug(
-      NodeOperations<Expression> nodeOperations,
       TypeOperations<Variable, Type> typeOperations,
       Iterable<Variable> variablesWrittenAnywhere,
       Iterable<Variable> variablesCapturedAnywhere) {
@@ -776,8 +775,8 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
     variablesCapturedAnywhere = variablesCapturedAnywhere.toList();
     print('FlowAnalysisDebug($variablesWrittenAnywhere, '
         '$variablesCapturedAnywhere)');
-    return FlowAnalysisDebug._(FlowAnalysis(nodeOperations, typeOperations,
-        variablesWrittenAnywhere, variablesCapturedAnywhere));
+    return FlowAnalysisDebug._(FlowAnalysis(
+        typeOperations, variablesWrittenAnywhere, variablesCapturedAnywhere));
   }
 
   FlowAnalysisDebug._(this._wrapped);
@@ -938,6 +937,15 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
   }
 
   @override
+  void parenthesizedExpression(
+      Expression outerExpression, Expression innerExpression) {
+    _wrap(
+        'parenthesizedExpression($outerExpression, $innerExpression)',
+        () =>
+            _wrapped.parenthesizedExpression(outerExpression, innerExpression));
+  }
+
+  @override
   Type promotedType(Variable variable) {
     return _wrap(
         'promotedType($variable)', () => _wrapped.promotedType(variable),
@@ -970,7 +978,7 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
   Type variableRead(Expression expression, Variable variable) {
     return _wrap('variableRead($expression, $variable)',
         () => _wrapped.variableRead(expression, variable),
-        isQuery: true);
+        isQuery: true, isPure: false);
   }
 
   @override
@@ -978,7 +986,8 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
     _wrap('write($variable)', () => _wrapped.write(variable));
   }
 
-  T _wrap<T>(String desc, T callback(), {bool isQuery: false}) {
+  T _wrap<T>(String desc, T callback(), {bool isQuery: false, bool isPure}) {
+    isPure ??= isQuery;
     print(desc);
     T result;
     try {
@@ -989,10 +998,11 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
       _exceptionOccurred = true;
       rethrow;
     }
+    if (!isPure) {
+      _wrapped._dumpState();
+    }
     if (isQuery) {
       print('  => $result');
-    } else {
-      _wrapped._dumpState();
     }
     return result;
   }
@@ -1506,6 +1516,9 @@ class _BranchContext<Variable, Type> extends _FlowContext {
   final _ExpressionInfo<Variable, Type> _conditionInfo;
 
   _BranchContext(this._conditionInfo);
+
+  @override
+  String toString() => '_BranchContext(conditionInfo: $_conditionInfo)';
 }
 
 /// [_FlowContext] representing a language construct that can be targeted by
@@ -1529,6 +1542,10 @@ class _ConditionalContext<Variable, Type>
 
   _ConditionalContext(_ExpressionInfo<Variable, Type> conditionInfo)
       : super(conditionInfo);
+
+  @override
+  String toString() => '_ConditionalContext(conditionInfo: $_conditionInfo, '
+      'thenInfo: $_thenInfo)';
 }
 
 /// A collection of flow models representing the possible outcomes of evaluating
@@ -1559,6 +1576,10 @@ class _IfContext<Variable, Type> extends _BranchContext<Variable, Type> {
 
   _IfContext(_ExpressionInfo<Variable, Type> conditionInfo)
       : super(conditionInfo);
+
+  @override
+  String toString() =>
+      '_IfContext(conditionInfo: $_conditionInfo, afterThen: $_afterThen)';
 }
 
 /// [_ExpressionInfo] representing a `null` literal.
@@ -1636,6 +1657,10 @@ class _VariableReadInfo<Variable, Type>
 
   @override
   FlowModel<Variable, Type> get _ifTrue => _after;
+
+  @override
+  String toString() =>
+      '_VariableReadInfo(after: $_after, variable: $_variable)';
 }
 
 /// [_FlowContext] representing a `while` loop (or a C-style `for` loop, which

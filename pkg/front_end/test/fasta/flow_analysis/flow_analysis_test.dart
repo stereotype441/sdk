@@ -1795,7 +1795,14 @@ Matcher get _asserts {
 /// expressions.
 typedef _Expression LazyExpression();
 
-class _Expression {}
+class _Expression {
+  static int _idCounter = 0;
+
+  final int _id = _idCounter++;
+
+  @override
+  String toString() => 'E$_id';
+}
 
 class _Harness implements TypeOperations<_Var, _Type> {
   FlowAnalysis<_Statement, _Expression, _Var, _Type> _flow;
