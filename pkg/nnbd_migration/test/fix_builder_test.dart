@@ -736,6 +736,43 @@ bool _f(dynamic d, bool b) => d && b;
     visitSubexpression(findNode.binary('&&'), 'bool');
   }
 
+  test_variableDeclaration_typed_initialized_nonNullable() async {
+    await analyze('''
+void _f() {
+  int x = 0;
+}
+''');
+    visitStatement(findNode.statement('int x'));
+  }
+
+  test_variableDeclaration_typed_initialized_nullable() async {
+    await analyze('''
+void _f() {
+  int x = null;
+}
+''');
+    visitStatement(findNode.statement('int x'),
+        nullable: {findNode.typeAnnotation('int')});
+  }
+
+  test_variableDeclaration_typed_uninitialized() async {
+    await analyze('''
+void _f() {
+  int x;
+}
+''');
+    visitStatement(findNode.statement('int x'));
+  }
+
+  test_variableDeclaration_untyped_initialized() async {
+    await analyze('''
+void _f() {
+  var x = 0;
+}
+''');
+    visitStatement(findNode.statement('var x'));
+  }
+
   test_variableDeclaration_untyped_uninitialized() async {
     await analyze('''
 void _f() {
@@ -743,6 +780,16 @@ void _f() {
 }
 ''');
     visitStatement(findNode.statement('var x'));
+  }
+
+  test_variableDeclaration_visit_initializer() async {
+    await analyze('''
+void _f(bool/*?*/ x, bool/*?*/ y) {
+  bool z = x && y;
+}
+''');
+    visitStatement(findNode.statement('bool z'),
+        nullChecked: {findNode.simple('x &&'), findNode.simple('y;')});
   }
 
   void visitAssignmentTarget(

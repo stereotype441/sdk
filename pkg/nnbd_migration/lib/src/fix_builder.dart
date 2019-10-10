@@ -329,17 +329,17 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     DartType contextType;
     var typeAnnotation = node.type;
     if (typeAnnotation != null) {
-      typeAnnotation.accept(this);
-      contextType = _typeAnnotationType;
+      contextType = typeAnnotation.accept(this);
       assert(contextType != null);
     } else {
       contextType = UnknownInferredType.instance;
     }
     for (var variable in node.variables) {
       if (variable.initializer != null) {
-        throw UnimplementedError('TODO(paulberry)');
+        visitSubexpression(variable.initializer, contextType);
       }
     }
+    return null;
   }
 
   @override
