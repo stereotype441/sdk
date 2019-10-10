@@ -546,7 +546,7 @@ class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// Call this method just after visiting a non-null assertion (`x!`)
   /// expression.
   void nonNullAssert_end(Expression operand) {
-    var operandInfo = _getExpressionInfo(operand);
+    _ExpressionInfo<Variable, Type> operandInfo = _getExpressionInfo(operand);
     if (operandInfo is _VariableReadInfo<Variable, Type>) {
       _current =
           _current.markNonNullable(typeOperations, operandInfo._variable);
