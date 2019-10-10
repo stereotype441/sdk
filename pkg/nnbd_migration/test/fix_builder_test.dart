@@ -668,6 +668,15 @@ bool _f(dynamic d, bool b) => d && b;
     visitSubexpression(findNode.binary('&&'), 'bool');
   }
 
+  test_variableDeclaration_untyped_uninitialized() async {
+    await analyze('''
+void _f() {
+  var x;
+}
+''');
+    visitStatement(findNode.statement('var x'));
+  }
+
   void visitAssignmentTarget(
       Expression node, String expectedReadType, String expectedWriteType,
       {Set<Expression> nullChecked = const <Expression>{},

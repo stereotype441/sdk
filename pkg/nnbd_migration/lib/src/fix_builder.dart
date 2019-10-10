@@ -295,6 +295,32 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     }
   }
 
+  @override
+  DartType visitVariableDeclarationList(VariableDeclarationList node) {
+    node.metadata.accept(this);
+    DartType contextType;
+    var typeAnnotation = node.type;
+    if (typeAnnotation != null) {
+      typeAnnotation.accept(this);
+      contextType = _typeAnnotationType;
+      assert(contextType != null);
+    } else {
+      contextType = UnknownInferredType.instance;
+    }
+    for (var variable in node.variables) {
+      if (variable.initializer != null) {
+        throw UnimplementedError('TODO(paulberry)');
+      }
+    }
+  }
+
+  @override
+  DartType visitVariableDeclarationStatement(
+      VariableDeclarationStatement node) {
+    node.variables.accept(this);
+    return null;
+  }
+
   /// Computes the type that [element] will have after migration.
   ///
   /// If [targetType] is present, and [element] is a class member, it is the
