@@ -419,6 +419,17 @@ _f(int/*?*/ x, double/*?*/ y) {
     visitSubexpression(findNode.binary('??'), 'num?');
   }
 
+  test_binaryExpression_question_question_flow() async {
+    await analyze('''
+_f(int/*?*/ x, int/*?*/ y) =>
+    <dynamic>[x ?? (y != null ? 1 : throw 'foo'), y + 1];
+''');
+    // The null check on the RHS of the `??` doesn't promote, because it is not
+    // guaranteed to execute.
+    visitSubexpression(findNode.listLiteral('['), 'List<dynamic>',
+        nullChecked: {findNode.simple('y +')});
+  }
+
   test_binaryExpression_question_question_nullChecked() async {
     await analyze('''
 Object/*!*/ _f(int/*?*/ x, double/*?*/ y) {
@@ -513,6 +524,16 @@ _f(_C<int, String/*?*/> c, String/*?*/ s) => c + s;
 f() => true;
 ''');
     visitSubexpression(findNode.booleanLiteral('true'), 'bool');
+  }
+
+  test_conditionalExpression_promotes() async {
+    await analyze('''
+_f(int/*?*/ x) =>
+    <dynamic>[(x != null ? 1 : throw 'foo'), x + 1];
+''');
+    // No null check needs to be added to `x + 1`, because there is already an
+    // explicit null check.
+    visitSubexpression(findNode.listLiteral('['), 'List<dynamic>');
   }
 
   test_doubleLiteral() async {
