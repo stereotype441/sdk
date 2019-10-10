@@ -666,7 +666,37 @@ void _f() {
   dynamic d = null;
 }
 ''');
-    visitTypeAnnotation((findNode.typeAnnotation('dynamic')), 'dynamic');
+    visitTypeAnnotation(findNode.typeAnnotation('dynamic'), 'dynamic');
+  }
+
+  test_typeName_generic_nonNullable() async {
+    await analyze('''
+void _f() {
+  List<int> i = [0];
+}
+''');
+    visitTypeAnnotation(findNode.typeAnnotation('List<int>'), 'List<int>');
+  }
+
+  test_typeName_generic_nullable() async {
+    await analyze('''
+void _f() {
+  List<int> i = null;
+}
+''');
+    var listIntAnnotation = findNode.typeAnnotation('List<int>');
+    visitTypeAnnotation(listIntAnnotation, 'List<int>?',
+        nullable: {listIntAnnotation});
+  }
+
+  test_typeName_generic_nullable_arg() async {
+    await analyze('''
+void _f() {
+  List<int> i = [null];
+}
+''');
+    visitTypeAnnotation(findNode.typeAnnotation('List<int>'), 'List<int?>',
+        nullable: {findNode.typeAnnotation('int')});
   }
 
   test_typeName_simple_nonNullable() async {
@@ -675,7 +705,7 @@ void _f() {
   int i = 0;
 }
 ''');
-    visitTypeAnnotation((findNode.typeAnnotation('int')), 'int');
+    visitTypeAnnotation(findNode.typeAnnotation('int'), 'int');
   }
 
   test_typeName_simple_nullable() async {
@@ -694,7 +724,7 @@ void _f() {
   void v;
 }
 ''');
-    visitTypeAnnotation((findNode.typeAnnotation('void v')), 'void');
+    visitTypeAnnotation(findNode.typeAnnotation('void v'), 'void');
   }
 
   test_use_of_dynamic() async {
