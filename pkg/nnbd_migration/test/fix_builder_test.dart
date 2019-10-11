@@ -727,6 +727,31 @@ f() => #foo;
     visitSubexpression(findNode.symbolLiteral('#foo'), 'Symbol');
   }
 
+  test_throw_flow() async {
+    await analyze('''
+_f(int/*?*/ i) {
+  if (i == null) throw 'foo';
+  i + 1;
+}
+''');
+    visitStatement(findNode.block('{'));
+  }
+
+  test_throw_nullable() async {
+    await analyze('''
+_f(int/*?*/ i) => throw i;
+''');
+    visitSubexpression(findNode.throw_('throw'), 'Never',
+        nullChecked: {findNode.simple('i;')});
+  }
+
+  test_throw_simple() async {
+    await analyze('''
+_f() => throw 'foo';
+''');
+    visitSubexpression(findNode.throw_('throw'), 'Never');
+  }
+
   test_typeName_dynamic() async {
     await analyze('''
 void _f() {

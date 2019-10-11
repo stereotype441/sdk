@@ -355,6 +355,13 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   }
 
   @override
+  DartType visitThrowExpression(ThrowExpression node) {
+    visitSubexpression(node.expression, _typeProvider.objectType);
+    _flowAnalysis.handleExit();
+    return _typeProvider.neverType;
+  }
+
+  @override
   DartType visitTypeName(TypeName node) {
     var decoratedType = _variables.decoratedTypeAnnotation(source, node);
     assert(decoratedType != null);
