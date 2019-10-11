@@ -722,8 +722,7 @@ abstract class _E {
   f() => x++;
 }
 ''');
-    var assignment = findNode.postfix('++');
-    visitSubexpression(assignment, 'dynamic');
+    visitSubexpression(findNode.postfix('++'), 'dynamic');
   }
 
   test_postfixExpression_combined_nullable_problem() async {
@@ -742,6 +741,13 @@ abstract class _E {
     visitSubexpression(postfix, '_C', problems: {
       postfix: {const CompoundAssignmentCombinedNullable()}
     });
+  }
+
+  test_postfixExpression_dynamic() async {
+    await analyze('''
+_f(dynamic x) => x++;
+''');
+    visitSubexpression(findNode.postfix('++'), 'dynamic');
   }
 
   test_postfixExpression_lhs_nullable_problem() async {
