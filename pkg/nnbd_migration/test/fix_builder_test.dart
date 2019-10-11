@@ -949,7 +949,7 @@ abstract class _C<T> {
 }
 _f(_C<int> x) => ~x;
 ''');
-    visitSubexpression(findNode.prefix('-x'), 'List<int>');
+    visitSubexpression(findNode.prefix('~x'), 'List<int>');
   }
 
   test_simpleIdentifier_className() async {
