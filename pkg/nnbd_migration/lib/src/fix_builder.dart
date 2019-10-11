@@ -189,46 +189,30 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
       if (writeElement == null) {
         indexContext = UnknownInferredType.instance;
         writeType = _typeProvider.dynamicType;
-        readType = _typeProvider.dynamicType;
+        readType = isCompound ? _typeProvider.dynamicType : null;
       } else {
         var writerType =
             _computeMigratedType(writeElement, targetType: targetType)
                 as FunctionType;
         writeType = writerType.parameters[1].type;
-        var auxiliaryElements = node.auxiliaryElements;
-        if (auxiliaryElements == null) {
-          throw UnimplementedError('TODO(paulberry)');
+        if (isCompound) {
+          var auxiliaryElements = node.auxiliaryElements;
+          if (auxiliaryElements == null) {
+            throw UnimplementedError('TODO(paulberry)');
+          } else {
+            var readElement = auxiliaryElements.staticElement;
+            var readerType =
+                _computeMigratedType(readElement, targetType: targetType)
+                    as FunctionType;
+            readType = readerType.returnType;
+            indexContext = readerType.parameters[0].type;
+          }
         } else {
-          var readElement = auxiliaryElements.staticElement;
-          var readerType =
-              _computeMigratedType(readElement, targetType: targetType)
-                  as FunctionType;
-          readType = readerType.returnType;
-          indexContext =
-              (isCompound ? readerType : writerType).parameters[0].type;
+          indexContext = writerType.parameters[0].type;
         }
       }
       visitSubexpression(node.index, indexContext);
       return AssignmentTargetInfo(isCompound ? readType : null, writeType);
-//      var writeType = node.staticElement == null ? null : _computeMigratedType(writeElement, targetType: targetType);
-//
-//      var auxiliaryElements = node.auxiliaryElements;
-//      var readElement = auxiliaryElements == null ? write
-//      var staticElement = node.staticElement;
-//      var index = node.index;
-//      DartType contextType;
-//      DartType returnType;
-//      if (staticElement == null) {
-//        contextType = _typeProvider.dynamicType;
-//        returnType = _typeProvider.dynamicType;
-//      } else {
-//        var methodType =
-//        _computeMigratedType(staticElement, targetType: targetType)
-//        as FunctionType;
-//        contextType = methodType.parameters[0].type;
-//        returnType = methodType.returnType;
-//      }
-//      return returnType;
     } else {
       throw UnimplementedError('TODO(paulberry)');
     }
