@@ -645,6 +645,77 @@ _f(int/*?*/ x) {
     visitStatement(findNode.statement('if'));
   }
 
+  test_indexExpression_dynamic() async {
+    await analyze('''
+Object/*!*/ _f(dynamic d, int/*?*/ i) => d[i];
+''');
+    visitSubexpression(findNode.index('d[i]'), 'dynamic',
+        contextType: objectType);
+  }
+
+  test_indexExpression_simple() async {
+    await analyze('''
+class _C {
+  int operator[](String s) => 1;
+}
+_f(_C c) => c['foo'];
+''');
+    visitSubexpression(findNode.index('c['), 'int');
+  }
+
+  test_indexExpression_simple_check_lhs() async {
+    await analyze('''
+class _C {
+  int operator[](String s) => 1;
+}
+_f(_C/*?*/ c) => c['foo'];
+''');
+    visitSubexpression(findNode.index('c['), 'int',
+        nullChecked: {findNode.simple('c[')});
+  }
+
+  test_indexExpression_simple_check_rhs() async {
+    await analyze('''
+class _C {
+  int operator[](String/*!*/ s) => 1;
+}
+_f(_C c, String/*?*/ s) => c[s];
+''');
+    visitSubexpression(findNode.index('c['), 'int',
+        nullChecked: {findNode.simple('s]')});
+  }
+
+  test_indexExpression_substituted() async {
+    await analyze('''
+class _C<T, U> {
+  T operator[](U u) => throw 'foo';
+}
+_f(_C<int, String> c) => c['foo'];
+''');
+    visitSubexpression(findNode.index('c['), 'int');
+  }
+
+  test_indexExpression_substituted_check_rhs() async {
+    await analyze('''
+class _C<T, U> {
+  T operator[](U u) => throw 'foo';
+}
+_f(_C<int, String/*!*/> c, String/*?*/ s) => c[s];
+''');
+    visitSubexpression(findNode.index('c['), 'int',
+        nullChecked: {findNode.simple('s]')});
+  }
+
+  test_indexExpression_substituted_no_check_rhs() async {
+    await analyze('''
+class _C<T, U> {
+  T operator[](U u) => throw 'foo';
+}
+_f(_C<int, String/*?*/> c, String/*?*/ s) => c[s];
+''');
+    visitSubexpression(findNode.index('c['), 'int');
+  }
+
   test_integerLiteral() async {
     await analyze('''
 f() => 1;
