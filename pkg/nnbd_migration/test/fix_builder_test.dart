@@ -1244,6 +1244,75 @@ _f(_C<int> x) => ~x;
     visitSubexpression(findNode.prefix('~x'), 'List<int>');
   }
 
+  test_propertyAccess_dynamic() async {
+    await analyze('''
+Object/*!*/ _f(dynamic d) => (d).x;
+''');
+    visitSubexpression(findNode.propertyAccess('(d).x'), 'dynamic',
+        contextType: objectType);
+  }
+
+  test_propertyAccess_field_nonNullable() async {
+    await analyze('''
+class _C {
+  int/*!*/ x = 0;
+}
+_f(_C c) => (c).x;
+''');
+    visitSubexpression(findNode.propertyAccess('(c).x'), 'int');
+  }
+
+  test_propertyAccess_field_nullable() async {
+    await analyze('''
+class _C {
+  int/*?*/ x = 0;
+}
+_f(_C c) => (c).x;
+''');
+    visitSubexpression(findNode.propertyAccess('(c).x'), 'int?');
+  }
+
+  test_propertyAccess_getter_check_lhs() async {
+    await analyze('''
+abstract class _C {
+  int get x;
+}
+_f(_C/*?*/ c) => (c).x;
+''');
+    visitSubexpression(findNode.propertyAccess('(c).x'), 'int',
+        nullChecked: {findNode.parenthesized('(c).x')});
+  }
+
+  test_propertyAccess_getter_nonNullable() async {
+    await analyze('''
+abstract class _C {
+  int/*!*/ get x;
+}
+_f(_C c) => (c).x;
+''');
+    visitSubexpression(findNode.propertyAccess('(c).x'), 'int');
+  }
+
+  test_propertyAccess_getter_nullable() async {
+    await analyze('''
+abstract class _C {
+  int/*?*/ get x;
+}
+_f(_C c) => (c).x;
+''');
+    visitSubexpression(findNode.propertyAccess('(c).x'), 'int?');
+  }
+
+  test_propertyAccess_substituted() async {
+    await analyze('''
+abstract class _C<T> {
+  List<T> get x;
+}
+_f(_C<int> c) => (c).x;
+''');
+    visitSubexpression(findNode.propertyAccess('(c).x'), 'List<int>');
+  }
+
   test_simpleIdentifier_className() async {
     await analyze('''
 _f() => int;
