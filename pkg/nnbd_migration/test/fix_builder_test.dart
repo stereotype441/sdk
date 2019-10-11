@@ -698,6 +698,81 @@ _f(bool/*?*/ x) => ((x) != (null)) && x;
     visitSubexpression(findNode.binary('&&'), 'bool');
   }
 
+  test_postfixExpression_combined_nullable_noProblem() async {
+    await analyze('''
+abstract class _C {
+  _D/*?*/ operator+(int/*!*/ value);
+}
+abstract class _D extends _C {}
+abstract class _E {
+  _C/*!*/ get x;
+  void set x(_C/*?*/ value);
+  f() => x++;
+}
+''');
+    visitSubexpression(findNode.postfix('++'), '_C');
+  }
+
+  @FailingTest(issue: 'https://github.com/dart-lang/sdk/issues/38833')
+  test_postfixExpression_combined_nullable_noProblem_dynamic() async {
+    await analyze('''
+abstract class _E {
+  dynamic get x;
+  void set x(Object/*!*/ value);
+  f() => x++;
+}
+''');
+    var assignment = findNode.postfix('++');
+    visitSubexpression(assignment, 'dynamic');
+  }
+
+  test_postfixExpression_combined_nullable_problem() async {
+    await analyze('''
+abstract class _C {
+  _D/*?*/ operator+(int/*!*/ value);
+}
+abstract class _D extends _C {}
+abstract class _E {
+  _C/*!*/ get x;
+  void set x(_C/*!*/ value);
+  f() => x++;
+}
+''');
+    var postfix = findNode.postfix('++');
+    visitSubexpression(postfix, '_C', problems: {
+      postfix: {const CompoundAssignmentCombinedNullable()}
+    });
+  }
+
+  test_postfixExpression_lhs_nullable_problem() async {
+    await analyze('''
+abstract class _C {
+  _D/*!*/ operator+(int/*!*/ value);
+}
+abstract class _D extends _C {}
+abstract class _E {
+  _C/*?*/ get x;
+  void set x(_C/*?*/ value);
+  f() => x++;
+}
+''');
+    var postfix = findNode.postfix('++');
+    visitSubexpression(postfix, '_C?', problems: {
+      postfix: {const CompoundAssignmentReadNullable()}
+    });
+  }
+
+  test_postfixExpression_rhs_nonNullable() async {
+    await analyze('''
+abstract class _C {
+  _D/*!*/ operator+(int/*!*/ value);
+}
+abstract class _D extends _C {}
+_f(_C/*!*/ x) => x++;
+''');
+    visitSubexpression(findNode.postfix('++'), '_C');
+  }
+
   test_simpleIdentifier_className() async {
     await analyze('''
 _f() => int;
