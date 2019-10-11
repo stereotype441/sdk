@@ -236,6 +236,13 @@ _f(bool/*?*/ x, bool/*?*/ y) => x != null && (x = y) != null;
     visitSubexpression(findNode.binary('&&'), 'bool');
   }
 
+  test_assignmentTarget_indexExpression_compound_dynamic() async {
+    await analyze('''
+_f(dynamic d, int/*?*/ i) => d[i] += 0;
+''');
+    visitAssignmentTarget(findNode.index('d[i]'), 'dynamic', 'dynamic');
+  }
+
   test_assignmentTarget_indexExpression_compound_simple() async {
     await analyze('''
 class _C {
