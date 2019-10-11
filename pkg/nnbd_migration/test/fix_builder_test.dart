@@ -516,6 +516,16 @@ f() => true;
     visitSubexpression(findNode.booleanLiteral('true'), 'bool');
   }
 
+  test_conditionalExpression_promotes() async {
+    await analyze('''
+_f(int/*?*/ x) =>
+    <dynamic>[(x != null ? 1 : throw 'foo'), x + 1];
+''');
+    // No null check needs to be added to `x + 1`, because there is already an
+    // explicit null check.
+    visitSubexpression(findNode.listLiteral('['), 'List<dynamic>');
+  }
+
   test_doubleLiteral() async {
     await analyze('''
 f() => 1.0;
