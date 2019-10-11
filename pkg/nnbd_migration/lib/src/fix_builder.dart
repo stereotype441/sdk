@@ -191,16 +191,21 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
         writeType = _typeProvider.dynamicType;
         readType = _typeProvider.dynamicType;
       } else {
-        var writerType = _computeMigratedType(writeElement, targetType: targetType) as FunctionType;
+        var writerType =
+            _computeMigratedType(writeElement, targetType: targetType)
+                as FunctionType;
         writeType = writerType.parameters[1].type;
         var auxiliaryElements = node.auxiliaryElements;
         if (auxiliaryElements == null) {
           throw UnimplementedError('TODO(paulberry)');
         } else {
           var readElement = auxiliaryElements.staticElement;
-          var readerType = _computeMigratedType(readElement, targetType: targetType) as FunctionType;
+          var readerType =
+              _computeMigratedType(readElement, targetType: targetType)
+                  as FunctionType;
           readType = readerType.returnType;
-          indexContext = (isCompound ? readerType : writerType).parameters[0].type;
+          indexContext =
+              (isCompound ? readerType : writerType).parameters[0].type;
         }
       }
       visitSubexpression(node.index, indexContext);
