@@ -1002,6 +1002,75 @@ _f(_C/*!*/ x) => x++;
     visitSubexpression(findNode.postfix('++'), '_C');
   }
 
+  test_prefixedIdentifier_dynamic() async {
+    await analyze('''
+Object/*!*/ _f(dynamic d) => d.x;
+''');
+    visitSubexpression(findNode.prefixed('d.x'), 'dynamic',
+        contextType: objectType);
+  }
+
+  test_prefixedIdentifier_field_nonNullable() async {
+    await analyze('''
+class _C {
+  int/*!*/ x = 0;
+}
+_f(_C c) => c.x;
+''');
+    visitSubexpression(findNode.prefixed('c.x'), 'int');
+  }
+
+  test_prefixedIdentifier_field_nullable() async {
+    await analyze('''
+class _C {
+  int/*?*/ x = 0;
+}
+_f(_C c) => c.x;
+''');
+    visitSubexpression(findNode.prefixed('c.x'), 'int?');
+  }
+
+  test_prefixedIdentifier_getter_check_lhs() async {
+    await analyze('''
+abstract class _C {
+  int get x;
+}
+_f(_C/*?*/ c) => c.x;
+''');
+    visitSubexpression(findNode.prefixed('c.x'), 'int',
+        nullChecked: {findNode.simple('c.x')});
+  }
+
+  test_prefixedIdentifier_getter_nonNullable() async {
+    await analyze('''
+abstract class _C {
+  int/*!*/ get x;
+}
+_f(_C c) => c.x;
+''');
+    visitSubexpression(findNode.prefixed('c.x'), 'int');
+  }
+
+  test_prefixedIdentifier_getter_nullable() async {
+    await analyze('''
+abstract class _C {
+  int/*?*/ get x;
+}
+_f(_C c) => c.x;
+''');
+    visitSubexpression(findNode.prefixed('c.x'), 'int?');
+  }
+
+  test_prefixedIdentifier_substituted() async {
+    await analyze('''
+abstract class _C<T> {
+  List<T> get x;
+}
+_f(_C<int> c) => c.x;
+''');
+    visitSubexpression(findNode.prefixed('c.x'), 'List<int>');
+  }
+
   test_prefixExpression_bang_flow() async {
     await analyze('''
 _f(int/*?*/ x) {

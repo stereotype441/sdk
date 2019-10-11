@@ -433,6 +433,16 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   }
 
   @override
+  DartType visitPrefixedIdentifier(PrefixedIdentifier node) {
+    if (node.prefix.staticElement is ImportElement) {
+      // TODO(paulberry)
+      throw UnimplementedError('TODO(paulberry): PrefixedIdentifier with a prefix');
+    } else {
+      return _handlePropertyAccess(node, node.prefix, node.identifier);
+    }
+  }
+
+  @override
   DartType visitSimpleIdentifier(SimpleIdentifier node) {
     assert(!node.inSetterContext(),
         'Should use visitAssignmentTarget in setter contexts');
@@ -618,6 +628,16 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   /// types they ger migrated to.
   List<DartType> _visitTypeArgumentList(TypeArgumentList arguments) {
     return [for (var argument in arguments.arguments) argument.accept(this)];
+  }
+
+  DartType _handlePropertyAccess(Expression node, Expression target, SimpleIdentifier propertyName) {
+    var staticElement = propertyName.staticElement;
+    var targetType = visitSubexpression(target, _typeProvider.objectType);
+    if (staticElement == null) {
+      return _typeProvider.dynamicType;
+    } else {
+      return _computeMigratedType(staticElement, targetType: targetType);
+    }
   }
 }
 
