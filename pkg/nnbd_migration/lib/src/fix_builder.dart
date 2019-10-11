@@ -207,6 +207,18 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
       }
       visitSubexpression(node.index, indexContext);
       return AssignmentTargetInfo(readType, writeType);
+    } else if (node is PropertyAccess) {
+      return _handleAssignmentTargetForPropertyAccess(node, node.target,
+          node.propertyName, _isNullAwareToken(node.operator.type), isCompound);
+    } else if (node is PrefixedIdentifier) {
+      if (node.prefix.staticElement is ImportElement) {
+        // TODO(paulberry)
+        throw UnimplementedError(
+            'TODO(paulberry): PrefixedIdentifier with a prefix');
+      } else {
+        return _handleAssignmentTargetForPropertyAccess(
+            node, node.prefix, node.identifier, false, isCompound);
+      }
     } else {
       throw UnimplementedError('TODO(paulberry)');
     }
@@ -609,6 +621,34 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     } else {
       return type;
     }
+  }
+
+  AssignmentTargetInfo _handleAssignmentTargetForPropertyAccess(
+      Expression node,
+      Expression target,
+      SimpleIdentifier propertyName,
+      bool isNullAware,
+      bool isCompound) {
+    var targetType = visitSubexpression(target,
+        isNullAware ? _typeProvider.dynamicType : _typeProvider.objectType);
+    var writeElement = propertyName.staticElement;
+    DartType writeType;
+    DartType readType;
+    if (writeElement == null) {
+      writeType = _typeProvider.dynamicType;
+      readType = isCompound ? _typeProvider.dynamicType : null;
+    } else {
+      writeType = _computeMigratedType(writeElement, targetType: targetType);
+      if (isCompound) {
+        readType = _computeMigratedType(
+            propertyName.auxiliaryElements.staticElement,
+            targetType: targetType);
+      } else {
+        throw UnimplementedError('TODO(paulberry)');
+      }
+      return AssignmentTargetInfo(readType, writeType);
+    }
+    return AssignmentTargetInfo(readType, writeType);
   }
 
   DartType _handleIncrementOrDecrement(MethodElement combiner,

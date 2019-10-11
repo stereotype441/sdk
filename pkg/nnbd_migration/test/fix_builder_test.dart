@@ -388,6 +388,159 @@ _f(_C<int, String/*?*/> c, String/*?*/ s) => c[s] = 0;
     visitAssignmentTarget(findNode.index('c['), null, 'int');
   }
 
+  test_assignmentTarget_prefixedIdentifier_dynamic() async {
+    await analyze('''
+Object/*!*/ _f(dynamic d) => d.x += 1;
+''');
+    visitAssignmentTarget(findNode.prefixed('d.x'), 'dynamic', 'dynamic');
+  }
+
+  test_assignmentTarget_propertyAccess_dynamic() async {
+    await analyze('''
+_f(dynamic d) => (d).x += 1;
+''');
+    visitAssignmentTarget(
+        findNode.propertyAccess('(d).x'), 'dynamic', 'dynamic');
+  }
+
+  test_assignmentTarget_propertyAccess_field_nonNullable() async {
+    await analyze('''
+class _C {
+  int/*!*/ x = 0;
+}
+_f(_C c) => (c).x += 1;
+''');
+    visitAssignmentTarget(findNode.propertyAccess('(c).x'), 'int', 'int');
+  }
+
+  test_assignmentTarget_propertyAccess_field_nullable() async {
+    await analyze('''
+class _C {
+  int/*?*/ x = 0;
+}
+_f(_C c) => (c).x += 1;
+''');
+    visitAssignmentTarget(findNode.propertyAccess('(c).x'), 'int?', 'int?');
+  }
+
+  test_assignmentTarget_propertyAccess_getter_nullable() async {
+    await analyze('''
+abstract class _C {
+  int/*?*/ get x;
+  void set x(num/*?*/ value);
+}
+_f(_C c) => (c).x += 1;
+''');
+    visitAssignmentTarget(findNode.propertyAccess('(c).x'), 'int?', 'num?');
+  }
+
+  test_assignmentTarget_propertyAccess_getter_setter_check_lhs() async {
+    await analyze('''
+abstract class _C {
+  int get x;
+  void set x(num value);
+}
+_f(_C/*?*/ c) => (c).x += 1;
+''');
+    visitAssignmentTarget(findNode.propertyAccess('(c).x'), 'int', 'num',
+        nullChecked: {findNode.parenthesized('(c).x')});
+  }
+
+  test_assignmentTarget_propertyAccess_getter_setter_nonNullable() async {
+    await analyze('''
+abstract class _C {
+  int/*!*/ get x;
+  void set x(num/*!*/ value);
+}
+_f(_C c) => (c).x += 1;
+''');
+    visitAssignmentTarget(findNode.propertyAccess('(c).x'), 'int', 'num');
+  }
+
+  test_assignmentTarget_propertyAccess_nullAware_dynamic() async {
+    await analyze('''
+_f(dynamic d) => d?.x += 1;
+''');
+    visitAssignmentTarget(
+        findNode.propertyAccess('d?.x'), 'dynamic', 'dynamic');
+  }
+
+  test_assignmentTarget_propertyAccess_nullAware_field_nonNullable() async {
+    await analyze('''
+class _C {
+  int/*!*/ x = 0;
+}
+_f(_C/*?*/ c) => c?.x += 1;
+''');
+    visitAssignmentTarget(findNode.propertyAccess('c?.x'), 'int', 'int');
+  }
+
+  test_assignmentTarget_propertyAccess_nullAware_field_nullable() async {
+    await analyze('''
+class _C {
+  int/*?*/ x = 0;
+}
+_f(_C/*?*/ c) => c?.x += 1;
+''');
+    visitAssignmentTarget(findNode.propertyAccess('c?.x'), 'int?', 'int?');
+  }
+
+  test_assignmentTarget_propertyAccess_nullAware_getter_setter_nonNullable() async {
+    await analyze('''
+abstract class _C {
+  int/*!*/ get x;
+  void set x(num/*!*/ value);
+}
+_f(_C/*?*/ c) => c?.x += 1;
+''');
+    visitAssignmentTarget(findNode.propertyAccess('c?.x'), 'int', 'num');
+  }
+
+  test_assignmentTarget_propertyAccess_nullAware_getter_setter_nullable() async {
+    await analyze('''
+abstract class _C {
+  int/*?*/ get x;
+  void set x(num/*?*/ value);
+}
+_f(_C/*?*/ c) => c?.x += 1;
+''');
+    visitAssignmentTarget(findNode.propertyAccess('c?.x'), 'int?', 'num?');
+  }
+
+  test_assignmentTarget_propertyAccess_nullAware_substituted() async {
+    await analyze('''
+abstract class _C<T> {
+  _E<T> get x;
+  void set x(_D<T> value);
+}
+class _D<T> implements Iterable<T> {
+  noSuchMethod(invocation) => super.noSuchMethod(invocation);
+  _D<T> operator+(int i) => this;
+}
+class _E<T> extends _D<T> {}
+_f(_C<int>/*?*/ c) => c?.x += 1;
+''');
+    visitAssignmentTarget(
+        findNode.propertyAccess('c?.x'), '_E<int>', '_D<int>');
+  }
+
+  test_assignmentTarget_propertyAccess_substituted() async {
+    await analyze('''
+abstract class _C<T> {
+  _E<T> get x;
+  void set x(_D<T> value);
+}
+class _D<T> implements Iterable<T> {
+  noSuchMethod(invocation) => super.noSuchMethod(invocation);
+  _D<T> operator+(int i) => this;
+}
+class _E<T> extends _D<T> {}
+_f(_C<int> c) => (c).x += 1;
+''');
+    visitAssignmentTarget(
+        findNode.propertyAccess('(c).x'), '_E<int>', '_D<int>');
+  }
+
   test_assignmentTarget_simpleIdentifier_field_generic() async {
     await analyze('''
 abstract class _C<T> {
