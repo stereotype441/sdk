@@ -409,7 +409,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
       throw UnimplementedError(
           'TODO(paulberry): PrefixedIdentifier with a prefix');
     } else {
-      return _handlePropertyAccess(node, node.prefix, node.identifier);
+      return _handlePropertyAccess(node, node.prefix, node.identifier, false);
     }
   }
 
@@ -445,7 +445,8 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
 
   @override
   DartType visitPropertyAccess(PropertyAccess node) {
-    return _handlePropertyAccess(node, node.target, node.propertyName);
+    return _handlePropertyAccess(node, node.target, node.propertyName,
+        _isNullAwareToken(node.operator.type));
   }
 
   @override
@@ -630,14 +631,33 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     return combinedType;
   }
 
-  DartType _handlePropertyAccess(
-      Expression node, Expression target, SimpleIdentifier propertyName) {
+  DartType _handlePropertyAccess(Expression node, Expression target,
+      SimpleIdentifier propertyName, bool isNullAware) {
     var staticElement = propertyName.staticElement;
-    var targetType = visitSubexpression(target, _typeProvider.objectType);
+    var targetType = visitSubexpression(target,
+        isNullAware ? _typeProvider.dynamicType : _typeProvider.objectType);
     if (staticElement == null) {
       return _typeProvider.dynamicType;
     } else {
-      return _computeMigratedType(staticElement, targetType: targetType);
+      var type = _computeMigratedType(staticElement, targetType: targetType);
+      if (isNullAware) {
+        return _typeSystem.makeNullable(type as TypeImpl);
+      } else {
+        return type;
+      }
+    }
+  }
+
+  bool _isNullAwareToken(TokenType tokenType) {
+    switch (tokenType) {
+      case TokenType.PERIOD:
+      case TokenType.PERIOD_PERIOD:
+        return false;
+      case TokenType.QUESTION_PERIOD:
+        return true;
+      default:
+        throw new UnimplementedError(
+            'TODO(paulberry): _isNullAwareToken($tokenType)');
     }
   }
 
