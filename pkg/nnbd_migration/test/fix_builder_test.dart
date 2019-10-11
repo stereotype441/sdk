@@ -509,6 +509,19 @@ _f(_C<int, String/*?*/> c, String/*?*/ s) => c + s;
     visitSubexpression(findNode.binary('c +'), 'int');
   }
 
+  test_block() async {
+    await analyze('''
+_f(int/*?*/ x, int/*?*/ y) {
+  { // block
+    x + 1;
+    y + 1;
+  }
+}
+''');
+    visitStatement(findNode.statement('{ // block'),
+        nullChecked: {findNode.simple('x + 1'), findNode.simple('y + 1')});
+  }
+
   test_booleanLiteral() async {
     await analyze('''
 f() => true;
