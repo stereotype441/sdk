@@ -1020,26 +1020,22 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     if (operatorType == TokenType.BANG) {
       _flowAnalysis.logicalNot_end(node, node.operand);
       return _nonNullableBoolType;
-    } else if (operatorType == TokenType.PLUS_PLUS ||
-        operatorType == TokenType.MINUS_MINUS) {
-      var callee = node.staticElement;
-      if (callee is ClassMemberElement &&
-          (callee.enclosingElement as ClassElement).typeParameters.isNotEmpty) {
-        // TODO(paulberry)
-        _unimplemented(node,
-            'Operator ${operatorType.lexeme} defined on a class with type parameters');
-      }
-      if (callee == null) {
-        // TODO(paulberry)
-        _unimplemented(node, 'Unresolved operator ${operatorType.lexeme}');
-      }
-      var calleeType = getOrComputeElementType(callee);
-      // TODO(paulberry): substitute if necessary
-      return _fixNumericTypes(calleeType.returnType, node.staticType);
     } else {
       var callee = node.staticElement;
+      if (callee == null) {
+        // Dynamic dispatch.  The return type is `dynamic`.
+        // TODO(paulberry): would it be better to assume a return type of `Never`
+        // so that we don't unnecessarily propagate nullabilities everywhere?
+        return _dynamicType;
+      }
       var calleeType = getOrComputeElementType(callee, targetType: targetType);
-      return _handleInvocationArguments(node, [], null, null, calleeType, null);
+      if (operatorType == TokenType.PLUS_PLUS ||
+          operatorType == TokenType.MINUS_MINUS) {
+        return _fixNumericTypes(calleeType.returnType, node.staticType);
+      } else {
+        return _handleInvocationArguments(
+            node, [], null, null, calleeType, null);
+      }
     }
   }
 
