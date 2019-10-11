@@ -24,8 +24,8 @@ import 'package:kernel/ast.dart'
         StringLiteral,
         Typedef;
 
+import '../builder/builder.dart';
 import '../builder/class_builder.dart';
-import '../builder/declaration.dart';
 import '../builder/dynamic_type_builder.dart';
 import '../builder/invalid_type_declaration_builder.dart';
 import '../builder/library_builder.dart';
@@ -295,6 +295,9 @@ class DillLibraryBuilder extends LibraryBuilderImpl {
         libraryUri = node.enclosingLibrary.importUri;
         name = node.name.name;
       } else if (node is Typedef) {
+        libraryUri = node.enclosingLibrary.importUri;
+        name = node.name;
+      } else if (node is Extension) {
         libraryUri = node.enclosingLibrary.importUri;
         name = node.name;
       } else {

@@ -36,6 +36,12 @@ class Pointer<T extends NativeType> extends NativeType {
   /// return a pointer to the newly allocated memory.
   ///
   /// Note that the memory is uninitialized.
+  ///
+  /// On Windows, this memory may only be freed via [Pointer.free].
+  ///
+  /// This method is deprecated. Please resolve allocation methods via
+  /// [DynamicLibrary] instead, or use "package:ffi".
+  @deprecated
   external factory Pointer.allocate({int count: 1});
 
   /// Construction from raw integer.
@@ -69,7 +75,8 @@ class Pointer<T extends NativeType> extends NativeType {
   ///
   /// Note that `this.address` needs to be aligned to the size of `T`.
   ///
-  /// Deprecated, use `pointer[...] =` and `pointer.value =` instead.
+  /// Deprecated, use `pointer[...] =` and `pointer.value =` instead, or use
+  /// "package:ffi".
   @deprecated
   external void store(@DartRepresentationOf("T") Object value);
 
@@ -92,11 +99,6 @@ class Pointer<T extends NativeType> extends NativeType {
   /// Pointer arithmetic (takes element size into account).
   external Pointer<T> elementAt(int index);
 
-  /// Pointer arithmetic (byte offset).
-  // TODO(dacoharkes): remove this?
-  // https://github.com/dart-lang/sdk/issues/35883
-  external Pointer<T> offsetBy(int offsetInBytes);
-
   /// Cast Pointer<T> to a Pointer<V>.
   external Pointer<U> cast<U extends NativeType>();
 
@@ -108,6 +110,13 @@ class Pointer<T extends NativeType> extends NativeType {
   external R asFunction<@DartRepresentationOf("T") R extends Function>();
 
   /// Free memory on the C heap pointed to by this pointer with free().
+  ///
+  /// On Windows, this method may only be used with a pointer allocated via
+  /// [Pointer.allocate].
+  ///
+  /// This method is deprecated. Please resolve allocation methods via
+  /// [DynamicLibrary] instead.
+  @deprecated
   external void free();
 
   /// Creates an *external* typed data array backed by this pointer.

@@ -8,6 +8,7 @@ import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type_provider.dart';
 import 'package:analyzer/src/generated/resolver.dart';
+import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/generated/type_system.dart';
 import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
 import 'package:nnbd_migration/src/fix_builder.dart';
@@ -543,11 +544,36 @@ f() => 1.0;
     visitSubexpression(findNode.doubleLiteral('1.0'), 'double');
   }
 
+  test_expressionStatement() async {
+    await analyze('''
+_f(int/*!*/ x, int/*?*/ y) {
+  x = y;
+}
+''');
+    visitStatement(findNode.statement('x = y'),
+        nullChecked: {findNode.simple('y;')});
+  }
+
   test_integerLiteral() async {
     await analyze('''
 f() => 1;
 ''');
     visitSubexpression(findNode.integerLiteral('1'), 'int');
+  }
+
+  test_listLiteral_typed() async {
+    await analyze('''
+_f() => <int>[];
+''');
+    visitSubexpression(findNode.listLiteral('['), 'List<int>');
+  }
+
+  test_listLiteral_typed_visit_contents() async {
+    await analyze('''
+_f(int/*?*/ x) => <int/*!*/>[x];
+''');
+    visitSubexpression(findNode.listLiteral('['), 'List<int>',
+        nullChecked: {findNode.simple('x]')});
   }
 
   test_nullAssertion_promotes() async {
@@ -670,6 +696,73 @@ f() => #foo;
     visitSubexpression(findNode.symbolLiteral('#foo'), 'Symbol');
   }
 
+  test_typeName_dynamic() async {
+    await analyze('''
+void _f() {
+  dynamic d = null;
+}
+''');
+    visitTypeAnnotation(findNode.typeAnnotation('dynamic'), 'dynamic');
+  }
+
+  test_typeName_generic_nonNullable() async {
+    await analyze('''
+void _f() {
+  List<int> i = [0];
+}
+''');
+    visitTypeAnnotation(findNode.typeAnnotation('List<int>'), 'List<int>');
+  }
+
+  test_typeName_generic_nullable() async {
+    await analyze('''
+void _f() {
+  List<int> i = null;
+}
+''');
+    var listIntAnnotation = findNode.typeAnnotation('List<int>');
+    visitTypeAnnotation(listIntAnnotation, 'List<int>?',
+        nullable: {listIntAnnotation});
+  }
+
+  test_typeName_generic_nullable_arg() async {
+    await analyze('''
+void _f() {
+  List<int> i = [null];
+}
+''');
+    visitTypeAnnotation(findNode.typeAnnotation('List<int>'), 'List<int?>',
+        nullable: {findNode.typeAnnotation('int')});
+  }
+
+  test_typeName_simple_nonNullable() async {
+    await analyze('''
+void _f() {
+  int i = 0;
+}
+''');
+    visitTypeAnnotation(findNode.typeAnnotation('int'), 'int');
+  }
+
+  test_typeName_simple_nullable() async {
+    await analyze('''
+void _f() {
+  int i = null;
+}
+''');
+    var intAnnotation = findNode.typeAnnotation('int');
+    visitTypeAnnotation((intAnnotation), 'int?', nullable: {intAnnotation});
+  }
+
+  test_typeName_void() async {
+    await analyze('''
+void _f() {
+  void v;
+}
+''');
+    visitTypeAnnotation(findNode.typeAnnotation('void v'), 'void');
+  }
+
   test_use_of_dynamic() async {
     // Use of `dynamic` in a context requiring non-null is not explicitly null
     // checked.
@@ -677,6 +770,62 @@ f() => #foo;
 bool _f(dynamic d, bool b) => d && b;
 ''');
     visitSubexpression(findNode.binary('&&'), 'bool');
+  }
+
+  test_variableDeclaration_typed_initialized_nonNullable() async {
+    await analyze('''
+void _f() {
+  int x = 0;
+}
+''');
+    visitStatement(findNode.statement('int x'));
+  }
+
+  test_variableDeclaration_typed_initialized_nullable() async {
+    await analyze('''
+void _f() {
+  int x = null;
+}
+''');
+    visitStatement(findNode.statement('int x'),
+        nullable: {findNode.typeAnnotation('int')});
+  }
+
+  test_variableDeclaration_typed_uninitialized() async {
+    await analyze('''
+void _f() {
+  int x;
+}
+''');
+    visitStatement(findNode.statement('int x'));
+  }
+
+  test_variableDeclaration_untyped_initialized() async {
+    await analyze('''
+void _f() {
+  var x = 0;
+}
+''');
+    visitStatement(findNode.statement('var x'));
+  }
+
+  test_variableDeclaration_untyped_uninitialized() async {
+    await analyze('''
+void _f() {
+  var x;
+}
+''');
+    visitStatement(findNode.statement('var x'));
+  }
+
+  test_variableDeclaration_visit_initializer() async {
+    await analyze('''
+void _f(bool/*?*/ x, bool/*?*/ y) {
+  bool z = x && y;
+}
+''');
+    visitStatement(findNode.statement('bool z'),
+        nullChecked: {findNode.simple('x &&'), findNode.simple('y;')});
   }
 
   void visitAssignmentTarget(
@@ -693,21 +842,47 @@ bool _f(dynamic d, bool b) => d && b;
     expect(fixBuilder.problems, problems);
   }
 
+  void visitStatement(Statement node,
+      {Set<Expression> nullChecked = const <Expression>{},
+      Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{},
+      Set<TypeAnnotation> nullable = const <TypeAnnotation>{}}) {
+    _FixBuilder fixBuilder = _createFixBuilder(node);
+    var type = node.accept(fixBuilder);
+    expect(type, null);
+    expect(fixBuilder.nullCheckedExpressions, nullChecked);
+    expect(fixBuilder.problems, problems);
+    expect(fixBuilder.nullable, nullable);
+  }
+
   void visitSubexpression(Expression node, String expectedType,
       {DartType contextType,
       Set<Expression> nullChecked = const <Expression>{},
-      Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
+      Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{},
+      Set<TypeAnnotation> nullable = const <TypeAnnotation>{}}) {
     contextType ??= dynamicType;
     _FixBuilder fixBuilder = _createFixBuilder(node);
     var type = fixBuilder.visitSubexpression(node, contextType);
     expect((type as TypeImpl).toString(withNullability: true), expectedType);
     expect(fixBuilder.nullCheckedExpressions, nullChecked);
     expect(fixBuilder.problems, problems);
+    expect(fixBuilder.nullable, nullable);
   }
 
-  _FixBuilder _createFixBuilder(Expression node) {
-    var fixBuilder = _FixBuilder(
-        decoratedClassHierarchy, typeProvider, typeSystem, variables);
+  void visitTypeAnnotation(TypeAnnotation node, String expectedType,
+      {Set<Expression> nullChecked = const <Expression>{},
+      Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{},
+      Set<TypeAnnotation> nullable = const <TypeAnnotation>{}}) {
+    _FixBuilder fixBuilder = _createFixBuilder(node);
+    var type = node.accept(fixBuilder);
+    expect((type as TypeImpl).toString(withNullability: true), expectedType);
+    expect(fixBuilder.nullCheckedExpressions, nullChecked);
+    expect(fixBuilder.problems, problems);
+    expect(fixBuilder.nullable, nullable);
+  }
+
+  _FixBuilder _createFixBuilder(AstNode node) {
+    var fixBuilder = _FixBuilder(testSource, decoratedClassHierarchy,
+        typeProvider, typeSystem, variables);
     var body = node.thisOrAncestorOfType<FunctionBody>();
     var declaration = body.thisOrAncestorOfType<Declaration>();
     fixBuilder.createFlowAnalysis(declaration, null);
@@ -718,11 +893,20 @@ bool _f(dynamic d, bool b) => d && b;
 class _FixBuilder extends FixBuilder {
   final Set<Expression> nullCheckedExpressions = {};
 
+  final Set<TypeAnnotation> nullable = {};
+
   final Map<AstNode, Set<Problem>> problems = {};
 
-  _FixBuilder(DecoratedClassHierarchy decoratedClassHierarchy,
+  _FixBuilder(Source source, DecoratedClassHierarchy decoratedClassHierarchy,
       TypeProvider typeProvider, TypeSystem typeSystem, Variables variables)
-      : super(decoratedClassHierarchy, typeProvider, typeSystem, variables);
+      : super(source, decoratedClassHierarchy, typeProvider, typeSystem,
+            variables);
+
+  @override
+  void addNullable(TypeAnnotation node) {
+    var newlyAdded = nullable.add(node);
+    expect(newlyAdded, true);
+  }
 
   @override
   void addNullCheck(Expression subexpression) {

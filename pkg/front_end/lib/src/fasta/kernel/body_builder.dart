@@ -9,14 +9,14 @@ import 'dart:core' hide MapEntry;
 import 'package:kernel/ast.dart';
 import 'package:kernel/type_environment.dart';
 
+import '../builder/builder.dart';
 import '../builder/class_builder.dart';
-import '../builder/declaration.dart';
 import '../builder/declaration_builder.dart';
 import '../builder/enum_builder.dart';
 import '../builder/extension_builder.dart';
 import '../builder/field_builder.dart';
 import '../builder/formal_parameter_builder.dart';
-import '../builder/procedure_builder.dart';
+import '../builder/function_builder.dart';
 import '../builder/function_type_builder.dart';
 import '../builder/invalid_type_declaration_builder.dart';
 import '../builder/library_builder.dart';
@@ -3548,12 +3548,8 @@ class BodyBuilder extends ScopeListener<JumpTarget>
         return node;
       } else {
         assert(constness == Constness.implicit);
-        StaticInvocation node =
-            new StaticInvocation(target, arguments, isConst: false)
-              ..fileOffset = charOffset;
-        libraryBuilder.checkBoundsInStaticInvocation(
-            node, typeEnvironment, uri);
-        return node;
+        return new StaticInvocation(target, arguments, isConst: false)
+          ..fileOffset = charOffset;
       }
     }
   }
