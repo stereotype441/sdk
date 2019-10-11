@@ -566,9 +566,8 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
 
   /// Visits all the type arguments in a [TypeArgumentList] and returns the
   /// types they ger migrated to.
-  List<DartType> _visitTypeArgumentList(TypeArgumentList arguments) {
-    return [for (var argument in arguments.arguments) argument.accept(this)];
-  }
+  List<DartType> _visitTypeArgumentList(TypeArgumentList arguments) =>
+      [for (var argument in arguments.arguments) argument.accept(this)];
 }
 
 /// Common supertype for problems reported by [FixBuilder.addProblem].
