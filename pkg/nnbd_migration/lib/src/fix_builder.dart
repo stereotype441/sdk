@@ -164,35 +164,6 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     }
   }
 
-  @override
-  DartType visitPostfixExpression(PostfixExpression node) {
-    if (node.operator.type == TokenType.BANG) {
-      throw UnimplementedError(
-          'TODO(paulberry): re-migration of already migrated code not '
-              'supported yet');
-    } else {
-      var targetInfo = visitAssignmentTarget(node.operand);
-      var combiner = node.staticElement;
-      DartType combinedType;
-      if (combiner == null) {
-        combinedType = _typeProvider.dynamicType;
-      } else {
-        if (_typeSystem.isNullable(targetInfo.readType)) {
-          addProblem(node, const CompoundAssignmentReadNullable());
-        }
-        var combinerType = _computeMigratedType(combiner) as FunctionType;
-        combinedType =
-            _fixNumericTypes(combinerType.returnType, node.staticType);
-      }
-      if (_doesAssignmentNeedCheck(
-          from: combinedType, to: targetInfo.writeType)) {
-        addProblem(node, const CompoundAssignmentCombinedNullable());
-        combinedType = _typeSystem.promoteToNonNull(combinedType as TypeImpl);
-      }
-      return targetInfo.readType;
-    }
-  }
-
   /// Recursively visits an assignment target, returning information about the
   /// target's read and write types.
   AssignmentTargetInfo visitAssignmentTarget(Expression node) {
@@ -361,6 +332,35 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
     var result = node.expression.accept(this);
     _flowAnalysis.parenthesizedExpression(node, node.expression);
     return result;
+  }
+
+  @override
+  DartType visitPostfixExpression(PostfixExpression node) {
+    if (node.operator.type == TokenType.BANG) {
+      throw UnimplementedError(
+          'TODO(paulberry): re-migration of already migrated code not '
+          'supported yet');
+    } else {
+      var targetInfo = visitAssignmentTarget(node.operand);
+      var combiner = node.staticElement;
+      DartType combinedType;
+      if (combiner == null) {
+        combinedType = _typeProvider.dynamicType;
+      } else {
+        if (_typeSystem.isNullable(targetInfo.readType)) {
+          addProblem(node, const CompoundAssignmentReadNullable());
+        }
+        var combinerType = _computeMigratedType(combiner) as FunctionType;
+        combinedType =
+            _fixNumericTypes(combinerType.returnType, node.staticType);
+      }
+      if (_doesAssignmentNeedCheck(
+          from: combinedType, to: targetInfo.writeType)) {
+        addProblem(node, const CompoundAssignmentCombinedNullable());
+        combinedType = _typeSystem.promoteToNonNull(combinedType as TypeImpl);
+      }
+      return targetInfo.readType;
+    }
   }
 
   @override
