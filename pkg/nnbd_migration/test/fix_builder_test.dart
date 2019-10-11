@@ -716,6 +716,78 @@ _f(_C<int, String/*?*/> c, String/*?*/ s) => c[s];
     visitSubexpression(findNode.index('c['), 'int');
   }
 
+  test_assignmentTarget_indexExpression_dynamic() async {
+    await analyze('''
+_f(dynamic d, int/*?*/ i) => d[i] += 0;
+''');
+    visitAssignmentTarget(findNode.index('d[i]'), 'dynamic', 'dynamic');
+  }
+
+  test_assignmentTarget_indexExpression_simple() async {
+    await analyze('''
+class _C {
+  int operator[](String s) => 1;
+  void operator[]=(String s, num n) {}
+}
+_f(_C c) => c['foo'] += 0;
+''');
+    visitAssignmentTarget(findNode.index('c['), 'int', 'num');
+  }
+
+  solo_test_assignmentTarget_indexExpression_simple_check_lhs() async {
+    await analyze('''
+class _C {
+  int operator[](String s) => 1;
+  void operator[]=(String s, num n) {}
+}
+_f(_C/*?*/ c) => c['foo'] += 0;
+''');
+    visitAssignmentTarget(findNode.index('c['), 'int', 'num',
+        nullChecked: {findNode.simple('c[')});
+  }
+
+  TODO_test_indexExpression_simple_check_rhs() async {
+    await analyze('''
+class _C {
+  int operator[](String/*!*/ s) => 1;
+}
+_f(_C c, String/*?*/ s) => c[s];
+''');
+    visitSubexpression(findNode.index('c['), 'int',
+        nullChecked: {findNode.simple('s]')});
+  }
+
+  TODO_test_indexExpression_substituted() async {
+    await analyze('''
+class _C<T, U> {
+  T operator[](U u) => throw 'foo';
+}
+_f(_C<int, String> c) => c['foo'];
+''');
+    visitSubexpression(findNode.index('c['), 'int');
+  }
+
+  TODO_test_indexExpression_substituted_check_rhs() async {
+    await analyze('''
+class _C<T, U> {
+  T operator[](U u) => throw 'foo';
+}
+_f(_C<int, String/*!*/> c, String/*?*/ s) => c[s];
+''');
+    visitSubexpression(findNode.index('c['), 'int',
+        nullChecked: {findNode.simple('s]')});
+  }
+
+  TODO_test_indexExpression_substituted_no_check_rhs() async {
+    await analyze('''
+class _C<T, U> {
+  T operator[](U u) => throw 'foo';
+}
+_f(_C<int, String/*?*/> c, String/*?*/ s) => c[s];
+''');
+    visitSubexpression(findNode.index('c['), 'int');
+  }
+
   test_integerLiteral() async {
     await analyze('''
 f() => 1;

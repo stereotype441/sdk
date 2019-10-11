@@ -180,28 +180,50 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
           : _computeMigratedType(auxiliaryElements.staticElement);
       return AssignmentTargetInfo(isCompound ? readType : null, writeType);
     } else if (node is IndexExpression) {
-      var target = node.target;
+      var targetType =
+          visitSubexpression(node.target, _typeProvider.objectType);
       var writeElement = node.staticElement;
-      var writeType = node.staticElement == null ? null : _computeMigratedType(writeElement, targetType: targetType);
-      var auxiliaryElements = node.auxiliaryElements;
-      var readElement = auxiliaryElements == null ? write
-      var staticElement = node.staticElement;
-      var index = node.index;
-      var targetType = visitSubexpression(target, _typeProvider.objectType);
-      DartType contextType;
-      DartType returnType;
-      if (staticElement == null) {
-        contextType = _typeProvider.dynamicType;
-        returnType = _typeProvider.dynamicType;
+      DartType indexContext;
+      DartType writeType;
+      DartType readType;
+      if (writeElement == null) {
+        indexContext = UnknownInferredType.instance;
+        writeType = _typeProvider.dynamicType;
+        readType = _typeProvider.dynamicType;
       } else {
-        var methodType =
-        _computeMigratedType(staticElement, targetType: targetType)
-        as FunctionType;
-        contextType = methodType.parameters[0].type;
-        returnType = methodType.returnType;
+        var writerType = _computeMigratedType(writeElement, targetType: targetType) as FunctionType;
+        writeType = writerType.parameters[1].type;
+        var auxiliaryElements = node.auxiliaryElements;
+        if (auxiliaryElements == null) {
+          throw UnimplementedError('TODO(paulberry)');
+        } else {
+          var readElement = auxiliaryElements.staticElement;
+          var readerType = _computeMigratedType(readElement, targetType: targetType) as FunctionType;
+          readType = readerType.returnType;
+          indexContext = (isCompound ? readerType : writerType).parameters[0].type;
+        }
       }
-      visitSubexpression(index, contextType);
-      return returnType;
+      visitSubexpression(node.index, indexContext);
+      return AssignmentTargetInfo(isCompound ? readType : null, writeType);
+//      var writeType = node.staticElement == null ? null : _computeMigratedType(writeElement, targetType: targetType);
+//
+//      var auxiliaryElements = node.auxiliaryElements;
+//      var readElement = auxiliaryElements == null ? write
+//      var staticElement = node.staticElement;
+//      var index = node.index;
+//      DartType contextType;
+//      DartType returnType;
+//      if (staticElement == null) {
+//        contextType = _typeProvider.dynamicType;
+//        returnType = _typeProvider.dynamicType;
+//      } else {
+//        var methodType =
+//        _computeMigratedType(staticElement, targetType: targetType)
+//        as FunctionType;
+//        contextType = methodType.parameters[0].type;
+//        returnType = methodType.returnType;
+//      }
+//      return returnType;
     } else {
       throw UnimplementedError('TODO(paulberry)');
     }
