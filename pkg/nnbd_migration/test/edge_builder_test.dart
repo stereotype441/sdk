@@ -4221,7 +4221,7 @@ int f(int i) {
     assertNullCheck(use, assertEdge(declaration, never, hard: true));
 
     var returnType = decoratedTypeAnnotation('int f').node;
-    assertEdge(never, returnType, hard: false);
+    assertEdge(declaration, returnType, hard: false);
   }
 
   test_postfixExpression_plusPlus() async {
@@ -4236,7 +4236,37 @@ int f(int i) {
     assertNullCheck(use, assertEdge(declaration, never, hard: true));
 
     var returnType = decoratedTypeAnnotation('int f').node;
-    assertEdge(never, returnType, hard: false);
+    assertEdge(declaration, returnType, hard: false);
+  }
+
+  test_postfixExpression_plusPlus_dynamic() async {
+    await analyze('''
+Object f(dynamic d) {
+  return d++;
+}
+''');
+    assertEdge(decoratedTypeAnnotation('dynamic d').node,
+        decoratedTypeAnnotation('Object f').node,
+        hard: false);
+  }
+
+  test_postfixExpression_plusPlus_substituted() async {
+    await analyze('''
+abstract class C<T> {
+  C<T> operator+(int x);
+}
+C<int> f(C<int> c) {
+  return c++;
+}
+''');
+
+    var cType = decoratedTypeAnnotation('C<int> c');
+    var returnType = decoratedTypeAnnotation('C<int> f');
+    assertNullCheck(
+        checkExpression('c++'), assertEdge(cType.node, never, hard: true));
+    assertEdge(cType.node, returnType.node, hard: false);
+    assertEdge(cType.typeArguments[0].node, returnType.typeArguments[0].node,
+        hard: false);
   }
 
   test_prefixedIdentifier_field_type() async {

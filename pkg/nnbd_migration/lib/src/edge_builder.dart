@@ -983,21 +983,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     var operatorType = node.operator.type;
     if (operatorType == TokenType.PLUS_PLUS ||
         operatorType == TokenType.MINUS_MINUS) {
-      _checkExpressionNotNull(node.operand);
-      var callee = node.staticElement;
-      if (callee is ClassMemberElement &&
-          (callee.enclosingElement as ClassElement).typeParameters.isNotEmpty) {
-        // TODO(paulberry)
-        _unimplemented(node,
-            'Operator ${operatorType.lexeme} defined on a class with type parameters');
-      }
-      if (callee == null) {
-        // TODO(paulberry)
-        _unimplemented(node, 'Unresolved operator ${operatorType.lexeme}');
-      }
-      var calleeType = getOrComputeElementType(callee);
-      // TODO(paulberry): substitute if necessary
-      return _fixNumericTypes(calleeType.returnType, node.staticType);
+      return _checkExpressionNotNull(node.operand);
     }
     _unimplemented(
         node, 'Postfix expression with operator ${node.operator.lexeme}');
