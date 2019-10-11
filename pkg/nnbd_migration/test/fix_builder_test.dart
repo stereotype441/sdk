@@ -509,6 +509,19 @@ _f(_C<int, String/*?*/> c, String/*?*/ s) => c + s;
     visitSubexpression(findNode.binary('c +'), 'int');
   }
 
+  test_block() async {
+    await analyze('''
+_f(int/*?*/ x, int/*?*/ y) {
+  { // block
+    x + 1;
+    y + 1;
+  }
+}
+''');
+    visitStatement(findNode.statement('{ // block'),
+        nullChecked: {findNode.simple('x + 1'), findNode.simple('y + 1')});
+  }
+
   test_booleanLiteral() async {
     await analyze('''
 f() => true;
@@ -580,6 +593,45 @@ _f(int/*!*/ x, int/*?*/ y) {
 ''');
     visitStatement(findNode.statement('x = y'),
         nullChecked: {findNode.simple('y;')});
+  }
+
+  test_ifStatement_flow_promote_in_else() async {
+    await analyze('''
+_f(int/*?*/ x) {
+  if (x == null) {
+    x + 1;
+  } else {
+    x + 2;
+  }
+}
+''');
+    visitStatement(findNode.statement('if'),
+        nullChecked: {findNode.simple('x + 1')});
+  }
+
+  test_ifStatement_flow_promote_in_then() async {
+    await analyze('''
+_f(int/*?*/ x) {
+  if (x != null) {
+    x + 1;
+  } else {
+    x + 2;
+  }
+}
+''');
+    visitStatement(findNode.statement('if'),
+        nullChecked: {findNode.simple('x + 2')});
+  }
+
+  test_ifStatement_flow_promote_in_then_no_else() async {
+    await analyze('''
+_f(int/*?*/ x) {
+  if (x != null) {
+    x + 1;
+  }
+}
+''');
+    visitStatement(findNode.statement('if'));
   }
 
   test_integerLiteral() async {
@@ -722,6 +774,31 @@ f() => 'foo';
 f() => #foo;
 ''');
     visitSubexpression(findNode.symbolLiteral('#foo'), 'Symbol');
+  }
+
+  test_throw_flow() async {
+    await analyze('''
+_f(int/*?*/ i) {
+  if (i == null) throw 'foo';
+  i + 1;
+}
+''');
+    visitStatement(findNode.block('{'));
+  }
+
+  test_throw_nullable() async {
+    await analyze('''
+_f(int/*?*/ i) => throw i;
+''');
+    visitSubexpression(findNode.throw_('throw'), 'Never',
+        nullChecked: {findNode.simple('i;')});
+  }
+
+  test_throw_simple() async {
+    await analyze('''
+_f() => throw 'foo';
+''');
+    visitSubexpression(findNode.throw_('throw'), 'Never');
   }
 
   test_typeName_dynamic() async {
