@@ -520,6 +520,19 @@ _f(_C<int, String/*?*/> c, String/*?*/ s) => c + s;
     visitSubexpression(findNode.binary('c +'), 'int');
   }
 
+  test_block() async {
+    await analyze('''
+_f(int/*?*/ x, int/*?*/ y) {
+  { // block
+    x + 1;
+    y + 1;
+  }
+}
+''');
+    visitStatement(findNode.statement('{ // block'),
+        nullChecked: {findNode.simple('x + 1'), findNode.simple('y + 1')});
+  }
+
   test_booleanLiteral() async {
     await analyze('''
 f() => true;
@@ -527,7 +540,46 @@ f() => true;
     visitSubexpression(findNode.booleanLiteral('true'), 'bool');
   }
 
-  test_conditionalExpression_promotes() async {
+  test_conditionalExpression_flow_as_condition() async {
+    await analyze('''
+_f(bool x, int/*?*/ y) => (x ? y != null : y != null) ? y + 1 : 0;
+''');
+    // No explicit check needs to be added to `y + 1`, because both arms of the
+    // conditional can only be true if `y != null`.
+    visitSubexpression(findNode.conditionalExpression('y + 1'), 'int');
+  }
+
+  test_conditionalExpression_flow_condition() async {
+    await analyze('''
+_f(bool/*?*/ x) => x ? (x && true) : (x && true);
+''');
+    // No explicit check needs to be added to either `x && true`, because there
+    // is already an explicit null check inserted for the condition.
+    visitSubexpression(findNode.conditionalExpression('x ?'), 'bool',
+        nullChecked: {findNode.simple('x ?')});
+  }
+
+  test_conditionalExpression_flow_then_else() async {
+    await analyze('''
+_f(bool x, bool/*?*/ y) => (x ? (y && true) : (y && true)) && y;
+''');
+    // No explicit check needs to be added to the final reference to `y`,
+    // because null checks are added to the "then" and "else" branches promoting
+    // y.
+    visitSubexpression(findNode.binary('&& y'), 'bool', nullChecked: {
+      findNode.simple('y && true) '),
+      findNode.simple('y && true))')
+    });
+  }
+
+  test_conditionalExpression_lub() async {
+    await analyze('''
+_f(bool b) => b ? 1 : 1.0;
+''');
+    visitSubexpression(findNode.conditionalExpression('1.0'), 'num');
+  }
+
+  test_conditionalExpression_throw_promotes() async {
     await analyze('''
 _f(int/*?*/ x) =>
     <dynamic>[(x != null ? 1 : throw 'foo'), x + 1];
@@ -552,6 +604,45 @@ _f(int/*!*/ x, int/*?*/ y) {
 ''');
     visitStatement(findNode.statement('x = y'),
         nullChecked: {findNode.simple('y;')});
+  }
+
+  test_ifStatement_flow_promote_in_else() async {
+    await analyze('''
+_f(int/*?*/ x) {
+  if (x == null) {
+    x + 1;
+  } else {
+    x + 2;
+  }
+}
+''');
+    visitStatement(findNode.statement('if'),
+        nullChecked: {findNode.simple('x + 1')});
+  }
+
+  test_ifStatement_flow_promote_in_then() async {
+    await analyze('''
+_f(int/*?*/ x) {
+  if (x != null) {
+    x + 1;
+  } else {
+    x + 2;
+  }
+}
+''');
+    visitStatement(findNode.statement('if'),
+        nullChecked: {findNode.simple('x + 2')});
+  }
+
+  test_ifStatement_flow_promote_in_then_no_else() async {
+    await analyze('''
+_f(int/*?*/ x) {
+  if (x != null) {
+    x + 1;
+  }
+}
+''');
+    visitStatement(findNode.statement('if'));
   }
 
   test_integerLiteral() async {
@@ -694,6 +785,31 @@ f() => 'foo';
 f() => #foo;
 ''');
     visitSubexpression(findNode.symbolLiteral('#foo'), 'Symbol');
+  }
+
+  test_throw_flow() async {
+    await analyze('''
+_f(int/*?*/ i) {
+  if (i == null) throw 'foo';
+  i + 1;
+}
+''');
+    visitStatement(findNode.block('{'));
+  }
+
+  test_throw_nullable() async {
+    await analyze('''
+_f(int/*?*/ i) => throw i;
+''');
+    visitSubexpression(findNode.throw_('throw'), 'Never',
+        nullChecked: {findNode.simple('i;')});
+  }
+
+  test_throw_simple() async {
+    await analyze('''
+_f() => throw 'foo';
+''');
+    visitSubexpression(findNode.throw_('throw'), 'Never');
   }
 
   test_typeName_dynamic() async {
