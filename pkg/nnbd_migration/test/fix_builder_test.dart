@@ -533,6 +533,45 @@ _f(int/*!*/ x, int/*?*/ y) {
         nullChecked: {findNode.simple('y;')});
   }
 
+  test_ifStatement_flow_promote_in_else() async {
+    await analyze('''
+_f(int/*?*/ x) {
+  if (x == null) {
+    x + 1;
+  } else {
+    x + 2;
+  }
+}
+''');
+    visitStatement(findNode.statement('if'),
+        nullChecked: {findNode.simple('x + 1')});
+  }
+
+  test_ifStatement_flow_promote_in_then() async {
+    await analyze('''
+_f(int/*?*/ x) {
+  if (x != null) {
+    x + 1;
+  } else {
+    x + 2;
+  }
+}
+''');
+    visitStatement(findNode.statement('if'),
+        nullChecked: {findNode.simple('x + 2')});
+  }
+
+  test_ifStatement_flow_promote_in_then_no_else() async {
+    await analyze('''
+_f(int/*?*/ x) {
+  if (x != null) {
+    x + 1;
+  }
+}
+''');
+    visitStatement(findNode.statement('if'));
+  }
+
   test_integerLiteral() async {
     await analyze('''
 f() => 1;

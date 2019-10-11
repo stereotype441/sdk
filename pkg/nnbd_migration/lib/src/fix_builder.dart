@@ -239,6 +239,20 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   }
 
   @override
+  DartType visitIfStatement(IfStatement node) {
+    visitSubexpression(node.condition, _typeProvider.boolType);
+    _flowAnalysis.ifStatement_thenBegin(node.condition);
+    node.thenStatement.accept(this);
+    bool hasElse = node.elseStatement != null;
+    if (hasElse) {
+      _flowAnalysis.ifStatement_elseBegin();
+      node.elseStatement.accept(this);
+    }
+    _flowAnalysis.ifStatement_end(hasElse);
+    return null;
+  }
+
+  @override
   DartType visitListLiteral(ListLiteral node) {
     DartType contextType;
     var typeArguments = node.typeArguments;
