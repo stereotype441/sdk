@@ -1203,7 +1203,8 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
       {Set<Expression> nullChecked = const <Expression>{},
       Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
     _FixBuilder fixBuilder = _createFixBuilder(node);
-    var targetInfo = fixBuilder.visitAssignmentTarget(node, expectedReadType != null);
+    var targetInfo =
+        fixBuilder.visitAssignmentTarget(node, expectedReadType != null);
     if (expectedReadType == null) {
       expect(targetInfo.readType, null);
     } else {
