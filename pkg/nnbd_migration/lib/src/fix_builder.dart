@@ -643,8 +643,6 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
         readType = _computeMigratedType(
             propertyName.auxiliaryElements.staticElement,
             targetType: targetType);
-      } else {
-        throw UnimplementedError('TODO(paulberry)');
       }
       return AssignmentTargetInfo(readType, writeType);
     }

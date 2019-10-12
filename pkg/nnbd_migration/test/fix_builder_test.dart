@@ -403,6 +403,13 @@ _f(dynamic d) => (d).x += 1;
         findNode.propertyAccess('(d).x'), 'dynamic', 'dynamic');
   }
 
+  test_assignmentTarget_propertyAccess_dynamic_notCompound() async {
+    await analyze('''
+_f(dynamic d) => (d).x = 1;
+''');
+    visitAssignmentTarget(findNode.propertyAccess('(d).x'), null, 'dynamic');
+  }
+
   test_assignmentTarget_propertyAccess_field_nonNullable() async {
     await analyze('''
 class _C {
@@ -411,6 +418,16 @@ class _C {
 _f(_C c) => (c).x += 1;
 ''');
     visitAssignmentTarget(findNode.propertyAccess('(c).x'), 'int', 'int');
+  }
+
+  test_assignmentTarget_propertyAccess_field_nonNullable_notCompound() async {
+    await analyze('''
+class _C {
+  int/*!*/ x = 0;
+}
+_f(_C c) => (c).x = 1;
+''');
+    visitAssignmentTarget(findNode.propertyAccess('(c).x'), null, 'int');
   }
 
   test_assignmentTarget_propertyAccess_field_nullable() async {
