@@ -1116,7 +1116,8 @@ abstract class TypeInferrerImpl extends TypeInferrer {
     throw unhandled('$target', 'getGetterType', null, null);
   }
 
-  /// Returns the getter type of [member] on a receiver of type [receiverType].
+  /// Returns the getter type of [interfaceMember] on a receiver of type
+  /// [receiverType].
   ///
   /// For instance
   ///
@@ -1906,6 +1907,8 @@ abstract class TypeInferrerImpl extends TypeInferrer {
           actualTypes,
           typeContext,
           inferredTypes);
+      assert(inferredTypes.every((type) => isKnown(type)),
+          "Unknown type(s) in inferred types: $inferredTypes.");
       substitution =
           Substitution.fromPairs(calleeTypeParameters, inferredTypes);
       instrumentation?.record(uriForInstrumentation, offset, 'typeArgs',

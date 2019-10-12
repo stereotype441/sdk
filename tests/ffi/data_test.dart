@@ -3,6 +3,8 @@
 // BSD-style license that can be found in the LICENSE file.
 //
 // Dart test program for testing dart:ffi primitive data pointers.
+//
+// SharedObjects=ffi_test_functions
 
 library FfiTest;
 
@@ -55,6 +57,7 @@ void main() {
   testSizeOfNativeType();
   testDynamicInvocation();
   testMemoryAddressTruncation();
+  testNullptrCast();
 }
 
 void testPointerBasic() {
@@ -328,7 +331,7 @@ void testPointerPointer() {
 
 void testPointerPointerNull() {
   Pointer<Pointer<Int8>> pointerToPointer = allocate();
-  Pointer<Int8> value = nullptr.cast();
+  Pointer<Int8> value = nullptr;
   pointerToPointer.value = value;
   value = pointerToPointer.value;
   Expect.equals(value, nullptr);
@@ -337,7 +340,7 @@ void testPointerPointerNull() {
   value = pointerToPointer.value;
   Expect.isNotNull(value);
   free(value);
-  value = nullptr.cast();
+  value = nullptr;
   pointerToPointer.value = value;
   value = pointerToPointer.value;
   Expect.equals(value, nullptr);
@@ -508,6 +511,16 @@ void testDynamicInvocation() {
   final int addr = p.address;
   final Pointer<Int16> p2 = p.cast<Int16>();
   free(p);
+}
+
+final nullableInt64ElementAt1 = ffiTestFunctions.lookupFunction<
+    Pointer<Int64> Function(Pointer<Int64>),
+    Pointer<Int64> Function(Pointer<Int64>)>("NullableInt64ElemAt1");
+
+void testNullptrCast() {
+  Pointer<Int64> ptr = nullptr;
+  ptr = nullableInt64ElementAt1(ptr);
+  Expect.equals(ptr, nullptr);
 }
 
 void testMemoryAddressTruncation() {

@@ -2,11 +2,10 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-export 'load_dill_twice_lib_2.dart';
+typedef G<X> = void Function();
 
-// Use annotation to force proper printing.
+class A<X extends G<A<Y, X>>, Y extends G<A<X, Y>>> {}
 
-typedef myTypedefWithNamed(@Foo int a, {@Foo int b});
-typedef myTypedefWithOptionalPositional(@Foo int a, [@Foo int b]);
-
-const Foo = 42;
+main() {
+  A();
+}

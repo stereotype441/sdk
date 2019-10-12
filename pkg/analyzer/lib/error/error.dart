@@ -6,6 +6,7 @@ import 'dart:collection';
 
 import 'package:analyzer/diagnostic/diagnostic.dart';
 import 'package:analyzer/error/listener.dart';
+import 'package:analyzer/src/dart/error/ffi_code.dart';
 import 'package:analyzer/src/dart/scanner/scanner.dart' show ScannerErrorCode;
 import 'package:analyzer/src/diagnostic/diagnostic.dart';
 import 'package:analyzer/src/error/codes.dart';
@@ -26,11 +27,12 @@ const List<ErrorCode> errorCodeValues = const [
   // following command from the root of the analyzer package:
   //
   // > cat
-  //       lib/src/analysis_options/error/option_codes.dart';
-  //       lib/src/dart/error/hint_codes.dart';
-  //       lib/src/dart/error/lint_codes.dart';
-  //       lib/src/dart/error/todo_codes.dart';
-  //       lib/src/html/error/html_codes.dart';
+  //       lib/src/analysis_options/error/option_codes.dart
+  //       lib/src/dart/error/ffi_code.dart
+  //       lib/src/dart/error/hint_codes.dart
+  //       lib/src/dart/error/lint_codes.dart
+  //       lib/src/dart/error/todo_codes.dart
+  //       lib/src/html/error/html_codes.dart
   //       lib/src/dart/error/syntactic_errors.dart
   //       lib/src/error/codes.dart
   //       ../front_end/lib/src/scanner/errors.dart |
@@ -319,6 +321,23 @@ const List<ErrorCode> errorCodeValues = const [
   CompileTimeErrorCode.WRONG_TYPE_PARAMETER_VARIANCE_IN_SUPERINTERFACE,
   CompileTimeErrorCode.YIELD_EACH_IN_NON_GENERATOR,
   CompileTimeErrorCode.YIELD_IN_NON_GENERATOR,
+  FfiCode.ANNOTATION_ON_POINTER_FIELD,
+  FfiCode.EXTRA_ANNOTATION_ON_STRUCT_FIELD,
+  FfiCode.FIELD_IN_STRUCT_WITH_INITIALIZER,
+  FfiCode.FIELD_INITIALIZER_IN_STRUCT,
+  FfiCode.GENERIC_STRUCT_SUBCLASS,
+  FfiCode.INVALID_FIELD_TYPE_IN_STRUCT,
+  FfiCode.INVALID_TYPE_ARGUMENT_FOR_STRUCT,
+  FfiCode.MISMATCHED_ANNOTATION_ON_STRUCT_FIELD,
+  FfiCode.MISSING_ANNOTATION_ON_STRUCT_FIELD,
+  FfiCode.MISSING_FIELD_TYPE_IN_STRUCT,
+  FfiCode.MISSING_TYPE_ARGUMENT_FOR_STRUCT,
+  FfiCode.SUBTYPE_OF_FFI_CLASS_IN_EXTENDS,
+  FfiCode.SUBTYPE_OF_FFI_CLASS_IN_IMPLEMENTS,
+  FfiCode.SUBTYPE_OF_FFI_CLASS_IN_WITH,
+  FfiCode.SUBTYPE_OF_STRUCT_CLASS_IN_EXTENDS,
+  FfiCode.SUBTYPE_OF_STRUCT_CLASS_IN_IMPLEMENTS,
+  FfiCode.SUBTYPE_OF_STRUCT_CLASS_IN_WITH,
   HintCode.CAN_BE_NULL_AFTER_NULL_AWARE,
   HintCode.DEAD_CODE,
   HintCode.DEAD_CODE_CATCH_FOLLOWING_CATCH,

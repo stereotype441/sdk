@@ -932,6 +932,20 @@ Representation StoreInstanceFieldInstr::RequiredInputRepresentation(
   return kTagged;
 }
 
+Instruction* StoreInstanceFieldInstr::Canonicalize(FlowGraph* flow_graph) {
+  // Dart objects are allocated null-initialized, which means we can eliminate
+  // all initializing stores which store null value.
+  // TODO(dartbug.com/38454) Context objects can be allocated uninitialized
+  // as a performance optimization (all initializing stores are inlined into
+  // the caller, which allocates the context). Investigate if this can be
+  // changed to align with normal Dart objects for code size reasons.
+  if (is_initialization_ && slot().IsDartField() &&
+      value()->BindsToConstantNull()) {
+    return nullptr;
+  }
+  return this;
+}
+
 bool GuardFieldClassInstr::AttributesEqual(Instruction* other) const {
   return field().raw() == other->AsGuardFieldClass()->field().raw();
 }
@@ -1437,6 +1451,15 @@ void Instruction::UnuseAllInputs() {
   }
   for (Environment::DeepIterator it(env()); !it.Done(); it.Advance()) {
     it.CurrentValue()->RemoveFromUseList();
+  }
+}
+
+void Instruction::RepairPushArgsInEnvironment() const {
+  const intptr_t arg_count = ArgumentCount();
+  ASSERT(arg_count <= env()->Length());
+  const intptr_t env_base = env()->Length() - arg_count;
+  for (intptr_t i = 0; i < arg_count; ++i) {
+    env()->ValueAt(env_base + i)->BindToEnvironment(PushArgumentAt(i));
   }
 }
 

@@ -805,6 +805,9 @@ class Instruction : public ZoneAllocated {
   }
   inline Definition* ArgumentAt(intptr_t index) const;
 
+  // Repairs trailing PushArgs in environment.
+  void RepairPushArgsInEnvironment() const;
+
   // Returns true, if this instruction can deoptimize with its current inputs.
   // This property can change if we add or remove redefinitions that constrain
   // the type or the range of input operands during compilation.
@@ -4698,6 +4701,8 @@ class StoreInstanceFieldInstr : public TemplateInstruction<2, NoThrow> {
   bool IsPotentialUnboxedStore() const;
 
   virtual Representation RequiredInputRepresentation(intptr_t index) const;
+
+  virtual Instruction* Canonicalize(FlowGraph* flow_graph);
 
   PRINT_OPERANDS_TO_SUPPORT
   ADD_OPERANDS_TO_S_EXPRESSION_SUPPORT

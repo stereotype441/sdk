@@ -4399,7 +4399,7 @@ C test(C c) => -c/*check*/;
 
   test_prefixExpression_minus_dynamic() async {
     await analyze('''
-Object test(dynamic d) => -d/*check*/;
+Object test(dynamic d) => -d;
 ''');
     assertEdge(always, decoratedTypeAnnotation('Object test').node,
         hard: false);
