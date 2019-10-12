@@ -286,6 +286,24 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType> {
   }
 
   @override
+  DecoratedType visitMethodInvocation(MethodInvocation node) {
+    var target = node.realTarget;
+    var callee = node.methodName.staticElement;
+    bool calleeIsStatic = callee is ExecutableElement && callee.isStatic;
+    if (target != null) {
+      if (_isPrefix(target)) {
+        // Nothing to do.
+      } else if (calleeIsStatic) {
+        target.accept(this);
+      } else if (isConditional) {
+        targetType = target.accept(this);
+      } else {
+        targetType = _handleTarget(target, node.methodName.name);
+      }
+    }
+  }
+
+  @override
   DartType visitConditionalExpression(ConditionalExpression node) {
     visitSubexpression(node.condition, _typeProvider.boolType);
     _flowAnalysis.conditional_thenBegin(node.condition);
