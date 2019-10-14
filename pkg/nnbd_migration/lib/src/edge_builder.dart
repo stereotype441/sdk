@@ -2292,7 +2292,7 @@ mixin _AssignmentChecker {
       if (destination.type is ParameterizedType) {
         for (final param
             in (destination.type as ParameterizedType).typeParameters) {
-          assert(param.type.bound.isDynamic,
+          assert(param.bound == null,
               'downcast to type parameters with bounds not supported');
         }
       }
@@ -2315,7 +2315,7 @@ mixin _AssignmentChecker {
       if (destination.type is ParameterizedType) {
         for (final param
             in (destination.type as ParameterizedType).typeParameters) {
-          assert(param.type.bound.isDynamic,
+          assert(param.bound == null,
               'downcast to type parameters with bounds not supported');
         }
       }
