@@ -287,26 +287,6 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   }
 
   @override
-  DartType visitMethodInvocation(MethodInvocation node) {
-    DartType targetType;
-    var target = node.realTarget;
-    bool isNullAware = operator != null && isNullAwareToken(operator.type);
-    var callee = node.methodName.staticElement;
-    bool calleeIsStatic = callee is ExecutableElement && callee.isStatic;
-    if (target != null) {
-      if (isPrefix(target)) {
-        // Nothing to do.
-      } else if (calleeIsStatic) {
-        target.accept(this);
-      } else if (isNullAware) {
-        targetType = target.accept(this);
-      } else {
-        targetType = _handleTarget(target, node.methodName.name);
-      }
-    }
-  }
-
-  @override
   DartType visitConditionalExpression(ConditionalExpression node) {
     visitSubexpression(node.condition, typeProvider.boolType);
     _flowAnalysis.conditional_thenBegin(node.condition);
@@ -401,6 +381,55 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
     }
     return (node.staticType as TypeImpl)
         .withNullability(NullabilitySuffix.none);
+  }
+
+  @override
+  DartType visitMethodInvocation(MethodInvocation node) {
+    var target = node.realTarget;
+    var callee = node.methodName.staticElement;
+    var operator = node.operator;
+    bool isNullAware = operator != null && isNullAwareToken(operator.type);
+    DartType targetType;
+    if (target != null) {
+      if (isPrefix(target)) {
+        // Nothing to do.
+      } else if (callee is ExecutableElement && callee.isStatic) {
+        target.accept(this);
+      } else {
+        targetType = visitSubexpression(
+            target,
+            isNullAware || isDeclaredOnObject(node.methodName.name)
+                ? typeProvider.dynamicType
+                : typeProvider.objectType);
+      }
+    }
+    if (callee == null) {
+      // Dynamic dispatch.  The return type is `dynamic`.
+      node.typeArguments?.accept(this);
+      node.argumentList.accept(this);
+      return typeProvider.dynamicType;
+    } else if (callee is VariableElement) {
+      // Function expression invocation that looks like a method invocation.
+      throw new UnimplementedError('TODO(paulberry)');
+    }
+    var calleeType = _computeMigratedType(callee, targetType: targetType);
+    if (callee is PropertyAccessorElement) {
+      calleeType = (calleeType as FunctionType).returnType;
+    }
+    var expressionType = _handleInvocationArguments(
+        node,
+        node.argumentList.arguments,
+        node.typeArguments,
+        node.typeArgumentTypes,
+        calleeType is FunctionType
+            ? calleeType
+            : throw UnimplementedError('TODO(paulberry)'),
+        null,
+        invokeType: node.staticInvokeType);
+    if (isNullAware) {
+      expressionType = _typeSystem.makeNullable(expressionType as TypeImpl);
+    }
+    return expressionType;
   }
 
   @override
@@ -688,6 +717,46 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
       combinedType = _typeSystem.promoteToNonNull(combinedType as TypeImpl);
     }
     return combinedType;
+  }
+
+  DartType _handleInvocationArguments(
+      AstNode node,
+      Iterable<AstNode> arguments,
+      TypeArgumentList typeArguments,
+      List<DartType> typeArgumentTypes,
+      FunctionType calleeType,
+      List<TypeParameterElement> constructorTypeParameters,
+      {DartType invokeType}) {
+    var typeFormals = constructorTypeParameters ?? calleeType.typeFormals;
+    if (typeFormals.isNotEmpty) {
+      throw UnimplementedError('TODO(paulberry)');
+    }
+    int i = 0;
+    for (var argument in arguments) {
+      String name;
+      Expression expression;
+      if (argument is NamedExpression) {
+        name = argument.name.label.name;
+        expression = argument.expression;
+      } else if (argument is FormalParameter) {
+        if (argument.isNamed) {
+          name = argument.identifier.name;
+        }
+        expression = argument.identifier;
+      } else {
+        expression = argument as Expression;
+      }
+      DartType parameterType;
+      if (name != null) {
+        parameterType = calleeType.namedParameterTypes[name];
+        assert(parameterType != null, 'Missing type for named parameter');
+      } else {
+        parameterType = calleeType.getPositionalParameterType(i);
+        assert(parameterType != null, 'Missing positional parameter at $i');
+      }
+      visitSubexpression(expression, parameterType);
+    }
+    return calleeType.returnType;
   }
 
   DartType _handlePropertyAccess(Expression node, Expression target,
