@@ -210,7 +210,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
       return AssignmentTargetInfo(readType, writeType);
     } else if (node is PropertyAccess) {
       return _handleAssignmentTargetForPropertyAccess(node, node.target,
-          node.propertyName, _isNullAwareToken(node.operator.type), isCompound);
+          node.propertyName, isNullAwareToken(node.operator.type), isCompound);
     } else if (node is PrefixedIdentifier) {
       if (node.prefix.staticElement is ImportElement) {
         // TODO(paulberry)
@@ -477,7 +477,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   @override
   DartType visitPropertyAccess(PropertyAccess node) {
     return _handlePropertyAccess(node, node.target, node.propertyName,
-        _isNullAwareToken(node.operator.type));
+        isNullAwareToken(node.operator.type));
   }
 
   @override
@@ -703,19 +703,6 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
       } else {
         return type;
       }
-    }
-  }
-
-  bool _isNullAwareToken(TokenType tokenType) {
-    switch (tokenType) {
-      case TokenType.PERIOD:
-      case TokenType.PERIOD_PERIOD:
-        return false;
-      case TokenType.QUESTION_PERIOD:
-        return true;
-      default:
-        throw new UnimplementedError(
-            'TODO(paulberry): _isNullAwareToken($tokenType)');
     }
   }
 
