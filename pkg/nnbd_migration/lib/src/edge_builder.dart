@@ -910,7 +910,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     var callee = node.methodName.staticElement;
     bool calleeIsStatic = callee is ExecutableElement && callee.isStatic;
     if (target != null) {
-      if (_isPrefix(target)) {
+      if (isPrefix(target)) {
         // Nothing to do.
       } else if (calleeIsStatic) {
         target.accept(this);
@@ -1400,7 +1400,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     // type of the expression, since all we are doing is causing a single graph
     // edge to be built; it is sufficient to pass in any decorated type whose
     // node is `never`.
-    if (_isPrefix(expression)) {
+    if (isPrefix(expression)) {
       throw ArgumentError('cannot check non-nullability of a prefix');
     }
     return _handleAssignment(expression, destinationType: _notNullType);
@@ -1964,7 +1964,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     DecoratedType targetType;
     var callee = propertyName.staticElement;
     bool calleeIsStatic = callee is ExecutableElement && callee.isStatic;
-    if (_isPrefix(target)) {
+    if (isPrefix(target)) {
       return propertyName.accept(this);
     } else if (calleeIsStatic) {
       target.accept(this);
@@ -2017,9 +2017,6 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
             .map((t) => DecoratedType(t, _graph.never))
             .toList());
   }
-
-  bool _isPrefix(Expression e) =>
-      e is SimpleIdentifier && e.staticElement is PrefixElement;
 
   bool _isUntypedParameter(NormalFormalParameter parameter) {
     if (parameter is SimpleFormalParameter) {

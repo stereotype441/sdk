@@ -2,7 +2,9 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/token.dart';
+import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 
 /// This mixin provides utilities that are useful to visitors implementing
@@ -30,6 +32,10 @@ mixin ResolutionUtils {
             'Unexpected token passed to isNullAwareToken: $tokenType');
     }
   }
+
+  /// Determines whether the given expression resolves to a prefix element..
+  bool isPrefix(Expression e) =>
+      e is SimpleIdentifier && e.staticElement is PrefixElement;
 
   List<String> _computeObjectGetNames() {
     var result = <String>[];
