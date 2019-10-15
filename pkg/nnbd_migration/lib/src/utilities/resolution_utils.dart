@@ -33,10 +33,6 @@ mixin ResolutionUtils {
     }
   }
 
-  /// Determines whether the given expression resolves to a prefix element..
-  bool isPrefix(Expression e) =>
-      e is SimpleIdentifier && e.staticElement is PrefixElement;
-
   List<String> _computeObjectGetNames() {
     var result = <String>[];
     var objectClass = typeProvider.objectType.element;
