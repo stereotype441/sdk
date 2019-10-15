@@ -531,9 +531,11 @@ abstract class FlowAnalysis<Statement, Expression, Variable, Type> {
   void write(Variable variable);
 }
 
+/// Alternate implementation of [FlowAnalysis] that prints out inputs and output
+/// at the API boundary, for assistance in debugging.
 class FlowAnalysisDebug<Statement, Expression, Variable, Type>
     implements FlowAnalysis<Statement, Expression, Variable, Type> {
-  FlowAnalysis<Statement, Expression, Variable, Type> _wrapped;
+  _FlowAnalysisImpl<Statement, Expression, Variable, Type> _wrapped;
 
   bool _exceptionOccurred = false;
 
@@ -545,7 +547,7 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
     variablesCapturedAnywhere = variablesCapturedAnywhere.toList();
     print('FlowAnalysisDebug($variablesWrittenAnywhere, '
         '$variablesCapturedAnywhere)');
-    return FlowAnalysisDebug._(FlowAnalysis(
+    return FlowAnalysisDebug._(_FlowAnalysisImpl(
         typeOperations, variablesWrittenAnywhere, variablesCapturedAnywhere));
   }
 
@@ -578,6 +580,29 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
   void conditional_thenBegin(Expression condition) {
     _wrap('conditional_thenBegin($condition)',
         () => _wrapped.conditional_thenBegin(condition));
+  }
+
+  @override
+  void doStatement_bodyBegin(Statement doStatement,
+      Iterable<Variable> loopAssigned, Iterable<Variable> loopCaptured) {
+    loopAssigned = loopAssigned.toList();
+    loopCaptured = loopCaptured.toList();
+    return _wrap(
+        'doStatement_bodyBegin($doStatement, $loopAssigned, $loopCaptured)',
+        () => _wrapped.doStatement_bodyBegin(
+            doStatement, loopAssigned, loopCaptured));
+  }
+
+  @override
+  void doStatement_conditionBegin() {
+    return _wrap('doStatement_conditionBegin()',
+        () => _wrapped.doStatement_conditionBegin());
+  }
+
+  @override
+  void doStatement_end(Expression condition) {
+    return _wrap('doStatement_end($condition)',
+        () => _wrapped.doStatement_end(condition));
   }
 
   @override
@@ -629,6 +654,22 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
   }
 
   @override
+  void forEach_bodyBegin(Iterable<Variable> loopAssigned,
+      Iterable<Variable> loopCaptured, Variable loopVariable) {
+    loopAssigned = loopAssigned.toList();
+    loopCaptured = loopCaptured.toList();
+    return _wrap(
+        'forEach_bodyBegin($loopAssigned, $loopCaptured, $loopVariable)',
+        () => _wrapped.forEach_bodyBegin(
+            loopAssigned, loopCaptured, loopVariable));
+  }
+
+  @override
+  void forEach_end() {
+    return _wrap('forEach_end()', () => _wrapped.forEach_end());
+  }
+
+  @override
   void functionExpression_begin(Iterable<Variable> writeCaptured) {
     writeCaptured = writeCaptured.toList();
     _wrap('functionExpression_begin($writeCaptured)',
@@ -656,6 +697,24 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
   }
 
   @override
+  void ifNullExpression_end() {
+    return _wrap(
+        'ifNullExpression_end()', () => _wrapped.ifNullExpression_end());
+  }
+
+  @override
+  void ifNullExpression_rightBegin() {
+    return _wrap('ifNullExpression_rightBegin()',
+        () => _wrapped.ifNullExpression_rightBegin());
+  }
+
+  @override
+  void ifStatement_elseBegin() {
+    return _wrap(
+        'ifStatement_elseBegin()', () => _wrapped.ifStatement_elseBegin());
+  }
+
+  @override
   void ifStatement_end(bool hasElse) {
     _wrap('ifStatement_end($hasElse)', () => _wrapped.ifStatement_end(hasElse));
   }
@@ -669,6 +728,12 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
   @override
   void initialize(Variable variable) {
     _wrap('initialize($variable)', () => _wrapped.initialize(variable));
+  }
+
+  @override
+  bool isAssigned(Variable variable) {
+    return _wrap('isAssigned($variable)', () => _wrapped.isAssigned(variable),
+        isQuery: true);
   }
 
   @override
@@ -695,10 +760,15 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
   }
 
   @override
-  noSuchMethod(Invocation invocation) {
-    _exceptionOccurred = true;
-    print('No such method: ${invocation.memberName}');
-    return super.noSuchMethod(invocation);
+  void logicalNot_end(Expression notExpression, Expression operand) {
+    return _wrap('logicalNot_end($notExpression, $operand)',
+        () => _wrapped.logicalNot_end(notExpression, operand));
+  }
+
+  @override
+  void nonNullAssert_end(Expression operand) {
+    return _wrap('nonNullAssert_end($operand)',
+        () => _wrapped.nonNullAssert_end(operand));
   }
 
   @override
@@ -745,10 +815,91 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
   }
 
   @override
+  void tryCatchStatement_bodyBegin() {
+    return _wrap('tryCatchStatement_bodyBegin()',
+        () => _wrapped.tryCatchStatement_bodyBegin());
+  }
+
+  @override
+  void tryCatchStatement_bodyEnd(
+      Iterable<Variable> assignedInBody, Iterable<Variable> capturedInBody) {
+    assignedInBody = assignedInBody.toList();
+    capturedInBody = capturedInBody.toList();
+    return _wrap(
+        'tryCatchStatement_bodyEnd($assignedInBody, $capturedInBody)',
+        () =>
+            _wrapped.tryCatchStatement_bodyEnd(assignedInBody, capturedInBody));
+  }
+
+  @override
+  void tryCatchStatement_catchBegin() {
+    return _wrap('tryCatchStatement_catchBegin()',
+        () => _wrapped.tryCatchStatement_catchBegin());
+  }
+
+  @override
+  void tryCatchStatement_catchEnd() {
+    return _wrap('tryCatchStatement_catchEnd()',
+        () => _wrapped.tryCatchStatement_catchEnd());
+  }
+
+  @override
+  void tryCatchStatement_end() {
+    return _wrap(
+        'tryCatchStatement_end()', () => _wrapped.tryCatchStatement_end());
+  }
+
+  @override
+  void tryFinallyStatement_bodyBegin() {
+    return _wrap('tryFinallyStatement_bodyBegin()',
+        () => _wrapped.tryFinallyStatement_bodyBegin());
+  }
+
+  @override
+  void tryFinallyStatement_end(Set<Variable> assignedInFinally) {
+    return _wrap('tryFinallyStatement_end($assignedInFinally)',
+        () => _wrapped.tryFinallyStatement_end(assignedInFinally));
+  }
+
+  @override
+  void tryFinallyStatement_finallyBegin(
+      Iterable<Variable> assignedInBody, Iterable<Variable> capturedInBody) {
+    assignedInBody = assignedInBody.toList();
+    capturedInBody = capturedInBody.toList();
+    return _wrap(
+        'tryFinallyStatement_finallyBegin($assignedInBody, $capturedInBody)',
+        () => _wrapped.tryFinallyStatement_finallyBegin(
+            assignedInBody, capturedInBody));
+  }
+
+  @override
   Type variableRead(Expression expression, Variable variable) {
     return _wrap('variableRead($expression, $variable)',
         () => _wrapped.variableRead(expression, variable),
         isQuery: true, isPure: false);
+  }
+
+  @override
+  void whileStatement_bodyBegin(
+      Statement whileStatement, Expression condition) {
+    return _wrap('whileStatement_bodyBegin($whileStatement, $condition)',
+        () => _wrapped.whileStatement_bodyBegin(whileStatement, condition));
+  }
+
+  @override
+  void whileStatement_conditionBegin(
+      Iterable<Variable> loopAssigned, Iterable<Variable> loopCaptured) {
+    loopAssigned = loopAssigned.toList();
+    loopCaptured = loopCaptured.toList();
+    return _wrap(
+        'whileStatement_conditionBegin($loopAssigned, $loopCaptured)',
+        () =>
+            _wrapped.whileStatement_conditionBegin(loopAssigned, loopCaptured));
+  }
+
+  @override
+  void whileStatement_end() {
+    return _wrap('whileStatement_end()', () => _wrapped.whileStatement_end());
   }
 
   @override
@@ -1340,16 +1491,6 @@ class _FlowAnalysisImpl<Statement, Expression, Variable, Type>
 
   final List<Variable> _variablesCapturedAnywhere;
 
-  void _dumpState() {
-    print('  current: $_current');
-    print('  expressionWithInfo: $_expressionWithInfo');
-    print('  expressionInfo: $_expressionInfo');
-    print('  stack:');
-    for (var stackEntry in _stack.reversed) {
-      print('    $stackEntry');
-    }
-  }
-
   /// The [TypeOperations], used to access types, and check subtyping.
   final TypeOperations<Variable, Type> typeOperations;
 
@@ -1849,6 +1990,16 @@ class _FlowAnalysisImpl<Statement, Expression, Variable, Type>
         "Variable is written to, but was not included in "
         "_variablesWrittenAnywhere: $variable");
     _current = _current.write(variable);
+  }
+
+  void _dumpState() {
+    print('  current: $_current');
+    print('  expressionWithInfo: $_expressionWithInfo');
+    print('  expressionInfo: $_expressionInfo');
+    print('  stack:');
+    for (var stackEntry in _stack.reversed) {
+      print('    $stackEntry');
+    }
   }
 
   /// Gets the [_ExpressionInfo] associated with the [expression] (which should
