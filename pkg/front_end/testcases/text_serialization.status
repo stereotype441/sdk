@@ -46,6 +46,7 @@ extensions/issue38712: TextSerializationFailure
 extensions/issue38713: TextSerializationFailure
 extensions/issue38745: TextSerializationFailure
 extensions/issue38750: TextSerializationFailure
+extensions/issue38755: TextSerializationFailure
 extensions/nested_on_types: TextSerializationFailure
 extensions/null_aware: TextSerializationFailure
 extensions/on_function_type: TextSerializationFailure
@@ -194,6 +195,7 @@ general/issue35875: TextSerializationFailure
 general/issue37027: TextSerializationFailure
 general/issue37381: TextSerializationFailure
 general/issue37776: TextSerializationFailure
+general/issue38812: TextSerializationFailure
 general/literals: TextSerializationFailure # Was: Pass
 general/local_generic_function: TextSerializationFailure # Was: Pass
 general/magic_const: TextSerializationFailure # Was: Pass
@@ -249,6 +251,7 @@ general/platform: TextSerializationFailure
 general/prefer_baseclass: TextSerializationFailure # Was: Pass
 general/private_method_tearoff: TextSerializationFailure # Was: Pass
 general/private_method_tearoff_lib: TextSerializationFailure # Was: Pass
+general/promoted_access: TextSerializationFailure
 general/public_method_tearoff: TextSerializationFailure # Was: Pass
 general/public_method_tearoff_lib: TextSerializationFailure # Was: Pass
 general/qualified: TextSerializationFailure # Was: Pass

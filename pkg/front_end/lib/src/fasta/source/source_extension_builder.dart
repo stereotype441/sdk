@@ -8,8 +8,8 @@ import 'package:kernel/ast.dart';
 
 import '../../base/common.dart';
 
+import '../builder/builder.dart';
 import '../builder/class_builder.dart';
-import '../builder/declaration.dart';
 import '../builder/extension_builder.dart';
 import '../builder/field_builder.dart';
 import '../builder/library_builder.dart';

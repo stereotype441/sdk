@@ -22,11 +22,11 @@ import 'package:kernel/core_types.dart' show CoreTypes;
 
 import '../../scanner/token.dart' show Token;
 
+import '../builder/builder.dart';
 import '../builder/class_builder.dart';
-import '../builder/declaration.dart';
 import '../builder/declaration_builder.dart';
 import '../builder/formal_parameter_builder.dart';
-import '../builder/procedure_builder.dart';
+import '../builder/function_builder.dart';
 import '../builder/function_type_builder.dart';
 import '../builder/metadata_builder.dart';
 import '../builder/modifier_builder.dart';
@@ -560,11 +560,6 @@ class DietListener extends StackListener {
   @override
   void endTypeVariables(Token beginToken, Token endToken) {
     debugEvent("TypeVariables");
-  }
-
-  @override
-  void handleVarianceModifier(Token variance) {
-    debugEvent("VarianceModifier");
   }
 
   @override

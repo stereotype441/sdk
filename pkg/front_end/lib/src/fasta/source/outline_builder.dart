@@ -8,6 +8,7 @@ import 'package:kernel/ast.dart' show InvalidType, ProcedureKind, Variance;
 
 import '../builder/constructor_reference_builder.dart';
 import '../builder/enum_builder.dart';
+import '../builder/fixed_type_builder.dart';
 import '../builder/formal_parameter_builder.dart';
 import '../builder/function_type_builder.dart';
 import '../builder/invalid_type_declaration_builder.dart';
@@ -18,7 +19,6 @@ import '../builder/nullability_builder.dart';
 import '../builder/type_builder.dart';
 import '../builder/type_variable_builder.dart';
 import '../builder/unresolved_type.dart';
-import '../builder/fixed_type_builder.dart';
 
 import '../combinator.dart' show Combinator;
 
@@ -1592,6 +1592,9 @@ class OutlineBuilder extends StackListener {
     if (typeParameters != null) {
       typeParameters[index].bound = bound;
       if (variance != null) {
+        if (!library.loader.target.enableVariance) {
+          reportVarianceModifierNotEnabled(variance);
+        }
         typeParameters[index].variance = Variance.fromString(variance.lexeme);
       }
     }
@@ -1659,13 +1662,6 @@ class OutlineBuilder extends StackListener {
       addProblem(messageConstructorWithTypeParameters,
           offsetForToken(beginToken), lengthOfSpan(beginToken, endToken));
       inConstructorName = false;
-    }
-  }
-
-  @override
-  void handleVarianceModifier(Token variance) {
-    if (!library.loader.target.enableVariance) {
-      reportVarianceModifierNotEnabled(variance);
     }
   }
 

@@ -6,6 +6,7 @@ library fasta.source_library_builder;
 
 import 'dart:convert' show jsonEncode;
 
+import 'package:front_end/src/fasta/kernel/kernel_shadow_ast.dart';
 import 'package:kernel/ast.dart'
     show
         Arguments,
@@ -58,16 +59,17 @@ import '../../base/resolve_relative_uri.dart' show resolveRelativeUri;
 
 import '../../scanner/token.dart' show Token;
 
+import '../builder/builder.dart';
 import '../builder/builtin_type_builder.dart';
 import '../builder/class_builder.dart';
+import '../builder/constructor_builder.dart';
 import '../builder/constructor_reference_builder.dart';
-import '../builder/declaration.dart';
 import '../builder/dynamic_type_builder.dart';
 import '../builder/enum_builder.dart';
 import '../builder/extension_builder.dart';
 import '../builder/field_builder.dart';
 import '../builder/formal_parameter_builder.dart';
-import '../builder/procedure_builder.dart';
+import '../builder/function_builder.dart';
 import '../builder/function_type_builder.dart';
 import '../builder/invalid_type_declaration_builder.dart';
 import '../builder/library_builder.dart';
@@ -78,6 +80,7 @@ import '../builder/name_iterator.dart';
 import '../builder/named_type_builder.dart';
 import '../builder/nullability_builder.dart';
 import '../builder/prefix_builder.dart';
+import '../builder/procedure_builder.dart';
 import '../builder/type_alias_builder.dart';
 import '../builder/type_builder.dart';
 import '../builder/type_declaration_builder.dart';
@@ -1301,8 +1304,8 @@ class SourceLibraryBuilder extends LibraryBuilderImpl {
 
     // When looking up a constructor, we don't consider type variables or the
     // library scope.
-    Scope constructorScope = new Scope(
-        local: constructors, debugName: className, isModifiable: false);
+    ConstructorScope constructorScope =
+        new ConstructorScope(className, constructors);
     bool isMixinDeclaration = false;
     if (modifiers & mixinDeclarationMask != 0) {
       isMixinDeclaration = true;
@@ -1678,10 +1681,7 @@ class SourceLibraryBuilder extends LibraryBuilderImpl {
                 parent: scope.withTypeVariables(typeVariables),
                 debugName: "mixin $fullname ",
                 isModifiable: false),
-            new Scope(
-                local: <String, MemberBuilder>{},
-                debugName: fullname,
-                isModifiable: false),
+            new ConstructorScope(fullname, <String, MemberBuilder>{}),
             this,
             <ConstructorReferenceBuilder>[],
             computedStartCharOffset,
@@ -1745,7 +1745,7 @@ class SourceLibraryBuilder extends LibraryBuilderImpl {
     if (hasInitializer) {
       modifiers |= hasInitializerMask;
     }
-    FieldBuilder fieldBuilder = new FieldBuilder(
+    FieldBuilderImpl fieldBuilder = new FieldBuilderImpl(
         metadata, type, name, modifiers, this, charOffset, charEndOffset);
     fieldBuilder.constInitializerToken = constInitializerToken;
     addBuilder(name, fieldBuilder, charOffset);
@@ -1774,7 +1774,7 @@ class SourceLibraryBuilder extends LibraryBuilderImpl {
       String nativeMethodName,
       {Token beginInitializers}) {
     MetadataCollector metadataCollector = loader.target.metadataCollector;
-    ConstructorBuilder constructorBuilder = new ConstructorBuilder(
+    ConstructorBuilder constructorBuilder = new ConstructorBuilderImpl(
         metadata,
         modifiers & ~abstractMask,
         returnType,
@@ -1829,7 +1829,7 @@ class SourceLibraryBuilder extends LibraryBuilderImpl {
         returnType = addVoidType(charOffset);
       }
     }
-    ProcedureBuilder procedureBuilder = new ProcedureBuilder(
+    ProcedureBuilder procedureBuilder = new ProcedureBuilderImpl(
         metadata,
         modifiers,
         returnType,
@@ -1903,7 +1903,7 @@ class SourceLibraryBuilder extends LibraryBuilderImpl {
           nativeMethodName,
           redirectionTarget);
     } else {
-      procedureBuilder = new ProcedureBuilder(
+      procedureBuilder = new ProcedureBuilderImpl(
           metadata,
           staticMask | modifiers,
           returnType,
@@ -2095,15 +2095,15 @@ class SourceLibraryBuilder extends LibraryBuilderImpl {
   }
 
   void addNativeDependency(String nativeImportPath) {
-    Builder constructor = loader.getNativeAnnotation();
+    MemberBuilder constructor = loader.getNativeAnnotation();
     Arguments arguments =
         new Arguments(<Expression>[new StringLiteral(nativeImportPath)]);
     Expression annotation;
     if (constructor.isConstructor) {
-      annotation = new ConstructorInvocation(constructor.target, arguments)
+      annotation = new ConstructorInvocation(constructor.member, arguments)
         ..isConst = true;
     } else {
-      annotation = new StaticInvocation(constructor.target, arguments)
+      annotation = new StaticInvocation(constructor.member, arguments)
         ..isConst = true;
     }
     library.addAnnotation(annotation);
@@ -2540,13 +2540,20 @@ class SourceLibraryBuilder extends LibraryBuilderImpl {
 
   void reportTypeArgumentIssues(
       List<TypeArgumentIssue> issues, Uri fileUri, int offset,
-      {bool inferred, DartType targetReceiver, String targetName}) {
+      {bool inferred,
+      TypeArgumentsInfo typeArgumentsInfo,
+      DartType targetReceiver,
+      String targetName}) {
     for (TypeArgumentIssue issue in issues) {
       DartType argument = issue.argument;
       TypeParameter typeParameter = issue.typeParameter;
 
       Message message;
-      bool issueInferred = inferred ?? inferredTypes.contains(argument);
+      bool issueInferred = inferred ??
+          typeArgumentsInfo?.isInferred(issue.index) ??
+          inferredTypes.contains(argument);
+      offset =
+          typeArgumentsInfo?.getOffsetForIndex(issue.index, offset) ?? offset;
       if (argument is FunctionType && argument.typeParameters.length > 0) {
         if (issueInferred) {
           message = templateGenericFunctionTypeInferredAsActualTypeArgument
@@ -2762,8 +2769,10 @@ class SourceLibraryBuilder extends LibraryBuilderImpl {
   }
 
   void checkBoundsInStaticInvocation(
-      StaticInvocation node, TypeEnvironment typeEnvironment, Uri fileUri,
-      {bool inferred = false}) {
+      StaticInvocation node,
+      TypeEnvironment typeEnvironment,
+      Uri fileUri,
+      TypeArgumentsInfo typeArgumentsInfo) {
     // TODO(johnniwinther): Handle partially inferred type arguments in
     // extension method calls. Currently all are considered inferred in the
     // error messages.
@@ -2782,7 +2791,7 @@ class SourceLibraryBuilder extends LibraryBuilderImpl {
       }
       String targetName = node.target.name.name;
       reportTypeArgumentIssues(issues, fileUri, node.fileOffset,
-          inferred: inferred,
+          typeArgumentsInfo: typeArgumentsInfo,
           targetReceiver: targetReceiver,
           targetName: targetName);
     }
@@ -2797,8 +2806,7 @@ class SourceLibraryBuilder extends LibraryBuilderImpl {
       Member interfaceTarget,
       Arguments arguments,
       Uri fileUri,
-      int offset,
-      {bool inferred = false}) {
+      int offset) {
     if (arguments.types.isEmpty) return;
     Class klass;
     List<DartType> receiverTypeArguments;
@@ -2842,7 +2850,7 @@ class SourceLibraryBuilder extends LibraryBuilderImpl {
         instantiatedMethodParameters, arguments.types, typeEnvironment);
     if (issues != null) {
       reportTypeArgumentIssues(issues, fileUri, offset,
-          inferred: inferred,
+          typeArgumentsInfo: getTypeArgumentsInfo(arguments),
           targetReceiver: receiverType,
           targetName: name.name);
     }

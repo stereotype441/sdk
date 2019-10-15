@@ -57,7 +57,7 @@ class MockLibraryBuilder extends SourceLibraryBuilder {
             null);
 
   ProcedureBuilder mockProcedure(String name) {
-    return new ProcedureBuilder(null, 0, null, name, null, null,
+    return new ProcedureBuilderImpl(null, 0, null, name, null, null,
         ProcedureKind.Getter, this, -1, -1, -1, -1);
   }
 }
