@@ -1073,6 +1073,17 @@ Object/*!*/ _f(dynamic d) => d.f();
   test_methodInvocation_namedParameter() async {
     await analyze('''
 abstract class _C {
+  int f({int/*!*/ x});
+}
+_f(_C c, int/*?*/ y) => c.f(x: y);
+''');
+    visitSubexpression(findNode.methodInvocation('c.f'), 'int',
+        changes: {findNode.simple('y);'): NullCheck()});
+  }
+
+  test_methodInvocation_ordinaryParameter() async {
+    await analyze('''
+abstract class _C {
   int f(int/*!*/ x);
 }
 _f(_C c, int/*?*/ y) => c.f(y);

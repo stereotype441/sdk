@@ -729,14 +729,13 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
       {DartType invokeType}) {
     var typeFormals = constructorTypeParameters ?? calleeType.typeFormals;
     if (typeFormals.isNotEmpty) {
-      throw UnimplementedError('TODO(paulberry)');
+      throw UnimplementedError('TODO(paulberry): Invocation of generic method');
     }
     int i = 0;
     for (var argument in arguments) {
       String name;
       Expression expression;
       if (argument is NamedExpression) {
-        throw new UnimplementedError('TODO(paulberry)');
         name = argument.name.label.name;
         expression = argument.expression;
       } else if (argument is FormalParameter) {
@@ -750,7 +749,6 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
       }
       DartType parameterType;
       if (name != null) {
-        throw new UnimplementedError('TODO(paulberry)');
         parameterType = calleeType.namedParameterTypes[name];
         assert(parameterType != null, 'Missing type for named parameter');
       } else {
