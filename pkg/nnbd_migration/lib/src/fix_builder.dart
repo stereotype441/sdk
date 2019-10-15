@@ -418,18 +418,12 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
       return typeProvider.dynamicType;
     }
     var calleeType = _computeMigratedType(callee, targetType: targetType);
-    if (callee is PropertyAccessorElement) {
-      throw new UnimplementedError('TODO(paulberry)');
-      calleeType = (calleeType as FunctionType).returnType;
-    }
     var expressionType = _handleInvocationArguments(
         node,
         node.argumentList.arguments,
         node.typeArguments,
         node.typeArgumentTypes,
-        calleeType is FunctionType
-            ? calleeType
-            : throw UnimplementedError('TODO(paulberry)'),
+        calleeType as FunctionType,
         null,
         invokeType: node.staticInvokeType);
     if (isNullAware) {
