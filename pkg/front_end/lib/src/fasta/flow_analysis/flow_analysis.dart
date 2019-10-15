@@ -1452,6 +1452,10 @@ class _BranchTargetContext<Variable, Type> extends _FlowContext {
   /// Accumulated flow model for all `continue` statements seen so far, or
   /// `null` if no `continue` statements have been seen yet.
   FlowModel<Variable, Type> _continueModel;
+
+  @override
+  String toString() => '_BranchTargetContext(breakModel: $_breakModel, '
+      'continueModel: $_continueModel)';
 }
 
 /// [_FlowContext] representing a conditional expression.
@@ -1483,6 +1487,10 @@ class _ExpressionInfo<Variable, Type> {
   final FlowModel<Variable, Type> _ifFalse;
 
   _ExpressionInfo(this._after, this._ifTrue, this._ifFalse);
+
+  @override
+  String toString() =>
+      '_ExpressionInfo(after: $_after, _ifTrue: $_ifTrue, ifFalse: $_ifFalse)';
 }
 
 class _FlowAnalysisImpl<Statement, Expression, Variable, Type>
@@ -2041,7 +2049,7 @@ class _FlowAnalysisImpl<Statement, Expression, Variable, Type>
 
 /// Base class for objects representing constructs in the Dart programming
 /// language for which flow analysis information needs to be tracked.
-class _FlowContext {}
+abstract class _FlowContext {}
 
 /// [_FlowContext] representing an `if` statement.
 class _IfContext<Variable, Type> extends _BranchContext<Variable, Type> {
@@ -2083,6 +2091,9 @@ class _SimpleContext<Variable, Type> extends _FlowContext {
   final FlowModel<Variable, Type> _previous;
 
   _SimpleContext(this._previous);
+
+  @override
+  String toString() => '_SimpleContext(previous: $_previous)';
 }
 
 /// [_FlowContext] representing a language construct that can be targeted by
@@ -2097,6 +2108,10 @@ class _SimpleStatementContext<Variable, Type>
   final FlowModel<Variable, Type> _previous;
 
   _SimpleStatementContext(this._previous);
+
+  @override
+  String toString() => '_SimpleStatementContext(breakModel: $_breakModel, '
+      'continueModel: $_continueModel, previous: $_previous)';
 }
 
 /// [_FlowContext] representing a try statement.
@@ -2113,6 +2128,11 @@ class _TryContext<Variable, Type> extends _SimpleContext<Variable, Type> {
   FlowModel<Variable, Type> _afterBodyAndCatches;
 
   _TryContext(FlowModel<Variable, Type> previous) : super(previous);
+
+  @override
+  String toString() =>
+      '_TryContext(previous: $_previous, beforeCatch: $_beforeCatch, '
+      'afterBodyAndCatches: $_afterBodyAndCatches)';
 }
 
 /// [_ExpressionInfo] representing an expression that reads the value of a
@@ -2146,4 +2166,8 @@ class _WhileContext<Variable, Type>
   final _ExpressionInfo<Variable, Type> _conditionInfo;
 
   _WhileContext(this._conditionInfo);
+
+  @override
+  String toString() => '_WhileContext(breakModel: $_breakModel, '
+      'continueModel: $_continueModel, conditionInfo: $_conditionInfo)';
 }
