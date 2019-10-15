@@ -88,7 +88,7 @@ class ConditionalModification extends PotentialModification {
         result.add(SourceEdit(end, 0, ' */'));
       }
     }
-    return result.reversed;
+    return result;
   }
 
   @override
@@ -103,9 +103,6 @@ class PotentiallyAddQuestionSuffix extends PotentialModification {
   final int _offset;
 
   PotentiallyAddQuestionSuffix(this.node, this.type, this._offset);
-
-  @override
-  int get offset => _offset;
 
   @override
   NullabilityFixDescription get description =>
@@ -141,9 +138,6 @@ class PotentiallyAddRequired extends PotentialModification {
         node, parameter.offset, cls.name, method.name, element.name);
   }
 
-  @override
-  int get offset => _offset;
-
   PotentiallyAddRequired._(this._node, this._offset, this.className,
       this.methodName, this.parameterName);
 
@@ -177,8 +171,6 @@ abstract class PotentialModification {
 
   /// Gets the reasons for this potential modification.
   Iterable<FixReasonInfo> get reasons;
-
-  int get offset;
 }
 
 /// Helper object used by [ConditionalModification] to keep track of AST nodes

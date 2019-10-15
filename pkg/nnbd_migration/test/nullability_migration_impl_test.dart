@@ -33,7 +33,6 @@ class NullabilityMigrationImplTest {
     final offset = text.indexOf('int') + 3;
     final potentialModification = _PotentialModificationMock(
         _NullabilityFixDescriptionMock('Add ?'),
-        0,
         false,
         [SourceEdit(offset, 0, '?')]);
     final listener = NullabilityMigrationListenerMock();
@@ -97,9 +96,7 @@ class SourceMock extends Mock implements Source {
   final String _contents;
 
   SourceMock(this._contents);
-
   TimestampedData<String> get contents => TimestampedData<String>(0, _contents);
-
   String get fullName => '/test.dart';
 }
 
@@ -122,15 +119,11 @@ class _PotentialModificationMock extends PotentialModification {
   @override
   final Iterable<SourceEdit> modifications;
 
-  @override
-  final int offset;
-
   _PotentialModificationMock(
-      this.description, this.offset, this.isEmpty, this.modifications);
+      this.description, this.isEmpty, this.modifications);
 
   _PotentialModificationMock.empty(this.description)
       : isEmpty = false,
-        offset = 0,
         modifications = [];
 
   @override
