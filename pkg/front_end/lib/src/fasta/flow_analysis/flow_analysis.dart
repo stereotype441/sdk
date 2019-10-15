@@ -547,7 +547,7 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
     variablesCapturedAnywhere = variablesCapturedAnywhere.toList();
     print('FlowAnalysisDebug($variablesWrittenAnywhere, '
         '$variablesCapturedAnywhere)');
-    return FlowAnalysisDebug._(_FlowAnalysisImpl(
+    return new FlowAnalysisDebug._(new _FlowAnalysisImpl(
         typeOperations, variablesWrittenAnywhere, variablesCapturedAnywhere));
   }
 
@@ -907,9 +907,9 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
     _wrap('write($variable)', () => _wrapped.write(variable));
   }
 
-  T _wrap<T>(String desc, T callback(), {bool isQuery: false, bool isPure}) {
+  T _wrap<T>(String description, T callback(), {bool isQuery: false, bool isPure}) {
     isPure ??= isQuery;
-    print(desc);
+    print(description);
     T result;
     try {
       result = callback();
@@ -2005,7 +2005,7 @@ class _FlowAnalysisImpl<Statement, Expression, Variable, Type>
     print('  expressionWithInfo: $_expressionWithInfo');
     print('  expressionInfo: $_expressionInfo');
     print('  stack:');
-    for (var stackEntry in _stack.reversed) {
+    for (_FlowContext stackEntry in _stack.reversed) {
       print('    $stackEntry');
     }
   }
