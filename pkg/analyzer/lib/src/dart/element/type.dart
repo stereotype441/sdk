@@ -247,12 +247,6 @@ class CircularFunctionTypeImpl extends DynamicTypeImpl
   }
 
   @override
-  DartType getPositionalParameterType(int index) {
-    // There are no parameters
-    return null;
-  }
-
-  @override
   FunctionTypeImpl instantiate(List<DartType> argumentTypes) => this;
 
   @override
@@ -663,18 +657,6 @@ abstract class FunctionTypeImpl extends TypeImpl implements FunctionType {
     } else {
       buffer.write('<recursive>');
     }
-  }
-
-  @override
-  DartType getPositionalParameterType(int index) {
-    if (index < normalParameterTypes.length) {
-      return normalParameterTypes[index];
-    }
-    index -= normalParameterTypes.length;
-    if (index < optionalParameterTypes.length) {
-      return optionalParameterTypes[index];
-    }
-    return null;
   }
 
   @override
