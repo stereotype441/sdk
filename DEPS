@@ -85,7 +85,7 @@ vars = {
   "dart_style_tag": "1.3.1",  # Please see the note above before updating.
 
   "args_tag" : "1.5.2",
-  "dartdoc_tag" : "v0.28.7",
+  "dartdoc_tag" : "v0.28.8",
   "ffi_tag": "f46c1f42c6f7f1938f2ff27c573da72d57c47ded",
   "fixnum_tag": "0.10.9",
   "glob_tag": "1.1.7",
@@ -427,7 +427,7 @@ deps = {
     "packages": [
       {
         "package": "dart/language_model",
-        "version": "EFtZ0Z5T822s4EUOOaWeiXUppRGKp5d9Z6jomJIeQYcC",
+        "version": "9fJQZ0TrnAGQKrEtuL3-AXbUfPzYxqpN_OBHr9P4hE4C",
       }
     ],
     "dep_type": "cipd",
