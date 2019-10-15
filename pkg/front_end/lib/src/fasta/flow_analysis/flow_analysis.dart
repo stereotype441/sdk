@@ -907,7 +907,8 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
     _wrap('write($variable)', () => _wrapped.write(variable));
   }
 
-  T _wrap<T>(String description, T callback(), {bool isQuery: false, bool isPure}) {
+  T _wrap<T>(String description, T callback(),
+      {bool isQuery: false, bool isPure}) {
     isPure ??= isQuery;
     print(description);
     T result;
