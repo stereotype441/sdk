@@ -1085,7 +1085,8 @@ abstract class _C {
 }
 _f(_C/*?*/ c) => c.f();
 ''');
-    visitSubexpression(findNode.methodInvocation('c.f'), 'int', nullChecked: {findNode.simple('c.f')});
+    visitSubexpression(findNode.methodInvocation('c.f'), 'int',
+        nullChecked: {findNode.simple('c.f')});
   }
 
   test_methodInvocation_return_nonNullable_nullAware() async {
@@ -1098,14 +1099,6 @@ _f(_C/*?*/ c) => c?.f();
     visitSubexpression(findNode.methodInvocation('c?.f'), 'int?');
   }
 
-  solo_test_methodInvocation_toString() async {
-    await analyze('''
-abstract class _C {}
-_f(_C/*?*/ c) => c.toString();
-''');
-    visitSubexpression(findNode.methodInvocation('c.toString'), 'String');
-  }
-
   test_methodInvocation_return_nullable() async {
     await analyze('''
 abstract class _C {
@@ -1114,6 +1107,14 @@ abstract class _C {
 _f(_C c) => c.f();
 ''');
     visitSubexpression(findNode.methodInvocation('c.f'), 'int?');
+  }
+
+  test_methodInvocation_toString() async {
+    await analyze('''
+abstract class _C {}
+_f(_C/*?*/ c) => c.toString();
+''');
+    visitSubexpression(findNode.methodInvocation('c.toString'), 'String');
   }
 
   test_nullAssertion_promotes() async {
