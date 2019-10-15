@@ -750,13 +750,14 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
     }
     int i = 0;
     for (var argument in arguments) {
-      throw new UnimplementedError('TODO(paulberry)');
       String name;
       Expression expression;
       if (argument is NamedExpression) {
+        throw new UnimplementedError('TODO(paulberry)');
         name = argument.name.label.name;
         expression = argument.expression;
       } else if (argument is FormalParameter) {
+        throw new UnimplementedError('TODO(paulberry)');
         if (argument.isNamed) {
           name = argument.identifier.name;
         }
@@ -766,6 +767,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
       }
       DartType parameterType;
       if (name != null) {
+        throw new UnimplementedError('TODO(paulberry)');
         parameterType = calleeType.namedParameterTypes[name];
         assert(parameterType != null, 'Missing type for named parameter');
       } else {
