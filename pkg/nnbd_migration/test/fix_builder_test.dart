@@ -1078,7 +1078,7 @@ abstract class _C {
 _f(_C c, int/*?*/ y) => c.f(y);
 ''');
     visitSubexpression(findNode.methodInvocation('c.f'), 'int',
-        nullChecked: {findNode.simple('y);')});
+        changes: {findNode.simple('y);'): NullCheck()});
   }
 
   test_methodInvocation_return_nonNullable() async {
@@ -1099,7 +1099,7 @@ abstract class _C {
 _f(_C/*?*/ c) => c.f();
 ''');
     visitSubexpression(findNode.methodInvocation('c.f'), 'int',
-        nullChecked: {findNode.simple('c.f')});
+        changes: {findNode.simple('c.f'): NullCheck()});
   }
 
   test_methodInvocation_return_nonNullable_nullAware() async {
