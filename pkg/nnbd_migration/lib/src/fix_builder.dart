@@ -406,9 +406,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
     bool isNullAware = operator != null && isNullAwareToken(operator.type);
     DartType targetType;
     if (target != null) {
-      if (isPrefix(target)) {
-        throw UnimplementedError('TODO(paulberry)');
-      } else if (callee is ExecutableElement && callee.isStatic) {
+      if (callee is ExecutableElement && callee.isStatic) {
         throw UnimplementedError('TODO(paulberry)');
         // target.accept(this);
       } else {
