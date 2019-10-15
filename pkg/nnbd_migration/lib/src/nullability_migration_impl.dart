@@ -94,6 +94,7 @@ class NullabilityMigrationImpl implements NullabilityMigration {
       NullabilityMigrationInstrumentation instrumentation) {
     for (var entry in variables.getPotentialModifications().entries) {
       var source = entry.key;
+      var editFixPairs = <_EditFixPair>[];
       final lineInfo = LineInfo.fromContent(source.contents.data);
       for (var potentialModification in entry.value) {
         var modifications = potentialModification.modifications;
@@ -105,11 +106,23 @@ class NullabilityMigrationImpl implements NullabilityMigration {
         listener.addFix(fix);
         instrumentation?.fix(fix, potentialModification.reasons);
         for (var edit in modifications) {
-          listener.addEdit(fix, edit);
+          editFixPairs.add(_EditFixPair(edit, fix));
         }
+      }
+      editFixPairs.sort((a, b) => b.edit.offset.compareTo(a.edit.offset));
+      for (var editFixPair in editFixPairs) {
+        listener.addEdit(editFixPair.fix, editFixPair.edit);
       }
     }
   }
+}
+
+class _EditFixPair {
+  final SourceEdit edit;
+
+  final _SingleNullabilityFix fix;
+
+  _EditFixPair(this.edit, this.fix);
 }
 
 /// Implementation of [SingleNullabilityFix] used internally by

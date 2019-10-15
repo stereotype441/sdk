@@ -59,7 +59,6 @@ abstract class _ProvisionalApiTestBase extends AbstractContextTest {
     }
     for (var path in expectedOutput.keys) {
       var sourceEditsForPath = sourceEdits[path] ?? [];
-      sourceEditsForPath.sort((a, b) => b.offset.compareTo(a.offset));
       expect(SourceEdit.applySequence(input[path], sourceEditsForPath),
           expectedOutput[path]);
     }
