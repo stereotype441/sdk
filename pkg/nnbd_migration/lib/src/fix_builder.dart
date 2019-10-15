@@ -403,8 +403,6 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
     var target = node.realTarget;
     var callee = node.methodName.staticElement;
     var operator = node.operator;
-    // TODO(paulberry): test the operator == null case
-    assert(operator != null);
     bool isNullAware = operator != null && isNullAwareToken(operator.type);
     DartType targetType;
     if (target != null) {

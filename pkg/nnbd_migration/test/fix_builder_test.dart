@@ -1109,6 +1109,14 @@ _f(_C c) => c.f();
     visitSubexpression(findNode.methodInvocation('c.f'), 'int?');
   }
 
+  test_methodInvocation_topLevel() async {
+    await analyze('''
+_f() => _g();
+int _g() => 1;
+''');
+    visitSubexpression(findNode.methodInvocation('_g();'), 'int');
+  }
+
   test_methodInvocation_toString() async {
     await analyze('''
 abstract class _C {}
