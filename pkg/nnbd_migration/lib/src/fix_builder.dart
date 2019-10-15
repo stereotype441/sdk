@@ -127,6 +127,21 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   }
 
   @override
+  DartType visitArgumentList(ArgumentList node) {
+    for (var argument in node.arguments) {
+      String name;
+      Expression expression;
+      if (argument is NamedExpression) {
+        expression = argument.expression;
+      } else {
+        expression = argument as Expression;
+      }
+      visitSubexpression(expression, UnknownInferredType.instance);
+    }
+    return null;
+  }
+
+  @override
   DartType visitAssignmentExpression(AssignmentExpression node) {
     var operatorType = node.operator.type;
     var targetInfo =
@@ -388,13 +403,16 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
     var target = node.realTarget;
     var callee = node.methodName.staticElement;
     var operator = node.operator;
+    // TODO(paulberry): test the operator == null case
+    assert(operator != null);
     bool isNullAware = operator != null && isNullAwareToken(operator.type);
     DartType targetType;
     if (target != null) {
       if (isPrefix(target)) {
-        // Nothing to do.
+        throw UnimplementedError('TODO(paulberry)');
       } else if (callee is ExecutableElement && callee.isStatic) {
-        target.accept(this);
+        throw UnimplementedError('TODO(paulberry)');
+        // target.accept(this);
       } else {
         targetType = visitSubexpression(
             target,
@@ -414,6 +432,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
     }
     var calleeType = _computeMigratedType(callee, targetType: targetType);
     if (callee is PropertyAccessorElement) {
+      throw new UnimplementedError('TODO(paulberry)');
       calleeType = (calleeType as FunctionType).returnType;
     }
     var expressionType = _handleInvocationArguments(
@@ -733,6 +752,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
     }
     int i = 0;
     for (var argument in arguments) {
+      throw new UnimplementedError('TODO(paulberry)');
       String name;
       Expression expression;
       if (argument is NamedExpression) {
