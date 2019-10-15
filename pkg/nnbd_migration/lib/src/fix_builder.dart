@@ -124,12 +124,11 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   @override
   DartType visitArgumentList(ArgumentList node) {
     for (var argument in node.arguments) {
-      String name;
       Expression expression;
       if (argument is NamedExpression) {
         expression = argument.expression;
       } else {
-        expression = argument as Expression;
+        expression = argument;
       }
       visitSubexpression(expression, UnknownInferredType.instance);
     }
@@ -732,6 +731,15 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
       throw UnimplementedError('TODO(paulberry): Invocation of generic method');
     }
     int i = 0;
+    var namedParameterTypes = <String, DartType>{};
+    var positionalParameterTypes = <DartType>[];
+    for (var parameter in calleeType.parameters) {
+      if (parameter.isNamed) {
+        namedParameterTypes[parameter.name] = parameter.type;
+      } else {
+        positionalParameterTypes.add(parameter.type);
+      }
+    }
     for (var argument in arguments) {
       String name;
       Expression expression;
@@ -743,11 +751,12 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
       }
       DartType parameterType;
       if (name != null) {
-        parameterType = calleeType.namedParameterTypes[name];
+        parameterType = namedParameterTypes[name];
         assert(parameterType != null, 'Missing type for named parameter');
       } else {
-        parameterType = calleeType.getPositionalParameterType(i);
-        assert(parameterType != null, 'Missing positional parameter at $i');
+        assert(i < positionalParameterTypes.length,
+            'Missing positional parameter at $i');
+        parameterType = positionalParameterTypes[i++];
       }
       visitSubexpression(expression, parameterType);
     }
