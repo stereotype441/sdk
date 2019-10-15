@@ -241,11 +241,6 @@ abstract class FunctionType implements ParameterizedType {
   /// from the perspective of this function type.
   List<TypeParameterElement> get typeFormals;
 
-  /// Retrieves the type of the positional parameter at the given [index] (which
-  /// may be either required or optional), or `null` if the total number of
-  /// positional parameters is less than or equal to [index].
-  DartType getPositionalParameterType(int index);
-
   @override
   FunctionType instantiate(List<DartType> argumentTypes);
 
