@@ -738,12 +738,6 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
       if (argument is NamedExpression) {
         name = argument.name.label.name;
         expression = argument.expression;
-      } else if (argument is FormalParameter) {
-        throw new UnimplementedError('TODO(paulberry)');
-        if (argument.isNamed) {
-          name = argument.identifier.name;
-        }
-        expression = argument.identifier;
       } else {
         expression = argument as Expression;
       }
