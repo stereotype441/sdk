@@ -421,9 +421,6 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
       node.typeArguments?.accept(this);
       node.argumentList.accept(this);
       return typeProvider.dynamicType;
-    } else if (callee is VariableElement) {
-      // Function expression invocation that looks like a method invocation.
-      throw new UnimplementedError('TODO(paulberry)');
     }
     var calleeType = _computeMigratedType(callee, targetType: targetType);
     if (callee is PropertyAccessorElement) {
