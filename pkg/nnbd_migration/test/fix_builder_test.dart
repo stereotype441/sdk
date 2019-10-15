@@ -1897,7 +1897,7 @@ void _f() {
 }
 ''');
     visitStatement(findNode.statement('int x'),
-        changes: {findNode.typeAnnotation('int'): NullCheck()});
+        changes: {findNode.typeAnnotation('int'): MakeNullable()});
   }
 
   test_variableDeclaration_typed_uninitialized() async {
