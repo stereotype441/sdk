@@ -407,8 +407,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
     DartType targetType;
     if (target != null) {
       if (callee is ExecutableElement && callee.isStatic) {
-        throw UnimplementedError('TODO(paulberry)');
-        // target.accept(this);
+        target.accept(this);
       } else {
         targetType = visitSubexpression(
             target,

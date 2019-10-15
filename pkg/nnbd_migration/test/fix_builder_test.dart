@@ -1120,6 +1120,16 @@ _f(_C c) => c.f();
     visitSubexpression(findNode.methodInvocation('c.f'), 'int?');
   }
 
+  test_methodInvocation_static() async {
+    await analyze('''
+_f() => _C.g();
+class _C {
+  static int g() => 1;
+}
+''');
+    visitSubexpression(findNode.methodInvocation('_C.g();'), 'int');
+  }
+
   test_methodInvocation_topLevel() async {
     await analyze('''
 _f() => _g();
