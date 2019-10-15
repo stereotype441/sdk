@@ -52,7 +52,6 @@ class Driver {
       for (SourceFileEdit fileEdit in result.edits) {
         final file = File(fileEdit.file);
         String code = file.existsSync() ? file.readAsStringSync() : '';
-        print('Applying sequence ${fileEdit.edits}');
         code = SourceEdit.applySequence(code, fileEdit.edits);
         await file.writeAsString(code);
       }
