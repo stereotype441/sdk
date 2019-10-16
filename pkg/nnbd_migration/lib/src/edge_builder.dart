@@ -190,7 +190,9 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   /// nullable.
   final Map<Expression, NullabilityNode> _conditionalNodes = {};
 
-  DecoratedType currentCascadeTargetType;
+  /// If we are visiting a cascade expression, the decorated type of the target
+  /// of the cascade.  Otherwise `null`.
+  DecoratedType _currentCascadeTargetType;
 
   EdgeBuilder(this.typeProvider, this._typeSystem, this._variables, this._graph,
       this.source, this.listener, this._decoratedClassHierarchy,
@@ -421,13 +423,13 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   DecoratedType visitCascadeExpression(CascadeExpression node) {
-    var oldCascadeTargetType = currentCascadeTargetType;
+    var oldCascadeTargetType = _currentCascadeTargetType;
     try {
-      currentCascadeTargetType = _checkExpressionNotNull(node.target);
+      _currentCascadeTargetType = _checkExpressionNotNull(node.target);
       node.cascadeSections.accept(this);
-      return currentCascadeTargetType;
+      return _currentCascadeTargetType;
     } finally {
-      currentCascadeTargetType = oldCascadeTargetType;
+      _currentCascadeTargetType = oldCascadeTargetType;
     }
   }
 
@@ -759,7 +761,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     DecoratedType targetType;
     var target = node.target;
     if (node.isCascaded) {
-      targetType = currentCascadeTargetType;
+      targetType = _currentCascadeTargetType;
     } else if (target != null) {
       targetType = _checkExpressionNotNull(target);
     }
@@ -919,7 +921,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     var callee = node.methodName.staticElement;
     bool calleeIsStatic = callee is ExecutableElement && callee.isStatic;
     if (node.isCascaded) {
-      targetType = currentCascadeTargetType;
+      targetType = _currentCascadeTargetType;
     } else if (target != null) {
       if (_isPrefix(target)) {
         // Nothing to do.
@@ -1977,7 +1979,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     var callee = propertyName.staticElement;
     bool calleeIsStatic = callee is ExecutableElement && callee.isStatic;
     if (isCascaded) {
-      targetType = currentCascadeTargetType;
+      targetType = _currentCascadeTargetType;
     } else if (_isPrefix(target)) {
       return propertyName.accept(this);
     } else if (calleeIsStatic) {
