@@ -396,8 +396,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   DartType visitMethodInvocation(MethodInvocation node) {
     var target = node.realTarget;
     var callee = node.methodName.staticElement;
-    var operator = node.operator;
-    bool isNullAware = operator != null && isNullAwareToken(operator.type);
+    bool isNullAware = node.isNullAware;
     DartType targetType;
     if (target != null) {
       if (callee is ExecutableElement && callee.isStatic) {

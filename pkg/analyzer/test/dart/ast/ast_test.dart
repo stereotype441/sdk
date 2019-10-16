@@ -388,6 +388,16 @@ class MethodInvocationTest extends ParserTestCase {
     expect(invocation.isNullAware, isFalse);
   }
 
+  void test_isNullAware_cascade_true() {
+    final invocation = AstTestFactory.methodInvocation3(
+        AstTestFactory.nullLiteral(),
+        'foo',
+        null,
+        [],
+        TokenType.QUESTION_PERIOD_PERIOD);
+    expect(invocation.isNullAware, isTrue);
+  }
+
   void test_isNullAware_regularInvocation() {
     final invocation = AstTestFactory.methodInvocation3(
         AstTestFactory.nullLiteral(), 'foo', null, [], TokenType.PERIOD);
@@ -760,6 +770,12 @@ class PropertyAccessTest extends ParserTestCase {
     final invocation = AstTestFactory.propertyAccess2(
         AstTestFactory.nullLiteral(), 'foo', TokenType.PERIOD_PERIOD);
     expect(invocation.isNullAware, isFalse);
+  }
+
+  void test_isNullAware_cascade_true() {
+    final invocation = AstTestFactory.propertyAccess2(
+        AstTestFactory.nullLiteral(), 'foo', TokenType.QUESTION_PERIOD_PERIOD);
+    expect(invocation.isNullAware, isTrue);
   }
 
   void test_isNullAware_regularPropertyAccess() {
