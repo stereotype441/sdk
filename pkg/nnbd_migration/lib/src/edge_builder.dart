@@ -190,6 +190,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   /// nullable.
   final Map<Expression, NullabilityNode> _conditionalNodes = {};
 
+  DecoratedType currentCascadeTargetType;
+
   EdgeBuilder(this.typeProvider, this._typeSystem, this._variables, this._graph,
       this.source, this.listener, this._decoratedClassHierarchy,
       {this.instrumentation})
@@ -419,9 +421,37 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   DecoratedType visitCascadeExpression(CascadeExpression node) {
-    var type = node.target.accept(this);
-    node.cascadeSections.accept(this);
-    return type;
+    var oldCascadeTargetType = currentCascadeTargetType;
+    try {
+      bool requiresNonNull = node.cascadeSections.any((e) {
+        if (e is MethodInvocation) {
+          return !e.isNullAware;
+        } else if (e is AssignmentExpression) {
+          var leftHandSide = e.leftHandSide;
+          if (leftHandSide is PropertyAccess) {
+            return !leftHandSide.isNullAware;
+          } else if (leftHandSide is IndexExpression) {
+            return !leftHandSide.isNullAware;
+          } else {
+            _unimplemented(
+                e, 'Unexpected LHS of assignment in cascade section');
+          }
+        } else if (e is IndexExpression) {
+          return !e.isNullAware;
+        } else {
+          _unimplemented(e, 'Unexpected cascade section');
+        }
+      });
+      if (requiresNonNull) {
+        currentCascadeTargetType = _checkExpressionNotNull(node.target);
+      } else {
+        currentCascadeTargetType = node.target.accept(this);
+      }
+      node.cascadeSections.accept(this);
+      return currentCascadeTargetType;
+    } finally {
+      currentCascadeTargetType = oldCascadeTargetType;
+    }
   }
 
   @override
@@ -904,12 +934,14 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   @override
   DecoratedType visitMethodInvocation(MethodInvocation node) {
     DecoratedType targetType;
-    var target = node.realTarget;
+    var target = node.target;
     var operator = node.operator;
     bool isNullAware = operator != null && isNullAwareToken(operator.type);
     var callee = node.methodName.staticElement;
     bool calleeIsStatic = callee is ExecutableElement && callee.isStatic;
-    if (target != null) {
+    if (node.isCascaded) {
+      targetType = currentCascadeTargetType;
+    } else if (target != null) {
       if (_isPrefix(target)) {
         // Nothing to do.
       } else if (calleeIsStatic) {
