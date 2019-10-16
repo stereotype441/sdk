@@ -423,30 +423,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   DecoratedType visitCascadeExpression(CascadeExpression node) {
     var oldCascadeTargetType = currentCascadeTargetType;
     try {
-      bool requiresNonNull = node.cascadeSections.any((e) {
-        if (e is MethodInvocation) {
-          return !e.isNullAware;
-        } else if (e is AssignmentExpression) {
-          var leftHandSide = e.leftHandSide;
-          if (leftHandSide is PropertyAccess) {
-            return !leftHandSide.isNullAware;
-          } else if (leftHandSide is IndexExpression) {
-            return !leftHandSide.isNullAware;
-          } else {
-            _unimplemented(
-                e, 'Unexpected LHS of assignment in cascade section');
-          }
-        } else if (e is IndexExpression) {
-          return !e.isNullAware;
-        } else {
-          _unimplemented(e, 'Unexpected cascade section');
-        }
-      });
-      if (requiresNonNull) {
-        currentCascadeTargetType = _checkExpressionNotNull(node.target);
-      } else {
-        currentCascadeTargetType = node.target.accept(this);
-      }
+      currentCascadeTargetType = _checkExpressionNotNull(node.target);
       node.cascadeSections.accept(this);
       return currentCascadeTargetType;
     } finally {
