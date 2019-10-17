@@ -23,6 +23,7 @@ import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
 import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type_algebra.dart';
+import 'package:analyzer/src/dart/resolver/variance.dart';
 import 'package:analyzer/src/error/codes.dart' show StrongModeCode;
 import 'package:analyzer/src/generated/engine.dart' show AnalysisOptionsImpl;
 import 'package:analyzer/src/generated/resolver.dart' show TypeProvider;
@@ -901,24 +902,24 @@ class CodeChecker extends RecursiveAstVisitor {
       // The member may be from a superclass, so we need to ensure the type
       // parameters are properly substituted.
       var classElement = targetType.element;
-      var classLowerBound = classElement.instantiate(
-        typeArguments: List.filled(
-          classElement.typeParameters.length,
-          BottomTypeImpl.instance,
-        ),
-        nullabilitySuffix: NullabilitySuffix.none,
-      );
-      var memberLowerBound = inheritance.getMember(
-        classLowerBound,
-        Name(element.librarySource.uri, element.name),
-      );
-      if (memberLowerBound == null &&
-          element.enclosingElement is ExtensionElement) {
-        return;
-      }
-      var expectedType = invokeType.returnType;
 
-      if (!rules.isSubtypeOf(memberLowerBound.returnType, expectedType)) {
+      var rawElement =
+          (element is ExecutableMember) ? element.baseElement : element;
+      var rawReturnType = rawElement.returnType;
+
+      // Check if the return type uses a class type parameter contravariantly.
+      bool needsCheck = false;
+      for (var typeParameter in classElement.typeParameters) {
+        var variance = computeVariance(typeParameter, rawReturnType);
+        if (variance == Variance.contravariant ||
+            variance == Variance.invariant) {
+          needsCheck = true;
+          break;
+        }
+      }
+
+      if (needsCheck) {
+        var expectedType = invokeType.returnType;
         var isMethod = element is MethodElement;
         var isCall = node is MethodInvocation;
 
@@ -1356,6 +1357,11 @@ class CodeChecker extends RecursiveAstVisitor {
   }
 
   void _visitForEachParts(ForEachParts node, SimpleIdentifier loopVariable) {
+    if (loopVariable.staticElement is! VariableElement) {
+      return;
+    }
+    VariableElement loopVariableElement = loopVariable.staticElement;
+
     // Safely handle malformed statements.
     if (loopVariable == null) {
       return;
@@ -1396,7 +1402,7 @@ class CodeChecker extends RecursiveAstVisitor {
     if (elementType != null) {
       // Insert a cast from the sequence's element type to the loop variable's
       // if needed.
-      _checkImplicitCast(loopVariable, _getExpressionType(loopVariable),
+      _checkImplicitCast(loopVariable, loopVariableElement.type,
           from: elementType);
     }
   }

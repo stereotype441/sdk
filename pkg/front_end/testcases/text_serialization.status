@@ -47,6 +47,7 @@ extensions/issue38713: TextSerializationFailure
 extensions/issue38745: TextSerializationFailure
 extensions/issue38750: TextSerializationFailure
 extensions/issue38755: TextSerializationFailure
+extensions/issue38915: TextSerializationFailure
 extensions/nested_on_types: TextSerializationFailure
 extensions/null_aware: TextSerializationFailure
 extensions/on_function_type: TextSerializationFailure
@@ -100,6 +101,7 @@ general/bug34511: TextSerializationFailure # Was: Pass
 general/bug35470: TextSerializationFailure # Was: Pass
 general/bug37476: TextSerializationFailure
 general/call: TypeCheckError
+general/candidate_found: TypeCheckError
 general/cascade: TextSerializationFailure # Was: RuntimeError
 general/casts: TextSerializationFailure # Was: Pass
 general/check_deferred_allocation: TextSerializationFailure # Was: Pass
@@ -874,6 +876,7 @@ nnbd/function_types: TextSerializationFailure
 nnbd/intersection_types: TextSerializationFailure
 nnbd/late: TextSerializationFailure
 nnbd/null_check: TextSerializationFailure
+nnbd/nullable_null: TextSerializationFailure
 nnbd/nullable_param: TextSerializationFailure
 nnbd/required: TextSerializationFailure
 nnbd/substitution_in_inference: TextSerializationFailure
@@ -1050,6 +1053,7 @@ regress/issue_34850: TextSerializationFailure # Was: Pass
 regress/issue_35151: TextSerializationFailure # Was: Pass
 regress/issue_35177: TextSerializationFailure # Was: RuntimeError
 regress/issue_35213: TextSerializationFailure # Was: Pass
+regress/issue_35220: TextSerializationFailure
 regress/issue_35258: TextSerializationFailure # Was: RuntimeError # Expected
 regress/issue_35259: TextSerializationFailure # Was: RuntimeError # Expected
 regress/issue_35260: TextSerializationFailure # Was: RuntimeError # Expected

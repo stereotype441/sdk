@@ -1533,13 +1533,16 @@ class BodyBuilder extends ScopeListener<JumpTarget>
             token.charOffset, token.length);
       }
     } else {
-      Expression result = buildMethodInvocation(a, new Name(operator),
-          forest.createArguments(noLocation, <Expression>[b]), token.charOffset,
+      Expression result = buildMethodInvocation(
+          a,
+          new Name(operator),
+          forest.createArguments(token.charOffset, <Expression>[b]),
+          token.charOffset,
           // This *could* be a constant expression, we can't know without
           // evaluating [a] and [b].
           isConstantExpression: !isSuper,
           isSuper: isSuper);
-      return negate ? forest.createNot(noLocation, result) : result;
+      return negate ? forest.createNot(token.charOffset, result) : result;
     }
   }
 
@@ -1616,7 +1619,17 @@ class BodyBuilder extends ScopeListener<JumpTarget>
         contextMessage = fasta.templateCandidateFoundIsDefaultConstructor
             .withArguments(candidate.enclosingClass.name);
       } else {
-        length = name.length;
+        if (candidate is Constructor) {
+          if (candidate.name.name == '') {
+            length = candidate.enclosingClass.name.length;
+          } else {
+            // Assume no spaces around the dot. Not perfect, but probably the
+            // best we can do with the information available.
+            length = candidate.enclosingClass.name.length + 1 + name.length;
+          }
+        } else {
+          length = name.length;
+        }
         contextMessage = fasta.messageCandidateFound;
       }
       context = [contextMessage.withLocation(uri, offset, length)];

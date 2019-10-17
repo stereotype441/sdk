@@ -13,7 +13,7 @@ namespace dart {
 
 // 0x4 is just a placeholder PC offset because no entry of a CSM should
 // have a PC offset of 0, otherwise internal assumptions break.
-static const intptr_t kTestPcOffset = 0x4;
+static const uint32_t kTestPcOffset = 0x4;
 static const intptr_t kTestSpillSlotBitCount = 0;
 
 static RawCompressedStackMaps* MapsFromBuilder(BitmapBuilder* bmap) {

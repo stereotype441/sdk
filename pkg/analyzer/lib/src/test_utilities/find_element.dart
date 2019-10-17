@@ -261,15 +261,21 @@ class FindElement {
   LocalVariableElement localVar(String name) {
     LocalVariableElement result;
 
-    unit.accept(new FunctionAstVisitor(
-      variableDeclaration: (node) {
-        var element = node.declaredElement;
-        if (element is LocalVariableElement && element.name == name) {
-          if (result != null) {
-            throw StateError('Not unique: $name');
-          }
-          result = element;
+    void updateResult(Element element) {
+      if (element is LocalVariableElement && element.name == name) {
+        if (result != null) {
+          throw StateError('Not unique: $name');
         }
+        result = element;
+      }
+    }
+
+    unit.accept(new FunctionAstVisitor(
+      declaredIdentifier: (node) {
+        updateResult(node.declaredElement);
+      },
+      variableDeclaration: (node) {
+        updateResult(node.declaredElement);
       },
     ));
 
@@ -375,6 +381,13 @@ class FindElement {
         findIn(accessor.parameters);
       }
     }
+
+    unit.accept(
+      FunctionAstVisitor(functionDeclarationStatement: (node) {
+        var functionElement = node.functionDeclaration.declaredElement;
+        findIn(functionElement.parameters);
+      }),
+    );
 
     if (result != null) {
       return result;

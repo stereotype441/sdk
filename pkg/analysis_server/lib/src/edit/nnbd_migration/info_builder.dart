@@ -2,6 +2,8 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+import 'dart:collection';
+
 import 'package:analysis_server/src/analysis_server.dart';
 import 'package:analysis_server/src/domains/analysis/navigation_dart.dart';
 import 'package:analysis_server/src/edit/fix/dartfix_listener.dart';
@@ -52,9 +54,10 @@ class InfoBuilder {
 
   /// Return the migration information for all of the libraries that were
   /// migrated.
-  Future<List<UnitInfo>> explainMigration() async {
+  Future<Set<UnitInfo>> explainMigration() async {
     Map<Source, SourceInformation> sourceInfoMap = info.sourceInformation;
-    List<UnitInfo> units = [];
+    Set<UnitInfo> units =
+        SplayTreeSet<UnitInfo>((u1, u2) => u1.path.compareTo(u2.path));
     for (Source source in sourceInfoMap.keys) {
       String filePath = source.fullName;
       AnalysisSession session =
@@ -111,26 +114,30 @@ class InfoBuilder {
 
     /// If the [node] is the return expression for a function body, return the
     /// function body. Otherwise return `null`.
-    AstNode findFunctionBody() {
+    FunctionBody findFunctionBody() {
       if (parent is ExpressionFunctionBody) {
         return parent;
-      } else if (parent is ReturnStatement &&
-          parent.parent?.parent is BlockFunctionBody) {
-        return parent.parent.parent;
+      } else {
+        ReturnStatement returnNode =
+            parent.thisOrAncestorOfType<ReturnStatement>();
+        BlockFunctionBody bodyNode =
+            returnNode?.thisOrAncestorOfType<BlockFunctionBody>();
+        return bodyNode;
       }
-      return null;
     }
 
-    AstNode functionBody = findFunctionBody();
+    FunctionBody functionBody = findFunctionBody();
     if (functionBody != null) {
+      CompilationUnit unit = node.thisOrAncestorOfType<CompilationUnit>();
+      int lineNumber = unit.lineInfo.getLocation(node.offset).lineNumber;
       AstNode function = functionBody.parent;
       if (function is MethodDeclaration) {
         if (function.isGetter) {
-          return "This getter returns a nullable value";
+          return "This getter returns a nullable value on line $lineNumber";
         }
-        return "This method returns a nullable value";
+        return "This method returns a nullable value on line $lineNumber";
       }
-      return "This function returns a nullable value";
+      return "This function returns a nullable value on line $lineNumber";
     } else if (parent is VariableDeclaration) {
       AstNode grandparent = parent.parent?.parent;
       if (grandparent is FieldDeclaration) {
@@ -178,26 +185,32 @@ class InfoBuilder {
   /// Return a description of the given [origin] associated with the [edge].
   RegionDetail _buildDetailForOrigin(EdgeOriginInfo origin, EdgeInfo edge) {
     AstNode node = origin.node;
-    if (origin.kind == EdgeOriginKind.inheritance) {
-      // The node is the method declaration in the subclass and we want to link
-      // to the corresponding parameter in the declaration in the superclass.
-      TypeAnnotation type = info.typeAnnotationForNode(edge.sourceNode);
-      if (type != null) {
-        CompilationUnit unit = type.thisOrAncestorOfType<CompilationUnit>();
-        NavigationTarget target;
-        // Some nodes don't need a target; default formal parameters
-        // without explicit default values, for example.
-        if (node is DefaultFormalParameter && node.defaultValue == null) {
-          target = null;
-        } else {
+    NavigationTarget target;
+    // Some nodes don't need a target; default formal parameters
+    // without explicit default values, for example.
+    if (node is DefaultFormalParameter && node.defaultValue == null) {
+      target = null;
+    } else {
+      if (origin.kind == EdgeOriginKind.inheritance) {
+        // The node is the method declaration in the subclass and we want to
+        // link to the corresponding parameter in the declaration in the
+        // superclass.
+        TypeAnnotation type = info.typeAnnotationForNode(edge.sourceNode);
+        if (type != null) {
+          CompilationUnit unit = type.thisOrAncestorOfType<CompilationUnit>();
           target = _targetForNode(unit.declaredElement.source.fullName, type);
+          return RegionDetail(
+              "The corresponding parameter in the overridden method is "
+              "nullable",
+              target);
+          // TODO(srawlins): Also, this could be where a return type in an
+          //  overridden method is made nullable because an overriding method
+          //  was found with a nullable return type. Figure out how to tell
+          //  which situation we are in.
         }
-        return RegionDetail(
-            "The corresponding parameter in the overridden method is nullable",
-            target);
       }
+      target = _targetForNode(origin.source.fullName, node);
     }
-    NavigationTarget target = _targetForNode(origin.source.fullName, node);
     return RegionDetail(_buildDescriptionForOrigin(node), target);
   }
 
@@ -274,7 +287,7 @@ class InfoBuilder {
     // [fileEdit] is null when a file has no edits.
     if (fileEdit != null) {
       List<RegionInfo> regions = unitInfo.regions;
-      List<SourceEdit> edits = fileEdit.edits;
+      List<SourceEdit> edits = List.of(fileEdit.edits);
       edits.sort((first, second) => first.offset.compareTo(second.offset));
       OffsetMapper mapper = OffsetMapper.forEdits(edits);
       // Apply edits in reverse order and build the regions.

@@ -254,10 +254,7 @@ class KernelTarget extends TargetImplementation {
           loader.coreLibrary.lookupLocalMember("dynamic", required: true));
       loader.resolveParts();
       loader.computeLibraryScopes();
-      objectType
-          .bind(loader.coreLibrary.lookupLocalMember("Object", required: true));
-      bottomType
-          .bind(loader.coreLibrary.lookupLocalMember("Null", required: true));
+      setupTopAndBottomTypes();
       loader.resolveTypes();
       loader.computeDefaultTypes(dynamicType, bottomType, objectClassBuilder);
       List<SourceClassBuilder> myClasses =
@@ -565,6 +562,16 @@ class KernelTarget extends TargetImplementation {
     return new InterfaceType(enclosingClass, typeParameterTypes);
   }
 
+  void setupTopAndBottomTypes() {
+    objectType
+        .bind(loader.coreLibrary.lookupLocalMember("Object", required: true));
+
+    ClassBuilder nullClassBuilder =
+        loader.coreLibrary.lookupLocalMember("Null", required: true);
+    nullClassBuilder.isNullClass = true;
+    bottomType.bind(nullClassBuilder);
+  }
+
   void computeCoreTypes() {
     List<Library> libraries = <Library>[];
     for (String platformLibrary in [
@@ -793,6 +800,7 @@ class KernelTarget extends TargetImplementation {
         environment,
         new KernelConstantErrorReporter(loader),
         desugarSets: !backendTarget.supportsSetLiterals,
+        enableTripleShift: enableTripleShift,
         errorOnUnevaluatedConstant: errorOnUnevaluatedConstant);
     ticker.logMs("Evaluated constants");
 

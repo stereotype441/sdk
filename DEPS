@@ -85,8 +85,8 @@ vars = {
   "dart_style_tag": "1.3.1",  # Please see the note above before updating.
 
   "args_tag" : "1.5.2",
-  "dartdoc_tag" : "v0.28.7",
-  "ffi_tag": "f46c1f42c6f7f1938f2ff27c573da72d57c47ded",
+  "dartdoc_tag" : "v0.28.8",
+  "ffi_tag": "ea88d71b043ee14b268c3aedff14e9eb32e20959",
   "fixnum_tag": "0.10.9",
   "glob_tag": "1.1.7",
   "html_tag" : "0.14.0+1",
@@ -140,7 +140,7 @@ vars = {
   "term_glyph_tag": "1.0.1",
   "test_reflective_loader_tag": "0.1.9",
   "test_tag": "test-v1.6.4",
-  "tflite_native_rev": "06e533a9747306d1114c53427cc67eda080f51f9",
+  "tflite_native_rev": "3c777c40608a2a9f1427bfe0028ab48e7116b4c1",
   "typed_data_tag": "1.1.6",
   "unittest_rev": "2b8375bc98bb9dc81c539c91aaea6adce12e1072",
   "usage_tag": "3.4.0",

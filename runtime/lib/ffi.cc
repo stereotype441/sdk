@@ -88,38 +88,10 @@ static size_t SizeOf(const AbstractType& type) {
 
 // The remainder of this file implements the dart:ffi native methods.
 
-DEFINE_NATIVE_ENTRY(Ffi_allocate, 1, 1) {
-  GET_NATIVE_TYPE_ARGUMENT(type_arg, arguments->NativeTypeArgAt(0));
-
-  CheckSized(type_arg);
-  size_t element_size = SizeOf(type_arg);
-
-  GET_NON_NULL_NATIVE_ARGUMENT(Integer, argCount, arguments->NativeArgAt(0));
-  int64_t count = argCount.AsInt64Value();
-  size_t size = element_size * count;  // Truncates overflow.
-  size_t memory = reinterpret_cast<size_t>(malloc(size));
-  if (memory == 0) {
-    const String& error = String::Handle(String::NewFormatted(
-        "allocating (%" Pd ") bytes of memory failed", size));
-    Exceptions::ThrowArgumentError(error);
-  }
-
-  RawPointer* result = Pointer::New(type_arg, memory);
-  return result;
-}
-
 DEFINE_NATIVE_ENTRY(Ffi_fromAddress, 1, 1) {
   GET_NATIVE_TYPE_ARGUMENT(type_arg, arguments->NativeTypeArgAt(0));
   GET_NON_NULL_NATIVE_ARGUMENT(Integer, arg_ptr, arguments->NativeArgAt(0));
   return Pointer::New(type_arg, arg_ptr.AsInt64Value());
-}
-
-DEFINE_NATIVE_ENTRY(Ffi_free, 0, 1) {
-  GET_NON_NULL_NATIVE_ARGUMENT(Pointer, pointer, arguments->NativeArgAt(0));
-
-  free(reinterpret_cast<void*>(pointer.NativeAddress()));
-
-  return Object::null();
 }
 
 DEFINE_NATIVE_ENTRY(Ffi_address, 0, 1) {
@@ -205,8 +177,6 @@ static RawObject* LoadValueStruct(Zone* zone,
   ASSERT(constructor.IsGenerativeConstructor());
   ASSERT(!Object::Handle(constructor.VerifyCallEntryPoint()).IsError());
   const Instance& new_object = Instance::Handle(Instance::New(cls));
-  new_object.SetTypeArguments(
-      TypeArguments::Handle(instance_type_arg.arguments()));
   ASSERT(cls.is_allocated() || Dart::vm_snapshot_kind() != Snapshot::kFullAOT);
   const Array& args = Array::Handle(zone, Array::New(2));
   args.SetAt(0, new_object);

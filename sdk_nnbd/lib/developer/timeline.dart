@@ -193,11 +193,11 @@ class TimelineTask {
   /// Create a task with an explicit [taskId]. This is useful if you are
   /// passing a task from one isolate to another.
   ///
-  /// If [parent] is provided, the parent's task ID is provided as argument
-  /// 'parentId' when [start] is called. In DevTools, this argument will result
-  /// in this [TimelineTask] being linked to the [parent] [TimelineTask].
-  TimelineTask.withTaskId(int taskId, {TimelineTask parent})
-      : _parent = parent,
+  /// Important note: only provide task IDs which have been obtained as a
+  /// result of invoking [TimelineTask.pass]. Specifying a custom ID can lead
+  /// to ID collisions, resulting in incorrect rendering of timeline events.
+  TimelineTask.withTaskId(int taskId)
+      : _parent = null,
         _taskId = taskId {
     ArgumentError.checkNotNull(taskId, 'taskId');
   }

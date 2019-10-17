@@ -291,7 +291,8 @@ void StackFrame::VisitObjectPointers(ObjectPointerVisitor* visitor) {
     maps = code.compressed_stackmaps();
     CompressedStackMapsIterator it(maps);
     const uword start = Instructions::PayloadStart(code.instructions());
-    if (it.Find(pc() - start)) {
+    const uint32_t pc_offset = pc() - start;
+    if (it.Find(pc_offset)) {
 #if !defined(TARGET_ARCH_DBC)
       if (is_interpreted()) {
         UNIMPLEMENTED();
@@ -379,7 +380,12 @@ void StackFrame::VisitObjectPointers(ObjectPointerVisitor* visitor) {
       return;
     }
 
-    // No stack map, fall through.
+    // If we are missing a stack map for a given PC offset, this must either be
+    // unoptimized code, code with no stack map information at all, or the entry
+    // to an osr function. In each of these cases, all stack slots contain
+    // tagged pointers, so fall through.
+    ASSERT(!code.is_optimized() || maps.IsNull() ||
+           (pc_offset == code.EntryPoint() - code.PayloadStart()));
   }
 
 #if !defined(TARGET_ARCH_DBC)

@@ -92,7 +92,7 @@ class InfoBuilderTest extends AbstractAnalysisTest {
     // Build the migration info.
     InstrumentationInformation info = instrumentationListener.data;
     InfoBuilder builder = InfoBuilder(info, listener);
-    infos = await builder.explainMigration();
+    infos = (await builder.explainMigration()).toList();
   }
 
   test_asExpression() async {
@@ -137,7 +137,7 @@ String? g() => 1 == 2 ? "Hello" : null;
     assertRegion(
         region: regions[0],
         offset: 6,
-        details: ["This function returns a nullable value"]);
+        details: ["This function returns a nullable value on line 1"]);
     assertDetail(detail: regions[0].details[0], offset: 11, length: 2);
   }
 
@@ -464,6 +464,62 @@ void f([String? s]) {}
         details: ["This parameter has an implicit default value of 'null'"]);
   }
 
+  @failingTest
+  test_return_fromOverriden() async {
+    addTestFile('''
+abstract class A {
+  String m();
+}
+class B implements A {
+  String m() => 1 == 2 ? "Hello" : null;
+}
+''');
+    await buildInfo();
+    expect(infos, hasLength(1));
+    UnitInfo unit = infos[0];
+    expect(unit.path, testFile);
+    expect(unit.content, '''
+abstract class A {
+  String? m();
+}
+class B implements A {
+  String? m() => 1 == 2 ? "Hello" : null;
+}
+''');
+    List<RegionInfo> regions = unit.regions;
+    expect(regions, hasLength(2));
+    assertRegion(
+        region: regions[0],
+        offset: 27,
+        details: ["An overridding method has a nullable return value"]);
+  }
+
+  test_return_multipleReturns() async {
+    addTestFile('''
+String g() {
+  int x = 1;
+  if (x == 2) return x == 3 ? "Hello" : null;
+  return "Hello";
+}
+''');
+    await buildInfo();
+    UnitInfo unit = infos[0];
+    expect(unit.content, '''
+String? g() {
+  int x = 1;
+  if (x == 2) return x == 3 ? "Hello" : null;
+  return "Hello";
+}
+''');
+    List<RegionInfo> regions = unit.regions;
+    expect(regions, hasLength(1));
+    assertRegion(
+        region: regions[0],
+        offset: 6,
+        details: ["This function returns a nullable value on line 3"]);
+    assertInTargets(targets: unit.targets, offset: 40, length: 6); // "return"
+  }
+
   test_returnDetailTarget() async {
     addTestFile('''
 String g() {
@@ -484,7 +540,7 @@ String? g() {
     assertRegion(
         region: regions[0],
         offset: 6,
-        details: ["This function returns a nullable value"]);
+        details: ["This function returns a nullable value on line 2"]);
     assertDetail(detail: regions[0].details[0], offset: 15, length: 6);
   }
 
@@ -510,7 +566,7 @@ int? f() => _f;
     assertRegion(
         region: regions[1],
         offset: 19,
-        details: ["This function returns a nullable value"]);
+        details: ["This function returns a nullable value on line 2"]);
   }
 
   test_returnType_getter_block() async {
@@ -543,7 +599,7 @@ class A {
     assertRegion(
         region: regions[1],
         offset: 33,
-        details: ["This getter returns a nullable value"]);
+        details: ["This getter returns a nullable value on line 4"]);
   }
 
   test_returnType_getter_expression() async {
@@ -572,7 +628,7 @@ class A {
     assertRegion(
         region: regions[1],
         offset: 33,
-        details: ["This getter returns a nullable value"]);
+        details: ["This getter returns a nullable value on line 3"]);
   }
 
   test_topLevelVariable() async {

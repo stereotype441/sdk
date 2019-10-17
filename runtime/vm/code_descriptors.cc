@@ -124,7 +124,7 @@ bool CompressedStackMapsIterator::MoveNext() {
 
   // Now that the current entry has been completely decoded without errors, set
   // the fields appropriately.
-  ASSERT(current_pc_offset_ < (kIntptrMax - static_cast<intptr_t>(pc_delta)));
+  ASSERT(pc_delta <= (kMaxUint32 - current_pc_offset_));
   current_pc_offset_ += pc_delta;
   current_spill_slot_bit_count_ = spill_slot_bit_count;
   current_non_spill_slot_bit_count_ = non_spill_slot_bit_count;

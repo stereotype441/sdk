@@ -2035,10 +2035,6 @@ class _Parser {
   static Rti toType(Object universe, Rti environment, Object item) {
     if (_Utils.isString(item)) {
       String name = _Utils.asString(item);
-      // TODO(sra): Compile this out for minified code.
-      if ('dynamic' == name) {
-        return _Universe._lookupDynamicRti(universe);
-      }
       return _Universe._lookupInterfaceRti(
           universe, name, _Universe.sharedEmptyArray(universe));
     } else if (_Utils.isNum(item)) {
@@ -2143,11 +2139,6 @@ bool _isSubtype(universe, Rti s, sEnv, Rti t, tEnv) {
     return false;
   }
 
-  // Generic function type parameters must match exactly, which would have
-  // exited earlier.
-  if (isGenericFunctionTypeParameter(s)) return false;
-  if (isGenericFunctionTypeParameter(t)) return false;
-
   if (isNullType(s)) return true;
 
   if (isFutureOrType(t)) {
@@ -2168,6 +2159,18 @@ bool _isSubtype(universe, Rti s, sEnv, Rti t, tEnv) {
           universe, s, sEnv, futureClass, argumentsArray, tEnv);
     }
   }
+
+  // If [s] and [t] are both generic function type parameters, they must be
+  // equal (as de Bruijn indices). This case is taken care of by the reflexivity
+  // check above, so it suffices to check that B <: [t] where B is the bound of
+  // [s].
+  if (isGenericFunctionTypeParameter(s)) {
+    int index = Rti._getGenericFunctionParameterIndex(s);
+    Rti bound = _castToRti(_Utils.arrayAt(sEnv, index));
+    return _isSubtype(universe, bound, sEnv, t, tEnv);
+  }
+
+  if (isGenericFunctionTypeParameter(t)) return false;
 
   // TODO(fishythefish): Disallow JavaScriptFunction as a subtype of function
   // types using features inaccessible from JavaScript.
@@ -2200,9 +2203,9 @@ bool _isGenericFunctionSubtype(universe, Rti s, sEnv, Rti t, tEnv) {
   var sBounds = Rti._getGenericFunctionBounds(s);
   var tBounds = Rti._getGenericFunctionBounds(t);
   if (!typesEqual(sBounds, tBounds)) return false;
-  // TODO(fishythefish): Extend [sEnv] and [tEnv] with bindings for the [s]
-  // and [t] type parameters to enable checking the bound against
-  // non-type-parameter terms.
+
+  sEnv = sEnv == null ? sBounds : _Utils.arrayConcat(sBounds, sEnv);
+  tEnv = tEnv == null ? tBounds : _Utils.arrayConcat(tBounds, tEnv);
 
   return _isFunctionSubtype(universe, Rti._getGenericFunctionBase(s), sEnv,
       Rti._getGenericFunctionBase(t), tEnv);
