@@ -76,7 +76,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   final TypeProvider typeProvider;
 
   /// The type system.
-  final TypeSystem _typeSystem;
+  final Dart2TypeSystem _typeSystem;
 
   /// Variables for this migration run.
   final Variables _variables;
@@ -726,13 +726,26 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
       List<TypeParameterElement> constructorTypeParameters,
       {DartType invokeType}) {
     var typeFormals = constructorTypeParameters ?? calleeType.typeFormals;
+    FunctionType downwardInferredCalleeType;
+    List<DartType> argumentTypes;
     if (typeFormals.isNotEmpty) {
-      throw UnimplementedError('TODO(paulberry): Invocation of generic method');
+      var downwardInferredTypeParameters =
+          _typeSystem.inferGenericFunctionOrType(
+              typeParameters: typeFormals,
+              parameters: const [],
+              declaredReturnType: calleeType.returnType,
+              argumentTypes: const [],
+              contextReturnType: _contextType);
+      downwardInferredCalleeType =
+          calleeType.instantiate(downwardInferredTypeParameters);
+      argumentTypes = [];
+    } else {
+      downwardInferredCalleeType = calleeType;
     }
     int i = 0;
     var namedParameterTypes = <String, DartType>{};
     var positionalParameterTypes = <DartType>[];
-    for (var parameter in calleeType.parameters) {
+    for (var parameter in downwardInferredCalleeType.parameters) {
       if (parameter.isNamed) {
         namedParameterTypes[parameter.name] = parameter.type;
       } else {
@@ -757,9 +770,23 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
             'Missing positional parameter at $i');
         parameterType = positionalParameterTypes[i++];
       }
-      visitSubexpression(expression, parameterType);
+      var argumentType = visitSubexpression(expression, parameterType);
+      argumentTypes?.add(argumentType);
     }
-    return calleeType.returnType;
+    FunctionType upwardInferredCalleeType;
+    if (typeFormals.isNotEmpty) {
+      var upwardInferredTypeParameters = _typeSystem.inferGenericFunctionOrType(
+          typeParameters: typeFormals,
+          parameters: downwardInferredCalleeType.parameters,
+          declaredReturnType: calleeType.returnType,
+          argumentTypes: argumentTypes,
+          contextReturnType: _contextType);
+      upwardInferredCalleeType =
+          calleeType.instantiate(upwardInferredTypeParameters);
+    } else {
+      upwardInferredCalleeType = calleeType;
+    }
+    return upwardInferredCalleeType.returnType;
   }
 
   DartType _handlePropertyAccess(Expression node, Expression target,
