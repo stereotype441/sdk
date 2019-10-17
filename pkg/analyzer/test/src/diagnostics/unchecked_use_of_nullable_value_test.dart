@@ -226,7 +226,7 @@ m() {
     ]);
   }
 
-  solo_test_cascade_nullable_indexed_assignment_null_aware() async {
+  test_cascade_nullable_indexed_assignment_null_aware() async {
     await assertErrorsInCode(r'''
 m() {
   List<int>? x;
