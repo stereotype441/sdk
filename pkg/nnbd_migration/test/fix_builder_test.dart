@@ -365,14 +365,11 @@ _f(_C<int, String> c) => c['foo'] = 1;
     visitAssignmentTarget(findNode.index('c['), null, 'int');
   }
 
-  @FailingTest(reason: r'''
-This test was broken because of considering  type parameter type nullabilities.
-''')
   test_assignmentTarget_indexExpression_substituted_check_rhs() async {
     await analyze('''
 class _C<T, U> {
   T operator[](U u) => throw 'foo';
-  void operator[]=(U/*?*/ u, T t) {}
+  void operator[]=(U/*!*/ u, T t) {}
 }
 _f(_C<int, String/*!*/> c, String/*?*/ s) => c[s] = 1;
 ''');
