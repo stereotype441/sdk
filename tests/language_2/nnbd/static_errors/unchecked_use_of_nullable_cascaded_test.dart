@@ -12,7 +12,7 @@ void main() {
   list..toString(); //# 02: ok
   list?..toString(); //# 03: ok
   list..last = 0; //# 04: compile-time error
-  list?..list = 0; //# 05: ok
+  list?..last = 0; //# 05: ok
   list..[0] = 0; //# 06: compile-time error
   list?..[0] = 0; //# 07: ok
 
