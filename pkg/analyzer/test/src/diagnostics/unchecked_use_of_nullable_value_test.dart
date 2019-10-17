@@ -227,12 +227,12 @@ m() {
   }
 
   test_cascade_nullable_indexed_assignment_null_aware() async {
-    await assertErrorsInCode(r'''
+    await assertNoErrorsInCode(r'''
 m() {
   List<int>? x;
   x?..[0] = 1;
 }
-''', []);
+''');
   }
 
   test_cascade_nullable_method_invocation() async {
@@ -247,12 +247,12 @@ m() {
   }
 
   test_cascade_nullable_method_invocation_null_aware() async {
-    await assertErrorsInCode(r'''
+    await assertNoErrorsInCode(r'''
 m() {
   int? x;
   x?..abs();
 }
-''', []);
+''');
   }
 
   test_cascade_nullable_property_access() async {
@@ -267,12 +267,12 @@ m() {
   }
 
   test_cascade_nullable_property_access_null_aware() async {
-    await assertErrorsInCode(r'''
+    await assertNoErrorsInCode(r'''
 m() {
   int? x;
   x?..isEven;
 }
-''', []);
+''');
   }
 
   test_eqEq_nullable() async {
