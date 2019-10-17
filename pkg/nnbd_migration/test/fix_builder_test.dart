@@ -821,16 +821,10 @@ _f(_C<int, String> c) => c + 'foo';
     visitSubexpression(findNode.binary('c +'), 'int');
   }
 
-  @FailingTest(reason: r'''
-The code is resolved without NNBD, so the type of `T operator+(U u)` is
-`T* Function(U*)`. When we replace `T` with `int!`, and `U` with `String!` we
-get `int* Function(String*)`. Previously we substituted without considering
-type parameter type nullabilities.
-''')
   test_binaryExpression_userDefinable_substituted_check_rhs() async {
     await analyze('''
 class _C<T, U> {
-  T operator+(U u) => throw 'foo';
+  T operator+(U/*!*/ u) => throw 'foo';
 }
 _f(_C<int, String/*!*/> c, String/*?*/ s) => c + s;
 ''');
