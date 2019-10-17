@@ -1019,13 +1019,10 @@ _f(_C<int, String> c) => c['foo'];
     visitSubexpression(findNode.index('c['), 'int');
   }
 
-  @FailingTest(reason: r'''
-This test was broken because of considering  type parameter type nullabilities.
-''')
   test_indexExpression_substituted_check_rhs() async {
     await analyze('''
 class _C<T, U> {
-  T operator[](U u) => throw 'foo';
+  T operator[](U/*!*/ u) => throw 'foo';
 }
 _f(_C<int, String/*!*/> c, String/*?*/ s) => c[s];
 ''');
