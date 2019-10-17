@@ -1081,6 +1081,36 @@ _f(_C c, int/*?*/ y) => c.f(x: y);
         changes: {findNode.simple('y);'): NullCheck()});
   }
 
+  test_instanceCreationExpression_parameter() async {
+    await analyze('''
+class _C {
+  _C(int/*!*/ x);
+}
+_f(int/*?*/ y) => _C(y);
+''');
+    visitSubexpression(findNode.instanceCreation('_C(y)'), '_C', changes: {findNode.simple('y);'): NullCheck()});
+  }
+
+  solo_test_instanceCreationExpression_generic_explicit_null_check() async {
+    await analyze('''
+class _C<T> {
+  _C(T/*!*/ t);
+}
+_f(int/*?*/ y) => _C<int/*!*/>(y);
+''');
+    visitSubexpression(findNode.instanceCreation('_C<int'), '_C<int>', changes: {findNode.simple('y);'): NullCheck()});
+  }
+
+  test_instanceCreationExpression_generic_explicit_no_null_check() async {
+    await analyze('''
+class _C<T> {
+  _C(T/*!*/ t);
+}
+_f(int/*?*/ y) => _C<int/*?*/>(y);
+''');
+    visitSubexpression(findNode.instanceCreation('_C<int'), '_C<int?>');
+  }
+
   test_methodInvocation_ordinaryParameter() async {
     await analyze('''
 abstract class _C {

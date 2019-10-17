@@ -349,6 +349,34 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   }
 
   @override
+  DartType visitInstanceCreationExpression(InstanceCreationExpression node) {
+    var callee = node.staticElement;
+    var classElement = callee.enclosingElement;
+    List<DartType> typeArgumentTypes;
+    var typeArguments = node.constructorName.type.typeArguments;
+    if (typeArguments != null) {
+      typeArgumentTypes =
+          typeArguments.arguments.map((t) => t.accept(this)).toList();
+    } else if (classElement.typeParameters.isNotEmpty) {
+      throw UnimplementedError('TODO(paulberry)');
+    } else {
+      typeArgumentTypes = const [];
+    }
+    var createdType = InterfaceTypeImpl.explicit(
+        classElement, typeArgumentTypes,
+        nullabilitySuffix: NullabilitySuffix.none);
+    var calleeType = _computeMigratedType(callee, targetType: createdType);
+    _handleInvocationArguments(
+        node,
+        node.argumentList.arguments,
+        typeArguments,
+        typeArgumentTypes,
+        calleeType as FunctionType,
+        classElement.typeParameters);
+    return createdType;
+  }
+
+  @override
   DartType visitListLiteral(ListLiteral node) {
     DartType contextType;
     var typeArguments = node.typeArguments;
