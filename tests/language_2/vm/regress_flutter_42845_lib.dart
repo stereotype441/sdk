@@ -2,8 +2,11 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'dart:io';
+extension TestExtension on int {
+  bool get isPositive => this > 0;
+  bool get isNegative => this < 0;
+}
 
-void main() {
-  print(Platform.environment);
+extension UnusedExtension on int {
+  bool get isReallyZero => this == 0;
 }
