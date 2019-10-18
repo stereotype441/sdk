@@ -97,6 +97,8 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   /// The file being analyzed.
   final Source source;
 
+  DartType _returnContext;
+
   FixBuilder(this.source, this._decoratedClassHierarchy,
       TypeProvider typeProvider, this._typeSystem, this._variables)
       : typeProvider = (typeProvider as TypeProviderImpl)
@@ -307,6 +309,12 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   }
 
   @override
+  DartType visitExpressionFunctionBody(ExpressionFunctionBody node) {
+    visitSubexpression(node.expression, _returnContext);
+    return null;
+  }
+
+  @override
   DartType visitExpressionStatement(ExpressionStatement node) {
     visitSubexpression(node.expression, UnknownInferredType.instance);
     return null;
@@ -314,7 +322,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
 
   @override
   DartType visitFunctionExpression(FunctionExpression node) {
-    if(node.typeParameters != null) {
+    if (node.typeParameters != null) {
       throw UnimplementedError('TODO(paulberry)');
     }
     var contextType = _contextType;
@@ -346,10 +354,12 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
       }
       if (parameter is SimpleFormalParameter) {
         if (parameter.type == null) {
-          var inferredParameterType = _typeSystem.upperBoundForType(parameterContextType);
-          var desiredParameterType = _computeMigratedType(parameter.declaredElement);
+          var inferredParameterType =
+              _typeSystem.upperBoundForType(parameterContextType);
+          var desiredParameterType =
+              _computeMigratedType(parameter.declaredElement);
           if (desiredParameterType != inferredParameterType) {
-            throw UnimplementedError('TODO(paulberry)');
+            addChange(parameter, MakeTypeExplicit(desiredParameterType));
           }
         } else {
           throw UnimplementedError('TODO(paulberry)');
@@ -492,14 +502,6 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   DartType visitNode(AstNode node) {
     // Every node type needs its own visit method.
     throw UnimplementedError('No visit method for ${node.runtimeType}');
-  }
-
-  DartType _returnContext;
-
-  @override
-  DartType visitExpressionFunctionBody(ExpressionFunctionBody node) {
-    visitSubexpression(node.expression, _returnContext);
-    return null;
   }
 
   @override
@@ -858,6 +860,18 @@ class MakeNullable implements NodeChange {
   factory MakeNullable() => const MakeNullable._();
 
   const MakeNullable._();
+}
+
+/// [NodeChange] representing an implicit type that needs to be made explicit.
+class MakeTypeExplicit implements NodeChange {
+  /// The explicit type that needs to be introduced.
+  final DartType type;
+
+  MakeTypeExplicit(this.type);
+
+  @override
+  bool operator ==(Object other) =>
+      other is MakeTypeExplicit && other.type == this.type;
 }
 
 /// Base class representing a change the FixBuilder wishes to make to an AST

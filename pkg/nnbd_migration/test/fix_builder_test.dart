@@ -942,16 +942,22 @@ Object Function(_C) _f() => (x) => x._g();
         contextType: _migratedReturnType('_f'));
   }
 
-  solo_test_functionExpression_infer_parameter_type_mismatch() async {
+  test_functionExpression_infer_parameter_type_mismatch() async {
     await analyze('''
 abstract class _C {
   String _g(dynamic d);
 }
-Object Function(_C) _f() => (x) => x?._g(x = null);
+Object Function(_C/*!*/) _f() =>
+  (x) => x == null ? throw 'foo' : x._g(x = null);
 ''');
+    var xParam = findNode.simpleParameter('x)');
+    var nullableC = InterfaceTypeImpl.explicit(
+        findNode.classDeclaration('class _C').declaredElement, [],
+        nullabilitySuffix: NullabilitySuffix.question);
     visitSubexpression(
-        findNode.functionExpression('(x)'), 'String Function(_C)',
-        contextType: _migratedReturnType('_f'));
+        findNode.functionExpression('(x)'), 'String Function(_C?)',
+        contextType: _migratedReturnType('_f'),
+        changes: {xParam: MakeTypeExplicit(nullableC)});
   }
 
   test_functionExpression_pass_down_return_context() async {
