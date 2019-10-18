@@ -408,11 +408,7 @@ static Dart_Isolate IsolateSetupHelper(Dart_Isolate isolate,
     Dart_Handle uri =
         DartUtils::ResolveScript(Dart_NewStringFromCString(script_uri));
     CHECK_RESULT(uri);
-    if (kernel_buffer == NULL) {
-      result = Loader::LibraryTagHandler(Dart_kScriptTag, Dart_Null(), uri);
-      CHECK_RESULT(result);
-    } else {
-      // Various core-library parts will send requests to the Loader to resolve
+    if (kernel_buffer != NULL) {
       // relative URIs and perform other related tasks. We need Loader to be
       // initialized for this to work because loading from Kernel binary
       // bypasses normal source code loading paths that initialize it.
@@ -421,7 +417,6 @@ static Dart_Isolate IsolateSetupHelper(Dart_Isolate isolate,
       CHECK_RESULT(result);
       Loader::InitForSnapshot(resolved_script_uri, isolate_data);
     }
-
     Dart_TimelineEvent("LoadScript", Dart_TimelineGetMicros(),
                        Dart_GetMainPortId(), Dart_Timeline_Event_Async_End, 0,
                        NULL, NULL);
@@ -1088,16 +1083,21 @@ void main(int argc, char** argv) {
   // snapshot, load and run that.
   // Any arguments passed to such an executable are meant for the actual
   // application so skip all Dart VM flag parsing.
-  app_snapshot = Snapshot::TryReadAppendedAppSnapshotElf(argv[0]);
-  if (app_snapshot != nullptr) {
-    script_name = argv[0];
 
-    // Store the executable name.
-    Platform::SetExecutableName(argv[0]);
+  const size_t kPathBufSize = PATH_MAX + 1;
+  char executable_path[kPathBufSize];
+  if (Platform::ResolveExecutablePathInto(executable_path, kPathBufSize) > 0) {
+    app_snapshot = Snapshot::TryReadAppendedAppSnapshotElf(executable_path);
+    if (app_snapshot != nullptr) {
+      script_name = argv[0];
 
-    // Parse out options to be passed to dart main.
-    for (int i = 1; i < argc; i++) {
-      dart_options.AddArgument(argv[i]);
+      // Store the executable name.
+      Platform::SetExecutableName(argv[0]);
+
+      // Parse out options to be passed to dart main.
+      for (int i = 1; i < argc; i++) {
+        dart_options.AddArgument(argv[i]);
+      }
     }
   }
 #endif

@@ -433,7 +433,7 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
     return new Annotations(decl, hasPragma);
   }
 
-  ObjectHandle getMemberAttributes(Member member) {
+  ObjectHandle getMemberAttributes() {
     if (procedureAttributesMetadata == null && inferredTypesAttribute == null) {
       return null;
     }
@@ -450,6 +450,17 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       attrs.add(StringConstant(InferredTypeMetadataRepository.repositoryTag));
       attrs.add(ListConstant(const DynamicType(), inferredTypesAttribute));
     }
+    return objectTable.getHandle(ListConstant(const DynamicType(), attrs));
+  }
+
+  ObjectHandle getClosureAttributes() {
+    if (inferredTypesAttribute == null) {
+      return null;
+    }
+    final attrs = <Constant>[
+      StringConstant(InferredTypeMetadataRepository.repositoryTag),
+      ListConstant(const DynamicType(), inferredTypesAttribute),
+    ];
     return objectTable.getHandle(ListConstant(const DynamicType(), attrs));
   }
 
@@ -621,7 +632,7 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
         flags |= FieldDeclaration.hasPragmaFlag;
       }
     }
-    final ObjectHandle attributes = getMemberAttributes(field);
+    final ObjectHandle attributes = getMemberAttributes();
     if (attributes != null) {
       flags |= FieldDeclaration.hasAttributesFlag;
     }
@@ -737,7 +748,7 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
         flags |= FunctionDeclaration.hasPragmaFlag;
       }
     }
-    final ObjectHandle attributes = getMemberAttributes(member);
+    final ObjectHandle attributes = getMemberAttributes();
     if (attributes != null) {
       flags |= FunctionDeclaration.hasAttributesFlag;
     }
@@ -2354,6 +2365,8 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
     enclosingFunction = function;
     final savedLoopDepth = currentLoopDepth;
     currentLoopDepth = 0;
+    final savedInferredTypesAttribute = inferredTypesAttribute;
+    inferredTypesAttribute = null;
 
     if (function.typeParameters.isNotEmpty) {
       functionTypeParameters ??= new List<TypeParameter>();
@@ -2430,6 +2443,13 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
     parentFunction = savedParentFunction;
     isClosure = savedIsClosure;
     currentLoopDepth = savedLoopDepth;
+
+    final attributes = getClosureAttributes();
+    if (attributes != null) {
+      closure.attributes = attributes;
+      closure.flags |= ClosureDeclaration.hasAttributesFlag;
+    }
+    inferredTypesAttribute = savedInferredTypesAttribute;
 
     locals.leaveScope();
 
@@ -2594,9 +2614,12 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
     _genPushFunctionTypeArguments();
     asm.emitStoreFieldTOS(cp.addInstanceField(closureFunctionTypeArguments));
 
-    asm.emitPush(temp);
-    asm.emitPushConstant(cp.addEmptyTypeArguments());
-    asm.emitStoreFieldTOS(cp.addInstanceField(closureDelayedTypeArguments));
+    // Delayed type arguments are only used by generic closures.
+    if (function.typeParameters.isNotEmpty) {
+      asm.emitPush(temp);
+      asm.emitPushConstant(cp.addEmptyTypeArguments());
+      asm.emitStoreFieldTOS(cp.addInstanceField(closureDelayedTypeArguments));
+    }
 
     asm.emitPush(temp);
     asm.emitPushConstant(closureFunctionIndex);
@@ -3228,8 +3251,7 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
     // correct noSuchMethod for method call.
     if (checkForNull) {
       asm.emitPush(receiverTemp);
-      asm.emitCheckReceiverForNull(
-          cp.addSelectorName(node.name, InvocationKind.method));
+      asm.emitNullCheck(cp.addSelectorName(node.name, InvocationKind.method));
     }
 
     _genInstanceCall(null, InvocationKind.getter, node.interfaceTarget,
@@ -3286,8 +3308,7 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       final int receiverTemp = locals.tempIndexInFrame(node);
       _genArguments(node.receiver, args, storeReceiverToLocal: receiverTemp);
       asm.emitPush(receiverTemp);
-      asm.emitCheckReceiverForNull(
-          cp.addSelectorName(node.name, InvocationKind.method));
+      asm.emitNullCheck(cp.addSelectorName(node.name, InvocationKind.method));
     } else {
       _genArguments(node.receiver, args);
     }
@@ -3321,8 +3342,7 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
         final int receiverTemp = locals.tempIndexInFrame(node);
         asm.emitStoreLocal(receiverTemp);
         asm.emitPush(receiverTemp);
-        asm.emitCheckReceiverForNull(
-            cp.addSelectorName(node.name, InvocationKind.getter));
+        asm.emitNullCheck(cp.addSelectorName(node.name, InvocationKind.getter));
       }
       _genDirectCall(directCall.target, argDesc, 1, isGet: true, node: node);
     } else {
@@ -3344,8 +3364,7 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       asm.emitStoreLocal(temp);
       _generateNode(node.value);
       asm.emitPush(temp);
-      asm.emitCheckReceiverForNull(
-          cp.addSelectorName(node.name, InvocationKind.setter));
+      asm.emitNullCheck(cp.addSelectorName(node.name, InvocationKind.setter));
     } else {
       _generateNode(node.value);
     }
@@ -3452,6 +3471,15 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
     if (!negated) {
       asm.emitBooleanNegateTOS();
     }
+  }
+
+  @override
+  visitNullCheck(NullCheck node) {
+    _generateNode(node.operand);
+    final operandTemp = locals.tempIndexInFrame(node);
+    asm.emitStoreLocal(operandTemp);
+    asm.emitPush(operandTemp);
+    asm.emitNullCheck(cp.addObjectRef(null));
   }
 
   @override

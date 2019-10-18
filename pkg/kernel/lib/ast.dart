@@ -97,6 +97,12 @@ abstract class Node {
   /// (possibly synthesized) name, whereas other AST nodes return the complete
   /// textual representation of their subtree.
   String toString() => debugNodeToString(this);
+
+  /// Returns the textual representation of this node for use in debugging.
+  ///
+  /// Note that this adds some nodes to a static map to ensure consistent
+  /// naming, but that it thus also leaks memory.
+  String leakingDebugToString() => debugNodeToString(this);
 }
 
 /// A mutable AST node with a parent pointer.
@@ -5301,6 +5307,12 @@ abstract class Name implements Node {
   visitChildren(Visitor v) {
     // DESIGN TODO: Should we visit the library as a library reference?
   }
+
+  /// Returns the textual representation of this node for use in debugging.
+  ///
+  /// Note that this adds some nodes to a static map to ensure consistent
+  /// naming, but that it thus also leaks memory.
+  String leakingDebugToString() => debugNodeToString(this);
 }
 
 class _PrivateName extends Name {
@@ -5339,18 +5351,6 @@ class _PublicName extends Name {
 
 /// Represents nullability of a type.
 enum Nullability {
-  /// Nullable types are marked with the '?' modifier.
-  ///
-  /// Null, dynamic, and void are nullable by default.
-  nullable,
-
-  /// Non-nullable types are types that aren't marked with the '?' modifier.
-  ///
-  /// Note that Null, dynamic, and void that are nullable by default.  Note also
-  /// that some types denoted by a type parameter without the '?' modifier can
-  /// be something else rather than non-nullable.
-  nonNullable,
-
   /// Non-legacy types not known to be nullable or non-nullable statically.
   ///
   /// An example of such type is type T in the example below.  Note that both
@@ -5364,6 +5364,18 @@ enum Nullability {
   ///     }
   ///   }
   undetermined,
+
+  /// Nullable types are marked with the '?' modifier.
+  ///
+  /// Null, dynamic, and void are nullable by default.
+  nullable,
+
+  /// Non-nullable types are types that aren't marked with the '?' modifier.
+  ///
+  /// Note that Null, dynamic, and void that are nullable by default.  Note also
+  /// that some types denoted by a type parameter without the '?' modifier can
+  /// be something else rather than non-nullable.
+  nonNullable,
 
   /// Types in opt-out libraries are 'legacy' types.
   ///
