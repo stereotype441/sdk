@@ -1143,6 +1143,26 @@ class _C {
     visitSubexpression(findNode.methodInvocation('_C.g();'), 'int');
   }
 
+  test_methodInvocation_getter() async {
+    await analyze('''
+abstract class _C {
+  int Function() get f;
+}
+_f(_C c) => c.f();
+''');
+    visitSubexpression(findNode.methodInvocation('c.f();'), 'int');
+  }
+
+  test_methodInvocation_getter_nullChecked() async {
+    await analyze('''
+abstract class _C {
+  int Function()/*?*/ get f;
+}
+_f(_C c) => c.f();
+''');
+    visitSubexpression(findNode.methodInvocation('c.f();'), 'int', TODO);
+  }
+
   test_methodInvocation_topLevel() async {
     await analyze('''
 _f() => _g();
