@@ -1998,6 +1998,12 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
     fixBuilder.createFlowAnalysis(declaration, null);
     return fixBuilder;
   }
+
+  DartType _migratedReturnType(String search) => variables
+      .decoratedElementType(
+          findNode.functionDeclaration(search).declaredElement)
+      .returnType
+      .toFinalType(typeProvider);
 }
 
 class _FixBuilder extends FixBuilder {
