@@ -15,6 +15,7 @@ import 'package:nnbd_migration/src/fix_builder.dart';
 import 'package:nnbd_migration/src/variables.dart';
 import 'package:test/test.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
+import 'package:analyzer/src/dart/element/element.dart';
 
 import 'migration_visitor_test_base.dart';
 
@@ -928,6 +929,17 @@ _f(int/*!*/ x, int/*?*/ y) {
 ''');
     visitStatement(findNode.statement('x = y'),
         changes: {findNode.simple('y;'): NullCheck()});
+  }
+
+  solo_test_functionExpression_infer_parameter_type() async {
+    await analyze('''
+abstract class _C {
+  String _g();
+}
+Object Function(_C) _f() => (x) => x._g();
+''');
+    visitSubexpression(findNode.functionExpression('(x)'), 'String Function(_C)',
+    contextType: TODO);
   }
 
   test_ifStatement_flow_promote_in_else() async {

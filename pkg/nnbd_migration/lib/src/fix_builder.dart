@@ -313,6 +313,57 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   }
 
   @override
+  DartType visitFunctionExpression(FunctionExpression node) {
+    if(node.typeParameters != null) {
+      throw UnimplementedError('TODO(paulberry)');
+    }
+    var contextType = _contextType;
+    List<DartType> normalParameterTypes = [];
+    if (contextType is FunctionType) {
+      for (var parameter in contextType.parameters) {
+        if (parameter.isNamed) {
+          throw UnimplementedError('TODO(paulberry)');
+        } else {
+          if (parameter.isOptional) {
+            throw UnimplementedError('TODO(paulberry)');
+          }
+          normalParameterTypes.add(parameter.type);
+        }
+      }
+    }
+    int parameterIndex = 0;
+    for (var parameter in node.parameters.parameters) {
+      DartType parameterContextType;
+      if (parameter.declaredElement.isNamed) {
+        throw UnimplementedError('TODO(paulberry)');
+      } else {
+        if (parameter.isOptional) {
+          throw UnimplementedError('TODO(paulberry)');
+        }
+        if (parameterIndex < normalParameterTypes.length) {
+          parameterContextType = normalParameterTypes[parameterIndex++];
+        }
+      }
+      if (parameter is SimpleFormalParameter) {
+        if (parameter.type == null) {
+          var inferredParameterType = _inferParameterType(parameterContextType);
+          var desiredParameterType = _computeMigratedType(parameter.declaredElement);
+          if (desiredParameterType == inferredParameterType) {
+            throw UnimplementedError('TODO(paulberry)');
+          } else {
+            throw UnimplementedError('TODO(paulberry)');
+          }
+        } else {
+          throw UnimplementedError('TODO(paulberry)');
+        }
+      } else {
+        throw UnimplementedError('TODO(paulberry): ${parameter.runtimeType}');
+      }
+    }
+    throw UnimplementedError('TODO(paulberry)');
+  }
+
+  @override
   DartType visitIfStatement(IfStatement node) {
     visitSubexpression(node.condition, typeProvider.boolType);
     _flowAnalysis.ifStatement_thenBegin(node.condition);
@@ -784,6 +835,10 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   /// types they ger migrated to.
   List<DartType> _visitTypeArgumentList(TypeArgumentList arguments) =>
       [for (var argument in arguments.arguments) argument.accept(this)];
+
+  DartType _inferParameterType(DartType contextType) {
+    throw UnimplementedError('TODO(paulberry): $contextType');
+  }
 }
 
 /// [NodeChange] reprensenting a type annotation that needs to have a question
