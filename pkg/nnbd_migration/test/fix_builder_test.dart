@@ -939,10 +939,11 @@ _f(dynamic d) => d();
 
   test_functionExpressionInvocation_function_checked() async {
     await analyze('''
-_f(Function/*?*/ f) => f();
+_f(Function/*?*/ func) => func();
 ''');
-    visitSubexpression(findNode.functionExpressionInvocation('f('), 'dynamic',
-        changes: {findNode.simple('f()'): NullCheck()});
+    visitSubexpression(
+        findNode.functionExpressionInvocation('func('), 'dynamic',
+        changes: {findNode.simple('func()'): NullCheck()});
   }
 
   test_functionExpressionInvocation_getter() async {
