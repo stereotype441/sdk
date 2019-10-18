@@ -356,19 +356,15 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
       } else {
         throw StateError('Unexpected parameter type: ${parameter.runtimeType}');
       }
-      if (normalParameter is SimpleFormalParameter) {
-        if (normalParameter.type == null) {
-          var inferredParameterType =
-              _typeSystem.upperBoundForType(parameterContextType);
-          var desiredParameterType =
-              _computeMigratedType(normalParameter.declaredElement);
-          if (desiredParameterType != inferredParameterType) {
-            addChange(normalParameter, MakeTypeExplicit(desiredParameterType));
-          }
+      if (normalParameter is SimpleFormalParameter &&
+          normalParameter.type == null) {
+        var inferredParameterType =
+            _typeSystem.upperBoundForType(parameterContextType);
+        var desiredParameterType =
+            _computeMigratedType(normalParameter.declaredElement);
+        if (desiredParameterType != inferredParameterType) {
+          addChange(normalParameter, MakeTypeExplicit(desiredParameterType));
         }
-      } else {
-        throw UnimplementedError(
-            'TODO(paulberry): ${normalParameter.runtimeType}');
       }
     }
     var previousReturnContext = _returnContext;
