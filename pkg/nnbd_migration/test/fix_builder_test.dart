@@ -1032,6 +1032,64 @@ Object Function(_C) Function() _f() => () => (x) => x._g();
         contextType: _migratedReturnType('_f'));
   }
 
+  test_functionExpressionInvocation_dynamic() async {
+    await analyze('''
+_f(dynamic d) => d();
+''');
+    visitSubexpression(findNode.functionExpressionInvocation('d('), 'dynamic');
+  }
+
+  test_functionExpressionInvocation_function_checked() async {
+    await analyze('''
+_f(Function/*?*/ func) => func();
+''');
+    visitSubexpression(
+        findNode.functionExpressionInvocation('func('), 'dynamic',
+        changes: {findNode.simple('func()'): NullCheck()});
+  }
+
+  test_functionExpressionInvocation_getter() async {
+    await analyze('''
+abstract class _C {
+  int Function() get f;
+}
+_f(_C c) => (c.f)();
+''');
+    visitSubexpression(findNode.functionExpressionInvocation('c.f'), 'int');
+  }
+
+  test_functionExpressionInvocation_getter_looksLikeMethodCall() async {
+    await analyze('''
+abstract class _C {
+  int Function() get f;
+}
+_f(_C c) => c.f();
+''');
+    visitSubexpression(findNode.functionExpressionInvocation('c.f'), 'int');
+  }
+
+  test_functionExpressionInvocation_getter_nullChecked() async {
+    await analyze('''
+abstract class _C {
+  int Function()/*?*/ get f;
+}
+_f(_C c) => (c.f)();
+''');
+    visitSubexpression(findNode.functionExpressionInvocation('c.f'), 'int',
+        changes: {findNode.parenthesized('c.f'): NullCheck()});
+  }
+
+  test_functionExpressionInvocation_getter_nullChecked_looksLikeMethodCall() async {
+    await analyze('''
+abstract class _C {
+  int Function()/*?*/ get f;
+}
+_f(_C c) => c.f();
+''');
+    visitSubexpression(findNode.functionExpressionInvocation('c.f'), 'int',
+        changes: {findNode.propertyAccess('c.f'): NullCheck()});
+  }
+
   test_ifStatement_flow_promote_in_else() async {
     await analyze('''
 _f(int/*?*/ x) {
