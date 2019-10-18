@@ -930,6 +930,18 @@ _f(int/*!*/ x, int/*?*/ y) {
         changes: {findNode.simple('y;'): NullCheck()});
   }
 
+  test_functionExpression_explicit_parameter_type() async {
+    await analyze('''
+abstract class _C {
+  String _g();
+}
+Object Function(_C) _f() => (_C x) => x._g();
+''');
+    visitSubexpression(
+        findNode.functionExpression('(_C x)'), 'String Function(_C)',
+        contextType: _migratedReturnType('_f'));
+  }
+
   test_functionExpression_infer_parameter_type_match() async {
     await analyze('''
 abstract class _C {

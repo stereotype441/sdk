@@ -365,8 +365,6 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
           if (desiredParameterType != inferredParameterType) {
             addChange(normalParameter, MakeTypeExplicit(desiredParameterType));
           }
-        } else {
-          throw UnimplementedError('TODO(paulberry)');
         }
       } else {
         throw UnimplementedError(
