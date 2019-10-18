@@ -76,7 +76,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   final TypeProvider typeProvider;
 
   /// The type system.
-  final TypeSystem _typeSystem;
+  final Dart2TypeSystem _typeSystem;
 
   /// Variables for this migration run.
   final Variables _variables;
@@ -346,11 +346,9 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
       }
       if (parameter is SimpleFormalParameter) {
         if (parameter.type == null) {
-          var inferredParameterType = _inferParameterType(parameterContextType);
+          var inferredParameterType = _typeSystem.upperBoundForType(parameterContextType);
           var desiredParameterType = _computeMigratedType(parameter.declaredElement);
-          if (desiredParameterType == inferredParameterType) {
-            throw UnimplementedError('TODO(paulberry)');
-          } else {
+          if (desiredParameterType != inferredParameterType) {
             throw UnimplementedError('TODO(paulberry)');
           }
         } else {
@@ -360,7 +358,16 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
         throw UnimplementedError('TODO(paulberry): ${parameter.runtimeType}');
       }
     }
-    throw UnimplementedError('TODO(paulberry)');
+    var previousReturnContext = _returnContext;
+    try {
+      _returnContext = contextType is FunctionType
+          ? contextType.returnType
+          : throw UnimplementedError('TODO(paulberry)');
+      node.body.accept(this);
+    } finally {
+      _returnContext = previousReturnContext;
+    }
+    return _computeMigratedType(node.declaredElement);
   }
 
   @override
@@ -485,6 +492,14 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   DartType visitNode(AstNode node) {
     // Every node type needs its own visit method.
     throw UnimplementedError('No visit method for ${node.runtimeType}');
+  }
+
+  DartType _returnContext;
+
+  @override
+  DartType visitExpressionFunctionBody(ExpressionFunctionBody node) {
+    visitSubexpression(node.expression, _returnContext);
+    return null;
   }
 
   @override
@@ -835,10 +850,6 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   /// types they ger migrated to.
   List<DartType> _visitTypeArgumentList(TypeArgumentList arguments) =>
       [for (var argument in arguments.arguments) argument.accept(this)];
-
-  DartType _inferParameterType(DartType contextType) {
-    throw UnimplementedError('TODO(paulberry): $contextType');
-  }
 }
 
 /// [NodeChange] reprensenting a type annotation that needs to have a question

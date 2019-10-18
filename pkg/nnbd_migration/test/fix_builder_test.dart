@@ -15,7 +15,6 @@ import 'package:nnbd_migration/src/fix_builder.dart';
 import 'package:nnbd_migration/src/variables.dart';
 import 'package:test/test.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
-import 'package:analyzer/src/dart/element/element.dart';
 
 import 'migration_visitor_test_base.dart';
 
@@ -931,15 +930,16 @@ _f(int/*!*/ x, int/*?*/ y) {
         changes: {findNode.simple('y;'): NullCheck()});
   }
 
-  solo_test_functionExpression_infer_parameter_type() async {
+  test_functionExpression_infer_parameter_type_match() async {
     await analyze('''
 abstract class _C {
   String _g();
 }
 Object Function(_C) _f() => (x) => x._g();
 ''');
-    visitSubexpression(findNode.functionExpression('(x)'), 'String Function(_C)',
-    contextType: TODO);
+    visitSubexpression(
+        findNode.functionExpression('(x)'), 'String Function(_C)',
+        contextType: _migratedReturnType('_f'));
   }
 
   test_ifStatement_flow_promote_in_else() async {
@@ -2004,12 +2004,18 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
 
   _FixBuilder _createFixBuilder(AstNode node) {
     var fixBuilder = _FixBuilder(testSource, decoratedClassHierarchy,
-        typeProvider, typeSystem, variables);
+        typeProvider, typeSystem as Dart2TypeSystem, variables);
     var body = node.thisOrAncestorOfType<FunctionBody>();
     var declaration = body.thisOrAncestorOfType<Declaration>();
     fixBuilder.createFlowAnalysis(declaration, null);
     return fixBuilder;
   }
+
+  DartType _migratedReturnType(String search) => variables
+      .decoratedElementType(
+          findNode.functionDeclaration(search).declaredElement)
+      .returnType
+      .toFinalType(typeProvider);
 }
 
 class _FixBuilder extends FixBuilder {
@@ -2017,8 +2023,12 @@ class _FixBuilder extends FixBuilder {
 
   final Map<AstNode, Set<Problem>> problems = {};
 
-  _FixBuilder(Source source, DecoratedClassHierarchy decoratedClassHierarchy,
-      TypeProvider typeProvider, TypeSystem typeSystem, Variables variables)
+  _FixBuilder(
+      Source source,
+      DecoratedClassHierarchy decoratedClassHierarchy,
+      TypeProvider typeProvider,
+      Dart2TypeSystem typeSystem,
+      Variables variables)
       : super(source, decoratedClassHierarchy, typeProvider, typeSystem,
             variables);
 
