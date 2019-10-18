@@ -938,6 +938,17 @@ _f() => () => (x) => 0;
         'int Function(dynamic) Function()');
   }
 
+  solo_test_functionExpression_generic_explicit_parameter_type() async {
+    await analyze('''
+abstract class _C<T> {
+  T _g();
+}
+Object Function<U>(_C<U>) _f() => <V>(_C<V> x) => x._g();
+''');
+    visitSubexpression(findNode.functionExpression('(_C<V> x)'), 'U Function<U>(_C<U>)',
+    contextType: _migratedReturnType('_f'));
+  }
+
   test_functionExpression_explicit_parameter_type() async {
     await analyze('''
 abstract class _C {
