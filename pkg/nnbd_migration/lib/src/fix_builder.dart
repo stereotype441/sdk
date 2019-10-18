@@ -329,10 +329,11 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
     }
     var contextType = _contextType;
     List<DartType> normalParameterTypes = [];
+    Map<String, DartType> namedParameterTypes = {};
     if (contextType is FunctionType) {
       for (var parameter in contextType.parameters) {
         if (parameter.isNamed) {
-          throw UnimplementedError('TODO(paulberry)');
+          namedParameterTypes[parameter.name] = parameter.type;
         } else {
           normalParameterTypes.add(parameter.type);
         }
@@ -341,8 +342,9 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
     int parameterIndex = 0;
     for (var parameter in node.parameters.parameters) {
       DartType parameterContextType;
-      if (parameter.declaredElement.isNamed) {
-        throw UnimplementedError('TODO(paulberry)');
+      var declaredElement = parameter.declaredElement;
+      if (declaredElement.isNamed) {
+        parameterContextType = namedParameterTypes[declaredElement.name];
       } else if (parameterIndex < normalParameterTypes.length) {
         parameterContextType = normalParameterTypes[parameterIndex++];
       }
