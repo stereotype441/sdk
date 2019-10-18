@@ -930,6 +930,27 @@ _f(int/*!*/ x, int/*?*/ y) {
         changes: {findNode.simple('y;'): NullCheck()});
   }
 
+  test_functionExpressionInvocation_getter() async {
+    await analyze('''
+abstract class _C {
+  int Function() get f;
+}
+_f(_C c) => (c.f)();
+''');
+    visitSubexpression(findNode.functionExpressionInvocation('c.f'), 'int');
+  }
+
+  test_functionExpressionInvocation_getter_nullChecked() async {
+    await analyze('''
+abstract class _C {
+  int Function()/*?*/ get f;
+}
+_f(_C c) => (c.f)();
+''');
+    visitSubexpression(findNode.functionExpressionInvocation('c.f'), 'int',
+        changes: {findNode.parenthesized('c.f'): NullCheck()});
+  }
+
   test_ifStatement_flow_promote_in_else() async {
     await analyze('''
 _f(int/*?*/ x) {
@@ -1068,27 +1089,6 @@ Object/*!*/ _f(dynamic d) => d.f();
 ''');
     visitSubexpression(findNode.methodInvocation('d.f'), 'dynamic',
         contextType: objectType);
-  }
-
-  test_methodInvocation_getter() async {
-    await analyze('''
-abstract class _C {
-  int Function() get f;
-}
-_f(_C c) => (c.f)();
-''');
-    visitSubexpression(findNode.functionExpressionInvocation('c.f'), 'int');
-  }
-
-  test_methodInvocation_getter_nullChecked() async {
-    await analyze('''
-abstract class _C {
-  int Function()/*?*/ get f;
-}
-_f(_C c) => c.f();
-''');
-    fail('TODO(paulberry)');
-    visitSubexpression(findNode.methodInvocation('c.f();'), 'int');
   }
 
   test_methodInvocation_namedParameter() async {
