@@ -322,7 +322,6 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
           invokeType: node.staticInvokeType);
     } else {
       // Dynamic dispatch.  The return type is `dynamic`.
-      throw UnimplementedError('TODO(paulberry)');
       node.typeArguments?.accept(this);
       node.argumentList.accept(this);
       return typeProvider.dynamicType;
