@@ -97,6 +97,8 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   /// The file being analyzed.
   final Source source;
 
+  /// If we are visiting a function body, the context type that should be used
+  /// for return statements inside the function body.
   DartType _returnContext;
 
   FixBuilder(this.source, this._decoratedClassHierarchy,
@@ -310,6 +312,9 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
 
   @override
   DartType visitExpressionFunctionBody(ExpressionFunctionBody node) {
+    if (node.isAsynchronous) {
+      throw UnimplementedError('TODO(paulberry)');
+    }
     visitSubexpression(node.expression, _returnContext);
     return null;
   }
