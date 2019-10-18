@@ -942,6 +942,18 @@ Object Function(_C) _f() => (x) => x._g();
         contextType: _migratedReturnType('_f'));
   }
 
+  solo_test_functionExpression_infer_parameter_type_mismatch() async {
+    await analyze('''
+abstract class _C {
+  String _g(dynamic d);
+}
+Object Function(_C) _f() => (x) => x._g(x = null);
+''');
+    visitSubexpression(
+        findNode.functionExpression('(x)'), 'String Function(_C)',
+        contextType: _migratedReturnType('_f'));
+  }
+
   test_functionExpression_pass_down_return_context() async {
     await analyze('''
 abstract class _C {
