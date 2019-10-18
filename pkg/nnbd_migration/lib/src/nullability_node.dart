@@ -88,7 +88,7 @@ class NullabilityGraph {
 
   /// Set this const to `true` to dump the nullability graph just before
   /// propagation.
-  static const _debugAfterPropagation = true;
+  static const _debugAfterPropagation = false;
 
   final NullabilityMigrationInstrumentation /*?*/ instrumentation;
 
