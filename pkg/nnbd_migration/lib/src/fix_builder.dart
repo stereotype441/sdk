@@ -346,28 +346,32 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
       DartType parameterContextType;
       if (parameter.declaredElement.isNamed) {
         throw UnimplementedError('TODO(paulberry)');
-      } else {
-        if (parameter.isOptional) {
-          throw UnimplementedError('TODO(paulberry)');
-        }
-        if (parameterIndex < normalParameterTypes.length) {
-          parameterContextType = normalParameterTypes[parameterIndex++];
-        }
+      } else if (parameterIndex < normalParameterTypes.length) {
+        parameterContextType = normalParameterTypes[parameterIndex++];
       }
-      if (parameter is SimpleFormalParameter) {
-        if (parameter.type == null) {
+      NormalFormalParameter normalParameter;
+      if (parameter is DefaultFormalParameter) {
+        normalParameter = parameter.parameter;
+      } else if (parameter is NormalFormalParameter) {
+        normalParameter = parameter;
+      } else {
+        throw StateError('Unexpected parameter type: ${parameter.runtimeType}');
+      }
+      if (normalParameter is SimpleFormalParameter) {
+        if (normalParameter.type == null) {
           var inferredParameterType =
               _typeSystem.upperBoundForType(parameterContextType);
           var desiredParameterType =
-              _computeMigratedType(parameter.declaredElement);
+              _computeMigratedType(normalParameter.declaredElement);
           if (desiredParameterType != inferredParameterType) {
-            addChange(parameter, MakeTypeExplicit(desiredParameterType));
+            addChange(normalParameter, MakeTypeExplicit(desiredParameterType));
           }
         } else {
           throw UnimplementedError('TODO(paulberry)');
         }
       } else {
-        throw UnimplementedError('TODO(paulberry): ${parameter.runtimeType}');
+        throw UnimplementedError(
+            'TODO(paulberry): ${normalParameter.runtimeType}');
       }
     }
     var previousReturnContext = _returnContext;
