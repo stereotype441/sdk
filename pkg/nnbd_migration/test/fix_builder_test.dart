@@ -947,7 +947,7 @@ Object Function(_C) _f() => (x) => x._g();
 abstract class _C {
   String _g(dynamic d);
 }
-Object Function(_C) _f() => (x) => x._g(x = null);
+Object Function(_C) _f() => (x) => x?._g(x = null);
 ''');
     visitSubexpression(
         findNode.functionExpression('(x)'), 'String Function(_C)',
