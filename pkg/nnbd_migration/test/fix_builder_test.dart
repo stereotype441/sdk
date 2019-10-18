@@ -947,6 +947,18 @@ Object Function(_C) _f() => (x) => x._g();
 abstract class _C {
   String _g();
 }
+Object Function([_C]) _f() => ([x]) => x._g();
+''');
+    visitSubexpression(
+        findNode.functionExpression('([x])'), 'String Function([_C])',
+        contextType: _migratedReturnType('_f'));
+  }
+
+  test_functionExpression_infer_parameter_type_match_optional_for_required() async {
+    await analyze('''
+abstract class _C {
+  String _g();
+}
 Object Function(_C) _f() => ([x]) => x._g();
 ''');
     visitSubexpression(
