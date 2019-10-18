@@ -940,6 +940,16 @@ _f(_C c) => (c.f)();
     visitSubexpression(findNode.functionExpressionInvocation('c.f'), 'int');
   }
 
+  test_functionExpressionInvocation_getter_looksLikeMethodCall() async {
+    await analyze('''
+abstract class _C {
+  int Function() get f;
+}
+_f(_C c) => c.f();
+''');
+    visitSubexpression(findNode.functionExpressionInvocation('c.f'), 'int');
+  }
+
   test_functionExpressionInvocation_getter_nullChecked() async {
     await analyze('''
 abstract class _C {
@@ -949,6 +959,17 @@ _f(_C c) => (c.f)();
 ''');
     visitSubexpression(findNode.functionExpressionInvocation('c.f'), 'int',
         changes: {findNode.parenthesized('c.f'): NullCheck()});
+  }
+
+  test_functionExpressionInvocation_getter_nullChecked_looksLikeMethodCall() async {
+    await analyze('''
+abstract class _C {
+  int Function()/*?*/ get f;
+}
+_f(_C c) => c.f();
+''');
+    visitSubexpression(findNode.functionExpressionInvocation('c.f'), 'int',
+        changes: {findNode.propertyAccess('c.f'): NullCheck()});
   }
 
   test_ifStatement_flow_promote_in_else() async {
