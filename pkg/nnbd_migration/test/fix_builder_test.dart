@@ -1070,6 +1070,15 @@ Object/*!*/ _f(dynamic d) => d.f();
         contextType: objectType);
   }
 
+  solo_test_methodInvocation_inference_downward() async {
+    await analyze('''
+List<int/*!*/> _f(int/*?*/ i) => _g(i);
+List<T> _g<T>(T t);
+TODO
+    ''');
+    fail('TODO(paulberry)');
+  }
+
   test_methodInvocation_namedParameter() async {
     await analyze('''
 abstract class _C {
@@ -2005,8 +2014,12 @@ class _FixBuilder extends FixBuilder {
 
   final Map<AstNode, Set<Problem>> problems = {};
 
-  _FixBuilder(Source source, DecoratedClassHierarchy decoratedClassHierarchy,
-      TypeProvider typeProvider, Dart2TypeSystem typeSystem, Variables variables)
+  _FixBuilder(
+      Source source,
+      DecoratedClassHierarchy decoratedClassHierarchy,
+      TypeProvider typeProvider,
+      Dart2TypeSystem typeSystem,
+      Variables variables)
       : super(source, decoratedClassHierarchy, typeProvider, typeSystem,
             variables);
 
