@@ -930,6 +930,14 @@ _f(int/*!*/ x, int/*?*/ y) {
         changes: {findNode.simple('y;'): NullCheck()});
   }
 
+  test_functionExpression_dynamic_context() async {
+    await analyze('''
+_f() => () => (x) => 0;
+''');
+    visitSubexpression(findNode.functionExpression('() => (x)'),
+        'int Function(dynamic) Function()');
+  }
+
   test_functionExpression_explicit_parameter_type() async {
     await analyze('''
 abstract class _C {

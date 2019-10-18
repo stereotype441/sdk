@@ -358,8 +358,8 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
       }
       if (normalParameter is SimpleFormalParameter &&
           normalParameter.type == null) {
-        var inferredParameterType =
-            _typeSystem.upperBoundForType(parameterContextType);
+        var inferredParameterType = _typeSystem.upperBoundForType(
+            parameterContextType ?? typeProvider.dynamicType);
         var desiredParameterType =
             _computeMigratedType(normalParameter.declaredElement);
         if (desiredParameterType != inferredParameterType) {
@@ -371,7 +371,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
     try {
       _returnContext = contextType is FunctionType
           ? contextType.returnType
-          : throw UnimplementedError('TODO(paulberry)');
+          : typeProvider.dynamicType;
       node.body.accept(this);
     } finally {
       _returnContext = previousReturnContext;
