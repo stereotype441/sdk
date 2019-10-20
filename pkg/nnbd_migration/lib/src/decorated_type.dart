@@ -245,7 +245,8 @@ class DecoratedType implements DecoratedTypeInfo {
         if (thisType.typeFormals.length != otherType.typeFormals.length) {
           return false;
         }
-        var renamed = RenamedDecoratedFunctionTypes.match(this, other);
+        var renamed = RenamedDecoratedFunctionTypes.match(
+            this, other, (bound1, bound2) => bound1 == bound2);
         if (renamed == null) return false;
         if (renamed.returnType1 != renamed.returnType2) return false;
         if (!_compareLists(
@@ -599,7 +600,9 @@ class RenamedDecoratedFunctionTypes {
   /// If such a renaming can be found, it is returned.  If not, `null` is
   /// returned.
   static RenamedDecoratedFunctionTypes match(
-      DecoratedType type1, DecoratedType type2) {
+      DecoratedType type1,
+      DecoratedType type2,
+      bool Function(DecoratedType, DecoratedType) boundsMatcher) {
     if (!_isNeeded(type1.typeFormals, type2.typeFormals)) {
       return RenamedDecoratedFunctionTypes._(
           type1.returnType,
@@ -626,7 +629,7 @@ class RenamedDecoratedFunctionTypes {
     for (int i = 0; i < type1.typeFormals.length; i++) {
       var bound1 = type1.typeFormalBounds[i].substitute(substitution1);
       var bound2 = type2.typeFormalBounds[i].substitute(substitution2);
-      if (bound1 != bound2) return null;
+      if (!boundsMatcher(bound1, bound2)) return null;
       DecoratedType.recordTypeParameterBound(newParameters[i], bound1);
     }
     var returnType1 = type1.returnType.substitute(substitution1);

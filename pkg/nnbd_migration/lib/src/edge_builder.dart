@@ -2071,36 +2071,6 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     throw UnimplementedError(buffer.toString());
   }
 
-  void _unionDecoratedTypeParameters(
-      DecoratedType x, DecoratedType y, EdgeOrigin origin) {
-    for (int i = 0;
-        i < x.positionalParameters.length && i < y.positionalParameters.length;
-        i++) {
-      _unionDecoratedTypes(
-          x.positionalParameters[i], y.positionalParameters[i], origin);
-    }
-    for (var entry in x.namedParameters.entries) {
-      var superParameterType = y.namedParameters[entry.key];
-      if (superParameterType != null) {
-        _unionDecoratedTypes(entry.value, y.namedParameters[entry.key], origin);
-      }
-    }
-  }
-
-  void _unionDecoratedTypes(
-      DecoratedType x, DecoratedType y, EdgeOrigin origin) {
-    _graph.union(x.node, y.node, origin);
-    _unionDecoratedTypeParameters(x, y, origin);
-    for (int i = 0;
-        i < x.typeArguments.length && i < y.typeArguments.length;
-        i++) {
-      _unionDecoratedTypes(x.typeArguments[i], y.typeArguments[i], origin);
-    }
-    if (x.returnType != null && y.returnType != null) {
-      _unionDecoratedTypes(x.returnType, y.returnType, origin);
-    }
-  }
-
   /// Produce Future<flatten(T)> for some T, however, we would like to merely
   /// upcast T to that type if possible, skipping the flatten when not
   /// necessary.
@@ -2261,7 +2231,12 @@ mixin _AssignmentChecker {
       }
     } else if (sourceType is FunctionType && destinationType is FunctionType) {
       RenamedDecoratedFunctionTypes renamed =
-          RenamedDecoratedFunctionTypes.match(source, destination);
+          RenamedDecoratedFunctionTypes.match(source, destination,
+              (bound1, bound2) {
+        _unionDecoratedTypes(
+            bound1, bound2, GenericFunctionSubtypeBoundsOrigin(origin));
+        return true;
+      });
       // We've already checked that a subtype relationship exists between the
       // two function types, so a match should be found.
       assert(renamed != null);
@@ -2359,6 +2334,36 @@ mixin _AssignmentChecker {
 
   /// Given a [type] representing a type parameter, retrieves the type's bound.
   DecoratedType _getTypeParameterTypeBound(DecoratedType type);
+
+  void _unionDecoratedTypeParameters(
+      DecoratedType x, DecoratedType y, EdgeOrigin origin) {
+    for (int i = 0;
+        i < x.positionalParameters.length && i < y.positionalParameters.length;
+        i++) {
+      _unionDecoratedTypes(
+          x.positionalParameters[i], y.positionalParameters[i], origin);
+    }
+    for (var entry in x.namedParameters.entries) {
+      var superParameterType = y.namedParameters[entry.key];
+      if (superParameterType != null) {
+        _unionDecoratedTypes(entry.value, y.namedParameters[entry.key], origin);
+      }
+    }
+  }
+
+  void _unionDecoratedTypes(
+      DecoratedType x, DecoratedType y, EdgeOrigin origin) {
+    _graph.union(x.node, y.node, origin);
+    _unionDecoratedTypeParameters(x, y, origin);
+    for (int i = 0;
+        i < x.typeArguments.length && i < y.typeArguments.length;
+        i++) {
+      _unionDecoratedTypes(x.typeArguments[i], y.typeArguments[i], origin);
+    }
+    if (x.returnType != null && y.returnType != null) {
+      _unionDecoratedTypes(x.returnType, y.returnType, origin);
+    }
+  }
 }
 
 /// Information about a binary expression whose boolean value could possibly

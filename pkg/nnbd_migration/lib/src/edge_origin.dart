@@ -82,6 +82,23 @@ class ForEachVariableOrigin extends EdgeOrigin {
   EdgeOriginKind get kind => EdgeOriginKind.forEachVariable;
 }
 
+/// Edge origin resulting from the use of one generic function type as the
+/// subtype of another.  When this happens, the bounds of the type parameters
+/// must match exactly, so they must have matching nullabilities.
+class GenericFunctionSubtypeBoundsOrigin implements EdgeOrigin {
+  final EdgeOrigin _assignmentOrigin;
+  GenericFunctionSubtypeBoundsOrigin(this._assignmentOrigin);
+
+  @override
+  EdgeOriginKind get kind => EdgeOriginKind.genericFunctionSubtypeBounds;
+
+  @override
+  AstNode get node => _assignmentOrigin.node;
+
+  @override
+  Source get source => _assignmentOrigin.source;
+}
+
 /// Edge origin resulting from the use of greatest lower bound.
 ///
 /// For example, in the following code snippet:

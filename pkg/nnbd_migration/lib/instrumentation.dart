@@ -119,6 +119,7 @@ enum EdgeOriginKind {
   expressionChecks,
   fieldFormalParameter,
   forEachVariable,
+  genericFunctionSubtypeBounds,
   greatestLowerBound,
   ifNull,
   implicitMixinSuperCall,

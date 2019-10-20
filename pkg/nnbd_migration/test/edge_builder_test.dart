@@ -109,9 +109,29 @@ class AssignmentCheckerTest extends Object
     // Note: no assertions to do; just need to make sure there wasn't a crash.
   }
 
-  void solo_test_function_type_generic() {
-    var n1 = newNode();
-    var n2 = newNode();
+  void test_function_type_generic_match_named_parameters() {
+    var t = typeParameter('T', object());
+    var u = typeParameter('U', object());
+    var t1 = function(dynamic_,
+        typeFormals: [t], named: {'x': typeParameterType(t)});
+    var t2 = function(dynamic_,
+        typeFormals: [u], named: {'x': typeParameterType(u)});
+    assign(t1, t2, hard: true);
+    assertEdge(t2.returnType.node, t1.returnType.node, hard: false);
+  }
+
+  void test_function_type_generic_match_positional_parameters() {
+    var t = typeParameter('T', object());
+    var u = typeParameter('U', object());
+    var t1 = function(dynamic_,
+        typeFormals: [t], positional: [typeParameterType(t)]);
+    var t2 = function(dynamic_,
+        typeFormals: [u], positional: [typeParameterType(u)]);
+    assign(t1, t2, hard: true);
+    assertEdge(t2.returnType.node, t1.returnType.node, hard: false);
+  }
+
+  void test_function_type_generic_match_return_types() {
     var t = typeParameter('T', object());
     var u = typeParameter('U', object());
     var t1 = function(typeParameterType(t), typeFormals: [t]);
