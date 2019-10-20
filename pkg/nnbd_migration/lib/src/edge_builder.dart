@@ -2260,29 +2260,30 @@ mixin _AssignmentChecker {
             hard: false);
       }
     } else if (sourceType is FunctionType && destinationType is FunctionType) {
+      RenamedDecoratedFunctionTypes renamed =
+          RenamedDecoratedFunctionTypes.match(source, destination);
+      // We've already checked that a subtype relationship exists between the
+      // two function types, so a match should be found.
+      assert(renamed != null);
       _checkAssignment(origin,
-          source: source.returnType,
-          destination: destination.returnType,
+          source: renamed.returnType1,
+          destination: renamed.returnType2,
           hard: false);
-      if (source.typeArguments.isNotEmpty ||
-          destination.typeArguments.isNotEmpty) {
-        throw UnimplementedError('TODO(paulberry)');
-      }
       for (int i = 0;
-          i < source.positionalParameters.length &&
-              i < destination.positionalParameters.length;
+          i < renamed.positionalParameters1.length &&
+              i < renamed.positionalParameters2.length;
           i++) {
         // Note: source and destination are swapped due to contravariance.
         _checkAssignment(origin,
-            source: destination.positionalParameters[i],
-            destination: source.positionalParameters[i],
+            source: renamed.positionalParameters2[i],
+            destination: renamed.positionalParameters1[i],
             hard: false);
       }
-      for (var entry in destination.namedParameters.entries) {
+      for (var entry in renamed.namedParameters2.entries) {
         // Note: source and destination are swapped due to contravariance.
         _checkAssignment(origin,
             source: entry.value,
-            destination: source.namedParameters[entry.key],
+            destination: renamed.namedParameters1[entry.key],
             hard: false);
       }
     } else if (destinationType.isDynamic || sourceType.isDynamic) {

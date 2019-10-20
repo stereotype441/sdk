@@ -109,14 +109,15 @@ class AssignmentCheckerTest extends Object
     // Note: no assertions to do; just need to make sure there wasn't a crash.
   }
 
-  void test_function_type_generic() {
+  void solo_test_function_type_generic() {
     var n1 = newNode();
     var n2 = newNode();
     var t = typeParameter('T', object());
-    var u = typeParameter('U', int_());
+    var u = typeParameter('U', object());
     var t1 = function(typeParameterType(t), typeFormals: [t]);
     var t2 = function(typeParameterType(u), typeFormals: [u]);
-    fail('TODO(paulberry)');
+    assign(t1, t2, hard: true);
+    assertEdge(t1.returnType.node, t2.returnType.node, hard: false);
   }
 
   void test_function_type_named_parameter() {
