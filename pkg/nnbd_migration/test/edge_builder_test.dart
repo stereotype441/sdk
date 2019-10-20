@@ -109,6 +109,16 @@ class AssignmentCheckerTest extends Object
     // Note: no assertions to do; just need to make sure there wasn't a crash.
   }
 
+  void test_function_type_generic() {
+    var n1 = newNode();
+    var n2 = newNode();
+    var t = typeParameter('T', object());
+    var u = typeParameter('U', int_());
+    var t1 = function(typeParameterType(t), typeFormals: [t]);
+    var t2 = function(typeParameterType(u), typeFormals: [u]);
+    fail('TODO(paulberry)');
+  }
+
   void test_function_type_named_parameter() {
     var t1 = function(dynamic_, named: {'x': object()});
     var t2 = function(dynamic_, named: {'x': object()});
