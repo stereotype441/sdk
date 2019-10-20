@@ -597,6 +597,9 @@ class RenamedDecoratedFunctionTypes {
   /// (both of which should be function types) such that the generic type
   /// parameters match.
   ///
+  /// The callback [boundsMatcher] is used to determine whether type parameter
+  /// bounds match.
+  ///
   /// If such a renaming can be found, it is returned.  If not, `null` is
   /// returned.
   static RenamedDecoratedFunctionTypes match(
