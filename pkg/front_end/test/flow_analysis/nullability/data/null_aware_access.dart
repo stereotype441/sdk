@@ -4,16 +4,16 @@
 
 class C {
   void set setter(value) {}
-  C operator[](index) => this;
-  void operator[]=(index, value) {}
+  C operator [](index) => this;
+  void operator []=(index, value) {}
   C get getterReturningC => this;
   C? get getterReturningNullableC => this;
 }
 
 class D {
   void set setter(value) {}
-  D? operator[](index) => this;
-  void operator[]=(index, value) {}
+  D? operator [](index) => this;
+  void operator []=(index, value) {}
 }
 
 void setterCall(C? c) {
