@@ -782,6 +782,20 @@ main() {
       });
     });
 
+    test('nullAwareAccess temporarily promotes', () {
+      var h = _Harness();
+      var x = h.addVar('x', 'int?');
+      h.run((flow) {
+        h.declare(x, initialized: true);
+        var varExpr = _Expression();
+        flow.variableRead(varExpr, x);
+        flow.nullAwareAccess_rightBegin(varExpr);
+        expect(flow.promotedType(x).type, 'int');
+        flow.nullAwareAccess_end();
+        expect(flow.promotedType(x), isNull);
+      });
+    });
+
     test('parenthesizedExpression preserves promotion behaviors', () {
       var h = _Harness();
       var x = h.addVar('x', 'int?');

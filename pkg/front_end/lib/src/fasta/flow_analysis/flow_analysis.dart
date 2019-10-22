@@ -383,6 +383,20 @@ abstract class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// expression.
   void nonNullAssert_end(Expression operand);
 
+  /// Call this method after visiting an expression using `?.`.
+  void nullAwareAccess_end();
+
+  /// Call this method after visiting a `?.` operator.
+  ///
+  /// [target] should be the expression just before `?.`.
+  ///
+  /// Note that it [nullAwareAccess_end] should be called after the conclusion
+  /// of any null-shorting that is caused by the `?.`.  So, for example, if the
+  /// code being analyzed is `x?.y?.z(x)`, [nullAwareAccess_rightBegin] should
+  /// be called once upon reaching each `?.`, but [nullAwareAccess_end] should
+  /// not be called until after processing the method call to `z(x)`.
+  void nullAwareAccess_rightBegin(Expression target);
+
   /// Call this method when encountering an expression that is a `null` literal.
   void nullLiteral(Expression expression);
 
@@ -776,6 +790,17 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
   void nonNullAssert_end(Expression operand) {
     return _wrap('nonNullAssert_end($operand)',
         () => _wrapped.nonNullAssert_end(operand));
+  }
+
+  @override
+  void nullAwareAccess_end() {
+    _wrap('nullAwareAccess_end()', () => _wrapped.nullAwareAccess_end());
+  }
+
+  @override
+  void nullAwareAccess_rightBegin(Expression target) {
+    _wrap('nullAwareAccess_rightBegin($target)',
+        () => _wrapped.nullAwareAccess_rightBegin(target));
   }
 
   @override
@@ -1861,6 +1886,22 @@ class _FlowAnalysisImpl<Statement, Expression, Variable, Type>
     if (operandInfo is _VariableReadInfo<Variable, Type>) {
       _current =
           _current.markNonNullable(typeOperations, operandInfo._variable);
+    }
+  }
+
+  @override
+  void nullAwareAccess_end() {
+    _SimpleContext<Variable, Type> context =
+        _stack.removeLast() as _SimpleContext<Variable, Type>;
+    _current = context._previous;
+  }
+
+  @override
+  void nullAwareAccess_rightBegin(Expression target) {
+    _stack.add(new _SimpleContext<Variable, Type>(_current));
+    _ExpressionInfo<Variable, Type> targetInfo = _getExpressionInfo(target);
+    if (targetInfo is _VariableReadInfo<Variable, Type>) {
+      _current = _current.markNonNullable(typeOperations, targetInfo._variable);
     }
   }
 
