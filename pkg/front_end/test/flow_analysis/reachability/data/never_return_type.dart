@@ -37,9 +37,9 @@ void static_getter_call(bool b) {
   }
 }
 
-void complex_getter_call(bool b, C c) {
-  if (b) {
-    (true ? c : c).getter;
+void complex_getter_call(bool b1, bool b2, C c) {
+  if (b1) {
+    (b2 ? c : c).getter;
     /*stmt: unreachable*/ 0;
   }
 }
