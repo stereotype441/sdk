@@ -710,6 +710,7 @@ delimited
 delimiter
 delimiters
 delta
+demotions
 denote
 denoted
 denotes
