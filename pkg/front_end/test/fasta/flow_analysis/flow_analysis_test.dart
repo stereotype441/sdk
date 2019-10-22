@@ -796,6 +796,22 @@ main() {
       });
     });
 
+    test('nullAwareAccess preserves demotions', () {
+      var h = _Harness();
+      var x = h.addVar('x', 'int?', hasWrites: true);
+      h.run((flow) {
+        h.declare(x, initialized: true);
+        h.promote(x, 'int');
+        var lhs = _Expression();
+        flow.nullAwareAccess_rightBegin(lhs);
+        expect(flow.promotedType(x).type, 'int');
+        flow.write(x);
+        expect(flow.promotedType(x), isNull);
+        flow.nullAwareAccess_end();
+        expect(flow.promotedType(x), isNull);
+      });
+    });
+
     test('parenthesizedExpression preserves promotion behaviors', () {
       var h = _Harness();
       var x = h.addVar('x', 'int?');
