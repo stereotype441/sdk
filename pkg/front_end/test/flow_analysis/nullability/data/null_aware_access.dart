@@ -49,7 +49,7 @@ void indexSetterCall_nullShorting(C? c, D? d) {
   d?.[0]?.[/*nonNullable*/ d] = /*nonNullable*/ d;
 }
 
-void cascaded(C? c) {
+void null_aware_cascades_do_not_promote_target(C? c) {
   // Cascaded invocations act on an invisible temporary variable that
   // holds the result of evaluating the cascade target.  So
   // effectively, no promotion happens (because there is no way to
@@ -57,4 +57,27 @@ void cascaded(C? c) {
   c?..setter = c;
   c?..[c];
   c?..[c] = c;
+}
+
+void null_aware_cascades_do_not_promote_others(C? c, int? i, int? j) {
+  // Promotions that happen inside null-aware cascade sections
+  // disappear after the cascade section, because they are not
+  // guaranteed to execute.
+  c?..setter = i!;
+  c?..[i!];
+  c?..[i!] = j!;
+  i;
+  j;
+}
+
+void normal_cascades_do_promote_others(C? c, int? i, int? j, int? k, int? l) {
+  // Promotions that happen inside non-null-aware cascade sections
+  // don't disappear after the cascade section.
+  c?..setter = i!;
+  c?..[j!];
+  c?..[k!] = l!;
+  /*nonNullable*/ i;
+  /*nonNullable*/ j;
+  /*nonNullable*/ k;
+  /*nonNullable*/ l;
 }
