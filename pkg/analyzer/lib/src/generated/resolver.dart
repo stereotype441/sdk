@@ -2644,7 +2644,7 @@ class ResolverVisitor extends ScopedVisitor {
     }
     this.inferenceContext = new InferenceContext._(
         typeProvider, typeSystem, strongModeHints, errorReporter);
-    this.typeAnalyzer = new StaticTypeAnalyzer(this, featureSet);
+    this.typeAnalyzer = new StaticTypeAnalyzer(this, featureSet, _flowAnalysis);
   }
 
   /// Return the element representing the function containing the current node,
@@ -3655,6 +3655,10 @@ class ResolverVisitor extends ScopedVisitor {
   @override
   void visitIndexExpression(IndexExpression node) {
     node.target?.accept(this);
+    if (node.leftBracket.type ==
+        TokenType.QUESTION_PERIOD_OPEN_SQUARE_BRACKET) {
+      _flowAnalysis?.flow?.nullAwareAccess_rightBegin(node.target);
+    }
     node.accept(elementResolver);
     var method = node.staticElement;
     if (method != null && method.parameters.isNotEmpty) {
@@ -3848,6 +3852,9 @@ class ResolverVisitor extends ScopedVisitor {
     // to be visited in the context of the property access node.
     //
     node.target?.accept(this);
+    if (node.operator.type == TokenType.QUESTION_PERIOD) {
+      _flowAnalysis?.flow?.nullAwareAccess_rightBegin(node.target);
+    }
     node.accept(elementResolver);
     node.accept(typeAnalyzer);
   }
