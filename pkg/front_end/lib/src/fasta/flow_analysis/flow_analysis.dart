@@ -1893,7 +1893,7 @@ class _FlowAnalysisImpl<Statement, Expression, Variable, Type>
   void nullAwareAccess_end() {
     _SimpleContext<Variable, Type> context =
         _stack.removeLast() as _SimpleContext<Variable, Type>;
-    _current = context._previous;
+    _current = _join(_current, context._previous);
   }
 
   @override
