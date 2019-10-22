@@ -166,9 +166,9 @@ class C {
   void methodTakingNamedArgument({arg}) {}
   Never get getter => throw 'foo';
   static Never get staticGetter => throw 'foo';
-  Never operator+(other) => throw 'foo';
-  Never operator[](other) => throw 'foo';
-  Never operator-() => throw 'foo';
+  Never operator +(other) => throw 'foo';
+  Never operator [](other) => throw 'foo';
+  Never operator -() => throw 'foo';
 
   void local_getter(bool b) {
     if (b) {
