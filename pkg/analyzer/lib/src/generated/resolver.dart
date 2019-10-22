@@ -3655,8 +3655,7 @@ class ResolverVisitor extends ScopedVisitor {
   @override
   void visitIndexExpression(IndexExpression node) {
     node.target?.accept(this);
-    if (node.leftBracket.type ==
-        TokenType.QUESTION_PERIOD_OPEN_SQUARE_BRACKET) {
+    if (node.isNullAware) {
       _flowAnalysis?.flow?.nullAwareAccess_rightBegin(node.target);
     }
     node.accept(elementResolver);
@@ -3852,7 +3851,7 @@ class ResolverVisitor extends ScopedVisitor {
     // to be visited in the context of the property access node.
     //
     node.target?.accept(this);
-    if (node.operator.type == TokenType.QUESTION_PERIOD) {
+    if (node.isNullAware) {
       _flowAnalysis?.flow?.nullAwareAccess_rightBegin(node.target);
     }
     node.accept(elementResolver);
