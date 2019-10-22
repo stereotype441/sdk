@@ -389,16 +389,15 @@ abstract class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// Call this method after visiting a null-aware operator such as `?.`,
   /// `?..`, `?.[`, or `?..[`.
   ///
-  /// [target] should be the expression just before the null-aware operator.
-  /// [isCascadeSection] should indicate whether the null-aware access starts
-  /// a cascade section.
+  /// [target] should be the expression just before the null-aware operator, or
+  /// `null` if the null-aware access starts a cascade section.
   ///
   /// Note that it [nullAwareAccess_end] should be called after the conclusion
   /// of any null-shorting that is caused by the `?.`.  So, for example, if the
   /// code being analyzed is `x?.y?.z(x)`, [nullAwareAccess_rightBegin] should
   /// be called once upon reaching each `?.`, but [nullAwareAccess_end] should
   /// not be called until after processing the method call to `z(x)`.
-  void nullAwareAccess_rightBegin(Expression target, bool isCascadeSection);
+  void nullAwareAccess_rightBegin(Expression target);
 
   /// Call this method when encountering an expression that is a `null` literal.
   void nullLiteral(Expression expression);
@@ -801,9 +800,9 @@ class FlowAnalysisDebug<Statement, Expression, Variable, Type>
   }
 
   @override
-  void nullAwareAccess_rightBegin(Expression target, bool isCascadeSection) {
-    _wrap('nullAwareAccess_rightBegin($target, $isCascadeSection)',
-        () => _wrapped.nullAwareAccess_rightBegin(target, isCascadeSection));
+  void nullAwareAccess_rightBegin(Expression target) {
+    _wrap('nullAwareAccess_rightBegin($target)',
+        () => _wrapped.nullAwareAccess_rightBegin(target));
   }
 
   @override
@@ -1900,11 +1899,14 @@ class _FlowAnalysisImpl<Statement, Expression, Variable, Type>
   }
 
   @override
-  void nullAwareAccess_rightBegin(Expression target, bool isCascadeSection) {
+  void nullAwareAccess_rightBegin(Expression target) {
     _stack.add(new _SimpleContext<Variable, Type>(_current));
-    _ExpressionInfo<Variable, Type> targetInfo = _getExpressionInfo(target);
-    if (!isCascadeSection && targetInfo is _VariableReadInfo<Variable, Type>) {
-      _current = _current.markNonNullable(typeOperations, targetInfo._variable);
+    if (target != null) {
+      _ExpressionInfo<Variable, Type> targetInfo = _getExpressionInfo(target);
+      if (targetInfo is _VariableReadInfo<Variable, Type>) {
+        _current =
+            _current.markNonNullable(typeOperations, targetInfo._variable);
+      }
     }
   }
 

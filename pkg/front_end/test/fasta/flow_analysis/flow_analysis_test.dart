@@ -789,7 +789,7 @@ main() {
         h.declare(x, initialized: true);
         var varExpr = _Expression();
         flow.variableRead(varExpr, x);
-        flow.nullAwareAccess_rightBegin(varExpr, false);
+        flow.nullAwareAccess_rightBegin(varExpr);
         expect(flow.promotedType(x).type, 'int');
         flow.nullAwareAccess_end();
         expect(flow.promotedType(x), isNull);
@@ -803,7 +803,7 @@ main() {
         h.declare(x, initialized: true);
         var varExpr = _Expression();
         flow.variableRead(varExpr, x);
-        flow.nullAwareAccess_rightBegin(varExpr, true);
+        flow.nullAwareAccess_rightBegin(null);
         expect(flow.promotedType(x), isNull);
         flow.nullAwareAccess_end();
       });
@@ -816,7 +816,7 @@ main() {
         h.declare(x, initialized: true);
         h.promote(x, 'int');
         var lhs = _Expression();
-        flow.nullAwareAccess_rightBegin(lhs, false);
+        flow.nullAwareAccess_rightBegin(lhs);
         expect(flow.promotedType(x).type, 'int');
         flow.write(x);
         expect(flow.promotedType(x), isNull);
