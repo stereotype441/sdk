@@ -48,3 +48,13 @@ void indexSetterCall_nullShorting(C? c, D? d) {
   c?.[0][/*nonNullable*/ c] = /*nonNullable*/ c;
   d?.[0]?.[/*nonNullable*/ d] = /*nonNullable*/ d;
 }
+
+void cascaded(C? c) {
+  // Cascaded invocations act on an invisible temporary variable that
+  // holds the result of evaluating the cascade target.  So
+  // effectively, no promotion happens (because there is no way to
+  // observe a change to the type of that variable).
+  c?..setter = c;
+  c?..[c];
+  c?..[c] = c;
+}
