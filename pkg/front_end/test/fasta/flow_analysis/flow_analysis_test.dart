@@ -789,10 +789,23 @@ main() {
         h.declare(x, initialized: true);
         var varExpr = _Expression();
         flow.variableRead(varExpr, x);
-        flow.nullAwareAccess_rightBegin(varExpr);
+        flow.nullAwareAccess_rightBegin(varExpr, false);
         expect(flow.promotedType(x).type, 'int');
         flow.nullAwareAccess_end();
         expect(flow.promotedType(x), isNull);
+      });
+    });
+
+    test('nullAwareAccess does not promote the target of a cascade', () {
+      var h = _Harness();
+      var x = h.addVar('x', 'int?');
+      h.run((flow) {
+        h.declare(x, initialized: true);
+        var varExpr = _Expression();
+        flow.variableRead(varExpr, x);
+        flow.nullAwareAccess_rightBegin(varExpr, true);
+        expect(flow.promotedType(x), isNull);
+        flow.nullAwareAccess_end();
       });
     });
 
@@ -803,7 +816,7 @@ main() {
         h.declare(x, initialized: true);
         h.promote(x, 'int');
         var lhs = _Expression();
-        flow.nullAwareAccess_rightBegin(lhs);
+        flow.nullAwareAccess_rightBegin(lhs, false);
         expect(flow.promotedType(x).type, 'int');
         flow.write(x);
         expect(flow.promotedType(x), isNull);
