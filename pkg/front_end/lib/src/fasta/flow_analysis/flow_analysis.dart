@@ -394,7 +394,7 @@ abstract class FlowAnalysis<Statement, Expression, Variable, Type> {
   /// [target] should be the expression just before the null-aware operator, or
   /// `null` if the null-aware access starts a cascade section.
   ///
-  /// Note that it [nullAwareAccess_end] should be called after the conclusion
+  /// Note that [nullAwareAccess_end] should be called after the conclusion
   /// of any null-shorting that is caused by the `?.`.  So, for example, if the
   /// code being analyzed is `x?.y?.z(x)`, [nullAwareAccess_rightBegin] should
   /// be called once upon reaching each `?.`, but [nullAwareAccess_end] should
