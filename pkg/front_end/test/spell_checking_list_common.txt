@@ -363,6 +363,7 @@ careful
 cares
 carry
 cascade
+cascaded
 cascading
 case
 cases
@@ -789,6 +790,7 @@ disabled
 disabling
 disambiguate
 disambiguated
+disappear
 discard
 discarded
 discarding
@@ -863,6 +865,7 @@ edition
 editor
 effect
 effective
+effectively
 efficiency
 effort
 either
@@ -1458,6 +1461,7 @@ invariantly
 invert
 inverted
 investigate
+invisible
 invocation
 invocation's
 invocations
