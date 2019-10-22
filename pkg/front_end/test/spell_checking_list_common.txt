@@ -2891,6 +2891,7 @@ under
 underlying
 underscore
 understand
+understands
 understood
 undetermined
 unevaluated
