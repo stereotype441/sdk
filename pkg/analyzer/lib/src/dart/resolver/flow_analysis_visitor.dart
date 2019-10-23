@@ -72,9 +72,9 @@ class FlowAnalysisHelper {
 
   void assignmentExpression_afterRight(
       AssignmentExpression node, VariableElement localElement) {
-    if (localElement == null) return;
-
-    flow.write(localElement);
+    if (localElement != null) {
+      flow.write(localElement);
+    }
 
     if (node.operator.type == TokenType.QUESTION_QUESTION_EQ) {
       flow.ifNullExpression_end();
