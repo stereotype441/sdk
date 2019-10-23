@@ -2347,6 +2347,7 @@ restrict
 restricted
 restrictive
 result
+resulted
 resulting
 results
 resume
