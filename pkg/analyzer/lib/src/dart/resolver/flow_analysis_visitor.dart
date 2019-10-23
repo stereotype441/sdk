@@ -8,6 +8,7 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/dart/element/type_system.dart';
 import 'package:analyzer/src/dart/element/type.dart';
+import 'package:analyzer/src/generated/type_system.dart' show Dart2TypeSystem;
 import 'package:analyzer/src/generated/variable_type_provider.dart';
 import 'package:front_end/src/fasta/flow_analysis/flow_analysis.dart';
 
@@ -258,7 +259,7 @@ class FlowAnalysisResult {
 
 class TypeSystemTypeOperations
     implements TypeOperations<PromotableElement, DartType> {
-  final TypeSystem typeSystem;
+  final Dart2TypeSystem typeSystem;
 
   TypeSystemTypeOperations(this.typeSystem);
 
@@ -275,6 +276,11 @@ class TypeSystemTypeOperations
   @override
   DartType promoteToNonNull(DartType type) {
     return typeSystem.promoteToNonNull(type);
+  }
+
+  @override
+  DartType tryPromoteToType(DartType to, DartType from) {
+    return typeSystem.tryPromoteToType(to, from);
   }
 
   @override
