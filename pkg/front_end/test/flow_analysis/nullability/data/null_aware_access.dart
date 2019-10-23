@@ -143,7 +143,7 @@ void normal_cascades_do_promote_others(C c, int? i, int? j, int? k, int? l, int?
   /*nonNullable*/ k;
   /*nonNullable*/ l;
   /*nonNullable*/ m;
-  /*nonNullable*/ n;
+  n; // Not promoted because `n!` is on the RHS of `??=`
   /*nonNullable*/ o;
   /*nonNullable*/ p;
 }
