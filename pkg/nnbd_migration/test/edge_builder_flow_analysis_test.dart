@@ -2,6 +2,7 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+import 'package:test/test.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
 
 import 'migration_visitor_test_base.dart';
@@ -14,6 +15,21 @@ main() {
 
 @reflectiveTest
 class EdgeBuilderFlowAnalysisTest extends EdgeBuilderTestBase {
+  solo_test_type_parameter_promotion() async {
+    await analyze('''
+class C<T extends Object> {
+  void m(T t) {
+    if (t is int) {
+      f(t);
+    }
+  }
+}
+void f(int i) {}
+''');
+    graph.debugDump();
+    fail('TODO(paulberry)');
+  }
+
   test_assignmentExpression() async {
     await analyze('''
 void f(int i, int j) {
