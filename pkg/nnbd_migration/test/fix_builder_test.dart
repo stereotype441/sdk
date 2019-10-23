@@ -167,7 +167,7 @@ _f(_C/*!*/ x, int/*?*/ y) => x += y;
     visitSubexpression(findNode.assignment('+='), '_D');
   }
 
-  solo_test_assignmentExpression_null_aware_rhs_does_not_promote() async {
+  test_assignmentExpression_null_aware_rhs_does_not_promote() async {
     await analyze('''
 _f(bool/*?*/ b, int/*?*/ i) {
   b ??= i.isEven; // 1
