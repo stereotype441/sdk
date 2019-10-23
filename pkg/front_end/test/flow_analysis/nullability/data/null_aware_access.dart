@@ -10,7 +10,7 @@ class C {
   C? get getterReturningNullableC => this;
   C get getterSetter => this;
   void set getterSetter(value) {}
-  C operagor+(other) => this;
+  C operator+(other) => this;
 }
 
 class D {
@@ -19,7 +19,7 @@ class D {
   void operator []=(index, value) {}
   D get getterSetter => this;
   void set getterSetter(value) {}
-  D operagor+(other) => this;
+  D operator+(other) => this;
 }
 
 void setterCall(C? c) {
