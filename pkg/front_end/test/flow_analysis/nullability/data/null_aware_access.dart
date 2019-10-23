@@ -128,16 +128,16 @@ void null_aware_cascades_do_not_promote_others(C? c, int? i, int? j) {
   j;
 }
 
-void normal_cascades_do_promote_others(C c, int? i, int? j, int? k, int? l, int? m, int? n, int? o, int? p) {
+void normal_cascades_do_promote_others(C c, int? i, int? j, int? k, int? l, int? m, int? n, int? o, int? p, int? q, int? r) {
   // Promotions that happen inside non-null-aware cascade sections
   // don't disappear after the cascade section.
   c..setter = i!;
   c..getterSetter += m!;
-  c..getterSetter *= n!;
+  c..getterSetter ??= n!;
   c..[j!];
   c..[k!] = l!;
-  c..[k!] += o!;
-  c..[k!] ??= p!;
+  c..[o!] += p!;
+  c..[q!] ??= r!;
   /*nonNullable*/ i;
   /*nonNullable*/ j;
   /*nonNullable*/ k;
