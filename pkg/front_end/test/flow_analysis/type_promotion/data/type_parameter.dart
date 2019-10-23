@@ -8,6 +8,7 @@ class C<T extends num> {
       /*T & int*/ t;
     }
   }
+
   void doesNotPromote(T t) {
     if (t is String) {
       t;
