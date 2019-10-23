@@ -2296,35 +2296,14 @@ class InferenceVisitor
     // the type of the value parameter.
     DartType inferredType = valueResult.inferredType;
 
-    Expression assignment;
-    if (indexSetTarget.isMissing) {
-      assignment = inferrer.helper.buildProblem(
-          templateUndefinedMethod.withArguments('[]=', receiverType),
-          node.fileOffset,
-          '[]='.length);
-    } else if (indexSetTarget.isExtensionMember) {
-      assert(indexSetTarget.extensionMethodKind != ProcedureKind.Setter);
-      assignment = new StaticInvocation(
-          indexSetTarget.member,
-          new Arguments(<Expression>[
-            createVariableGet(receiverVariable),
-            createVariableGet(indexVariable),
-            createVariableGet(valueVariable)
-          ], types: indexSetTarget.inferredExtensionTypeArguments)
-            ..fileOffset = node.fileOffset)
-        ..fileOffset = node.fileOffset;
-    } else {
-      assignment = new MethodInvocation(
-          createVariableGet(receiverVariable),
-          indexSetName,
-          new Arguments(<Expression>[
-            createVariableGet(indexVariable),
-            createVariableGet(valueVariable)
-          ])
-            ..fileOffset = node.fileOffset,
-          indexSetTarget.member)
-        ..fileOffset = node.fileOffset;
-    }
+    Expression assignment = _computeIndexSet(
+        node.fileOffset,
+        createVariableGet(receiverVariable),
+        receiverType,
+        indexSetTarget,
+        createVariableGet(indexVariable),
+        createVariableGet(valueVariable));
+
     VariableDeclaration assignmentVariable =
         createVariable(assignment, const VoidType());
     Expression replacement = new Let(
@@ -2445,25 +2424,14 @@ class InferenceVisitor
     // the type of the value parameter.
     DartType inferredType = valueResult.inferredType;
 
-    Expression assignment;
-    if (target.isMissing) {
-      assignment = inferrer.helper.buildProblem(
-          templateUndefinedMethod.withArguments(
-              indexSetName.name, receiverType),
-          node.fileOffset,
-          noLength);
-    } else {
-      assert(target.isExtensionMember);
-      assignment = new StaticInvocation(
-          target.member,
-          new Arguments(<Expression>[
-            createVariableGet(receiverVariable),
-            createVariableGet(indexVariable),
-            createVariableGet(valueVariable)
-          ], types: target.inferredExtensionTypeArguments)
-            ..fileOffset = node.fileOffset)
-        ..fileOffset = node.fileOffset;
-    }
+    Expression assignment = _computeIndexSet(
+        node.fileOffset,
+        createVariableGet(receiverVariable),
+        receiverType,
+        target,
+        createVariableGet(indexVariable),
+        createVariableGet(valueVariable));
+
     VariableDeclaration assignmentVariable =
         createVariable(assignment, const VoidType());
     Expression replacement = new Let(
@@ -2512,12 +2480,7 @@ class InferenceVisitor
         inferrer.preCheckInvocationContravariance(receiverType, readTarget,
             isThisReceiver: node.receiver is ThisExpression);
 
-    DartType readType = inferrer.getReturnType(readTarget, receiverType);
     DartType readIndexType = inferrer.getIndexKeyType(readTarget, receiverType);
-
-    Member equalsMember = inferrer
-        .findInterfaceMember(readType, equalsName, node.testOffset)
-        .member;
 
     ObjectAccessTarget writeTarget = inferrer.findInterfaceMember(
         receiverType, indexSetName, node.writeOffset,
@@ -2537,6 +2500,15 @@ class InferenceVisitor
     readIndex = inferrer.ensureAssignable(
         readIndexType, indexResult.inferredType, readIndex);
 
+    ExpressionInferenceResult readResult = _computeIndexGet(node.readOffset,
+        readReceiver, receiverType, readTarget, readIndex, checkKind);
+    Expression read = readResult.expression;
+    DartType readType = readResult.inferredType;
+
+    Member equalsMember = inferrer
+        .findInterfaceMember(readType, equalsName, node.testOffset)
+        .member;
+
     Expression writeIndex = createVariableGet(indexVariable);
     writeIndex = inferrer.ensureAssignable(
         writeIndexType, indexResult.inferredType, writeIndex);
@@ -2548,47 +2520,6 @@ class InferenceVisitor
     DartType inferredType = inferrer.typeSchemaEnvironment
         .getStandardUpperBound(readType, valueResult.inferredType);
 
-    Expression read;
-
-    if (readTarget.isMissing) {
-      read = inferrer.helper.buildProblem(
-          templateUndefinedMethod.withArguments('[]', receiverType),
-          node.readOffset,
-          '[]'.length);
-    } else if (readTarget.isExtensionMember) {
-      read = new StaticInvocation(
-          readTarget.member,
-          new Arguments(<Expression>[
-            readReceiver,
-            readIndex,
-          ], types: readTarget.inferredExtensionTypeArguments)
-            ..fileOffset = node.readOffset)
-        ..fileOffset = node.readOffset;
-    } else {
-      read = new MethodInvocation(
-          readReceiver,
-          indexGetName,
-          new Arguments(<Expression>[
-            readIndex,
-          ])
-            ..fileOffset = node.readOffset,
-          readTarget.member)
-        ..fileOffset = node.readOffset;
-
-      if (checkKind == MethodContravarianceCheckKind.checkMethodReturn) {
-        if (inferrer.instrumentation != null) {
-          inferrer.instrumentation.record(
-              inferrer.uriForInstrumentation,
-              node.readOffset,
-              'checkReturn',
-              new InstrumentationValueForType(readType));
-        }
-        read = new AsExpression(read, readType)
-          ..isTypeError = true
-          ..fileOffset = node.readOffset;
-      }
-    }
-
     VariableDeclaration valueVariable;
     if (node.forEffect) {
       // No need for value variable.
@@ -2597,30 +2528,8 @@ class InferenceVisitor
       value = createVariableGet(valueVariable);
     }
 
-    Expression write;
-
-    if (writeTarget.isMissing) {
-      write = inferrer.helper.buildProblem(
-          templateUndefinedMethod.withArguments('[]=', receiverType),
-          node.writeOffset,
-          '[]='.length);
-    } else if (writeTarget.isExtensionMember) {
-      assert(writeTarget.extensionMethodKind != ProcedureKind.Setter);
-      write = new StaticInvocation(
-          writeTarget.member,
-          new Arguments(<Expression>[writeReceiver, writeIndex, value],
-              types: writeTarget.inferredExtensionTypeArguments)
-            ..fileOffset = node.writeOffset)
-        ..fileOffset = node.writeOffset;
-    } else {
-      write = new MethodInvocation(
-          writeReceiver,
-          indexSetName,
-          new Arguments(<Expression>[writeIndex, value])
-            ..fileOffset = node.writeOffset,
-          writeTarget.member)
-        ..fileOffset = node.writeOffset;
-    }
+    Expression write = _computeIndexSet(node.writeOffset, writeReceiver,
+        receiverType, writeTarget, writeIndex, value);
 
     Expression inner;
     if (node.forEffect) {
@@ -2775,9 +2684,9 @@ class InferenceVisitor
 
     if (writeTarget.isMissing) {
       write = inferrer.helper.buildProblem(
-          templateSuperclassHasNoMethod.withArguments('[]='),
+          templateSuperclassHasNoMethod.withArguments(indexSetName.name),
           node.writeOffset,
-          '[]='.length);
+          noLength);
     } else {
       assert(writeTarget.isInstanceMember);
       inferrer.instrumentation?.record(
@@ -2862,12 +2771,7 @@ class InferenceVisitor
             node.getter, null, ProcedureKind.Operator, extensionTypeArguments)
         : const ObjectAccessTarget.missing();
 
-    DartType readType = inferrer.getReturnType(readTarget, receiverType);
     DartType readIndexType = inferrer.getIndexKeyType(readTarget, receiverType);
-
-    Member equalsMember = inferrer
-        .findInterfaceMember(readType, equalsName, node.testOffset)
-        .member;
 
     ObjectAccessTarget writeTarget = node.setter != null
         ? new ExtensionAccessTarget(
@@ -2888,6 +2792,20 @@ class InferenceVisitor
     readIndex = inferrer.ensureAssignable(
         readIndexType, indexResult.inferredType, readIndex);
 
+    ExpressionInferenceResult readResult = _computeIndexGet(
+        node.readOffset,
+        createVariableGet(receiverVariable),
+        receiverType,
+        readTarget,
+        readIndex,
+        MethodContravarianceCheckKind.none);
+    Expression read = readResult.expression;
+    DartType readType = readResult.inferredType;
+
+    Member equalsMember = inferrer
+        .findInterfaceMember(readType, equalsName, node.testOffset)
+        .member;
+
     Expression writeIndex = createVariableGet(indexVariable);
     writeIndex = inferrer.ensureAssignable(
         writeIndexType, indexResult.inferredType, writeIndex);
@@ -2899,25 +2817,6 @@ class InferenceVisitor
     DartType inferredType = inferrer.typeSchemaEnvironment
         .getStandardUpperBound(readType, valueResult.inferredType);
 
-    Expression read;
-    if (readTarget.isMissing) {
-      read = inferrer.helper.buildProblem(
-          templateUndefinedMethod.withArguments(
-              indexGetName.name, receiverType),
-          node.readOffset,
-          noLength);
-    } else {
-      assert(readTarget.isExtensionMember);
-      read = new StaticInvocation(
-          readTarget.member,
-          new Arguments(<Expression>[
-            createVariableGet(receiverVariable),
-            readIndex,
-          ], types: readTarget.inferredExtensionTypeArguments)
-            ..fileOffset = node.readOffset)
-        ..fileOffset = node.readOffset;
-    }
-
     VariableDeclaration valueVariable;
     if (node.forEffect) {
       // No need for a value variable.
@@ -2926,25 +2825,13 @@ class InferenceVisitor
       value = createVariableGet(valueVariable);
     }
 
-    Expression write;
-    if (writeTarget.isMissing) {
-      write = inferrer.helper.buildProblem(
-          templateUndefinedMethod.withArguments(
-              indexSetName.name, receiverType),
-          node.writeOffset,
-          noLength);
-    } else {
-      assert(writeTarget.isExtensionMember);
-      write = new StaticInvocation(
-          writeTarget.member,
-          new Arguments(<Expression>[
-            createVariableGet(receiverVariable),
-            writeIndex,
-            value
-          ], types: writeTarget.inferredExtensionTypeArguments)
-            ..fileOffset = node.writeOffset)
-        ..fileOffset = node.writeOffset;
-    }
+    Expression write = _computeIndexSet(
+        node.writeOffset,
+        createVariableGet(receiverVariable),
+        receiverType,
+        writeTarget,
+        writeIndex,
+        value);
 
     Expression inner;
     if (node.forEffect) {
@@ -3029,7 +2916,8 @@ class InferenceVisitor
     Expression binary;
     if (binaryTarget.isMissing) {
       binary = inferrer.helper.buildProblem(
-          templateUndefinedMethod.withArguments(binaryName.name, leftType),
+          templateUndefinedMethod.withArguments(
+              binaryName.name, inferrer.resolveTypeParameter(leftType)),
           fileOffset,
           binaryName.name.length);
     } else if (binaryTarget.isExtensionMember) {
@@ -3069,6 +2957,263 @@ class InferenceVisitor
     return new ExpressionInferenceResult(binaryType, binary);
   }
 
+  /// Creates an index operation of [readTarget] on [receiver] using [index] as
+  /// the argument.
+  ///
+  /// [fileOffset] is used as the file offset for created nodes. [receiverType]
+  /// is the already inferred type of the [receiver] expression. The inferred
+  /// type of [index] must already have been computed.
+  ExpressionInferenceResult _computeIndexGet(
+      int fileOffset,
+      Expression readReceiver,
+      DartType receiverType,
+      ObjectAccessTarget readTarget,
+      Expression readIndex,
+      MethodContravarianceCheckKind readCheckKind) {
+    Expression read;
+    DartType readType = inferrer.getReturnType(readTarget, receiverType);
+    if (readTarget.isMissing) {
+      read = inferrer.helper.buildProblem(
+          templateUndefinedMethod.withArguments(
+              indexGetName.name, inferrer.resolveTypeParameter(receiverType)),
+          fileOffset,
+          noLength);
+    } else if (readTarget.isExtensionMember) {
+      read = new StaticInvocation(
+          readTarget.member,
+          new Arguments(<Expression>[
+            readReceiver,
+            readIndex,
+          ], types: readTarget.inferredExtensionTypeArguments)
+            ..fileOffset = fileOffset)
+        ..fileOffset = fileOffset;
+    } else {
+      read = new MethodInvocation(
+          readReceiver,
+          indexGetName,
+          new Arguments(<Expression>[
+            readIndex,
+          ])
+            ..fileOffset = fileOffset,
+          readTarget.member)
+        ..fileOffset = fileOffset;
+      if (readCheckKind == MethodContravarianceCheckKind.checkMethodReturn) {
+        if (inferrer.instrumentation != null) {
+          inferrer.instrumentation.record(
+              inferrer.uriForInstrumentation,
+              fileOffset,
+              'checkReturn',
+              new InstrumentationValueForType(readType));
+        }
+        read = new AsExpression(read, readType)
+          ..isTypeError = true
+          ..fileOffset = fileOffset;
+      }
+    }
+    return new ExpressionInferenceResult(readType, read);
+  }
+
+  /// Creates an index set operation of [writeTarget] on [receiver] using
+  /// [index] and [value] as the arguments.
+  ///
+  /// [fileOffset] is used as the file offset for created nodes. [receiverType]
+  /// is the already inferred type of the [receiver] expression. The inferred
+  /// type of [index] and [value] must already have been computed.
+  Expression _computeIndexSet(
+      int fileOffset,
+      Expression receiver,
+      DartType receiverType,
+      ObjectAccessTarget writeTarget,
+      Expression index,
+      Expression value) {
+    Expression write;
+    if (writeTarget.isMissing) {
+      write = inferrer.helper.buildProblem(
+          templateUndefinedMethod.withArguments(
+              indexSetName.name, inferrer.resolveTypeParameter(receiverType)),
+          fileOffset,
+          noLength);
+    } else if (writeTarget.isExtensionMember) {
+      assert(writeTarget.extensionMethodKind != ProcedureKind.Setter);
+      write = new StaticInvocation(
+          writeTarget.member,
+          new Arguments(<Expression>[receiver, index, value],
+              types: writeTarget.inferredExtensionTypeArguments)
+            ..fileOffset = fileOffset)
+        ..fileOffset = fileOffset;
+    } else {
+      write = new MethodInvocation(
+          receiver,
+          indexSetName,
+          new Arguments(<Expression>[index, value])..fileOffset = fileOffset,
+          writeTarget.member)
+        ..fileOffset = fileOffset;
+    }
+    return write;
+  }
+
+  /// Creates a property get of [propertyName] on [receiver] of type
+  /// [receiverType].
+  ///
+  /// [fileOffset] is used as the file offset for created nodes. [receiverType]
+  /// is the already inferred type of the [receiver] expression. The
+  /// [typeContext] is used to create implicit generic tearoff instantiation
+  /// if necessary. [isThisReceiver] must be set to `true` if the receiver is a
+  /// `this` expression.
+  ExpressionInferenceResult _computePropertyGet(
+      int fileOffset,
+      Expression receiver,
+      DartType receiverType,
+      Name propertyName,
+      DartType typeContext,
+      {bool isThisReceiver}) {
+    assert(isThisReceiver != null);
+
+    ObjectAccessTarget readTarget = inferrer.findInterfaceMember(
+        receiverType, propertyName, fileOffset,
+        includeExtensionMethods: true);
+
+    DartType readType = inferrer.getGetterType(readTarget, receiverType);
+
+    Expression read;
+    if (readTarget.isMissing) {
+      read = inferrer.helper.buildProblem(
+          templateUndefinedGetter.withArguments(
+              propertyName.name, inferrer.resolveTypeParameter(receiverType)),
+          fileOffset,
+          propertyName.name.length);
+    } else if (readTarget.isExtensionMember) {
+      switch (readTarget.extensionMethodKind) {
+        case ProcedureKind.Getter:
+          read = new StaticInvocation(
+              readTarget.member,
+              new Arguments(<Expression>[
+                receiver,
+              ], types: readTarget.inferredExtensionTypeArguments)
+                ..fileOffset = fileOffset)
+            ..fileOffset = fileOffset;
+          break;
+        case ProcedureKind.Method:
+          read = new StaticInvocation(
+              readTarget.tearoffTarget,
+              new Arguments(<Expression>[
+                receiver,
+              ], types: readTarget.inferredExtensionTypeArguments)
+                ..fileOffset = fileOffset)
+            ..fileOffset = fileOffset;
+          return inferrer.instantiateTearOff(readType, typeContext, read);
+        case ProcedureKind.Setter:
+        case ProcedureKind.Factory:
+        case ProcedureKind.Operator:
+          unhandled('$readTarget', "inferPropertyGet", null, null);
+          break;
+      }
+    } else {
+      if (readTarget.isInstanceMember &&
+          inferrer.instrumentation != null &&
+          receiverType == const DynamicType()) {
+        inferrer.instrumentation.record(
+            inferrer.uriForInstrumentation,
+            fileOffset,
+            'target',
+            new InstrumentationValueForMember(readTarget.member));
+      }
+      read = new PropertyGet(receiver, propertyName, readTarget.member)
+        ..fileOffset = fileOffset;
+      bool checkReturn = false;
+      if (readTarget.isInstanceMember && !isThisReceiver) {
+        Member interfaceMember = readTarget.member;
+        if (interfaceMember is Procedure) {
+          checkReturn =
+              TypeInferrerImpl.returnedTypeParametersOccurNonCovariantly(
+                  interfaceMember.enclosingClass,
+                  interfaceMember.function.returnType);
+        } else if (interfaceMember is Field) {
+          checkReturn =
+              TypeInferrerImpl.returnedTypeParametersOccurNonCovariantly(
+                  interfaceMember.enclosingClass, interfaceMember.type);
+        }
+      }
+      if (checkReturn) {
+        if (inferrer.instrumentation != null) {
+          inferrer.instrumentation.record(
+              inferrer.uriForInstrumentation,
+              fileOffset,
+              'checkReturn',
+              new InstrumentationValueForType(readType));
+        }
+        read = new AsExpression(read, readType)
+          ..isTypeError = true
+          ..fileOffset = fileOffset;
+      }
+      Member member = readTarget.member;
+      if (member is Procedure && member.kind == ProcedureKind.Method) {
+        return inferrer.instantiateTearOff(readType, typeContext, read);
+      }
+    }
+    return new ExpressionInferenceResult(readType, read);
+  }
+
+  /// Creates a property set operation of [writeTarget] on [receiver] using
+  /// [value] as the right-hand side.
+  ///
+  /// [fileOffset] is used as the file offset for created nodes. [propertyName]
+  /// is used for error reporting. [receiverType] is the already inferred type
+  /// of the [receiver] expression. The inferred type of [value] must already
+  /// have been computed.
+  ///
+  /// If [forEffect] the resulting expression is ensured to return the [value]
+  /// of static type [valueType]. This is needed for extension setters which are
+  /// encoded as static method calls that do not implicitly return the value.
+  Expression _computePropertySet(
+      int fileOffset,
+      Expression receiver,
+      DartType receiverType,
+      Name propertyName,
+      ObjectAccessTarget writeTarget,
+      Expression value,
+      {DartType valueType,
+      bool forEffect}) {
+    assert(forEffect != null);
+    assert(forEffect || valueType != null,
+        "No value type provided for property set needed for value.");
+    Expression write;
+    if (writeTarget.isMissing) {
+      write = inferrer.helper.buildProblem(
+          templateUndefinedSetter.withArguments(
+              propertyName.name, inferrer.resolveTypeParameter(receiverType)),
+          fileOffset,
+          propertyName.name.length);
+    } else if (writeTarget.isExtensionMember) {
+      if (forEffect) {
+        write = new StaticInvocation(
+            writeTarget.member,
+            new Arguments(<Expression>[receiver, value],
+                types: writeTarget.inferredExtensionTypeArguments)
+              ..fileOffset = fileOffset)
+          ..fileOffset = fileOffset;
+      } else {
+        VariableDeclaration valueVariable = createVariable(value, valueType);
+        VariableDeclaration assignmentVariable = createVariable(
+            new StaticInvocation(
+                writeTarget.member,
+                new Arguments(
+                    <Expression>[receiver, createVariableGet(valueVariable)],
+                    types: writeTarget.inferredExtensionTypeArguments)
+                  ..fileOffset = fileOffset)
+              ..fileOffset = fileOffset,
+            const VoidType());
+        write = createLet(valueVariable,
+            createLet(assignmentVariable, createVariableGet(valueVariable)))
+          ..fileOffset = fileOffset;
+      }
+    } else {
+      write = new PropertySet(receiver, propertyName, value, writeTarget.member)
+        ..fileOffset = fileOffset;
+    }
+    return write;
+  }
+
   ExpressionInferenceResult visitCompoundIndexSet(
       CompoundIndexSet node, DartType typeContext) {
     ExpressionInferenceResult receiverResult = inferrer.inferExpression(
@@ -3102,7 +3247,6 @@ class InferenceVisitor
         inferrer.preCheckInvocationContravariance(receiverType, readTarget,
             isThisReceiver: node.receiver is ThisExpression);
 
-    DartType readType = inferrer.getReturnType(readTarget, receiverType);
     DartType readIndexType = inferrer.getPositionalParameterTypeForTarget(
         readTarget, receiverType, 0);
 
@@ -3114,44 +3258,10 @@ class InferenceVisitor
     readIndex = inferrer.ensureAssignable(
         readIndexType, indexResult.inferredType, readIndex);
 
-    Expression read;
-    if (readTarget.isMissing) {
-      read = inferrer.helper.buildProblem(
-          templateUndefinedMethod.withArguments('[]', receiverType),
-          node.readOffset,
-          '[]'.length);
-    } else if (readTarget.isExtensionMember) {
-      read = new StaticInvocation(
-          readTarget.member,
-          new Arguments(<Expression>[
-            readReceiver,
-            readIndex,
-          ], types: readTarget.inferredExtensionTypeArguments)
-            ..fileOffset = node.readOffset)
-        ..fileOffset = node.readOffset;
-    } else {
-      read = new MethodInvocation(
-          readReceiver,
-          indexGetName,
-          new Arguments(<Expression>[
-            readIndex,
-          ])
-            ..fileOffset = node.readOffset,
-          readTarget.member)
-        ..fileOffset = node.readOffset;
-      if (readCheckKind == MethodContravarianceCheckKind.checkMethodReturn) {
-        if (inferrer.instrumentation != null) {
-          inferrer.instrumentation.record(
-              inferrer.uriForInstrumentation,
-              node.readOffset,
-              'checkReturn',
-              new InstrumentationValueForType(readType));
-        }
-        read = new AsExpression(read, readType)
-          ..isTypeError = true
-          ..fileOffset = node.readOffset;
-      }
-    }
+    ExpressionInferenceResult readResult = _computeIndexGet(node.readOffset,
+        readReceiver, receiverType, readTarget, readIndex, readCheckKind);
+    Expression read = readResult.expression;
+    DartType readType = readResult.inferredType;
 
     VariableDeclaration leftVariable;
     Expression left;
@@ -3193,31 +3303,8 @@ class InferenceVisitor
       valueExpression = createVariableGet(valueVariable);
     }
 
-    Expression write;
-
-    if (writeTarget.isMissing) {
-      write = inferrer.helper.buildProblem(
-          templateUndefinedMethod.withArguments('[]=', receiverType),
-          node.writeOffset,
-          '[]='.length);
-    } else if (writeTarget.isExtensionMember) {
-      assert(writeTarget.extensionMethodKind != ProcedureKind.Setter);
-      write = new StaticInvocation(
-          writeTarget.member,
-          new Arguments(
-              <Expression>[writeReceiver, writeIndex, valueExpression],
-              types: writeTarget.inferredExtensionTypeArguments)
-            ..fileOffset = node.writeOffset)
-        ..fileOffset = node.writeOffset;
-    } else {
-      write = new MethodInvocation(
-          writeReceiver,
-          indexSetName,
-          new Arguments(<Expression>[writeIndex, valueExpression])
-            ..fileOffset = node.writeOffset,
-          writeTarget.member)
-        ..fileOffset = node.writeOffset;
-    }
+    Expression write = _computeIndexSet(node.writeOffset, writeReceiver,
+        receiverType, writeTarget, writeIndex, valueExpression);
 
     Expression inner;
     if (node.forEffect) {
@@ -3292,47 +3379,11 @@ class InferenceVisitor
         .findInterfaceMember(receiverType, equalsName, node.receiver.fileOffset)
         .member;
 
-    ObjectAccessTarget readTarget = inferrer.findInterfaceMember(
-        receiverType, node.propertyName, node.readOffset,
-        includeExtensionMethods: true);
-
-    MethodContravarianceCheckKind readCheckKind =
-        inferrer.preCheckInvocationContravariance(receiverType, readTarget,
-            isThisReceiver: node.receiver is ThisExpression);
-
-    DartType readType = inferrer.getGetterType(readTarget, receiverType);
-
-    Expression read;
-    if (readTarget.isMissing) {
-      read = inferrer.helper.buildProblem(
-          templateUndefinedMethod.withArguments(
-              node.propertyName.name, receiverType),
-          node.readOffset,
-          node.propertyName.name.length);
-    } else if (readTarget.isExtensionMember) {
-      read = new StaticInvocation(
-          readTarget.member,
-          new Arguments(<Expression>[
-            readReceiver,
-          ], types: readTarget.inferredExtensionTypeArguments)
-            ..fileOffset = node.readOffset)
-        ..fileOffset = node.readOffset;
-    } else {
-      read = new PropertyGet(readReceiver, node.propertyName, readTarget.member)
-        ..fileOffset = node.readOffset;
-      if (readCheckKind == MethodContravarianceCheckKind.checkMethodReturn) {
-        if (inferrer.instrumentation != null) {
-          inferrer.instrumentation.record(
-              inferrer.uriForInstrumentation,
-              node.readOffset,
-              'checkReturn',
-              new InstrumentationValueForType(readType));
-        }
-        read = new AsExpression(read, readType)
-          ..isTypeError = true
-          ..fileOffset = node.readOffset;
-      }
-    }
+    ExpressionInferenceResult readResult = _computePropertyGet(node.readOffset,
+        readReceiver, receiverType, node.propertyName, const UnknownType(),
+        isThisReceiver: node.receiver is ThisExpression);
+    Expression read = readResult.expression;
+    DartType readType = readResult.inferredType;
 
     VariableDeclaration leftVariable;
     Expression left;
@@ -3367,26 +3418,9 @@ class InferenceVisitor
       valueExpression = createVariableGet(valueVariable);
     }
 
-    Expression write;
-
-    if (writeTarget.isMissing) {
-      write = inferrer.helper.buildProblem(
-          templateUndefinedMethod.withArguments(
-              node.propertyName.name, receiverType),
-          node.writeOffset,
-          node.propertyName.name.length);
-    } else if (writeTarget.isExtensionMember) {
-      write = new StaticInvocation(
-          writeTarget.member,
-          new Arguments(<Expression>[writeReceiver, valueExpression],
-              types: writeTarget.inferredExtensionTypeArguments)
-            ..fileOffset = node.writeOffset)
-        ..fileOffset = node.writeOffset;
-    } else {
-      write = new PropertySet(
-          writeReceiver, node.propertyName, valueExpression, writeTarget.member)
-        ..fileOffset = node.writeOffset;
-    }
+    Expression write = _computePropertySet(node.writeOffset, writeReceiver,
+        receiverType, node.propertyName, writeTarget, valueExpression,
+        forEffect: true);
 
     DartType resultType = node.forPostIncDec ? readType : binaryType;
 
@@ -3536,9 +3570,9 @@ class InferenceVisitor
 
     if (writeTarget.isMissing) {
       write = inferrer.helper.buildProblem(
-          templateSuperclassHasNoMethod.withArguments('[]='),
+          templateSuperclassHasNoMethod.withArguments(indexSetName.name),
           node.writeOffset,
-          '[]='.length);
+          noLength);
     } else {
       assert(writeTarget.isInstanceMember);
       inferrer.instrumentation?.record(
@@ -3626,7 +3660,6 @@ class InferenceVisitor
     VariableDeclaration receiverVariable =
         createVariable(receiver, receiverType);
 
-    DartType readType = inferrer.getReturnType(readTarget, receiverType);
     DartType readIndexType = inferrer.getPositionalParameterTypeForTarget(
         readTarget, receiverType, 0);
 
@@ -3638,24 +3671,15 @@ class InferenceVisitor
     readIndex = inferrer.ensureAssignable(
         readIndexType, indexResult.inferredType, readIndex);
 
-    Expression read;
-    if (readTarget.isMissing) {
-      read = inferrer.helper.buildProblem(
-          templateUndefinedMethod.withArguments(
-              indexGetName.name, receiverType),
-          node.readOffset,
-          noLength);
-    } else {
-      assert(readTarget.isExtensionMember);
-      read = new StaticInvocation(
-          readTarget.member,
-          new Arguments(<Expression>[
-            createVariableGet(receiverVariable),
-            readIndex,
-          ], types: readTarget.inferredExtensionTypeArguments)
-            ..fileOffset = node.readOffset)
-        ..fileOffset = node.readOffset;
-    }
+    ExpressionInferenceResult readResult = _computeIndexGet(
+        node.readOffset,
+        createVariableGet(receiverVariable),
+        receiverType,
+        readTarget,
+        readIndex,
+        MethodContravarianceCheckKind.none);
+    Expression read = readResult.expression;
+    DartType readType = readResult.inferredType;
 
     VariableDeclaration leftVariable;
     Expression left;
@@ -3698,25 +3722,13 @@ class InferenceVisitor
       valueExpression = createVariableGet(valueVariable);
     }
 
-    Expression write;
-    if (writeTarget.isMissing) {
-      write = inferrer.helper.buildProblem(
-          templateUndefinedMethod.withArguments(
-              indexSetName.name, receiverType),
-          node.writeOffset,
-          noLength);
-    } else {
-      assert(writeTarget.isExtensionMember);
-      write = new StaticInvocation(
-          writeTarget.member,
-          new Arguments(<Expression>[
-            createVariableGet(receiverVariable),
-            writeIndex,
-            valueExpression
-          ], types: writeTarget.inferredExtensionTypeArguments)
-            ..fileOffset = node.writeOffset)
-        ..fileOffset = node.writeOffset;
-    }
+    Expression write = _computeIndexSet(
+        node.writeOffset,
+        createVariableGet(receiverVariable),
+        receiverType,
+        writeTarget,
+        writeIndex,
+        valueExpression);
 
     Expression inner;
     if (node.forEffect) {
@@ -3814,8 +3826,6 @@ class InferenceVisitor
     ObjectAccessTarget target = inferrer.findInterfaceMember(
         receiverType, node.name, node.fileOffset,
         setter: true, instrumented: true, includeExtensionMethods: true);
-    Expression error = inferrer.reportMissingInterfaceMember(target,
-        receiverType, node.name, node.fileOffset, templateUndefinedSetter);
     if (target.isInstanceMember) {
       if (inferrer.instrumentation != null &&
           receiverType == const DynamicType()) {
@@ -3834,48 +3844,11 @@ class InferenceVisitor
     DartType rhsType = rhsResult.inferredType;
     Expression rhs = inferrer.ensureAssignableResult(writeContext, rhsResult,
         fileOffset: node.fileOffset, isVoidAllowed: writeContext is VoidType);
-    if (error != null) {
-      return new ExpressionInferenceResult(const DynamicType(), error);
-    }
-    Expression replacement;
-    if (target.isExtensionMember) {
-      if (node.forEffect) {
-        replacement = new StaticInvocation(
-            target.member,
-            new Arguments(<Expression>[receiver, rhs],
-                types: target.inferredExtensionTypeArguments)
-              ..fileOffset = node.fileOffset)
-          ..fileOffset = node.fileOffset;
-      } else {
-        VariableDeclaration receiverVariable;
-        if (node.readOnlyReceiver) {
-          // No need for a receiver variable.
-        } else {
-          receiverVariable = createVariable(receiver, receiverType);
-          receiver = createVariableGet(receiverVariable);
-        }
-        VariableDeclaration valueVariable = createVariable(rhs, rhsType);
-        VariableDeclaration assignmentVariable = createVariable(
-            new StaticInvocation(
-                target.member,
-                new Arguments(
-                    <Expression>[receiver, createVariableGet(valueVariable)],
-                    types: target.inferredExtensionTypeArguments)
-                  ..fileOffset = node.fileOffset)
-              ..fileOffset = node.fileOffset,
-            const VoidType());
-        replacement = createLet(valueVariable,
-            createLet(assignmentVariable, createVariableGet(valueVariable)));
-        if (receiverVariable != null) {
-          replacement = createLet(receiverVariable, replacement);
-        }
-        replacement..fileOffset = node.fileOffset;
-      }
-    } else {
-      node.receiver = receiver..parent = node;
-      node.value = rhs..parent = node;
-      replacement = node;
-    }
+
+    Expression replacement = _computePropertySet(
+        node.fileOffset, receiver, receiverType, node.name, target, rhs,
+        valueType: rhsType, forEffect: node.forEffect);
+
     return new ExpressionInferenceResult.nullAware(
         rhsType, replacement, nullAwareGuard);
   }
@@ -3895,50 +3868,15 @@ class InferenceVisitor
         .findInterfaceMember(receiverType, equalsName, node.receiver.fileOffset)
         .member;
 
-    ObjectAccessTarget readTarget = inferrer.findInterfaceMember(
-        receiverType, node.name, node.readOffset,
-        includeExtensionMethods: true);
-
-    MethodContravarianceCheckKind readCheckKind =
-        inferrer.preCheckInvocationContravariance(receiverType, readTarget,
-            isThisReceiver: node.receiver is ThisExpression);
-
-    DartType readType = inferrer.getGetterType(readTarget, receiverType);
+    ExpressionInferenceResult readResult = _computePropertyGet(
+        node.readOffset, readReceiver, receiverType, node.name, typeContext,
+        isThisReceiver: node.receiver is ThisExpression);
+    Expression read = readResult.expression;
+    DartType readType = readResult.inferredType;
 
     Member readEqualsMember = inferrer
         .findInterfaceMember(readType, equalsName, node.testOffset)
         .member;
-
-    Expression read;
-    if (readTarget.isMissing) {
-      read = inferrer.helper.buildProblem(
-          templateUndefinedMethod.withArguments(node.name.name, receiverType),
-          node.readOffset,
-          node.name.name.length);
-    } else if (readTarget.isExtensionMember) {
-      read = new StaticInvocation(
-          readTarget.member,
-          new Arguments(<Expression>[
-            readReceiver,
-          ], types: readTarget.inferredExtensionTypeArguments)
-            ..fileOffset = node.readOffset)
-        ..fileOffset = node.readOffset;
-    } else {
-      read = new PropertyGet(readReceiver, node.name, readTarget.member)
-        ..fileOffset = node.readOffset;
-      if (readCheckKind == MethodContravarianceCheckKind.checkMethodReturn) {
-        if (inferrer.instrumentation != null) {
-          inferrer.instrumentation.record(
-              inferrer.uriForInstrumentation,
-              node.readOffset,
-              'checkReturn',
-              new InstrumentationValueForType(readType));
-        }
-        read = new AsExpression(read, readType)
-          ..isTypeError = true
-          ..fileOffset = node.readOffset;
-      }
-    }
 
     VariableDeclaration readVariable;
     if (!node.forEffect) {
@@ -3956,43 +3894,9 @@ class InferenceVisitor
         .inferExpression(node.value, valueType, true, isVoidAllowed: true);
     Expression value = inferrer.ensureAssignableResult(valueType, valueResult);
 
-    Expression write;
-
-    if (writeTarget.isMissing) {
-      write = inferrer.helper.buildProblem(
-          templateUndefinedMethod.withArguments(node.name.name, receiverType),
-          node.writeOffset,
-          node.name.name.length);
-    } else if (writeTarget.isExtensionMember) {
-      if (node.forEffect) {
-        write = new StaticInvocation(
-            writeTarget.member,
-            new Arguments(<Expression>[writeReceiver, value],
-                types: writeTarget.inferredExtensionTypeArguments)
-              ..fileOffset = node.writeOffset)
-          ..fileOffset = node.writeOffset;
-      } else {
-        VariableDeclaration valueVariable =
-            createVariable(value, valueResult.inferredType);
-        VariableDeclaration assignmentVariable = createVariable(
-            new StaticInvocation(
-                writeTarget.member,
-                new Arguments(<Expression>[
-                  writeReceiver,
-                  createVariableGet(valueVariable)
-                ], types: writeTarget.inferredExtensionTypeArguments)
-                  ..fileOffset = node.writeOffset)
-              ..fileOffset = node.writeOffset,
-            const VoidType());
-        write = createLet(valueVariable,
-            createLet(assignmentVariable, createVariableGet(valueVariable)))
-          ..fileOffset = node.writeOffset;
-      }
-    } else {
-      write =
-          new PropertySet(writeReceiver, node.name, value, writeTarget.member)
-            ..fileOffset = node.writeOffset;
-    }
+    Expression write = _computePropertySet(node.writeOffset, writeReceiver,
+        receiverType, node.name, writeTarget, value,
+        valueType: valueResult.inferredType, forEffect: node.forEffect);
 
     DartType inferredType = inferrer.typeSchemaEnvironment
         .getStandardUpperBound(readType, valueResult.inferredType);
@@ -4058,7 +3962,23 @@ class InferenceVisitor
   @override
   ExpressionInferenceResult visitPropertyGet(
       PropertyGet node, DartType typeContext) {
-    return inferrer.inferPropertyGet(node, typeContext);
+    ExpressionInferenceResult result =
+        inferrer.inferExpression(node.receiver, const UnknownType(), true);
+    NullAwareGuard nullAwareGuard;
+    Expression receiver;
+    if (inferrer.isNonNullableByDefault) {
+      nullAwareGuard = result.nullAwareGuard;
+      receiver = result.nullAwareAction;
+    } else {
+      receiver = result.expression;
+    }
+    node.receiver = receiver..parent = node;
+    DartType receiverType = result.inferredType;
+    ExpressionInferenceResult readResult = _computePropertyGet(
+        node.fileOffset, receiver, receiverType, node.name, typeContext,
+        isThisReceiver: node.receiver is ThisExpression);
+    return new ExpressionInferenceResult.nullAware(
+        readResult.inferredType, readResult.expression, nullAwareGuard);
   }
 
   @override
