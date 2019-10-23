@@ -171,11 +171,9 @@ class C {
   Never operator [](other) => throw 'foo';
   Never operator -() => throw 'foo';
 
-  /*constructor: C.constructor_initializer:doesNotComplete*/
+  /*member: C.constructor_initializer:doesNotComplete*/
   C.constructor_initializer()
-  : field = topLevelFunction() {
-    /*stmt: unreachable*/ 0;
-  }
+  : field = topLevelFunction() /*stmt: unreachable*/ {}
 
   void local_getter(bool b) {
     if (b) {
