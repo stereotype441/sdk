@@ -11,7 +11,7 @@ assignmentDepromotes(Object x) {
 
 compoundAssignmentDepromotes(Object x) {
   if (x is int) {
-    x += 0.5;
+    /*int*/ x += 0.5;
     x;
   }
 }
