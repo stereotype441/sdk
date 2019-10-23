@@ -10,7 +10,7 @@ class C {
   C? get getterReturningNullableC => this;
   C get getterSetter => this;
   void set getterSetter(value) {}
-  C operator+(other) => this;
+  C operator +(other) => this;
 }
 
 class D {
@@ -19,7 +19,7 @@ class D {
   void operator []=(index, value) {}
   D get getterSetter => this;
   void set getterSetter(value) {}
-  D operator+(other) => this;
+  D operator +(other) => this;
 }
 
 void setterCall(C? c) {
@@ -128,7 +128,8 @@ void null_aware_cascades_do_not_promote_others(C? c, int? i, int? j) {
   j;
 }
 
-void normal_cascades_do_promote_others(C c, int? i, int? j, int? k, int? l, int? m, int? n, int? o, int? p, int? q, int? r) {
+void normal_cascades_do_promote_others(C c, int? i, int? j, int? k, int? l,
+    int? m, int? n, int? o, int? p, int? q, int? r) {
   // Promotions that happen inside non-null-aware cascade sections
   // don't disappear after the cascade section.
   c..setter = i!;
