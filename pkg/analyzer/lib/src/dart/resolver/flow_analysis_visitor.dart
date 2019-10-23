@@ -70,8 +70,8 @@ class FlowAnalysisHelper {
     return null;
   }
 
-  void assignmentExpression_afterRight(AssignmentExpression node,
-      VariableElement localElement) {
+  void assignmentExpression_afterRight(
+      AssignmentExpression node, VariableElement localElement) {
     if (localElement == null) return;
 
     flow.write(localElement);
