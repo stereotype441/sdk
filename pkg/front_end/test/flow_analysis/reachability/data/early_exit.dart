@@ -7,7 +7,8 @@ void beforeSplitStatement(bool b, int i) {
   return;
   /*stmt: unreachable*/ do /*stmt: unreachable*/ {} while (/*unreachable*/ b);
   /*stmt: unreachable*/ for (;;) /*stmt: unreachable*/ {}
-  /*stmt: unreachable*/ for (var _ in /*unreachable*/ []) /*stmt: unreachable*/ {}
+  /*stmt: unreachable*/ for (var _
+      in /*unreachable*/ []) /*stmt: unreachable*/ {}
   /*stmt: unreachable*/ if (/*unreachable*/ b) /*stmt: unreachable*/ {}
   /*stmt: unreachable*/ switch (/*unreachable*/ i) {
   }
