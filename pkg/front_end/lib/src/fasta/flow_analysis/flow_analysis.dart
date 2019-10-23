@@ -1054,11 +1054,11 @@ class FlowModel<Variable, Type> {
     Type previousType = info.promotedType;
     previousType ??= typeOperations.variableType(variable);
 
-    if (!typeOperations.isSubtypeOf(type, previousType) ||
-        typeOperations.isSameType(type, previousType)) {
+    Type newType = typeOperations.tryPromoteToType(type, previousType);
+    if (newType == null || typeOperations.isSameType(newType, previousType)) {
       return this;
     }
-    return _updateVariableInfo(variable, info.withPromotedType(type));
+    return _updateVariableInfo(variable, info.withPromotedType(newType));
   }
 
   /// Updates the state to indicate that the given [writtenVariables] are no
