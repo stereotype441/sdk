@@ -265,6 +265,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   DecoratedType visitAssertInitializer(AssertInitializer node) {
+    _flowAnalysis.assert_begin();
     _checkExpressionNotNull(node.condition);
     if (identical(_conditionInfo?.condition, node.condition)) {
       var intentNode = _conditionInfo.trueDemonstratesNonNullIntent;
@@ -274,12 +275,15 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
             hard: true);
       }
     }
+    _flowAnalysis.assert_afterCondition(node.condition);
     node.message?.accept(this);
+    _flowAnalysis.assert_end();
     return null;
   }
 
   @override
   DecoratedType visitAssertStatement(AssertStatement node) {
+    _flowAnalysis.assert_begin();
     _checkExpressionNotNull(node.condition);
     if (identical(_conditionInfo?.condition, node.condition)) {
       var intentNode = _conditionInfo.trueDemonstratesNonNullIntent;
@@ -289,7 +293,9 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
             hard: true);
       }
     }
+    _flowAnalysis.assert_afterCondition(node.condition);
     node.message?.accept(this);
+    _flowAnalysis.assert_end();
     return null;
   }
 
@@ -983,7 +989,14 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     var operatorType = node.operator.type;
     if (operatorType == TokenType.PLUS_PLUS ||
         operatorType == TokenType.MINUS_MINUS) {
-      return _checkExpressionNotNull(node.operand);
+      var operand = node.operand;
+      if (operand is SimpleIdentifier) {
+        var element = operand.staticElement;
+        if (element is PromotableElement) {
+          _flowAnalysis.write(element);
+        }
+      }
+      return _checkExpressionNotNull(operand);
     }
     _unimplemented(
         node, 'Postfix expression with operator ${node.operator.lexeme}');
@@ -1002,10 +1015,11 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   DecoratedType visitPrefixExpression(PrefixExpression node) {
-    var targetType = _checkExpressionNotNull(node.operand);
+    var operand = node.operand;
+    var targetType = _checkExpressionNotNull(operand);
     var operatorType = node.operator.type;
     if (operatorType == TokenType.BANG) {
-      _flowAnalysis.logicalNot_end(node, node.operand);
+      _flowAnalysis.logicalNot_end(node, operand);
       return _nonNullableBoolType;
     } else {
       var callee = node.staticElement;
@@ -1018,6 +1032,12 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       var calleeType = getOrComputeElementType(callee, targetType: targetType);
       if (operatorType == TokenType.PLUS_PLUS ||
           operatorType == TokenType.MINUS_MINUS) {
+        if (operand is SimpleIdentifier) {
+          var element = operand.staticElement;
+          if (element is PromotableElement) {
+            _flowAnalysis.write(element);
+          }
+        }
         return _fixNumericTypes(calleeType.returnType, node.staticType);
       } else {
         return _handleInvocationArguments(
@@ -1567,6 +1587,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
     if (questionAssignNode != null) {
       _guards.add(destinationType.node);
+      _flowAnalysis.ifNullExpression_rightBegin();
     }
     DecoratedType sourceType;
     try {
@@ -1626,6 +1647,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
                 _postDominatedLocals.isReferenceInScope(expression));
       }
       if (questionAssignNode != null) {
+        _flowAnalysis.ifNullExpression_end();
         // a ??= b is only nullable if both a and b are nullable.
         sourceType = destinationType.withNode(_nullabilityNodeForGLB(
             questionAssignNode, sourceType.node, destinationType.node));

@@ -167,6 +167,23 @@ _f(_C/*!*/ x, int/*?*/ y) => x += y;
     visitSubexpression(findNode.assignment('+='), '_D');
   }
 
+  test_assignmentExpression_null_aware_rhs_does_not_promote() async {
+    await analyze('''
+_f(bool/*?*/ b, int/*?*/ i) {
+  b ??= i.isEven; // 1
+  b = i.isEven; // 2
+  b = i.isEven; // 3
+}
+''');
+    // The null check inserted at 1 fails to promote i because it's inside the
+    // `??=`, so a null check is inserted at 2.  This does promote i, so no null
+    // check is inserted at 3.
+    visitStatement(findNode.block('{'), changes: {
+      findNode.simple('i.isEven; // 1'): NullCheck(),
+      findNode.simple('i.isEven; // 2'): NullCheck()
+    });
+  }
+
   test_assignmentExpression_null_aware_rhs_nonNullable() async {
     await analyze('''
 abstract class _B {}
@@ -1293,11 +1310,45 @@ abstract class _E {
     });
   }
 
+  test_postfixExpression_decrement_undoes_promotion() async {
+    await analyze('''
+abstract class _C {
+  _C/*?*/ operator-(int value);
+}
+_f(_C/*?*/ c) { // method
+  if (c != null) {
+    c--;
+    _g(c);
+  }
+}
+_g(_C/*!*/ c) {}
+''');
+    visitStatement(findNode.block('{ // method'),
+        changes: {findNode.simple('c);'): NullCheck()});
+  }
+
   test_postfixExpression_dynamic() async {
     await analyze('''
 _f(dynamic x) => x++;
 ''');
     visitSubexpression(findNode.postfix('++'), 'dynamic');
+  }
+
+  test_postfixExpression_increment_undoes_promotion() async {
+    await analyze('''
+abstract class _C {
+  _C/*?*/ operator+(int value);
+}
+_f(_C/*?*/ c) { // method
+  if (c != null) {
+    c++;
+    _g(c);
+  }
+}
+_g(_C/*!*/ c) {}
+''');
+    visitStatement(findNode.block('{ // method'),
+        changes: {findNode.simple('c);'): NullCheck()});
   }
 
   test_postfixExpression_lhs_nullable_problem() async {
@@ -1485,6 +1536,40 @@ abstract class _E {
     visitSubexpression(prefix, '_D', problems: {
       prefix: {const CompoundAssignmentCombinedNullable()}
     });
+  }
+
+  test_prefixExpression_decrement_undoes_promotion() async {
+    await analyze('''
+abstract class _C {
+  _C/*?*/ operator-(int value);
+}
+_f(_C/*?*/ c) { // method
+  if (c != null) {
+    --c;
+    _g(c);
+  }
+}
+_g(_C/*!*/ c) {}
+''');
+    visitStatement(findNode.block('{ // method'),
+        changes: {findNode.simple('c);'): NullCheck()});
+  }
+
+  test_prefixExpression_increment_undoes_promotion() async {
+    await analyze('''
+abstract class _C {
+  _C/*?*/ operator+(int value);
+}
+_f(_C/*?*/ c) { // method
+  if (c != null) {
+    ++c;
+    _g(c);
+  }
+}
+_g(_C/*!*/ c) {}
+''');
+    visitStatement(findNode.block('{ // method'),
+        changes: {findNode.simple('c);'): NullCheck()});
   }
 
   test_prefixExpression_intRules() async {
