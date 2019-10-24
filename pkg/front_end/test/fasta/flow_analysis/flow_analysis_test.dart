@@ -1906,6 +1906,63 @@ main() {
     });
   });
 
+  group('joinPromotionChains', () {
+    var doubleType = _Type('double');
+    var intType = _Type('int');
+    var numType = _Type('num');
+    var objectType = _Type('Object');
+    var neverType = _Type('Never');
+
+    test('should handle nulls', () {
+      var h = _Harness();
+      expect(VariableModel.joinPromotionChains(null, null, h), null);
+      expect(VariableModel.joinPromotionChains(null, [intType], h), null);
+      expect(VariableModel.joinPromotionChains([intType], null, h), null);
+    });
+
+    test('should return null if there are no common types', () {
+      var h = _Harness();
+      expect(
+          VariableModel.joinPromotionChains([intType], [doubleType], h), null);
+    });
+
+    test('should return common prefix if there are common types', () {
+      var h = _Harness();
+      _Type.allowComparisons(() {
+        expect(
+            VariableModel.joinPromotionChains(
+                [objectType, intType], [objectType, doubleType], h),
+            [objectType]);
+        expect(
+            VariableModel.joinPromotionChains([objectType, numType, intType],
+                [objectType, numType, doubleType], h),
+            [objectType, numType]);
+      });
+    });
+
+    test('should return an input if it is a prefix of the other', () {
+      var h = _Harness();
+      var prefix = [objectType, numType];
+      var largerChain = [objectType, numType, intType];
+      expect(VariableModel.joinPromotionChains(prefix, largerChain, h),
+          same(prefix));
+      expect(VariableModel.joinPromotionChains(largerChain, prefix, h),
+          same(prefix));
+      expect(
+          VariableModel.joinPromotionChains(prefix, prefix, h), same(prefix));
+    });
+
+    test('should not keep common types after the first difference', () {
+      var h = _Harness();
+      _Type.allowComparisons(() {
+        expect(
+            VariableModel.joinPromotionChains([objectType, intType, neverType],
+                [objectType, doubleType, neverType], h),
+            [objectType]);
+      });
+    });
+  });
+
   group('join', () {
     var x = _Var('x', null);
     var y = _Var('y', null);
