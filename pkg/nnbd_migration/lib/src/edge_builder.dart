@@ -986,7 +986,14 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     var operatorType = node.operator.type;
     if (operatorType == TokenType.PLUS_PLUS ||
         operatorType == TokenType.MINUS_MINUS) {
-      return _checkExpressionNotNull(node.operand);
+      var operand = node.operand;
+      if (operand is SimpleIdentifier) {
+        var element = operand.staticElement;
+        if (element is PromotableElement) {
+          _flowAnalysis.write(element);
+        }
+      }
+      return _checkExpressionNotNull(operand);
     }
     _unimplemented(
         node, 'Postfix expression with operator ${node.operator.lexeme}');
@@ -1005,10 +1012,11 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   DecoratedType visitPrefixExpression(PrefixExpression node) {
-    var targetType = _checkExpressionNotNull(node.operand);
+    var operand = node.operand;
+    var targetType = _checkExpressionNotNull(operand);
     var operatorType = node.operator.type;
     if (operatorType == TokenType.BANG) {
-      _flowAnalysis.logicalNot_end(node, node.operand);
+      _flowAnalysis.logicalNot_end(node, operand);
       return _nonNullableBoolType;
     } else {
       var callee = node.staticElement;
@@ -1021,6 +1029,12 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       var calleeType = getOrComputeElementType(callee, targetType: targetType);
       if (operatorType == TokenType.PLUS_PLUS ||
           operatorType == TokenType.MINUS_MINUS) {
+        if (operand is SimpleIdentifier) {
+          var element = operand.staticElement;
+          if (element is PromotableElement) {
+            _flowAnalysis.write(element);
+          }
+        }
         return _fixNumericTypes(calleeType.returnType, node.staticType);
       } else {
         return _handleInvocationArguments(
