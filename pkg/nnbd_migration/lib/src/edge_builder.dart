@@ -1641,7 +1641,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       _postDominatedLocals.removeReferenceFromAllScopes(destinationExpression);
     }
     if (destinationLocalVariable != null) {
-      _flowAnalysis.write(destinationLocalVariable);
+      _flowAnalysis.write(destinationLocalVariable,
+          throw UnimplementedError('TODO(paulberry)'));
     }
     return sourceType;
   }
@@ -1824,7 +1825,9 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         }
       }
       _flowAnalysis.forEach_bodyBegin(
-          node, lhsElement is PromotableElement ? lhsElement : null);
+          node,
+          lhsElement is PromotableElement ? lhsElement : null,
+          throw UnimplementedError('TODO(paulberry)'));
     }
 
     // The condition may fail/iterable may be empty, so the body gets a new

@@ -2885,7 +2885,8 @@ class ResolverVisitor extends ScopedVisitor {
     }
 
     right?.accept(this);
-    _flowAnalysis?.assignmentExpression_afterRight(leftLocalVariable, right);
+    _flowAnalysis?.assignmentExpression_afterRight(
+        leftLocalVariable, right, throw UnimplementedError('TODO(paulberry)'));
 
     node.accept(elementResolver);
     node.accept(typeAnalyzer);
@@ -3384,7 +3385,8 @@ class ResolverVisitor extends ScopedVisitor {
           node,
           identifierElement is VariableElement
               ? identifierElement
-              : loopVariable.declaredElement);
+              : loopVariable.declaredElement,
+          valueType ?? typeProvider.dynamicType);
       node.body?.accept(this);
       _flowAnalysis?.flow?.forEach_end();
 
@@ -3464,7 +3466,8 @@ class ResolverVisitor extends ScopedVisitor {
           node,
           identifierElement is VariableElement
               ? identifierElement
-              : loopVariable?.declaredElement);
+              : loopVariable?.declaredElement,
+          valueType ?? typeProvider.dynamicType);
 
       Statement body = node.body;
       if (body != null) {

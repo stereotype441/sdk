@@ -67,10 +67,10 @@ class FlowAnalysisHelper {
   }
 
   void assignmentExpression_afterRight(
-      VariableElement localElement, Expression right) {
+      VariableElement localElement, Expression right, DartType writtenType) {
     if (localElement == null) return;
 
-    flow.write(localElement);
+    flow.write(localElement, writtenType);
   }
 
   void breakStatement(BreakStatement node) {
