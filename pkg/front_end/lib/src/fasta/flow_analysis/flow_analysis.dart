@@ -210,7 +210,7 @@ abstract class FlowAnalysis<Node, Statement extends Node, Expression, Variable,
   /// - Call [assert_afterCondition]
   /// - Call [assert_end]
   ///
-  /// THe order of visiting an assert statement with a "message" part should be:
+  /// The order of visiting an assert statement with a "message" part should be:
   /// - Call [assert_begin]
   /// - Visit the condition
   /// - Call [assert_afterCondition]
