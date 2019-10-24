@@ -2,7 +2,7 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-f() {
+assertStatement() {
   late int v;
   assert((v = 0) >= 0, v);
   /*unassigned*/ v;

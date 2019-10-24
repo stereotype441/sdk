@@ -14,3 +14,15 @@ void promotionInConditionCarriesToMessage(Object x) {
   // condition evaluated to false.
   assert(x is! int, /*int*/ x.toString());
 }
+
+class C {
+  C.assertInitializer(Object x)
+  : assert((x is int ? /*int*/ x : throw 'foo') == 0) {
+    // x is not promoted because the assertion won't execute in release
+    // mode.
+    x;
+  }
+
+  C.promotionInConditionCarriesToMessage(Object x)
+  : assert(x is! int, /*int*/ x.toString());
+}
