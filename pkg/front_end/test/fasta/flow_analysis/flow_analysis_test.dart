@@ -2004,7 +2004,7 @@ main() {
       test('sub-map with matched subtype', () {
         var h = _Harness();
         var p1 = {
-          x: model([intType]),
+          x: model([intQType, intType]),
           y: model([stringType])
         };
         var p2 = {
@@ -2021,7 +2021,7 @@ main() {
           y: model([stringType])
         };
         var p2 = {
-          x: model([intType])
+          x: model([intQType, intType])
         };
         var join12 = FlowModel.joinVariableInfo(h, p1, p2);
         _Type.allowComparisons(() => expect(join12, {
