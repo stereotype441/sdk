@@ -58,14 +58,17 @@ supertype_notPreviouslyPromoted_nonNull(Object? x, num y) {
 sameType(Object? x, int? y) {
   if (x is int?) {
     /*int?*/ x ??= y;
-    /*int?*/ y;
+    /*int?*/ x;
   }
 }
 
 sameType_nonNull(Object? x, int y) {
   if (x is int?) {
     /*int?*/ x ??= y;
-    /*int*/ x;
+    // TODO(paulberry): x should be promoted to `int` once types of
+    // interest are implemented (since the `??=` implicitly does a
+    // null check, so it makes `int` a type of interest).
+    /*int?*/ x;
   }
 }
 
@@ -79,6 +82,9 @@ subtype(Object? x, int? y) {
 subtype_nonNull(Object? x, int y) {
   if (x is num?) {
     /*num?*/ x ??= y;
-    /*num*/ x;
+    // TODO(paulberry): x should be promoted to `num` once types of
+    // interest are implemented (since the `??=` implicitly does a
+    // null check, so it makes `num` a type of interest).
+    /*num?*/ x;
   }
 }
