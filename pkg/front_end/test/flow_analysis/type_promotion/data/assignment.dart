@@ -25,7 +25,7 @@ nullAwareAssignmentDepromotes(Object x) {
 
 preIncrementDepromotes(Object x) {
   if (x is C) {
-    ++/*C*/ x;
+    ++ /*C*/ x;
     x;
   }
 }
@@ -39,7 +39,7 @@ postIncrementDepromotes(Object x) {
 
 preDecrementDepromotes(Object x) {
   if (x is C) {
-    --/*C*/ x;
+    -- /*C*/ x;
     x;
   }
 }
@@ -52,6 +52,6 @@ postDecrementDepromotes(Object x) {
 }
 
 class C {
-  Object operator+(int i) => 'foo';
-  Object operator-(int i) => 'foo';
+  Object operator +(int i) => 'foo';
+  Object operator -(int i) => 'foo';
 }
