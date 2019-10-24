@@ -1494,7 +1494,7 @@ class VariableModel<Type> {
     if (numCommonElements == chain2.length) return chain2;
     // For now we just discard any promotions after the first matching
     // promotion.  TODO(paulberry): consider doing something smarter.
-    return chain1.sublist(0, numCommonElements);
+    return numCommonElements == 0 ? null : chain1.sublist(0, numCommonElements);
   }
 
   /// Creates a new [VariableModel] object, unless it is equivalent to either

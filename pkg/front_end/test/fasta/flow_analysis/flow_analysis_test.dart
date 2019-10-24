@@ -1916,14 +1916,20 @@ main() {
     var stringType = _Type('String');
     const emptyMap = <Null, VariableModel<Null>>{};
 
-    VariableModel<_Type> model(_Type type) =>
-        VariableModel<_Type>(type == null ? null : [type], true, false);
+    VariableModel<_Type> model(List<_Type> promotionChain) =>
+        VariableModel<_Type>(promotionChain, true, false);
 
     group('without input reuse', () {
       test('promoted with unpromoted', () {
         var h = _Harness();
-        var p1 = {x: model(intType), y: model(null)};
-        var p2 = {x: model(null), y: model(intType)};
+        var p1 = {
+          x: model([intType]),
+          y: model(null)
+        };
+        var p2 = {
+          x: model(null),
+          y: model([intType])
+        };
         expect(FlowModel.joinVariableInfo(h, p1, p2),
             {x: model(null), y: model(null)});
       });
@@ -1931,13 +1937,19 @@ main() {
     group('should re-use an input if possible', () {
       test('identical inputs', () {
         var h = _Harness();
-        var p = {x: model(intType), y: model(stringType)};
+        var p = {
+          x: model([intType]),
+          y: model([stringType])
+        };
         expect(FlowModel.joinVariableInfo(h, p, p), same(p));
       });
 
       test('one input empty', () {
         var h = _Harness();
-        var p1 = {x: model(intType), y: model(stringType)};
+        var p1 = {
+          x: model([intType]),
+          y: model([stringType])
+        };
         var p2 = <_Var, VariableModel<_Type>>{};
         expect(FlowModel.joinVariableInfo(h, p1, p2), same(emptyMap));
         expect(FlowModel.joinVariableInfo(h, p2, p1), same(emptyMap));
@@ -1945,32 +1957,45 @@ main() {
 
       test('promoted with unpromoted', () {
         var h = _Harness();
-        var p1 = {x: model(intType)};
+        var p1 = {
+          x: model([intType])
+        };
         var p2 = {x: model(null)};
         expect(FlowModel.joinVariableInfo(h, p1, p2), same(p2));
         expect(FlowModel.joinVariableInfo(h, p2, p1), same(p2));
       });
 
-      test('related types', () {
+      test('related type chains', () {
         var h = _Harness();
-        var p1 = {x: model(intType)};
-        var p2 = {x: model(intQType)};
+        var p1 = {
+          x: model([intQType, intType])
+        };
+        var p2 = {
+          x: model([intQType])
+        };
         expect(FlowModel.joinVariableInfo(h, p1, p2), same(p2));
         expect(FlowModel.joinVariableInfo(h, p2, p1), same(p2));
       });
 
-      test('unrelated types', () {
+      test('unrelated type chains', () {
         var h = _Harness();
-        var p1 = {x: model(intType)};
-        var p2 = {x: model(stringType)};
+        var p1 = {
+          x: model([intType])
+        };
+        var p2 = {
+          x: model([stringType])
+        };
         expect(FlowModel.joinVariableInfo(h, p1, p2), {x: model(null)});
         expect(FlowModel.joinVariableInfo(h, p2, p1), {x: model(null)});
       });
 
       test('sub-map', () {
         var h = _Harness();
-        var xModel = model(intType);
-        var p1 = {x: xModel, y: model(stringType)};
+        var xModel = model([intType]);
+        var p1 = {
+          x: xModel,
+          y: model([stringType])
+        };
         var p2 = {x: xModel};
         expect(FlowModel.joinVariableInfo(h, p1, p2), same(p2));
         expect(FlowModel.joinVariableInfo(h, p2, p1), same(p2));
@@ -1978,65 +2003,79 @@ main() {
 
       test('sub-map with matched subtype', () {
         var h = _Harness();
-        var p1 = {x: model(intType), y: model(stringType)};
-        var p2 = {x: model(intQType)};
+        var p1 = {
+          x: model([intType]),
+          y: model([stringType])
+        };
+        var p2 = {
+          x: model([intQType])
+        };
         expect(FlowModel.joinVariableInfo(h, p1, p2), same(p2));
         expect(FlowModel.joinVariableInfo(h, p2, p1), same(p2));
       });
 
       test('sub-map with mismatched subtype', () {
         var h = _Harness();
-        var p1 = {x: model(intQType), y: model(stringType)};
-        var p2 = {x: model(intType)};
+        var p1 = {
+          x: model([intQType]),
+          y: model([stringType])
+        };
+        var p2 = {
+          x: model([intType])
+        };
         var join12 = FlowModel.joinVariableInfo(h, p1, p2);
-        _Type.allowComparisons(() => expect(join12, {x: model(intQType)}));
+        _Type.allowComparisons(() => expect(join12, {
+              x: model([intQType])
+            }));
         var join21 = FlowModel.joinVariableInfo(h, p2, p1);
-        _Type.allowComparisons(() => expect(join21, {x: model(intQType)}));
+        _Type.allowComparisons(() => expect(join21, {
+              x: model([intQType])
+            }));
       });
 
       test('assigned', () {
         var h = _Harness();
         var p1 = {
-          x: model(intQType).write(_Type('int?'), h),
-          y: model(intQType).write(_Type('int?'), h),
-          z: model(intQType),
-          w: model(intQType)
+          x: model([intQType]).write(_Type('int?'), h),
+          y: model([intQType]).write(_Type('int?'), h),
+          z: model([intQType]),
+          w: model([intQType])
         };
         var p2 = {
-          x: model(intQType).write(_Type('int?'), h),
-          y: model(intQType),
-          z: model(intQType).write(_Type('int?'), h),
-          w: model(intQType)
+          x: model([intQType]).write(_Type('int?'), h),
+          y: model([intQType]),
+          z: model([intQType]).write(_Type('int?'), h),
+          w: model([intQType])
         };
         var joined = FlowModel.joinVariableInfo(h, p1, p2);
         _Type.allowComparisons(() => expect(joined, {
-              x: model(intQType).write(_Type('int?'), h),
-              y: model(intQType).write(_Type('int?'), h),
-              z: model(intQType).write(_Type('int?'), h),
-              w: model(intQType)
+              x: model([intQType]).write(_Type('int?'), h),
+              y: model([intQType]).write(_Type('int?'), h),
+              z: model([intQType]).write(_Type('int?'), h),
+              w: model([intQType])
             }));
       });
 
       test('write captured', () {
         var h = _Harness();
         var p1 = {
-          x: model(intQType).writeCapture(),
-          y: model(intQType).writeCapture(),
-          z: model(intQType),
-          w: model(intQType)
+          x: model([intQType]).writeCapture(),
+          y: model([intQType]).writeCapture(),
+          z: model([intQType]),
+          w: model([intQType])
         };
         var p2 = {
-          x: model(intQType).writeCapture(),
-          y: model(intQType),
-          z: model(intQType).writeCapture(),
-          w: model(intQType)
+          x: model([intQType]).writeCapture(),
+          y: model([intQType]),
+          z: model([intQType]).writeCapture(),
+          w: model([intQType])
         };
         var joined = FlowModel.joinVariableInfo(h, p1, p2);
         _Type.allowComparisons(() => expect(joined, {
-              x: model(intQType).writeCapture(),
-              y: model(intQType).writeCapture(),
-              z: model(intQType).writeCapture(),
-              w: model(intQType)
+              x: model([intQType]).writeCapture(),
+              y: model([intQType]).writeCapture(),
+              z: model([intQType]).writeCapture(),
+              w: model([intQType])
             }));
       });
     });
