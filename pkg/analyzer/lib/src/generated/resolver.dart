@@ -2885,11 +2885,14 @@ class ResolverVisitor extends ScopedVisitor {
     }
 
     right?.accept(this);
-    _flowAnalysis?.assignmentExpression_afterRight(
-        leftLocalVariable, right, throw UnimplementedError('TODO(paulberry)'));
-
     node.accept(elementResolver);
     node.accept(typeAnalyzer);
+    _flowAnalysis?.assignmentExpression_afterRight(
+        leftLocalVariable,
+        right,
+        operator == TokenType.QUESTION_QUESTION_EQ
+            ? node.rightHandSide.staticType
+            : node.staticType);
   }
 
   @override
