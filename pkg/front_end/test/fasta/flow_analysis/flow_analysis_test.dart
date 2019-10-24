@@ -1723,7 +1723,7 @@ main() {
         expect(s2.infoFor(objectQVar), VariableModel<_Type>(null, true, false));
       });
 
-      test('un-promotes', () {
+      test('un-promotes fully', () {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
             .write(objectQVar, _Type('Object?'), h)
@@ -1733,6 +1733,84 @@ main() {
         expect(s2.reachable, true);
         expect(s2.variableInfo,
             {objectQVar: VariableModel<_Type>(null, true, false)});
+      });
+
+      test('un-promotes partially, when no exact match', () {
+        var h = _Harness();
+        var s1 = FlowModel<_Var, _Type>(true)
+            .write(objectQVar, _Type('Object?'), h)
+            .promote(h, objectQVar, _Type('num?'))
+            .promote(h, objectQVar, _Type('int'));
+        _Type.allowComparisons(() {
+          expect(s1.variableInfo, {
+            objectQVar:
+                VariableModel([_Type('num?'), _Type('int')], true, false)
+          });
+        });
+        var s2 = s1.write(objectQVar, _Type('num'), h);
+        expect(s2.reachable, true);
+        _Type.allowComparisons(() {
+          expect(s2.variableInfo, {
+            objectQVar: VariableModel([_Type('num?')], true, false)
+          });
+        });
+      });
+
+      test('un-promotes partially, when exact match', () {
+        var h = _Harness();
+        var s1 = FlowModel<_Var, _Type>(true)
+            .write(objectQVar, _Type('Object?'), h)
+            .promote(h, objectQVar, _Type('num?'))
+            .promote(h, objectQVar, _Type('num'))
+            .promote(h, objectQVar, _Type('int'));
+        _Type.allowComparisons(() {
+          expect(s1.variableInfo, {
+            objectQVar: VariableModel(
+                [_Type('num?'), _Type('num'), _Type('int')], true, false)
+          });
+        });
+        var s2 = s1.write(objectQVar, _Type('num'), h);
+        expect(s2.reachable, true);
+        _Type.allowComparisons(() {
+          expect(s2.variableInfo, {
+            objectQVar:
+                VariableModel([_Type('num?'), _Type('num')], true, false)
+          });
+        });
+      });
+
+      test('leaves promoted, when exact match', () {
+        var h = _Harness();
+        var s1 = FlowModel<_Var, _Type>(true)
+            .write(objectQVar, _Type('Object?'), h)
+            .promote(h, objectQVar, _Type('num?'))
+            .promote(h, objectQVar, _Type('num'));
+        _Type.allowComparisons(() {
+          expect(s1.variableInfo, {
+            objectQVar:
+                VariableModel([_Type('num?'), _Type('num')], true, false)
+          });
+        });
+        var s2 = s1.write(objectQVar, _Type('num'), h);
+        expect(s2.reachable, true);
+        expect(s2.variableInfo, same(s1.variableInfo));
+      });
+
+      test('leaves promoted, when writing a subtype', () {
+        var h = _Harness();
+        var s1 = FlowModel<_Var, _Type>(true)
+            .write(objectQVar, _Type('Object?'), h)
+            .promote(h, objectQVar, _Type('num?'))
+            .promote(h, objectQVar, _Type('num'));
+        _Type.allowComparisons(() {
+          expect(s1.variableInfo, {
+            objectQVar:
+                VariableModel([_Type('num?'), _Type('num')], true, false)
+          });
+        });
+        var s2 = s1.write(objectQVar, _Type('int'), h);
+        expect(s2.reachable, true);
+        expect(s2.variableInfo, same(s1.variableInfo));
       });
     });
 
@@ -2307,11 +2385,16 @@ class _Harness implements TypeOperations<_Var, _Type> {
   bool isSubtypeOf(_Type leftType, _Type rightType) {
     const Map<String, bool> _subtypes = const {
       'int <: int?': true,
+      'int <: num': true,
+      'int <: num?': true,
       'int <: Object': true,
       'int <: Object?': true,
       'int <: String': false,
       'int? <: int': false,
       'int? <: Object?': true,
+      'num <: int': false,
+      'num <: num?': true,
+      'num? <: Object?': true,
       'Object <: int': false,
       'String <: int': false,
       'String <: int?': false,
