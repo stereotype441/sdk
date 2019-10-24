@@ -1917,7 +1917,7 @@ main() {
     const emptyMap = <Null, VariableModel<Null>>{};
 
     VariableModel<_Type> model(_Type type) =>
-        VariableModel<_Type>([type], true, false);
+        VariableModel<_Type>(type == null ? null : [type], true, false);
 
     group('without input reuse', () {
       test('promoted with unpromoted', () {
