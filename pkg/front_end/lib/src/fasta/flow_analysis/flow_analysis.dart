@@ -155,6 +155,9 @@ class AssignedVariables<Node, Variable> {
   }
 }
 
+/// Extension of [AssignedVariables] intended for use in unit tests.  This class
+/// exposes the results of the analysis so that they can be tested directly.
+/// Not intended to be used by clients of flow analysis.
 @visibleForTesting
 class AssignedVariablesForTesting<Node, Variable>
     extends AssignedVariables<Node, Variable> {
@@ -207,10 +210,8 @@ abstract class FlowAnalysis<Node, Statement extends Node, Expression, Variable,
   void conditional_thenBegin(Expression condition);
 
   /// Call this method before visiting the body of a "do-while" statement.
-  /// [loopAssigned] should be the set of variables that are assigned in the
-  /// body of the loop (or the condition), and [loopCaptured] should be the set
-  /// of variables that are captured by closures within the body of the loop (or
-  /// the condition).
+  /// [doStatement] should be the same node that was passed to
+  /// [AssignedVariables.endNode] for the do-while statement.
   void doStatement_bodyBegin(Statement doStatement);
 
   /// Call this method after visiting the body of a "do-while" statement, and
@@ -266,8 +267,8 @@ abstract class FlowAnalysis<Node, Statement extends Node, Expression, Variable,
   /// - Visit the updaters.
   /// - Call [for_end].
   ///
-  /// [loopAssigned] should be the set of variables that are assigned anywhere
-  /// in the loop's condition, updaters, or body.
+  /// [node] should be the same node that was passed to
+  /// [AssignedVariables.endNode] for the for statement.
   void for_conditionBegin(Node node);
 
   /// Call this method just after visiting the updaters of a conventional "for"
@@ -288,9 +289,8 @@ abstract class FlowAnalysis<Node, Statement extends Node, Expression, Variable,
   /// - Visit the body.
   /// - Call [forEach_end].
   ///
-  /// [loopAssigned] should be the set of variables that are assigned anywhere
-  /// in the loop's body.  [loopVariable] should be the loop variable, if it's a
-  /// local variable, or `null` otherwise.
+  /// [node] should be the same node that was passed to
+  /// [AssignedVariables.endNode] for the for statement.
   void forEach_bodyBegin(Node node, Variable loopVariable);
 
   /// Call this method just before visiting the body of a "for-in" statement or
@@ -299,6 +299,9 @@ abstract class FlowAnalysis<Node, Statement extends Node, Expression, Variable,
 
   /// Call this method just before visiting the body of a function expression or
   /// local function.
+  ///
+  /// [node] should be the same node that was passed to
+  /// [AssignedVariables.endNode] for the function expression.
   void functionExpression_begin(Node node);
 
   /// Call this method just after visiting the body of a function expression or
@@ -428,8 +431,8 @@ abstract class FlowAnalysis<Node, Statement extends Node, Expression, Variable,
   ///
   /// [hasLabel] indicates whether the case has any labels.
   ///
-  /// The [notPromoted] set contains all variables that are potentially assigned
-  /// within the body of the switch statement.
+  /// [node] should be the same node that was passed to
+  /// [AssignedVariables.endNode] for the switch statement.
   void switchStatement_beginCase(bool hasLabel, Node node);
 
   /// Call this method just after visiting the body of a switch statement.  See
@@ -482,9 +485,8 @@ abstract class FlowAnalysis<Node, Statement extends Node, Expression, Variable,
   /// Call this method just after visiting the body of a "try/catch" statement.
   /// See [tryCatchStatement_bodyBegin] for details.
   ///
-  /// [assignedInBody] should be the set of variables assigned in the "try" part
-  /// of the statement.  [capturedInBody] should be the set of variables
-  /// captured by closures in the "try" part of the statement.
+  /// [body] should be the same node that was passed to
+  /// [AssignedVariables.endNode] for the "try" part of the try/catch statement.
   void tryCatchStatement_bodyEnd(Node body);
 
   /// Call this method just before visiting a catch clause of a "try/catch"
@@ -521,12 +523,17 @@ abstract class FlowAnalysis<Node, Statement extends Node, Expression, Variable,
   /// Call this method just after visiting a "try/finally" statement.
   /// See [tryFinallyStatement_bodyBegin] for details.
   ///
-  /// [assignedInFinally] should be the set of variables assigned in the
-  /// "finally" part of the statement.
+  /// [finallyBlock] should be the same node that was passed to
+  /// [AssignedVariables.endNode] for the "finally" part of the try/finally
+  /// statement.
   void tryFinallyStatement_end(Node finallyBlock);
 
   /// Call this method just before visiting the finally block of a "try/finally"
   /// statement.  See [tryFinallyStatement_bodyBegin] for details.
+  ///
+  /// [body] should be the same node that was passed to
+  /// [AssignedVariables.endNode] for the "try" part of the try/finally
+  /// statement.
   void tryFinallyStatement_finallyBegin(Node body);
 
   /// Call this method when encountering an expression that reads the value of
@@ -543,9 +550,9 @@ abstract class FlowAnalysis<Node, Statement extends Node, Expression, Variable,
 
   /// Call this method before visiting the condition part of a "while"
   /// statement.
-  /// [loopAssigned] should be the set of variables assigned in the body of the
-  /// loop (or in the condition).  [loopCaptured] should be the set of variables
-  /// captured by closures in the body of the loop (or in the condition).
+  ///
+  /// [node] should be the same node that was passed to
+  /// [AssignedVariables.endNode] for the while statement.
   void whileStatement_conditionBegin(Node node);
 
   /// Call this method after visiting a "while" statement.
