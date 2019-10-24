@@ -15,14 +15,16 @@ conditional_isNotType(bool b, Object v) {
   if (b ? (v is! int) : (v is! num)) {
     v;
   } else {
-    /*num*/ v;
+    // TODO(paulberry): this used to promote to num
+    v;
   }
   v;
 }
 
 conditional_isType(bool b, Object v) {
   if (b ? (v is int) : (v is num)) {
-    /*num*/ v;
+    // TODO(paulberry): this used to promote to num
+    v;
   } else {
     v;
   }
