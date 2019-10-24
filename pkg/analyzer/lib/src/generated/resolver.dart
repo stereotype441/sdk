@@ -3384,6 +3384,13 @@ class ResolverVisitor extends ScopedVisitor {
       //
       iterable?.accept(this);
       loopVariable?.accept(this);
+      var elementType = typeAnalyzer.computeForEachElementType(
+          iterable, node.awaitKeyword != null);
+      if (loopVariable != null && elementType != null) {
+        var loopVariableElement =
+            loopVariable.declaredElement as LocalVariableElementImpl;
+        loopVariableElement.type ??= elementType;
+      }
       _flowAnalysis?.flow?.forEach_bodyBegin(
           node,
           identifierElement is VariableElement
@@ -3464,6 +3471,13 @@ class ResolverVisitor extends ScopedVisitor {
       //
       iterable?.accept(this);
       loopVariable?.accept(this);
+      var elementType = typeAnalyzer.computeForEachElementType(
+          iterable, node.awaitKeyword != null);
+      if (loopVariable != null && elementType != null) {
+        var loopVariableElement =
+            loopVariable.declaredElement as LocalVariableElementImpl;
+        loopVariableElement.type ??= elementType;
+      }
 
       _flowAnalysis?.flow?.forEach_bodyBegin(
           node,
