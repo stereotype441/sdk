@@ -1698,7 +1698,8 @@ main() {
         expect(s2.reachable, true);
         _Type.allowComparisons(() {
           expect(s2.variableInfo, {
-            objectQVar: VariableModel<_Type>([_Type('int')], false, false)
+            objectQVar: VariableModel<_Type>(
+                [_Type('int?'), _Type('int')], false, false)
           });
         });
       });
@@ -1770,7 +1771,8 @@ main() {
         expect(s2.reachable, true);
         _Type.allowComparisons(() {
           expect(s2.variableInfo, {
-            objectQVar: VariableModel<_Type>([_Type('int')], false, false)
+            objectQVar: VariableModel<_Type>(
+                [_Type('int?'), _Type('int')], false, false)
           });
         });
       });
