@@ -1677,8 +1677,10 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
 
   @override
   void for_conditionBegin(Node node) {
-    var loopAssigned = _assignedVariables._getWrittenInNode(node);
-    var loopCaptured = _assignedVariables._getCapturedInNode(node);
+    Iterable<Variable> loopAssigned =
+        _assignedVariables._getWrittenInNode(node);
+    Iterable<Variable> loopCaptured =
+        _assignedVariables._getCapturedInNode(node);
     _current = _current.removePromotedAll(loopAssigned, loopCaptured);
   }
 
