@@ -170,7 +170,7 @@ class FlowAnalysisHelper {
     assert(node != null);
     assert(flow == null);
     assignedVariables = computeAssignedVariables(node, parameters);
-    flow = FlowAnalysisDebug<AstNode, Statement, Expression, PromotableElement,
+    flow = FlowAnalysis<AstNode, Statement, Expression, PromotableElement,
         DartType>(_typeOperations, assignedVariables);
   }
 
