@@ -1814,6 +1814,36 @@ main() {
       });
     });
 
+    group('initialize', () {
+      var objectQVar = _Var('x', _Type('Object?'));
+      test('unchanged', () {
+        var h = _Harness();
+        var s1 = FlowModel<_Var, _Type>(true).initialize(objectQVar);
+        var s2 = s1.initialize(objectQVar);
+        expect(s2, same(s1));
+      });
+
+      test('marks as assigned', () {
+        var h = _Harness();
+        var s1 = FlowModel<_Var, _Type>(true);
+        var s2 = s1.initialize(objectQVar);
+        expect(s2.reachable, true);
+        expect(s2.infoFor(objectQVar), VariableModel<_Type>(null, true, false));
+      });
+
+      test('un-promotes fully', () {
+        var h = _Harness();
+        var s1 = FlowModel<_Var, _Type>(true)
+            .initialize(objectQVar)
+            .promote(h, objectQVar, _Type('int'));
+        expect(s1.variableInfo, contains(objectQVar));
+        var s2 = s1.initialize(objectQVar);
+        expect(s2.reachable, true);
+        expect(s2.variableInfo,
+            {objectQVar: VariableModel<_Type>(null, true, false)});
+      });
+    });
+
     group('markNonNullable', () {
       test('unpromoted -> unchanged', () {
         var h = _Harness();
