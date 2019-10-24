@@ -1362,7 +1362,7 @@ class VariableModel<Type> {
         this.writeCaptured == other.writeCaptured;
   }
 
-  VariableModel discardPromotions() {
+  VariableModel<Type> discardPromotions() {
     assert(promotionChain != null, 'No promotions to discard');
     return new VariableModel<Type>(null, assigned, writeCaptured);
   }
@@ -1416,8 +1416,10 @@ class VariableModel<Type> {
   /// Returns a new [VariableModel] where the promoted type is replaced with
   /// [promotedType].
   VariableModel<Type> withPromotedType(Type promotedType) {
-    return new VariableModel<Type>(
-        promotionChain.toList()..add(promotedType), assigned, writeCaptured);
+    List<Type> newPromotionChain = promotionChain == null
+        ? [promotedType]
+        : (promotionChain.toList()..add(promotedType));
+    return new VariableModel<Type>(newPromotionChain, assigned, writeCaptured);
   }
 
   /// Returns a new [VariableModel] reflecting the fact that the variable was
