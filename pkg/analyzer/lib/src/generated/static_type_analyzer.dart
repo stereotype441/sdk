@@ -112,6 +112,7 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
    */
   DartType computeForEachElementType(Expression iterable, bool isAsync) {
     DartType iterableType = iterable.staticType;
+    if (iterableType == null) return null;
     iterableType = iterableType.resolveToBound(_typeProvider.objectType);
 
     ClassElement iteratedElement =
