@@ -2,8 +2,9 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-f() {
-  late int v;
-  assert((v = 0) >= 0, v);
-  /*unassigned*/ v;
+f(int? i) {
+  // Assert statements do not promote because they only are only
+  // checked in debug mode.
+  assert(i != null);
+  i;
 }
