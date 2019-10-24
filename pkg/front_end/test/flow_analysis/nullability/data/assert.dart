@@ -10,8 +10,7 @@ assertStatement(int? i) {
 }
 
 class C {
-  C.assertInitializer(int? i)
-  : assert(i != null) {
+  C.assertInitializer(int? i) : assert(i != null) {
     // Assert statements do not promote because they only are only
     // checked in debug mode.
     i;
