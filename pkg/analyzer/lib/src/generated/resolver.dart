@@ -3396,7 +3396,7 @@ class ResolverVisitor extends ScopedVisitor {
           identifierElement is VariableElement
               ? identifierElement
               : loopVariable.declaredElement,
-          valueType ?? typeProvider.dynamicType);
+          elementType ?? typeProvider.dynamicType);
       node.body?.accept(this);
       _flowAnalysis?.flow?.forEach_end();
 
@@ -3484,7 +3484,7 @@ class ResolverVisitor extends ScopedVisitor {
           identifierElement is VariableElement
               ? identifierElement
               : loopVariable?.declaredElement,
-          valueType ?? typeProvider.dynamicType);
+          elementType ?? typeProvider.dynamicType);
 
       Statement body = node.body;
       if (body != null) {
