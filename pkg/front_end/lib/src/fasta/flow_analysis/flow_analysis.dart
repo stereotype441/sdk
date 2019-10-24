@@ -920,7 +920,8 @@ class FlowAnalysisDebug<Node, Statement extends Node, Expression, Variable,
 
   @override
   void write(Variable variable, Type writtenType) {
-    _wrap('write($variable)', () => _wrapped.write(variable, writtenType));
+    _wrap('write($variable, $writtenType)',
+        () => _wrapped.write(variable, writtenType));
   }
 
   T _wrap<T>(String description, T callback(),
