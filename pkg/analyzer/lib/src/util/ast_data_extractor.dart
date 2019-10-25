@@ -116,6 +116,8 @@ abstract class AstDataExtractor<T> extends GeneralizingAstVisitor<dynamic>
   visitVariableDeclaration(VariableDeclaration node) {
     if (node.parent.parent is TopLevelVariableDeclaration) {
       computeForMember(node, createMemberId(node));
+    } else if (node.parent.parent is FieldDeclaration) {
+      computeForMember(node, createMemberId(node));
     }
     return super.visitVariableDeclaration(node);
   }
