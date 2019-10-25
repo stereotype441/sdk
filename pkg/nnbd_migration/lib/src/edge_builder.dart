@@ -993,7 +993,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       if (operand is SimpleIdentifier) {
         var element = operand.staticElement;
         if (element is PromotableElement) {
-          _flowAnalysis.write(element, throw UnimplementedError('TODO(paulberry)'));
+          _flowAnalysis.write(
+              element, throw UnimplementedError('TODO(paulberry)'));
         }
       }
       return _checkExpressionNotNull(operand);
@@ -1035,7 +1036,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         if (operand is SimpleIdentifier) {
           var element = operand.staticElement;
           if (element is PromotableElement) {
-            _flowAnalysis.write(element, throw UnimplementedError('TODO(paulberry)'));
+            _flowAnalysis.write(
+                element, throw UnimplementedError('TODO(paulberry)'));
           }
         }
         return _fixNumericTypes(calleeType.returnType, node.staticType);
@@ -1647,8 +1649,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
                 _postDominatedLocals.isReferenceInScope(expression));
       }
       if (destinationLocalVariable != null) {
-        _flowAnalysis.write(destinationLocalVariable,
-            sourceType);
+        _flowAnalysis.write(destinationLocalVariable, sourceType);
       }
       if (questionAssignNode != null) {
         _flowAnalysis.ifNullExpression_end();
@@ -1833,12 +1834,13 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
             'Unexpected ForEachParts subtype: ${parts.runtimeType}');
       }
       var iterableType = _checkExpressionNotNull(parts.iterable);
+      DecoratedType elementType;
       if (lhsElement != null) {
         DecoratedType lhsType = _variables.decoratedElementType(lhsElement);
         var iterableTypeType = iterableType.type;
         if (_typeSystem.isSubtypeOf(
             iterableTypeType, typeProvider.iterableDynamicType)) {
-          var elementType = _decoratedClassHierarchy
+          elementType = _decoratedClassHierarchy
               .asInstanceOf(
                   iterableType, typeProvider.iterableDynamicType.element)
               .typeArguments[0];
@@ -1849,7 +1851,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       _flowAnalysis.forEach_bodyBegin(
           node,
           lhsElement is PromotableElement ? lhsElement : null,
-          throw UnimplementedError('TODO(paulberry)'));
+          elementType ?? _dynamicType);
     }
 
     // The condition may fail/iterable may be empty, so the body gets a new
