@@ -1062,6 +1062,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
           }
         }
       }
+      return staticType;
     }
   }
 
