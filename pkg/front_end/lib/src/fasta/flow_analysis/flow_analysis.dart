@@ -1453,19 +1453,38 @@ class VariableModel<Type> {
     List<Type> otherPromotionChain = otherModel.promotionChain;
     bool newAssigned = assigned || otherModel.assigned;
     bool newWriteCaptured = writeCaptured || otherModel.writeCaptured;
-    if (!unsafe) {
-      if (otherPromotionChain != null &&
-          (thisPromotionChain == null ||
-              typeOperations.isSubtypeOf(
-                  otherPromotionChain.last, thisPromotionChain.last))) {
-        // TODO(paulberry): THIS IS UNSOUND!  We are keeping the entire chain
-        // from other; we should only keep the parts that match.
-        return _identicalOrNew(this, otherModel, otherPromotionChain,
-            newAssigned, newWriteCaptured);
+    List<Type> newPromotionChain;
+    if (unsafe) {
+      // There was an assignment to the variable in the "this" path, so none of
+      // the promotions from the "other" path can be used.
+      newPromotionChain = thisPromotionChain;
+    } else
+    if (otherPromotionChain == null) {
+      // The other promotion chain contributes nothing so we just use this
+      // promotion chain directly.
+      newPromotionChain = thisPromotionChain;
+    } else if (thisPromotionChain == null) {
+      // This promotion chain contributes nothing so we just use the other
+      // promotion chain directly.
+      newPromotionChain = otherPromotionChain;
+    } else {
+      // Start with otherPromotionChain and apply each of the promotions in
+      // thisPromotionChain (discarding any that don't follow the ordering
+      // invariant)
+      newPromotionChain = otherPromotionChain;
+      var otherPromotedType = otherPromotionChain.last;
+      int i = 0;
+      while (i < thisPromotionChain.length) {
+        var nextType = thisPromotionChain[i];
+        if (typeOperations.isSubtypeOf(nextType, otherPromotedType) && !typeOperations.isSameType(nextType, otherPromotedType)) {
+          newPromotionChain = otherPromotionChain.toList()..addAll(thisPromotionChain.skip(i));
+          break;
+        }
+        i++;
       }
     }
     return _identicalOrNew(
-        this, otherModel, thisPromotionChain, newAssigned, newWriteCaptured);
+        this, otherModel, newPromotionChain, newAssigned, newWriteCaptured);
   }
 
   @override

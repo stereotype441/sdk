@@ -2012,33 +2012,89 @@ main() {
 
       test('promotion', () {
         void _check(String thisType, String otherType, bool unsafe,
-            String expectedType) {
+            List<String> expectedChain) {
           var h = _Harness();
           var x = _Var('x', _Type('Object?'));
           var s0 = FlowModel<_Var, _Type>(true).write(x, _Type('Object?'), h);
           var s1 = thisType == null ? s0 : s0.promote(h, x, _Type(thisType));
           var s2 = otherType == null ? s0 : s0.promote(h, x, _Type(otherType));
           var result = s1.restrict(h, s2, unsafe ? [x].toSet() : Set());
-          if (expectedType == null) {
+          if (expectedChain == null) {
             expect(result.variableInfo, contains(x));
             expect(result.infoFor(x).promotionChain, isNull);
           } else {
-            expect(result.infoFor(x).promotionChain.single.type, expectedType);
+            expect(result.infoFor(x).promotionChain.map((t) => t.type).toList(),
+                expectedChain);
           }
         }
 
         _check(null, null, false, null);
         _check(null, null, true, null);
-        _check('int', null, false, 'int');
-        _check('int', null, true, 'int');
-        _check(null, 'int', false, 'int');
+        _check('int', null, false, ['int']);
+        _check('int', null, true, ['int']);
+        _check(null, 'int', false, ['int']);
         _check(null, 'int', true, null);
-        _check('int?', 'int', false, 'int');
-        _check('int', 'int?', false, 'int');
-        _check('int', 'String', false, 'int');
-        _check('int?', 'int', true, 'int?');
-        _check('int', 'int?', true, 'int');
-        _check('int', 'String', true, 'int');
+        _check('int?', 'int', false, ['int']);
+        _check('int', 'int?', false, ['int?', 'int']);
+        _check('int', 'String', false, ['String']);
+        _check('int?', 'int', true, ['int?']);
+        _check('int', 'int?', true, ['int']);
+        _check('int', 'String', true, ['int']);
+      });
+
+      test('promotion chains', () {
+        // Test the following scenario:
+        // - Prior to the try/finally block, the sequence of promotions in
+        //   [before] is done.
+        // - During the try block, the sequence of promotions in [inTry] is
+        //   done.
+        // - During the finally block, the sequence of promotions in
+        //   [inFinally] is done.
+        // - After calling `restrict` to refine the state from the finally
+        //   block, the expected promotion chain is [expectedResult].
+        _check(List<String> before, List<String> inTry, List<String> inFinally,
+            List<String> expectedResult) {
+          var h = _Harness();
+          var x = _Var('x', _Type('Object?'));
+          var initialModel =
+              FlowModel<_Var, _Type>(true).write(x, _Type('Object?'), h);
+          for (var t in before) {
+            initialModel = initialModel.promote(h, x, _Type(t));
+          }
+          var tryModel = initialModel;
+          for (var t in inTry) {
+            tryModel = tryModel.promote(h, x, _Type(t));
+          }
+          var finallyModel = initialModel;
+          for (var t in inFinally) {
+            finallyModel = finallyModel.promote(h, x, _Type(t));
+          }
+          var result = finallyModel.restrict(h, tryModel, {});
+          var resultStrings = (result.infoFor(x).promotionChain ?? <_Type>[])
+              .map((t) => t.type)
+              .toList();
+          expect(resultStrings, expectedResult);
+        }
+
+        _check(['Object'], ['Iterable', 'List'], ['num', 'int'],
+            ['Object', 'Iterable', 'List']);
+        _check([], ['Iterable', 'List'], ['num', 'int'], ['Iterable', 'List']);
+        _check(['Object'], ['Iterable', 'List'], [],
+            ['Object', 'Iterable', 'List']);
+        _check([], ['Iterable', 'List'], [], ['Iterable', 'List']);
+        _check(['Object'], [], ['num', 'int'], ['Object', 'num', 'int']);
+        _check([], [], ['num', 'int'], ['num', 'int']);
+        _check(['Object'], [], [], ['Object']);
+        _check([], [], [], []);
+        _check(
+            [], ['Object', 'Iterable'], ['num', 'int'], ['Object', 'Iterable']);
+        _check([], ['Object'], ['num', 'int'], ['Object', 'num', 'int']);
+        _check([], ['num', 'int'], ['Object', 'Iterable'], ['num', 'int']);
+        _check([], ['num', 'int'], ['Object'], ['num', 'int']);
+        _check([], ['Object', 'int'], ['num'], ['Object', 'int']);
+        _check([], ['Object', 'num'], ['int'], ['Object', 'num', 'int']);
+        _check([], ['num'], ['Object', 'int'], ['num', 'int']);
+        _check([], ['int'], ['Object', 'num'], ['int']);
       });
 
       test('variable present in one state but not the other', () {
@@ -2455,6 +2511,8 @@ class _Harness implements TypeOperations<_Var, _Type> {
   bool isSubtypeOf(_Type leftType, _Type rightType) {
     const Map<String, bool> _subtypes = const {
       'int <: int?': true,
+      'int <: Iterable': false,
+      'int <: List': false,
       'int <: num': true,
       'int <: num?': true,
       'int <: Object': true,
@@ -2463,9 +2521,23 @@ class _Harness implements TypeOperations<_Var, _Type> {
       'int? <: int': false,
       'int? <: Object?': true,
       'num <: int': false,
+      'num <: Iterable': false,
+      'num <: List': false,
       'num <: num?': true,
+      'num <: Object': true,
+      'num <: Object?': true,
       'num? <: Object?': true,
+      'Iterable <: int': false,
+      'Iterable <: num': false,
+      'Iterable <: Object': true,
+      'Iterable <: Object?': true,
+      'List <: int': false,
+      'List <: Iterable': true,
+      'List <: Object': true,
       'Object <: int': false,
+      'Object <: List': false,
+      'Object <: num': false,
+      'Object <: Object?': true,
       'String <: int': false,
       'String <: int?': false,
       'String <: Object?': true,
