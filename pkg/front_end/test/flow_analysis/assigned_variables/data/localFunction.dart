@@ -12,6 +12,7 @@ singleNesting(int a, int b, int c) {
     b = 0;
     d = 0;
   }
+
   c = 0;
 }
 
