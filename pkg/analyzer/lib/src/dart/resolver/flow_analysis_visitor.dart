@@ -3,6 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
@@ -54,6 +55,10 @@ class FlowAnalysisHelper {
   VariableElement assignmentExpression(AssignmentExpression node) {
     if (flow == null) return null;
 
+    if (node.operator.type == TokenType.QUESTION_QUESTION_EQ) {
+      flow.ifNullExpression_rightBegin();
+    }
+
     var left = node.leftHandSide;
 
     if (left is SimpleIdentifier) {
@@ -67,10 +72,14 @@ class FlowAnalysisHelper {
   }
 
   void assignmentExpression_afterRight(
-      VariableElement localElement, Expression right) {
-    if (localElement == null) return;
+      AssignmentExpression node, VariableElement localElement) {
+    if (localElement != null) {
+      flow.write(localElement);
+    }
 
-    flow.write(localElement);
+    if (node.operator.type == TokenType.QUESTION_QUESTION_EQ) {
+      flow.ifNullExpression_end();
+    }
   }
 
   void breakStatement(BreakStatement node) {
@@ -371,6 +380,36 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
   @override
   void visitMethodDeclaration(MethodDeclaration node) {
     throw StateError('Should not visit top level declarations');
+  }
+
+  @override
+  void visitPostfixExpression(PostfixExpression node) {
+    super.visitPostfixExpression(node);
+    var operator = node.operator.type;
+    if (operator == TokenType.PLUS_PLUS || operator == TokenType.MINUS_MINUS) {
+      var operand = node.operand;
+      if (operand is SimpleIdentifier) {
+        var element = operand.staticElement;
+        if (element is PromotableElement) {
+          assignedVariables.write(element);
+        }
+      }
+    }
+  }
+
+  @override
+  void visitPrefixExpression(PrefixExpression node) {
+    super.visitPrefixExpression(node);
+    var operator = node.operator.type;
+    if (operator == TokenType.PLUS_PLUS || operator == TokenType.MINUS_MINUS) {
+      var operand = node.operand;
+      if (operand is SimpleIdentifier) {
+        var element = operand.staticElement;
+        if (element is PromotableElement) {
+          assignedVariables.write(element);
+        }
+      }
+    }
   }
 
   @override

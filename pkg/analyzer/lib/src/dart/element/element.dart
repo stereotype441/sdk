@@ -2431,6 +2431,9 @@ class ElementAnnotationImpl implements ElementAnnotation {
   /// annotations.
   static String _NG_META_LIB_NAME = "angular.meta";
 
+  /// The name of the top-level variable used to mark a member as being nonVirtual.
+  static String _NON_VIRTUAL_VARIABLE_NAME = "nonVirtual";
+
   /// The name of the top-level variable used to mark a method as being expected
   /// to override an inherited method.
   static String _OVERRIDE_VARIABLE_NAME = "override";
@@ -2552,6 +2555,12 @@ class ElementAnnotationImpl implements ElementAnnotation {
   bool get isMustCallSuper =>
       element is PropertyAccessorElement &&
       element.name == _MUST_CALL_SUPER_VARIABLE_NAME &&
+      element.library?.name == _META_LIB_NAME;
+
+  @override
+  bool get isNonVirtual =>
+      element is PropertyAccessorElement &&
+      element.name == _NON_VIRTUAL_VARIABLE_NAME &&
       element.library?.name == _META_LIB_NAME;
 
   @override
@@ -4515,21 +4524,6 @@ class FunctionElementImpl extends ExecutableElementImpl
 
   @override
   T accept<T>(ElementVisitor<T> visitor) => visitor.visitFunctionElement(this);
-
-  /// Set the parameters defined by this type alias to the given [parameters]
-  /// without becoming the parent of the parameters. This should only be used by
-  /// the [TypeResolverVisitor] when creating a synthetic type alias.
-  void shareParameters(List<ParameterElement> parameters) {
-    this._parameters = parameters;
-  }
-
-  /// Set the type parameters defined by this type alias to the given
-  /// [parameters] without becoming the parent of the parameters. This should
-  /// only be used by the [TypeResolverVisitor] when creating a synthetic type
-  /// alias.
-  void shareTypeParameters(List<TypeParameterElement> typeParameters) {
-    this._typeParameterElements = typeParameters;
-  }
 }
 
 /// Implementation of [FunctionElementImpl] for a function typed parameter.
@@ -5817,33 +5811,6 @@ enum LibraryResolutionCapability {
   constantExpressions,
 }
 
-/// The context in which the library is resynthesized.
-abstract class LibraryResynthesizerContext {
-  /// Return the [LinkedLibrary] that corresponds to the library being
-  /// resynthesized.
-  LinkedLibrary get linkedLibrary;
-
-  /// Return the exported [LibraryElement] for with the given [relativeUri].
-  LibraryElement buildExportedLibrary(String relativeUri);
-
-  /// Return the export namespace of the library.
-  Namespace buildExportNamespace();
-
-  /// Return the imported [LibraryElement] for the given dependency in the
-  /// linked library.
-  LibraryElement buildImportedLibrary(int dependency);
-
-  /// Return the public namespace of the library.
-  Namespace buildPublicNamespace();
-
-  /// Find the entry point of the library.
-  FunctionElement findEntryPoint();
-
-  /// Ensure that getters and setters in different units use the same
-  /// top-level variables.
-  void patchTopLevelAccessors();
-}
-
 /// A concrete implementation of a [LocalVariableElement].
 class LocalVariableElementImpl extends NonParameterVariableElementImpl
     implements LocalVariableElement {
@@ -6360,48 +6327,6 @@ class MultiplyDefinedElementImpl implements MultiplyDefinedElement {
   @override
   void visitChildren(ElementVisitor visitor) {
     // There are no children to visit
-  }
-}
-
-/// A [MethodElementImpl], with the additional information of a list of
-/// [ExecutableElement]s from which this element was composed.
-class MultiplyInheritedMethodElementImpl extends MethodElementImpl
-    implements MultiplyInheritedExecutableElement {
-  /// A list the array of executable elements that were used to compose this
-  /// element.
-  List<ExecutableElement> _elements = const <MethodElement>[];
-
-  MultiplyInheritedMethodElementImpl(Identifier name) : super.forNode(name) {
-    isSynthetic = true;
-  }
-
-  @override
-  List<ExecutableElement> get inheritedElements => _elements;
-
-  void set inheritedElements(List<ExecutableElement> elements) {
-    this._elements = elements;
-  }
-}
-
-/// A [PropertyAccessorElementImpl], with the additional information of a list
-///  of[ExecutableElement]s from which this element was composed.
-class MultiplyInheritedPropertyAccessorElementImpl
-    extends PropertyAccessorElementImpl
-    implements MultiplyInheritedExecutableElement {
-  /// A list the array of executable elements that were used to compose this
-  /// element.
-  List<ExecutableElement> _elements = const <PropertyAccessorElement>[];
-
-  MultiplyInheritedPropertyAccessorElementImpl(Identifier name)
-      : super.forNode(name) {
-    isSynthetic = true;
-  }
-
-  @override
-  List<ExecutableElement> get inheritedElements => _elements;
-
-  void set inheritedElements(List<ExecutableElement> elements) {
-    this._elements = elements;
   }
 }
 
@@ -7750,10 +7675,7 @@ abstract class UriReferencedElementImpl extends ElementImpl
 /// A concrete implementation of a [VariableElement].
 abstract class VariableElementImpl extends ElementImpl
     implements VariableElement {
-  /// The declared type of this variable.
-  DartType _declaredType;
-
-  /// The inferred type of this variable.
+  /// The type of this variable.
   DartType _type;
 
   /// A synthetic function representing this variable's initializer, or `null
@@ -7786,10 +7708,6 @@ abstract class VariableElementImpl extends ElementImpl
 
   @override
   DartObject get constantValue => evaluationResult?.value;
-
-  void set declaredType(DartType type) {
-    _declaredType = _checkElementOfType(type);
-  }
 
   @override
   String get displayName => name;
@@ -7862,7 +7780,7 @@ abstract class VariableElementImpl extends ElementImpl
   bool get isStatic => hasModifier(Modifier.STATIC);
 
   @override
-  DartType get type => _type ?? _declaredType;
+  DartType get type => _type;
 
   void set type(DartType type) {
     if (linkedNode != null) {
