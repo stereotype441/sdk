@@ -5,8 +5,11 @@
 import 'dart:io';
 
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/src/dart/analysis/testing_data.dart';
+import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
 import 'package:analyzer/src/util/ast_data_extractor.dart';
+import 'package:front_end/src/fasta/flow_analysis/flow_analysis.dart';
 import 'package:front_end/src/testing/id.dart' show ActualData, Id;
 import 'package:front_end/src/testing/id_testing.dart';
 
@@ -34,19 +37,54 @@ class _AssignedVariablesDataComputer extends DataComputer<_Data> {
   @override
   void computeUnitData(TestingData testingData, CompilationUnit unit,
       Map<Id, ActualData<_Data>> actualMap) {
-    _AssignedVariablesDataExtractor(unit.declaredElement.source.uri, actualMap)
+    var flowResult =
+        testingData.uriToFlowAnalysisData[unit.declaredElement.source.uri];
+    _AssignedVariablesDataExtractor(
+            unit.declaredElement.source.uri, actualMap, flowResult)
         .run(unit);
   }
 }
 
 class _AssignedVariablesDataExtractor extends AstDataExtractor<_Data> {
-  _AssignedVariablesDataExtractor(Uri uri, Map<Id, ActualData<_Data>> actualMap)
+  final FlowAnalysisDataForTesting _flowResult;
+
+  Declaration _currentDeclaration;
+
+  AssignedVariablesForTesting<AstNode, PromotableElement>
+      _currentAssignedVariables;
+
+  _AssignedVariablesDataExtractor(
+      Uri uri, Map<Id, ActualData<_Data>> actualMap, this._flowResult)
       : super(uri, actualMap);
 
   @override
   _Data computeNodeValue(Id id, AstNode node) {
-    throw UnimplementedError('TODO(paulberry)');
+    if (node == _currentDeclaration) {
+      return _Data(_convertVars(_currentAssignedVariables.writtenAnywhere),
+          _convertVars(_currentAssignedVariables.capturedAnywhere));
+    }
+    if (!_currentAssignedVariables.isTracked(node)) return null;
+    return _Data(_convertVars(_currentAssignedVariables.writtenInNode(node)),
+        _convertVars(_currentAssignedVariables.capturedInNode(node)));
   }
+
+  @override
+  void visitFunctionDeclaration(FunctionDeclaration node) {
+    if (node.parent is CompilationUnit) {
+      assert(_currentDeclaration == null);
+      _currentDeclaration = node;
+      assert(_currentAssignedVariables == null);
+      _currentAssignedVariables = _flowResult.assignedVariables[node];
+      super.visitFunctionDeclaration(node);
+      _currentDeclaration = null;
+      _currentAssignedVariables = null;
+    } else {
+      super.visitFunctionDeclaration(node);
+    }
+  }
+
+  Set<String> _convertVars(Iterable<PromotableElement> x) =>
+      x.map((e) => e.name).toSet();
 }
 
 class _AssignedVariablesDataInterpreter implements DataInterpreter<_Data> {
@@ -54,16 +92,35 @@ class _AssignedVariablesDataInterpreter implements DataInterpreter<_Data> {
 
   @override
   String getText(_Data actualData) {
-    throw UnimplementedError('TODO(paulberry)');
+    var parts = <String>[];
+    if (actualData.assigned.isNotEmpty) {
+      parts.add('assigned=${_setToString(actualData.assigned)}');
+    }
+    if (actualData.captured.isNotEmpty) {
+      parts.add('captured=${_setToString(actualData.captured)}');
+    }
+    if (parts.isEmpty) return 'none';
+    return parts.join(', ');
   }
 
   @override
   String isAsExpected(_Data actualData, String expectedData) {
-    throw UnimplementedError('TODO(paulberry)');
+    var actualDataText = getText(actualData);
+    if (actualDataText == expectedData) {
+      return null;
+    } else {
+      return 'Expected "$expectedData", got "$actualDataText"';
+    }
   }
 
   @override
-  bool isEmpty(_Data actualData) => throw UnimplementedError('TODO(paulberry)');
+  bool isEmpty(_Data actualData) =>
+      actualData.assigned.isEmpty && actualData.captured.isEmpty;
+
+  String _setToString(Set<String> values) {
+    List<String> sortedValues = values.toList()..sort();
+    return '{${sortedValues.join(', ')}}';
+  }
 }
 
 class _Data {

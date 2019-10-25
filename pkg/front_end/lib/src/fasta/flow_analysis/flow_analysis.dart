@@ -2,6 +2,7 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+import 'package:analyzer/dart/ast/ast.dart';
 import 'package:meta/meta.dart';
 
 /// [AssignedVariables] is a helper class capable of computing the set of
@@ -165,6 +166,8 @@ class AssignedVariablesForTesting<Node, Variable>
   Set<Variable> get writtenAnywhere => _writtenAnywhere;
 
   Set<Variable> capturedInNode(Node node) => _getCapturedInNode(node);
+
+  bool isTracked(AstNode node) => _writtenInNode.containsKey(node);
 
   Set<Variable> writtenInNode(Node node) => _getWrittenInNode(node);
 }
