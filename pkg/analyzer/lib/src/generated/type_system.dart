@@ -1073,7 +1073,6 @@ class Dart2TypeSystem extends TypeSystem {
           type.typeArguments, (t) => _substituteType(t, lowerBound, visitType));
       if (identical(type.typeArguments, newTypeArgs)) return type;
       return new InterfaceTypeImpl(type.element,
-          prunedTypedefs: type.prunedTypedefs,
           nullabilitySuffix: type.nullabilitySuffix)
         ..typeArguments = newTypeArgs;
     }
@@ -2413,8 +2412,14 @@ abstract class TypeSystem implements public.TypeSystem {
    * no instantiation is done.
    */
   DartType instantiateType(DartType type, List<DartType> typeArguments) {
-    if (type is ParameterizedType) {
+    if (type is FunctionType) {
       return type.instantiate(typeArguments);
+    } else if (type is InterfaceTypeImpl) {
+      // TODO(scheglov) Use `ClassElement.instantiate()`, don't use raw types.
+      return type.element.instantiate(
+        typeArguments: typeArguments,
+        nullabilitySuffix: type.nullabilitySuffix,
+      );
     } else {
       return type;
     }
@@ -2887,9 +2892,6 @@ class UnknownInferredType extends TypeImpl {
   }
 
   @override
-  TypeImpl pruned(List<FunctionTypeAliasElement> prune) => this;
-
-  @override
   DartType replaceTopAndBottom(TypeProvider typeProvider,
       {bool isCovariant = true}) {
     // In theory this should never happen, since we only need to do this
@@ -2908,8 +2910,7 @@ class UnknownInferredType extends TypeImpl {
 
   @override
   DartType substitute2(
-      List<DartType> argumentTypes, List<DartType> parameterTypes,
-      [List<FunctionTypeAliasElement> prune]) {
+      List<DartType> argumentTypes, List<DartType> parameterTypes) {
     int length = parameterTypes.length;
     for (int i = 0; i < length; i++) {
       if (parameterTypes[i] == this) {
