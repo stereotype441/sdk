@@ -193,6 +193,12 @@ class AnalyzerCompiledData<T> extends CompiledData<T> {
           if (declaration.name.name == name) {
             return declaration.offset;
           }
+        } else if (declaration is TopLevelVariableDeclaration) {
+          for (var variable in declaration.variables.variables) {
+            if (variable.name.name == name) {
+              return variable.offset;
+            }
+          }
         }
       }
       throw StateError('Member not found: $name');

@@ -59,16 +59,12 @@ class _AssignedVariablesDataExtractor extends AstDataExtractor<_Data> {
 
   @override
   _Data computeNodeValue(Id id, AstNode node) {
+    if (_currentAssignedVariables == null) return null;
     if (node == _currentDeclaration) {
       return _Data(
           _convertVars(_currentAssignedVariables.declaredAtTopLevel),
           _convertVars(_currentAssignedVariables.writtenAnywhere),
           _convertVars(_currentAssignedVariables.capturedAnywhere));
-    }
-    if (node is FunctionExpression && node.parent == _currentDeclaration) {
-      // TODO(paulberry): there is extra data here that's unnecessary.  Get rid
-      // of it.
-      return null;
     }
     if (!_currentAssignedVariables.isTracked(node)) return null;
     return _Data(
@@ -79,21 +75,30 @@ class _AssignedVariablesDataExtractor extends AstDataExtractor<_Data> {
 
   @override
   void visitFunctionDeclaration(FunctionDeclaration node) {
-    if (node.parent is CompilationUnit) {
-      assert(_currentDeclaration == null);
-      _currentDeclaration = node;
-      assert(_currentAssignedVariables == null);
-      _currentAssignedVariables = _flowResult.assignedVariables[node];
-      super.visitFunctionDeclaration(node);
-      _currentDeclaration = null;
-      _currentAssignedVariables = null;
-    } else {
-      super.visitFunctionDeclaration(node);
-    }
+    _handlePossibleTopLevelDeclaration(
+        node, () => super.visitFunctionDeclaration(node));
+  }
+
+  @override
+  void visitVariableDeclaration(VariableDeclaration node) {
+    _handlePossibleTopLevelDeclaration(
+        node, () => super.visitVariableDeclaration(node));
   }
 
   Set<String> _convertVars(Iterable<PromotableElement> x) =>
       x.map((e) => e.name).toSet();
+
+  void _handlePossibleTopLevelDeclaration(AstNode node, void callback()) {
+    if (_currentDeclaration == null) {
+      _currentDeclaration = node;
+      _currentAssignedVariables = _flowResult.assignedVariables[node];
+      callback();
+      _currentDeclaration = null;
+      _currentAssignedVariables = null;
+    } else {
+      callback();
+    }
+  }
 }
 
 class _AssignedVariablesDataInterpreter implements DataInterpreter<_Data> {

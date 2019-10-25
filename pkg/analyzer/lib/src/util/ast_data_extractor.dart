@@ -112,6 +112,14 @@ abstract class AstDataExtractor<T> extends GeneralizingAstVisitor<dynamic>
     super.visitStatement(node);
   }
 
+  @override
+  visitVariableDeclaration(VariableDeclaration node) {
+    if (node.parent.parent is TopLevelVariableDeclaration) {
+      computeForMember(node, createMemberId(node));
+    }
+    return super.visitVariableDeclaration(node);
+  }
+
   int _nodeOffset(AstNode node) {
     var offset = node.offset;
     assert(offset != null && offset >= 0,
