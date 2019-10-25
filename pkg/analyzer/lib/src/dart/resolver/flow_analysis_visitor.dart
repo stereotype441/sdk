@@ -27,8 +27,11 @@ class FlowAnalysisDataForTesting {
   /// the corresponding variable has been definitely assigned.
   final List<AstNode> unassignedNodes = [];
 
-  /// For each ???, the assigned variables information that was computed for it.
-  final Map<int, AssignedVariablesForTesting<AstNode, PromotableElement>> assignedVariables = {};
+  /// For each top level or class level declaration, the assigned variables
+  /// information that was computed for it.
+  final Map<Declaration,
+          AssignedVariablesForTesting<AstNode, PromotableElement>>
+      assignedVariables = {};
 }
 
 /// The helper for performing flow analysis during resolution.
@@ -196,7 +199,11 @@ class FlowAnalysisHelper {
       Declaration node, FormalParameterList parameters, FunctionBody body) {
     assert(node != null);
     assert(flow == null);
-    assignedVariables = computeAssignedVariables(node, parameters, result != null);
+    assignedVariables = computeAssignedVariables(node, parameters,
+        retainDataForTesting: dataForTesting != null);
+    if (dataForTesting != null) {
+      dataForTesting.assignedVariables[node] = assignedVariables;
+    }
     flow = FlowAnalysis<AstNode, Statement, Expression, PromotableElement,
         DartType>(_typeOperations, assignedVariables);
   }
@@ -226,9 +233,12 @@ class FlowAnalysisHelper {
 
   /// Computes the [AssignedVariables] map for the given [node].
   static AssignedVariables<AstNode, PromotableElement> computeAssignedVariables(
-      Declaration node, FormalParameterList parameters, bool retainDataForTesting) {
+      Declaration node, FormalParameterList parameters,
+      {bool retainDataForTesting = false}) {
     AssignedVariables<AstNode, PromotableElement> assignedVariables =
-     retainDataForTesting ? AssignedVariablesForTesting() : AssignedVariables();
+        retainDataForTesting
+            ? AssignedVariablesForTesting()
+            : AssignedVariables();
     var assignedVariablesVisitor = _AssignedVariablesVisitor(assignedVariables);
     assignedVariablesVisitor._declareParameters(parameters);
     node.visitChildren(assignedVariablesVisitor);
