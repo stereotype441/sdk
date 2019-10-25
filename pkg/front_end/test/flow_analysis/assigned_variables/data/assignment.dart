@@ -3,16 +3,16 @@
 // BSD-style license that can be found in the LICENSE file.
 
 /*member: ordinary:assigned={x}*/
-ordinary(int x) {
-  x = 0;
+ordinary(int x, int y) {
+  x = y;
 }
 
 /*member: nullAware:assigned={x}*/
-nullAware(int? x) {
-  x = 0;
+nullAware(int? x, int y) {
+  x ??= y;
 }
 
 /*member: compound:assigned={x}*/
-compound(int x) {
-  x += 1;
+compound(int x, int y) {
+  x += y;
 }

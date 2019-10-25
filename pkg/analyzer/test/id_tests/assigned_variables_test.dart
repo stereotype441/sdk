@@ -63,6 +63,11 @@ class _AssignedVariablesDataExtractor extends AstDataExtractor<_Data> {
       return _Data(_convertVars(_currentAssignedVariables.writtenAnywhere),
           _convertVars(_currentAssignedVariables.capturedAnywhere));
     }
+    if (node is FunctionExpression && node.parent == _currentDeclaration) {
+      // TODO(paulberry): there is extra data here that's unnecessary.  Get rid
+      // of it.
+      return null;
+    }
     if (!_currentAssignedVariables.isTracked(node)) return null;
     return _Data(_convertVars(_currentAssignedVariables.writtenInNode(node)),
         _convertVars(_currentAssignedVariables.capturedInNode(node)));
