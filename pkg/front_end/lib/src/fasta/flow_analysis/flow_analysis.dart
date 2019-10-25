@@ -1458,8 +1458,7 @@ class VariableModel<Type> {
       // There was an assignment to the variable in the "this" path, so none of
       // the promotions from the "other" path can be used.
       newPromotionChain = thisPromotionChain;
-    } else
-    if (otherPromotionChain == null) {
+    } else if (otherPromotionChain == null) {
       // The other promotion chain contributes nothing so we just use this
       // promotion chain directly.
       newPromotionChain = thisPromotionChain;
@@ -1473,14 +1472,14 @@ class VariableModel<Type> {
       // invariant)
       newPromotionChain = otherPromotionChain;
       var otherPromotedType = otherPromotionChain.last;
-      int i = 0;
-      while (i < thisPromotionChain.length) {
+      for (int i = 0; i < thisPromotionChain.length; i++) {
         var nextType = thisPromotionChain[i];
-        if (typeOperations.isSubtypeOf(nextType, otherPromotedType) && !typeOperations.isSameType(nextType, otherPromotedType)) {
-          newPromotionChain = otherPromotionChain.toList()..addAll(thisPromotionChain.skip(i));
+        if (typeOperations.isSubtypeOf(nextType, otherPromotedType) &&
+            !typeOperations.isSameType(nextType, otherPromotedType)) {
+          newPromotionChain = otherPromotionChain.toList()
+            ..addAll(thisPromotionChain.skip(i));
           break;
         }
-        i++;
       }
     }
     return _identicalOrNew(

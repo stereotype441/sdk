@@ -2043,6 +2043,13 @@ main() {
       });
 
       test('promotion chains', () {
+        // Verify that the given promotion chain matches the expected list of
+        // strings.
+        void _checkChain(List<_Type> chain, List<String> expected) {
+          var strings = (chain ?? <_Type>[]).map((t) => t.type).toList();
+          expect(strings, expected);
+        }
+
         // Test the following scenario:
         // - Prior to the try/finally block, the sequence of promotions in
         //   [before] is done.
@@ -2052,8 +2059,8 @@ main() {
         //   [inFinally] is done.
         // - After calling `restrict` to refine the state from the finally
         //   block, the expected promotion chain is [expectedResult].
-        _check(List<String> before, List<String> inTry, List<String> inFinally,
-            List<String> expectedResult) {
+        void _check(List<String> before, List<String> inTry,
+            List<String> inFinally, List<String> expectedResult) {
           var h = _Harness();
           var x = _Var('x', _Type('Object?'));
           var initialModel =
@@ -2061,19 +2068,27 @@ main() {
           for (var t in before) {
             initialModel = initialModel.promote(h, x, _Type(t));
           }
+          _checkChain(initialModel.infoFor(x).promotionChain, before);
           var tryModel = initialModel;
           for (var t in inTry) {
             tryModel = tryModel.promote(h, x, _Type(t));
           }
+          var expectedTryChain = before.toList()..addAll(inTry);
+          _checkChain(tryModel.infoFor(x).promotionChain, expectedTryChain);
           var finallyModel = initialModel;
           for (var t in inFinally) {
             finallyModel = finallyModel.promote(h, x, _Type(t));
           }
+          var expectedFinallyChain = before.toList()..addAll(inFinally);
+          _checkChain(
+              finallyModel.infoFor(x).promotionChain, expectedFinallyChain);
           var result = finallyModel.restrict(h, tryModel, {});
-          var resultStrings = (result.infoFor(x).promotionChain ?? <_Type>[])
-              .map((t) => t.type)
-              .toList();
-          expect(resultStrings, expectedResult);
+          _checkChain(result.infoFor(x).promotionChain, expectedResult);
+          // And verify that the inputs are unchanged.
+          _checkChain(initialModel.infoFor(x).promotionChain, before);
+          _checkChain(tryModel.infoFor(x).promotionChain, expectedTryChain);
+          _checkChain(
+              finallyModel.infoFor(x).promotionChain, expectedFinallyChain);
         }
 
         _check(['Object'], ['Iterable', 'List'], ['num', 'int'],
