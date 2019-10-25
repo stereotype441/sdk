@@ -24,7 +24,7 @@ abstract class AstDataExtractor<T> extends GeneralizingAstVisitor<dynamic>
   NodeId computeDefaultNodeId(AstNode node) =>
       NodeId(_nodeOffset(node), IdKind.node);
 
-  void computeForExpression(Expression node, NodeId id) {
+  void computeForCollectionElement(CollectionElement node, NodeId id) {
     if (id == null) return;
     T value = computeNodeValue(id, node);
     registerValue(uri, node.offset, id, value, node);
@@ -83,15 +83,15 @@ abstract class AstDataExtractor<T> extends GeneralizingAstVisitor<dynamic>
   }
 
   @override
-  visitConstructorDeclaration(ConstructorDeclaration node) {
-    computeForMember(node, createMemberId(node));
-    return super.visitConstructorDeclaration(node);
+  visitCollectionElement(CollectionElement node) {
+    computeForCollectionElement(node, computeDefaultNodeId(node));
+    super.visitCollectionElement(node);
   }
 
   @override
-  visitExpression(Expression node) {
-    computeForExpression(node, computeDefaultNodeId(node));
-    super.visitExpression(node);
+  visitConstructorDeclaration(ConstructorDeclaration node) {
+    computeForMember(node, createMemberId(node));
+    return super.visitConstructorDeclaration(node);
   }
 
   @override
