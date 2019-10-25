@@ -990,14 +990,26 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     if (operatorType == TokenType.PLUS_PLUS ||
         operatorType == TokenType.MINUS_MINUS) {
       var operand = node.operand;
+      var targetType = _checkExpressionNotNull(operand);
+      var callee = node.staticElement;
+      DecoratedType writeType;
+      if (callee == null) {
+        // Dynamic dispatch.  The return type is `dynamic`.
+        // TODO(paulberry): would it be better to assume a return type of `Never`
+        // so that we don't unnecessarily propagate nullabilities everywhere?
+        writeType = _dynamicType;
+      } else {
+        var calleeType =
+            getOrComputeElementType(callee, targetType: targetType);
+        writeType = _fixNumericTypes(calleeType.returnType, node.staticType);
+      }
       if (operand is SimpleIdentifier) {
         var element = operand.staticElement;
         if (element is PromotableElement) {
-          _flowAnalysis.write(
-              element, throw UnimplementedError('TODO(paulberry)'));
+          _flowAnalysis.write(element, writeType);
         }
       }
-      return _checkExpressionNotNull(operand);
+      return targetType;
     }
     _unimplemented(
         node, 'Postfix expression with operator ${node.operator.lexeme}');
@@ -1024,26 +1036,31 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       return _nonNullableBoolType;
     } else {
       var callee = node.staticElement;
+      var isIncrementOrDecrement = operatorType == TokenType.PLUS_PLUS ||
+          operatorType == TokenType.MINUS_MINUS;
+      DecoratedType staticType;
       if (callee == null) {
         // Dynamic dispatch.  The return type is `dynamic`.
         // TODO(paulberry): would it be better to assume a return type of `Never`
         // so that we don't unnecessarily propagate nullabilities everywhere?
-        return _dynamicType;
+        staticType = _dynamicType;
+      } else {
+        var calleeType =
+            getOrComputeElementType(callee, targetType: targetType);
+        if (isIncrementOrDecrement) {
+          staticType = _fixNumericTypes(calleeType.returnType, node.staticType);
+        } else {
+          staticType = _handleInvocationArguments(
+              node, [], null, null, calleeType, null);
+        }
       }
-      var calleeType = getOrComputeElementType(callee, targetType: targetType);
-      if (operatorType == TokenType.PLUS_PLUS ||
-          operatorType == TokenType.MINUS_MINUS) {
+      if (isIncrementOrDecrement) {
         if (operand is SimpleIdentifier) {
           var element = operand.staticElement;
           if (element is PromotableElement) {
-            _flowAnalysis.write(
-                element, throw UnimplementedError('TODO(paulberry)'));
+            _flowAnalysis.write(element, staticType);
           }
         }
-        return _fixNumericTypes(calleeType.returnType, node.staticType);
-      } else {
-        return _handleInvocationArguments(
-            node, [], null, null, calleeType, null);
       }
     }
   }
