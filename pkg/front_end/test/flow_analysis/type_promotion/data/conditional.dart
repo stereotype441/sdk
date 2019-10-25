@@ -4,7 +4,6 @@
 
 void conditional_both(bool b, Object x) {
   b ? ((x is num) || (throw 1)) : ((x is int) || (throw 2));
-  // TODO(paulberry): this used to promote to num
   x;
 }
 

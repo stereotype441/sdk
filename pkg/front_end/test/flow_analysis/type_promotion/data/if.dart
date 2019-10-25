@@ -15,7 +15,6 @@ conditional_isNotType(bool b, Object v) {
   if (b ? (v is! int) : (v is! num)) {
     v;
   } else {
-    // TODO(paulberry): this used to promote to num
     v;
   }
   v;
@@ -23,7 +22,6 @@ conditional_isNotType(bool b, Object v) {
 
 conditional_isType(bool b, Object v) {
   if (b ? (v is int) : (v is num)) {
-    // TODO(paulberry): this used to promote to num
     v;
   } else {
     v;
