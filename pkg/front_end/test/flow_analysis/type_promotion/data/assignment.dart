@@ -83,6 +83,34 @@ postDecrementDepromotes(Object x) {
   }
 }
 
+preIncrementPreservesPromotion(Object x) {
+  if (x is int) {
+    ++ /*int*/ x;
+    /*int*/ x;
+  }
+}
+
+postIncrementPreservesPromotion(Object x) {
+  if (x is int) {
+    /*int*/ x++;
+    /*int*/ x;
+  }
+}
+
+preDecrementPreservesPromotion(Object x) {
+  if (x is int) {
+    -- /*int*/ x;
+    /*int*/ x;
+  }
+}
+
+postDecrementPreservesPromotion(Object x) {
+  if (x is int) {
+    /*int*/ x--;
+    /*int*/ x;
+  }
+}
+
 class C {
   Object operator +(int i) => 'foo';
   Object operator -(int i) => 'foo';
