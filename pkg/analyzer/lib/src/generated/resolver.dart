@@ -3903,7 +3903,7 @@ class ResolverVisitor extends ScopedVisitor {
       if (operand is SimpleIdentifier) {
         var element = operand.staticElement;
         if (element is PromotableElement) {
-          _flowAnalysis?.flow?.write(element);
+          _flowAnalysis?.flow?.write(element, throw UnimplementedError('TODO(paulberry)'));
         }
       }
     }
@@ -3933,7 +3933,7 @@ class ResolverVisitor extends ScopedVisitor {
       if (operand is SimpleIdentifier) {
         var element = operand.staticElement;
         if (element is PromotableElement) {
-          _flowAnalysis?.flow?.write(element);
+          _flowAnalysis?.flow?.write(element, throw UnimplementedError('TODO(paulberry)'));
         }
       }
     }

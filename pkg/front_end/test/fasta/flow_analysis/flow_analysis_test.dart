@@ -53,8 +53,8 @@ main() {
         h.promote(x, 'int');
         h.promote(z, 'int');
         flow.assert_begin();
-        flow.write(x);
-        flow.write(z);
+        flow.write(x, _Type('int?'));
+        flow.write(z, _Type('int?'));
         var expr = h.and(h.notNull(x), h.notNull(y))();
         flow.assert_afterCondition(expr);
         flow.assert_end();
@@ -1859,14 +1859,12 @@ main() {
     group('initialize', () {
       var objectQVar = _Var('x', _Type('Object?'));
       test('unchanged', () {
-        var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true).initialize(objectQVar);
         var s2 = s1.initialize(objectQVar);
         expect(s2, same(s1));
       });
 
       test('marks as assigned', () {
-        var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true);
         var s2 = s1.initialize(objectQVar);
         expect(s2.reachable, true);

@@ -993,7 +993,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       if (operand is SimpleIdentifier) {
         var element = operand.staticElement;
         if (element is PromotableElement) {
-          _flowAnalysis.write(element);
+          _flowAnalysis.write(element, throw UnimplementedError('TODO(paulberry)'));
         }
       }
       return _checkExpressionNotNull(operand);
@@ -1035,7 +1035,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         if (operand is SimpleIdentifier) {
           var element = operand.staticElement;
           if (element is PromotableElement) {
-            _flowAnalysis.write(element);
+            _flowAnalysis.write(element, throw UnimplementedError('TODO(paulberry)'));
           }
         }
         return _fixNumericTypes(calleeType.returnType, node.staticType);
