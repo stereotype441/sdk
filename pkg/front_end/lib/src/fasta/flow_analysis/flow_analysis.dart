@@ -337,7 +337,10 @@ abstract class FlowAnalysis<Node, Statement extends Node, Expression, Variable,
   /// - Call [forEach_end].
   ///
   /// [node] should be the same node that was passed to
-  /// [AssignedVariables.endNode] for the for statement.
+  /// [AssignedVariables.endNode] for the for statement.  [loopVariable] should
+  /// be the variable assigned to by the loop (if it is promotable, otherwise
+  /// null).  [writtenType] should be the type written to that variable (i.e.
+  /// if the loop iterates over `List<Foo>`, it should be `Foo`).
   void forEach_bodyBegin(Node node, Variable loopVariable, Type writtenType);
 
   /// Call this method just before visiting the body of a "for-in" statement or
@@ -612,6 +615,7 @@ abstract class FlowAnalysis<Node, Statement extends Node, Expression, Variable,
   void whileStatement_end();
 
   /// Register write of the given [variable] in the current state.
+  /// [writtenType] should be the type of the value that was written.
   void write(Variable variable, Type writtenType);
 }
 
@@ -1432,6 +1436,8 @@ class VariableModel<Type> {
         this.writeCaptured == other.writeCaptured;
   }
 
+  /// Returns a new [VariableModel] in which any promotions present have been
+  /// dropped.
   VariableModel<Type> discardPromotions() {
     assert(promotionChain != null, 'No promotions to discard');
     return new VariableModel<Type>(null, assigned, writeCaptured);
@@ -1567,6 +1573,9 @@ class VariableModel<Type> {
         first, second, newPromotionChain, newAssigned, newWriteCaptured);
   }
 
+  /// Performs the portion of the "join" algorithm that applies to promotion
+  /// chains.  Briefly, we keep the longest initial subchain that both input
+  /// chains share, and discard all other promotions.
   static List<Type> joinPromotionChains<Type>(List<Type> chain1,
       List<Type> chain2, TypeOperations<Object, Type> typeOperations) {
     if (chain1 == null) return chain1;
@@ -1580,7 +1589,7 @@ class VariableModel<Type> {
     }
     if (numCommonElements == chain1.length) return chain1;
     if (numCommonElements == chain2.length) return chain2;
-    // For now we just discard any promotions after the first matching
+    // For now we just discard any promotions after the first non-matching
     // promotion.  TODO(paulberry): consider doing something smarter.
     return numCommonElements == 0 ? null : chain1.sublist(0, numCommonElements);
   }
