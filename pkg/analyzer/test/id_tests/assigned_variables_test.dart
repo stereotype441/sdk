@@ -59,6 +59,9 @@ class _AssignedVariablesDataExtractor extends AstDataExtractor<_Data> {
 
   @override
   _Data computeNodeValue(Id id, AstNode node) {
+    if (node is FunctionDeclarationStatement) {
+      node = (node as FunctionDeclarationStatement).functionDeclaration;
+    }
     if (_currentAssignedVariables == null) return null;
     if (node == _currentDeclaration) {
       return _Data(
