@@ -9,7 +9,6 @@ cStyle(int a, int b, int c, int d) {
 
 /*member: cStyleWithDeclaration:declared={a, b, c, d, e}, assigned={a, b, c, d}*/
 cStyleWithDeclaration(int a, int b, int c, int d) {
-  // TODO(paulberry): we should record the declaration of e here.
   [/*assigned={b, c, d}*/ for (int e = (a = 0); (b = 0) != 0; c = 0) (d = 0)];
 }
 
