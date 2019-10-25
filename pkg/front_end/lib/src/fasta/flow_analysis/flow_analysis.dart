@@ -155,10 +155,9 @@ class AssignedVariables<Node, Variable> {
   }
 }
 
-/// Extension of [AssignedVariables] intended for use in unit tests.  This class
+/// Extension of [AssignedVariables] intended for use in tests.  This class
 /// exposes the results of the analysis so that they can be tested directly.
 /// Not intended to be used by clients of flow analysis.
-@visibleForTesting
 class AssignedVariablesForTesting<Node, Variable>
     extends AssignedVariables<Node, Variable> {
   Set<Variable> get capturedAnywhere => _capturedAnywhere;

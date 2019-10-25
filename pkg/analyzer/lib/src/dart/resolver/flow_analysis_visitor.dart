@@ -178,7 +178,7 @@ class FlowAnalysisHelper {
       Declaration node, FormalParameterList parameters, FunctionBody body) {
     assert(node != null);
     assert(flow == null);
-    assignedVariables = computeAssignedVariables(node, parameters);
+    assignedVariables = computeAssignedVariables(node, parameters, result != null);
     flow = FlowAnalysis<AstNode, Statement, Expression, PromotableElement,
         DartType>(_typeOperations, assignedVariables);
   }
@@ -208,8 +208,9 @@ class FlowAnalysisHelper {
 
   /// Computes the [AssignedVariables] map for the given [node].
   static AssignedVariables<AstNode, PromotableElement> computeAssignedVariables(
-      Declaration node, FormalParameterList parameters) {
-    var assignedVariables = AssignedVariables<AstNode, PromotableElement>();
+      Declaration node, FormalParameterList parameters, bool retainDataForTesting) {
+    AssignedVariables<AstNode, PromotableElement> assignedVariables =
+     retainDataForTesting ? AssignedVariablesForTesting() : AssignedVariables();
     var assignedVariablesVisitor = _AssignedVariablesVisitor(assignedVariables);
     assignedVariablesVisitor._declareParameters(parameters);
     node.visitChildren(assignedVariablesVisitor);
@@ -265,6 +266,9 @@ class FlowAnalysisResult {
   /// The list of [Expression]s representing variable accesses that occur before
   /// the corresponding variable has been definitely assigned.
   final List<AstNode> unassignedNodes = [];
+
+  /// For each ???, the assigned variables information that was computed for it.
+  final Map<int, AssignedVariablesForTesting<AstNode, PromotableElement>> assignedVariables = {};
 }
 
 class TypeSystemTypeOperations
