@@ -161,11 +161,25 @@ class AssignedVariables<Node, Variable> {
 /// Not intended to be used by clients of flow analysis.
 class AssignedVariablesForTesting<Node, Variable>
     extends AssignedVariables<Node, Variable> {
+  final Map<Node, Set<Variable>> _declaredInNode = {};
+
   Set<Variable> get capturedAnywhere => _capturedAnywhere;
+
+  Set<Variable> get declaredAtTopLevel => _declaredStack.first;
 
   Set<Variable> get writtenAnywhere => _writtenAnywhere;
 
   Set<Variable> capturedInNode(Node node) => _getCapturedInNode(node);
+
+  Set<Variable> declaredInNode(Node node) =>
+      _declaredInNode[node] ??
+      (throw new StateError('No information for $node'));
+
+  @override
+  void endNode(Node node, {bool isClosure: false}) {
+    _declaredInNode[node] = _declaredStack.last;
+    super.endNode(node, isClosure: isClosure);
+  }
 
   bool isTracked(AstNode node) => _writtenInNode.containsKey(node);
 

@@ -377,14 +377,18 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
     }
     assignedVariables.beginNode();
     _declareParameters(node.functionExpression.parameters);
-    // Note: we bypass this.visitFunctionExpression so that the function
-    // expression isn't mistaken for a closure.
-    super.visitFunctionExpression(node.functionExpression);
+    super.visitFunctionDeclaration(node);
     assignedVariables.endNode(node, isClosure: true);
   }
 
   @override
   void visitFunctionExpression(FunctionExpression node) {
+    if (node.parent is FunctionDeclaration) {
+      // A FunctionExpression just inside a FunctionDeclaration is an analyzer
+      // artifact--it doesn't correspond to a separate closure.  So skip our
+      // usual processing.
+      return super.visitFunctionExpression(node);
+    }
     assignedVariables.beginNode();
     _declareParameters(node.parameters);
     super.visitFunctionExpression(node);

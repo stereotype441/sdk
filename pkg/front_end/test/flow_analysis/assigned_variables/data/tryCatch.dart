@@ -2,47 +2,33 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-/*member: tryOn:assigned={x, y}*/
-tryOn(int x, int y) {
-  try /*assigned={x}*/ {
-    x = 0;
+/*member: tryCatch:declared={a, b, d}, assigned={a, b}*/
+tryCatch(int a, int b) {
+  try /*declared={c}, assigned={a}*/ {
+    a = 0;
+    var c;
   } on String {
-    y = 0;
+    b = 0;
+    var d;
   }
 }
 
-/*member: tryCatch:assigned={x, y}*/
-tryCatch(int x, int y) {
-  try /*assigned={x}*/ {
-    x = 0;
-  } catch (e) {
-    y = 0;
-  }
+/*member: catchClause:declared={e}*/
+catchClause() {
+  try {} catch (e) {}
 }
 
-/*member: tryOnCatch:assigned={x, y}*/
-tryOnCatch(int x, int y) {
-  try /*assigned={x}*/ {
-    x = 0;
-  } on String catch (e) {
-    y = 0;
-  }
+/*member: onCatch:declared={e}*/
+onCatch() {
+  try {} on String catch (e) {}
 }
 
-/*member: tryCatchStackTrace:assigned={x, y}*/
-tryCatchStackTrace(int x, int y) {
-  try /*assigned={x}*/ {
-    x = 0;
-  } catch (e, st) {
-    y = 0;
-  }
+/*member: catchStackTrace:declared={e, st}*/
+catchStackTrace() {
+  try {} catch (e, st) {}
 }
 
-/*member: tryOnCatchStackTrace:assigned={x, y}*/
-tryOnCatchStackTrace(int x, int y) {
-  try /*assigned={x}*/ {
-    x = 0;
-  } on String catch (e, st) {
-    y = 0;
-  }
+/*member: onCatchStackTrace:declared={e, st}*/
+onCatchStackTrace() {
+  try {} on String catch (e, st) {}
 }

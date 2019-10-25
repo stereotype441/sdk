@@ -60,7 +60,9 @@ class _AssignedVariablesDataExtractor extends AstDataExtractor<_Data> {
   @override
   _Data computeNodeValue(Id id, AstNode node) {
     if (node == _currentDeclaration) {
-      return _Data(_convertVars(_currentAssignedVariables.writtenAnywhere),
+      return _Data(
+          _convertVars(_currentAssignedVariables.declaredAtTopLevel),
+          _convertVars(_currentAssignedVariables.writtenAnywhere),
           _convertVars(_currentAssignedVariables.capturedAnywhere));
     }
     if (node is FunctionExpression && node.parent == _currentDeclaration) {
@@ -69,7 +71,9 @@ class _AssignedVariablesDataExtractor extends AstDataExtractor<_Data> {
       return null;
     }
     if (!_currentAssignedVariables.isTracked(node)) return null;
-    return _Data(_convertVars(_currentAssignedVariables.writtenInNode(node)),
+    return _Data(
+        _convertVars(_currentAssignedVariables.declaredInNode(node)),
+        _convertVars(_currentAssignedVariables.writtenInNode(node)),
         _convertVars(_currentAssignedVariables.capturedInNode(node)));
   }
 
@@ -98,6 +102,9 @@ class _AssignedVariablesDataInterpreter implements DataInterpreter<_Data> {
   @override
   String getText(_Data actualData) {
     var parts = <String>[];
+    if (actualData.declared.isNotEmpty) {
+      parts.add('declared=${_setToString(actualData.declared)}');
+    }
     if (actualData.assigned.isNotEmpty) {
       parts.add('assigned=${_setToString(actualData.assigned)}');
     }
@@ -129,9 +136,11 @@ class _AssignedVariablesDataInterpreter implements DataInterpreter<_Data> {
 }
 
 class _Data {
+  final Set<String> declared;
+
   final Set<String> assigned;
 
   final Set<String> captured;
 
-  _Data(this.assigned, this.captured);
+  _Data(this.declared, this.assigned, this.captured);
 }
