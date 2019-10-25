@@ -953,6 +953,12 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
         } else {
           _checkForInvalidAssignmentIncDec(node, operand, staticType);
         }
+        if (operand is SimpleIdentifier) {
+          var element = operand.staticElement;
+          if (element is PromotableElement) {
+            _flowAnalysis?.flow?.write(element, staticType);
+          }
+        }
       }
       _recordStaticType(node, staticType);
     }
