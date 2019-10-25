@@ -92,8 +92,8 @@ class FlowAnalysisHelper {
     return null;
   }
 
-  void assignmentExpression_afterRight(
-      AssignmentExpression node, VariableElement localElement, DartType writtenType) {
+  void assignmentExpression_afterRight(AssignmentExpression node,
+      VariableElement localElement, DartType writtenType) {
     if (localElement != null) {
       flow.write(localElement, writtenType);
     }

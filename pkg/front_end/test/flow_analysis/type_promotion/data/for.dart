@@ -156,7 +156,7 @@ void forEach_noDemotion(Object? x, List<int> y) {
 
 void forEach_partialDemotion(Object? x, List<num> y) {
   if (x is num) {
-    if (/*num*/x is int) {
+    if (/*num*/ x is int) {
       /*int*/ x;
       for (x in y) {
         /*num*/ x;
@@ -169,16 +169,16 @@ void forEach_partialDemotion(Object? x, List<num> y) {
 void collection_forEach_noDemotion(Object? x, List<int> y) {
   if (x is int) {
     /*int*/ x;
-    [for (x in y) /*int*/ x];
+    [for (x in y) /*int*/ x ];
     /*int*/ x;
   }
 }
 
 void collection_forEach_partialDemotion(Object? x, List<num> y) {
   if (x is num) {
-    if (/*num*/x is int) {
+    if (/*num*/ x is int) {
       /*int*/ x;
-      [for (x in y) /*num*/ x];
+      [for (x in y) /*num*/ x ];
       /*num*/ x;
     }
   }

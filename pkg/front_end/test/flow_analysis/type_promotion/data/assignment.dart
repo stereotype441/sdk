@@ -11,9 +11,9 @@ assignmentDepromotes(Object x) {
 
 assignmentDepromotes_partial(Object x) {
   if (x is num) {
-    if (/*num*/x is int) {
+    if (/*num*/ x is int) {
       x = 42.0;
-      /*num*/x;
+      /*num*/ x;
     }
   }
 }
@@ -34,7 +34,7 @@ compoundAssignmentDepromotes(Object x) {
 
 compoundAssignmentDepromotes_partial(Object x) {
   if (x is num) {
-    if (/*num*/x is int) {
+    if (/*num*/ x is int) {
       /*int*/ x += 0.5;
       /*num*/ x;
     }

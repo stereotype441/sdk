@@ -1477,9 +1477,9 @@ class VariableModel<Type> {
       // thisPromotionChain (discarding any that don't follow the ordering
       // invariant)
       newPromotionChain = otherPromotionChain;
-      var otherPromotedType = otherPromotionChain.last;
+      Type otherPromotedType = otherPromotionChain.last;
       for (int i = 0; i < thisPromotionChain.length; i++) {
-        var nextType = thisPromotionChain[i];
+        Type nextType = thisPromotionChain[i];
         if (typeOperations.isSubtypeOf(nextType, otherPromotedType) &&
             !typeOperations.isSameType(nextType, otherPromotedType)) {
           newPromotionChain = otherPromotionChain.toList()

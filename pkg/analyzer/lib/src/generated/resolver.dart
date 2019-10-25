@@ -2942,7 +2942,8 @@ class ResolverVisitor extends ScopedVisitor {
     node.accept(elementResolver);
     node.accept(typeAnalyzer);
     _flowAnalysis?.assignmentExpression_afterRight(
-        node, leftLocalVariable,
+        node,
+        leftLocalVariable,
         operator == TokenType.QUESTION_QUESTION_EQ
             ? node.rightHandSide.staticType
             : node.staticType);
