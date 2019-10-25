@@ -964,7 +964,7 @@ class CodeChecker extends RecursiveAstVisitor {
 
   void _checkUnary(Expression operand, Token op, MethodElement element) {
     bool isIncrementAssign =
-        op.type == TokenType.PLUS_PLUS || op.type == TokenType.MINUS_MINUS;
+        op.type.isIncrementOperator;
     if (op.isUserDefinableOperator || isIncrementAssign) {
       if (element == null) {
         _recordDynamicInvoke(operand.parent, operand);
