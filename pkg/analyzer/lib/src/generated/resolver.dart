@@ -3897,15 +3897,6 @@ class ResolverVisitor extends ScopedVisitor {
     var operator = node.operator.type;
     if (operator == TokenType.BANG) {
       _flowAnalysis?.flow?.nonNullAssert_end(node.operand);
-    } else if (operator == TokenType.PLUS_PLUS ||
-        operator == TokenType.MINUS_MINUS) {
-      var operand = node.operand;
-      if (operand is SimpleIdentifier) {
-        var element = operand.staticElement;
-        if (element is PromotableElement) {
-          _flowAnalysis?.flow?.write(element, throw UnimplementedError('TODO(paulberry)'));
-        }
-      }
     }
   }
 

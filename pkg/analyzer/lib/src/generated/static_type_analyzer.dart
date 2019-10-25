@@ -870,11 +870,20 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
     if (node.operator.type == TokenType.BANG) {
       staticType = _typeSystem.promoteToNonNull(staticType);
     } else {
-      // No need to check for `intVar++`, the result is `int`.
-      if (!staticType.isDartCoreInt) {
+      DartType operatorReturnType;
+      if (staticType.isDartCoreInt) {
+        // No need to check for `intVar++`, the result is `int`.
+        operatorReturnType = staticType;
+      } else {
         var operatorElement = node.staticElement;
-        var operatorReturnType = _computeStaticReturnType(operatorElement);
+        operatorReturnType = _computeStaticReturnType(operatorElement);
         _checkForInvalidAssignmentIncDec(node, operand, operatorReturnType);
+      }
+      if (operand is SimpleIdentifier) {
+        var element = operand.staticElement;
+        if (element is PromotableElement) {
+          _flowAnalysis?.flow?.write(element, operatorReturnType);
+        }
       }
     }
 
