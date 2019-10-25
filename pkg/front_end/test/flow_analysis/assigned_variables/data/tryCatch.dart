@@ -4,7 +4,7 @@
 
 /*member: tryOn:assigned={x, y}*/
 tryOn(int x, int y) {
-  try /*stmt: assigned={x}*/ {
+  try /*assigned={x}*/ {
     x = 0;
   } on String {
     y = 0;
@@ -13,7 +13,7 @@ tryOn(int x, int y) {
 
 /*member: tryCatch:assigned={x, y}*/
 tryCatch(int x, int y) {
-  try /*stmt: assigned={x}*/ {
+  try /*assigned={x}*/ {
     x = 0;
   } catch (e) {
     y = 0;
@@ -22,7 +22,7 @@ tryCatch(int x, int y) {
 
 /*member: tryOnCatch:assigned={x, y}*/
 tryOnCatch(int x, int y) {
-  try /*stmt: assigned={x}*/ {
+  try /*assigned={x}*/ {
     x = 0;
   } on String catch (e) {
     y = 0;
@@ -31,7 +31,7 @@ tryOnCatch(int x, int y) {
 
 /*member: tryCatchStackTrace:assigned={x, y}*/
 tryCatchStackTrace(int x, int y) {
-  try /*stmt: assigned={x}*/ {
+  try /*assigned={x}*/ {
     x = 0;
   } catch (e, st) {
     y = 0;
@@ -40,7 +40,7 @@ tryCatchStackTrace(int x, int y) {
 
 /*member: tryOnCatchStackTrace:assigned={x, y}*/
 tryOnCatchStackTrace(int x, int y) {
-  try /*stmt: assigned={x}*/ {
+  try /*assigned={x}*/ {
     x = 0;
   } on String catch (e, st) {
     y = 0;
