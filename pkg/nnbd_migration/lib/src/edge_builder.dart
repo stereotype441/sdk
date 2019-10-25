@@ -1646,6 +1646,10 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
             hard: questionAssignNode == null &&
                 _postDominatedLocals.isReferenceInScope(expression));
       }
+      if (destinationLocalVariable != null) {
+        _flowAnalysis.write(destinationLocalVariable,
+            sourceType);
+      }
       if (questionAssignNode != null) {
         _flowAnalysis.ifNullExpression_end();
         // a ??= b is only nullable if both a and b are nullable.
@@ -1661,10 +1665,6 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     }
     if (destinationExpression != null) {
       _postDominatedLocals.removeReferenceFromAllScopes(destinationExpression);
-    }
-    if (destinationLocalVariable != null) {
-      _flowAnalysis.write(destinationLocalVariable,
-          throw UnimplementedError('TODO(paulberry)'));
     }
     return sourceType;
   }
