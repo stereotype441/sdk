@@ -13,6 +13,7 @@ import 'package:kernel/ast.dart'
         InterfaceType,
         Member,
         NamedType,
+        Nullability,
         TreeNode,
         TypeParameter,
         TypeParameterType,
@@ -23,9 +24,13 @@ import 'package:kernel/class_hierarchy.dart' show ClassHierarchy;
 
 import 'package:kernel/core_types.dart' show CoreTypes;
 
+import 'package:kernel/type_environment.dart';
+
 import '../../base/instrumentation.dart' show Instrumentation;
 
 import '../builder/library_builder.dart';
+
+import '../flow_analysis/flow_analysis.dart';
 
 import '../kernel/forest.dart';
 
@@ -34,7 +39,7 @@ import '../kernel/kernel_builder.dart'
 
 import '../source/source_library_builder.dart' show SourceLibraryBuilder;
 
-import 'type_inferrer.dart' show TypeInferrer;
+import 'type_inferrer.dart';
 
 import 'type_schema_environment.dart' show TypeSchemaEnvironment;
 
@@ -217,6 +222,27 @@ abstract class TypeInferenceEngine {
   }
 }
 
+/// Concrete implementation of [TypeInferenceEngine] specialized to work with
+/// kernel objects.
+class TypeInferenceEngineImpl extends TypeInferenceEngine {
+  TypeInferenceEngineImpl(Instrumentation instrumentation)
+      : super(instrumentation);
+
+  @override
+  TypeInferrer createLocalTypeInferrer(Uri uri, InterfaceType thisType,
+      SourceLibraryBuilder library, InferenceDataForTesting dataForTesting) {
+    return new TypeInferrerImpl(
+        this, uri, false, thisType, library, dataForTesting);
+  }
+
+  @override
+  TypeInferrer createTopLevelTypeInferrer(Uri uri, InterfaceType thisType,
+      SourceLibraryBuilder library, InferenceDataForTesting dataForTesting) {
+    return new TypeInferrerImpl(
+        this, uri, true, thisType, library, dataForTesting);
+  }
+}
+
 class InferenceDataForTesting {
   final FlowAnalysisResult flowAnalysisResult = new FlowAnalysisResult();
 }
@@ -234,4 +260,38 @@ class FlowAnalysisResult {
   /// The list of [Expression]s representing variable accesses that occur before
   /// the corresponding variable has been definitely assigned.
   final List<TreeNode> unassignedNodes = [];
+}
+
+/// CFE-specific implementation of [TypeOperations].
+class TypeOperationsCfe
+    implements TypeOperations<VariableDeclaration, DartType> {
+  final TypeEnvironment typeEnvironment;
+
+  TypeOperationsCfe(this.typeEnvironment);
+
+  // TODO(dmitryas): Consider checking for mutual subtypes instead of ==.
+  @override
+  bool isSameType(DartType type1, DartType type2) => type1 == type2;
+
+  @override
+  bool isSubtypeOf(DartType leftType, DartType rightType) {
+    return typeEnvironment.isSubtypeOf(
+        leftType, rightType, SubtypeCheckMode.withNullabilities);
+  }
+
+  @override
+  DartType promoteToNonNull(DartType type) {
+    return type.withNullability(Nullability.nonNullable);
+  }
+
+  @override
+  DartType variableType(VariableDeclaration variable) => variable.type;
+
+  @override
+  DartType tryPromoteToType(DartType from, DartType to) {
+    if (from is TypeParameterType) {
+      return new TypeParameterType(from.parameter, to, from.nullability);
+    }
+    return to;
+  }
 }

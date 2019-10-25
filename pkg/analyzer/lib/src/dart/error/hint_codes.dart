@@ -357,6 +357,19 @@ class HintCode extends AnalyzerErrorCode {
       hasPublishedDocs: true);
 
   /**
+   * This hint is generated anywhere where `@nonVirtual` annotates something
+   * other than a non-abstract instance member in a class or mixin.
+   *
+   * Parameters:
+   * 0: the name of the member
+   */
+  static const HintCode INVALID_NON_VIRTUAL_ANNOTATION = const HintCode(
+      'INVALID_NON_VIRTUAL_ANNOTATION',
+      "The member '{0}' can't be '@nonVirtual' because it isn't a concrete "
+          "instance member.",
+      correction: "Try removing @nonVirtual.");
+
+  /**
    * This hint is generated anywhere where `@required` annotates a named
    * parameter with a default value.
    *
@@ -561,7 +574,7 @@ class HintCode extends AnalyzerErrorCode {
   // The following code produces this diagnostic:
   //
   // ```dart
-  // [!int!] f(int x) {
+  // int [!f!](int x) {
   //   if (x < 0) {
   //     return 0;
   //   }

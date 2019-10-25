@@ -155,6 +155,27 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
         _errorReporter
             .reportErrorForNode(HintCode.INVALID_LITERAL_ANNOTATION, node, []);
       }
+    } else if (element?.isNonVirtual == true) {
+      if (parent is FieldDeclaration) {
+        if (parent.isStatic) {
+          _errorReporter.reportErrorForNode(
+              HintCode.INVALID_NON_VIRTUAL_ANNOTATION,
+              node,
+              [node.element.name]);
+        }
+      } else if (parent is MethodDeclaration) {
+        if (parent.parent is ExtensionDeclaration ||
+            parent.isStatic ||
+            parent.isAbstract) {
+          _errorReporter.reportErrorForNode(
+              HintCode.INVALID_NON_VIRTUAL_ANNOTATION,
+              node,
+              [node.element.name]);
+        }
+      } else {
+        _errorReporter.reportErrorForNode(
+            HintCode.INVALID_NON_VIRTUAL_ANNOTATION, node, [node.element.name]);
+      }
     } else if (element?.isSealed == true) {
       if (!(parent is ClassDeclaration || parent is ClassTypeAlias)) {
         _errorReporter.reportErrorForNode(
@@ -539,8 +560,8 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
   bool _checkAllTypeChecks(IsExpression node) {
     Expression expression = node.expression;
     TypeAnnotation typeName = node.type;
-    DartType lhsType = expression.staticType;
-    DartType rhsType = typeName.type;
+    TypeImpl lhsType = expression.staticType;
+    TypeImpl rhsType = typeName.type;
     if (lhsType == null || rhsType == null) {
       return false;
     }
@@ -561,29 +582,53 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
     Element rhsElement = rhsType.element;
     LibraryElement libraryElement = rhsElement?.library;
     if (libraryElement != null && libraryElement.isDartCore) {
-      // if x is Object or null is Null
-      if (rhsType.isObject ||
-          (expression is NullLiteral && rhsNameStr == _NULL_TYPE_NAME)) {
-        if (node.notOperator == null) {
-          // the is case
-          _errorReporter.reportErrorForNode(
-              HintCode.UNNECESSARY_TYPE_CHECK_TRUE, node);
+      // `is Null` or `is! Null`
+      if (rhsNameStr == _NULL_TYPE_NAME) {
+        if (expression is NullLiteral) {
+          if (node.notOperator == null) {
+            _errorReporter.reportErrorForNode(
+              HintCode.UNNECESSARY_TYPE_CHECK_TRUE,
+              node,
+            );
+          } else {
+            _errorReporter.reportErrorForNode(
+              HintCode.UNNECESSARY_TYPE_CHECK_FALSE,
+              node,
+            );
+          }
         } else {
-          // the is not case
-          _errorReporter.reportErrorForNode(
-              HintCode.UNNECESSARY_TYPE_CHECK_FALSE, node);
+          if (node.notOperator == null) {
+            _errorReporter.reportErrorForNode(
+              HintCode.TYPE_CHECK_IS_NULL,
+              node,
+            );
+          } else {
+            _errorReporter.reportErrorForNode(
+              HintCode.TYPE_CHECK_IS_NOT_NULL,
+              node,
+            );
+          }
         }
         return true;
-      } else if (rhsNameStr == _NULL_TYPE_NAME) {
-        if (node.notOperator == null) {
-          // the is case
-          _errorReporter.reportErrorForNode(HintCode.TYPE_CHECK_IS_NULL, node);
-        } else {
-          // the is not case
-          _errorReporter.reportErrorForNode(
-              HintCode.TYPE_CHECK_IS_NOT_NULL, node);
+      }
+      // `is Object` or `is! Object`
+      if (rhsType.isObject) {
+        var nullability = rhsType.nullabilitySuffix;
+        if (nullability == NullabilitySuffix.star ||
+            nullability == NullabilitySuffix.question) {
+          if (node.notOperator == null) {
+            _errorReporter.reportErrorForNode(
+              HintCode.UNNECESSARY_TYPE_CHECK_TRUE,
+              node,
+            );
+          } else {
+            _errorReporter.reportErrorForNode(
+              HintCode.UNNECESSARY_TYPE_CHECK_FALSE,
+              node,
+            );
+          }
+          return true;
         }
-        return true;
       }
     }
     return false;
@@ -937,22 +982,18 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
 
   /// Generate a hint for functions or methods that have a return type, but do
   /// not have a return statement on all branches. At the end of blocks with no
-  /// return, Dart implicitly returns `null`, avoiding these implicit returns is
-  /// considered a best practice.
+  /// return, Dart implicitly returns `null`. Avoiding these implicit returns
+  /// is considered a best practice.
   ///
   /// Note: for async functions/methods, this hint only applies when the
   /// function has a return type that Future<Null> is not assignable to.
   ///
-  /// @param node the binary expression to check
-  /// @param body the function body
-  /// @return `true` if and only if a hint code is generated on the passed node
   /// See [HintCode.MISSING_RETURN].
   void _checkForMissingReturn(TypeAnnotation returnNode, FunctionBody body,
       ExecutableElement element, AstNode functionNode) {
     if (body is BlockFunctionBody) {
       // Prefer the type from the element model, in case we've inferred one.
       DartType returnType = element?.returnType ?? returnNode?.type;
-      AstNode errorNode = returnNode ?? functionNode;
 
       // Skip the check if we're missing a return type (e.g. erroneous code).
       // Generators are never required to have a return statement.
@@ -991,6 +1032,11 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
       }
       // Otherwise issue a warning if the block doesn't have a return.
       if (!ExitDetector.exits(body)) {
+        AstNode errorNode = functionNode is MethodDeclaration
+            ? functionNode.name
+            : functionNode is FunctionDeclaration
+                ? functionNode.name
+                : functionNode;
         _errorReporter.reportErrorForNode(
             HintCode.MISSING_RETURN, errorNode, [returnType.displayName]);
       }
@@ -2860,13 +2906,21 @@ class ResolverVisitor extends ScopedVisitor {
   @override
   void visitAssertInitializer(AssertInitializer node) {
     InferenceContext.setType(node.condition, typeProvider.boolType);
-    super.visitAssertInitializer(node);
+    _flowAnalysis?.flow?.assert_begin();
+    node.condition?.accept(this);
+    _flowAnalysis?.flow?.assert_afterCondition(node.condition);
+    node.message?.accept(this);
+    _flowAnalysis?.flow?.assert_end();
   }
 
   @override
   void visitAssertStatement(AssertStatement node) {
     InferenceContext.setType(node.condition, typeProvider.boolType);
-    super.visitAssertStatement(node);
+    _flowAnalysis?.flow?.assert_begin();
+    node.condition?.accept(this);
+    _flowAnalysis?.flow?.assert_afterCondition(node.condition);
+    node.message?.accept(this);
+    _flowAnalysis?.flow?.assert_end();
   }
 
   @override
@@ -2888,8 +2942,7 @@ class ResolverVisitor extends ScopedVisitor {
     node.accept(elementResolver);
     node.accept(typeAnalyzer);
     _flowAnalysis?.assignmentExpression_afterRight(
-        leftLocalVariable,
-        right,
+        node, leftLocalVariable,
         operator == TokenType.QUESTION_QUESTION_EQ
             ? node.rightHandSide.staticType
             : node.staticType);
@@ -3386,10 +3439,12 @@ class ResolverVisitor extends ScopedVisitor {
       loopVariable?.accept(this);
       var elementType = typeAnalyzer.computeForEachElementType(
           iterable, node.awaitKeyword != null);
-      if (loopVariable != null && elementType != null) {
+      if (loopVariable != null &&
+          elementType != null &&
+          loopVariable.type == null) {
         var loopVariableElement =
             loopVariable.declaredElement as LocalVariableElementImpl;
-        loopVariableElement.type ??= elementType;
+        loopVariableElement.type = elementType;
       }
       _flowAnalysis?.flow?.forEach_bodyBegin(
           node,
@@ -3473,10 +3528,12 @@ class ResolverVisitor extends ScopedVisitor {
       loopVariable?.accept(this);
       var elementType = typeAnalyzer.computeForEachElementType(
           iterable, node.awaitKeyword != null);
-      if (loopVariable != null && elementType != null) {
+      if (loopVariable != null &&
+          elementType != null &&
+          loopVariable.type == null) {
         var loopVariableElement =
             loopVariable.declaredElement as LocalVariableElementImpl;
-        loopVariableElement.type ??= elementType;
+        loopVariableElement.type = elementType;
       }
 
       _flowAnalysis?.flow?.forEach_bodyBegin(
@@ -3837,8 +3894,18 @@ class ResolverVisitor extends ScopedVisitor {
   void visitPostfixExpression(PostfixExpression node) {
     super.visitPostfixExpression(node);
 
-    if (node.operator.type == TokenType.BANG) {
+    var operator = node.operator.type;
+    if (operator == TokenType.BANG) {
       _flowAnalysis?.flow?.nonNullAssert_end(node.operand);
+    } else if (operator == TokenType.PLUS_PLUS ||
+        operator == TokenType.MINUS_MINUS) {
+      var operand = node.operand;
+      if (operand is SimpleIdentifier) {
+        var element = operand.staticElement;
+        if (element is PromotableElement) {
+          _flowAnalysis?.flow?.write(element);
+        }
+      }
     }
   }
 
@@ -3860,6 +3927,15 @@ class ResolverVisitor extends ScopedVisitor {
     var operator = node.operator.type;
     if (operator == TokenType.BANG) {
       _flowAnalysis?.flow?.logicalNot_end(node, node.operand);
+    } else if (operator == TokenType.PLUS_PLUS ||
+        operator == TokenType.MINUS_MINUS) {
+      var operand = node.operand;
+      if (operand is SimpleIdentifier) {
+        var element = operand.staticElement;
+        if (element is PromotableElement) {
+          _flowAnalysis?.flow?.write(element);
+        }
+      }
     }
   }
 

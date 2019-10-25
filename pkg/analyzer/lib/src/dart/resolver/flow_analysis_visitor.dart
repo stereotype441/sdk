@@ -3,6 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
@@ -11,6 +12,27 @@ import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/generated/type_system.dart' show Dart2TypeSystem;
 import 'package:analyzer/src/generated/variable_type_provider.dart';
 import 'package:front_end/src/fasta/flow_analysis/flow_analysis.dart';
+
+/// Data gathered by flow analysis, retained for testing purposes.
+class FlowAnalysisDataForTesting {
+  /// The list of nodes, [Expression]s or [Statement]s, that cannot be reached,
+  /// for example because a previous statement always exits.
+  final List<AstNode> unreachableNodes = [];
+
+  /// The list of [FunctionBody]s that don't complete, for example because
+  /// there is a `return` statement at the end of the function body block.
+  final List<FunctionBody> functionBodiesThatDontComplete = [];
+
+  /// The list of [Expression]s representing variable accesses that occur before
+  /// the corresponding variable has been definitely assigned.
+  final List<AstNode> unassignedNodes = [];
+
+  /// For each top level or class level declaration, the assigned variables
+  /// information that was computed for it.
+  final Map<Declaration,
+          AssignedVariablesForTesting<AstNode, PromotableElement>>
+      assignedVariables = {};
+}
 
 /// The helper for performing flow analysis during resolution.
 ///
@@ -24,8 +46,8 @@ class FlowAnalysisHelper {
   /// Precomputed sets of potentially assigned variables.
   AssignedVariables<AstNode, PromotableElement> assignedVariables;
 
-  /// The result for post-resolution stages of analysis.
-  final FlowAnalysisResult result;
+  /// The result for post-resolution stages of analysis, for testing only.
+  final FlowAnalysisDataForTesting dataForTesting;
 
   /// The current flow, when resolving a function body, or `null` otherwise.
   FlowAnalysis<AstNode, Statement, Expression, PromotableElement, DartType>
@@ -33,10 +55,10 @@ class FlowAnalysisHelper {
 
   factory FlowAnalysisHelper(TypeSystem typeSystem, bool retainDataForTesting) {
     return FlowAnalysisHelper._(TypeSystemTypeOperations(typeSystem),
-        retainDataForTesting ? FlowAnalysisResult() : null);
+        retainDataForTesting ? FlowAnalysisDataForTesting() : null);
   }
 
-  FlowAnalysisHelper._(this._typeOperations, this.result);
+  FlowAnalysisHelper._(this._typeOperations, this.dataForTesting);
 
   LocalVariableTypeProvider get localVariableTypeProvider {
     return _LocalVariableTypeProvider(this);
@@ -54,6 +76,10 @@ class FlowAnalysisHelper {
   VariableElement assignmentExpression(AssignmentExpression node) {
     if (flow == null) return null;
 
+    if (node.operator.type == TokenType.QUESTION_QUESTION_EQ) {
+      flow.ifNullExpression_rightBegin();
+    }
+
     var left = node.leftHandSide;
 
     if (left is SimpleIdentifier) {
@@ -67,10 +93,14 @@ class FlowAnalysisHelper {
   }
 
   void assignmentExpression_afterRight(
-      VariableElement localElement, Expression right, DartType writtenType) {
-    if (localElement == null) return;
+      AssignmentExpression node, VariableElement localElement, DartType writtenType) {
+    if (localElement != null) {
+      flow.write(localElement, writtenType);
+    }
 
-    flow.write(localElement, writtenType);
+    if (node.operator.type == TokenType.QUESTION_QUESTION_EQ) {
+      flow.ifNullExpression_end();
+    }
   }
 
   void breakStatement(BreakStatement node) {
@@ -84,8 +114,8 @@ class FlowAnalysisHelper {
     if (flow == null) return;
     if (flow.isReachable) return;
 
-    if (result != null) {
-      result.unreachableNodes.add(node);
+    if (dataForTesting != null) {
+      dataForTesting.unreachableNodes.add(node);
     }
   }
 
@@ -112,7 +142,7 @@ class FlowAnalysisHelper {
       flow.functionExpression_end();
     }
     if (!flow.isReachable) {
-      result?.functionBodiesThatDontComplete?.add(body);
+      dataForTesting?.functionBodiesThatDontComplete?.add(body);
     }
   }
 
@@ -150,7 +180,7 @@ class FlowAnalysisHelper {
       if (typeSystem.isPotentiallyNonNullable(element.type)) {
         var isUnassigned = !flow.isAssigned(element);
         if (isUnassigned) {
-          result?.unassignedNodes?.add(node);
+          dataForTesting?.unassignedNodes?.add(node);
         }
         // Note: in principle we could make this slightly more performant by
         // checking element.isLate earlier, but we would lose the ability to
@@ -169,7 +199,11 @@ class FlowAnalysisHelper {
       Declaration node, FormalParameterList parameters, FunctionBody body) {
     assert(node != null);
     assert(flow == null);
-    assignedVariables = computeAssignedVariables(node, parameters);
+    assignedVariables = computeAssignedVariables(node, parameters,
+        retainDataForTesting: dataForTesting != null);
+    if (dataForTesting != null) {
+      dataForTesting.assignedVariables[node] = assignedVariables;
+    }
     flow = FlowAnalysis<AstNode, Statement, Expression, PromotableElement,
         DartType>(_typeOperations, assignedVariables);
   }
@@ -199,8 +233,12 @@ class FlowAnalysisHelper {
 
   /// Computes the [AssignedVariables] map for the given [node].
   static AssignedVariables<AstNode, PromotableElement> computeAssignedVariables(
-      Declaration node, FormalParameterList parameters) {
-    var assignedVariables = AssignedVariables<AstNode, PromotableElement>();
+      Declaration node, FormalParameterList parameters,
+      {bool retainDataForTesting = false}) {
+    AssignedVariables<AstNode, PromotableElement> assignedVariables =
+        retainDataForTesting
+            ? AssignedVariablesForTesting()
+            : AssignedVariables();
     var assignedVariablesVisitor = _AssignedVariablesVisitor(assignedVariables);
     assignedVariablesVisitor._declareParameters(parameters);
     node.visitChildren(assignedVariablesVisitor);
@@ -241,21 +279,6 @@ class FlowAnalysisHelper {
     }
     return null;
   }
-}
-
-/// The result of performing flow analysis on a unit.
-class FlowAnalysisResult {
-  /// The list of nodes, [Expression]s or [Statement]s, that cannot be reached,
-  /// for example because a previous statement always exits.
-  final List<AstNode> unreachableNodes = [];
-
-  /// The list of [FunctionBody]s that don't complete, for example because
-  /// there is a `return` statement at the end of the function body block.
-  final List<FunctionBody> functionBodiesThatDontComplete = [];
-
-  /// The list of [Expression]s representing variable accesses that occur before
-  /// the corresponding variable has been definitely assigned.
-  final List<AstNode> unassignedNodes = [];
 }
 
 class TypeSystemTypeOperations
@@ -354,14 +377,18 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
     }
     assignedVariables.beginNode();
     _declareParameters(node.functionExpression.parameters);
-    // Note: we bypass this.visitFunctionExpression so that the function
-    // expression isn't mistaken for a closure.
-    super.visitFunctionExpression(node.functionExpression);
+    super.visitFunctionDeclaration(node);
     assignedVariables.endNode(node, isClosure: true);
   }
 
   @override
   void visitFunctionExpression(FunctionExpression node) {
+    if (node.parent is FunctionDeclaration) {
+      // A FunctionExpression just inside a FunctionDeclaration is an analyzer
+      // artifact--it doesn't correspond to a separate closure.  So skip our
+      // usual processing.
+      return super.visitFunctionExpression(node);
+    }
     assignedVariables.beginNode();
     _declareParameters(node.parameters);
     super.visitFunctionExpression(node);
@@ -371,6 +398,36 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
   @override
   void visitMethodDeclaration(MethodDeclaration node) {
     throw StateError('Should not visit top level declarations');
+  }
+
+  @override
+  void visitPostfixExpression(PostfixExpression node) {
+    super.visitPostfixExpression(node);
+    var operator = node.operator.type;
+    if (operator == TokenType.PLUS_PLUS || operator == TokenType.MINUS_MINUS) {
+      var operand = node.operand;
+      if (operand is SimpleIdentifier) {
+        var element = operand.staticElement;
+        if (element is PromotableElement) {
+          assignedVariables.write(element);
+        }
+      }
+    }
+  }
+
+  @override
+  void visitPrefixExpression(PrefixExpression node) {
+    super.visitPrefixExpression(node);
+    var operator = node.operator.type;
+    if (operator == TokenType.PLUS_PLUS || operator == TokenType.MINUS_MINUS) {
+      var operand = node.operand;
+      if (operand is SimpleIdentifier) {
+        var element = operand.staticElement;
+        if (element is PromotableElement) {
+          assignedVariables.write(element);
+        }
+      }
+    }
   }
 
   @override

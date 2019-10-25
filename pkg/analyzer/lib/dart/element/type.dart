@@ -133,6 +133,9 @@ abstract class DartType {
   ///
   /// Note too that the current implementation of this method is only guaranteed
   /// to work when the parameter types are type variables.
+  @Deprecated("""
+Use ClassElement.instantiate() or FunctionTypeAliasElement.instantiate()
+""")
   DartType substitute2(
       List<DartType> argumentTypes, List<DartType> parameterTypes);
 }
@@ -201,6 +204,7 @@ abstract class FunctionType implements ParameterizedType {
   @override
   FunctionType instantiate(List<DartType> argumentTypes);
 
+  @Deprecated("Use FunctionTypeAliasElement.instantiate()")
   @override
   FunctionType substitute2(
       List<DartType> argumentTypes, List<DartType> parameterTypes);
@@ -270,6 +274,7 @@ abstract class InterfaceType implements ParameterizedType {
   /// with the given name.
   PropertyAccessorElement getSetter(String name);
 
+  @Deprecated("Use ClassElement.instantiate()")
   @override
   InterfaceType instantiate(List<DartType> argumentTypes);
 
@@ -433,6 +438,7 @@ abstract class InterfaceType implements ParameterizedType {
   PropertyAccessorElement lookUpSetterInSuperclass(
       String name, LibraryElement library);
 
+  @Deprecated("Use ClassElement.instantiate()")
   @override
   InterfaceType substitute2(
       List<DartType> argumentTypes, List<DartType> parameterTypes);
@@ -482,6 +488,7 @@ abstract class ParameterizedType implements DartType {
 
   /// Return the type resulting from instantiating (replacing) the given
   /// [argumentTypes] for this type's bound type parameters.
+  @Deprecated("Use ClassElement.instantiate()")
   ParameterizedType instantiate(List<DartType> argumentTypes);
 }
 
