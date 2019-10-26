@@ -311,6 +311,37 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
 
     try {
       super.visitFieldDeclaration(node);
+      for (var field in node.fields.variables) {
+        ExecutableElement getOverriddenPropertyAccessor() {
+          final element = field.declaredElement;
+          if (element is PropertyAccessorElement || element is FieldElement) {
+            Name name = new Name(_currentLibrary.source.uri, element.name);
+            Element enclosingElement = element.enclosingElement;
+            if (enclosingElement is ClassElement) {
+              InterfaceType classType = enclosingElement.thisType;
+              var overridden = _inheritanceManager.getMember(classType, name,
+                  forSuper: true);
+              // Check for a setter.
+              if (overridden == null) {
+                Name setterName =
+                    new Name(_currentLibrary.source.uri, '${element.name}=');
+                overridden = _inheritanceManager
+                    .getMember(classType, setterName, forSuper: true);
+              }
+              return overridden;
+            }
+          }
+          return null;
+        }
+
+        final overriddenElement = getOverriddenPropertyAccessor();
+        if (overriddenElement?.hasNonVirtual == true) {
+          _errorReporter.reportErrorForNode(
+              HintCode.INVALID_OVERRIDE_OF_NON_VIRTUAL_MEMBER,
+              field.name,
+              [field.name, overriddenElement.enclosingElement.name]);
+        }
+      }
     } finally {
       _inDeprecatedMember = wasInDeprecatedMember;
     }
@@ -440,17 +471,24 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
   void visitMethodDeclaration(MethodDeclaration node) {
     bool wasInDeprecatedMember = _inDeprecatedMember;
     ExecutableElement element = node.declaredElement;
-    bool elementIsOverride() {
-      if (element is ClassMemberElement) {
-        Name name = new Name(_currentLibrary.source.uri, element.name);
-        Element enclosingElement = element.enclosingElement;
-        if (enclosingElement is ClassElement) {
-          InterfaceType classType = enclosingElement.thisType;
-          return _inheritanceManager.getOverridden(classType, name) != null;
-        }
-      }
-      return false;
-    }
+    Element enclosingElement = element?.enclosingElement;
+
+    InterfaceType classType =
+        enclosingElement is ClassElement ? enclosingElement.thisType : null;
+    Name name = Name(_currentLibrary.source.uri, element?.name ?? '');
+
+    bool elementIsOverride() =>
+        element is ClassMemberElement && enclosingElement != null
+            ? _inheritanceManager.getOverridden(classType, name) != null
+            : false;
+    ExecutableElement getConcreteOverriddenElement() =>
+        element is ClassMemberElement && enclosingElement != null
+            ? _inheritanceManager.getMember(classType, name, forSuper: true)
+            : null;
+    ExecutableElement getOverriddenPropertyAccessor() =>
+        element is PropertyAccessorElement && enclosingElement != null
+            ? _inheritanceManager.getMember(classType, name, forSuper: true)
+            : null;
 
     if (element != null && element.hasDeprecated) {
       _inDeprecatedMember = true;
@@ -460,10 +498,24 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
       //checkForOverridingPrivateMember(node);
       _checkForMissingReturn(node.returnType, node.body, element, node);
       _checkForUnnecessaryNoSuchMethod(node);
+
       if (_strictInference && !node.isSetter && !elementIsOverride()) {
         _checkStrictInferenceReturnType(node.returnType, node, node.name.name);
       }
       _checkStrictInferenceInParameters(node.parameters);
+
+      ExecutableElement overriddenElement = getConcreteOverriddenElement();
+      if (overriddenElement == null && (node.isSetter || node.isGetter)) {
+        overriddenElement = getOverriddenPropertyAccessor();
+      }
+
+      if (overriddenElement?.hasNonVirtual == true) {
+        _errorReporter.reportErrorForNode(
+            HintCode.INVALID_OVERRIDE_OF_NON_VIRTUAL_MEMBER,
+            node.name,
+            [node.name, overriddenElement.enclosingElement.name]);
+      }
+
       super.visitMethodDeclaration(node);
     } finally {
       _inDeprecatedMember = wasInDeprecatedMember;
@@ -2622,6 +2674,9 @@ class ResolverVisitor extends ScopedVisitor {
   /// or `null` if not in a [SwitchStatement].
   DartType _enclosingSwitchStatementExpressionType;
 
+  InterfaceType _iterableForSetMapDisambiguationCached;
+  InterfaceType _mapForSetMapDisambiguationCached;
+
   /// Initialize a newly created visitor to resolve the nodes in an AST node.
   ///
   /// The [definingLibrary] is the element for the library containing the node
@@ -2712,6 +2767,31 @@ class ResolverVisitor extends ScopedVisitor {
     return _nonNullableEnabled
         ? NullabilitySuffix.none
         : NullabilitySuffix.star;
+  }
+
+  InterfaceType get _iterableForSetMapDisambiguation {
+    return _iterableForSetMapDisambiguationCached ??=
+        typeProvider.iterableElement.instantiate(
+      typeArguments: [
+        typeProvider.dynamicType,
+      ],
+      nullabilitySuffix: _nonNullableEnabled
+          ? NullabilitySuffix.question
+          : NullabilitySuffix.star,
+    );
+  }
+
+  InterfaceType get _mapForSetMapDisambiguation {
+    return _mapForSetMapDisambiguationCached ??=
+        typeProvider.mapElement.instantiate(
+      typeArguments: [
+        typeProvider.dynamicType,
+        typeProvider.dynamicType,
+      ],
+      nullabilitySuffix: _nonNullableEnabled
+          ? NullabilitySuffix.question
+          : NullabilitySuffix.star,
+    );
   }
 
   /**
@@ -3365,8 +3445,7 @@ class ResolverVisitor extends ScopedVisitor {
     // Continue the extension resolution.
     //
     try {
-      DartType extendedType = node.declaredElement.extendedType;
-      typeAnalyzer.thisType = typeSystem.resolveToBound(extendedType);
+      typeAnalyzer.thisType = node.declaredElement.extendedType;
       super.visitExtensionDeclaration(node);
       node.accept(elementResolver);
       node.accept(typeAnalyzer);
@@ -4396,9 +4475,9 @@ class ResolverVisitor extends ScopedVisitor {
       // TODO(brianwilkerson) Find out what the "greatest closure" is and use that
       // where [unwrappedContextType] is used below.
       bool isIterable = typeSystem.isSubtypeOf(
-          unwrappedContextType, typeProvider.iterableObjectType);
+          unwrappedContextType, _iterableForSetMapDisambiguation);
       bool isMap = typeSystem.isSubtypeOf(
-          unwrappedContextType, typeProvider.mapObjectObjectType);
+          unwrappedContextType, _mapForSetMapDisambiguation);
       if (isIterable && !isMap) {
         return _LiteralResolution(
             _LiteralResolutionKind.set, unwrappedContextType);
@@ -5845,7 +5924,7 @@ class TypeNameResolver {
         }
       }
       if (element is GenericTypeAliasElementImpl) {
-        type = element.instantiate2(
+        type = element.instantiate(
           typeArguments: typeArguments,
           nullabilitySuffix: _getNullability(node.question != null),
         );
@@ -5861,7 +5940,7 @@ class TypeNameResolver {
         var typeArguments = typeSystem.instantiateTypeFormalsToBounds(
           element.typeParameters,
         );
-        type = element.instantiate2(
+        type = element.instantiate(
           typeArguments: typeArguments,
           nullabilitySuffix: _getNullability(node.question != null),
         );

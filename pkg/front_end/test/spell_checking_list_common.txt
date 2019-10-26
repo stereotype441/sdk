@@ -650,6 +650,7 @@ crossed
 curly
 current
 currently
+curried
 custom
 customize
 cyan
@@ -1299,6 +1300,7 @@ identifiers
 identify
 identity
 if
+ignorant
 ignore
 ignored
 ignores
@@ -1854,6 +1856,7 @@ numeric
 object
 object's
 objects
+oblivious
 observation
 observed
 obtain
@@ -2506,6 +2509,7 @@ shortcut
 shorten
 shortened
 shorting
+shorts
 should
 shouldn't
 show
@@ -2955,6 +2959,7 @@ unsatisfied
 unserializable
 unsigned
 unsized
+unskip
 unsorted
 unspecified
 unsplit

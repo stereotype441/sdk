@@ -113,16 +113,18 @@ class FunctionTypeTest with ElementsTypesMixin {
       );
 
   test_synthetic() {
-    FunctionType f = new FunctionTypeImpl.synthetic(dynamicType, [], []);
+    FunctionType f = new FunctionTypeImpl.synthetic(dynamicType, [], [],
+        nullabilitySuffix: NullabilitySuffix.star);
     basicChecks(f, element: isNull);
   }
 
   test_synthetic_instantiate() {
     // T Function<T>(T x)
     var t = typeParameter('T');
-    var x = requiredParameter('x', type: typeParameterType(t));
-    FunctionType f =
-        new FunctionTypeImpl.synthetic(typeParameterType(t), [t], [x]);
+    var x = requiredParameter(name: 'x', type: typeParameterType(t));
+    FunctionType f = new FunctionTypeImpl.synthetic(
+        typeParameterType(t), [t], [x],
+        nullabilitySuffix: NullabilitySuffix.star);
     FunctionType instantiated = f.instantiate([objectType]);
     basicChecks(instantiated,
         element: isNull,
@@ -136,21 +138,24 @@ class FunctionTypeTest with ElementsTypesMixin {
   test_synthetic_instantiate_argument_length_mismatch() {
     // dynamic Function<T>()
     var t = typeParameter('T');
-    FunctionType f = new FunctionTypeImpl.synthetic(dynamicType, [t], []);
+    FunctionType f = new FunctionTypeImpl.synthetic(dynamicType, [t], [],
+        nullabilitySuffix: NullabilitySuffix.star);
     expect(() => f.instantiate([]), throwsA(new TypeMatcher<ArgumentError>()));
   }
 
   test_synthetic_instantiate_no_type_formals() {
-    FunctionType f = new FunctionTypeImpl.synthetic(dynamicType, [], []);
+    FunctionType f = new FunctionTypeImpl.synthetic(dynamicType, [], [],
+        nullabilitySuffix: NullabilitySuffix.star);
     expect(f.instantiate([]), same(f));
   }
 
   test_synthetic_instantiate_share_parameters() {
     // T Function<T>(int x)
     var t = typeParameter('T');
-    var x = requiredParameter('x', type: intType);
-    FunctionType f =
-        new FunctionTypeImpl.synthetic(typeParameterType(t), [t], [x]);
+    var x = requiredParameter(name: 'x', type: intType);
+    FunctionType f = new FunctionTypeImpl.synthetic(
+        typeParameterType(t), [t], [x],
+        nullabilitySuffix: NullabilitySuffix.star);
     FunctionType instantiated = f.instantiate([objectType]);
     basicChecks(instantiated,
         element: isNull,
@@ -162,8 +167,9 @@ class FunctionTypeTest with ElementsTypesMixin {
   }
 
   test_synthetic_namedParameter() {
-    var p = namedParameter('x', type: objectType);
-    FunctionType f = new FunctionTypeImpl.synthetic(dynamicType, [], [p]);
+    var p = namedParameter(name: 'x', type: objectType);
+    FunctionType f = new FunctionTypeImpl.synthetic(dynamicType, [], [p],
+        nullabilitySuffix: NullabilitySuffix.star);
     basicChecks(f,
         element: isNull,
         displayName: 'dynamic Function({x: Object})',
@@ -175,8 +181,9 @@ class FunctionTypeTest with ElementsTypesMixin {
   }
 
   test_synthetic_normalParameter() {
-    var p = requiredParameter('x', type: objectType);
-    FunctionType f = new FunctionTypeImpl.synthetic(dynamicType, [], [p]);
+    var p = requiredParameter(name: 'x', type: objectType);
+    FunctionType f = new FunctionTypeImpl.synthetic(dynamicType, [], [p],
+        nullabilitySuffix: NullabilitySuffix.star);
     basicChecks(f,
         element: isNull,
         displayName: 'dynamic Function(Object)',
@@ -189,8 +196,9 @@ class FunctionTypeTest with ElementsTypesMixin {
   }
 
   test_synthetic_optionalParameter() {
-    var p = positionalParameter('x', type: objectType);
-    FunctionType f = new FunctionTypeImpl.synthetic(dynamicType, [], [p]);
+    var p = positionalParameter(name: 'x', type: objectType);
+    FunctionType f = new FunctionTypeImpl.synthetic(dynamicType, [], [p],
+        nullabilitySuffix: NullabilitySuffix.star);
     basicChecks(f,
         element: isNull,
         displayName: 'dynamic Function([Object])',
@@ -203,7 +211,8 @@ class FunctionTypeTest with ElementsTypesMixin {
   }
 
   test_synthetic_returnType() {
-    FunctionType f = new FunctionTypeImpl.synthetic(objectType, [], []);
+    FunctionType f = new FunctionTypeImpl.synthetic(objectType, [], [],
+        nullabilitySuffix: NullabilitySuffix.star);
     basicChecks(f,
         element: isNull,
         displayName: 'Object Function()',
@@ -215,10 +224,11 @@ class FunctionTypeTest with ElementsTypesMixin {
     // Map<T, U> Function<U extends T>(T x, U y)
     var t = typeParameter('T');
     var u = typeParameter('U', bound: typeParameterType(t));
-    var x = requiredParameter('x', type: typeParameterType(t));
-    var y = requiredParameter('y', type: typeParameterType(u));
+    var x = requiredParameter(name: 'x', type: typeParameterType(t));
+    var y = requiredParameter(name: 'y', type: typeParameterType(u));
     FunctionType f = new FunctionTypeImpl.synthetic(
-        mapOf(typeParameterType(t), typeParameterType(u)), [u], [x, y]);
+        mapOf(typeParameterType(t), typeParameterType(u)), [u], [x, y],
+        nullabilitySuffix: NullabilitySuffix.star);
     FunctionType substituted =
         f.substitute2([objectType], [typeParameterType(t)]);
     var uSubstituted = substituted.typeFormals[0];
@@ -239,7 +249,8 @@ class FunctionTypeTest with ElementsTypesMixin {
   test_synthetic_substitute_argument_length_mismatch() {
     // dynamic Function()
     var t = typeParameter('T');
-    FunctionType f = new FunctionTypeImpl.synthetic(dynamicType, [], []);
+    FunctionType f = new FunctionTypeImpl.synthetic(dynamicType, [], [],
+        nullabilitySuffix: NullabilitySuffix.star);
     expect(() => f.substitute2([], [typeParameterType(t)]),
         throwsA(new TypeMatcher<ArgumentError>()));
   }
@@ -249,8 +260,9 @@ class FunctionTypeTest with ElementsTypesMixin {
     // dynamic Function<U>(U x)
     var t = typeParameter('T');
     var u = typeParameter('U');
-    var x = requiredParameter('x', type: typeParameterType(u));
-    FunctionType f = new FunctionTypeImpl.synthetic(dynamicType, [u], [x]);
+    var x = requiredParameter(name: 'x', type: typeParameterType(u));
+    FunctionType f = new FunctionTypeImpl.synthetic(dynamicType, [u], [x],
+        nullabilitySuffix: NullabilitySuffix.star);
     FunctionType substituted =
         f.substitute2([objectType], [typeParameterType(t)]);
     expect(substituted, same(f));
@@ -258,8 +270,9 @@ class FunctionTypeTest with ElementsTypesMixin {
 
   test_synthetic_typeFormals() {
     var t = typeParameter('T');
-    FunctionType f =
-        new FunctionTypeImpl.synthetic(typeParameterType(t), [t], []);
+    FunctionType f = new FunctionTypeImpl.synthetic(
+        typeParameterType(t), [t], [],
+        nullabilitySuffix: NullabilitySuffix.star);
     basicChecks(f,
         element: isNull,
         displayName: 'T Function<T>()',
