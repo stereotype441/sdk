@@ -1822,7 +1822,7 @@ main() {
         _Type.allowComparisons(() {
           expect(s2.variableInfo, {
             objectQVar: VariableModel([_Type('num?'), _Type('num')],
-                [_Type('num?'), _Type('num')], true, false)
+                [_Type('num?'), _Type('num'), _Type('int')], true, false)
           });
         });
       });
@@ -2256,8 +2256,11 @@ main() {
           x: model([intType])
         };
         var p2 = {x: model(null)};
-        expect(FlowModel.joinVariableInfo(h, p1, p2), same(p2));
-        expect(FlowModel.joinVariableInfo(h, p2, p1), same(p2));
+        var expected = {x: model(null, [intType])};
+        _Type.allowComparisons(() {
+          expect(FlowModel.joinVariableInfo(h, p1, p2), expected);
+          expect(FlowModel.joinVariableInfo(h, p2, p1), expected);
+        });
       });
 
       test('related type chains', () {
