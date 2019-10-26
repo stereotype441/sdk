@@ -1726,7 +1726,7 @@ class VariableModel<Type> {
   static List<Type> _addTypeToUniqueList<Type>(List<Type> types, Type newType,
       TypeOperations<Object, Type> typeOperations) {
     if (_typeListContains(typeOperations, types, newType)) return types;
-    return types.toList()..add(newType);
+    return new List<Type>.from(types)..add(newType);
   }
 
   /// Creates a new [VariableModel] object, unless it is equivalent to either
