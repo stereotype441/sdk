@@ -545,6 +545,9 @@ abstract class Element implements AnalysisTarget {
   /// Return  `true` if this element has an annotation of the form `@mustCallSuper`.
   bool get hasMustCallSuper;
 
+  /// Return  `true` if this element has an annotation of the form `@nonVirtual`.
+  bool get hasNonVirtual;
+
   /// Return `true` if this element has an annotation of the form
   /// `@optionalTypeArgs`.
   bool get hasOptionalTypeArgs;
@@ -1114,6 +1117,20 @@ abstract class FunctionTypeAliasElement
   /// generic function, with type formals. For example, if the typedef is:
   ///     typedef F<T> = void Function<U>(T, U);
   /// then `F<int>` will produce `void Function<U>(int, U)`.
+  FunctionType instantiate({
+    @required List<DartType> typeArguments,
+    @required NullabilitySuffix nullabilitySuffix,
+  });
+
+  /// Produces the function type resulting from instantiating this typedef with
+  /// the given [typeArguments] and [nullabilitySuffix].
+  ///
+  /// Note that this always instantiates the typedef itself, so for a
+  /// [GenericTypeAliasElement] the returned [FunctionType] might still be a
+  /// generic function, with type formals. For example, if the typedef is:
+  ///     typedef F<T> = void Function<U>(T, U);
+  /// then `F<int>` will produce `void Function<U>(int, U)`.
+  @Deprecated('Use instantiate() instead')
   FunctionType instantiate2({
     @required List<DartType> typeArguments,
     @required NullabilitySuffix nullabilitySuffix,

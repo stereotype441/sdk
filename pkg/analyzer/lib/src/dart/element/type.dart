@@ -16,6 +16,7 @@ import 'package:analyzer/src/generated/engine.dart'
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/type_system.dart';
 import 'package:analyzer/src/generated/utilities_dart.dart';
+import 'package:meta/meta.dart';
 
 /// Transforms the given [list] by applying [transform] to all its elements.
 ///
@@ -135,24 +136,6 @@ class BottomTypeImpl extends TypeImpl {
 }
 
 /**
- * Type created internally if a circular reference is ever detected.  Behaves
- * like `dynamic`, except that when converted to a string it is displayed as
- * `...`.
- */
-class CircularTypeImpl extends DynamicTypeImpl {
-  CircularTypeImpl() : super._circular();
-
-  @override
-  bool operator ==(Object object) => object is CircularTypeImpl;
-
-  @override
-  void appendTo(StringBuffer buffer, Set<TypeImpl> visitedTypes,
-      {bool withNullability = false}) {
-    buffer.write('...');
-  }
-}
-
-/**
  * The [Type] representing the type `dynamic`.
  */
 class DynamicTypeImpl extends TypeImpl {
@@ -165,11 +148,6 @@ class DynamicTypeImpl extends TypeImpl {
    * Prevent the creation of instances of this class.
    */
   DynamicTypeImpl._() : super(new DynamicElementImpl(), Keyword.DYNAMIC.lexeme);
-
-  /**
-   * Constructor used by [CircularTypeImpl].
-   */
-  DynamicTypeImpl._circular() : super(instance.element, Keyword.DYNAMIC.lexeme);
 
   @override
   int get hashCode => 1;
@@ -216,25 +194,31 @@ class DynamicTypeImpl extends TypeImpl {
 /**
  * The type of a function, method, constructor, getter, or setter.
  */
-abstract class FunctionTypeImpl extends TypeImpl implements FunctionType {
+class FunctionTypeImpl extends TypeImpl implements FunctionType {
+  @override
+  final DartType returnType;
+
+  @override
+  final List<TypeParameterElement> typeFormals;
+
+  @override
+  final List<ParameterElement> parameters;
+
+  @override
+  final List<DartType> typeArguments;
+
   @override
   final NullabilitySuffix nullabilitySuffix;
 
   /// Creates a function type that's not associated with any element in the
   /// element tree.
-  factory FunctionTypeImpl.synthetic(DartType returnType,
-      List<TypeParameterElement> typeFormals, List<ParameterElement> parameters,
+  FunctionTypeImpl.synthetic(this.returnType, this.typeFormals, this.parameters,
       {Element element,
-      List<DartType> typeArguments = const <DartType>[],
-      NullabilitySuffix nullabilitySuffix = NullabilitySuffix.star}) {
-    return new _FunctionTypeImplStrict._(returnType, typeFormals, parameters,
-        element: element,
-        typeArguments: typeArguments,
-        nullabilitySuffix: nullabilitySuffix);
-  }
-
-  FunctionTypeImpl._(Element element, String name, this.nullabilitySuffix)
-      : super(element, name);
+      List<DartType> typeArguments,
+      @required NullabilitySuffix nullabilitySuffix})
+      : typeArguments = typeArguments ?? const <DartType>[],
+        nullabilitySuffix = nullabilitySuffix,
+        super(element, null);
 
   @deprecated
   @override
@@ -285,7 +269,14 @@ abstract class FunctionTypeImpl extends TypeImpl implements FunctionType {
   }
 
   @override
-  FunctionTypedElement get element => super.element;
+  FunctionTypedElement get element {
+    var element = super.element;
+    // TODO(scheglov) Can we just construct it with the right element?
+    if (element is GenericTypeAliasElement) {
+      return element.function;
+    }
+    return element;
+  }
 
   @override
   int get hashCode {
@@ -310,11 +301,6 @@ abstract class FunctionTypeImpl extends TypeImpl implements FunctionType {
     return code;
   }
 
-  /**
-   * Return `true` if this type is the result of instantiating type parameters.
-   */
-  bool get isInstantiated;
-
   @override
   Map<String, DartType> get namedParameterTypes {
     // TODO(brianwilkerson) This implementation breaks the contract because the
@@ -331,6 +317,12 @@ abstract class FunctionTypeImpl extends TypeImpl implements FunctionType {
   }
 
   @override
+  List<String> get normalParameterNames => parameters
+      .where((p) => p.isRequiredPositional)
+      .map((p) => p.name)
+      .toList();
+
+  @override
   List<DartType> get normalParameterTypes {
     List<DartType> types = <DartType>[];
     _forEachParameterType(ParameterKind.REQUIRED, (name, type) {
@@ -340,6 +332,12 @@ abstract class FunctionTypeImpl extends TypeImpl implements FunctionType {
   }
 
   @override
+  List<String> get optionalParameterNames => parameters
+      .where((p) => p.isOptionalPositional)
+      .map((p) => p.name)
+      .toList();
+
+  @override
   List<DartType> get optionalParameterTypes {
     List<DartType> types = <DartType>[];
     _forEachParameterType(ParameterKind.POSITIONAL, (name, type) {
@@ -347,6 +345,9 @@ abstract class FunctionTypeImpl extends TypeImpl implements FunctionType {
     });
     return types;
   }
+
+  @override
+  List<TypeParameterElement> get typeParameters => const [] /*TODO(paulberry)*/;
 
   @override
   bool operator ==(Object object) {
@@ -428,7 +429,8 @@ abstract class FunctionTypeImpl extends TypeImpl implements FunctionType {
             TypeImpl renamed =
                 Substitution.fromPairs(variables, instantiateTypeArgs)
                     .substituteType(e.bound);
-            renamed.appendTo(typeParametersBuffer, visitedTypes);
+            renamed.appendTo(typeParametersBuffer, visitedTypes,
+                withNullability: withNullability);
           }
         }
         typeParametersBuffer.write('>');
@@ -449,7 +451,34 @@ abstract class FunctionTypeImpl extends TypeImpl implements FunctionType {
   }
 
   @override
-  FunctionTypeImpl instantiate(List<DartType> argumentTypes);
+  FunctionTypeImpl instantiate(List<DartType> argumentTypes) {
+    if (argumentTypes.length != typeFormals.length) {
+      throw new ArgumentError(
+          "argumentTypes.length (${argumentTypes.length}) != "
+          "typeFormals.length (${typeFormals.length})");
+    }
+    if (argumentTypes.isEmpty) {
+      return this;
+    }
+
+    var substitution = Substitution.fromPairs(typeFormals, argumentTypes);
+
+    ParameterElement transformParameter(ParameterElement p) {
+      var type = p.type;
+      var newType = substitution.substituteType(type);
+      if (identical(newType, type)) return p;
+      return new ParameterElementImpl.synthetic(
+          p.name,
+          newType,
+          // ignore: deprecated_member_use_from_same_package
+          p.parameterKind)
+        ..isExplicitlyCovariant = p.isCovariant;
+    }
+
+    return FunctionTypeImpl.synthetic(substitution.substituteType(returnType),
+        const [], _transformOrShare(parameters, transformParameter),
+        nullabilitySuffix: nullabilitySuffix);
+  }
 
   @override
   DartType replaceTopAndBottom(TypeProvider typeProvider,
@@ -473,19 +502,40 @@ abstract class FunctionTypeImpl extends TypeImpl implements FunctionType {
         identical(parameters, this.parameters)) {
       return this;
     }
-    return new _FunctionTypeImplStrict._(returnType, typeFormals, parameters,
+    return FunctionTypeImpl.synthetic(returnType, typeFormals, parameters,
         nullabilitySuffix: nullabilitySuffix);
   }
 
   @override
   @deprecated
   FunctionType substitute2(
-      List<DartType> argumentTypes, List<DartType> parameterTypes);
+      List<DartType> argumentTypes, List<DartType> parameterTypes) {
+    if (argumentTypes.length != parameterTypes.length) {
+      throw new ArgumentError(
+          "argumentTypes.length (${argumentTypes.length}) != "
+          "parameterTypes.length (${parameterTypes.length})");
+    }
+
+    var substitution = Substitution.fromPairs(
+      parameterTypes.map<TypeParameterElement>((t) => t.element).toList(),
+      argumentTypes,
+    );
+    return substitution.substituteType(this);
+  }
 
   @override
   @deprecated
   FunctionTypeImpl substitute3(List<DartType> argumentTypes) =>
       substitute2(argumentTypes, typeArguments);
+
+  @override
+  TypeImpl withNullability(NullabilitySuffix nullabilitySuffix) {
+    if (this.nullabilitySuffix == nullabilitySuffix) return this;
+    return FunctionTypeImpl.synthetic(returnType, typeFormals, parameters,
+        element: element,
+        typeArguments: typeArguments,
+        nullabilitySuffix: nullabilitySuffix);
+  }
 
   void _appendToWithTypeParameters(StringBuffer buffer,
       Set<TypeImpl> visitedTypes, bool withNullability, String typeParameters) {
@@ -557,12 +607,15 @@ abstract class FunctionTypeImpl extends TypeImpl implements FunctionType {
     }
   }
 
-  /**
-   * Invokes [callback] for each parameter of [kind] with the parameter's [name]
-   * and type after any type parameters have been applied.
-   */
   void _forEachParameterType(
-      ParameterKind kind, callback(String name, DartType type));
+      ParameterKind kind, Function(String name, DartType type) callback) {
+    for (var parameter in parameters) {
+      // ignore: deprecated_member_use_from_same_package
+      if (parameter.parameterKind == kind) {
+        callback(parameter.name, parameter.type);
+      }
+    }
+  }
 
   void _freeVariablesInFunctionType(
       FunctionType type, Set<TypeParameterType> free) {
@@ -870,11 +923,6 @@ class InterfaceTypeImpl extends TypeImpl implements InterfaceType {
   List<DartType> _typeArguments = const <DartType>[];
 
   /**
-   * The version of [element] for which members are cached.
-   */
-  int _versionOfCachedMembers;
-
-  /**
    * Cached [ConstructorElement]s - members or raw elements.
    */
   List<ConstructorElement> _constructors;
@@ -915,7 +963,6 @@ class InterfaceTypeImpl extends TypeImpl implements InterfaceType {
 
   @override
   List<PropertyAccessorElement> get accessors {
-    _flushCachedMembersIfStale();
     if (_accessors == null) {
       List<PropertyAccessorElement> accessors = element.accessors;
       List<PropertyAccessorElement> members =
@@ -930,7 +977,6 @@ class InterfaceTypeImpl extends TypeImpl implements InterfaceType {
 
   @override
   List<ConstructorElement> get constructors {
-    _flushCachedMembersIfStale();
     if (_constructors == null) {
       List<ConstructorElement> constructors = element.constructors;
       List<ConstructorElement> members =
@@ -1124,7 +1170,6 @@ class InterfaceTypeImpl extends TypeImpl implements InterfaceType {
 
   @override
   List<MethodElement> get methods {
-    _flushCachedMembersIfStale();
     if (_methods == null) {
       List<MethodElement> methods = element.methods;
       List<MethodElement> members = new List<MethodElement>(methods.length);
@@ -1651,23 +1696,6 @@ class InterfaceTypeImpl extends TypeImpl implements InterfaceType {
       }
     }
     return null;
-  }
-
-  /**
-   * Flush cache members if the version of [element] for which members are
-   * cached and the current version of the [element].
-   */
-  void _flushCachedMembersIfStale() {
-    ClassElement element = this.element;
-    if (element is ClassElementImpl) {
-      int currentVersion = element.version;
-      if (_versionOfCachedMembers != currentVersion) {
-        _constructors = null;
-        _accessors = null;
-        _methods = null;
-      }
-      _versionOfCachedMembers = currentVersion;
-    }
   }
 
   List<InterfaceType> _instantiateSuperTypes(List<InterfaceType> defined) {
@@ -2289,126 +2317,5 @@ class VoidTypeImpl extends TypeImpl implements VoidType {
   TypeImpl withNullability(NullabilitySuffix nullabilitySuffix) {
     // The void type is always nullable.
     return this;
-  }
-}
-
-/// [FunctionTypeImpl] with all properties known at construction time.
-class _FunctionTypeImplStrict extends FunctionTypeImpl {
-  @override
-  final DartType returnType;
-
-  @override
-  final List<TypeParameterElement> typeFormals;
-
-  @override
-  final List<ParameterElement> parameters;
-
-  @override
-  final List<DartType> typeArguments;
-
-  _FunctionTypeImplStrict._(this.returnType, this.typeFormals, this.parameters,
-      {Element element,
-      List<DartType> typeArguments,
-      NullabilitySuffix nullabilitySuffix = NullabilitySuffix.star})
-      : typeArguments = typeArguments ?? const <DartType>[],
-        super._(element, null, nullabilitySuffix);
-
-  @override
-  List<TypeParameterElement> get boundTypeParameters => typeFormals;
-
-  @override
-  FunctionTypedElement get element {
-    var element = super.element;
-    if (element is GenericTypeAliasElement) {
-      return element.function;
-    }
-    return element;
-  }
-
-  @override
-  bool get isInstantiated => throw new UnimplementedError('TODO(paulberry)');
-
-  @override
-  List<String> get normalParameterNames => parameters
-      .where((p) => p.isRequiredPositional)
-      .map((p) => p.name)
-      .toList();
-
-  @override
-  List<String> get optionalParameterNames => parameters
-      .where((p) => p.isOptionalPositional)
-      .map((p) => p.name)
-      .toList();
-
-  @override
-  List<TypeParameterElement> get typeParameters => const [] /*TODO(paulberry)*/;
-
-  @override
-  FunctionTypeImpl instantiate(List<DartType> argumentTypes) {
-    if (argumentTypes.length != typeFormals.length) {
-      throw new ArgumentError(
-          "argumentTypes.length (${argumentTypes.length}) != "
-          "typeFormals.length (${typeFormals.length})");
-    }
-    if (argumentTypes.isEmpty) {
-      return this;
-    }
-
-    var substitution = Substitution.fromPairs(typeFormals, argumentTypes);
-
-    ParameterElement transformParameter(ParameterElement p) {
-      var type = p.type;
-      var newType = substitution.substituteType(type);
-      if (identical(newType, type)) return p;
-      return new ParameterElementImpl.synthetic(
-          p.name,
-          newType,
-          // ignore: deprecated_member_use_from_same_package
-          p.parameterKind)
-        ..isExplicitlyCovariant = p.isCovariant;
-    }
-
-    return new _FunctionTypeImplStrict._(
-        substitution.substituteType(returnType),
-        const [],
-        _transformOrShare(parameters, transformParameter),
-        nullabilitySuffix: nullabilitySuffix);
-  }
-
-  @override
-  @deprecated
-  FunctionType substitute2(
-      List<DartType> argumentTypes, List<DartType> parameterTypes) {
-    if (argumentTypes.length != parameterTypes.length) {
-      throw new ArgumentError(
-          "argumentTypes.length (${argumentTypes.length}) != "
-          "parameterTypes.length (${parameterTypes.length})");
-    }
-
-    var substitution = Substitution.fromPairs(
-      parameterTypes.map<TypeParameterElement>((t) => t.element).toList(),
-      argumentTypes,
-    );
-    return substitution.substituteType(this);
-  }
-
-  @override
-  TypeImpl withNullability(NullabilitySuffix nullabilitySuffix) {
-    if (this.nullabilitySuffix == nullabilitySuffix) return this;
-    return _FunctionTypeImplStrict._(returnType, typeFormals, parameters,
-        element: element,
-        typeArguments: typeArguments,
-        nullabilitySuffix: nullabilitySuffix);
-  }
-
-  @override
-  void _forEachParameterType(
-      ParameterKind kind, Function(String name, DartType type) callback) {
-    for (var parameter in parameters) {
-      // ignore: deprecated_member_use_from_same_package
-      if (parameter.parameterKind == kind) {
-        callback(parameter.name, parameter.type);
-      }
-    }
   }
 }

@@ -444,11 +444,6 @@ class ClassElementImpl extends AbstractClassElementImpl
   /// of this class have been inferred.
   bool _hasBeenInferred = false;
 
-  /// The version of this element. The version is changed when the element is
-  /// incrementally updated, so that its lists of constructors, accessors and
-  /// methods might be different.
-  int version = 0;
-
   /// This callback is set during mixins inference to handle reentrant calls.
   List<InterfaceType> Function(ClassElementImpl) linkedMixinInferenceCallback;
 
@@ -2853,6 +2848,18 @@ abstract class ElementImpl implements Element {
   }
 
   @override
+  bool get hasNonVirtual {
+    var metadata = this.metadata;
+    for (var i = 0; i < metadata.length; i++) {
+      var annotation = metadata[i];
+      if (annotation.isNonVirtual) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @override
   bool get hasOptionalTypeArgs {
     var metadata = this.metadata;
     for (var i = 0; i < metadata.length; i++) {
@@ -3566,9 +3573,6 @@ abstract class ExecutableElementImpl extends ElementImpl
   /// element.
   List<ParameterElement> _parameters;
 
-  /// The declared return type of this executable element.
-  DartType _declaredReturnType;
-
   /// The inferred return type of this executable element.
   DartType _returnType;
 
@@ -3607,10 +3611,6 @@ abstract class ExecutableElementImpl extends ElementImpl
       return linkedContext.getCodeOffset(linkedNode);
     }
     return super.codeOffset;
-  }
-
-  void set declaredReturnType(DartType returnType) {
-    _declaredReturnType = _checkElementOfType(returnType);
   }
 
   @override
@@ -3739,12 +3739,13 @@ abstract class ExecutableElementImpl extends ElementImpl
 
   @override
   DartType get returnType {
+    if (_returnType != null) return _returnType;
+
     if (linkedNode != null) {
-      if (_returnType != null) return _returnType;
       var context = enclosingUnit.linkedContext;
       return _returnType = context.getReturnType(linkedNode);
     }
-    return _returnType ?? _declaredReturnType;
+    return _returnType;
   }
 
   void set returnType(DartType returnType) {
@@ -4863,6 +4864,7 @@ class GenericTypeAliasElementImpl extends ElementImpl
           nullabilitySuffix: NullabilitySuffix.star,
         );
       }).toList(),
+      nullabilitySuffix: NullabilitySuffix.star,
     );
     return _type;
   }
@@ -4918,7 +4920,7 @@ class GenericTypeAliasElementImpl extends ElementImpl
   }
 
   @override
-  FunctionType instantiate2({
+  FunctionType instantiate({
     @required List<DartType> typeArguments,
     @required NullabilitySuffix nullabilitySuffix,
   }) {
@@ -4939,6 +4941,18 @@ class GenericTypeAliasElementImpl extends ElementImpl
       type.typeFormals,
       type.parameters,
       element: this,
+      typeArguments: typeArguments,
+      nullabilitySuffix: nullabilitySuffix,
+    );
+  }
+
+  @override
+  @deprecated
+  FunctionType instantiate2({
+    @required List<DartType> typeArguments,
+    @required NullabilitySuffix nullabilitySuffix,
+  }) {
+    return instantiate(
       typeArguments: typeArguments,
       nullabilitySuffix: nullabilitySuffix,
     );
@@ -6210,6 +6224,9 @@ class MultiplyDefinedElementImpl implements MultiplyDefinedElement {
   bool get hasMustCallSuper => false;
 
   @override
+  bool get hasNonVirtual => false;
+
+  @override
   bool get hasOptionalTypeArgs => false;
 
   @override
@@ -6431,7 +6448,8 @@ abstract class NonParameterVariableElementImpl extends VariableElementImpl {
         if (linkedContext.hasInitializer(linkedNode)) {
           _initializer = new FunctionElementImpl('', -1)
             ..isSynthetic = true
-            .._type = FunctionTypeImpl.synthetic(type, [], [])
+            .._type = FunctionTypeImpl.synthetic(type, [], [],
+                nullabilitySuffix: NullabilitySuffix.star)
             ..enclosingElement = this;
         }
       }
@@ -7163,6 +7181,9 @@ class PropertyAccessorElementImpl_ImplicitGetter
   bool get isGetter => true;
 
   @override
+  List<ElementAnnotation> get metadata => variable.metadata;
+
+  @override
   DartType get returnType => variable.type;
 
   @override
@@ -7213,6 +7234,9 @@ class PropertyAccessorElementImpl_ImplicitSetter
 
   @override
   bool get isSetter => true;
+
+  @override
+  List<ElementAnnotation> get metadata => variable.metadata;
 
   @override
   List<ParameterElement> get parameters {
