@@ -1678,32 +1678,32 @@ main() {
       test('unpromoted -> unchanged (same)', () {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true);
-        var s2 = s1.promote(h, intVar, _Type('int'));
+        var s2 = s1.tryPromote(h, intVar, _Type('int'), true);
         expect(s2, same(s1));
       });
 
       test('unpromoted -> unchanged (supertype)', () {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true);
-        var s2 = s1.promote(h, intVar, _Type('Object'));
+        var s2 = s1.tryPromote(h, intVar, _Type('Object'), true);
         expect(s2, same(s1));
       });
 
       test('unpromoted -> unchanged (unrelated)', () {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true);
-        var s2 = s1.promote(h, intVar, _Type('String'));
+        var s2 = s1.tryPromote(h, intVar, _Type('String'), true);
         expect(s2, same(s1));
       });
 
       test('unpromoted -> subtype', () {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true);
-        var s2 = s1.promote(h, intQVar, _Type('int'));
+        var s2 = s1.tryPromote(h, intQVar, _Type('int'), true);
         expect(s2.reachable, true);
         _Type.allowComparisons(() {
           expect(s2.variableInfo, {
-            intQVar: VariableModel<_Type>([_Type('int')], false, false)
+            intQVar: VariableModel<_Type>([_Type('int')], [_Type('int')], false, false)
           });
         });
       });
@@ -1711,31 +1711,31 @@ main() {
       test('promoted -> unchanged (same)', () {
         var h = _Harness();
         var s1 =
-            FlowModel<_Var, _Type>(true).promote(h, objectQVar, _Type('int'));
-        var s2 = s1.promote(h, objectQVar, _Type('int'));
+            FlowModel<_Var, _Type>(true).tryPromote(h, objectQVar, _Type('int'), true);
+        var s2 = s1.tryPromote(h, objectQVar, _Type('int'), true);
         expect(s2, same(s1));
       });
 
       test('promoted -> unchanged (supertype)', () {
         var h = _Harness();
         var s1 =
-            FlowModel<_Var, _Type>(true).promote(h, objectQVar, _Type('int'));
-        var s2 = s1.promote(h, objectQVar, _Type('Object'));
+            FlowModel<_Var, _Type>(true).tryPromote(h, objectQVar, _Type('int'), true);
+        var s2 = s1.tryPromote(h, objectQVar, _Type('Object'), true);
         expect(s2, same(s1));
       });
 
       test('promoted -> unchanged (unrelated)', () {
         var h = _Harness();
         var s1 =
-            FlowModel<_Var, _Type>(true).promote(h, objectQVar, _Type('int'));
-        var s2 = s1.promote(h, objectQVar, _Type('String'));
+            FlowModel<_Var, _Type>(true).tryPromote(h, objectQVar, _Type('int'), true);
+        var s2 = s1.tryPromote(h, objectQVar, _Type('String'), true);
         expect(s2, same(s1));
       });
 
       test('promoted -> subtype', () {
         var h = _Harness();
         var s1 =
-            FlowModel<_Var, _Type>(true).promote(h, objectQVar, _Type('int?'));
+            FlowModel<_Var, _Type>(true).tryPromote(h, objectQVar, _Type('int?'), true);
         var s2 = s1.promote(h, objectQVar, _Type('int'));
         expect(s2.reachable, true);
         _Type.allowComparisons(() {
