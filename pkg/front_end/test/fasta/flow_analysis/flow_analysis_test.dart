@@ -2277,8 +2277,8 @@ main() {
           x: model([intQType], [intQType, intType])
         };
         _Type.allowComparisons(() {
-          expect(FlowModel.joinVariableInfo(h, p1, p2), same(p2));
-          expect(FlowModel.joinVariableInfo(h, p2, p1), same(p2));
+          expect(FlowModel.joinVariableInfo(h, p1, p2), expected);
+          expect(FlowModel.joinVariableInfo(h, p2, p1), expected);
         });
       });
 
