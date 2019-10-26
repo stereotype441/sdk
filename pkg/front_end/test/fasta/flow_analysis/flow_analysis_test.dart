@@ -2205,8 +2205,10 @@ main() {
     var stringType = _Type('String');
     const emptyMap = <Null, VariableModel<Null>>{};
 
-    VariableModel<_Type> model(List<_Type> promotionChain) =>
-        VariableModel<_Type>(promotionChain, promotionChain, true, false);
+    VariableModel<_Type> model(List<_Type> promotionChain,
+            [List<_Type> typesOfInterest]) =>
+        VariableModel<_Type>(promotionChain,
+            typesOfInterest ?? promotionChain ?? [], true, false);
 
     group('without input reuse', () {
       test('promoted with unpromoted', () {
@@ -2219,8 +2221,12 @@ main() {
           x: model(null),
           y: model([intType])
         };
-        expect(FlowModel.joinVariableInfo(h, p1, p2),
-            {x: model(null), y: model(null)});
+        _Type.allowComparisons(() {
+          expect(FlowModel.joinVariableInfo(h, p1, p2), {
+            x: model(null, [intType]),
+            y: model(null, [intType])
+          });
+        });
       });
     });
     group('should re-use an input if possible', () {

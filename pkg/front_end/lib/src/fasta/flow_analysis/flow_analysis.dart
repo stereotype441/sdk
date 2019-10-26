@@ -1432,6 +1432,7 @@ class VariableModel<Type> {
     assert(promotionChain == null || promotionChain.isNotEmpty);
     assert(!writeCaptured || promotionChain == null,
         "Write-captured variables can't be promoted");
+    assert(typesOfInterest != null);
   }
 
   /// Creates a [VariableModel] representing a variable that's never been seen
