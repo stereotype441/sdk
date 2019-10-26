@@ -1447,7 +1447,7 @@ class VariableModel<Type> {
   bool operator ==(Object other) {
     return other is VariableModel<Type> &&
         _typeListsEqual(this.promotionChain, other.promotionChain) &&
-        _typeListsEqual(this.typesOfInterest, other.typesOfInterest) &&
+        _typeListsEqualUnordered(this.typesOfInterest, other.typesOfInterest) &&
         this.assigned == other.assigned &&
         this.writeCaptured == other.writeCaptured;
   }
@@ -1657,6 +1657,15 @@ class VariableModel<Type> {
     if (list1.length != list2.length) return false;
     for (int i = 0; i < list1.length; i++) {
       if (list1[i] != list2[i]) return false;
+    }
+    return true;
+  }
+
+  bool _typeListsEqualUnordered(List<Type> list1, List<Type> list2) {
+    if (list1.length != list2.length) return false;
+    var list2Copy = List<Type>.from(list2);
+    for (var type in list1) {
+      if (!list2Copy.remove(type)) return false;
     }
     return true;
   }

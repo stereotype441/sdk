@@ -2273,8 +2273,13 @@ main() {
         var p2 = {
           x: model([intQType])
         };
-        expect(FlowModel.joinVariableInfo(h, p1, p2), same(p2));
-        expect(FlowModel.joinVariableInfo(h, p2, p1), same(p2));
+        var expected = {
+          x: model([intQType], [intQType, intType])
+        };
+        _Type.allowComparisons(() {
+          expect(FlowModel.joinVariableInfo(h, p1, p2), same(p2));
+          expect(FlowModel.joinVariableInfo(h, p2, p1), same(p2));
+        });
       });
 
       test('unrelated type chains', () {
@@ -2334,13 +2339,14 @@ main() {
           x: model([intQType, intType])
         };
         var join12 = FlowModel.joinVariableInfo(h, p1, p2);
-        _Type.allowComparisons(() => expect(join12, {
-              x: model([intQType], [intQType, intType])
-            }));
+        var expected = {
+          x: model([intQType], [intQType, intType])
+        };
+        _Type.allowComparisons(() {
+          return expect(join12, expected);
+        });
         var join21 = FlowModel.joinVariableInfo(h, p2, p1);
-        _Type.allowComparisons(() => expect(join21, {
-              x: model([intQType])
-            }));
+        _Type.allowComparisons(() => expect(join21, expected));
       });
 
       test('assigned', () {
