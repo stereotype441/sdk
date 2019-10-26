@@ -1795,8 +1795,8 @@ main() {
         expect(s2.reachable, true);
         _Type.allowComparisons(() {
           expect(s2.variableInfo, {
-            objectQVar:
-                VariableModel([_Type('num?')], [_Type('num?')], true, false)
+            objectQVar: VariableModel(
+                [_Type('num?')], [_Type('num?'), _Type('int')], true, false)
           });
         });
       });

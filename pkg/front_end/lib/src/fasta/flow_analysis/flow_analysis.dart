@@ -1596,55 +1596,58 @@ class VariableModel<Type> {
       List<Type> promotionChain,
       Type writtenType) {
     // Figure out if we have any promotion candidates (types that are a
-    // supertype of writtenType and a proper subtype of the currently-promoted type).
+    // supertype of writtenType and a proper subtype of the currently-promoted
+    // type).
     Type currentlyPromotedType = promotionChain?.last;
+    List<Type> candidates = null;
     for (int i = 0; i < typesOfInterest.length; i++) {
       var type = typesOfInterest[i];
+      if (!typeOperations.isSubtypeOf(writtenType, type)) {
+        // Can't promote to this type; the type written is not a subtype of
+        // it.
+      } else if (currentlyPromotedType != null &&
+          !typeOperations.isSubtypeOf(type, currentlyPromotedType)) {
+        // Can't promote to this type; it's less specific than the currently
+        // promoted type.
+      } else if (currentlyPromotedType != null &&
+          typeOperations.isSameType(type, currentlyPromotedType)) {
+        // Can't promote to this type; it's the same as the currently
+        // promoted type.
+      } else {
+        (candidates ??= []).add(type);
+      }
       if (typeOperations.isSubtypeOf(writtenType, type)) {
-        List<Type> candidates = [type];
         for (i++; i < typesOfInterest.length; i++) {
           type = typesOfInterest[i];
-          if (!typeOperations.isSubtypeOf(writtenType, type)) {
-            // Can't promote to this type; the type written is not a subtype of
-            // it.
-          } else if (currentlyPromotedType != null &&
-              !typeOperations.isSubtypeOf(type, currentlyPromotedType)) {
-            // Can't promote to this type; it's less specific than the currently
-            // promoted type.
-          } else if (currentlyPromotedType != null &&
-              typeOperations.isSameType(type, currentlyPromotedType)) {
-            // Can't promote to this type; it's the same as the currently
-            // promoted type.
-          } else {
-            candidates.add(type);
-          }
-        }
-        // Figure out if we have a unique promotion candidate that's a subtype
-        // of all the others.
-        Type promoted;
-        outer:
-        for (i = 0; i < candidates.length; i++) {
-          for (int j = 0; j < candidates.length; j++) {
-            if (j == i) continue;
-            if (!typeOperations.isSubtypeOf(candidates[i], candidates[j])) {
-              // Not a subtype of all the others.
-              continue outer;
-            }
-          }
-          if (promoted != null) {
-            // Not unique.  Do not promote.
-            return promotionChain;
-          } else {
-            promoted = candidates[i];
-          }
-        }
-        if (promoted != null) {
-          return promotionChain.toList()..add(promoted);
-        } else {
-          return promotionChain;
         }
       }
     }
+    if (candidates != null) {
+      // Figure out if we have a unique promotion candidate that's a subtype
+      // of all the others.
+      Type promoted;
+      outer:
+      for (int i = 0; i < candidates.length; i++) {
+        for (int j = 0; j < candidates.length; j++) {
+          if (j == i) continue;
+          if (!typeOperations.isSubtypeOf(candidates[i], candidates[j])) {
+            // Not a subtype of all the others.
+            continue outer;
+          }
+        }
+        if (promoted != null) {
+          // Not unique.  Do not promote.
+          return promotionChain;
+        } else {
+          promoted = candidates[i];
+        }
+      }
+      if (promoted != null) {
+        return promotionChain.toList()..add(promoted);
+      }
+    }
+    // No suitable promotion found.
+    return promotionChain;
   }
 
   bool _typeListsEqual(List<Type> list1, List<Type> list2) {
