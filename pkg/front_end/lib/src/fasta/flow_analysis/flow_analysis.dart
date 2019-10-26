@@ -1668,10 +1668,12 @@ class VariableModel<Type> {
       VariableModel<Type> second) {
     List<Type> newPromotionChain = joinPromotionChains(
         first.promotionChain, second.promotionChain, typeOperations);
-    List<Type> newTypesOfInterest = joinTypesOfInterest(
-        first.typesOfInterest, second.typesOfInterest, typeOperations);
     bool newAssigned = first.assigned && second.assigned;
     bool newWriteCaptured = first.writeCaptured || second.writeCaptured;
+    List<Type> newTypesOfInterest = newWriteCaptured
+        ? const []
+        : joinTypesOfInterest(
+            first.typesOfInterest, second.typesOfInterest, typeOperations);
     return _identicalOrNew(first, second, newPromotionChain, newTypesOfInterest,
         newAssigned, newWriteCaptured);
   }
