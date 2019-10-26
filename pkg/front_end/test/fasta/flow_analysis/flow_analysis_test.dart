@@ -2198,8 +2198,8 @@ main() {
   group('join', () {
     var x = _Var('x', null);
     var y = _Var('y', null);
-    var z = _Var('y', null);
-    var w = _Var('y', null);
+    var z = _Var('z', null);
+    var w = _Var('w', null);
     var intType = _Type('int');
     var intQType = _Type('int?');
     var stringType = _Type('String');
@@ -2256,7 +2256,9 @@ main() {
           x: model([intType])
         };
         var p2 = {x: model(null)};
-        var expected = {x: model(null, [intType])};
+        var expected = {
+          x: model(null, [intType])
+        };
         _Type.allowComparisons(() {
           expect(FlowModel.joinVariableInfo(h, p1, p2), expected);
           expect(FlowModel.joinVariableInfo(h, p2, p1), expected);
@@ -2283,8 +2285,13 @@ main() {
         var p2 = {
           x: model([stringType])
         };
-        expect(FlowModel.joinVariableInfo(h, p1, p2), {x: model(null)});
-        expect(FlowModel.joinVariableInfo(h, p2, p1), {x: model(null)});
+        var expected = {
+          x: model(null, [stringType, intType])
+        };
+        _Type.allowComparisons(() {
+          expect(FlowModel.joinVariableInfo(h, p1, p2), expected);
+          expect(FlowModel.joinVariableInfo(h, p2, p1), expected);
+        });
       });
 
       test('sub-map', () {
@@ -2308,8 +2315,13 @@ main() {
         var p2 = {
           x: model([intQType])
         };
-        expect(FlowModel.joinVariableInfo(h, p1, p2), same(p2));
-        expect(FlowModel.joinVariableInfo(h, p2, p1), same(p2));
+        var expected = {
+          x: model([intQType], [intQType, intType])
+        };
+        _Type.allowComparisons(() {
+          expect(FlowModel.joinVariableInfo(h, p1, p2), expected);
+          expect(FlowModel.joinVariableInfo(h, p2, p1), expected);
+        });
       });
 
       test('sub-map with mismatched subtype', () {
@@ -2323,7 +2335,7 @@ main() {
         };
         var join12 = FlowModel.joinVariableInfo(h, p1, p2);
         _Type.allowComparisons(() => expect(join12, {
-              x: model([intQType])
+              x: model([intQType], [intQType, intType])
             }));
         var join21 = FlowModel.joinVariableInfo(h, p2, p1);
         _Type.allowComparisons(() => expect(join21, {
