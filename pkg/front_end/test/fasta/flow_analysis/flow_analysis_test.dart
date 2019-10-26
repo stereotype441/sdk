@@ -1953,7 +1953,7 @@ main() {
           expect(s2.variableInfo, {
             objectQVar: VariableModel<_Type>(
                 [_Type('int')], [_Type('int')], false, false),
-            intQVar: VariableModel<_Type>(null, [], false, false)
+            intQVar: VariableModel<_Type>(null, [_Type('int')], false, false)
           });
         });
       });
@@ -2554,6 +2554,7 @@ class _Harness implements TypeOperations<_Var, _Type> {
       'num <: num?': true,
       'num <: Object': true,
       'num <: Object?': true,
+      'num? <: num': false,
       'num? <: Object?': true,
       'Iterable <: int': false,
       'Iterable <: num': false,
