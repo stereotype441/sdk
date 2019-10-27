@@ -1737,7 +1737,8 @@ main() {
         var s2 = s1.tryPromote(h, objectQVar, _Type('int'), true);
         expect(s2.reachable, true);
         expect(s2.variableInfo, {
-          objectQVar: _matchVariableModel(chain: ['int?', 'int'], ofInterest: ['int?', 'int'])
+          objectQVar: _matchVariableModel(
+              chain: ['int?', 'int'], ofInterest: ['int?', 'int'])
         });
       });
     });
@@ -1757,8 +1758,10 @@ main() {
         var s1 = FlowModel<_Var, _Type>(true);
         var s2 = s1.write(objectQVar, _Type('int?'), h);
         expect(s2.reachable, true);
-        expect(s2.infoFor(objectQVar),
-            _matchVariableModel(chain: null, ofInterest: isEmpty, assigned: true));
+        expect(
+            s2.infoFor(objectQVar),
+            _matchVariableModel(
+                chain: null, ofInterest: isEmpty, assigned: true));
       });
 
       test('un-promotes fully', () {
@@ -1769,24 +1772,29 @@ main() {
         expect(s1.variableInfo, contains(objectQVar));
         var s2 = s1.write(objectQVar, _Type('int?'), h);
         expect(s2.reachable, true);
-        expect(s2.variableInfo,
-            {objectQVar: _matchVariableModel(chain: null, ofInterest: isEmpty, assigned: true)});
+        expect(s2.variableInfo, {
+          objectQVar: _matchVariableModel(
+              chain: null, ofInterest: isEmpty, assigned: true)
+        });
       });
 
       test('un-promotes partially, when no exact match', () {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
             .write(objectQVar, _Type('Object?'), h)
-            .promote(h, objectQVar, _Type('num?'))
-            .promote(h, objectQVar, _Type('int'));
+            .tryPromote(h, objectQVar, _Type('num?'), true)
+            .tryPromote(h, objectQVar, _Type('int'), true);
         expect(s1.variableInfo, {
-          objectQVar:
-              _matchVariableModel(chain: ['num?', 'int'], ofInterest: ['num?', 'int'], assigned: true)
+          objectQVar: _matchVariableModel(
+              chain: ['num?', 'int'],
+              ofInterest: ['num?', 'int'],
+              assigned: true)
         });
         var s2 = s1.write(objectQVar, _Type('num'), h);
         expect(s2.reachable, true);
         expect(s2.variableInfo, {
-          objectQVar: _matchVariableModel(chain: ['num?'], ofInterest: ['num?', 'int'], assigned: true)
+          objectQVar: _matchVariableModel(
+              chain: ['num?'], ofInterest: ['num?', 'int'], assigned: true)
         });
       });
 
@@ -1794,18 +1802,22 @@ main() {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
             .write(objectQVar, _Type('Object?'), h)
-            .promote(h, objectQVar, _Type('num?'))
-            .promote(h, objectQVar, _Type('num'))
-            .promote(h, objectQVar, _Type('int'));
+            .tryPromote(h, objectQVar, _Type('num?'), true)
+            .tryPromote(h, objectQVar, _Type('num'), true)
+            .tryPromote(h, objectQVar, _Type('int'), true);
         expect(s1.variableInfo, {
-          objectQVar:
-              _matchVariableModel(chain: ['num?', 'num', 'int'], ofInterest: ['num?', 'num', 'int'], assigned: true)
+          objectQVar: _matchVariableModel(
+              chain: ['num?', 'num', 'int'],
+              ofInterest: ['num?', 'num', 'int'],
+              assigned: true)
         });
         var s2 = s1.write(objectQVar, _Type('num'), h);
         expect(s2.reachable, true);
         expect(s2.variableInfo, {
-          objectQVar:
-              _matchVariableModel(chain: ['num?', 'num'], ['num?', 'num', 'int'], assigned: true)
+          objectQVar: _matchVariableModel(
+              chain: ['num?', 'num'],
+              ofInterest: ['num?', 'num', 'int'],
+              assigned: true)
         });
       });
 
@@ -1813,11 +1825,13 @@ main() {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
             .write(objectQVar, _Type('Object?'), h)
-            .promote(h, objectQVar, _Type('num?'))
-            .promote(h, objectQVar, _Type('num'));
+            .tryPromote(h, objectQVar, _Type('num?'), true)
+            .tryPromote(h, objectQVar, _Type('num'), true);
         expect(s1.variableInfo, {
-          objectQVar:
-              _matchVariableModel(chain: ['num?', 'num'], ofInterest: ['num?', 'num'], assigned: true)
+          objectQVar: _matchVariableModel(
+              chain: ['num?', 'num'],
+              ofInterest: ['num?', 'num'],
+              assigned: true)
         });
         var s2 = s1.write(objectQVar, _Type('num'), h);
         expect(s2.reachable, true);
@@ -1828,11 +1842,13 @@ main() {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
             .write(objectQVar, _Type('Object?'), h)
-            .promote(h, objectQVar, _Type('num?'))
-            .promote(h, objectQVar, _Type('num'));
+            .tryPromote(h, objectQVar, _Type('num?'), true)
+            .tryPromote(h, objectQVar, _Type('num'), true);
         expect(s1.variableInfo, {
-          objectQVar:
-              _matchVariableModel(chain: ['num?', 'num'], ofInterest: ['num?', 'num'], assigned: true)
+          objectQVar: _matchVariableModel(
+              chain: ['num?', 'num'],
+              ofInterest: ['num?', 'num'],
+              assigned: true)
         });
         var s2 = s1.write(objectQVar, _Type('int'), h);
         expect(s2.reachable, true);
@@ -1852,8 +1868,10 @@ main() {
         var s1 = FlowModel<_Var, _Type>(true);
         var s2 = s1.initialize(objectQVar);
         expect(s2.reachable, true);
-        expect(s2.infoFor(objectQVar),
-            _matchVariableModel(chain: null, ofInterest: isEmpty, assigned: true));
+        expect(
+            s2.infoFor(objectQVar),
+            _matchVariableModel(
+                chain: null, ofInterest: isEmpty, assigned: true));
       });
 
       test('un-promotes fully', () {
@@ -1864,8 +1882,10 @@ main() {
         expect(s1.variableInfo, contains(objectQVar));
         var s2 = s1.initialize(objectQVar);
         expect(s2.reachable, true);
-        expect(s2.variableInfo,
-            {objectQVar: _matchVariableModel(chain: null, ofInterest: isEmpty, assigned: true)});
+        expect(s2.variableInfo, {
+          objectQVar: _matchVariableModel(
+              chain: null, ofInterest: isEmpty, assigned: true)
+        });
       });
     });
 
@@ -1882,7 +1902,8 @@ main() {
         var s1 = FlowModel<_Var, _Type>(true);
         var s2 = s1.tryMarkNonNullable(h, intQVar, true);
         expect(s2.reachable, true);
-        expect(s2.infoFor(intQVar), _matchVariableModel(chain: ['int'], ofInterest: ['int']));
+        expect(s2.infoFor(intQVar),
+            _matchVariableModel(chain: ['int'], ofInterest: ['int']));
       });
 
       test('promoted -> unchanged', () {
@@ -1900,7 +1921,8 @@ main() {
         var s2 = s1.tryMarkNonNullable(h, objectQVar, true);
         expect(s2.reachable, true);
         expect(s2.variableInfo, {
-          objectQVar: _matchVariableModel(chain: ['int?', 'int'], ofInterest: ['int?', 'int'])
+          objectQVar: _matchVariableModel(
+              chain: ['int?', 'int'], ofInterest: ['int?', 'int'])
         });
       });
     });
@@ -2217,12 +2239,10 @@ main() {
         };
         var p2 = {x: model(null)};
         var expected = {
-          x: model(null, [intType])
+          x: _matchVariableModel(chain: null, ofInterest: ['int'])
         };
-        _Type.allowComparisons(() {
-          expect(FlowModel.joinVariableInfo(h, p1, p2), expected);
-          expect(FlowModel.joinVariableInfo(h, p2, p1), expected);
-        });
+        expect(FlowModel.joinVariableInfo(h, p1, p2), expected);
+        expect(FlowModel.joinVariableInfo(h, p2, p1), expected);
       });
 
       test('related type chains', () {
@@ -2234,12 +2254,10 @@ main() {
           x: model([intQType])
         };
         var expected = {
-          x: model([intQType], [intQType, intType])
+          x: _matchVariableModel(chain: ['int?'], ofInterest: ['int?', 'int'])
         };
-        _Type.allowComparisons(() {
-          expect(FlowModel.joinVariableInfo(h, p1, p2), expected);
-          expect(FlowModel.joinVariableInfo(h, p2, p1), expected);
-        });
+        expect(FlowModel.joinVariableInfo(h, p1, p2), expected);
+        expect(FlowModel.joinVariableInfo(h, p2, p1), expected);
       });
 
       test('unrelated type chains', () {
@@ -2253,10 +2271,8 @@ main() {
         var expected = {
           x: _matchVariableModel(chain: null, ofInterest: ['String', 'int'])
         };
-        expect(FlowModel.joinVariableInfo(h, p1, p2),
-            expected);
-        expect(FlowModel.joinVariableInfo(h, p2, p1),
-            expected);
+        expect(FlowModel.joinVariableInfo(h, p1, p2), expected);
+        expect(FlowModel.joinVariableInfo(h, p2, p1), expected);
       });
 
       test('sub-map', () {
@@ -2281,12 +2297,10 @@ main() {
           x: model([intQType])
         };
         var expected = {
-          x: model([intQType], [intQType, intType])
+          x: _matchVariableModel(chain: ['int?'], ofInterest: ['int?', 'int'])
         };
-        _Type.allowComparisons(() {
-          expect(FlowModel.joinVariableInfo(h, p1, p2), expected);
-          expect(FlowModel.joinVariableInfo(h, p2, p1), expected);
-        });
+        expect(FlowModel.joinVariableInfo(h, p1, p2), expected);
+        expect(FlowModel.joinVariableInfo(h, p2, p1), expected);
       });
 
       test('sub-map with mismatched subtype', () {
@@ -2298,15 +2312,11 @@ main() {
         var p2 = {
           x: model([intQType, intType])
         };
-        var join12 = FlowModel.joinVariableInfo(h, p1, p2);
         var expected = {
           x: _matchVariableModel(chain: ['int?'], ofInterest: ['int?', 'int'])
         };
-        expect(join12, {
-          x: expected
-        });
-        var join21 = FlowModel.joinVariableInfo(h, p2, p1);
-        _Type.allowComparisons(() => expect(join21, expected));
+        expect(FlowModel.joinVariableInfo(h, p1, p2), expected);
+        expect(FlowModel.joinVariableInfo(h, p2, p1), expected);
       });
 
       test('assigned', () {
@@ -2370,6 +2380,13 @@ String _describeMatcher(Matcher matcher) {
   return description.toString();
 }
 
+Matcher _matchOfInterestSet(List<String> expectedTypes) {
+  return predicate(
+      (List<_Type> x) => unorderedEquals(expectedTypes)
+          .matches(x.map((t) => t.type).toList(), {}),
+      'interest set $expectedTypes');
+}
+
 Matcher _matchPromotionChain(List<String> expectedTypes) {
   if (expectedTypes == null) return isNull;
   return predicate(
@@ -2380,19 +2397,25 @@ Matcher _matchPromotionChain(List<String> expectedTypes) {
 
 Matcher _matchVariableModel(
     {Object chain = anything,
+    Object ofInterest = anything,
     Object assigned = anything,
     Object writeCaptured = anything}) {
   Matcher chainMatcher =
       chain is List<String> ? _matchPromotionChain(chain) : wrapMatcher(chain);
+  Matcher ofInterestMatcher = ofInterest is List<String>
+      ? _matchOfInterestSet(ofInterest)
+      : wrapMatcher(ofInterest);
   Matcher assignedMatcher = wrapMatcher(assigned);
   Matcher writeCapturedMatcher = wrapMatcher(writeCaptured);
   return predicate((VariableModel<_Type> model) {
     if (!chainMatcher.matches(model.promotionChain, {})) return false;
+    if (!ofInterestMatcher.matches(model.typesOfInterest, {})) return false;
     if (!assignedMatcher.matches(model.assigned, {})) return false;
     if (!writeCapturedMatcher.matches(model.writeCaptured, {})) return false;
     return true;
   },
       'VariableModel(chain: ${_describeMatcher(chainMatcher)}, '
+      'ofInterest: ${_describeMatcher(ofInterestMatcher)}, '
       'assigned: ${_describeMatcher(assignedMatcher)}, writeCaptured: '
       '${_describeMatcher(writeCapturedMatcher)})');
 }
