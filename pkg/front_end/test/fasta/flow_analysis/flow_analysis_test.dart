@@ -2183,17 +2183,17 @@ main() {
   });
 
   group('join', () {
-    var x = _Var('x', null);
-    var y = _Var('y', null);
-    var z = _Var('y', null);
-    var w = _Var('y', null);
+    var x = _Var('x', _Type('Object?'));
+    var y = _Var('y', _Type('Object?'));
+    var z = _Var('y', _Type('Object?'));
+    var w = _Var('y', _Type('Object?'));
     var intType = _Type('int');
     var intQType = _Type('int?');
     var stringType = _Type('String');
     const emptyMap = <Null, VariableModel<Null>>{};
 
     VariableModel<_Type> model(List<_Type> promotionChain) =>
-        VariableModel<_Type>(promotionChain, true, false);
+        VariableModel<_Type>(promotionChain, false, false);
 
     group('without input reuse', () {
       test('promoted with unpromoted', () {
@@ -2312,22 +2312,22 @@ main() {
       test('assigned', () {
         var h = _Harness();
         var p1 = {
-          x: model([intQType]).write(_Type('int?'), h),
-          y: model([intQType]).write(_Type('int?'), h),
+          x: model([intQType]).write(_Type('Object?'), h),
+          y: model([intQType]).write(_Type('Object?'), h),
           z: model([intQType]),
           w: model([intQType])
         };
         var p2 = {
-          x: model([intQType]).write(_Type('int?'), h),
+          x: model([intQType]).write(_Type('Object?'), h),
           y: model([intQType]),
-          z: model([intQType]).write(_Type('int?'), h),
+          z: model([intQType]).write(_Type('Object?'), h),
           w: model([intQType])
         };
         var joined = FlowModel.joinVariableInfo(h, p1, p2);
         _Type.allowComparisons(() => expect(joined, {
-              x: model([intQType]).write(_Type('int?'), h),
-              y: model([intQType]).write(_Type('int?'), h),
-              z: model([intQType]).write(_Type('int?'), h),
+              x: model(null).write(_Type('Object?'), h),
+              y: model(null),
+              z: model(null),
               w: model([intQType])
             }));
       });
@@ -2553,6 +2553,8 @@ class _Harness implements TypeOperations<_Var, _Type> {
       'Object <: List': false,
       'Object <: num': false,
       'Object <: Object?': true,
+      'Object? <: int': false,
+      'Object? <: int?': false,
       'String <: int': false,
       'String <: int?': false,
       'String <: Object?': true,
