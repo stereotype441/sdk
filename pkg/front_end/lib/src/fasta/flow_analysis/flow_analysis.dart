@@ -4,6 +4,16 @@
 
 import 'package:meta/meta.dart';
 
+/// Whether equality comparisons are allowed.
+///
+/// By design, flow analysis does not compare types using equality; it uses
+/// [TypeOperations.isSameType] instead.  (This allows easier integration with
+/// the migration engine, which needs to make finer distinctions between types
+/// than flow analysis).  However, for easier unit testing of the
+TODO(I am here).
+@visibleForTesting
+bool allowEqualityComparisons = false;
+
 /// [AssignedVariables] is a helper class capable of computing the set of
 /// variables that are potentially written to, and potentially captured by
 /// closures, at various locations inside the code being analyzed.  This class
@@ -1430,6 +1440,7 @@ class VariableModel<Type> {
 
   @override
   bool operator ==(Object other) {
+    assert(allowEqualityComparisons);
     return other is VariableModel<Type> &&
         _promotionChainsEqual(this.promotionChain, other.promotionChain) &&
         this.assigned == other.assigned &&
@@ -1551,6 +1562,7 @@ class VariableModel<Type> {
   }
 
   bool _promotionChainsEqual(List<Type> chain1, List<Type> chain2) {
+    assert(allowEqualityComparisons);
     if (chain1 == null) return chain2 == null;
     if (chain2 == null) return false;
     if (chain1.length != chain2.length) return false;
