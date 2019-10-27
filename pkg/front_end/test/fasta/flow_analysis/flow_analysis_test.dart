@@ -2154,17 +2154,17 @@ main() {
   });
 
   group('join', () {
-    var x = _Var('x', null);
-    var y = _Var('y', null);
-    var z = _Var('z', null);
-    var w = _Var('w', null);
+    var x = _Var('x', _Type('Object?'));
+    var y = _Var('y', _Type('Object?'));
+    var z = _Var('z', _Type('Object?'));
+    var w = _Var('w', _Type('Object?'));
     var intType = _Type('int');
     var intQType = _Type('int?');
     var stringType = _Type('String');
     const emptyMap = <Null, VariableModel<Null>>{};
 
     VariableModel<_Type> model(List<_Type> promotionChain) =>
-        VariableModel<_Type>(promotionChain, true, false);
+        VariableModel<_Type>(promotionChain, false, false);
 
     group('without input reuse', () {
       test('promoted with unpromoted', () {
@@ -2286,47 +2286,41 @@ main() {
 
       test('assigned', () {
         var h = _Harness();
-        var p1 = {
-          x: model([intQType]).write(_Type('int?'), h),
-          y: model([intQType]).write(_Type('int?'), h),
-          z: model([intQType]),
-          w: model([intQType])
-        };
-        var p2 = {
-          x: model([intQType]).write(_Type('int?'), h),
-          y: model([intQType]),
-          z: model([intQType]).write(_Type('int?'), h),
-          w: model([intQType])
-        };
+        var intQModel = model([intQType]);
+        var writtenModel = intQModel.write(_Type('Object?'), h);
+        var p1 = {x: writtenModel, y: writtenModel, z: intQModel, w: intQModel};
+        var p2 = {x: writtenModel, y: intQModel, z: writtenModel, w: intQModel};
         var joined = FlowModel.joinVariableInfo(h, p1, p2);
         expect(joined, {
-          x: _matchVariableModel(chain: ['int?'], assigned: true),
-          y: _matchVariableModel(chain: ['int?'], assigned: true),
-          z: _matchVariableModel(chain: ['int?'], assigned: true),
-          w: _matchVariableModel(chain: ['int?'], assigned: false)
+          x: same(writtenModel),
+          y: _matchVariableModel(chain: null, assigned: false),
+          z: _matchVariableModel(chain: null, assigned: false),
+          w: same(intQModel)
         });
       });
 
       test('write captured', () {
         var h = _Harness();
+        var intQModel = model([intQType]);
+        var writeCapturedModel = intQModel.writeCapture();
         var p1 = {
-          x: model([intQType]).writeCapture(),
-          y: model([intQType]).writeCapture(),
-          z: model([intQType]),
-          w: model([intQType])
+          x: writeCapturedModel,
+          y: writeCapturedModel,
+          z: intQModel,
+          w: intQModel
         };
         var p2 = {
-          x: model([intQType]).writeCapture(),
-          y: model([intQType]),
-          z: model([intQType]).writeCapture(),
-          w: model([intQType])
+          x: writeCapturedModel,
+          y: intQModel,
+          z: writeCapturedModel,
+          w: intQModel
         };
         var joined = FlowModel.joinVariableInfo(h, p1, p2);
         expect(joined, {
-          x: _matchVariableModel(chain: ['int?'], writeCaptured: true),
-          y: _matchVariableModel(chain: ['int?'], writeCaptured: true),
-          z: _matchVariableModel(chain: ['int?'], writeCaptured: true),
-          w: _matchVariableModel(chain: ['int?'], writeCaptured: false)
+          x: same(writeCapturedModel),
+          y: same(writeCapturedModel),
+          z: same(writeCapturedModel),
+          w: same(intQModel)
         });
       });
     });
@@ -2561,6 +2555,8 @@ class _Harness implements TypeOperations<_Var, _Type> {
       'Object <: List': false,
       'Object <: num': false,
       'Object <: Object?': true,
+      'Object? <: int': false,
+      'Object? <: int?': false,
       'String <: int': false,
       'String <: int?': false,
       'String <: Object?': true,
