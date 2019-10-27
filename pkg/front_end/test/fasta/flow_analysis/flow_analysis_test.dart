@@ -2185,8 +2185,8 @@ main() {
   group('join', () {
     var x = _Var('x', _Type('Object?'));
     var y = _Var('y', _Type('Object?'));
-    var z = _Var('y', _Type('Object?'));
-    var w = _Var('y', _Type('Object?'));
+    var z = _Var('z', _Type('Object?'));
+    var w = _Var('w', _Type('Object?'));
     var intType = _Type('int');
     var intQType = _Type('int?');
     var stringType = _Type('String');
