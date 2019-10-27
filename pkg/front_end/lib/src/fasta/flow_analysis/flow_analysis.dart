@@ -1443,15 +1443,6 @@ class VariableModel<Type> {
         assigned = false,
         writeCaptured = false;
 
-  @override
-  bool operator ==(Object other) {
-    return other is VariableModel<Type> &&
-        _typeListsEqual(this.promotionChain, other.promotionChain) &&
-        _typeListsEqualUnordered(this.typesOfInterest, other.typesOfInterest) &&
-        this.assigned == other.assigned &&
-        this.writeCaptured == other.writeCaptured;
-  }
-
   /// Returns a new [VariableModel] in which any promotions present have been
   /// dropped.
   VariableModel<Type> discardPromotions() {
@@ -1649,25 +1640,6 @@ class VariableModel<Type> {
     }
     // No suitable promotion found.
     return promotionChain;
-  }
-
-  bool _typeListsEqual(List<Type> list1, List<Type> list2) {
-    if (list1 == null) return list2 == null;
-    if (list2 == null) return false;
-    if (list1.length != list2.length) return false;
-    for (int i = 0; i < list1.length; i++) {
-      if (list1[i] != list2[i]) return false;
-    }
-    return true;
-  }
-
-  bool _typeListsEqualUnordered(List<Type> list1, List<Type> list2) {
-    if (list1.length != list2.length) return false;
-    var list2Copy = List<Type>.from(list2);
-    for (var type in list1) {
-      if (!list2Copy.remove(type)) return false;
-    }
-    return true;
   }
 
   /// Joins two variable models.  See [FlowModel.join] for details.
