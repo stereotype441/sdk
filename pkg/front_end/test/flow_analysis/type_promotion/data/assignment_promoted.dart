@@ -43,3 +43,8 @@ typeOfInterest_equalNull(Object? x) {
   }
   /*Object*/ x;
 }
+
+typeOfInterest_nullAwareAssignment(Object? x) {
+  x ??= 1;
+  /*Object*/ x;
+}
