@@ -1230,6 +1230,11 @@ class FlowModel<Variable, Type> {
   @override
   String toString() => '($reachable, $variableInfo)';
 
+  /// Returns an [ExpressionInfo] indicating the result of checking whether the
+  /// given [variable] is non-null.
+  ///
+  /// Note that the state is only changed if the previous type of [variable] was
+  /// potentially nullable.
   ExpressionInfo<Variable, Type> tryMarkNonNullable(
       TypeOperations<Variable, Type> typeOperations, Variable variable) {
     VariableModel<Type> info = infoFor(variable);
