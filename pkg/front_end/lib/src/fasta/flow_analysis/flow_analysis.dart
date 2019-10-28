@@ -204,6 +204,8 @@ class ExpressionInfo<Variable, Type> {
   String toString() =>
       'ExpressionInfo(after: $after, _ifTrue: $ifTrue, ifFalse: $ifFalse)';
 
+  /// Compute a new [ExpressionInfo] based on this one, but with the roles of
+  /// [ifTrue] and [ifFalse] reversed.
   static ExpressionInfo<Variable, Type> invert<Variable, Type>(
           ExpressionInfo<Variable, Type> info) =>
       new ExpressionInfo<Variable, Type>(info.after, info.ifFalse, info.ifTrue);
@@ -1291,6 +1293,13 @@ class FlowModel<Variable, Type> {
     return _updateVariableInfo(variable, newInfoForVar);
   }
 
+  /// Common algorithm for [tryMarkNonNullable] and [tryPromote].  Builds an
+  /// [ExpressionInfo] object describing the effect of trying to promote
+  /// [variable] to [testedType], under the following preconditions:
+  /// - [info] should be the result of calling `infoFor(variable)`
+  /// - [testedType] should be a subtype of the currently-promoted type (i.e.
+  ///   no redundant or side-promotions)
+  /// - The variable should not be write-captured.
   ExpressionInfo<Variable, Type> _finishTypeTest(
       TypeOperations<Variable, Type> typeOperations,
       Variable variable,
@@ -1612,6 +1621,13 @@ class VariableModel<Type> {
     return new VariableModel<Type>(null, const [], assigned, true);
   }
 
+  /// Determines whether a variable with the given [promotionChain] should be
+  /// promoted to [writtenType] based on types of interest.  If it should,
+  /// returns an updated promotion chain; otherwise returns [promotionChain]
+  /// unchanged.
+  ///
+  /// Note that since promotions chains are considered immutable, if promotion
+  /// is required, a new promotion chain will be created and returned.
   List<Type> _tryPromoteToTypeOfInterest(
       TypeOperations<Object, Type> typeOperations,
       List<Type> promotionChain,
@@ -1707,6 +1723,14 @@ class VariableModel<Type> {
     return numCommonElements == 0 ? null : chain1.sublist(0, numCommonElements);
   }
 
+  /// Performs the portion of the "join" algorithm that applies to promotion
+  /// chains.  Essentially this performs a set union, with the following
+  /// caveats:
+  /// - The "sets" are represented as lists (since they are expected to be very
+  ///   small in real-world cases)
+  /// - The sense of equality for the union operation is determined by
+  ///   [TypeOperations.isSameType].
+  /// - The types of interests lists are considered immutable.
   static List<Type> joinTypesOfInterest<Type>(List<Type> types1,
       List<Type> types2, TypeOperations<Object, Type> typeOperations) {
     // Ensure that types1 is the shorter list.
