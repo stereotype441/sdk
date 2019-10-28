@@ -1678,28 +1678,28 @@ main() {
       test('unpromoted -> unchanged (same)', () {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true);
-        var s2 = s1.tryPromote(h, intVar, _Type('int'), true);
+        var s2 = s1.tryPromote(h, intVar, _Type('int')).ifTrue;
         expect(s2, same(s1));
       });
 
       test('unpromoted -> unchanged (supertype)', () {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true);
-        var s2 = s1.tryPromote(h, intVar, _Type('Object'), true);
+        var s2 = s1.tryPromote(h, intVar, _Type('Object')).ifTrue;
         expect(s2, same(s1));
       });
 
       test('unpromoted -> unchanged (unrelated)', () {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true);
-        var s2 = s1.tryPromote(h, intVar, _Type('String'), true);
+        var s2 = s1.tryPromote(h, intVar, _Type('String')).ifTrue;
         expect(s2, same(s1));
       });
 
       test('unpromoted -> subtype', () {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true);
-        var s2 = s1.tryPromote(h, intQVar, _Type('int'), true);
+        var s2 = s1.tryPromote(h, intQVar, _Type('int')).ifTrue;
         expect(s2.reachable, true);
         expect(s2.variableInfo, {
           intQVar: _matchVariableModel(chain: ['int'], ofInterest: ['int'])
@@ -1709,32 +1709,36 @@ main() {
       test('promoted -> unchanged (same)', () {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
-            .tryPromote(h, objectQVar, _Type('int'), true);
-        var s2 = s1.tryPromote(h, objectQVar, _Type('int'), true);
+            .tryPromote(h, objectQVar, _Type('int'))
+            .ifTrue;
+        var s2 = s1.tryPromote(h, objectQVar, _Type('int')).ifTrue;
         expect(s2, same(s1));
       });
 
       test('promoted -> unchanged (supertype)', () {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
-            .tryPromote(h, objectQVar, _Type('int'), true);
-        var s2 = s1.tryPromote(h, objectQVar, _Type('Object'), true);
+            .tryPromote(h, objectQVar, _Type('int'))
+            .ifTrue;
+        var s2 = s1.tryPromote(h, objectQVar, _Type('Object')).ifTrue;
         expect(s2, same(s1));
       });
 
       test('promoted -> unchanged (unrelated)', () {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
-            .tryPromote(h, objectQVar, _Type('int'), true);
-        var s2 = s1.tryPromote(h, objectQVar, _Type('String'), true);
+            .tryPromote(h, objectQVar, _Type('int'))
+            .ifTrue;
+        var s2 = s1.tryPromote(h, objectQVar, _Type('String')).ifTrue;
         expect(s2, same(s1));
       });
 
       test('promoted -> subtype', () {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
-            .tryPromote(h, objectQVar, _Type('int?'), true);
-        var s2 = s1.tryPromote(h, objectQVar, _Type('int'), true);
+            .tryPromote(h, objectQVar, _Type('int?'))
+            .ifTrue;
+        var s2 = s1.tryPromote(h, objectQVar, _Type('int')).ifTrue;
         expect(s2.reachable, true);
         expect(s2.variableInfo, {
           objectQVar: _matchVariableModel(
@@ -1768,7 +1772,8 @@ main() {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
             .write(objectQVar, _Type('Object?'), h)
-            .tryPromote(h, objectQVar, _Type('int'), true);
+            .tryPromote(h, objectQVar, _Type('int'))
+            .ifTrue;
         expect(s1.variableInfo, contains(objectQVar));
         var s2 = s1.write(objectQVar, _Type('int?'), h);
         expect(s2.reachable, true);
@@ -1782,8 +1787,10 @@ main() {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
             .write(objectQVar, _Type('Object?'), h)
-            .tryPromote(h, objectQVar, _Type('num?'), true)
-            .tryPromote(h, objectQVar, _Type('int'), true);
+            .tryPromote(h, objectQVar, _Type('num?'))
+            .ifTrue
+            .tryPromote(h, objectQVar, _Type('int'))
+            .ifTrue;
         expect(s1.variableInfo, {
           objectQVar: _matchVariableModel(
               chain: ['num?', 'int'],
@@ -1802,9 +1809,12 @@ main() {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
             .write(objectQVar, _Type('Object?'), h)
-            .tryPromote(h, objectQVar, _Type('num?'), true)
-            .tryPromote(h, objectQVar, _Type('num'), true)
-            .tryPromote(h, objectQVar, _Type('int'), true);
+            .tryPromote(h, objectQVar, _Type('num?'))
+            .ifTrue
+            .tryPromote(h, objectQVar, _Type('num'))
+            .ifTrue
+            .tryPromote(h, objectQVar, _Type('int'))
+            .ifTrue;
         expect(s1.variableInfo, {
           objectQVar: _matchVariableModel(
               chain: ['num?', 'num', 'int'],
@@ -1825,8 +1835,10 @@ main() {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
             .write(objectQVar, _Type('Object?'), h)
-            .tryPromote(h, objectQVar, _Type('num?'), true)
-            .tryPromote(h, objectQVar, _Type('num'), true);
+            .tryPromote(h, objectQVar, _Type('num?'))
+            .ifTrue
+            .tryPromote(h, objectQVar, _Type('num'))
+            .ifTrue;
         expect(s1.variableInfo, {
           objectQVar: _matchVariableModel(
               chain: ['num?', 'num'],
@@ -1842,8 +1854,10 @@ main() {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
             .write(objectQVar, _Type('Object?'), h)
-            .tryPromote(h, objectQVar, _Type('num?'), true)
-            .tryPromote(h, objectQVar, _Type('num'), true);
+            .tryPromote(h, objectQVar, _Type('num?'))
+            .ifTrue
+            .tryPromote(h, objectQVar, _Type('num'))
+            .ifTrue;
         expect(s1.variableInfo, {
           objectQVar: _matchVariableModel(
               chain: ['num?', 'num'],
@@ -1859,7 +1873,8 @@ main() {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
             .write(objectQVar, _Type('Object?'), h)
-            .tryPromote(h, objectQVar, _Type('num?'), false);
+            .tryPromote(h, objectQVar, _Type('num?'))
+            .ifFalse;
         expect(s1.variableInfo, {
           objectQVar: _matchVariableModel(chain: null, ofInterest: ['num?'])
         });
@@ -1873,8 +1888,10 @@ main() {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
             .write(objectQVar, _Type('Object?'), h)
-            .tryPromote(h, objectQVar, _Type('num?'), true)
-            .tryPromote(h, objectQVar, _Type('int?'), false);
+            .tryPromote(h, objectQVar, _Type('num?'))
+            .ifTrue
+            .tryPromote(h, objectQVar, _Type('int?'))
+            .ifFalse;
         expect(s1.variableInfo, {
           objectQVar:
               _matchVariableModel(chain: ['num?'], ofInterest: ['num?', 'int?'])
@@ -1891,8 +1908,10 @@ main() {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
             .write(objectQVar, _Type('Object?'), h)
-            .tryPromote(h, objectQVar, _Type('int?'), false)
-            .tryPromote(h, objectQVar, _Type('num?'), false);
+            .tryPromote(h, objectQVar, _Type('int?'))
+            .ifFalse
+            .tryPromote(h, objectQVar, _Type('num?'))
+            .ifFalse;
         expect(s1.variableInfo, {
           objectQVar:
               _matchVariableModel(chain: null, ofInterest: ['num?', 'int?'])
@@ -1910,8 +1929,10 @@ main() {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
             .write(objectQVar, _Type('Object?'), h)
-            .tryPromote(h, objectQVar, _Type('num?'), false)
-            .tryPromote(h, objectQVar, _Type('int?'), false);
+            .tryPromote(h, objectQVar, _Type('num?'))
+            .ifFalse
+            .tryPromote(h, objectQVar, _Type('int?'))
+            .ifFalse;
         expect(s1.variableInfo, {
           objectQVar:
               _matchVariableModel(chain: null, ofInterest: ['num?', 'int?'])
@@ -1927,8 +1948,10 @@ main() {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
             .write(objectQVar, _Type('Object?'), h)
-            .tryPromote(h, objectQVar, _Type('num?'), false)
-            .tryPromote(h, objectQVar, _Type('num*'), false);
+            .tryPromote(h, objectQVar, _Type('num?'))
+            .ifFalse
+            .tryPromote(h, objectQVar, _Type('num*'))
+            .ifFalse;
         expect(s1.variableInfo, {
           objectQVar:
               _matchVariableModel(chain: null, ofInterest: ['num?', 'num*'])
@@ -1944,8 +1967,10 @@ main() {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
             .write(objectQVar, _Type('Object?'), h)
-            .tryPromote(h, objectQVar, _Type('num?'), false)
-            .tryPromote(h, objectQVar, _Type('num*'), false);
+            .tryPromote(h, objectQVar, _Type('num?'))
+            .ifFalse
+            .tryPromote(h, objectQVar, _Type('num*'))
+            .ifFalse;
         expect(s1.variableInfo, {
           objectQVar:
               _matchVariableModel(chain: null, ofInterest: ['num?', 'num*'])
@@ -1982,7 +2007,8 @@ main() {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
             .initialize(objectQVar)
-            .tryPromote(h, objectQVar, _Type('int'), true);
+            .tryPromote(h, objectQVar, _Type('int'))
+            .ifTrue;
         expect(s1.variableInfo, contains(objectQVar));
         var s2 = s1.initialize(objectQVar);
         expect(s2.reachable, true);
@@ -1997,14 +2023,14 @@ main() {
       test('unpromoted -> unchanged', () {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true);
-        var s2 = s1.tryMarkNonNullable(h, intVar, true);
+        var s2 = s1.tryMarkNonNullable(h, intVar).ifTrue;
         expect(s2, same(s1));
       });
 
       test('unpromoted -> promoted', () {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true);
-        var s2 = s1.tryMarkNonNullable(h, intQVar, true);
+        var s2 = s1.tryMarkNonNullable(h, intQVar).ifTrue;
         expect(s2.reachable, true);
         expect(s2.infoFor(intQVar),
             _matchVariableModel(chain: ['int'], ofInterest: ['int']));
@@ -2013,16 +2039,18 @@ main() {
       test('promoted -> unchanged', () {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
-            .tryPromote(h, objectQVar, _Type('int'), true);
-        var s2 = s1.tryMarkNonNullable(h, objectQVar, true);
+            .tryPromote(h, objectQVar, _Type('int'))
+            .ifTrue;
+        var s2 = s1.tryMarkNonNullable(h, objectQVar).ifTrue;
         expect(s2, same(s1));
       });
 
       test('promoted -> re-promoted', () {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
-            .tryPromote(h, objectQVar, _Type('int?'), true);
-        var s2 = s1.tryMarkNonNullable(h, objectQVar, true);
+            .tryPromote(h, objectQVar, _Type('int?'))
+            .ifTrue;
+        var s2 = s1.tryMarkNonNullable(h, objectQVar).ifTrue;
         expect(s2.reachable, true);
         expect(s2.variableInfo, {
           objectQVar: _matchVariableModel(
@@ -2035,7 +2063,8 @@ main() {
       test('unchanged', () {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
-            .tryPromote(h, objectQVar, _Type('int'), true);
+            .tryPromote(h, objectQVar, _Type('int'))
+            .ifTrue;
         var s2 = s1.removePromotedAll([intQVar], []);
         expect(s2, same(s1));
       });
@@ -2043,8 +2072,10 @@ main() {
       test('written', () {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
-            .tryPromote(h, objectQVar, _Type('int'), true)
-            .tryPromote(h, intQVar, _Type('int'), true);
+            .tryPromote(h, objectQVar, _Type('int'))
+            .ifTrue
+            .tryPromote(h, intQVar, _Type('int'))
+            .ifTrue;
         var s2 = s1.removePromotedAll([intQVar], []);
         expect(s2.reachable, true);
         expect(s2.variableInfo, {
@@ -2056,8 +2087,10 @@ main() {
       test('write captured', () {
         var h = _Harness();
         var s1 = FlowModel<_Var, _Type>(true)
-            .tryPromote(h, objectQVar, _Type('int'), true)
-            .tryPromote(h, intQVar, _Type('int'), true);
+            .tryPromote(h, objectQVar, _Type('int'))
+            .ifTrue
+            .tryPromote(h, intQVar, _Type('int'))
+            .ifTrue;
         var s2 = s1.removePromotedAll([], [intQVar]);
         expect(s2.reachable, true);
         expect(s2.variableInfo, {
@@ -2119,10 +2152,10 @@ main() {
           var s0 = FlowModel<_Var, _Type>(true).write(x, _Type('Object?'), h);
           var s1 = thisType == null
               ? s0
-              : s0.tryPromote(h, x, _Type(thisType), true);
+              : s0.tryPromote(h, x, _Type(thisType)).ifTrue;
           var s2 = otherType == null
               ? s0
-              : s0.tryPromote(h, x, _Type(otherType), true);
+              : s0.tryPromote(h, x, _Type(otherType)).ifTrue;
           var result = s1.restrict(h, s2, unsafe ? [x].toSet() : Set());
           if (expectedChain == null) {
             expect(result.variableInfo, contains(x));
@@ -2171,18 +2204,18 @@ main() {
           var initialModel =
               FlowModel<_Var, _Type>(true).write(x, _Type('Object?'), h);
           for (var t in before) {
-            initialModel = initialModel.tryPromote(h, x, _Type(t), true);
+            initialModel = initialModel.tryPromote(h, x, _Type(t)).ifTrue;
           }
           _checkChain(initialModel.infoFor(x).promotionChain, before);
           var tryModel = initialModel;
           for (var t in inTry) {
-            tryModel = tryModel.tryPromote(h, x, _Type(t), true);
+            tryModel = tryModel.tryPromote(h, x, _Type(t)).ifTrue;
           }
           var expectedTryChain = before.toList()..addAll(inTry);
           _checkChain(tryModel.infoFor(x).promotionChain, expectedTryChain);
           var finallyModel = initialModel;
           for (var t in inFinally) {
-            finallyModel = finallyModel.tryPromote(h, x, _Type(t), true);
+            finallyModel = finallyModel.tryPromote(h, x, _Type(t)).ifTrue;
           }
           var expectedFinallyChain = before.toList()..addAll(inFinally);
           _checkChain(

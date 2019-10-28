@@ -185,6 +185,30 @@ class AssignedVariablesForTesting<Node, Variable>
   Set<Variable> writtenInNode(Node node) => _getWrittenInNode(node);
 }
 
+/// A collection of flow models representing the possible outcomes of evaluating
+/// an expression that are relevant to flow analysis.
+class ExpressionInfo<Variable, Type> {
+  /// The state after the expression evaluates, if we don't care what it
+  /// evaluates to.
+  final FlowModel<Variable, Type> after;
+
+  /// The state after the expression evaluates, if it evaluates to `true`.
+  final FlowModel<Variable, Type> ifTrue;
+
+  /// The state after the expression evaluates, if it evaluates to `false`.
+  final FlowModel<Variable, Type> ifFalse;
+
+  ExpressionInfo(this.after, this.ifTrue, this.ifFalse);
+
+  @override
+  String toString() =>
+      'ExpressionInfo(after: $after, _ifTrue: $ifTrue, ifFalse: $ifFalse)';
+
+  static ExpressionInfo<Variable, Type> invert<Variable, Type>(
+          ExpressionInfo<Variable, Type> info) =>
+      ExpressionInfo<Variable, Type>(info.after, info.ifFalse, info.ifTrue);
+}
+
 /// Implementation of flow analysis to be shared between the analyzer and the
 /// front end.
 ///
@@ -1206,45 +1230,48 @@ class FlowModel<Variable, Type> {
   @override
   String toString() => '($reachable, $variableInfo)';
 
-  FlowModel<Variable, Type> tryMarkNonNullable(
-      TypeOperations<Variable, Type> typeOperations,
-      Variable variable,
-      bool success) {
+  ExpressionInfo<Variable, Type> tryMarkNonNullable(
+      TypeOperations<Variable, Type> typeOperations, Variable variable) {
     VariableModel<Type> info = infoFor(variable);
-    if (info.writeCaptured) return this;
+    if (info.writeCaptured) {
+      return ExpressionInfo<Variable, Type>(this, this, this);
+    }
     Type previousType = info.promotionChain?.last;
     previousType ??= typeOperations.variableType(variable);
     Type type = typeOperations.promoteToNonNull(previousType);
-    if (typeOperations.isSameType(type, previousType)) return this;
+    if (typeOperations.isSameType(type, previousType)) {
+      return ExpressionInfo<Variable, Type>(this, this, this);
+    }
     assert(typeOperations.isSubtypeOf(type, previousType));
-    return _finishTypeTest(typeOperations, variable, info, type, success);
+    return _finishTypeTest(typeOperations, variable, info, type);
   }
 
-  /// Updates the state to indicate that the given [variable] has been
-  /// determined to satisfy the given [type], e.g. as a consequence of an `is`
-  /// expression as the condition of an `if` statement.
+  /// Returns an [ExpressionInfo] indicating the result of checking whether the
+  /// given [variable] satisfies the given [type], e.g. as a consequence of an
+  /// `is` expression as the condition of an `if` statement.
   ///
   /// Note that the state is only changed if [type] is a subtype of the
   /// variable's previous (possibly promoted) type.
   ///
   /// TODO(paulberry): if the type is non-nullable, should this method mark the
   /// variable as definitely assigned?  Does it matter?
-  FlowModel<Variable, Type> tryPromote(
+  ExpressionInfo<Variable, Type> tryPromote(
       TypeOperations<Variable, Type> typeOperations,
       Variable variable,
-      Type type,
-      bool success) {
+      Type type) {
     VariableModel<Type> info = infoFor(variable);
-    if (info.writeCaptured) return this;
+    if (info.writeCaptured) {
+      return ExpressionInfo<Variable, Type>(this, this, this);
+    }
     Type previousType = info.promotionChain?.last;
     previousType ??= typeOperations.variableType(variable);
 
     Type newType = typeOperations.tryPromoteToType(type, previousType);
     if (newType == null || typeOperations.isSameType(newType, previousType)) {
-      return this;
+      return ExpressionInfo<Variable, Type>(this, this, this);
     }
     assert(typeOperations.isSubtypeOf(newType, previousType));
-    return _finishTypeTest(typeOperations, variable, info, newType, success);
+    return _finishTypeTest(typeOperations, variable, info, newType);
   }
 
   /// Updates the state to indicate that an assignment was made to the given
@@ -1259,15 +1286,32 @@ class FlowModel<Variable, Type> {
     return _updateVariableInfo(variable, newInfoForVar);
   }
 
-  FlowModel<Variable, Type> _finishTypeTest(
+  ExpressionInfo<Variable, Type> _finishTypeTest(
       TypeOperations<Variable, Type> typeOperations,
       Variable variable,
       VariableModel<Type> info,
-      Type testedType,
-      bool success) {
-    var newModel = info.promotionAttempt(testedType, typeOperations, success);
-    if (identical(newModel, info)) return this;
-    return _updateVariableInfo(variable, newModel);
+      Type testedType) {
+    List<Type> newPromotionChain =
+        VariableModel._addToPromotionChain(info.promotionChain, testedType);
+    List<Type> newTypesOfInterest = VariableModel._addTypeToUniqueList(
+        info.typesOfInterest, testedType, typeOperations);
+    FlowModel<Variable, Type> modelIfFailed =
+        identical(newTypesOfInterest, info.typesOfInterest)
+            ? this
+            : _updateVariableInfo(
+                variable,
+                new VariableModel<Type>(info.promotionChain, newTypesOfInterest,
+                    info.assigned, info.writeCaptured));
+    FlowModel<Variable, Type> modelIfSuccessful =
+        identical(newPromotionChain, info.promotionChain) &&
+                identical(newTypesOfInterest, info.typesOfInterest)
+            ? this
+            : _updateVariableInfo(
+                variable,
+                new VariableModel<Type>(newPromotionChain, newTypesOfInterest,
+                    info.assigned, info.writeCaptured));
+    return ExpressionInfo<Variable, Type>(
+        this, modelIfSuccessful, modelIfFailed);
   }
 
   /// Returns a new [FlowModel] where the information for [variable] is replaced
@@ -1458,26 +1502,6 @@ class VariableModel<Type> {
       return this;
     }
     return new VariableModel<Type>(null, const [], true, writeCaptured);
-  }
-
-  VariableModel<Type> promotionAttempt(Type testedType,
-      TypeOperations<Object, Type> typeOperations, bool successful) {
-    List<Type> newPromotionChain;
-    if (!successful) {
-      newPromotionChain = promotionChain;
-    } else if (promotionChain == null) {
-      newPromotionChain = [testedType];
-    } else {
-      newPromotionChain = (promotionChain.toList()..add(testedType));
-    }
-    List<Type> newTypesOfInterest =
-        _addTypeToUniqueList(typesOfInterest, testedType, typeOperations);
-    if (identical(newPromotionChain, promotionChain) &&
-        identical(newTypesOfInterest, typesOfInterest)) {
-      return this;
-    }
-    return new VariableModel<Type>(
-        newPromotionChain, newTypesOfInterest, assigned, writeCaptured);
   }
 
   /// Returns an updated model reflect a control path that is known to have
@@ -1759,7 +1783,7 @@ class VariableModel<Type> {
 /// [_FlowContext] representing an assert statement or assert initializer.
 class _AssertContext<Variable, Type> extends _SimpleContext<Variable, Type> {
   /// Flow models associated with the condition being asserted.
-  _ExpressionInfo<Variable, Type> _conditionInfo;
+  ExpressionInfo<Variable, Type> _conditionInfo;
 
   _AssertContext(FlowModel<Variable, Type> previous) : super(previous);
 
@@ -1773,7 +1797,7 @@ class _AssertContext<Variable, Type> extends _SimpleContext<Variable, Type> {
 /// binary operator.
 class _BranchContext<Variable, Type> extends _FlowContext {
   /// Flow models associated with the condition being branched on.
-  final _ExpressionInfo<Variable, Type> _conditionInfo;
+  final ExpressionInfo<Variable, Type> _conditionInfo;
 
   _BranchContext(this._conditionInfo);
 
@@ -1802,34 +1826,14 @@ class _ConditionalContext<Variable, Type>
     extends _BranchContext<Variable, Type> {
   /// Flow models associated with the value of the conditional expression in the
   /// circumstance where the "then" branch is taken.
-  _ExpressionInfo<Variable, Type> _thenInfo;
+  ExpressionInfo<Variable, Type> _thenInfo;
 
-  _ConditionalContext(_ExpressionInfo<Variable, Type> conditionInfo)
+  _ConditionalContext(ExpressionInfo<Variable, Type> conditionInfo)
       : super(conditionInfo);
 
   @override
   String toString() => '_ConditionalContext(conditionInfo: $_conditionInfo, '
       'thenInfo: $_thenInfo)';
-}
-
-/// A collection of flow models representing the possible outcomes of evaluating
-/// an expression that are relevant to flow analysis.
-class _ExpressionInfo<Variable, Type> {
-  /// The state after the expression evaluates, if we don't care what it
-  /// evaluates to.
-  final FlowModel<Variable, Type> _after;
-
-  /// The state after the expression evaluates, if it evaluates to `true`.
-  final FlowModel<Variable, Type> _ifTrue;
-
-  /// The state after the expression evaluates, if it evaluates to `false`.
-  final FlowModel<Variable, Type> _ifFalse;
-
-  _ExpressionInfo(this._after, this._ifTrue, this._ifFalse);
-
-  @override
-  String toString() =>
-      '_ExpressionInfo(after: $_after, _ifTrue: $_ifTrue, ifFalse: $_ifFalse)';
 }
 
 class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
@@ -1849,14 +1853,14 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
 
   FlowModel<Variable, Type> _current;
 
-  /// The most recently visited expression for which an [_ExpressionInfo] object
+  /// The most recently visited expression for which an [ExpressionInfo] object
   /// exists, or `null` if no expression has been visited that has a
-  /// corresponding [_ExpressionInfo] object.
+  /// corresponding [ExpressionInfo] object.
   Expression _expressionWithInfo;
 
-  /// If [_expressionWithInfo] is not `null`, the [_ExpressionInfo] object
+  /// If [_expressionWithInfo] is not `null`, the [ExpressionInfo] object
   /// corresponding to it.  Otherwise `null`.
-  _ExpressionInfo<Variable, Type> _expressionInfo;
+  ExpressionInfo<Variable, Type> _expressionInfo;
 
   int _functionNestingLevel = 0;
 
@@ -1871,7 +1875,7 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
 
   @override
   void asExpression_end(Expression subExpression, Type type) {
-    _ExpressionInfo<Variable, Type> subExpressionInfo =
+    ExpressionInfo<Variable, Type> subExpressionInfo =
         _getExpressionInfo(subExpression);
     Variable variable;
     if (subExpressionInfo is _VariableReadInfo<Variable, Type>) {
@@ -1879,16 +1883,16 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
     } else {
       return;
     }
-    _current = _current.tryPromote(typeOperations, variable, type, true);
+    _current = _current.tryPromote(typeOperations, variable, type).ifTrue;
   }
 
   @override
   void assert_afterCondition(Expression condition) {
     _AssertContext<Variable, Type> context =
         _stack.last as _AssertContext<Variable, Type>;
-    _ExpressionInfo<Variable, Type> conditionInfo = _expressionEnd(condition);
+    ExpressionInfo<Variable, Type> conditionInfo = _expressionEnd(condition);
     context._conditionInfo = conditionInfo;
-    _current = conditionInfo._ifFalse;
+    _current = conditionInfo.ifFalse;
   }
 
   @override
@@ -1900,7 +1904,7 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
   void assert_end() {
     _AssertContext<Variable, Type> context =
         _stack.removeLast() as _AssertContext<Variable, Type>;
-    _current = _join(context._previous, context._conditionInfo._ifTrue);
+    _current = _join(context._previous, context._conditionInfo.ifTrue);
   }
 
   @override
@@ -1909,8 +1913,8 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
     _storeExpressionInfo(
         expression,
         value
-            ? new _ExpressionInfo(_current, _current, unreachable)
-            : new _ExpressionInfo(_current, unreachable, _current));
+            ? new ExpressionInfo(_current, _current, unreachable)
+            : new ExpressionInfo(_current, unreachable, _current));
   }
 
   @override
@@ -1918,7 +1922,7 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
     _ConditionalContext<Variable, Type> context =
         _stack.last as _ConditionalContext<Variable, Type>;
     context._thenInfo = _expressionEnd(thenExpression);
-    _current = context._conditionInfo._ifFalse;
+    _current = context._conditionInfo.ifFalse;
   }
 
   @override
@@ -1926,21 +1930,21 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
       Expression conditionalExpression, Expression elseExpression) {
     _ConditionalContext<Variable, Type> context =
         _stack.removeLast() as _ConditionalContext<Variable, Type>;
-    _ExpressionInfo<Variable, Type> thenInfo = context._thenInfo;
-    _ExpressionInfo<Variable, Type> elseInfo = _expressionEnd(elseExpression);
+    ExpressionInfo<Variable, Type> thenInfo = context._thenInfo;
+    ExpressionInfo<Variable, Type> elseInfo = _expressionEnd(elseExpression);
     _storeExpressionInfo(
         conditionalExpression,
-        new _ExpressionInfo(
-            _join(thenInfo._after, elseInfo._after),
-            _join(thenInfo._ifTrue, elseInfo._ifTrue),
-            _join(thenInfo._ifFalse, elseInfo._ifFalse)));
+        new ExpressionInfo(
+            _join(thenInfo.after, elseInfo.after),
+            _join(thenInfo.ifTrue, elseInfo.ifTrue),
+            _join(thenInfo.ifFalse, elseInfo.ifFalse)));
   }
 
   @override
   void conditional_thenBegin(Expression condition) {
-    _ExpressionInfo<Variable, Type> conditionInfo = _expressionEnd(condition);
+    ExpressionInfo<Variable, Type> conditionInfo = _expressionEnd(condition);
     _stack.add(new _ConditionalContext(conditionInfo));
-    _current = conditionInfo._ifTrue;
+    _current = conditionInfo.ifTrue;
   }
 
   @override
@@ -1967,7 +1971,7 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
   void doStatement_end(Expression condition) {
     _BranchTargetContext<Variable, Type> context =
         _stack.removeLast() as _BranchTargetContext<Variable, Type>;
-    _current = _join(_expressionEnd(condition)._ifFalse, context._breakModel);
+    _current = _join(_expressionEnd(condition).ifFalse, context._breakModel);
   }
 
   @override
@@ -1975,8 +1979,8 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
       {bool notEqual = false}) {
     _BranchContext<Variable, Type> context =
         _stack.removeLast() as _BranchContext<Variable, Type>;
-    _ExpressionInfo<Variable, Type> lhsInfo = context._conditionInfo;
-    _ExpressionInfo<Variable, Type> rhsInfo = _getExpressionInfo(rightOperand);
+    ExpressionInfo<Variable, Type> lhsInfo = context._conditionInfo;
+    ExpressionInfo<Variable, Type> rhsInfo = _getExpressionInfo(rightOperand);
     Variable variable;
     if (lhsInfo is _NullInfo<Variable, Type> &&
         rhsInfo is _VariableReadInfo<Variable, Type>) {
@@ -1987,16 +1991,10 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
     } else {
       return;
     }
-    // TODO(paulberry): should tryMarkNonNullable return a pair?
-    FlowModel<Variable, Type> ifNotNull =
-        _current.tryMarkNonNullable(typeOperations, variable, true);
-    FlowModel<Variable, Type> ifNull =
-        _current.tryMarkNonNullable(typeOperations, variable, false);
-    _storeExpressionInfo(
-        wholeExpression,
-        notEqual
-            ? new _ExpressionInfo(_current, ifNotNull, ifNull)
-            : new _ExpressionInfo(_current, ifNull, ifNotNull));
+    ExpressionInfo<Variable, Type> expressionInfo =
+        _current.tryMarkNonNullable(typeOperations, variable);
+    _storeExpressionInfo(wholeExpression,
+        notEqual ? expressionInfo : ExpressionInfo.invert(expressionInfo));
   }
 
   @override
@@ -2012,8 +2010,8 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
 
   @override
   void for_bodyBegin(Statement node, Expression condition) {
-    _ExpressionInfo<Variable, Type> conditionInfo = condition == null
-        ? new _ExpressionInfo(_current, _current, _current.setReachable(false))
+    ExpressionInfo<Variable, Type> conditionInfo = condition == null
+        ? new ExpressionInfo(_current, _current, _current.setReachable(false))
         : _expressionEnd(condition);
     _WhileContext<Variable, Type> context =
         new _WhileContext<Variable, Type>(conditionInfo);
@@ -2021,7 +2019,7 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
     if (node != null) {
       _statementToContext[node] = context;
     }
-    _current = conditionInfo._ifTrue;
+    _current = conditionInfo.ifTrue;
   }
 
   @override
@@ -2039,7 +2037,7 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
         _stack.removeLast() as _WhileContext<Variable, Type>;
     // Tail of the stack: falseCondition, break
     FlowModel<Variable, Type> breakState = context._breakModel;
-    FlowModel<Variable, Type> falseCondition = context._conditionInfo._ifFalse;
+    FlowModel<Variable, Type> falseCondition = context._conditionInfo.ifFalse;
 
     _current = _join(falseCondition, breakState);
   }
@@ -2133,7 +2131,7 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
     _IfContext<Variable, Type> context =
         _stack.last as _IfContext<Variable, Type>;
     context._afterThen = _current;
-    _current = context._conditionInfo._ifFalse;
+    _current = context._conditionInfo.ifFalse;
   }
 
   @override
@@ -2147,16 +2145,16 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
       afterElse = _current;
     } else {
       afterThen = _current; // no `else`, so `then` is still current
-      afterElse = context._conditionInfo._ifFalse;
+      afterElse = context._conditionInfo.ifFalse;
     }
     _current = _join(afterThen, afterElse);
   }
 
   @override
   void ifStatement_thenBegin(Expression condition) {
-    _ExpressionInfo<Variable, Type> conditionInfo = _expressionEnd(condition);
+    ExpressionInfo<Variable, Type> conditionInfo = _expressionEnd(condition);
     _stack.add(new _IfContext(conditionInfo));
-    _current = conditionInfo._ifTrue;
+    _current = conditionInfo.ifTrue;
   }
 
   @override
@@ -2172,7 +2170,7 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
   @override
   void isExpression_end(Expression isExpression, Expression subExpression,
       bool isNot, Type type) {
-    _ExpressionInfo<Variable, Type> subExpressionInfo =
+    ExpressionInfo<Variable, Type> subExpressionInfo =
         _getExpressionInfo(subExpression);
     Variable variable;
     if (subExpressionInfo is _VariableReadInfo<Variable, Type>) {
@@ -2180,16 +2178,10 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
     } else {
       return;
     }
-    // TODO(paulberry): should tryPromote return a pair?
-    FlowModel<Variable, Type> promoted =
-        _current.tryPromote(typeOperations, variable, type, true);
-    FlowModel<Variable, Type> unpromoted =
-        _current.tryPromote(typeOperations, variable, type, false);
-    _storeExpressionInfo(
-        isExpression,
-        isNot
-            ? new _ExpressionInfo(_current, unpromoted, promoted)
-            : new _ExpressionInfo(_current, promoted, unpromoted));
+    ExpressionInfo<Variable, Type> expressionInfo =
+        _current.tryPromote(typeOperations, variable, type);
+    _storeExpressionInfo(isExpression,
+        isNot ? ExpressionInfo.invert(expressionInfo) : expressionInfo);
   }
 
   @override
@@ -2197,46 +2189,44 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
       {@required bool isAnd}) {
     _BranchContext<Variable, Type> context =
         _stack.removeLast() as _BranchContext<Variable, Type>;
-    _ExpressionInfo<Variable, Type> rhsInfo = _expressionEnd(rightOperand);
+    ExpressionInfo<Variable, Type> rhsInfo = _expressionEnd(rightOperand);
 
     FlowModel<Variable, Type> trueResult;
     FlowModel<Variable, Type> falseResult;
     if (isAnd) {
-      trueResult = rhsInfo._ifTrue;
-      falseResult = _join(context._conditionInfo._ifFalse, rhsInfo._ifFalse);
+      trueResult = rhsInfo.ifTrue;
+      falseResult = _join(context._conditionInfo.ifFalse, rhsInfo.ifFalse);
     } else {
-      trueResult = _join(context._conditionInfo._ifTrue, rhsInfo._ifTrue);
-      falseResult = rhsInfo._ifFalse;
+      trueResult = _join(context._conditionInfo.ifTrue, rhsInfo.ifTrue);
+      falseResult = rhsInfo.ifFalse;
     }
     _storeExpressionInfo(
         wholeExpression,
-        new _ExpressionInfo(
+        new ExpressionInfo(
             _join(trueResult, falseResult), trueResult, falseResult));
   }
 
   @override
   void logicalBinaryOp_rightBegin(Expression leftOperand,
       {@required bool isAnd}) {
-    _ExpressionInfo<Variable, Type> conditionInfo = _expressionEnd(leftOperand);
+    ExpressionInfo<Variable, Type> conditionInfo = _expressionEnd(leftOperand);
     _stack.add(new _BranchContext<Variable, Type>(conditionInfo));
-    _current = isAnd ? conditionInfo._ifTrue : conditionInfo._ifFalse;
+    _current = isAnd ? conditionInfo.ifTrue : conditionInfo.ifFalse;
   }
 
   @override
   void logicalNot_end(Expression notExpression, Expression operand) {
-    _ExpressionInfo<Variable, Type> conditionInfo = _expressionEnd(operand);
-    _storeExpressionInfo(
-        notExpression,
-        new _ExpressionInfo(conditionInfo._after, conditionInfo._ifFalse,
-            conditionInfo._ifTrue));
+    ExpressionInfo<Variable, Type> conditionInfo = _expressionEnd(operand);
+    _storeExpressionInfo(notExpression, ExpressionInfo.invert(conditionInfo));
   }
 
   @override
   void nonNullAssert_end(Expression operand) {
-    _ExpressionInfo<Variable, Type> operandInfo = _getExpressionInfo(operand);
+    ExpressionInfo<Variable, Type> operandInfo = _getExpressionInfo(operand);
     if (operandInfo is _VariableReadInfo<Variable, Type>) {
-      _current = _current.tryMarkNonNullable(
-          typeOperations, operandInfo._variable, true);
+      _current = _current
+          .tryMarkNonNullable(typeOperations, operandInfo._variable)
+          .ifTrue;
     }
   }
 
@@ -2251,10 +2241,11 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
   void nullAwareAccess_rightBegin(Expression target) {
     _stack.add(new _SimpleContext<Variable, Type>(_current));
     if (target != null) {
-      _ExpressionInfo<Variable, Type> targetInfo = _getExpressionInfo(target);
+      ExpressionInfo<Variable, Type> targetInfo = _getExpressionInfo(target);
       if (targetInfo is _VariableReadInfo<Variable, Type>) {
-        _current = _current.tryMarkNonNullable(
-            typeOperations, targetInfo._variable, true);
+        _current = _current
+            .tryMarkNonNullable(typeOperations, targetInfo._variable)
+            .ifTrue;
       }
     }
   }
@@ -2400,12 +2391,12 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
   @override
   void whileStatement_bodyBegin(
       Statement whileStatement, Expression condition) {
-    _ExpressionInfo<Variable, Type> conditionInfo = _expressionEnd(condition);
+    ExpressionInfo<Variable, Type> conditionInfo = _expressionEnd(condition);
     _WhileContext<Variable, Type> context =
         new _WhileContext<Variable, Type>(conditionInfo);
     _stack.add(context);
     _statementToContext[whileStatement] = context;
-    _current = conditionInfo._ifTrue;
+    _current = conditionInfo.ifTrue;
   }
 
   @override
@@ -2421,7 +2412,7 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
   void whileStatement_end() {
     _WhileContext<Variable, Type> context =
         _stack.removeLast() as _WhileContext<Variable, Type>;
-    _current = _join(context._conditionInfo._ifFalse, context._breakModel);
+    _current = _join(context._conditionInfo.ifFalse, context._breakModel);
   }
 
   @override
@@ -2443,21 +2434,21 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
     }
   }
 
-  /// Gets the [_ExpressionInfo] associated with the [expression] (which should
+  /// Gets the [ExpressionInfo] associated with the [expression] (which should
   /// be the last expression that was traversed).  If there is no
-  /// [_ExpressionInfo] associated with the [expression], then a fresh
-  /// [_ExpressionInfo] is created recording the current flow analysis state.
-  _ExpressionInfo<Variable, Type> _expressionEnd(Expression expression) =>
+  /// [ExpressionInfo] associated with the [expression], then a fresh
+  /// [ExpressionInfo] is created recording the current flow analysis state.
+  ExpressionInfo<Variable, Type> _expressionEnd(Expression expression) =>
       _getExpressionInfo(expression) ??
-      new _ExpressionInfo(_current, _current, _current);
+      new ExpressionInfo(_current, _current, _current);
 
-  /// Gets the [_ExpressionInfo] associated with the [expression] (which should
+  /// Gets the [ExpressionInfo] associated with the [expression] (which should
   /// be the last expression that was traversed).  If there is no
-  /// [_ExpressionInfo] associated with the [expression], then `null` is
+  /// [ExpressionInfo] associated with the [expression], then `null` is
   /// returned.
-  _ExpressionInfo<Variable, Type> _getExpressionInfo(Expression expression) {
+  ExpressionInfo<Variable, Type> _getExpressionInfo(Expression expression) {
     if (identical(expression, _expressionWithInfo)) {
-      _ExpressionInfo<Variable, Type> expressionInfo = _expressionInfo;
+      ExpressionInfo<Variable, Type> expressionInfo = _expressionInfo;
       _expressionInfo = null;
       return expressionInfo;
     } else {
@@ -2473,10 +2464,10 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
   /// expression, with the given [expressionInfo] object, and updates the
   /// current flow model state to correspond to it.
   void _storeExpressionInfo(
-      Expression expression, _ExpressionInfo<Variable, Type> expressionInfo) {
+      Expression expression, ExpressionInfo<Variable, Type> expressionInfo) {
     _expressionWithInfo = expression;
     _expressionInfo = expressionInfo;
-    _current = expressionInfo._after;
+    _current = expressionInfo.after;
   }
 }
 
@@ -2490,7 +2481,7 @@ class _IfContext<Variable, Type> extends _BranchContext<Variable, Type> {
   /// statement executes, in the circumstance where the "then" branch is taken.
   FlowModel<Variable, Type> _afterThen;
 
-  _IfContext(_ExpressionInfo<Variable, Type> conditionInfo)
+  _IfContext(ExpressionInfo<Variable, Type> conditionInfo)
       : super(conditionInfo);
 
   @override
@@ -2498,18 +2489,18 @@ class _IfContext<Variable, Type> extends _BranchContext<Variable, Type> {
       '_IfContext(conditionInfo: $_conditionInfo, afterThen: $_afterThen)';
 }
 
-/// [_ExpressionInfo] representing a `null` literal.
-class _NullInfo<Variable, Type> implements _ExpressionInfo<Variable, Type> {
+/// [ExpressionInfo] representing a `null` literal.
+class _NullInfo<Variable, Type> implements ExpressionInfo<Variable, Type> {
   @override
-  final FlowModel<Variable, Type> _after;
+  final FlowModel<Variable, Type> after;
 
-  _NullInfo(this._after);
-
-  @override
-  FlowModel<Variable, Type> get _ifFalse => _after;
+  _NullInfo(this.after);
 
   @override
-  FlowModel<Variable, Type> get _ifTrue => _after;
+  FlowModel<Variable, Type> get ifFalse => after;
+
+  @override
+  FlowModel<Variable, Type> get ifTrue => after;
 }
 
 /// [_FlowContext] representing a language construct for which flow analysis
@@ -2568,27 +2559,26 @@ class _TryContext<Variable, Type> extends _SimpleContext<Variable, Type> {
       'afterBodyAndCatches: $_afterBodyAndCatches)';
 }
 
-/// [_ExpressionInfo] representing an expression that reads the value of a
+/// [ExpressionInfo] representing an expression that reads the value of a
 /// variable.
 class _VariableReadInfo<Variable, Type>
-    implements _ExpressionInfo<Variable, Type> {
+    implements ExpressionInfo<Variable, Type> {
   @override
-  final FlowModel<Variable, Type> _after;
+  final FlowModel<Variable, Type> after;
 
   /// The variable that is being read.
   final Variable _variable;
 
-  _VariableReadInfo(this._after, this._variable);
+  _VariableReadInfo(this.after, this._variable);
 
   @override
-  FlowModel<Variable, Type> get _ifFalse => _after;
+  FlowModel<Variable, Type> get ifFalse => after;
 
   @override
-  FlowModel<Variable, Type> get _ifTrue => _after;
+  FlowModel<Variable, Type> get ifTrue => after;
 
   @override
-  String toString() =>
-      '_VariableReadInfo(after: $_after, variable: $_variable)';
+  String toString() => '_VariableReadInfo(after: $after, variable: $_variable)';
 }
 
 /// [_FlowContext] representing a `while` loop (or a C-style `for` loop, which
@@ -2596,7 +2586,7 @@ class _VariableReadInfo<Variable, Type>
 class _WhileContext<Variable, Type>
     extends _BranchTargetContext<Variable, Type> {
   /// Flow models associated with the loop condition.
-  final _ExpressionInfo<Variable, Type> _conditionInfo;
+  final ExpressionInfo<Variable, Type> _conditionInfo;
 
   _WhileContext(this._conditionInfo);
 
