@@ -1885,6 +1885,43 @@ main() {
               chain: ['num?', 'int?'], ofInterest: ['num?', 'int?'])
         });
       });
+
+      test('Multiple candidate types of interest; choose most specific (first)',
+          () {
+        var h = _Harness();
+        var s1 = FlowModel<_Var, _Type>(true)
+            .write(objectQVar, _Type('Object?'), h)
+            .tryPromote(h, objectQVar, _Type('int?'), false)
+            .tryPromote(h, objectQVar, _Type('num?'), false);
+        expect(s1.variableInfo, {
+          objectQVar:
+              _matchVariableModel(chain: null, ofInterest: ['num?', 'int?'])
+        });
+        var s2 = s1.write(objectQVar, _Type('int'), h);
+        expect(s2.variableInfo, {
+          objectQVar:
+              _matchVariableModel(chain: ['int?'], ofInterest: ['num?', 'int?'])
+        });
+      });
+
+      test(
+          'Multiple candidate types of interest; choose most specific (second)',
+          () {
+        var h = _Harness();
+        var s1 = FlowModel<_Var, _Type>(true)
+            .write(objectQVar, _Type('Object?'), h)
+            .tryPromote(h, objectQVar, _Type('num?'), false)
+            .tryPromote(h, objectQVar, _Type('int?'), false);
+        expect(s1.variableInfo, {
+          objectQVar:
+              _matchVariableModel(chain: null, ofInterest: ['num?', 'int?'])
+        });
+        var s2 = s1.write(objectQVar, _Type('int'), h);
+        expect(s2.variableInfo, {
+          objectQVar:
+              _matchVariableModel(chain: ['int?'], ofInterest: ['num?', 'int?'])
+        });
+      });
     });
 
     group('initialize', () {
@@ -2623,6 +2660,7 @@ class _Harness implements TypeOperations<_Var, _Type> {
       'num <: num?': true,
       'num <: Object': true,
       'num <: Object?': true,
+      'num? <: int?': false,
       'num? <: num': false,
       'num? <: Object?': true,
       'Iterable <: int': false,
