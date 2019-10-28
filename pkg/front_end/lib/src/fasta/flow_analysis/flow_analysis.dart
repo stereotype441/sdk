@@ -206,7 +206,7 @@ class ExpressionInfo<Variable, Type> {
 
   static ExpressionInfo<Variable, Type> invert<Variable, Type>(
           ExpressionInfo<Variable, Type> info) =>
-      ExpressionInfo<Variable, Type>(info.after, info.ifFalse, info.ifTrue);
+      new ExpressionInfo<Variable, Type>(info.after, info.ifFalse, info.ifTrue);
 }
 
 /// Implementation of flow analysis to be shared between the analyzer and the
@@ -1234,13 +1234,13 @@ class FlowModel<Variable, Type> {
       TypeOperations<Variable, Type> typeOperations, Variable variable) {
     VariableModel<Type> info = infoFor(variable);
     if (info.writeCaptured) {
-      return ExpressionInfo<Variable, Type>(this, this, this);
+      return new ExpressionInfo<Variable, Type>(this, this, this);
     }
     Type previousType = info.promotionChain?.last;
     previousType ??= typeOperations.variableType(variable);
     Type type = typeOperations.promoteToNonNull(previousType);
     if (typeOperations.isSameType(type, previousType)) {
-      return ExpressionInfo<Variable, Type>(this, this, this);
+      return new ExpressionInfo<Variable, Type>(this, this, this);
     }
     assert(typeOperations.isSubtypeOf(type, previousType));
     return _finishTypeTest(typeOperations, variable, info, type);
@@ -1261,14 +1261,14 @@ class FlowModel<Variable, Type> {
       Type type) {
     VariableModel<Type> info = infoFor(variable);
     if (info.writeCaptured) {
-      return ExpressionInfo<Variable, Type>(this, this, this);
+      return new ExpressionInfo<Variable, Type>(this, this, this);
     }
     Type previousType = info.promotionChain?.last;
     previousType ??= typeOperations.variableType(variable);
 
     Type newType = typeOperations.tryPromoteToType(type, previousType);
     if (newType == null || typeOperations.isSameType(newType, previousType)) {
-      return ExpressionInfo<Variable, Type>(this, this, this);
+      return new ExpressionInfo<Variable, Type>(this, this, this);
     }
     assert(typeOperations.isSubtypeOf(newType, previousType));
     return _finishTypeTest(typeOperations, variable, info, newType);
@@ -1310,7 +1310,7 @@ class FlowModel<Variable, Type> {
                 variable,
                 new VariableModel<Type>(newPromotionChain, newTypesOfInterest,
                     info.assigned, info.writeCaptured));
-    return ExpressionInfo<Variable, Type>(
+    return new ExpressionInfo<Variable, Type>(
         this, modelIfSuccessful, modelIfFailed);
   }
 
