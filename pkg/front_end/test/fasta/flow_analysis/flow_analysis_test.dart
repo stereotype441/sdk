@@ -738,6 +738,46 @@ main() {
       });
     });
 
+    test('ifNullExpression allows ensure guarding', () {
+      var h = _Harness();
+      var x = h.addVar('x', 'int?');
+      h.assignedVariables((vars) => vars.write(x));
+      h.run((flow) {
+        h.declare(x, initialized: true);
+        flow.ifNullExpression_rightBegin(h.variableRead(x)());
+        flow.write(x, _Type('int'));
+        expect(flow.promotedType(x).type, 'int');
+        flow.ifNullExpression_end();
+        expect(flow.promotedType(x).type, 'int');
+      });
+    });
+
+    test('ifNullExpression allows promotion of tested var', () {
+      var h = _Harness();
+      var x = h.addVar('x', 'int?');
+      h.run((flow) {
+        h.declare(x, initialized: true);
+        flow.ifNullExpression_rightBegin(h.variableRead(x)());
+        h.promote(x, 'int');
+        expect(flow.promotedType(x).type, 'int');
+        flow.ifNullExpression_end();
+        expect(flow.promotedType(x).type, 'int');
+      });
+    });
+
+    test('ifNullExpression discards promotions unrelated to tested expr', () {
+      var h = _Harness();
+      var x = h.addVar('x', 'int?');
+      h.run((flow) {
+        h.declare(x, initialized: true);
+        flow.ifNullExpression_rightBegin(h.expr());
+        h.promote(x, 'int');
+        expect(flow.promotedType(x).type, 'int');
+        flow.ifNullExpression_end();
+        expect(flow.promotedType(x), null);
+      });
+    });
+
     test('ifStatement_end(false) keeps else branch if then branch exits', () {
       var h = _Harness();
       var x = h.addVar('x', 'int?');
