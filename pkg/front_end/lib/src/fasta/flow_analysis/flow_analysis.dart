@@ -406,7 +406,7 @@ abstract class FlowAnalysis<Node, Statement extends Node, Expression, Variable,
 
   /// Call this method after visiting the LHS of an if-null expression ("??")
   /// or if-null assignment ("??=").
-  void ifNullExpression_rightBegin();
+  void ifNullExpression_rightBegin(Expression leftHandSide);
 
   /// Call this method after visiting the "then" part of an if statement, and
   /// before visiting the "else" part.
@@ -819,9 +819,9 @@ class FlowAnalysisDebug<Node, Statement extends Node, Expression, Variable,
   }
 
   @override
-  void ifNullExpression_rightBegin() {
-    return _wrap('ifNullExpression_rightBegin()',
-        () => _wrapped.ifNullExpression_rightBegin());
+  void ifNullExpression_rightBegin(Expression leftHandSide) {
+    return _wrap('ifNullExpression_rightBegin($leftHandSide)',
+        () => _wrapped.ifNullExpression_rightBegin(leftHandSide));
   }
 
   @override
@@ -2122,8 +2122,18 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
   }
 
   @override
-  void ifNullExpression_rightBegin() {
-    _stack.add(new _SimpleContext<Variable, Type>(_current));
+  void ifNullExpression_rightBegin(Expression leftHandSide) {
+    ExpressionInfo<Variable, Type> lhsInfo = _getExpressionInfo(leftHandSide);
+    FlowModel<Variable, Type> promoted;
+    if (lhsInfo is _VariableReadInfo<Variable, Type>) {
+      ExpressionInfo<Variable, Type> promotionInfo =
+          _current.tryMarkNonNullable(typeOperations, lhsInfo._variable);
+      _current = promotionInfo.ifFalse;
+      promoted = promotionInfo.ifTrue;
+    } else {
+      promoted = _current;
+    }
+    _stack.add(new _SimpleContext<Variable, Type>(promoted));
   }
 
   @override
