@@ -8,7 +8,8 @@ notATypeOfInterest(Object x) {
 }
 
 typeOfInterest_is(Object x) {
-  if (x is int) {} else {
+  if (x is int) {
+  } else {
     x = 1;
     /*int*/ x;
   }
@@ -29,7 +30,8 @@ notATypeOfInterest_nullability(Object? x) {
 }
 
 typeOfInterest_notEqualNull(Object? x) {
-  if (x != null) {} else {
+  if (x != null) {
+  } else {
     x = 1;
     /*Object*/ x;
   }
