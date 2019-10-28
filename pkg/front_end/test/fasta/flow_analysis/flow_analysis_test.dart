@@ -1854,6 +1854,37 @@ main() {
         expect(s2.reachable, true);
         expect(s2.variableInfo, same(s1.variableInfo));
       });
+
+      test('Promotes to type of interest when not previously promoted', () {
+        var h = _Harness();
+        var s1 = FlowModel<_Var, _Type>(true)
+            .write(objectQVar, _Type('Object?'), h)
+            .tryPromote(h, objectQVar, _Type('num?'), false);
+        expect(s1.variableInfo, {
+          objectQVar: _matchVariableModel(chain: null, ofInterest: ['num?'])
+        });
+        var s2 = s1.write(objectQVar, _Type('num?'), h);
+        expect(s2.variableInfo, {
+          objectQVar: _matchVariableModel(chain: ['num?'], ofInterest: ['num?'])
+        });
+      });
+
+      test('Promotes to type of interest when previously promoted', () {
+        var h = _Harness();
+        var s1 = FlowModel<_Var, _Type>(true)
+            .write(objectQVar, _Type('Object?'), h)
+            .tryPromote(h, objectQVar, _Type('num?'), true)
+            .tryPromote(h, objectQVar, _Type('int?'), false);
+        expect(s1.variableInfo, {
+          objectQVar:
+              _matchVariableModel(chain: ['num?'], ofInterest: ['num?', 'int?'])
+        });
+        var s2 = s1.write(objectQVar, _Type('int?'), h);
+        expect(s2.variableInfo, {
+          objectQVar: _matchVariableModel(
+              chain: ['num?', 'int?'], ofInterest: ['num?', 'int?'])
+        });
+      });
     });
 
     group('initialize', () {
@@ -2584,6 +2615,7 @@ class _Harness implements TypeOperations<_Var, _Type> {
       'int <: Object?': true,
       'int <: String': false,
       'int? <: int': false,
+      'int? <: num?': true,
       'int? <: Object?': true,
       'num <: int': false,
       'num <: Iterable': false,

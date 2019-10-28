@@ -1608,11 +1608,6 @@ class VariableModel<Type> {
       } else {
         (candidates ??= []).add(type);
       }
-      if (typeOperations.isSubtypeOf(writtenType, type)) {
-        for (i++; i < typesOfInterest.length; i++) {
-          type = typesOfInterest[i];
-        }
-      }
     }
     if (candidates != null) {
       // Figure out if we have a unique promotion candidate that's a subtype
@@ -1635,7 +1630,9 @@ class VariableModel<Type> {
         }
       }
       if (promoted != null) {
-        return promotionChain.toList()..add(promoted);
+        return promotionChain == null
+            ? [promoted]
+            : (promotionChain.toList()..add(promoted));
       }
     }
     // No suitable promotion found.
