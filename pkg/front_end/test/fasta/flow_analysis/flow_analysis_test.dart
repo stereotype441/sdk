@@ -1922,6 +1922,22 @@ main() {
               _matchVariableModel(chain: ['int?'], ofInterest: ['num?', 'int?'])
         });
       });
+
+      test('Multiple candidate types of interest; ambiguous', () {
+        var h = _Harness();
+        var s1 = FlowModel<_Var, _Type>(true)
+            .write(objectQVar, _Type('Object?'), h)
+            .tryPromote(h, objectQVar, _Type('num?'), false)
+            .tryPromote(h, objectQVar, _Type('num*'), false);
+        expect(s1.variableInfo, {
+          objectQVar:
+              _matchVariableModel(chain: null, ofInterest: ['num?', 'num*'])
+        });
+        var s2 = s1.write(objectQVar, _Type('int'), h);
+        // It's ambiguous whether to promote to num? or num*, so we don't
+        // promote.
+        expect(s2, same(s1));
+      });
     });
 
     group('initialize', () {
@@ -2244,6 +2260,48 @@ main() {
           VariableModel.joinPromotionChains([objectType, intType, neverType],
               [objectType, doubleType, neverType], h),
           _matchPromotionChain(['Object']));
+    });
+  });
+
+  group('joinTypesOfInterest', () {
+    List<_Type> _makeTypes(List<String> typeNames) =>
+        typeNames.map((t) => _Type(t)).toList();
+
+    test('simple prefix', () {
+      var h = _Harness();
+      var s1 = _makeTypes(['double', 'int']);
+      var s2 = _makeTypes(['double', 'int', 'bool']);
+      var expected = _matchOfInterestSet(['double', 'int', 'bool']);
+      expect(VariableModel.joinTypesOfInterest(s1, s2, h), expected);
+      expect(VariableModel.joinTypesOfInterest(s2, s1, h), expected);
+    });
+
+    test('common prefix', () {
+      var h = _Harness();
+      var s1 = _makeTypes(['double', 'int', 'String']);
+      var s2 = _makeTypes(['double', 'int', 'bool']);
+      var expected = _matchOfInterestSet(['double', 'int', 'String', 'bool']);
+      expect(VariableModel.joinTypesOfInterest(s1, s2, h), expected);
+      expect(VariableModel.joinTypesOfInterest(s2, s1, h), expected);
+    });
+
+    test('order mismatch', () {
+      var h = _Harness();
+      var s1 = _makeTypes(['double', 'int']);
+      var s2 = _makeTypes(['int', 'double']);
+      var expected = _matchOfInterestSet(['double', 'int']);
+      expect(VariableModel.joinTypesOfInterest(s1, s2, h), expected);
+      expect(VariableModel.joinTypesOfInterest(s2, s1, h), expected);
+    });
+
+    test('small common prefix', () {
+      var h = _Harness();
+      var s1 = _makeTypes(['int', 'double', 'String', 'bool']);
+      var s2 = _makeTypes(['int', 'List', 'bool', 'Future']);
+      var expected = _matchOfInterestSet(
+          ['int', 'double', 'String', 'bool', 'List', 'Future']);
+      expect(VariableModel.joinTypesOfInterest(s1, s2, h), expected);
+      expect(VariableModel.joinTypesOfInterest(s2, s1, h), expected);
     });
   });
 
@@ -2648,6 +2706,7 @@ class _Harness implements TypeOperations<_Var, _Type> {
       'int <: List': false,
       'int <: num': true,
       'int <: num?': true,
+      'int <: num*': true,
       'int <: Object': true,
       'int <: Object?': true,
       'int <: String': false,
@@ -2662,7 +2721,10 @@ class _Harness implements TypeOperations<_Var, _Type> {
       'num <: Object?': true,
       'num? <: int?': false,
       'num? <: num': false,
+      'num? <: num*': true,
       'num? <: Object?': true,
+      'num* <: num?': true,
+      'num* <: Object?': true,
       'Iterable <: int': false,
       'Iterable <: num': false,
       'Iterable <: Object': true,
