@@ -23,12 +23,12 @@ typeOfInterest_isNot(Object x) {
   /*int*/ x;
 }
 
-notATypeOfInterest_nullability(Object? x, Object y) {
-  x = y;
+notATypeOfInterest_nullability(Object? x) {
+  x = 1;
   x;
 }
 
-typeOfInterest_notEqualNull(Object? x, Object y) {
+typeOfInterest_notEqualNull(Object? x) {
   if (x != null) {} else {
     x = 1;
     /*Object*/ x;
@@ -36,7 +36,7 @@ typeOfInterest_notEqualNull(Object? x, Object y) {
   /*Object*/ x;
 }
 
-typeOfInterest_equalNull(Object x) {
+typeOfInterest_equalNull(Object? x) {
   if (x == null) {
     x = 1;
     /*Object*/ x;
