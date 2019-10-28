@@ -1462,7 +1462,7 @@ class VariableModel<Type> {
   final List<Type> promotionChain;
 
   /// List of types that the variable has been tested against in all code paths
-  /// leading to the given point in the source coed.
+  /// leading to the given point in the source code.
   final List<Type> typesOfInterest;
 
   /// Indicates whether the variable has definitely been assigned.
@@ -1617,7 +1617,7 @@ class VariableModel<Type> {
     Type currentlyPromotedType = promotionChain?.last;
     List<Type> candidates = null;
     for (int i = 0; i < typesOfInterest.length; i++) {
-      var type = typesOfInterest[i];
+      Type type = typesOfInterest[i];
       if (!typeOperations.isSubtypeOf(writtenType, type)) {
         // Can't promote to this type; the type written is not a subtype of
         // it.
