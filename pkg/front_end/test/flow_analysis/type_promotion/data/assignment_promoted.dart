@@ -1,0 +1,45 @@
+// Copyright (c) 2019, the Dart project authors. Please see the AUTHORS file
+// for details. All rights reserved. Use of this source code is governed by a
+// BSD-style license that can be found in the LICENSE file.
+
+notATypeOfInterest(Object x) {
+  x = 1;
+  x;
+}
+
+typeOfInterest_is(Object x) {
+  if (x is int) {} else {
+    x = 1;
+    /*int*/ x;
+  }
+  /*int*/ x;
+}
+
+typeOfInterest_isNot(Object x) {
+  if (x is! int) {
+    x = 1;
+    /*int*/ x;
+  }
+  /*int*/ x;
+}
+
+notATypeOfInterest_nullability(Object? x, Object y) {
+  x = y;
+  x;
+}
+
+typeOfInterest_notEqualNull(Object? x, Object y) {
+  if (x != null) {} else {
+    x = 1;
+    /*Object*/ x;
+  }
+  /*Object*/ x;
+}
+
+typeOfInterest_equalNull(Object x) {
+  if (x == null) {
+    x = 1;
+    /*Object*/ x;
+  }
+  /*Object*/ x;
+}
