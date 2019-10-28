@@ -1938,6 +1938,26 @@ main() {
         // promote.
         expect(s2, same(s1));
       });
+
+      test('Multiple candidate types of interest; ambiguous but exact match',
+          () {
+        var h = _Harness();
+        var s1 = FlowModel<_Var, _Type>(true)
+            .write(objectQVar, _Type('Object?'), h)
+            .tryPromote(h, objectQVar, _Type('num?'), false)
+            .tryPromote(h, objectQVar, _Type('num*'), false);
+        expect(s1.variableInfo, {
+          objectQVar:
+              _matchVariableModel(chain: null, ofInterest: ['num?', 'num*'])
+        });
+        var s2 = s1.write(objectQVar, _Type('num?'), h);
+        // It's ambiguous whether to promote to num? or num*, but since the
+        // written type is exactly num?, we use that.
+        expect(s2.variableInfo, {
+          objectQVar:
+              _matchVariableModel(chain: ['num?'], ofInterest: ['num?', 'num*'])
+        });
+      });
     });
 
     group('initialize', () {

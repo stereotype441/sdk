@@ -1589,7 +1589,7 @@ class VariableModel<Type> {
       Type writtenType) {
     // Figure out if we have any promotion candidates (types that are a
     // supertype of writtenType and a proper subtype of the currently-promoted
-    // type).
+    // type).  If at any point we find an exact match, we take it immediately.
     Type currentlyPromotedType = promotionChain?.last;
     List<Type> candidates = null;
     for (int i = 0; i < typesOfInterest.length; i++) {
@@ -1605,6 +1605,9 @@ class VariableModel<Type> {
           typeOperations.isSameType(type, currentlyPromotedType)) {
         // Can't promote to this type; it's the same as the currently
         // promoted type.
+      } else if (typeOperations.isSameType(type, writtenType)) {
+        // This is precisely the type we want to promote to; take it.
+        return _addToPromotionChain(promotionChain, writtenType);
       } else {
         (candidates ??= []).add(type);
       }
@@ -1630,9 +1633,7 @@ class VariableModel<Type> {
         }
       }
       if (promoted != null) {
-        return promotionChain == null
-            ? [promoted]
-            : (promotionChain.toList()..add(promoted));
+        return _addToPromotionChain(promotionChain, promoted);
       }
     }
     // No suitable promotion found.
@@ -1706,6 +1707,12 @@ class VariableModel<Type> {
     // No types needed to be added.
     return types2;
   }
+
+  static List<Type> _addToPromotionChain<Type>(
+          List<Type> promotionChain, Type promoted) =>
+      promotionChain == null
+          ? [promoted]
+          : (promotionChain.toList()..add(promoted));
 
   static List<Type> _addTypeToUniqueList<Type>(List<Type> types, Type newType,
       TypeOperations<Object, Type> typeOperations) {
