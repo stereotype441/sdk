@@ -7,6 +7,22 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:nnbd_migration/instrumentation.dart';
 
+/// Edge origin resulting from a type in already-migrated code.
+///
+/// For example, in the Map class in dart:core:
+///   V? operator [](Object key);
+///
+/// this class is used for the edge connecting `always` to the return type of
+/// `operator []`, due to the fact that dart:core has already been migrated and
+/// the type is explicitly nullable.
+class AlreadyMigratedTypeOrigin extends EdgeOrigin {
+  AlreadyMigratedTypeOrigin.forElement(Element element)
+      : super.forElement(element);
+
+  @override
+  EdgeOriginKind get kind => EdgeOriginKind.alreadyMigratedType;
+}
+
 /// Edge origin resulting from the use of a type that is always nullable.
 ///
 /// For example, in the following code snippet:

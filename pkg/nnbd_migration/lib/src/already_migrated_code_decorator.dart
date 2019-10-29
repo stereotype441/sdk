@@ -32,7 +32,8 @@ class AlreadyMigratedCodeDecorator {
     NullabilityNode node;
     var nullabilitySuffix = (type as TypeImpl).nullabilitySuffix;
     if (nullabilitySuffix == NullabilitySuffix.question) {
-      node = _graph.always;
+      node = NullabilityNode.forAlreadyMigrated();
+      _graph.makeNullable(node, AlreadyMigratedTypeOrigin.forElement(element));
     } else {
       // Currently, all types passed to this method have nullability suffix `star`
       // because (a) we don't yet have a migrated SDK, and (b) we haven't added
@@ -40,7 +41,9 @@ class AlreadyMigratedCodeDecorator {
       // migrated with NNBD enabled.
       // TODO(paulberry): fix this assertion when things change.
       assert(nullabilitySuffix == NullabilitySuffix.star);
-      node = _graph.never;
+      node = NullabilityNode.forAlreadyMigrated();
+      _graph.makeNonNullable(
+          node, AlreadyMigratedTypeOrigin.forElement(element));
     }
     if (type is FunctionType) {
       var typeFormalBounds = type.typeFormals.map((e) {

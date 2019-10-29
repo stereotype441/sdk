@@ -34,6 +34,8 @@ class _AlreadyMigratedCodeDecoratorTest extends Object with EdgeTester {
 
   final NullabilityGraphForTesting graph;
 
+  Element element = _MockElement();
+
   factory _AlreadyMigratedCodeDecoratorTest() {
     return _AlreadyMigratedCodeDecoratorTest._(
         NullabilityGraphForTesting(), TestTypeProvider());
@@ -46,11 +48,29 @@ class _AlreadyMigratedCodeDecoratorTest extends Object with EdgeTester {
 
   NullabilityNode get never => graph.never;
 
-  void checkDynamic(DecoratedType decoratedType, Element element) {
-    expect(decoratedType.type, same(typeProvider.dynamicType));
-    var edge = assertEdge(always, decoratedType.node, hard: false);
+  void checkAlwaysNullable(NullabilityNode node) {
+    var edge = assertEdge(always, node, hard: false);
     var origin = graph.getEdgeOrigin(edge);
     expect(origin.kind, EdgeOriginKind.alwaysNullableType);
+    expect(origin.element, same(element));
+  }
+
+  void checkDynamic(DecoratedType decoratedType) {
+    expect(decoratedType.type, same(typeProvider.dynamicType));
+    checkAlwaysNullable(decoratedType.node);
+  }
+
+  void checkExplicitlyNonNullable(NullabilityNode node) {
+    var edge = assertEdge(node, never, hard: true);
+    var origin = graph.getEdgeOrigin(edge);
+    expect(origin.kind, EdgeOriginKind.alreadyMigratedType);
+    expect(origin.element, same(element));
+  }
+
+  void checkExplicitlyNullable(NullabilityNode node) {
+    var edge = assertEdge(always, node, hard: false);
+    var origin = graph.getEdgeOrigin(edge);
+    expect(origin.kind, EdgeOriginKind.alreadyMigratedType);
     expect(origin.element, same(element));
   }
 
@@ -63,60 +83,56 @@ class _AlreadyMigratedCodeDecoratorTest extends Object with EdgeTester {
     checkArgument(decoratedType.typeArguments[0]);
   }
 
-  void checkInt(
-      DecoratedType decoratedType, NullabilityNode expectedNullability) {
+  void checkInt(DecoratedType decoratedType,
+      void Function(NullabilityNode) checkNullability) {
     expect(decoratedType.type.element, typeProvider.intType.element);
-    expect(decoratedType.node, expectedNullability);
+    checkNullability(decoratedType.node);
   }
 
   void checkIterable(
       DecoratedType decoratedType,
-      NullabilityNode expectedNullability,
+      void Function(NullabilityNode) checkNullability,
       void Function(DecoratedType) checkArgument) {
     expect(
         decoratedType.type.element, typeProvider.iterableDynamicType.element);
-    expect(decoratedType.node, expectedNullability);
+    checkNullability(decoratedType.node);
     checkArgument(decoratedType.typeArguments[0]);
   }
 
-  void checkNum(
-      DecoratedType decoratedType, NullabilityNode expectedNullability) {
+  void checkNum(DecoratedType decoratedType,
+      void Function(NullabilityNode) checkNullability) {
     expect(decoratedType.type.element, typeProvider.numType.element);
-    expect(decoratedType.node, expectedNullability);
+    checkNullability(decoratedType.node);
   }
 
-  void checkObject(
-      DecoratedType decoratedType, NullabilityNode expectedNullability) {
+  void checkObject(DecoratedType decoratedType,
+      void Function(NullabilityNode) checkNullability) {
     expect(decoratedType.type.element, typeProvider.objectType.element);
-    expect(decoratedType.node, expectedNullability);
+    checkNullability(decoratedType.node);
   }
 
   void checkTypeParameter(
       DecoratedType decoratedType,
-      NullabilityNode expectedNullability,
+      void Function(NullabilityNode) checkNullability,
       TypeParameterElement expectedElement) {
     var type = decoratedType.type as TypeParameterTypeImpl;
     expect(type.element, same(expectedElement));
-    expect(decoratedType.node, expectedNullability);
+    checkNullability(decoratedType.node);
   }
 
-  void checkVoid(DecoratedType decoratedType, Element element) {
+  void checkVoid(DecoratedType decoratedType) {
     expect(decoratedType.type, same(typeProvider.voidType));
-    var edge = assertEdge(always, decoratedType.node, hard: false);
-    var origin = graph.getEdgeOrigin(edge);
-    expect(origin.kind, EdgeOriginKind.alwaysNullableType);
-    expect(origin.element, same(element));
+    checkAlwaysNullable(decoratedType.node);
   }
 
-  DecoratedType decorate(DartType type, {Element element}) {
-    var decoratedType = decorator.decorate(type, element ?? _MockElement());
+  DecoratedType decorate(DartType type) {
+    var decoratedType = decorator.decorate(type, element);
     expect(decoratedType.type, same(type));
     return decoratedType;
   }
 
   test_decorate_dynamic() {
-    var element = _MockElement();
-    checkDynamic(decorate(typeProvider.dynamicType, element: element), element);
+    checkDynamic(decorate(typeProvider.dynamicType));
   }
 
   test_decorate_functionType_generic_bounded() {
@@ -126,8 +142,9 @@ class _AlreadyMigratedCodeDecoratorTest extends Object with EdgeTester {
         TypeParameterTypeImpl(typeFormal), [typeFormal], [],
         nullabilitySuffix: NullabilitySuffix.star));
     expect(decoratedType.typeFormalBounds, hasLength(1));
-    checkNum(decoratedType.typeFormalBounds[0], never);
-    checkTypeParameter(decoratedType.returnType, never, typeFormal);
+    checkNum(decoratedType.typeFormalBounds[0], checkExplicitlyNonNullable);
+    checkTypeParameter(
+        decoratedType.returnType, checkExplicitlyNonNullable, typeFormal);
   }
 
   test_decorate_functionType_generic_no_explicit_bound() {
@@ -136,107 +153,85 @@ class _AlreadyMigratedCodeDecoratorTest extends Object with EdgeTester {
         TypeParameterTypeImpl(typeFormal), [typeFormal], [],
         nullabilitySuffix: NullabilitySuffix.star));
     expect(decoratedType.typeFormalBounds, hasLength(1));
-    checkObject(decoratedType.typeFormalBounds[0], always);
-    checkTypeParameter(decoratedType.returnType, never, typeFormal);
+    checkObject(decoratedType.typeFormalBounds[0], checkExplicitlyNullable);
+    checkTypeParameter(
+        decoratedType.returnType, checkExplicitlyNonNullable, typeFormal);
   }
 
   test_decorate_functionType_named_parameter() {
-    var element = _MockElement();
-    checkDynamic(
-        decorate(
-                FunctionTypeImpl.synthetic(
-                    typeProvider.voidType,
-                    [],
-                    [
-                      ParameterElementImpl.synthetic(
-                          'x', typeProvider.dynamicType, ParameterKind.NAMED)
-                    ],
-                    nullabilitySuffix: NullabilitySuffix.star),
-                element: element)
-            .namedParameters['x'],
-        element);
+    checkDynamic(decorate(FunctionTypeImpl.synthetic(
+            typeProvider.voidType,
+            [],
+            [
+              ParameterElementImpl.synthetic(
+                  'x', typeProvider.dynamicType, ParameterKind.NAMED)
+            ],
+            nullabilitySuffix: NullabilitySuffix.star))
+        .namedParameters['x']);
   }
 
   test_decorate_functionType_ordinary_parameter() {
-    var element = _MockElement();
-    checkDynamic(
-        decorate(
-                FunctionTypeImpl.synthetic(
-                    typeProvider.voidType,
-                    [],
-                    [
-                      ParameterElementImpl.synthetic(
-                          'x', typeProvider.dynamicType, ParameterKind.REQUIRED)
-                    ],
-                    nullabilitySuffix: NullabilitySuffix.star),
-                element: element)
-            .positionalParameters[0],
-        element);
+    checkDynamic(decorate(FunctionTypeImpl.synthetic(
+            typeProvider.voidType,
+            [],
+            [
+              ParameterElementImpl.synthetic(
+                  'x', typeProvider.dynamicType, ParameterKind.REQUIRED)
+            ],
+            nullabilitySuffix: NullabilitySuffix.star))
+        .positionalParameters[0]);
   }
 
   test_decorate_functionType_positional_parameter() {
-    var element = _MockElement();
-    checkDynamic(
-        decorate(
-                FunctionTypeImpl.synthetic(
-                    typeProvider.voidType,
-                    [],
-                    [
-                      ParameterElementImpl.synthetic('x',
-                          typeProvider.dynamicType, ParameterKind.POSITIONAL)
-                    ],
-                    nullabilitySuffix: NullabilitySuffix.star),
-                element: element)
-            .positionalParameters[0],
-        element);
+    checkDynamic(decorate(FunctionTypeImpl.synthetic(
+            typeProvider.voidType,
+            [],
+            [
+              ParameterElementImpl.synthetic(
+                  'x', typeProvider.dynamicType, ParameterKind.POSITIONAL)
+            ],
+            nullabilitySuffix: NullabilitySuffix.star))
+        .positionalParameters[0]);
   }
 
   test_decorate_functionType_question() {
-    expect(
-        decorate(FunctionTypeImpl.synthetic(typeProvider.voidType, [], [],
-                nullabilitySuffix: NullabilitySuffix.question))
-            .node,
-        same(always));
+    checkExplicitlyNullable(decorate(FunctionTypeImpl.synthetic(
+            typeProvider.voidType, [], [],
+            nullabilitySuffix: NullabilitySuffix.question))
+        .node);
   }
 
   test_decorate_functionType_returnType() {
-    var element = _MockElement();
-    checkDynamic(
-        decorate(
-                FunctionTypeImpl.synthetic(typeProvider.dynamicType, [], [],
-                    nullabilitySuffix: NullabilitySuffix.star),
-                element: element)
-            .returnType,
-        element);
+    checkDynamic(decorate(FunctionTypeImpl.synthetic(
+            typeProvider.dynamicType, [], [],
+            nullabilitySuffix: NullabilitySuffix.star))
+        .returnType);
   }
 
   test_decorate_functionType_star() {
-    expect(
-        decorate(FunctionTypeImpl.synthetic(typeProvider.voidType, [], [],
-                nullabilitySuffix: NullabilitySuffix.star))
-            .node,
-        same(never));
+    checkExplicitlyNonNullable(decorate(FunctionTypeImpl.synthetic(
+            typeProvider.voidType, [], [],
+            nullabilitySuffix: NullabilitySuffix.star))
+        .node);
   }
 
   test_decorate_interfaceType_simple_question() {
     checkInt(
         decorate(InterfaceTypeImpl(typeProvider.intType.element,
             nullabilitySuffix: NullabilitySuffix.question)),
-        always);
+        checkExplicitlyNullable);
   }
 
   test_decorate_interfaceType_simple_star() {
     checkInt(
         decorate(InterfaceTypeImpl(typeProvider.intType.element,
             nullabilitySuffix: NullabilitySuffix.star)),
-        never);
+        checkExplicitlyNonNullable);
   }
 
   test_decorate_iterable_dynamic() {
-    var element = _MockElement();
-    var decorated =
-        decorate(typeProvider.iterableDynamicType, element: element);
-    checkIterable(decorated, never, (t) => checkDynamic(t, element));
+    var decorated = decorate(typeProvider.iterableDynamicType);
+    checkIterable(decorated, checkExplicitlyNonNullable, checkDynamic);
   }
 
   test_decorate_typeParameterType_question() {
@@ -244,7 +239,7 @@ class _AlreadyMigratedCodeDecoratorTest extends Object with EdgeTester {
     checkTypeParameter(
         decorate(TypeParameterTypeImpl(element,
             nullabilitySuffix: NullabilitySuffix.question)),
-        always,
+        checkExplicitlyNullable,
         element);
   }
 
@@ -253,27 +248,27 @@ class _AlreadyMigratedCodeDecoratorTest extends Object with EdgeTester {
     checkTypeParameter(
         decorate(TypeParameterTypeImpl(element,
             nullabilitySuffix: NullabilitySuffix.star)),
-        never,
+        checkExplicitlyNonNullable,
         element);
   }
 
   test_decorate_void() {
-    var element = _MockElement();
-    checkVoid(decorate(typeProvider.voidType, element: element), element);
+    checkVoid(decorate(typeProvider.voidType));
   }
 
-  test_getImmediateSupertypes_future() {
-    var element = typeProvider.futureElement;
+  solo_test_getImmediateSupertypes_future() {
+    var class_ =
+    element = typeProvider.futureElement;
     var decoratedSupertypes =
-        decorator.getImmediateSupertypes(element).toList();
-    var typeParam = element.typeParameters[0];
+        decorator.getImmediateSupertypes(class_).toList();
+    var typeParam = class_.typeParameters[0];
     expect(decoratedSupertypes, hasLength(2));
-    checkObject(decoratedSupertypes[0], never);
+    checkObject(decoratedSupertypes[0], checkExplicitlyNonNullable);
     // Since Future<T> is a subtype of FutureOr<T>, we consider FutureOr<T> to
     // be an immediate supertype, even though the class declaration for Future
     // doesn't mention FutureOr.
     checkFutureOr(decoratedSupertypes[1], never,
-        (t) => checkTypeParameter(t, never, typeParam));
+        (t) => checkTypeParameter(t, checkExplicitlyNonNullable, typeParam));
   }
 
   test_getImmediateSupertypes_generic() {
@@ -287,8 +282,8 @@ class _AlreadyMigratedCodeDecoratorTest extends Object with EdgeTester {
     );
     var decoratedSupertypes = decorator.getImmediateSupertypes(class_).toList();
     expect(decoratedSupertypes, hasLength(1));
-    checkIterable(decoratedSupertypes[0], never,
-        (type) => checkTypeParameter(type, never, t));
+    checkIterable(decoratedSupertypes[0], checkExplicitlyNonNullable,
+        (type) => checkTypeParameter(type, checkExplicitlyNonNullable, t));
   }
 
   test_getImmediateSupertypes_interface() {
@@ -296,8 +291,8 @@ class _AlreadyMigratedCodeDecoratorTest extends Object with EdgeTester {
     class_.interfaces = [typeProvider.numType];
     var decoratedSupertypes = decorator.getImmediateSupertypes(class_).toList();
     expect(decoratedSupertypes, hasLength(2));
-    checkObject(decoratedSupertypes[0], never);
-    checkNum(decoratedSupertypes[1], never);
+    checkObject(decoratedSupertypes[0], checkExplicitlyNonNullable);
+    checkNum(decoratedSupertypes[1], checkExplicitlyNonNullable);
   }
 
   test_getImmediateSupertypes_mixin() {
@@ -305,8 +300,8 @@ class _AlreadyMigratedCodeDecoratorTest extends Object with EdgeTester {
     class_.mixins = [typeProvider.numType];
     var decoratedSupertypes = decorator.getImmediateSupertypes(class_).toList();
     expect(decoratedSupertypes, hasLength(2));
-    checkObject(decoratedSupertypes[0], never);
-    checkNum(decoratedSupertypes[1], never);
+    checkObject(decoratedSupertypes[0], checkExplicitlyNonNullable);
+    checkNum(decoratedSupertypes[1], checkExplicitlyNonNullable);
   }
 
   test_getImmediateSupertypes_superclassConstraint() {
@@ -314,14 +309,14 @@ class _AlreadyMigratedCodeDecoratorTest extends Object with EdgeTester {
         name: 'C', constraints: [typeProvider.numType]);
     var decoratedSupertypes = decorator.getImmediateSupertypes(class_).toList();
     expect(decoratedSupertypes, hasLength(1));
-    checkNum(decoratedSupertypes[0], never);
+    checkNum(decoratedSupertypes[0], checkExplicitlyNonNullable);
   }
 
   test_getImmediateSupertypes_supertype() {
     var class_ = ElementFactory.classElement('C', typeProvider.objectType);
     var decoratedSupertypes = decorator.getImmediateSupertypes(class_).toList();
     expect(decoratedSupertypes, hasLength(1));
-    checkObject(decoratedSupertypes[0], never);
+    checkObject(decoratedSupertypes[0], checkExplicitlyNonNullable);
   }
 }
 

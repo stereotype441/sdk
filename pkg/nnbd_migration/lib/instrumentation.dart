@@ -125,6 +125,7 @@ abstract class EdgeOriginInfo {
 /// An enumeration of the various kinds of edge origins created by the migration
 /// engine.
 enum EdgeOriginKind {
+  alreadyMigratedType,
   alwaysNullableType,
   compoundAssignment,
   defaultValue,
