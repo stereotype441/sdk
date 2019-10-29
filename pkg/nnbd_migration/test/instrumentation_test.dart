@@ -4,7 +4,6 @@
 
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
-import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/test_utilities/find_node.dart';
 import 'package:nnbd_migration/instrumentation.dart';
@@ -180,6 +179,21 @@ f(Point<int> x) {}
             .type
             .toString(),
         'num');
+  }
+
+  test_externalType_nullability_dynamic_edge() async {
+    await analyze('''
+f(List<int> x) {}
+''');
+    var listElement = findNode.simple('List').staticElement as ClassElement;
+    var listElementTypeParameter = listElement.typeParameters[0];
+    var typeParameterBoundNode =
+        externalDecoratedTypeParameterBound[listElementTypeParameter].node;
+    expect(
+        edges.where((e) =>
+            e.sourceNode == always &&
+            e.destinationNode == typeParameterBoundNode),
+        hasLength(1));
   }
 
   test_fix_reason_edge() async {
