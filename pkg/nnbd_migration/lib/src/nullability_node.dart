@@ -158,6 +158,13 @@ class NullabilityGraph {
     return _sourcesBeingMigrated.contains(source);
   }
 
+  /// Creates a graph edge that will try to force the given [node] to be
+  /// nullable.
+  void makeNullable(NullabilityNode node, EdgeOrigin origin,
+      {List<NullabilityNode> guards: const []}) {
+    connect(always, node, origin, guards: guards);
+  }
+
   /// Record source as code that is being migrated.
   void migrating(Source source) {
     _sourcesBeingMigrated.add(source);
@@ -521,7 +528,7 @@ abstract class NullabilityNode implements NullabilityNodeInfo {
   void recordNamedParameterNotSupplied(List<NullabilityNode> guards,
       NullabilityGraph graph, NamedParameterNotSuppliedOrigin origin) {
     if (isPossiblyOptional) {
-      graph.connect(graph.always, this, origin, guards: guards);
+      graph.makeNullable(this, origin, guards: guards);
     }
   }
 
