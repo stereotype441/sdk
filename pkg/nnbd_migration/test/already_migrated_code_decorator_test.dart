@@ -271,7 +271,7 @@ class _AlreadyMigratedCodeDecoratorTest extends Object with EdgeTester {
 
   test_getImmediateSupertypes_generic() {
     var t = ElementFactory.typeParameterElement('T');
-    var class_ = ElementFactory.classElement3(
+    var class_ = element = ElementFactory.classElement3(
       name: 'C',
       typeParameters: [t],
       supertype: typeProvider.iterableType2(
