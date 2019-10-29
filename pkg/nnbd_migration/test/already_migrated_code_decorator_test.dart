@@ -11,6 +11,7 @@ import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/testing/element_factory.dart';
 import 'package:analyzer/src/generated/testing/test_type_provider.dart';
 import 'package:analyzer/src/generated/utilities_dart.dart';
+import 'package:nnbd_migration/instrumentation.dart';
 import 'package:nnbd_migration/src/already_migrated_code_decorator.dart';
 import 'package:nnbd_migration/src/decorated_type.dart';
 import 'package:nnbd_migration/src/nullability_node.dart';
@@ -45,9 +46,12 @@ class _AlreadyMigratedCodeDecoratorTest extends Object with EdgeTester {
 
   NullabilityNode get never => graph.never;
 
-  void checkDynamic(DecoratedType decoratedType) {
+  void checkDynamic(DecoratedType decoratedType, Element element) {
     expect(decoratedType.type, same(typeProvider.dynamicType));
-    assertEdge(always, decoratedType.node, hard: false);
+    var edge = assertEdge(always, decoratedType.node, hard: false);
+    var origin = graph.getEdgeOrigin(edge);
+    expect(origin.kind, EdgeOriginKind.alwaysNullableType);
+    expect(origin.element, same(element));
   }
 
   void checkFutureOr(
@@ -96,19 +100,23 @@ class _AlreadyMigratedCodeDecoratorTest extends Object with EdgeTester {
     expect(decoratedType.node, expectedNullability);
   }
 
-  void checkVoid(DecoratedType decoratedType) {
+  void checkVoid(DecoratedType decoratedType, Element element) {
     expect(decoratedType.type, same(typeProvider.voidType));
-    assertEdge(always, decoratedType.node, hard: false);
+    var edge = assertEdge(always, decoratedType.node, hard: false);
+    var origin = graph.getEdgeOrigin(edge);
+    expect(origin.kind, EdgeOriginKind.alwaysNullableType);
+    expect(origin.element, same(element));
   }
 
-  DecoratedType decorate(DartType type) {
-    var decoratedType = decorator.decorate(type, _MockElement());
+  DecoratedType decorate(DartType type, {Element element}) {
+    var decoratedType = decorator.decorate(type, element ?? _MockElement());
     expect(decoratedType.type, same(type));
     return decoratedType;
   }
 
   test_decorate_dynamic() {
-    checkDynamic(decorate(typeProvider.dynamicType));
+    var element = _MockElement();
+    checkDynamic(decorate(typeProvider.dynamicType, element: element), element);
   }
 
   test_decorate_functionType_generic_bounded() {
@@ -133,39 +141,54 @@ class _AlreadyMigratedCodeDecoratorTest extends Object with EdgeTester {
   }
 
   test_decorate_functionType_named_parameter() {
-    checkDynamic(decorate(FunctionTypeImpl.synthetic(
-            typeProvider.voidType,
-            [],
-            [
-              ParameterElementImpl.synthetic(
-                  'x', typeProvider.dynamicType, ParameterKind.NAMED)
-            ],
-            nullabilitySuffix: NullabilitySuffix.star))
-        .namedParameters['x']);
+    var element = _MockElement();
+    checkDynamic(
+        decorate(
+                FunctionTypeImpl.synthetic(
+                    typeProvider.voidType,
+                    [],
+                    [
+                      ParameterElementImpl.synthetic(
+                          'x', typeProvider.dynamicType, ParameterKind.NAMED)
+                    ],
+                    nullabilitySuffix: NullabilitySuffix.star),
+                element: element)
+            .namedParameters['x'],
+        element);
   }
 
   test_decorate_functionType_ordinary_parameter() {
-    checkDynamic(decorate(FunctionTypeImpl.synthetic(
-            typeProvider.voidType,
-            [],
-            [
-              ParameterElementImpl.synthetic(
-                  'x', typeProvider.dynamicType, ParameterKind.REQUIRED)
-            ],
-            nullabilitySuffix: NullabilitySuffix.star))
-        .positionalParameters[0]);
+    var element = _MockElement();
+    checkDynamic(
+        decorate(
+                FunctionTypeImpl.synthetic(
+                    typeProvider.voidType,
+                    [],
+                    [
+                      ParameterElementImpl.synthetic(
+                          'x', typeProvider.dynamicType, ParameterKind.REQUIRED)
+                    ],
+                    nullabilitySuffix: NullabilitySuffix.star),
+                element: element)
+            .positionalParameters[0],
+        element);
   }
 
   test_decorate_functionType_positional_parameter() {
-    checkDynamic(decorate(FunctionTypeImpl.synthetic(
-            typeProvider.voidType,
-            [],
-            [
-              ParameterElementImpl.synthetic(
-                  'x', typeProvider.dynamicType, ParameterKind.POSITIONAL)
-            ],
-            nullabilitySuffix: NullabilitySuffix.star))
-        .positionalParameters[0]);
+    var element = _MockElement();
+    checkDynamic(
+        decorate(
+                FunctionTypeImpl.synthetic(
+                    typeProvider.voidType,
+                    [],
+                    [
+                      ParameterElementImpl.synthetic('x',
+                          typeProvider.dynamicType, ParameterKind.POSITIONAL)
+                    ],
+                    nullabilitySuffix: NullabilitySuffix.star),
+                element: element)
+            .positionalParameters[0],
+        element);
   }
 
   test_decorate_functionType_question() {
@@ -177,10 +200,14 @@ class _AlreadyMigratedCodeDecoratorTest extends Object with EdgeTester {
   }
 
   test_decorate_functionType_returnType() {
-    checkDynamic(decorate(FunctionTypeImpl.synthetic(
-            typeProvider.dynamicType, [], [],
-            nullabilitySuffix: NullabilitySuffix.star))
-        .returnType);
+    var element = _MockElement();
+    checkDynamic(
+        decorate(
+                FunctionTypeImpl.synthetic(typeProvider.dynamicType, [], [],
+                    nullabilitySuffix: NullabilitySuffix.star),
+                element: element)
+            .returnType,
+        element);
   }
 
   test_decorate_functionType_star() {
@@ -206,8 +233,10 @@ class _AlreadyMigratedCodeDecoratorTest extends Object with EdgeTester {
   }
 
   test_decorate_iterable_dynamic() {
-    var decorated = decorate(typeProvider.iterableDynamicType);
-    checkIterable(decorated, never, checkDynamic);
+    var element = _MockElement();
+    var decorated =
+        decorate(typeProvider.iterableDynamicType, element: element);
+    checkIterable(decorated, never, (t) => checkDynamic(t, element));
   }
 
   test_decorate_typeParameterType_question() {
@@ -229,7 +258,8 @@ class _AlreadyMigratedCodeDecoratorTest extends Object with EdgeTester {
   }
 
   test_decorate_void() {
-    checkVoid(decorate(typeProvider.voidType));
+    var element = _MockElement();
+    checkVoid(decorate(typeProvider.voidType, element: element), element);
   }
 
   test_getImmediateSupertypes_future() {
