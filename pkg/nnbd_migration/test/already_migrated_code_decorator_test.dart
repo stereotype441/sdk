@@ -285,7 +285,8 @@ class _AlreadyMigratedCodeDecoratorTest extends Object with EdgeTester {
   }
 
   test_getImmediateSupertypes_interface() {
-    var class_ = ElementFactory.classElement('C', typeProvider.objectType);
+    var class_ =
+        element = ElementFactory.classElement('C', typeProvider.objectType);
     class_.interfaces = [typeProvider.numType];
     var decoratedSupertypes = decorator.getImmediateSupertypes(class_).toList();
     expect(decoratedSupertypes, hasLength(2));
@@ -294,7 +295,8 @@ class _AlreadyMigratedCodeDecoratorTest extends Object with EdgeTester {
   }
 
   test_getImmediateSupertypes_mixin() {
-    var class_ = ElementFactory.classElement('C', typeProvider.objectType);
+    var class_ =
+        element = ElementFactory.classElement('C', typeProvider.objectType);
     class_.mixins = [typeProvider.numType];
     var decoratedSupertypes = decorator.getImmediateSupertypes(class_).toList();
     expect(decoratedSupertypes, hasLength(2));
@@ -303,7 +305,7 @@ class _AlreadyMigratedCodeDecoratorTest extends Object with EdgeTester {
   }
 
   test_getImmediateSupertypes_superclassConstraint() {
-    var class_ = ElementFactory.mixinElement(
+    var class_ = element = ElementFactory.mixinElement(
         name: 'C', constraints: [typeProvider.numType]);
     var decoratedSupertypes = decorator.getImmediateSupertypes(class_).toList();
     expect(decoratedSupertypes, hasLength(1));
@@ -311,7 +313,8 @@ class _AlreadyMigratedCodeDecoratorTest extends Object with EdgeTester {
   }
 
   test_getImmediateSupertypes_supertype() {
-    var class_ = ElementFactory.classElement('C', typeProvider.objectType);
+    var class_ =
+        element = ElementFactory.classElement('C', typeProvider.objectType);
     var decoratedSupertypes = decorator.getImmediateSupertypes(class_).toList();
     expect(decoratedSupertypes, hasLength(1));
     checkObject(decoratedSupertypes[0], checkExplicitlyNonNullable);
