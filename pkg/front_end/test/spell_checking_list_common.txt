@@ -376,6 +376,7 @@ catch
 catches
 categories
 category
+caveats
 caught
 cause
 caused
@@ -958,6 +959,7 @@ escapes
 escaping
 especially
 essence
+essentially
 essentials
 etc
 evaluate
@@ -1442,6 +1444,7 @@ intercept
 interceptors
 interest
 interesting
+interests
 interface
 interfaces
 interferes
@@ -2075,6 +2078,7 @@ precisely
 precision
 preclude
 precondition
+preconditions
 predefined
 predicate
 preemptively
@@ -2399,6 +2403,7 @@ right
 rightfully
 rights
 rise
+roles
 roll
 root
 roots
