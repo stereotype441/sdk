@@ -92,8 +92,10 @@ class Variables implements VariableRecorder, VariableRepository {
               'have been stored by the NodeBuilder via '
               'recordTypeParameterBound');
         }
-        decoratedType = _alreadyMigratedCodeDecorator
-            .decorate(typeParameter.bound ?? DynamicTypeImpl.instance);
+        decoratedType = _alreadyMigratedCodeDecorator.decorate(
+            typeParameter.bound ?? DynamicTypeImpl.instance, typeParameter);
+        instrumentation?.externalDecoratedTypeParameterBound(
+            typeParameter, decoratedType);
         _decoratedTypeParameterBounds[typeParameter] = decoratedType;
       }
       return decoratedType;
@@ -181,9 +183,11 @@ class Variables implements VariableRecorder, VariableRepository {
 
     DecoratedType decoratedType;
     if (element is FunctionTypedElement) {
-      decoratedType = _alreadyMigratedCodeDecorator.decorate(element.type);
+      decoratedType =
+          _alreadyMigratedCodeDecorator.decorate(element.type, element);
     } else if (element is VariableElement) {
-      decoratedType = _alreadyMigratedCodeDecorator.decorate(element.type);
+      decoratedType =
+          _alreadyMigratedCodeDecorator.decorate(element.type, element);
     } else {
       // TODO(paulberry)
       throw UnimplementedError('Decorating ${element.runtimeType}');

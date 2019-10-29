@@ -8,6 +8,7 @@ import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:nnbd_migration/src/decorated_type.dart';
+import 'package:nnbd_migration/src/edge_origin.dart';
 import 'package:nnbd_migration/src/nullability_node.dart';
 
 /// This class transforms ordinary [DartType]s into their corresponding
@@ -22,8 +23,10 @@ class AlreadyMigratedCodeDecorator {
 
   /// Transforms [type], which should have come from code that has already been
   /// migrated to NNBD, into the corresponding [DecoratedType].
-  DecoratedType decorate(DartType type) {
+  DecoratedType decorate(DartType type, Element element) {
     if (type.isVoid || type.isDynamic) {
+      var node = NullabilityNode.forAlreadyMigrated();
+      _graph.makeNullable(node, AlwaysNullableTypeOrigin.forElement(element));
       return DecoratedType(type, _graph.always);
     }
     NullabilityNode node;
@@ -43,31 +46,34 @@ class AlreadyMigratedCodeDecorator {
       var typeFormalBounds = type.typeFormals.map((e) {
         var bound = e.bound;
         if (bound == null) {
-          return decorate((_typeProvider.objectType as TypeImpl)
-              .withNullability(NullabilitySuffix.question));
+          return decorate(
+              (_typeProvider.objectType as TypeImpl)
+                  .withNullability(NullabilitySuffix.question),
+              element);
         } else {
-          return decorate(bound);
+          return decorate(bound, element);
         }
       }).toList();
       var positionalParameters = <DecoratedType>[];
       var namedParameters = <String, DecoratedType>{};
       for (var parameter in type.parameters) {
         if (parameter.isPositional) {
-          positionalParameters.add(decorate(parameter.type));
+          positionalParameters.add(decorate(parameter.type, element));
         } else {
-          namedParameters[parameter.name] = decorate(parameter.type);
+          namedParameters[parameter.name] = decorate(parameter.type, element);
         }
       }
       return DecoratedType(type, node,
           typeFormalBounds: typeFormalBounds,
-          returnType: decorate(type.returnType),
+          returnType: decorate(type.returnType, element),
           namedParameters: namedParameters,
           positionalParameters: positionalParameters);
     } else if (type is InterfaceType) {
       if (type.typeParameters.isNotEmpty) {
         assert(type.typeArguments.length == type.typeParameters.length);
-        return DecoratedType(type, node,
-            typeArguments: type.typeArguments.map(decorate).toList());
+        return DecoratedType(type, node, typeArguments: [
+          for (var t in type.typeArguments) decorate(t, element)
+        ]);
       }
       return DecoratedType(type, node);
     } else if (type is TypeParameterType) {
@@ -95,6 +101,6 @@ class AlreadyMigratedCodeDecorator {
       // Add FutureOr<T> as a supertype of Future<T>.
       allSupertypes.add(_typeProvider.futureOrType2(type.typeArguments.single));
     }
-    return allSupertypes.map(decorate);
+    return [for (var t in allSupertypes) decorate(t, class_)];
   }
 }

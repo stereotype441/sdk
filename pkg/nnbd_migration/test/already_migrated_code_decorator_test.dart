@@ -100,7 +100,7 @@ class _AlreadyMigratedCodeDecoratorTest {
   }
 
   DecoratedType decorate(DartType type) {
-    var decoratedType = decorator.decorate(type);
+    var decoratedType = decorator.decorate(type, _MockElement());
     expect(decoratedType.type, same(type));
     return decoratedType;
   }
@@ -291,4 +291,8 @@ class _AlreadyMigratedCodeDecoratorTest {
     expect(decoratedSupertypes, hasLength(1));
     checkObject(decoratedSupertypes[0], never);
   }
+}
+
+class _MockElement implements Element {
+  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

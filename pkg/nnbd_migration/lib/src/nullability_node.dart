@@ -454,6 +454,11 @@ abstract class NullabilityNode implements NullabilityNodeInfo {
   /// List of edges that have this node as their destination.
   final _upstreamEdges = <NullabilityEdge>[];
 
+  /// Creates a [NullabilityNode] representing the nullability of a variable
+  /// whose type comes from an already-migrated library.
+  factory NullabilityNode.forAlreadyMigrated() =>
+      _NullabilityNodeSimple('migrated');
+
   /// Creates a [NullabilityNode] representing the nullability of an expression
   /// which is nullable iff two other nullability nodes are both nullable.
   ///
