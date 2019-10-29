@@ -76,10 +76,10 @@ class _AlreadyMigratedCodeDecoratorTest extends Object with EdgeTester {
 
   void checkFutureOr(
       DecoratedType decoratedType,
-      NullabilityNode expectedNullability,
+      void Function(NullabilityNode) checkNullability,
       void Function(DecoratedType) checkArgument) {
     expect(decoratedType.type.element, typeProvider.futureOrElement);
-    expect(decoratedType.node, expectedNullability);
+    checkNullability(decoratedType.node);
     checkArgument(decoratedType.typeArguments[0]);
   }
 
@@ -256,18 +256,16 @@ class _AlreadyMigratedCodeDecoratorTest extends Object with EdgeTester {
     checkVoid(decorate(typeProvider.voidType));
   }
 
-  solo_test_getImmediateSupertypes_future() {
-    var class_ =
-    element = typeProvider.futureElement;
-    var decoratedSupertypes =
-        decorator.getImmediateSupertypes(class_).toList();
+  test_getImmediateSupertypes_future() {
+    var class_ = element = typeProvider.futureElement;
+    var decoratedSupertypes = decorator.getImmediateSupertypes(class_).toList();
     var typeParam = class_.typeParameters[0];
     expect(decoratedSupertypes, hasLength(2));
     checkObject(decoratedSupertypes[0], checkExplicitlyNonNullable);
     // Since Future<T> is a subtype of FutureOr<T>, we consider FutureOr<T> to
     // be an immediate supertype, even though the class declaration for Future
     // doesn't mention FutureOr.
-    checkFutureOr(decoratedSupertypes[1], never,
+    checkFutureOr(decoratedSupertypes[1], checkExplicitlyNonNullable,
         (t) => checkTypeParameter(t, checkExplicitlyNonNullable, typeParam));
   }
 
