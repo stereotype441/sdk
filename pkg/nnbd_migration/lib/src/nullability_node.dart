@@ -533,7 +533,7 @@ abstract class NullabilityNode implements NullabilityNodeInfo {
   void recordNamedParameterNotSupplied(List<NullabilityNode> guards,
       NullabilityGraph graph, NamedParameterNotSuppliedOrigin origin) {
     if (isPossiblyOptional) {
-      graph.makeNullable(this, origin, guards: guards);
+      graph.connect(graph.always, this, origin, guards: guards);
     }
   }
 
