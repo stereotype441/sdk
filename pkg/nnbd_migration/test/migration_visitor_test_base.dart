@@ -23,8 +23,8 @@ import 'package:test/test.dart';
 
 import 'abstract_single_unit.dart';
 
-/// A [NodeMatcher] that matches any node, and records what node it matched to.
-class AnyNodeMatcher implements NodeMatcher {
+/// Base class for [NodeMatcher]s that remember which nodes were matched.
+abstract class _RecordingNodeMatcher implements NodeMatcher {
   final List<NullabilityNode> _matchingNodes = [];
 
   NullabilityNode get matchingNode => _matchingNodes.single;
@@ -33,10 +33,27 @@ class AnyNodeMatcher implements NodeMatcher {
   void matched(NullabilityNode node) {
     _matchingNodes.add(node);
   }
+}
 
+/// A [NodeMatcher] that matches any node, and records what node it matched to.
+class AnyNodeMatcher extends _RecordingNodeMatcher {
   @override
   bool matches(NullabilityNode node) {
     return true;
+  }
+}
+
+/// A [NodeMatcher] that matches any node with a hard edge pointing to `never`.
+class NeverConnectedNodeMatcher extends _RecordingNodeMatcher {
+  @override
+  bool matches(NullabilityNode node) {
+    for (var edge in node.downstreamEdges) {
+      var destinationNode = edge.destinationNode;
+      if (destinationNode.isImmutable && !destinationNode.isNullable) {
+        return true;
+      }
+    }
+    return false;
   }
 }
 
@@ -155,6 +172,8 @@ class EdgeBuilderTestBase extends MigrationVisitorTestBase {
 mixin EdgeTester {
   /// Returns a [NodeMatcher] that matches any node whatsoever.
   AnyNodeMatcher get anyNode => AnyNodeMatcher();
+  
+  NeverConnectedNodeMatcher get neverConnected => NeverConnectedNodeMatcher();
 
   NullabilityGraphForTesting get graph;
 

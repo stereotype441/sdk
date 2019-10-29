@@ -356,6 +356,11 @@ class EdgeBuilderTest extends EdgeBuilderTestBase {
     // upstream from it.
     if (node == never) return;
 
+    // Also, any node that has a hard edge to never can't become nullable.
+    for (var edge in getEdges(node, never)) {
+      if (edge.isHard) return;
+    }
+
     for (var edge in getEdges(anyNode, node)) {
       expect(edge.sourceNode, never);
     }
@@ -513,7 +518,10 @@ FutureOr<int> f(Future<int> x) => x;
         decoratedTypeAnnotation('int> f').node);
     // If `x` is `Future<int?>`, then the only way to migrate is to make the
     // return type `FutureOr<int?>`.
-    assertEdge(substitutionNode(decoratedTypeAnnotation('int> x').node, never),
+
+    assertEdge(
+        substitutionNode(
+            decoratedTypeAnnotation('int> x').node, neverConnected),
         decoratedTypeAnnotation('int> f').node,
         hard: false);
     assertNoEdge(decoratedTypeAnnotation('int> x').node,
@@ -589,7 +597,7 @@ void g(List<int> x) {
     var iterableInt = decoratedTypeAnnotation('Iterable<int>');
     var listInt = decoratedTypeAnnotation('List<int>');
     assertEdge(listInt.node, iterableInt.node, hard: true);
-    assertEdge(substitutionNode(listInt.typeArguments[0].node, never),
+    assertEdge(substitutionNode(listInt.typeArguments[0].node, neverConnected),
         iterableInt.typeArguments[0].node,
         hard: false);
   }

@@ -512,6 +512,8 @@ abstract class NullabilityNode implements NullabilityNodeInfo {
   /// annotate the nullability of that type.
   String get debugSuffix => '?($this)';
 
+  Iterable<EdgeInfo> get downstreamEdges => _downstreamEdges;
+
   /// After nullability propagation, this getter can be used to query whether
   /// the type associated with this node should be considered "exact nullable".
   @visibleForTesting
