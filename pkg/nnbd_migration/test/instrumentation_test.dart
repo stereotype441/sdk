@@ -9,6 +9,7 @@ import 'package:analyzer/src/test_utilities/find_node.dart';
 import 'package:nnbd_migration/instrumentation.dart';
 import 'package:nnbd_migration/nnbd_migration.dart';
 import 'package:nnbd_migration/nullability_state.dart';
+import 'package:nnbd_migration/src/decorated_type.dart';
 import 'package:test/test.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
 
@@ -38,6 +39,14 @@ class _InstrumentationClient implements NullabilityMigrationInstrumentation {
   void externalDecoratedType(Element element, DecoratedTypeInfo decoratedType) {
     expect(test.externalDecoratedType, isNot(contains(element)));
     test.externalDecoratedType[element] = decoratedType;
+  }
+
+  @override
+  void externalDecoratedTypeParameterBound(
+      TypeParameterElement typeParameter, DecoratedType decoratedType) {
+    expect(test.externalDecoratedTypeParameterBound,
+        isNot(contains(typeParameter)));
+    test.externalDecoratedTypeParameterBound[typeParameter] = decoratedType;
   }
 
   @override
@@ -96,6 +105,9 @@ class _InstrumentationTest extends AbstractContextTest {
 
   final Map<Element, DecoratedTypeInfo> externalDecoratedType = {};
 
+  final Map<TypeParameterElement, DecoratedTypeInfo>
+      externalDecoratedTypeParameterBound = {};
+
   final List<EdgeInfo> edges = [];
 
   Map<SingleNullabilityFix, List<FixReasonInfo>> fixes = {};
@@ -153,6 +165,40 @@ main() {
             .type
             .toString(),
         'void Function(Object)');
+  }
+
+  test_externalDecoratedTypeParameterBound() async {
+    await analyze('''
+import 'dart:math';
+f(Point<int> x) {}
+''');
+    var pointElement = findNode.simple('Point').staticElement as ClassElement;
+    var pointElementTypeParameter = pointElement.typeParameters[0];
+    expect(
+        externalDecoratedTypeParameterBound[pointElementTypeParameter]
+            .type
+            .toString(),
+        'num');
+  }
+
+  test_externalType_nullability_dynamic_edge() async {
+    await analyze('''
+f(List<int> x) {}
+''');
+    var listElement = findNode.simple('List').staticElement as ClassElement;
+    var listElementTypeParameter = listElement.typeParameters[0];
+    var typeParameterBoundNode =
+        externalDecoratedTypeParameterBound[listElementTypeParameter].node;
+    var edge = edges
+        .where((e) =>
+            e.sourceNode == always &&
+            e.destinationNode == typeParameterBoundNode)
+        .single;
+    var origin = edgeOrigin[edge];
+    expect(origin.kind, EdgeOriginKind.alwaysNullableType);
+    expect(origin.element, same(listElementTypeParameter));
+    expect(origin.source, null);
+    expect(origin.node, null);
   }
 
   test_fix_reason_edge() async {

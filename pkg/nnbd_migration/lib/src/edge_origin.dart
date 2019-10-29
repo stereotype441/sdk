@@ -3,6 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:nnbd_migration/instrumentation.dart';
 
@@ -16,6 +17,9 @@ import 'package:nnbd_migration/instrumentation.dart';
 /// nullable.
 class AlwaysNullableTypeOrigin extends EdgeOrigin {
   AlwaysNullableTypeOrigin(Source source, AstNode node) : super(source, node);
+
+  AlwaysNullableTypeOrigin.forElement(Element element)
+      : super.forElement(element);
 
   @override
   EdgeOriginKind get kind => EdgeOriginKind.alwaysNullableType;
@@ -53,7 +57,14 @@ abstract class EdgeOrigin extends EdgeOriginInfo {
   @override
   final AstNode node;
 
-  EdgeOrigin(this.source, this.node);
+  @override
+  final Element element;
+
+  EdgeOrigin(this.source, this.node) : element = null;
+
+  EdgeOrigin.forElement(this.element)
+      : source = null,
+        node = null;
 }
 
 /// Edge origin resulting from the relationship between a field formal parameter
