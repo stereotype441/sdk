@@ -100,13 +100,13 @@ class NullabilityGraph {
   ///
   /// Propagation of nullability always proceeds downstream starting at this
   /// node.
-  final NullabilityNode always = _NullabilityNodeImmutable('always', true);
+  final NullabilityNode _always = _NullabilityNodeImmutable('always', true);
 
   /// Returns a [NullabilityNode] that is a priori non-nullable.
   ///
   /// Propagation of nullability always proceeds upstream starting at this
   /// node.
-  final NullabilityNode never = _NullabilityNodeImmutable('never', false);
+  final NullabilityNode _never = _NullabilityNodeImmutable('never', false);
 
   /// Set containing all sources being migrated.
   final _sourcesBeingMigrated = <Source>{};
@@ -225,8 +225,8 @@ class NullabilityGraph {
 
   /// Propagates nullability downstream along union edges from "always".
   void _propagateAlways() {
-    _unionedWithAlways.add(always);
-    _pendingEdges.addAll(always._downstreamEdges);
+    _unionedWithAlways.add(_always);
+    _pendingEdges.addAll(_always._downstreamEdges);
     while (_pendingEdges.isNotEmpty) {
       var edge = _pendingEdges.removeLast();
       if (!edge.isUnion) continue;
@@ -281,7 +281,7 @@ class NullabilityGraph {
   /// lines.
   void _propagateUpstream() {
     assert(_pendingEdges.isEmpty);
-    _pendingEdges.addAll(never._upstreamEdges);
+    _pendingEdges.addAll(_never._upstreamEdges);
     while (_pendingEdges.isNotEmpty) {
       var edge = _pendingEdges.removeLast();
       // We only propagate for nodes that are "upstream triggered".  At this
