@@ -189,11 +189,16 @@ f(List<int> x) {}
     var listElementTypeParameter = listElement.typeParameters[0];
     var typeParameterBoundNode =
         externalDecoratedTypeParameterBound[listElementTypeParameter].node;
-    expect(
-        edges.where((e) =>
+    var edge = edges
+        .where((e) =>
             e.sourceNode == always &&
-            e.destinationNode == typeParameterBoundNode),
-        hasLength(1));
+            e.destinationNode == typeParameterBoundNode)
+        .single;
+    var origin = edgeOrigin[edge];
+    expect(origin.kind, EdgeOriginKind.alwaysNullableType);
+    expect(origin.element, same(listElementTypeParameter));
+    expect(origin.source, null);
+    expect(origin.node, null);
   }
 
   test_fix_reason_edge() async {
