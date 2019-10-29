@@ -38,6 +38,19 @@ f() {
     String message = result.errors[0].message;
     expect(message.contains("_A"), isTrue);
   }
+  
+  solo_test_foo() async {
+    // See https://github.com/dart-lang/sdk/issues/39171
+    await assertNoErrorsInCode('''
+void f<T>(Iterable<T> Function() g, void Function(T) h) {
+  for (var x in g()) {
+    if (x is String) {
+      h(x);
+    }
+  }
+}
+''');
+  }
 
   test_annotation_namedConstructor() async {
     await assertErrorsInCode('''
