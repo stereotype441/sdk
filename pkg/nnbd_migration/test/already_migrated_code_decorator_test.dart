@@ -17,6 +17,8 @@ import 'package:nnbd_migration/src/nullability_node.dart';
 import 'package:test/test.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
 
+import 'migration_visitor_test_base.dart';
+
 main() {
   defineReflectiveSuite(() {
     defineReflectiveTests(_AlreadyMigratedCodeDecoratorTest);
@@ -24,7 +26,7 @@ main() {
 }
 
 @reflectiveTest
-class _AlreadyMigratedCodeDecoratorTest {
+class _AlreadyMigratedCodeDecoratorTest extends Object with EdgeTester {
   final TypeProvider typeProvider;
 
   final AlreadyMigratedCodeDecorator decorator;
@@ -45,7 +47,7 @@ class _AlreadyMigratedCodeDecoratorTest {
 
   void checkDynamic(DecoratedType decoratedType) {
     expect(decoratedType.type, same(typeProvider.dynamicType));
-    expect(decoratedType.node, same(always));
+    assertEdge(always, decoratedType.node, hard: false);
   }
 
   void checkFutureOr(
@@ -96,7 +98,7 @@ class _AlreadyMigratedCodeDecoratorTest {
 
   void checkVoid(DecoratedType decoratedType) {
     expect(decoratedType.type, same(typeProvider.voidType));
-    expect(decoratedType.node, same(always));
+    assertEdge(always, decoratedType.node, hard: false);
   }
 
   DecoratedType decorate(DartType type) {
