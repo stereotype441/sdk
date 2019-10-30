@@ -18,7 +18,7 @@ f(Object x, bool b) {
         // they are promoted to now, there's no guarantee that they
         // had that type throughout execution of the try block.  In
         // this particular case that's over-conservative--we could in
-        // priniciple keep the promotion to "num", since the value
+        // principle keep the promotion to "num", since the value
         // assigned is compatible with "num").  But it doesn't seem
         // worth the extra analysis cost to do so.
         x;
