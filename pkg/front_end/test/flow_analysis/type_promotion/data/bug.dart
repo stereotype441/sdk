@@ -4,7 +4,7 @@
 
 f(Object x, bool b) {
   if (x is num) {
-    if (x is int) {
+    if (/*num*/ x is int) {
       try {
         throw 'foo';
       } catch (e) {
@@ -12,7 +12,16 @@ f(Object x, bool b) {
         if (b) throw 'baz';
         x = 0;
       } finally {
-        x.isEven;
+        // Note: on entry to the "finally", flow analysis
+	// conservatively de-promotes any variables that were assigned
+	// earlier in the statement, on the grounds that whatever type
+	// they are promoted to now, there's no guarantee that they
+	// had that type throughout execution of the try block.  In
+	// this particular case that's over-conservative--we could in
+	// priniciple keep the promotion to "num", since the value
+	// assigned is compatible with "num").  But it doesn't seem
+	// worth the extra analysis cost to do so.
+        x;
       }
     }
   }
