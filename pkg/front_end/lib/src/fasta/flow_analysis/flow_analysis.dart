@@ -170,18 +170,9 @@ class AssignedVariables<Node, Variable> {
     _anywhere._written.add(variable);
   }
 
-  /// Queries the set of variables for which a potential write is captured by a
-  /// local function or closure inside the [node].
-  Set<Variable> _getCapturedInNode(Node node) {
-    return (_info[node] ?? (throw new StateError('No information for $node')))
-        ._captured;
-  }
-
-  /// Queries the set of variables that are potentially written to inside the
-  /// [node].
-  Set<Variable> _getWrittenInNode(Node node) {
-    return (_info[node] ?? (throw new StateError('No information for $node')))
-        ._written;
+  /// Queries the information stored for the given [node].
+  AssignedVariablesNodeInfo<Variable> _getInfoForNode(Node node) {
+    return _info[node] ?? (throw new StateError('No information for $node'));
   }
 
   void _printOn(StringBuffer sb) {
@@ -202,11 +193,9 @@ class AssignedVariablesForTesting<Node, Variable>
 
   Set<Variable> get writtenAnywhere => _anywhere._written;
 
-  Set<Variable> capturedInNode(Node node) => _getCapturedInNode(node);
+  Set<Variable> capturedInNode(Node node) => _getInfoForNode(node)._captured;
 
-  Set<Variable> declaredInNode(Node node) =>
-      (_info[node] ?? (throw new StateError('No information for $node')))
-          ._declared;
+  Set<Variable> declaredInNode(Node node) => _getInfoForNode(node)._declared;
 
   bool isTracked(Node node) => _info.containsKey(node);
 
@@ -218,7 +207,7 @@ class AssignedVariablesForTesting<Node, Variable>
     return sb.toString();
   }
 
-  Set<Variable> writtenInNode(Node node) => _getWrittenInNode(node);
+  Set<Variable> writtenInNode(Node node) => _getInfoForNode(node)._written;
 }
 
 /// Information tracked by [AssignedVariables] for a single node.
@@ -2031,14 +2020,12 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
 
   @override
   void doStatement_bodyBegin(Statement doStatement) {
-    Iterable<Variable> loopAssigned =
-        _assignedVariables._getWrittenInNode(doStatement);
-    Iterable<Variable> loopCaptured =
-        _assignedVariables._getCapturedInNode(doStatement);
+    AssignedVariablesNodeInfo<Variable> info =
+        _assignedVariables._getInfoForNode(doStatement);
     _BranchTargetContext<Variable, Type> context =
         new _BranchTargetContext<Variable, Type>();
     _stack.add(context);
-    _current = _current.removePromotedAll(loopAssigned, loopCaptured);
+    _current = _current.removePromotedAll(info._written, info._captured);
     _statementToContext[doStatement] = context;
   }
 
@@ -2106,11 +2093,9 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
 
   @override
   void for_conditionBegin(Node node) {
-    Iterable<Variable> loopAssigned =
-        _assignedVariables._getWrittenInNode(node);
-    Iterable<Variable> loopCaptured =
-        _assignedVariables._getCapturedInNode(node);
-    _current = _current.removePromotedAll(loopAssigned, loopCaptured);
+    AssignedVariablesNodeInfo<Variable> info =
+        _assignedVariables._getInfoForNode(node);
+    _current = _current.removePromotedAll(info._written, info._captured);
   }
 
   @override
@@ -2133,14 +2118,12 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
 
   @override
   void forEach_bodyBegin(Node node, Variable loopVariable, Type writtenType) {
-    Iterable<Variable> loopAssigned =
-        _assignedVariables._getWrittenInNode(node);
-    Iterable<Variable> loopCaptured =
-        _assignedVariables._getCapturedInNode(node);
+    AssignedVariablesNodeInfo<Variable> info =
+        _assignedVariables._getInfoForNode(node);
     _SimpleStatementContext<Variable, Type> context =
         new _SimpleStatementContext<Variable, Type>(_current);
     _stack.add(context);
-    _current = _current.removePromotedAll(loopAssigned, loopCaptured);
+    _current = _current.removePromotedAll(info._written, info._captured);
     if (loopVariable != null) {
       _current = _current.write(loopVariable, writtenType, typeOperations);
     }
@@ -2155,10 +2138,9 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
 
   @override
   void functionExpression_begin(Node node) {
-    Iterable<Variable> writeCaptured =
-        _assignedVariables._getWrittenInNode(node);
+    var info = _assignedVariables._getInfoForNode(node);
     ++_functionNestingLevel;
-    _current = _current.removePromotedAll(const [], writeCaptured);
+    _current = _current.removePromotedAll(const [], info._written);
     _stack.add(new _SimpleContext(_current));
     _current = _current.removePromotedAll(_assignedVariables._anywhere._written,
         _assignedVariables._anywhere._captured);
@@ -2362,12 +2344,13 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
 
   @override
   void switchStatement_beginCase(bool hasLabel, Node node) {
-    Iterable<Variable> notPromoted = _assignedVariables._getWrittenInNode(node);
-    Iterable<Variable> captured = _assignedVariables._getCapturedInNode(node);
+    AssignedVariablesNodeInfo<Variable> info =
+        _assignedVariables._getInfoForNode(node);
     _SimpleStatementContext<Variable, Type> context =
         _stack.last as _SimpleStatementContext<Variable, Type>;
     if (hasLabel) {
-      _current = context._previous.removePromotedAll(notPromoted, captured);
+      _current =
+          context._previous.removePromotedAll(info._written, info._captured);
     } else {
       _current = context._previous;
     }
@@ -2404,15 +2387,13 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
 
   @override
   void tryCatchStatement_bodyEnd(Node body) {
-    Iterable<Variable> assignedInBody =
-        _assignedVariables._getWrittenInNode(body);
-    Iterable<Variable> capturedInBody =
-        _assignedVariables._getCapturedInNode(body);
+    AssignedVariablesNodeInfo<Variable> info =
+        _assignedVariables._getInfoForNode(body);
     _TryContext<Variable, Type> context =
         _stack.last as _TryContext<Variable, Type>;
     FlowModel<Variable, Type> beforeBody = context._previous;
     FlowModel<Variable, Type> beforeCatch =
-        beforeBody.removePromotedAll(assignedInBody, capturedInBody);
+        beforeBody.removePromotedAll(info._written, info._captured);
     context._beforeCatch = beforeCatch;
     context._afterBodyAndCatches = _current;
   }
@@ -2453,25 +2434,23 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
 
   @override
   void tryFinallyStatement_end(Node finallyBlock) {
-    Iterable<Variable> assignedInFinally =
-        _assignedVariables._getWrittenInNode(finallyBlock);
+    AssignedVariablesNodeInfo<Variable> info =
+        _assignedVariables._getInfoForNode(finallyBlock);
     _TryContext<Variable, Type> context =
         _stack.removeLast() as _TryContext<Variable, Type>;
     _current = _current.restrict(
-        typeOperations, context._afterBodyAndCatches, assignedInFinally);
+        typeOperations, context._afterBodyAndCatches, info._written);
   }
 
   @override
   void tryFinallyStatement_finallyBegin(Node body) {
-    Iterable<Variable> assignedInBody =
-        _assignedVariables._getWrittenInNode(body);
-    Iterable<Variable> capturedInBody =
-        _assignedVariables._getCapturedInNode(body);
+    AssignedVariablesNodeInfo<Variable> info =
+        _assignedVariables._getInfoForNode(body);
     _TryContext<Variable, Type> context =
         _stack.last as _TryContext<Variable, Type>;
     context._afterBodyAndCatches = _current;
     _current = _join(_current,
-        context._previous.removePromotedAll(assignedInBody, capturedInBody));
+        context._previous.removePromotedAll(info._written, info._captured));
   }
 
   @override
@@ -2493,11 +2472,9 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
 
   @override
   void whileStatement_conditionBegin(Node node) {
-    Iterable<Variable> loopAssigned =
-        _assignedVariables._getWrittenInNode(node);
-    Iterable<Variable> loopCaptured =
-        _assignedVariables._getCapturedInNode(node);
-    _current = _current.removePromotedAll(loopAssigned, loopCaptured);
+    AssignedVariablesNodeInfo<Variable> info =
+        _assignedVariables._getInfoForNode(node);
+    _current = _current.removePromotedAll(info._written, info._captured);
   }
 
   @override
