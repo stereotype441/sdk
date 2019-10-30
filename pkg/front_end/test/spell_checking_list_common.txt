@@ -608,6 +608,7 @@ convertible
 converting
 converts
 cookie
+cope
 copied
 copier
 copies
@@ -2458,6 +2459,7 @@ searching
 second
 section
 see
+seeing
 seem
 seems
 seen
