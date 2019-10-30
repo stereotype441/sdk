@@ -1099,9 +1099,22 @@ class Parser {
         (token.kind == IDENTIFIER_TOKEN || token.type.isPseudo) &&
         optional('=', typeParam.skip(token).next)) {
       listener.handleIdentifier(token, IdentifierContext.typedefDeclaration);
-      equals = typeParam.parseVariables(token, this).next;
-      assert(optional('=', equals));
-      token = computeType(equals, true).ensureTypeOrVoid(equals, this);
+      token = typeParam.parseVariables(token, this).next;
+      // parseVariables rewrites so even though we checked in the if,
+      // we might not have an equal here now.
+      if (!optional('=', token) && optional('=', token.next)) {
+        // Recovery after recovery: A token was inserted, but we'll skip it now
+        // to get more in line with what we thought in the if before.
+        token = token.next;
+      }
+      if (optional('=', token)) {
+        equals = token;
+        token = computeType(equals, true).ensureTypeOrVoid(equals, this);
+      } else {
+        // A rewrite caused the = to disappear
+        token = parseFormalParametersRequiredOpt(
+            token, MemberKind.FunctionTypeAlias);
+      }
     } else {
       token = typeInfo.parseType(typedefKeyword, this);
       token = ensureIdentifier(token, IdentifierContext.typedefDeclaration);
@@ -2098,6 +2111,10 @@ class Parser {
     Token name = token.next;
     if (name.isIdentifier && !optional('on', name)) {
       token = name;
+      if (name.type.isBuiltIn) {
+        reportRecoverableErrorWithToken(
+            token, fasta.templateBuiltInIdentifierInDeclaration);
+      }
     } else {
       name = null;
     }
@@ -2471,7 +2488,7 @@ class Parser {
     listener.beginTopLevelMethod(beforeStart, externalToken);
 
     Token token = typeInfo.parseType(beforeType, this);
-    assert(token.next == (getOrSet ?? name));
+    assert(token.next == (getOrSet ?? name) || token.next.isEof);
     name = ensureIdentifier(
         getOrSet ?? token, IdentifierContext.topLevelFunctionDeclaration);
 
@@ -3150,7 +3167,8 @@ class Parser {
               lateToken,
               varFinalOrConst,
               beforeType,
-              kind);
+              kind,
+              enclosingDeclarationName);
         } else if (isUnaryMinus(next2)) {
           // Recovery
           token = parseMethod(
@@ -3205,7 +3223,8 @@ class Parser {
               lateToken,
               varFinalOrConst,
               beforeType,
-              kind);
+              kind,
+              enclosingDeclarationName);
         }
       }
     }
@@ -6471,17 +6490,37 @@ class Parser {
       Token lateToken,
       Token varFinalOrConst,
       Token beforeType,
-      DeclarationKind kind) {
-    TypeInfo typeInfo = computeType(beforeType, true, true);
-
+      DeclarationKind kind,
+      String enclosingDeclarationName) {
+    TypeInfo typeInfo = computeType(beforeStart, false, true);
     Token beforeName = typeInfo.skipType(beforeType);
     Token next = beforeName.next;
 
     if (optional('operator', next)) {
       next = next.next;
     } else {
-      reportRecoverableError(next, fasta.messageMissingOperatorKeyword);
+      // The 'operator' keyword is missing, but we may or may not have a type
+      // before the token that is the actual operator.
+      Token operator = next;
+      if (!next.isOperator && next.next.isOperator) {
+        beforeName = next;
+        operator = next.next;
+      }
+      reportRecoverableError(operator, fasta.messageMissingOperatorKeyword);
       rewriter.insertSyntheticKeyword(beforeName, Keyword.OPERATOR);
+
+      // Having inserted the keyword the type now possibly compute differently.
+      typeInfo = computeType(beforeStart, true, true);
+      beforeName = typeInfo.skipType(beforeType);
+      next = beforeName.next;
+
+      // The 'next' token can be the just-inserted 'operator' keyword.
+      // If it is, change it so it points to the actual operator.
+      if (!next.isOperator &&
+          next.next.isOperator &&
+          identical(next.stringValue, 'operator')) {
+        next = next.next;
+      }
     }
 
     assert((next.isOperator && next.endGroup == null) ||
@@ -6500,7 +6539,7 @@ class Parser {
         null,
         beforeName.next,
         kind,
-        null);
+        enclosingDeclarationName);
     listener.endMember();
     return token;
   }
@@ -6539,7 +6578,8 @@ class Parser {
           lateToken,
           varFinalOrConst,
           beforeType,
-          kind);
+          kind,
+          enclosingDeclarationName);
     }
 
     if (getOrSet != null ||
