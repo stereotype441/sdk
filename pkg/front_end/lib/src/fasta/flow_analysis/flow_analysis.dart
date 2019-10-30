@@ -2138,7 +2138,8 @@ class _FlowAnalysisImpl<Node, Statement extends Node, Expression, Variable,
 
   @override
   void functionExpression_begin(Node node) {
-    var info = _assignedVariables._getInfoForNode(node);
+    AssignedVariablesNodeInfo<Variable> info =
+        _assignedVariables._getInfoForNode(node);
     ++_functionNestingLevel;
     _current = _current.removePromotedAll(const [], info._written);
     _stack.add(new _SimpleContext(_current));
