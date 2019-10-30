@@ -1099,9 +1099,22 @@ class Parser {
         (token.kind == IDENTIFIER_TOKEN || token.type.isPseudo) &&
         optional('=', typeParam.skip(token).next)) {
       listener.handleIdentifier(token, IdentifierContext.typedefDeclaration);
-      equals = typeParam.parseVariables(token, this).next;
-      assert(optional('=', equals));
-      token = computeType(equals, true).ensureTypeOrVoid(equals, this);
+      token = typeParam.parseVariables(token, this).next;
+      // parseVariables rewrites so even though we checked in the if,
+      // we might not have an equal here now.
+      if (!optional('=', token) && optional('=', token.next)) {
+        // Recovery after recovery: A token was inserted, but we'll skip it now
+        // to get more in line with what we thought in the if before.
+        token = token.next;
+      }
+      if (optional('=', token)) {
+        equals = token;
+        token = computeType(equals, true).ensureTypeOrVoid(equals, this);
+      } else {
+        // A rewrite caused the = to disappear
+        token = parseFormalParametersRequiredOpt(
+            token, MemberKind.FunctionTypeAlias);
+      }
     } else {
       token = typeInfo.parseType(typedefKeyword, this);
       token = ensureIdentifier(token, IdentifierContext.typedefDeclaration);
@@ -2098,6 +2111,10 @@ class Parser {
     Token name = token.next;
     if (name.isIdentifier && !optional('on', name)) {
       token = name;
+      if (name.type.isBuiltIn) {
+        reportRecoverableErrorWithToken(
+            token, fasta.templateBuiltInIdentifierInDeclaration);
+      }
     } else {
       name = null;
     }
@@ -2471,7 +2488,7 @@ class Parser {
     listener.beginTopLevelMethod(beforeStart, externalToken);
 
     Token token = typeInfo.parseType(beforeType, this);
-    assert(token.next == (getOrSet ?? name));
+    assert(token.next == (getOrSet ?? name) || token.next.isEof);
     name = ensureIdentifier(
         getOrSet ?? token, IdentifierContext.topLevelFunctionDeclaration);
 
