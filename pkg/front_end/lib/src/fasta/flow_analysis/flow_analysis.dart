@@ -89,6 +89,26 @@ class AssignedVariables<Node, Variable> {
     _declaredStack.last.add(variable);
   }
 
+  /// This method may be called during pre-traversal, to discard the effects of
+  /// the most recent unmatched call to [beginNode].
+  ///
+  /// This is necessary because try/catch/finally needs to be desugared into
+  /// a try/catch nested inside a try/finally, however the pre-traversal phase
+  /// of the front end happens during parsing, so when a `try` is encountered,
+  /// it is not known whether it will need to be desugared into two nested
+  /// `try`s.  To cope with this, the front end may call [beginNode] twice upon
+  /// seeing the two `try`s, and later if it turns out that no desugaring was
+  /// needed, use [discardNode] to discard the effects of one of the [beginNode]
+  /// calls.
+  void discardNode() {
+    Set<Variable> declared = _declaredStack.removeLast();
+    _declaredStack.last.addAll(declared);
+    Set<Variable> written = _writtenStack.removeLast();
+    _writtenStack.last.addAll(written);
+    Set<Variable> captured = _capturedStack.removeLast();
+    _capturedStack.last.addAll(captured);
+  }
+
   /// This method should be called during pre-traversal, to mark the end of a
   /// loop statement, switch statement, try statement, loop collection element,
   /// local function, or closure which might need to be queried later.
@@ -136,6 +156,14 @@ class AssignedVariables<Node, Variable> {
     }());
   }
 
+  String toString() {
+    StringBuffer sb = new StringBuffer();
+    sb.write('AssignedVariables(');
+    _printOn(sb);
+    sb.write(')');
+    return sb.toString();
+  }
+
   /// This method should be called during pre-traversal, to mark a write to a
   /// variable.
   void write(Variable variable) {
@@ -164,14 +192,6 @@ class AssignedVariables<Node, Variable> {
     sb.write('_capturedAnywhere=$_capturedAnywhere,');
     sb.write('_writtenStack=$_writtenStack,');
     sb.write('_capturedStack=$_capturedStack');
-  }
-
-  String toString() {
-    StringBuffer sb = new StringBuffer();
-    sb.write('AssignedVariables(');
-    _printOn(sb);
-    sb.write(')');
-    return sb.toString();
   }
 }
 
@@ -202,20 +222,20 @@ class AssignedVariablesForTesting<Node, Variable>
 
   bool isTracked(Node node) => _writtenInNode.containsKey(node);
 
-  Set<Variable> writtenInNode(Node node) => _getWrittenInNode(node);
-
-  @override
-  void _printOn(StringBuffer sb) {
-    super._printOn(sb);
-    sb.write(',_declaredInNode=$_declaredInNode');
-  }
-
   String toString() {
     StringBuffer sb = new StringBuffer();
     sb.write('AssignedVariablesForTesting(');
     _printOn(sb);
     sb.write(')');
     return sb.toString();
+  }
+
+  Set<Variable> writtenInNode(Node node) => _getWrittenInNode(node);
+
+  @override
+  void _printOn(StringBuffer sb) {
+    super._printOn(sb);
+    sb.write(',_declaredInNode=$_declaredInNode');
   }
 }
 
