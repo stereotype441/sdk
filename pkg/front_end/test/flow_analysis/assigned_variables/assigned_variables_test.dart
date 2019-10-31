@@ -73,6 +73,9 @@ class AssignedVariablesDataExtractor extends CfeDataExtractor<_Data> {
         _convertVars(_assignedVariables.capturedAnywhere));
   }
 
+  Set<String> _convertVars(Iterable<VariableDeclaration> x) =>
+      x.map((e) => e.name).toSet();
+
   @override
   _Data computeNodeValue(Id id, TreeNode node) {
     if (!_assignedVariables.isTracked(node)) return null;
@@ -81,9 +84,6 @@ class AssignedVariablesDataExtractor extends CfeDataExtractor<_Data> {
         _convertVars(_assignedVariables.writtenInNode(node)),
         _convertVars(_assignedVariables.capturedInNode(node)));
   }
-
-  Set<String> _convertVars(Iterable<VariableDeclaration> x) =>
-      x.map((e) => e.name).toSet();
 }
 
 class _AssignedVariablesDataInterpreter implements DataInterpreter<_Data> {
