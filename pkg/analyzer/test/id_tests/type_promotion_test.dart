@@ -17,8 +17,9 @@ import 'package:front_end/src/testing/id_testing.dart';
 import '../util/id_testing_helper.dart';
 
 main(List<String> args) async {
-  Directory dataDir = new Directory.fromUri(Platform.script
-      .resolve('../../../front_end/test/flow_analysis/type_promotion/data'));
+  Directory dataDir = new Directory.fromUri(Platform.script.resolve(
+      '../../../_fe_analyzer_shared/test/flow_analysis/type_promotion/'
+      'data'));
   await runTests(dataDir,
       args: args,
       supportedMarkers: sharedMarkers,
