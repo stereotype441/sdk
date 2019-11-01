@@ -25,6 +25,8 @@ import 'package:kernel/ast.dart' show Location, TreeNode;
 
 import '../compute_platform_binaries_location.dart' show translateSdk;
 
+import 'colors.dart' as colors;
+
 import 'colors.dart' show green, magenta, red;
 
 import 'compiler_context.dart' show CompilerContext;
@@ -56,7 +58,7 @@ String format(LocatedMessage message, Severity severity, {Location location}) {
     if (message.tip != null) {
       messageText += "\n${message.tip}";
     }
-    if (CompilerContext.enableColors) {
+    if (colors.enableColors) {
       switch (severity) {
         case Severity.error:
         case Severity.internalProblem:
