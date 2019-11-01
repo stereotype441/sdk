@@ -10,6 +10,8 @@ import 'dart:convert' show jsonDecode;
 
 import 'dart:io' show Directory, File, Platform;
 
+import 'package:_fe_analyzer_shared/src/util/colors.dart' as colors;
+
 import 'package:front_end/src/api_prototype/compiler_options.dart'
     show
         CompilerOptions,
@@ -408,7 +410,7 @@ class Outline extends Step<TestDescription, Component, FastaContext> {
     return await CompilerContext.runWithOptions(options, (_) async {
       // Disable colors to ensure that expectation files are the same across
       // platforms and independent of stdin/stderr.
-      CompilerContext.current.disableColors();
+      colors.enableColors = false;
       Component platform = await context.loadPlatform();
       Ticker ticker = new Ticker();
       DillTarget dillTarget = new DillTarget(

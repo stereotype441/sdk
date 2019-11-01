@@ -868,12 +868,13 @@ class ClassElementImpl extends AbstractClassElementImpl
   }
 
   @override
+  @deprecated
   InterfaceType get type {
     if (_type == null) {
-      var typeArguments = typeParameters.map((e) => e.type).toList();
-      InterfaceTypeImpl type =
-          new InterfaceTypeImpl.explicit(this, typeArguments);
-      _type = type;
+      var typeArguments = typeParameters
+          .map((e) => e.instantiate(nullabilitySuffix: _noneOrStarSuffix))
+          .toList();
+      _type = InterfaceTypeImpl.explicit(this, typeArguments);
     }
     return _type;
   }
@@ -985,18 +986,22 @@ class ClassElementImpl extends AbstractClassElementImpl
   /// one (this is used to detect circularities).
   List<ConstructorElement> _computeMixinAppConstructors(
       [List<ClassElementImpl> visitedClasses]) {
-    // First get the list of constructors of the superclass which need to be
-    // forwarded to this class.
-    Iterable<ConstructorElement> constructorsToForward;
     if (supertype == null) {
       // Shouldn't ever happen, since the only classes with no supertype are
       // Object and mixins, and they aren't a mixin application. But for
       // safety's sake just assume an empty list.
       assert(false);
-      constructorsToForward = <ConstructorElement>[];
-    } else if (!supertype.element.isMixinApplication) {
+      return <ConstructorElement>[];
+    }
+
+    ClassElementImpl superElement = supertype.element;
+
+    // First get the list of constructors of the superclass which need to be
+    // forwarded to this class.
+    Iterable<ConstructorElement> constructorsToForward;
+    if (!superElement.isMixinApplication) {
       var library = this.library;
-      constructorsToForward = supertype.element.constructors
+      constructorsToForward = superElement.constructors
           .where((constructor) => constructor.isAccessibleIn(library));
     } else {
       if (visitedClasses == null) {
@@ -1010,7 +1015,6 @@ class ClassElementImpl extends AbstractClassElementImpl
         visitedClasses.add(this);
       }
       try {
-        ClassElementImpl superElement = supertype.element;
         constructorsToForward =
             superElement._computeMixinAppConstructors(visitedClasses);
       } finally {
@@ -1022,9 +1026,9 @@ class ClassElementImpl extends AbstractClassElementImpl
     // to produce constructors for this class.  We want to be robust in the
     // face of errors, so drop any extra type arguments and fill in any missing
     // ones with `dynamic`.
-    var superTypeParameters = supertype.typeParameters;
+    var superClassParameters = superElement.typeParameters;
     List<DartType> argumentTypes = new List<DartType>.filled(
-        superTypeParameters.length, DynamicTypeImpl.instance);
+        superClassParameters.length, DynamicTypeImpl.instance);
     for (int i = 0; i < supertype.typeArguments.length; i++) {
       if (i >= argumentTypes.length) {
         break;
@@ -1032,7 +1036,7 @@ class ClassElementImpl extends AbstractClassElementImpl
       argumentTypes[i] = supertype.typeArguments[i];
     }
     var substitution =
-        Substitution.fromPairs(superTypeParameters, argumentTypes);
+        Substitution.fromPairs(superClassParameters, argumentTypes);
 
     // Now create an implicit constructor for every constructor found above,
     // substituting type parameters as appropriate.
@@ -1658,15 +1662,12 @@ class CompilationUnitElementImpl extends UriReferencedElementImpl
 
   @override
   ClassElement getType(String className) {
-    return getTypeFromTypes(className, types);
-  }
-
-  /// Replace the given [from] top-level variable with [to] in this compilation
-  /// unit.
-  void replaceTopLevelVariable(
-      TopLevelVariableElement from, TopLevelVariableElement to) {
-    int index = _variables.indexOf(from);
-    _variables[index] = to;
+    for (ClassElement type in types) {
+      if (type.name == className) {
+        return type;
+      }
+    }
+    return null;
   }
 
   @override
@@ -1680,16 +1681,6 @@ class CompilationUnitElementImpl extends UriReferencedElementImpl
     safelyVisitChildren(mixins, visitor);
     safelyVisitChildren(types, visitor);
     safelyVisitChildren(topLevelVariables, visitor);
-  }
-
-  static ClassElement getTypeFromTypes(
-      String className, List<ClassElement> types) {
-    for (ClassElement type in types) {
-      if (type.name == className) {
-        return type;
-      }
-    }
-    return null;
   }
 
   static void _createPropertiesAndAccessors(CompilationUnitElementImpl unit) {
@@ -2194,7 +2185,7 @@ class ConstructorElementImpl extends ExecutableElementImpl
       } else {
         message = 'Found unnamed constructor element with no enclosing element';
       }
-      AnalysisEngine.instance.logger.logError(message);
+      AnalysisEngine.instance.instrumentationService.logError(message);
       name = '<unknown class>';
     } else {
       name = enclosingElement.displayName;
@@ -3457,6 +3448,7 @@ class EnumElementImpl extends AbstractClassElementImpl {
   InterfaceType get supertype => context.typeProvider.objectType;
 
   @override
+  @deprecated
   InterfaceType get type {
     if (_type == null) {
       var typeArguments = const <DartType>[];
@@ -4747,7 +4739,10 @@ class GenericTypeAliasElementImpl extends ElementImpl
           encloseElement(_function);
           return _function;
         } else {
-          return null;
+          return _function = GenericFunctionTypeElementImpl.forOffset(-1)
+            ..typeParameters = const <TypeParameterElement>[]
+            ..parameters = const <ParameterElement>[]
+            ..returnType = DynamicTypeImpl.instance;
         }
       } else {
         return _function = GenericFunctionTypeElementImpl.forLinkedNode(
@@ -4770,6 +4765,8 @@ class GenericTypeAliasElementImpl extends ElementImpl
     _function = function;
   }
 
+  /// Return `true` if the element has direct or indirect reference to itself
+  /// from anywhere except a class element or type parameter bounds.
   bool get hasSelfReference {
     if (linkedNode != null) {
       return linkedContext.getHasTypedefSelfReference(linkedNode);
@@ -4819,11 +4816,12 @@ class GenericTypeAliasElementImpl extends ElementImpl
   }
 
   @override
+  @deprecated
   FunctionType get type {
     _type ??= FunctionTypeImpl.synthetic(
-      returnType,
+      function.returnType,
       typeParameters,
-      parameters,
+      function.parameters,
       element: this,
       typeArguments: typeParameters.map((e) {
         return e.instantiate(
@@ -5628,6 +5626,7 @@ class LibraryElementImpl extends ElementImpl implements LibraryElement {
     for (var unit in units) {
       yield* unit.accessors;
       yield* unit.enums;
+      yield* unit.extensions;
       yield* unit.functionTypeAliases;
       yield* unit.functions;
       yield* unit.mixins;
@@ -7535,6 +7534,8 @@ class TypeParameterElementImpl extends ElementImpl
     return super.nameOffset;
   }
 
+  @override
+  @deprecated
   TypeParameterType get type {
     // Note: TypeParameterElement.type has nullability suffix `star` regardless
     // of whether it appears in a migrated library.  This is because for type

@@ -11,7 +11,6 @@ import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
-import 'package:analyzer/dart/element/visitor.dart';
 import 'package:analyzer/error/error.dart';
 import 'package:analyzer/error/listener.dart';
 import 'package:analyzer/src/dart/ast/ast.dart';
@@ -141,15 +140,9 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
 
   /**
    * A flag indicating whether the visitor is currently within an instance
-   * variable declaration.
+   * variable declaration, which is not `late`.
    */
-  bool _isInInstanceVariableDeclaration = false;
-
-  /**
-   * A flag indicating whether the visitor is currently within an instance
-   * variable initializer.
-   */
-  bool _isInInstanceVariableInitializer = false;
+  bool _isInInstanceNotLateVariableDeclaration = false;
 
   /**
    * A flag indicating whether the visitor is currently within a constructor
@@ -321,8 +314,6 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
     _isEnclosingConstructorConst = false;
     _isInCatchClause = false;
     _isInStaticVariableDeclaration = false;
-    _isInInstanceVariableDeclaration = false;
-    _isInInstanceVariableInitializer = false;
     _isInConstructorInitializer = false;
     _isInStaticMethod = false;
     _boolType = _typeProvider.boolType;
@@ -725,13 +716,14 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
 
   @override
   void visitFieldDeclaration(FieldDeclaration node) {
+    var fields = node.fields;
     _isInStaticVariableDeclaration = node.isStatic;
-    _isInInstanceVariableDeclaration = !_isInStaticVariableDeclaration;
-    if (_isInInstanceVariableDeclaration) {
-      VariableDeclarationList variables = node.fields;
-      if (variables.isConst) {
+    _isInInstanceNotLateVariableDeclaration =
+        !node.isStatic && !node.fields.isLate;
+    if (!_isInStaticVariableDeclaration) {
+      if (fields.isConst) {
         _errorReporter.reportErrorForToken(
-            CompileTimeErrorCode.CONST_INSTANCE_FIELD, variables.keyword);
+            CompileTimeErrorCode.CONST_INSTANCE_FIELD, fields.keyword);
       }
     }
     try {
@@ -739,7 +731,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
       super.visitFieldDeclaration(node);
     } finally {
       _isInStaticVariableDeclaration = false;
-      _isInInstanceVariableDeclaration = false;
+      _isInInstanceNotLateVariableDeclaration = false;
     }
   }
 
@@ -896,7 +888,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
     _checkForBuiltInIdentifierAsName(
         node.name, CompileTimeErrorCode.BUILT_IN_IDENTIFIER_AS_TYPEDEF_NAME);
     _checkForDefaultValueInFunctionTypeAlias(node);
-    _checkForTypeAliasCannotReferenceItself_function(node);
+    _checkForTypeAliasCannotReferenceItself(node, node.declaredElement);
     super.visitFunctionTypeAlias(node);
   }
 
@@ -929,10 +921,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
 
   @override
   void visitGenericTypeAlias(GenericTypeAlias node) {
-    if (_hasTypedefSelfReference(node.declaredElement)) {
-      _errorReporter.reportErrorForNode(
-          CompileTimeErrorCode.TYPE_ALIAS_CANNOT_REFERENCE_ITSELF, node);
-    }
+    _checkForTypeAliasCannotReferenceItself(node, node.declaredElement);
     super.visitGenericTypeAlias(node);
   }
 
@@ -1379,14 +1368,11 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
     // visit initializer
     String name = nameNode.name;
     _namesForReferenceToDeclaredVariableInInitializer.add(name);
-    bool wasInInstanceVariableInitializer = _isInInstanceVariableInitializer;
-    _isInInstanceVariableInitializer = _isInInstanceVariableDeclaration;
     try {
       if (initializerNode != null) {
         initializerNode.accept(this);
       }
     } finally {
-      _isInInstanceVariableInitializer = wasInInstanceVariableInitializer;
       _namesForReferenceToDeclaredVariableInInitializer.remove(name);
     }
     // declare the variable
@@ -3237,10 +3223,13 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
    */
   void _checkForImplicitThisReferenceInInitializer(
       SimpleIdentifier identifier) {
+    if (_isInComment) {
+      return;
+    }
     if (!_isInConstructorInitializer &&
         !_isInStaticMethod &&
         !_isInFactory &&
-        !_isInInstanceVariableInitializer &&
+        !_isInInstanceNotLateVariableDeclaration &&
         !_isInStaticVariableDeclaration) {
       return;
     }
@@ -3259,12 +3248,8 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
     if (enclosingElement is! ClassElement) {
       return;
     }
-    // comment
-    AstNode parent = identifier.parent;
-    if (parent is CommentReference) {
-      return;
-    }
     // qualified method invocation
+    AstNode parent = identifier.parent;
     if (parent is MethodInvocation) {
       if (identical(parent.methodName, identifier) &&
           parent.realTarget != null) {
@@ -4884,16 +4869,20 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
   }
 
   /**
-   * Verify that the given function type [alias] does not reference itself
-   * directly.
+   * Verify that the given [element] does not reference itself directly.
+   * If it does, report the error on the [node].
    *
    * See [CompileTimeErrorCode.TYPE_ALIAS_CANNOT_REFERENCE_ITSELF].
    */
-  void _checkForTypeAliasCannotReferenceItself_function(
-      FunctionTypeAlias alias) {
-    if (_hasTypedefSelfReference(alias.declaredElement)) {
+  void _checkForTypeAliasCannotReferenceItself(
+    AstNode node,
+    FunctionTypeAliasElement element,
+  ) {
+    if ((element as GenericTypeAliasElementImpl).hasSelfReference) {
       _errorReporter.reportErrorForNode(
-          CompileTimeErrorCode.TYPE_ALIAS_CANNOT_REFERENCE_ITSELF, alias);
+        CompileTimeErrorCode.TYPE_ALIAS_CANNOT_REFERENCE_ITSELF,
+        node,
+      );
     }
   }
 
@@ -5773,22 +5762,6 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
     return false;
   }
 
-  /**
-   * Return `true` if the given [element] has direct or indirect reference to
-   * itself from anywhere except a class element or type parameter bounds.
-   */
-  bool _hasTypedefSelfReference(GenericTypeAliasElement element) {
-    if (element == null) {
-      return false;
-    }
-    if (element is GenericTypeAliasElementImpl && element.linkedNode != null) {
-      return element.hasSelfReference;
-    }
-    var visitor = new _HasTypedefSelfReferenceVisitor(element.function);
-    element.accept(visitor);
-    return visitor.hasSelfReference;
-  }
-
   void _initializeInitialFieldElementsMap(List<FieldElement> fields) {
     _initialFieldElementsMap = new HashMap<FieldElement, INIT_STATE>();
     for (FieldElement fieldElement in fields) {
@@ -6003,73 +5976,6 @@ class HiddenElements {
    */
   void _initializeElements(Block block) {
     _elements.addAll(BlockScope.elementsInBlock(block));
-  }
-}
-
-class _HasTypedefSelfReferenceVisitor extends GeneralizingElementVisitor<void> {
-  final GenericFunctionTypeElement element;
-  bool hasSelfReference = false;
-
-  _HasTypedefSelfReferenceVisitor(this.element);
-
-  @override
-  void visitClassElement(ClassElement element) {
-    // Typedefs are allowed to reference themselves via classes.
-  }
-
-  @override
-  void visitFunctionElement(FunctionElement element) {
-    _addTypeToCheck(element.returnType);
-    super.visitFunctionElement(element);
-  }
-
-  @override
-  void visitFunctionTypeAliasElement(FunctionTypeAliasElement element) {
-    _addTypeToCheck(element.returnType);
-    super.visitFunctionTypeAliasElement(element);
-  }
-
-  @override
-  void visitGenericFunctionTypeElement(GenericFunctionTypeElement element) {
-    _addTypeToCheck(element.returnType);
-    super.visitGenericFunctionTypeElement(element);
-  }
-
-  @override
-  void visitParameterElement(ParameterElement element) {
-    _addTypeToCheck(element.type);
-    super.visitParameterElement(element);
-  }
-
-  @override
-  void visitTypeParameterElement(TypeParameterElement element) {
-    _addTypeToCheck(element.bound);
-    super.visitTypeParameterElement(element);
-  }
-
-  void _addTypeToCheck(DartType type) {
-    if (hasSelfReference) {
-      return;
-    }
-    if (type == null) {
-      return;
-    }
-    if (type.element == element) {
-      hasSelfReference = true;
-      return;
-    }
-    if (type is FunctionType) {
-      _addTypeToCheck(type.returnType);
-      for (ParameterElement parameter in type.parameters) {
-        _addTypeToCheck(parameter.type);
-      }
-    }
-    // type arguments
-    if (type is InterfaceType) {
-      for (DartType typeArgument in type.typeArguments) {
-        _addTypeToCheck(typeArgument);
-      }
-    }
   }
 }
 

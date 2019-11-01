@@ -3,13 +3,13 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'dart:io' show Directory, Platform;
+import 'package:_fe_analyzer_shared/src/testing/id.dart' show ActualData, Id;
+import 'package:_fe_analyzer_shared/src/testing/id_testing.dart'
+    show DataInterpreter, runTests;
+import 'package:_fe_analyzer_shared/src/testing/id_testing.dart';
 import 'package:front_end/src/api_prototype/experimental_flags.dart'
     show ExperimentalFlag;
 
-import 'package:front_end/src/testing/id.dart' show ActualData, Id;
-import 'package:front_end/src/testing/id_testing.dart'
-    show DataInterpreter, runTests;
-import 'package:front_end/src/testing/id_testing.dart';
 import 'package:front_end/src/testing/id_testing_helper.dart';
 import 'package:front_end/src/fasta/type_inference/type_inference_engine.dart';
 import 'package:front_end/src/fasta/builder/member_builder.dart';
@@ -17,7 +17,8 @@ import 'package:front_end/src/testing/id_testing_utils.dart';
 import 'package:kernel/ast.dart' hide Variance;
 
 main(List<String> args) async {
-  Directory dataDir = new Directory.fromUri(Platform.script.resolve('data'));
+  Directory dataDir = new Directory.fromUri(Platform.script.resolve(
+      '../../../../_fe_analyzer_shared/test/flow_analysis/reachability/data'));
   await runTests(dataDir,
       args: args,
       supportedMarkers: sharedMarkers,
@@ -26,16 +27,7 @@ main(List<String> args) async {
       runTest: runTestFor(const ReachabilityDataComputer(), [
         new TestConfig(cfeMarker, 'cfe with nnbd',
             experimentalFlags: const {ExperimentalFlag.nonNullable: true})
-      ]),
-      skipList: [
-        // TODO(dmitryas): Run all reachability tests.
-        'assert.dart',
-        'do.dart',
-        'for.dart',
-        'never_return_type.dart',
-        'switch.dart',
-        'try_catch.dart',
-      ]);
+      ]));
 }
 
 class ReachabilityDataComputer
@@ -84,7 +76,14 @@ class ReachabilityDataExtractor
   @override
   Set<_ReachabilityAssertion> computeNodeValue(Id id, TreeNode node) {
     Set<_ReachabilityAssertion> result = {};
-    if (_flowResult.unreachableNodes.contains(node)) {
+    if (node is Expression && node.parent is ExpressionStatement) {
+      // The reachability of an expression statement and the statement it
+      // contains should always be the same.  We check this with an assert
+      // statement, and only annotate the expression statement, to reduce the
+      // amount of redundancy in the test files.
+      assert(_flowResult.unreachableNodes.contains(node) ==
+          _flowResult.unreachableNodes.contains(node.parent));
+    } else if (_flowResult.unreachableNodes.contains(node)) {
       result.add(_ReachabilityAssertion.unreachable);
     }
     if (node is FunctionDeclaration) {

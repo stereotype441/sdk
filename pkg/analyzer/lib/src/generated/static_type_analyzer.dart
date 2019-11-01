@@ -284,7 +284,7 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
     );
   }
 
-  ParameterizedType inferMapTypeDownwards(
+  InterfaceType inferMapTypeDownwards(
       SetOrMapLiteral node, DartType contextType) {
     if (contextType == null) {
       return null;
@@ -953,8 +953,6 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
     } else if (staticElement is PropertyAccessorElement) {
       staticType = _getTypeOfProperty(staticElement);
     } else if (staticElement is ExecutableElement) {
-      staticType = staticElement.type;
-    } else if (staticElement is TypeParameterElement) {
       staticType = staticElement.type;
     } else if (staticElement is VariableElement) {
       staticType = staticElement.type;

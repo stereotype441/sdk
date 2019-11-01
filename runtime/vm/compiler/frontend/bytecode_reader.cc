@@ -502,11 +502,11 @@ void BytecodeReaderHelper::ReadClosureDeclaration(const Function& function,
   closures_->SetAt(closureIndex, closure);
 
   Type& signature_type = Type::Handle(
-      Z, ReadFunctionSignature(closure,
-                               (flags & kHasOptionalPositionalParamsFlag) != 0,
-                               (flags & kHasOptionalNamedParamsFlag) != 0,
-                               (flags & kHasTypeParamsFlag) != 0,
-                               /* has_positional_param_names = */ true));
+      Z, ReadFunctionSignature(
+             closure, (flags & kHasOptionalPositionalParamsFlag) != 0,
+             (flags & kHasOptionalNamedParamsFlag) != 0,
+             (flags & kHasTypeParamsFlag) != 0,
+             /* has_positional_param_names = */ true, kNonNullable));
 
   closure.SetSignatureType(signature_type);
 
@@ -551,7 +551,8 @@ RawType* BytecodeReaderHelper::ReadFunctionSignature(
     bool has_optional_positional_params,
     bool has_optional_named_params,
     bool has_type_params,
-    bool has_positional_param_names) {
+    bool has_positional_param_names,
+    Nullability nullability) {
   FunctionTypeScope function_type_scope(this);
 
   if (has_type_params) {
@@ -599,7 +600,7 @@ RawType* BytecodeReaderHelper::ReadFunctionSignature(
   func.set_result_type(type);
 
   // Finalize function type.
-  type = func.SignatureType();
+  type = func.SignatureType(nullability);
   ClassFinalizer::FinalizationKind finalization = ClassFinalizer::kCanonicalize;
   if (pending_recursive_types_ != nullptr && HasNonCanonicalTypes(Z, func)) {
     // This function type is a part of recursive type. Avoid canonicalization
@@ -1539,14 +1540,20 @@ RawObject* BytecodeReaderHelper::ReadObjectContents(uint32_t header) {
             ReadSourceFile(uri, bytecode_component_->GetSourceFilesOffset() +
                                     reader_.ReadUInt());
       } else {
-        script = Script::New(uri, Object::null_string(), RawScript::kKernelTag);
+        script = Script::New(uri, Object::null_string());
       }
       script.set_kernel_program_info(H.GetKernelProgramInfo());
       return script.raw();
     }
     case kType: {
-      const intptr_t tag = flags / kFlagBit0;
-      return ReadType(tag);
+      const intptr_t tag = (flags & kTagMask) / kFlagBit0;
+      static_assert(KernelBytecode::kMinSupportedBytecodeFormatVersion < 24,
+                    "Cleanup condition");
+      const Nullability nullability =
+          bytecode_component_->GetVersion() >= 24
+              ? static_cast<Nullability>((flags & kNullabilityMask) / kFlagBit4)
+              : kLegacy;
+      return ReadType(tag, nullability);
     }
     default:
       UNREACHABLE();
@@ -1668,7 +1675,8 @@ RawObject* BytecodeReaderHelper::ReadConstObject(intptr_t tag) {
   return Object::null();
 }
 
-RawObject* BytecodeReaderHelper::ReadType(intptr_t tag) {
+RawObject* BytecodeReaderHelper::ReadType(intptr_t tag,
+                                          Nullability nullability) {
   // Must be in sync with enum TypeTag in
   // pkg/vm/lib/bytecode/object_table.dart.
   enum TypeTag {
@@ -1681,6 +1689,7 @@ RawObject* BytecodeReaderHelper::ReadType(intptr_t tag) {
     kRecursiveGenericType,
     kRecursiveTypeRef,
     kFunctionType,
+    kNever,
   };
 
   // FunctionType flags, must be in sync with _FunctionTypeHandle constants in
@@ -1697,12 +1706,21 @@ RawObject* BytecodeReaderHelper::ReadType(intptr_t tag) {
       return AbstractType::dynamic_type().raw();
     case kVoid:
       return AbstractType::void_type().raw();
+    case kNever:
+      return AbstractType::never_type().raw();
     case kSimpleType: {
       const Class& cls = Class::CheckedHandle(Z, ReadObject());
       if (!cls.is_declaration_loaded()) {
         LoadReferencedClass(cls);
       }
-      return cls.DeclarationType();
+      Type& type = Type::Handle(Z, cls.DeclarationType());
+      // TODO(regis): Remove this workaround once nullability of Null provided
+      // by CFE is always kNullable.
+      if (type.IsNullType()) {
+        ASSERT(type.IsNullable());
+        return type.raw();
+      }
+      return type.ToNullability(nullability, Heap::kOld);
     }
     case kTypeParameter: {
       Object& parent = Object::Handle(Z, ReadObject());
@@ -1725,7 +1743,9 @@ RawObject* BytecodeReaderHelper::ReadType(intptr_t tag) {
       } else {
         UNREACHABLE();
       }
-      return type_parameters.TypeAt(index_in_parent);
+      TypeParameter& type_parameter = TypeParameter::Handle(Z);
+      type_parameter ^= type_parameters.TypeAt(index_in_parent);
+      return type_parameter.ToNullability(nullability, Heap::kOld);
     }
     case kGenericType: {
       const Class& cls = Class::CheckedHandle(Z, ReadObject());
@@ -1736,6 +1756,7 @@ RawObject* BytecodeReaderHelper::ReadType(intptr_t tag) {
           TypeArguments::CheckedHandle(Z, ReadObject());
       const Type& type = Type::Handle(
           Z, Type::New(cls, type_arguments, TokenPosition::kNoSource));
+      type.set_nullability(nullability);
       type.SetIsFinalized();
       return type.Canonicalize();
     }
@@ -1767,6 +1788,7 @@ RawObject* BytecodeReaderHelper::ReadType(intptr_t tag) {
 
       Type& type = Type::Handle(
           Z, Type::New(cls, type_arguments, TokenPosition::kNoSource));
+      type.set_nullability(nullability);
       type_ref.set_type(type);
       type.SetIsFinalized();
       if (id != 0) {
@@ -1801,7 +1823,7 @@ RawObject* BytecodeReaderHelper::ReadType(intptr_t tag) {
           signature_function, (flags & kFlagHasOptionalPositionalParams) != 0,
           (flags & kFlagHasOptionalNamedParams) != 0,
           (flags & kFlagHasTypeParams) != 0,
-          /* has_positional_param_names = */ false);
+          /* has_positional_param_names = */ false, nullability);
     }
     default:
       UNREACHABLE();
@@ -1888,8 +1910,8 @@ RawScript* BytecodeReaderHelper::ReadSourceFile(const String& uri,
     source = ReadString(/* is_canonical = */ false);
   }
 
-  const Script& script = Script::Handle(
-      Z, Script::New(import_uri, uri, source, RawScript::kKernelTag));
+  const Script& script =
+      Script::Handle(Z, Script::New(import_uri, uri, source));
   script.set_line_starts(line_starts);
 
   if (source.IsNull() && line_starts.IsNull()) {

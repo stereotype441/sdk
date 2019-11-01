@@ -35,21 +35,7 @@ import 'package:vm/bytecode/gen_bytecode.dart'
     show generateBytecode, createFreshComponentWithBytecode;
 import 'package:vm/bytecode/options.dart' show BytecodeOptions;
 import 'package:vm/incremental_compiler.dart' show IncrementalCompiler;
-import 'package:vm/kernel_front_end.dart'
-    show
-        KernelCompilationResults,
-        asFileUri,
-        compileToKernel,
-        convertFileOrUriArgumentToUri,
-        createFrontEndFileSystem,
-        createFrontEndTarget,
-        forEachPackage,
-        packageFor,
-        parseCommandLineDefines,
-        runWithFrontEndCompilerContext,
-        setVMEnvironmentDefines,
-        sortComponent,
-        writeDepfile;
+import 'package:vm/kernel_front_end.dart';
 
 import 'src/javascript_bundle.dart';
 import 'src/strong_components.dart';
@@ -159,7 +145,15 @@ ArgParser argParser = ArgParser(allowTrailingOptions: true)
       help: 'Whether asserts will be enabled.', defaultsTo: false)
   ..addMultiOption('enable-experiment',
       help: 'Comma separated list of experimental features, eg set-literals.',
-      hide: true);
+      hide: true)
+  ..addFlag('split-output-by-packages',
+      help:
+          'Split resulting kernel file into multiple files (one per package).',
+      defaultsTo: false)
+  ..addOption('component-name', help: 'Name of the Fuchsia component')
+  ..addOption('data-dir',
+      help: 'Name of the subdirectory of //data for output files')
+  ..addOption('far-manifest', help: 'Path to output Fuchsia package manifest');
 
 String usage = '''
 Usage: server [options] [input.dart]
@@ -523,16 +517,21 @@ class FrontendCompiler implements CompilerInterface {
     // Create JavaScript bundler.
     final File sourceFile = File('$filename.sources');
     final File manifestFile = File('$filename.json');
+    final File sourceMapsFile = File('$filename.map');
     if (!sourceFile.parent.existsSync()) {
       sourceFile.parent.createSync(recursive: true);
     }
     final bundler = JavaScriptBundler(component, strongComponents);
     final sourceFileSink = sourceFile.openWrite();
     final manifestFileSink = manifestFile.openWrite();
-    await bundler.compile(results.classHierarchy, results.coreTypes,
-        sourceFileSink, manifestFileSink);
-    await sourceFileSink.close();
-    await manifestFileSink.close();
+    final sourceMapsFileSink = sourceMapsFile.openWrite();
+    bundler.compile(results.classHierarchy, results.coreTypes, sourceFileSink,
+        manifestFileSink, sourceMapsFileSink);
+    await Future.wait([
+      sourceFileSink.close(),
+      manifestFileSink.close(),
+      sourceMapsFileSink.close()
+    ]);
   }
 
   writeDillFile(KernelCompilationResults results, String filename,
@@ -609,6 +608,28 @@ class FrontendCompiler implements CompilerInterface {
 
       printer.writeComponentFile(component);
       await sink.close();
+    }
+
+    if (_options['split-output-by-packages']) {
+      await writeOutputSplitByPackages(
+          _mainSource,
+          _compilerOptions,
+          results.component,
+          results.coreTypes,
+          results.classHierarchy,
+          filename,
+          genBytecode: _compilerOptions.bytecode,
+          bytecodeOptions: _bytecodeOptions,
+          dropAST: _options['drop-ast']);
+    }
+
+    final String manifestFilename = _options['far-manifest'];
+    if (manifestFilename != null) {
+      final String output = _options['output-dill'];
+      final String dataDir = _options.options.contains('component-name')
+          ? _options['component-name']
+          : _options['data-dir'];
+      await createFarManifest(output, dataDir, manifestFilename);
     }
   }
 

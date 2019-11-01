@@ -647,8 +647,9 @@ class AssignmentExpressionImpl extends ExpressionImpl
       } else {
         message = "The right-hand size is null";
       }
-      AnalysisEngine.instance.logger.logError(
-          message, new CaughtException(new AnalysisException(message), null));
+      AnalysisEngine.instance.instrumentationService.logException(
+          new CaughtException(new AnalysisException(message), null),
+          StackTrace.current);
     }
     _leftHandSide = _becomeParentOf(leftHandSide);
     _rightHandSide = _becomeParentOf(rightHandSide);
@@ -1995,10 +1996,6 @@ class CompilationUnitImpl extends AstNodeImpl implements CompilationUnit {
   /// The line information for this compilation unit.
   @override
   LineInfo lineInfo;
-
-  /// ?
-  // TODO(brianwilkerson) Remove this field. It is never read, only written.
-  Map<int, AstNode> localDeclarations;
 
   @override
   final FeatureSet featureSet;

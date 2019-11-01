@@ -259,7 +259,7 @@ class ElementResolver extends SimpleAstVisitor<void> {
         if (library == null) {
           // TODO(brianwilkerson) We need to understand how the library could
           // ever be null.
-          AnalysisEngine.instance.logger
+          AnalysisEngine.instance.instrumentationService
               .logError("Found element with null library: ${element.name}");
         } else if (library != _definingLibrary) {
           // TODO(brianwilkerson) Report this error.
@@ -659,6 +659,18 @@ class ElementResolver extends SimpleAstVisitor<void> {
         operatorType.isIncrementOperator) {
       Expression operand = node.operand;
       String methodName = _getPrefixOperator(node);
+      if (operand is ExtensionOverride) {
+        ExtensionElement element = operand.extensionName.staticElement;
+        MethodElement member = element.getMethod(methodName);
+        if (member == null) {
+          _resolver.errorReporter.reportErrorForToken(
+              CompileTimeErrorCode.UNDEFINED_EXTENSION_OPERATOR,
+              node.operator,
+              [methodName, element.name]);
+        }
+        node.staticElement = member;
+        return;
+      }
       DartType staticType = _getStaticType(operand, read: true);
       var result = _newPropertyResolver()
           .resolve(operand, staticType, methodName, operand);

@@ -2,8 +2,8 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+import 'package:_fe_analyzer_shared/src/testing/id.dart';
 import 'package:kernel/ast.dart';
-import 'id.dart';
 
 /// Compute a canonical [Id] for kernel-based nodes.
 Id computeMemberId(Member node) {
@@ -140,6 +140,14 @@ abstract class DataExtractor<T> extends Visitor with DataRegistry<T> {
     return new NodeId(node.fileOffset, IdKind.moveNext);
   }
 
+  NodeId createExpressionStatementId(ExpressionStatement node) {
+    if (node.expression.fileOffset == TreeNode.noOffset) {
+      // TODO(johnniwinther): Find out why we something have no offset.
+      return null;
+    }
+    return new NodeId(node.expression.fileOffset, IdKind.stmt);
+  }
+
   NodeId createLabeledStatementId(LabeledStatement node) =>
       computeDefaultNodeId(node.body);
   NodeId createLoopId(TreeNode node) => computeDefaultNodeId(node);
@@ -270,6 +278,12 @@ abstract class DataExtractor<T> extends Visitor with DataRegistry<T> {
       computeForNode(node, createUpdateId(node));
     }
     super.visitVariableSet(node);
+  }
+
+  @override
+  visitExpressionStatement(ExpressionStatement node) {
+    computeForNode(node, createExpressionStatementId(node));
+    return super.visitExpressionStatement(node);
   }
 
   @override

@@ -208,7 +208,7 @@ class SourceClassBuilder extends ClassBuilderImpl
       }
     });
 
-    scope.setters.forEach((String name, Builder setter) {
+    scope.forEachLocalSetter((String name, Builder setter) {
       Builder member = scopeBuilder[name];
       if (member == null ||
           !(member.isField && !member.isFinal && !member.isConst ||
@@ -222,7 +222,7 @@ class SourceClassBuilder extends ClassBuilderImpl
           member.charOffset, noLength);
     });
 
-    scope.setters.forEach((String name, Builder setter) {
+    scope.forEachLocalSetter((String name, Builder setter) {
       Builder constructor = constructorScopeBuilder[name];
       if (constructor == null || !setter.isStatic) return;
       addProblem(templateConflictsWithConstructor.withArguments(name),
@@ -239,7 +239,7 @@ class SourceClassBuilder extends ClassBuilderImpl
     if (typeVariables == null || supertype == null) return supertype;
     Message message;
     for (int i = 0; i < typeVariables.length; ++i) {
-      int variance = computeVariance(typeVariables[i], supertype);
+      int variance = computeVariance(typeVariables[i], supertype, library);
       if (!Variance.greaterThanOrEqual(variance, typeVariables[i].variance)) {
         if (typeVariables[i].parameter.isLegacyCovariant) {
           message = templateInvalidTypeVariableInSupertype.withArguments(

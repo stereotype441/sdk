@@ -10,6 +10,21 @@ import 'dart:convert' show utf8;
 
 import 'dart:typed_data' show Uint8List;
 
+import 'package:_fe_analyzer_shared/src/parser/class_member_parser.dart'
+    show ClassMemberParser;
+
+import 'package:_fe_analyzer_shared/src/parser/parser.dart'
+    show Parser, lengthForToken;
+
+import 'package:_fe_analyzer_shared/src/scanner/scanner.dart'
+    show
+        ErrorToken,
+        LanguageVersionToken,
+        ScannerConfiguration,
+        ScannerResult,
+        Token,
+        scan;
+
 import 'package:kernel/ast.dart'
     show
         Arguments,
@@ -32,6 +47,8 @@ import 'package:kernel/class_hierarchy.dart'
 import 'package:kernel/core_types.dart' show CoreTypes;
 
 import '../../api_prototype/file_system.dart';
+
+import '../../base/common.dart';
 
 import '../../base/instrumentation.dart' show Instrumentation;
 
@@ -95,20 +112,9 @@ import '../kernel/type_builder_computer.dart' show TypeBuilderComputer;
 
 import '../loader.dart' show Loader, untranslatableUriScheme;
 
-import '../parser/class_member_parser.dart' show ClassMemberParser;
-
-import '../parser.dart' show Parser, lengthForToken, offsetForToken;
-
 import '../problems.dart' show internalProblem;
 
-import '../scanner.dart'
-    show
-        ErrorToken,
-        LanguageVersionToken,
-        ScannerConfiguration,
-        ScannerResult,
-        Token,
-        scan;
+import '../source/stack_listener.dart' show offsetForToken;
 
 import '../type_inference/type_inference_engine.dart';
 
@@ -151,8 +157,12 @@ class SourceLoader extends Loader {
 
   SetLiteralTransformer setLiteralTransformer;
 
+  final SourceLoaderDataForTesting dataForTesting;
+
   SourceLoader(this.fileSystem, this.includeComments, KernelTarget target)
-      : super(target);
+      : dataForTesting =
+            retainDataForTesting ? new SourceLoaderDataForTesting() : null,
+        super(target);
 
   Template<SummaryTemplate> get outlineSummaryTemplate =>
       templateSourceOutlineSummary;
@@ -511,6 +521,16 @@ class SourceLoader extends Loader {
       }
     });
     ticker.logMs("Resolved $count type-variable bounds");
+  }
+
+  void computeVariances() {
+    int count = 0;
+    builders.forEach((Uri uri, LibraryBuilder library) {
+      if (library.loader == this) {
+        count += library.computeVariances();
+      }
+    });
+    ticker.logMs("Computed variances of $count type variables");
   }
 
   void computeDefaultTypes(TypeBuilder dynamicType, TypeBuilder bottomType,
@@ -1265,4 +1285,20 @@ class AmbiguousTypesRecord {
   final Supertype b;
 
   const AmbiguousTypesRecord(this.cls, this.a, this.b);
+}
+
+class SourceLoaderDataForTesting {
+  final Map<TreeNode, TreeNode> _aliasMap = {};
+
+  /// Registers that [original] has been replaced by [alias] in the generated
+  /// AST.
+  void registerAlias(TreeNode original, TreeNode alias) {
+    _aliasMap[alias] = original;
+  }
+
+  /// Returns the original node for [alias] or [alias] if it was not registered
+  /// as an alias.
+  TreeNode toOriginal(TreeNode alias) {
+    return _aliasMap[alias] ?? alias;
+  }
 }

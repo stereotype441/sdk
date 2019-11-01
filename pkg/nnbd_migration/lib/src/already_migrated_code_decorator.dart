@@ -72,9 +72,11 @@ class AlreadyMigratedCodeDecorator {
           namedParameters: namedParameters,
           positionalParameters: positionalParameters);
     } else if (type is InterfaceType) {
-      if (type.typeParameters.isNotEmpty) {
-        assert(type.typeArguments.length == type.typeParameters.length);
-        return DecoratedType(type, node, typeArguments: [
+      var typeParameters = type.element.typeParameters;
+      if (typeParameters.isNotEmpty) {
+        assert(type.typeArguments.length == typeParameters.length);
+        return DecoratedType(type, node,
+            typeArguments: [
           for (var t in type.typeArguments) decorate(t, element)
         ]);
       }
