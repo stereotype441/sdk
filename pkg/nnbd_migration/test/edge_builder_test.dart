@@ -1834,7 +1834,9 @@ void f(List<int> l) {
 }
 ''');
     assertEdge(decoratedTypeAnnotation('List<int>').node, never, hard: true);
-    assertEdge(substitutionNode(decoratedTypeAnnotation('int> l').node, never),
+    assertEdge(
+        substitutionNode(
+            decoratedTypeAnnotation('int> l').node, neverConnected),
         decoratedTypeAnnotation('int i').node,
         hard: false);
   }
