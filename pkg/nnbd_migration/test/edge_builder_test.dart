@@ -352,17 +352,15 @@ class EdgeBuilderTest extends EdgeBuilderTestBase {
   /// Checks that there are no nullability nodes upstream from [node] that could
   /// cause it to become nullable.
   void assertNoUpstreamNullability(NullabilityNode node) {
-    // never can never become nullable, even if it has nodes
-    // upstream from it.
-    if (node == never) return;
+    // Any node with a hard edge to never (or never itself) won't become
+    // nullable, even if it has nodes upstream from it.
+    var nodesWithHardEdgesToNever = computeNodesWithHardEdgesToNever();
+    if (nodesWithHardEdgesToNever.contains(node)) return;
 
-    // Also, any node that has a hard edge to never can't become nullable.
-    for (var edge in getEdges(node, never)) {
-      if (edge.isHard) return;
-    }
-
+    // Otherwise, make sure that every node directly upstream from this node
+    // has a hard edge to never.
     for (var edge in getEdges(anyNode, node)) {
-      expect(edge.sourceNode, never);
+      expect(nodesWithHardEdgesToNever, contains(edge.sourceNode));
     }
   }
 
@@ -380,6 +378,22 @@ class EdgeBuilderTest extends EdgeBuilderTestBase {
   /// [ExpressionChecks] associated with it.
   ExpressionChecksOrigin checkExpression(String text) {
     return variables.checkExpression(findNode.expression(text));
+  }
+
+  /// Gets the transitive closure of all nodes with hard edges pointing to
+  /// never, plus never itself.
+  Set<NullabilityNode> computeNodesWithHardEdgesToNever() {
+    var result = <NullabilityNode>{};
+    var pending = <NullabilityNode>[never];
+    while (pending.isNotEmpty) {
+      var node = pending.removeLast();
+      if (result.add(node)) {
+        for (var edge in getEdges(anyNode, node)) {
+          pending.add(edge.sourceNode);
+        }
+      }
+    }
+    return result;
   }
 
   /// Gets the [DecoratedType] associated with the expression whose text
