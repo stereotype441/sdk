@@ -170,7 +170,7 @@ abstract class NullabilityMigrationInstrumentation {
   /// code being migrated, to report the nullability nodes associated with the
   /// bound of the type parameter.
   void externalDecoratedTypeParameterBound(
-      TypeParameterElement typeParameter, DecoratedType decoratedType);
+      TypeParameterElement typeParameter, DecoratedTypeInfo decoratedType);
 
   /// Called whenever a fix is decided upon, to report the reasons for the fix.
   void fix(SingleNullabilityFix fix, Iterable<FixReasonInfo> reasons);
