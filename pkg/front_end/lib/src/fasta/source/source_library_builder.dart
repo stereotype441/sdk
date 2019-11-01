@@ -10,7 +10,8 @@ import 'package:_fe_analyzer_shared/src/messages/severity.dart' show Severity;
 
 import 'package:_fe_analyzer_shared/src/scanner/token.dart' show Token;
 
-import 'package:_fe_analyzer_shared/src/util/resolve_relative_uri.dart' show resolveRelativeUri;
+import 'package:_fe_analyzer_shared/src/util/resolve_relative_uri.dart'
+    show resolveRelativeUri;
 
 import 'package:kernel/ast.dart'
     show
