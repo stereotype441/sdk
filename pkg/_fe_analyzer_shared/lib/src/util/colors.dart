@@ -94,9 +94,7 @@ void set enableColors(bool value) {
 }
 
 String wrap(String string, String color) {
-  return enableColors
-      ? "${color}$string${DEFAULT_COLOR}"
-      : string;
+  return enableColors ? "${color}$string${DEFAULT_COLOR}" : string;
 }
 
 String black(String string) => wrap(string, BLACK_COLOR);
@@ -121,9 +119,11 @@ bool _supportsAnsiEscapes(sink) {
   }
 }
 
+typedef void _StringToNullFunction(String s);
+
 /// Callback used by [_computeEnableColors] to report why it has or hasn't
 /// chosen to use ANSI colors.
-void Function(String) printEnableColorsReason = (_) {};
+_StringToNullFunction printEnableColorsReason = (_) {};
 
 /// True if we should enable colors in output.
 ///
@@ -140,11 +140,13 @@ bool _computeEnableColors() {
   bool stdoutSupportsColors = _supportsAnsiEscapes(stderr);
 
   if (stdoutSupportsColors == false) {
-    printEnableColorsReason("Not enabling colors, stdout does not support ANSI colors.");
+    printEnableColorsReason(
+        "Not enabling colors, stdout does not support ANSI colors.");
     return false;
   }
   if (stderrSupportsColors == false) {
-    printEnableColorsReason("Not enabling colors, stderr does not support ANSI colors.");
+    printEnableColorsReason(
+        "Not enabling colors, stderr does not support ANSI colors.");
     return false;
   }
 
@@ -178,21 +180,22 @@ bool _computeEnableColors() {
 
   if (lines.length != 2) {
     printEnableColorsReason("Not enabling colors, unexpected output from tput: "
-          "${jsonEncode(result.stdout)}.");
+        "${jsonEncode(result.stdout)}.");
     return false;
   }
 
   String numberOfColors = lines[0];
   if ((int.tryParse(numberOfColors) ?? -1) < 8) {
-    printEnableColorsReason("Not enabling colors, less than 8 colors supported: "
-          "${jsonEncode(numberOfColors)}.");
+    printEnableColorsReason(
+        "Not enabling colors, less than 8 colors supported: "
+        "${jsonEncode(numberOfColors)}.");
     return false;
   }
 
   String allCodes = lines[1].trim();
   if (ALL_CODES != allCodes) {
     printEnableColorsReason("Not enabling colors, color codes don't match: "
-          "${jsonEncode(ALL_CODES)} != ${jsonEncode(allCodes)}.");
+        "${jsonEncode(ALL_CODES)} != ${jsonEncode(allCodes)}.");
     return false;
   }
 
