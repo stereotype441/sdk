@@ -59,9 +59,8 @@ import 'package:analyzer/src/fasta/error_converter.dart';
 import 'package:analyzer/src/generated/utilities_dart.dart';
 import 'package:front_end/src/fasta/problems.dart' show unhandled;
 import 'package:front_end/src/fasta/quote.dart';
-import 'package:front_end/src/fasta/source/stack_listener.dart'
-    show NullValue, StackListener;
-import 'package:kernel/ast.dart' show AsyncMarker;
+import 'package:front_end/src/fasta/source/stack_listener_2.dart'
+    show NullValue, StackListener, AsyncMarker;
 
 const _invalidCollectionElement = const _InvalidCollectionElement._();
 
