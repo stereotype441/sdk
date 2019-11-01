@@ -1174,13 +1174,8 @@ int f(int i, int j) => i + j;
 int f(int i, int j) => i + j;
 ''');
 
-    var plusArg = variables
-        .decoratedElementType(typeProvider.numType.element.getMethod('+'))
-        .positionalParameters[0];
-    assertNullCheck(
-        checkExpression('j;'),
-        assertEdge(decoratedTypeAnnotation('int j').node, plusArg.node,
-            hard: true));
+    assertNullCheck(checkExpression('j;'),
+        assertEdge(decoratedTypeAnnotation('int j').node, never, hard: true));
   }
 
   test_binaryExpression_plus_right_check_custom() async {
