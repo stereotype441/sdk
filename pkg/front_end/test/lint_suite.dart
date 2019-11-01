@@ -222,8 +222,7 @@ class ExplicitTypeLintListener extends LintListener {
       Token beginToken,
       Token endToken) {
     if (!_latestType.type) {
-      onProblem(
-          beginToken.offset, beginToken.length, "No explicit type.");
+      onProblem(beginToken.offset, beginToken.length, "No explicit type.");
     }
   }
 
