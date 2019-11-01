@@ -1174,8 +1174,10 @@ int f(int i, int j) => i + j;
 int f(int i, int j) => i + j;
 ''');
 
-    assertNullCheck(checkExpression('j;'),
-        assertEdge(decoratedTypeAnnotation('int j').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('j;'),
+        assertEdge(decoratedTypeAnnotation('int j').node, neverConnected,
+            hard: true));
   }
 
   test_binaryExpression_plus_right_check_custom() async {
@@ -1849,7 +1851,9 @@ int g(int j) => 0;
     var iNode = iMatcher.matchingNode;
     assertEdge(decoratedTypeAnnotation('List<int>').node, never, hard: true);
     assertEdge(
-        substitutionNode(decoratedTypeAnnotation('int> l').node, never), iNode,
+        substitutionNode(
+            decoratedTypeAnnotation('int> l').node, neverConnected),
+        iNode,
         hard: false);
   }
 
@@ -1861,7 +1865,9 @@ void f(List<int> l) {
 }
 ''');
     assertEdge(decoratedTypeAnnotation('List<int>').node, never, hard: true);
-    assertEdge(substitutionNode(decoratedTypeAnnotation('int> l').node, never),
+    assertEdge(
+        substitutionNode(
+            decoratedTypeAnnotation('int> l').node, neverConnected),
         decoratedTypeAnnotation('int x').node,
         hard: false);
   }
@@ -1873,7 +1879,9 @@ void f(List<int> l) {
 }
 ''');
     assertEdge(decoratedTypeAnnotation('List<int>').node, never, hard: true);
-    assertEdge(substitutionNode(decoratedTypeAnnotation('int> l').node, never),
+    assertEdge(
+        substitutionNode(
+            decoratedTypeAnnotation('int> l').node, neverConnected),
         decoratedTypeAnnotation('int i').node,
         hard: false);
   }
@@ -1893,7 +1901,9 @@ void g(int j) {}
     var iNode = iMatcher.matchingNode;
     assertEdge(decoratedTypeAnnotation('List<int>').node, never, hard: true);
     assertEdge(
-        substitutionNode(decoratedTypeAnnotation('int> l').node, never), iNode,
+        substitutionNode(
+            decoratedTypeAnnotation('int> l').node, neverConnected),
+        iNode,
         hard: false);
   }
 
@@ -1905,7 +1915,9 @@ void f(List<int> l) {
 }
 ''');
     assertEdge(decoratedTypeAnnotation('List<int>').node, never, hard: true);
-    assertEdge(substitutionNode(decoratedTypeAnnotation('int> l').node, never),
+    assertEdge(
+        substitutionNode(
+            decoratedTypeAnnotation('int> l').node, neverConnected),
         decoratedTypeAnnotation('int x').node,
         hard: false);
   }
@@ -3147,7 +3159,7 @@ void f(List<int> x, int i) {
         .decoratedElementType(addMethod.baseElement)
         .positionalParameters[0]
         .node;
-    expect(nullable_t, same(never));
+    assertEdge(nullable_t, never, hard: true);
     var check_i = checkExpression('i/*check*/');
     var nullable_list_t_or_nullable_t = check_i
         .checks.edges.single.destinationNode as NullabilityNodeForSubstitution;
@@ -3224,7 +3236,7 @@ void g(C c, int j) {
 ''');
     var nullable_j = decoratedTypeAnnotation('int j');
     assertNullCheck(checkExpression('j/*check*/'),
-        assertEdge(nullable_j.node, never, hard: true));
+        assertEdge(nullable_j.node, neverConnected, hard: true));
   }
 
   test_methodInvocation_resolves_to_getter() async {
@@ -4466,7 +4478,7 @@ int f(int i) {
     assertNullCheck(use, assertEdge(declaration, never, hard: true));
 
     var returnType = decoratedTypeAnnotation('int f').node;
-    assertEdge(never, returnType, hard: false);
+    assertEdge(neverConnected, returnType, hard: false);
   }
 
   test_prefixExpression_plusPlus() async {
@@ -4481,7 +4493,7 @@ int f(int i) {
     assertNullCheck(use, assertEdge(declaration, never, hard: true));
 
     var returnType = decoratedTypeAnnotation('int f').node;
-    assertEdge(never, returnType, hard: false);
+    assertEdge(neverConnected, returnType, hard: false);
   }
 
   test_prefixExpression_plusPlus_dynamic() async {
@@ -5262,7 +5274,7 @@ import "package:pkgPi/piConst.dart";
 double get myPi => pi;
 ''');
     var myPiType = decoratedTypeAnnotation('double get');
-    assertEdge(never, myPiType.node, hard: false);
+    assertEdge(neverConnected, myPiType.node, hard: false);
   }
 
   test_topLevelVariable_type_inferred() async {
