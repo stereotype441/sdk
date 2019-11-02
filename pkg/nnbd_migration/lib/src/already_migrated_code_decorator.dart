@@ -75,8 +75,7 @@ class AlreadyMigratedCodeDecorator {
       var typeParameters = type.element.typeParameters;
       if (typeParameters.isNotEmpty) {
         assert(type.typeArguments.length == typeParameters.length);
-        return DecoratedType(type, node,
-            typeArguments: [
+        return DecoratedType(type, node, typeArguments: [
           for (var t in type.typeArguments) decorate(t, element)
         ]);
       }
