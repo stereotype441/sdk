@@ -23,37 +23,11 @@ import 'package:test/test.dart';
 
 import 'abstract_single_unit.dart';
 
-/// Base class for [NodeMatcher]s that remember which nodes were matched.
-abstract class _RecordingNodeMatcher implements NodeMatcher {
-  final List<NullabilityNode> _matchingNodes = [];
-
-  NullabilityNode get matchingNode => _matchingNodes.single;
-
-  @override
-  void matched(NullabilityNode node) {
-    _matchingNodes.add(node);
-  }
-}
-
 /// A [NodeMatcher] that matches any node, and records what node it matched to.
 class AnyNodeMatcher extends _RecordingNodeMatcher {
   @override
   bool matches(NullabilityNode node) {
     return true;
-  }
-}
-
-/// A [NodeMatcher] that matches any node with a hard edge pointing to `never`.
-class NeverConnectedNodeMatcher extends _RecordingNodeMatcher {
-  @override
-  bool matches(NullabilityNode node) {
-    for (var edge in node.downstreamEdges) {
-      var destinationNode = edge.destinationNode;
-      if (destinationNode.isImmutable && !destinationNode.isNullable) {
-        return true;
-      }
-    }
-    return false;
   }
 }
 
@@ -172,10 +146,24 @@ class EdgeBuilderTestBase extends MigrationVisitorTestBase {
 mixin EdgeTester {
   /// Returns a [NodeMatcher] that matches any node whatsoever.
   AnyNodeMatcher get anyNode => AnyNodeMatcher();
-  
-  NeverConnectedNodeMatcher get neverConnected => NeverConnectedNodeMatcher();
 
   NullabilityGraphForTesting get graph;
+
+  /// Gets the transitive closure of all nodes with hard edges pointing to
+  /// never, plus never itself.
+  Set<NullabilityNode> get neverClosure {
+    var result = <NullabilityNode>{};
+    var pending = <NullabilityNode>[graph.never];
+    while (pending.isNotEmpty) {
+      var node = pending.removeLast();
+      if (result.add(node)) {
+        for (var edge in getEdges(anyNode, node)) {
+          pending.add(edge.sourceNode);
+        }
+      }
+    }
+    return result;
+  }
 
   /// Asserts that an edge exists with a node matching [source] and a node
   /// matching [destination], and with the given [hard]ness and [guards].
@@ -247,6 +235,9 @@ mixin EdgeTester {
     }
     return result;
   }
+
+  /// Returns a [NodeMatcher] that matches any node in the given set.
+  NodeSetMatcher inSet(Set<NullabilityNode> nodes) => NodeSetMatcher(nodes);
 
   /// Creates a [NodeMatcher] matching a substitution node whose inner and outer
   /// nodes match [inner] and [outer].
@@ -403,6 +394,16 @@ abstract class NodeMatcher {
   bool matches(NullabilityNode node);
 }
 
+/// A [NodeMatcher] that matches any node contained in the given set.
+class NodeSetMatcher extends _RecordingNodeMatcher {
+  final Set<NullabilityNode> _targetSet;
+
+  NodeSetMatcher(this._targetSet);
+
+  @override
+  bool matches(NullabilityNode node) => _targetSet.contains(node);
+}
+
 /// A [NodeMatcher] that matches exactly one node.
 class _ExactNodeMatcher implements NodeMatcher {
   final NullabilityNode _expectation;
@@ -414,6 +415,18 @@ class _ExactNodeMatcher implements NodeMatcher {
 
   @override
   bool matches(NullabilityNode node) => node == _expectation;
+}
+
+/// Base class for [NodeMatcher]s that remember which nodes were matched.
+abstract class _RecordingNodeMatcher implements NodeMatcher {
+  final List<NullabilityNode> _matchingNodes = [];
+
+  NullabilityNode get matchingNode => _matchingNodes.single;
+
+  @override
+  void matched(NullabilityNode node) {
+    _matchingNodes.add(node);
+  }
 }
 
 /// A [NodeMatcher] that matches a substitution node with the given inner and
