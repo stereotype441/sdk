@@ -15,6 +15,13 @@ import 'package:nnbd_migration/instrumentation.dart';
 /// this class is used for the edge connecting `always` to the return type of
 /// `operator []`, due to the fact that dart:core has already been migrated and
 /// the type is explicitly nullable.
+///
+/// Note that since a single element can have a complex type, it is likely that
+/// multiple edges will be created with an [AlreadyMigratedTypeOrigin] pointing
+/// to the same type.  To distinguish which edge corresponds to which part of
+/// the element's type, use the callbacks
+/// [NullabilityMigrationInstrumentation.externalDecoratedType] and
+/// [NullabilityMigrationInstrumentation.externalDecoratedTypeParameterBound].
 class AlreadyMigratedTypeOrigin extends EdgeOrigin {
   AlreadyMigratedTypeOrigin.forElement(Element element)
       : super.forElement(element);
