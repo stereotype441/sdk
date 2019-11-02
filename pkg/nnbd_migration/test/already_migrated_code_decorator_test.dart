@@ -22,12 +22,21 @@ import 'migration_visitor_test_base.dart';
 
 main() {
   defineReflectiveSuite(() {
-    defineReflectiveTests(_AlreadyMigratedCodeDecoratorTest);
+    defineReflectiveTests(_AlreadyMigratedCodeDecoratorTestBase);
   });
 }
 
+/// Specialization of [_AlreadyMigratedCodeDecoratorTestBase] for testing the
+/// situation where the already migrated code contains star types.  In the final
+/// product, this will never happen.  However, since we do not migrate using a
+/// fully NNBD-aware SDK, we need to handle this situation on a short term
+/// basis.
 @reflectiveTest
-class _AlreadyMigratedCodeDecoratorTest extends Object with EdgeTester {
+class _AlreadyMigratedCodeDecoratorTestProvisional extends _AlreadyMigratedCodeDecoratorTestBase {
+  factory _AlreadyMigratedCodeDecoratorTestProvisional
+}
+
+class _AlreadyMigratedCodeDecoratorTestBase extends Object with EdgeTester {
   final TypeProvider typeProvider;
 
   final AlreadyMigratedCodeDecorator decorator;
@@ -36,12 +45,14 @@ class _AlreadyMigratedCodeDecoratorTest extends Object with EdgeTester {
 
   Element element = _MockElement();
 
-  factory _AlreadyMigratedCodeDecoratorTest() {
-    return _AlreadyMigratedCodeDecoratorTest._(
+  _AlreadyMigratedCodeDecoratorTestBase(NullabilitySuffix nullabilitySuffix) : this._(NullabilityGraphForTesting(), TestTypeProvider(nullabilitySuffix: nullabilitySuffix))
+
+  factory _AlreadyMigratedCodeDecoratorTestBase() {
+    return _AlreadyMigratedCodeDecoratorTestBase._(
         NullabilityGraphForTesting(), TestTypeProvider());
   }
 
-  _AlreadyMigratedCodeDecoratorTest._(this.graph, this.typeProvider)
+  _AlreadyMigratedCodeDecoratorTestBase._(this.graph, this.typeProvider)
       : decorator = AlreadyMigratedCodeDecorator(graph, typeProvider);
 
   NullabilityNode get always => graph.always;
