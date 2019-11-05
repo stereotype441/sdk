@@ -1797,6 +1797,7 @@ class InterfaceTypeImplTest extends AbstractTypeTest {
     expect(0 == typeA.hashCode, isFalse);
   }
 
+  @deprecated
   void test_lookUpGetter_implemented() {
     //
     // class A { g {} }
@@ -1814,6 +1815,7 @@ class InterfaceTypeImplTest extends AbstractTypeTest {
     expect(typeA.lookUpGetter(getterName, library), same(getterG));
   }
 
+  @deprecated
   void test_lookUpGetter_inherited() {
     //
     // class A { g {} }
@@ -1834,6 +1836,7 @@ class InterfaceTypeImplTest extends AbstractTypeTest {
     expect(typeB.lookUpGetter(getterName, library), same(getterG));
   }
 
+  @deprecated
   void test_lookUpGetter_mixin_shadowing() {
     //
     // class B {}
@@ -1865,6 +1868,7 @@ class InterfaceTypeImplTest extends AbstractTypeTest {
     expect(interfaceType(classC).lookUpGetter(getterName, library), getterM2g);
   }
 
+  @deprecated
   void test_lookUpGetter_recursive() {
     //
     // class A extends B {}
@@ -1881,6 +1885,7 @@ class InterfaceTypeImplTest extends AbstractTypeTest {
     expect(typeA.lookUpGetter("g", library), isNull);
   }
 
+  @deprecated
   void test_lookUpGetter_unimplemented() {
     //
     // class A {}
@@ -1894,6 +1899,7 @@ class InterfaceTypeImplTest extends AbstractTypeTest {
     expect(typeA.lookUpGetter("g", library), isNull);
   }
 
+  @deprecated
   void test_lookUpMethod_implemented() {
     //
     // class A { m() {} }
@@ -1910,6 +1916,7 @@ class InterfaceTypeImplTest extends AbstractTypeTest {
     expect(typeA.lookUpMethod(methodName, library), same(methodM));
   }
 
+  @deprecated
   void test_lookUpMethod_inherited() {
     //
     // class A { m() {} }
@@ -1929,6 +1936,7 @@ class InterfaceTypeImplTest extends AbstractTypeTest {
     expect(typeB.lookUpMethod(methodName, library), same(methodM));
   }
 
+  @deprecated
   void test_lookUpMethod_mixin_shadowing() {
     //
     // class B {}
@@ -1959,6 +1967,7 @@ class InterfaceTypeImplTest extends AbstractTypeTest {
     expect(interfaceType(classC).lookUpMethod(methodName, library), methodM2m);
   }
 
+  @deprecated
   void test_lookUpMethod_parameterized() {
     //
     // class A<E> { E m(E p) {} }
@@ -1999,6 +2008,7 @@ class InterfaceTypeImplTest extends AbstractTypeTest {
     expect(parameterTypes[0], same(typeI));
   }
 
+  @deprecated
   void test_lookUpMethod_recursive() {
     //
     // class A extends B {}
@@ -2015,6 +2025,7 @@ class InterfaceTypeImplTest extends AbstractTypeTest {
     expect(typeA.lookUpMethod("m", library), isNull);
   }
 
+  @deprecated
   void test_lookUpMethod_unimplemented() {
     //
     // class A {}
@@ -2028,6 +2039,7 @@ class InterfaceTypeImplTest extends AbstractTypeTest {
     expect(typeA.lookUpMethod("m", library), isNull);
   }
 
+  @deprecated
   void test_lookUpSetter_implemented() {
     //
     // class A { s(x) {} }
@@ -2045,6 +2057,7 @@ class InterfaceTypeImplTest extends AbstractTypeTest {
     expect(typeA.lookUpSetter(setterName, library), same(setterS));
   }
 
+  @deprecated
   void test_lookUpSetter_inherited() {
     //
     // class A { s(x) {} }
@@ -2065,6 +2078,7 @@ class InterfaceTypeImplTest extends AbstractTypeTest {
     expect(typeB.lookUpSetter(setterName, library), same(setterS));
   }
 
+  @deprecated
   void test_lookUpSetter_mixin_shadowing() {
     //
     // class B {}
@@ -2096,6 +2110,7 @@ class InterfaceTypeImplTest extends AbstractTypeTest {
     expect(interfaceType(classC).lookUpGetter(setterName, library), setterM2g);
   }
 
+  @deprecated
   void test_lookUpSetter_recursive() {
     //
     // class A extends B {}
@@ -2112,6 +2127,7 @@ class InterfaceTypeImplTest extends AbstractTypeTest {
     expect(typeA.lookUpSetter("s", library), isNull);
   }
 
+  @deprecated
   void test_lookUpSetter_unimplemented() {
     //
     // class A {}

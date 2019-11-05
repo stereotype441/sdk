@@ -384,6 +384,7 @@ class ElementResolverTest with ResourceProviderMixin, ElementsTypesMixin {
     // abstract class A { int operator[](int index); }
     //
     ClassElementImpl classA = ElementFactory.classElement2("A");
+    classA.enclosingElement = _definingLibrary.definingCompilationUnit;
     MethodElement operator =
         ElementFactory.methodElement("[]", intType, [intType]);
     classA.methods = <MethodElement>[operator];
@@ -391,17 +392,20 @@ class ElementResolverTest with ResourceProviderMixin, ElementsTypesMixin {
     // class B implements A {}
     //
     ClassElementImpl classB = ElementFactory.classElement2("B");
+    classB.enclosingElement = _definingLibrary.definingCompilationUnit;
     classB.interfaces = <InterfaceType>[interfaceType(classA)];
     //
     // class C extends Object with B {}
     //
     ClassElementImpl classC = ElementFactory.classElement2("C");
+    classC.enclosingElement = _definingLibrary.definingCompilationUnit;
     classC.mixins = <InterfaceType>[interfaceType(classB)];
     //
     // class D extends C {}
     //
     ClassElementImpl classD =
         ElementFactory.classElement("D", interfaceType(classC));
+    classD.enclosingElement = _definingLibrary.definingCompilationUnit;
     //
     // D a;
     // a[i];
@@ -848,6 +852,7 @@ class ElementResolverTest with ResourceProviderMixin, ElementsTypesMixin {
 
   test_visitPrefixedIdentifier_nonDynamic() async {
     ClassElementImpl classA = ElementFactory.classElement2("A");
+    classA.enclosingElement = _definingLibrary.definingCompilationUnit;
     String getterName = "b";
     PropertyAccessorElement getter =
         ElementFactory.getterElement(getterName, false, _typeProvider.intType);
@@ -945,6 +950,7 @@ class ElementResolverTest with ResourceProviderMixin, ElementsTypesMixin {
 
   test_visitPropertyAccess_getter_identifier() async {
     ClassElementImpl classA = ElementFactory.classElement2("A");
+    classA.enclosingElement = _definingLibrary.definingCompilationUnit;
     String getterName = "b";
     PropertyAccessorElement getter =
         ElementFactory.getterElement(getterName, false, _typeProvider.intType);
@@ -967,13 +973,15 @@ class ElementResolverTest with ResourceProviderMixin, ElementsTypesMixin {
     // }
     //
     ClassElementImpl classA = ElementFactory.classElement2("A");
+    classA.enclosingElement = _definingLibrary.definingCompilationUnit;
     String getterName = "b";
     PropertyAccessorElement getter =
         ElementFactory.getterElement(getterName, false, _typeProvider.intType);
     classA.accessors = <PropertyAccessorElement>[getter];
     SuperExpression target = AstTestFactory.superExpression();
-    target.staticType =
-        interfaceType(ElementFactory.classElement("B", interfaceType(classA)));
+    var classB = ElementFactory.classElement("B", interfaceType(classA));
+    classB.enclosingElement = _definingLibrary.definingCompilationUnit;
+    target.staticType = interfaceType(classB);
     PropertyAccess access = AstTestFactory.propertyAccess2(target, getterName);
     AstTestFactory.methodDeclaration2(
         null,
@@ -990,6 +998,7 @@ class ElementResolverTest with ResourceProviderMixin, ElementsTypesMixin {
 
   test_visitPropertyAccess_setter_this() async {
     ClassElementImpl classA = ElementFactory.classElement2("A");
+    classA.enclosingElement = _definingLibrary.definingCompilationUnit;
     String setterName = "b";
     PropertyAccessorElement setter =
         ElementFactory.setterElement(setterName, false, _typeProvider.intType);

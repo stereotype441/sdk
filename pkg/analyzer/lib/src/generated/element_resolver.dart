@@ -1653,9 +1653,18 @@ class ElementResolver extends SimpleAstVisitor<void> {
     if (target is SuperExpression) {
       if (staticType is InterfaceTypeImpl) {
         if (propertyName.inGetterContext()) {
-          var element = staticType.lookUpInheritedMember(
-              propertyName.name, _definingLibrary,
-              setter: false, concrete: true, forSuperInvocation: true);
+          var element = staticType.lookUpGetter2(
+                propertyName.name,
+                _definingLibrary,
+                concrete: true,
+                inherited: true,
+              ) ??
+              staticType.lookUpMethod2(
+                propertyName.name,
+                _definingLibrary,
+                concrete: true,
+                inherited: true,
+              );
 
           if (element != null) {
             propertyName.staticElement = element;
@@ -1663,9 +1672,16 @@ class ElementResolver extends SimpleAstVisitor<void> {
             // We were not able to find the concrete dispatch target.
             // But we would like to give the user at least some resolution.
             // So, we retry without the "concrete" requirement.
-            element = staticType.lookUpInheritedMember(
-                propertyName.name, _definingLibrary,
-                setter: false, concrete: false);
+            element = staticType.lookUpGetter2(
+                  propertyName.name,
+                  _definingLibrary,
+                  inherited: true,
+                ) ??
+                staticType.lookUpMethod2(
+                  propertyName.name,
+                  _definingLibrary,
+                  inherited: true,
+                );
             if (element != null) {
               propertyName.staticElement = element;
               ClassElementImpl receiverSuperClass =
@@ -1688,9 +1704,12 @@ class ElementResolver extends SimpleAstVisitor<void> {
         }
 
         if (propertyName.inSetterContext()) {
-          var element = staticType.lookUpInheritedMember(
-              propertyName.name, _definingLibrary,
-              setter: true, concrete: true, forSuperInvocation: true);
+          var element = staticType.lookUpSetter2(
+            propertyName.name,
+            _definingLibrary,
+            concrete: true,
+            inherited: true,
+          );
 
           if (element != null) {
             propertyName.staticElement = element;
@@ -1698,9 +1717,11 @@ class ElementResolver extends SimpleAstVisitor<void> {
             // We were not able to find the concrete dispatch target.
             // But we would like to give the user at least some resolution.
             // So, we retry without the "concrete" requirement.
-            element = staticType.lookUpInheritedMember(
-                propertyName.name, _definingLibrary,
-                setter: true, concrete: false);
+            var element = staticType.lookUpSetter2(
+              propertyName.name,
+              _definingLibrary,
+              inherited: true,
+            );
             if (element != null) {
               propertyName.staticElement = element;
               ClassElementImpl receiverSuperClass =
@@ -2040,20 +2061,43 @@ class _PropertyResolver {
       var isSuper = target is SuperExpression;
 
       if (name == '[]') {
-        typeGetter = type.lookUpInheritedMethod('[]',
-            library: _definingLibrary, thisType: !isSuper);
+        typeGetter = type.lookUpMethod2(
+          '[]',
+          _definingLibrary,
+          concrete: isSuper,
+          inherited: isSuper,
+        );
 
-        typeSetter = type.lookUpInheritedMethod('[]=',
-            library: _definingLibrary, thisType: !isSuper);
+        typeSetter = type.lookUpMethod2(
+          '[]=',
+          _definingLibrary,
+          concrete: isSuper,
+          inherited: isSuper,
+        );
       } else {
-        typeGetter = type.lookUpInheritedGetter(name,
-            library: _definingLibrary, thisType: !isSuper);
+        typeGetter = type.lookUpGetter2(
+          name,
+          _definingLibrary,
+          concrete: isSuper,
+          inherited: isSuper,
+          recoveryStatic: true,
+        );
 
-        typeGetter ??= type.lookUpInheritedMethod(name,
-            library: _definingLibrary, thisType: !isSuper);
+        typeGetter ??= type.lookUpMethod2(
+          name,
+          _definingLibrary,
+          concrete: isSuper,
+          inherited: isSuper,
+          recoveryStatic: true,
+        );
 
-        typeSetter = type.lookUpInheritedSetter(name,
-            library: _definingLibrary, thisType: !isSuper);
+        typeSetter = type.lookUpSetter2(
+          name,
+          _definingLibrary,
+          concrete: isSuper,
+          inherited: isSuper,
+          recoveryStatic: true,
+        );
       }
     }
 

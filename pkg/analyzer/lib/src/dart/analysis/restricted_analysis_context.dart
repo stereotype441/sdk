@@ -5,6 +5,7 @@
 import 'package:analyzer/dart/analysis/declared_variables.dart';
 import 'package:analyzer/src/context/context.dart';
 import 'package:analyzer/src/dart/analysis/session.dart';
+import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
 import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/source.dart';
@@ -29,6 +30,10 @@ class RestrictedAnalysisContext implements AnalysisContextImpl {
   DeclaredVariables get declaredVariables =>
       synchronousSession.declaredVariables;
 
+  InheritanceManager3 get inheritanceManager {
+    return synchronousSession.inheritanceManager;
+  }
+
   @override
   TypeProvider get typeProvider => synchronousSession.typeProvider;
 
@@ -40,11 +45,11 @@ class RestrictedAnalysisContext implements AnalysisContextImpl {
   @override
   TypeSystem get typeSystem => synchronousSession.typeSystem;
 
-  noSuchMethod(Invocation invocation) {
-    return super.noSuchMethod(invocation);
-  }
-
   void clearTypeProvider() {
     synchronousSession.clearTypeProvider();
+  }
+
+  noSuchMethod(Invocation invocation) {
+    return super.noSuchMethod(invocation);
   }
 }

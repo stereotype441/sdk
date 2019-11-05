@@ -19,7 +19,7 @@ import 'package:analyzer/src/error/codes.dart';
 import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/source.dart'
-    show NonExistingSource, UriKind;
+    show NonExistingSource, Source, UriKind;
 import 'package:analyzer/src/generated/testing/element_factory.dart';
 import 'package:analyzer/src/generated/utilities_dart.dart';
 import 'package:meta/meta.dart';
@@ -42,6 +42,7 @@ main() {
 }
 
 abstract class AbstractTypeSystemTest {
+  TestAnalysisContext analysisContext;
   TypeProvider typeProvider;
   Dart2TypeSystem typeSystem;
 
@@ -92,7 +93,7 @@ abstract class AbstractTypeSystemTest {
   }
 
   void setUp() {
-    var analysisContext = TestAnalysisContext(
+    analysisContext = TestAnalysisContext(
       featureSet: testFeatureSet,
     );
     typeProvider = analysisContext.typeProvider;
@@ -254,6 +255,9 @@ class AssignabilityTest extends AbstractTypeSystemTest {
         ]),
       ],
     );
+
+    var testLibrary = _testLibrary();
+    B.enclosingElement = testLibrary.definingCompilationUnit;
 
     _checkIsStrictAssignableTo(
       _interfaceType(B),
@@ -497,6 +501,19 @@ class AssignabilityTest extends AbstractTypeSystemTest {
   void _checkUnrelated(DartType type1, DartType type2) {
     _checkIsNotAssignableTo(type1, type2);
     _checkIsNotAssignableTo(type2, type1);
+  }
+
+  /// Return a test library, in `/test.dart` file.
+  LibraryElementImpl _testLibrary() {
+    var source = _MockSource(toUri('/test.dart'));
+
+    var definingUnit = CompilationUnitElementImpl();
+    definingUnit.source = definingUnit.librarySource = source;
+
+    var testLibrary =
+        LibraryElementImpl(analysisContext, null, '', -1, 0, false);
+    testLibrary.definingCompilationUnit = definingUnit;
+    return testLibrary;
   }
 }
 
@@ -3580,4 +3597,16 @@ class TypeSystemTest extends AbstractTypeSystemTest {
     }
     expect(actual.nullabilitySuffix, expectedNullabilitySuffix);
   }
+}
+
+class _MockSource implements Source {
+  @override
+  final Uri uri;
+
+  _MockSource(this.uri);
+
+  @override
+  String get encoding => '$uri';
+
+  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
