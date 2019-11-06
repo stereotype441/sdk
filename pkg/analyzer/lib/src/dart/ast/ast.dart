@@ -614,7 +614,7 @@ class AssertStatementImpl extends StatementImpl implements AssertStatement {
 ///
 ///    assignmentExpression ::=
 ///        [Expression] operator [Expression]
-class AssignmentExpressionImpl extends ExpressionImpl
+class AssignmentExpressionImpl extends ExpressionImpl with NullShortableExpressionImpl
     implements AssignmentExpression {
   /// The expression used to compute the left hand side.
   ExpressionImpl _leftHandSide;
@@ -726,6 +726,9 @@ class AssignmentExpressionImpl extends ExpressionImpl
     _leftHandSide?.accept(visitor);
     _rightHandSide?.accept(visitor);
   }
+
+  @override
+  Expression get _nullShortingTarget => _leftHandSide;
 }
 
 /// A node in the AST structure for a Dart program.
@@ -5746,11 +5749,27 @@ class ImportDirectiveImpl extends NamespaceDirectiveImpl
   }
 }
 
+mixin NullShortableExpressionImpl implements NullShortableExpression {
+  Expression get nullShortingTermination {
+    var result = this;
+    while (true) {
+      var parent = result.parent;
+      if (parent is NullShortableExpressionImpl && identical(parent._nullShortingTarget, result)) {
+        result = parent;
+      } else {
+        return result;
+      }
+    }
+  }
+
+  Expression get _nullShortingTarget;
+}
+
 /// An index expression.
 ///
 ///    indexExpression ::=
 ///        [Expression] '[' [Expression] ']'
-class IndexExpressionImpl extends ExpressionImpl implements IndexExpression {
+class IndexExpressionImpl extends ExpressionImpl with NullShortableExpressionImpl implements IndexExpression {
   /// The expression used to compute the object being indexed, or `null` if this
   /// index expression is part of a cascade expression.
   ExpressionImpl _target;
@@ -5912,6 +5931,9 @@ class IndexExpressionImpl extends ExpressionImpl implements IndexExpression {
     _target?.accept(visitor);
     _index?.accept(visitor);
   }
+
+  @override
+  Expression get _nullShortingTarget => _target;
 }
 
 /// An instance creation expression.
@@ -8184,7 +8206,7 @@ class PrefixExpressionImpl extends ExpressionImpl implements PrefixExpression {
 ///
 ///    propertyAccess ::=
 ///        [Expression] '.' [SimpleIdentifier]
-class PropertyAccessImpl extends ExpressionImpl implements PropertyAccess {
+class PropertyAccessImpl extends ExpressionImpl with NullShortableExpressionImpl implements PropertyAccess {
   /// The expression computing the object defining the property being accessed.
   ExpressionImpl _target;
 
@@ -8273,6 +8295,9 @@ class PropertyAccessImpl extends ExpressionImpl implements PropertyAccess {
     _target?.accept(visitor);
     _propertyName?.accept(visitor);
   }
+
+  @override
+  Expression get _nullShortingTarget => _target;
 }
 
 /// The invocation of a constructor in the same class from within a
