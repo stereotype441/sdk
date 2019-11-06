@@ -1245,6 +1245,29 @@ class CascadeExpressionImpl extends ExpressionImpl
     _target?.accept(visitor);
     _cascadeSections.accept(visitor);
   }
+
+  @override
+  bool get isNullAware {
+    BAD; // I need to figure out what cascade sections can look like :(
+    var firstSection = _cascadeSections.first;
+    if (firstSection is MethodInvocation) {
+      return firstSection.isNullAware;
+    } else if (firstSection is IndexExpression) {
+      return firstSection.isNullAware;
+    } else if (firstSection is PropertyAccess) {
+      return firstSection.isNullAware;
+    } else if (firstSection is AssignmentExpression) {
+      var lhs = firstSection.leftHandSide;
+      if (lhs is PropertyAccess) {
+        return lhs.isNullAware;
+      } else {
+        assert(false, 'Unexpected cascade section assignment LHS: ${lhs.runtimeType}');
+        return false;
+      }
+    } else {
+      assert(false, 'Unexpected ')
+    }
+  }
 }
 
 /// A catch clause within a try statement.

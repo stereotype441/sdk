@@ -4302,6 +4302,11 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
       return false;
     }
 
+    var parent = expression.parent;
+    if (parent is CascadeExpression && identical(expression, parent.target) && parent.isNullAware) {
+      return false;
+    }
+
     StaticWarningCode code = expression.staticType == _typeProvider.nullType
         ? StaticWarningCode.INVALID_USE_OF_NULL_VALUE
         : StaticWarningCode.UNCHECKED_USE_OF_NULLABLE_VALUE;

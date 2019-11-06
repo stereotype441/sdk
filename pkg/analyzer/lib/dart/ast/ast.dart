@@ -840,6 +840,9 @@ abstract class CascadeExpression implements Expression {
   /// Return the cascade sections sharing the common target.
   NodeList<Expression> get cascadeSections;
 
+  /// Returns `true` if the first cascade section uses the `?..` operator.
+  bool get isNullAware;
+
   /// Return the target of the cascade sections.
   Expression get target;
 
