@@ -7736,7 +7736,7 @@ mixin NullShortableExpressionImpl implements NullShortableExpression {
     while (true) {
       var parent = result.parent;
       if (parent is NullShortableExpressionImpl &&
-          _extendsNullShorting(result)) {
+          parent._extendsNullShorting(result)) {
         result = parent;
       } else {
         return result;
