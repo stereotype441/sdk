@@ -615,6 +615,7 @@ class AssertStatementImpl extends StatementImpl implements AssertStatement {
 ///    assignmentExpression ::=
 ///        [Expression] operator [Expression]
 class AssignmentExpressionImpl extends ExpressionImpl
+    with NullShortableExpressionImpl
     implements AssignmentExpression {
   /// The expression used to compute the left hand side.
   ExpressionImpl _leftHandSide;
@@ -726,6 +727,10 @@ class AssignmentExpressionImpl extends ExpressionImpl
     _leftHandSide?.accept(visitor);
     _rightHandSide?.accept(visitor);
   }
+
+  @override
+  bool _extendsNullShorting(Expression child) =>
+      identical(child, _leftHandSide);
 }
 
 /// A node in the AST structure for a Dart program.
@@ -5750,7 +5755,9 @@ class ImportDirectiveImpl extends NamespaceDirectiveImpl
 ///
 ///    indexExpression ::=
 ///        [Expression] '[' [Expression] ']'
-class IndexExpressionImpl extends ExpressionImpl implements IndexExpression {
+class IndexExpressionImpl extends ExpressionImpl
+    with NullShortableExpressionImpl
+    implements IndexExpression {
   /// The expression used to compute the object being indexed, or `null` if this
   /// index expression is part of a cascade expression.
   ExpressionImpl _target;
@@ -5912,6 +5919,9 @@ class IndexExpressionImpl extends ExpressionImpl implements IndexExpression {
     _target?.accept(visitor);
     _index?.accept(visitor);
   }
+
+  @override
+  bool _extendsNullShorting(Expression child) => identical(child, _target);
 }
 
 /// An instance creation expression.
@@ -7718,6 +7728,27 @@ class NullLiteralImpl extends LiteralImpl implements NullLiteral {
   }
 }
 
+/// Mixin that can be used to implement [NullShortableExpression].
+mixin NullShortableExpressionImpl implements NullShortableExpression {
+  @override
+  Expression get nullShortingTermination {
+    var result = this;
+    while (true) {
+      var parent = result.parent;
+      if (parent is NullShortableExpressionImpl &&
+          parent._extendsNullShorting(result)) {
+        result = parent;
+      } else {
+        return result;
+      }
+    }
+  }
+
+  /// Indicates whether the effect of any null-shorting within [child] (which
+  /// should be a child of `this`) should extend to include `this`.
+  bool _extendsNullShorting(Expression child);
+}
+
 /// The "on" clause in a mixin declaration.
 ///
 ///    onClause ::=
@@ -8184,7 +8215,9 @@ class PrefixExpressionImpl extends ExpressionImpl implements PrefixExpression {
 ///
 ///    propertyAccess ::=
 ///        [Expression] '.' [SimpleIdentifier]
-class PropertyAccessImpl extends ExpressionImpl implements PropertyAccess {
+class PropertyAccessImpl extends ExpressionImpl
+    with NullShortableExpressionImpl
+    implements PropertyAccess {
   /// The expression computing the object defining the property being accessed.
   ExpressionImpl _target;
 
@@ -8273,6 +8306,9 @@ class PropertyAccessImpl extends ExpressionImpl implements PropertyAccess {
     _target?.accept(visitor);
     _propertyName?.accept(visitor);
   }
+
+  @override
+  bool _extendsNullShorting(Expression child) => identical(child, _target);
 }
 
 /// The invocation of a constructor in the same class from within a

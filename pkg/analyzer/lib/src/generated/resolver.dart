@@ -3837,11 +3837,14 @@ class ResolverVisitor extends ScopedVisitor {
     node.accept(typeAnalyzer);
   }
 
+  final List<Expression> unfinishedNullShorts = [null];
+
   @override
   void visitIndexExpression(IndexExpression node) {
     node.target?.accept(this);
-    if (node.isNullAware) {
-      _flowAnalysis?.flow?.nullAwareAccess_rightBegin(node.target);
+    if (node.isNullAware && _nonNullableEnabled) {
+      _flowAnalysis.flow.nullAwareAccess_rightBegin(node.target);
+      unfinishedNullShorts.add(node.nullShortingTermination);
     }
     node.accept(elementResolver);
     var method = node.staticElement;
@@ -4037,8 +4040,9 @@ class ResolverVisitor extends ScopedVisitor {
     // to be visited in the context of the property access node.
     //
     node.target?.accept(this);
-    if (node.isNullAware) {
-      _flowAnalysis?.flow?.nullAwareAccess_rightBegin(node.target);
+    if (node.isNullAware && _nonNullableEnabled) {
+      _flowAnalysis.flow.nullAwareAccess_rightBegin(node.target);
+      unfinishedNullShorts.add(node.nullShortingTermination);
     }
     node.accept(elementResolver);
     node.accept(typeAnalyzer);
