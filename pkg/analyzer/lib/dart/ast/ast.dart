@@ -4,7 +4,6 @@
 
 import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/dart/ast/precedence.dart';
-
 /// Defines the AST model. The AST (Abstract Syntax Tree) model describes the
 /// syntactic (as opposed to semantic) structure of Dart code. The semantic
 /// structure of the code is modeled by the
@@ -2178,11 +2177,6 @@ abstract class FieldFormalParameter implements NormalFormalParameter {
   /// is not a function-typed field formal parameter.
   FormalParameterList get parameters;
 
-  /// If the parameter is function-typed, and has the question mark, then its
-  /// function type is nullable. Having a nullable function type means that the
-  /// parameter can be null.
-  Token get question;
-
   /// Set the parameters of the function-typed parameter to the given
   /// [parameters].
   void set parameters(FormalParameterList parameters);
@@ -2192,6 +2186,11 @@ abstract class FieldFormalParameter implements NormalFormalParameter {
 
   /// Set the token representing the period to the given [token].
   void set period(Token token);
+
+  /// If the parameter is function-typed, and has the question mark, then its
+  /// function type is nullable. Having a nullable function type means that the
+  /// parameter can be null.
+  Token get question;
 
   /// Return the token representing the 'this' keyword.
   Token get thisKeyword;
@@ -3155,24 +3154,6 @@ abstract class ImportDirective implements NamespaceDirective {
   void set prefix(SimpleIdentifier identifier);
 }
 
-/// Abstract interface for expressions that may participate in null-shorting.
-abstract class NullShortableExpression implements Expression {
-  /// Returns the expression that terminates any null shorting that might occur
-  /// in this expression.  This may be called regardless of whether this
-  /// expression is itself null-aware.
-  ///
-  /// For example, the statement `a?.b[c] = d;` contains the following
-  /// null-shortable subexpressions:
-  /// - `a?.b`
-  /// - `a?.b[c]`
-  /// - `a?.b[c] = d`
-  ///
-  /// Calling [nullShortingTermination] on any of these subexpressions yields
-  /// the expression `a?.b[c] = d`, indicating that the null-shorting terminates
-  /// after the assignment.
-  Expression get nullShortingTermination;
-}
-
 /// An index expression.
 ///
 ///    indexExpression ::=
@@ -4070,6 +4051,24 @@ abstract class NullLiteral implements Literal {
 
   /// Set the token representing the literal to the given [token].
   void set literal(Token token);
+}
+
+/// Abstract interface for expressions that may participate in null-shorting.
+abstract class NullShortableExpression implements Expression {
+  /// Returns the expression that terminates any null shorting that might occur
+  /// in this expression.  This may be called regardless of whether this
+  /// expression is itself null-aware.
+  ///
+  /// For example, the statement `a?.b[c] = d;` contains the following
+  /// null-shortable subexpressions:
+  /// - `a?.b`
+  /// - `a?.b[c]`
+  /// - `a?.b[c] = d`
+  ///
+  /// Calling [nullShortingTermination] on any of these subexpressions yields
+  /// the expression `a?.b[c] = d`, indicating that the null-shorting induced by
+  /// the `?.` causes the rest of the subexpression `a?.b[c] = d` to be skipped.
+  Expression get nullShortingTermination;
 }
 
 /// The "on" clause in a mixin declaration.
