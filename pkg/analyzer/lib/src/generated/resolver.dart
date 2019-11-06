@@ -2700,6 +2700,8 @@ class ResolverVisitor extends ScopedVisitor {
   InterfaceType _iterableForSetMapDisambiguationCached;
   InterfaceType _mapForSetMapDisambiguationCached;
 
+  final List<Expression> unfinishedNullShorts = [null];
+
   /// Initialize a newly created visitor to resolve the nodes in an AST node.
   ///
   /// The [definingLibrary] is the element for the library containing the node
@@ -3837,8 +3839,6 @@ class ResolverVisitor extends ScopedVisitor {
     node.accept(typeAnalyzer);
   }
 
-  final List<Expression> unfinishedNullShorts = [null];
-
   @override
   void visitIndexExpression(IndexExpression node) {
     node.target?.accept(this);
@@ -3938,6 +3938,10 @@ class ResolverVisitor extends ScopedVisitor {
     // because it needs to be visited in the context of the invocation.
     //
     node.target?.accept(this);
+    if (node.isNullAware && _nonNullableEnabled) {
+      _flowAnalysis.flow.nullAwareAccess_rightBegin(node.target);
+      unfinishedNullShorts.add(node.nullShortingTermination);
+    }
     node.typeArguments?.accept(this);
     node.accept(elementResolver);
 
@@ -6384,12 +6388,12 @@ abstract class TypeProvider {
 
   /// Return a list containing all of the types that cannot be either extended
   /// or implemented.
-  @Deprecated('Use nonSubtypableClasses instead.')
-  List<InterfaceType> get nonSubtypableTypes;
+  Set<ClassElement> get nonSubtypableClasses;
 
   /// Return a list containing all of the types that cannot be either extended
   /// or implemented.
-  Set<ClassElement> get nonSubtypableClasses;
+  @Deprecated('Use nonSubtypableClasses instead.')
+  List<InterfaceType> get nonSubtypableTypes;
 
   /// Return the element representing the built-in class 'null'.
   ClassElement get nullElement;

@@ -22,7 +22,6 @@ import 'package:analyzer/src/generated/utilities_dart.dart';
 import 'package:analyzer/src/generated/variable_type_provider.dart';
 import 'package:analyzer/src/task/strong/checker.dart'
     show getExpressionType, getReadType;
-import 'package:meta/meta.dart';
 
 /**
  * Instances of the class `StaticTypeAnalyzer` perform two type-related tasks. First, they
@@ -657,8 +656,7 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
   @override
   void visitFunctionExpressionInvocation(FunctionExpressionInvocation node) {
     _inferGenericInvocationExpression(node);
-    DartType staticType =
-        _computeInvokeReturnType(node.staticInvokeType, isNullAware: false);
+    DartType staticType = _computeInvokeReturnType(node.staticInvokeType);
     _recordStaticType(node, staticType);
   }
 
@@ -836,11 +834,11 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
         _inferMethodInvocationInlineJS(node);
 
     if (!inferredStaticType) {
-      DartType staticStaticType = _computeInvokeReturnType(
-          node.staticInvokeType,
-          isNullAware: node.isNullAware);
+      DartType staticStaticType =
+          _computeInvokeReturnType(node.staticInvokeType);
       _recordStaticType(node, staticStaticType);
     }
+    _nullShortingTermination(node);
   }
 
   @override
@@ -1364,8 +1362,7 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
    * Compute the return type of the method or function represented by the given
    * type that is being invoked.
    */
-  DartType /*!*/ _computeInvokeReturnType(DartType type,
-      {@required bool isNullAware}) {
+  DartType /*!*/ _computeInvokeReturnType(DartType type) {
     TypeImpl /*!*/ returnType;
     if (type is InterfaceType) {
       MethodElement callMethod = type.lookUpMethod(
@@ -1375,10 +1372,6 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
       returnType = type.returnType ?? _dynamicType;
     } else {
       returnType = _dynamicType;
-    }
-
-    if (isNullAware && _nonNullableEnabled) {
-      returnType = _typeSystem.makeNullable(returnType);
     }
 
     return returnType;
@@ -1423,11 +1416,10 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
       //
       FunctionType propertyType = element.type;
       if (propertyType != null) {
-        return _computeInvokeReturnType(propertyType.returnType,
-            isNullAware: false);
+        return _computeInvokeReturnType(propertyType.returnType);
       }
     } else if (element is ExecutableElement) {
-      return _computeInvokeReturnType(element.type, isNullAware: false);
+      return _computeInvokeReturnType(element.type);
     }
     return _dynamicType;
   }
@@ -2063,8 +2055,7 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
       do {
         _resolver.unfinishedNullShorts.removeLast();
         _flowAnalysis.flow.nullAwareAccess_end();
-      }
-      while (identical(_resolver.unfinishedNullShorts.last, node));
+      } while (identical(_resolver.unfinishedNullShorts.last, node));
       node.staticType = _typeSystem.makeNullable(node.staticType);
     }
   }

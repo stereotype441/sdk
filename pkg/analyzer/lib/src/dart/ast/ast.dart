@@ -6950,6 +6950,7 @@ class MethodDeclarationImpl extends ClassMemberImpl
 ///        ([Expression] '.')? [SimpleIdentifier] [TypeArgumentList]?
 ///        [ArgumentList]
 class MethodInvocationImpl extends InvocationExpressionImpl
+    with NullShortableExpressionImpl
     implements MethodInvocation {
   /// The expression producing the object on which the method is defined, or
   /// `null` if there is no target (that is, the target is implicitly `this`).
@@ -7077,6 +7078,9 @@ class MethodInvocationImpl extends InvocationExpressionImpl
     _typeArguments?.accept(visitor);
     _argumentList?.accept(visitor);
   }
+
+  @override
+  bool _extendsNullShorting(Expression child) => identical(child, _target);
 }
 
 /// The declaration of a mixin.
