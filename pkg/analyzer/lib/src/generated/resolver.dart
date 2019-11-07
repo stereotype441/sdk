@@ -2702,6 +2702,13 @@ class ResolverVisitor extends ScopedVisitor {
   /// or `null` if not in a [SwitchStatement].
   DartType _enclosingSwitchStatementExpressionType;
 
+  /// Stack of expressions which we have not yet finished visiting, that should
+  /// terminate a null-shorting expression.
+  ///
+  /// The stack contains a `null` sentinel as its first entry so that it is
+  /// always safe to use `.last` to examine the top of the stack.
+  final List<Expression> unfinishedNullShorts = [null];
+
   /// Initialize a newly created visitor to resolve the nodes in an AST node.
   ///
   /// The [definingLibrary] is the element for the library containing the node
@@ -3813,8 +3820,6 @@ class ResolverVisitor extends ScopedVisitor {
     node.accept(elementResolver);
     node.accept(typeAnalyzer);
   }
-
-  final List<Expression> unfinishedNullShorts = [null];
 
   @override
   void visitIndexExpression(IndexExpression node) {

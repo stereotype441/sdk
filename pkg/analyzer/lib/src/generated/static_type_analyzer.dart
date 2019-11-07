@@ -2038,8 +2038,7 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
       do {
         _resolver.unfinishedNullShorts.removeLast();
         _flowAnalysis.flow.nullAwareAccess_end();
-      }
-      while (identical(_resolver.unfinishedNullShorts.last, node));
+      } while (identical(_resolver.unfinishedNullShorts.last, node));
       node.staticType = _typeSystem.makeNullable(node.staticType);
     }
   }
