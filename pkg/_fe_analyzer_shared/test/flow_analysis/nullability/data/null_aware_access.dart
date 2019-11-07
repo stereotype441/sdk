@@ -9,6 +9,7 @@ class C {
   void operator []=(index, value) {}
   C methodReturningC() => this;
   C? methodReturningNullableC() => this;
+  C Function([dynamic]) methodReturningCfunction([value]) => this;
   C get getterReturningC => this;
   C? get getterReturningNullableC => this;
   C get getterSetter => this;
@@ -24,6 +25,10 @@ class D {
   void set getterSetter(value) {}
   int methodReturningInt([value]) => 0;
   D operator +(other) => this;
+}
+
+void foo(C? c) {
+  c?.methodReturningCfunction(/*nonNullable*/ c)(/*nonNullable*/ c).methodReturningInt(/*nonNullable*/ c);
 }
 
 void methodCall(C? c) {
