@@ -352,9 +352,12 @@ class EdgeBuilderTest extends EdgeBuilderTestBase {
   /// Checks that there are no nullability nodes upstream from [node] that could
   /// cause it to become nullable.
   void assertNoUpstreamNullability(NullabilityNode node) {
+    // Store `neverClosure` in a local variable so that we avoid the
+    // computational expense of recomputing it each time through the loop below.
+    var neverClosure = this.neverClosure;
+
     // Any node with a hard edge to never (or never itself) won't become
     // nullable, even if it has nodes upstream from it.
-    var neverClosure = this.neverClosure;
     if (neverClosure.contains(node)) return;
 
     // Otherwise, make sure that every node directly upstream from this node
