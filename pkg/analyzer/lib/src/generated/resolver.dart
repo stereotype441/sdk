@@ -3843,7 +3843,7 @@ class ResolverVisitor extends ScopedVisitor {
   void visitIndexExpression(IndexExpression node) {
     node.target?.accept(this);
     if (node.isNullAware && _nonNullableEnabled) {
-      _flowAnalysis.flow.nullAwareAccess_rightBegin(node.target);
+      _flowAnalysis.flow.nullAwareAccess_rightBegin(node.realTarget);
       unfinishedNullShorts.add(node.nullShortingTermination);
     }
     node.accept(elementResolver);
@@ -3939,7 +3939,7 @@ class ResolverVisitor extends ScopedVisitor {
     //
     node.target?.accept(this);
     if (node.isNullAware && _nonNullableEnabled) {
-      _flowAnalysis.flow.nullAwareAccess_rightBegin(node.target);
+      _flowAnalysis.flow.nullAwareAccess_rightBegin(node.realTarget);
       unfinishedNullShorts.add(node.nullShortingTermination);
     }
     node.typeArguments?.accept(this);
@@ -4045,7 +4045,7 @@ class ResolverVisitor extends ScopedVisitor {
     //
     node.target?.accept(this);
     if (node.isNullAware && _nonNullableEnabled) {
-      _flowAnalysis.flow.nullAwareAccess_rightBegin(node.target);
+      _flowAnalysis.flow.nullAwareAccess_rightBegin(node.realTarget);
       unfinishedNullShorts.add(node.nullShortingTermination);
     }
     node.accept(elementResolver);

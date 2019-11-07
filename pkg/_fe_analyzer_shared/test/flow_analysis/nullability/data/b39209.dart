@@ -3,7 +3,7 @@ propertyAccess(int? x) {
 }
 
 methodCall(C? c) {
-  c?..f(/*notNull*/ c)..f(/*notNull*/ c);
+  c?..f(/*nonNullable*/ c)..f(/*nonNullable*/ c);
 }
 
 abstract class C {
