@@ -687,6 +687,9 @@ class AssignmentExpressionImpl extends ExpressionImpl
     _rightHandSide = _becomeParentOf(expression as ExpressionImpl);
   }
 
+  @override
+  AstNode get _nullShortingExtensionCandidate => parent;
+
   /// If the AST structure has been resolved, and the function being invoked is
   /// known based on static type information, then return the parameter element
   /// representing the parameter to which the value of the right operand will be
@@ -5846,19 +5849,7 @@ class IndexExpressionImpl extends ExpressionImpl
   Precedence get precedence => Precedence.postfix;
 
   @override
-  Expression get realTarget {
-    if (isCascaded) {
-      AstNode ancestor = parent;
-      while (ancestor is! CascadeExpression) {
-        if (ancestor == null) {
-          return _target;
-        }
-        ancestor = ancestor.parent;
-      }
-      return (ancestor as CascadeExpression).target;
-    }
-    return _target;
-  }
+  Expression get realTarget => _cascadeExpression?.target ?? _target;
 
   @override
   Expression get target => _target;
@@ -5867,6 +5858,12 @@ class IndexExpressionImpl extends ExpressionImpl
   void set target(Expression expression) {
     _target = _becomeParentOf(expression as ExpressionImpl);
   }
+
+  CascadeExpression get _cascadeExpression =>
+      isCascaded ? thisOrAncestorOfType<CascadeExpression>() : null;
+
+  @override
+  AstNode get _nullShortingExtensionCandidate => _cascadeExpression ?? parent;
 
   /// If the AST structure has been resolved, and the function being invoked is
   /// known based on static type information, then return the parameter element
@@ -7045,19 +7042,7 @@ class MethodInvocationImpl extends InvocationExpressionImpl
   Precedence get precedence => Precedence.postfix;
 
   @override
-  Expression get realTarget {
-    if (isCascaded) {
-      AstNode ancestor = parent;
-      while (ancestor is! CascadeExpression) {
-        if (ancestor == null) {
-          return _target;
-        }
-        ancestor = ancestor.parent;
-      }
-      return (ancestor as CascadeExpression).target;
-    }
-    return _target;
-  }
+  Expression get realTarget => _cascadeExpression?.target ?? _target;
 
   @override
   Expression get target => _target;
@@ -7066,6 +7051,12 @@ class MethodInvocationImpl extends InvocationExpressionImpl
   void set target(Expression expression) {
     _target = _becomeParentOf(expression as ExpressionImpl);
   }
+
+  CascadeExpression get _cascadeExpression =>
+      isCascaded ? thisOrAncestorOfType<CascadeExpression>() : null;
+
+  @override
+  AstNode get _nullShortingExtensionCandidate => _cascadeExpression ?? parent;
 
   @override
   E accept<E>(AstVisitor<E> visitor) => visitor.visitMethodInvocation(this);
@@ -7734,7 +7725,7 @@ mixin NullShortableExpressionImpl implements NullShortableExpression {
   Expression get nullShortingTermination {
     var result = this;
     while (true) {
-      var parent = result.parent;
+      var parent = result._nullShortingExtensionCandidate;
       if (parent is NullShortableExpressionImpl &&
           parent._extendsNullShorting(result)) {
         result = parent;
@@ -7744,9 +7735,14 @@ mixin NullShortableExpressionImpl implements NullShortableExpression {
     }
   }
 
-  /// Indicates whether the effect of any null-shorting within [child] (which
-  /// should be a child of `this`) should extend to include `this`.
-  bool _extendsNullShorting(Expression child);
+  /// Gets the ancestor of this node to which null-shorting might be extended.
+  /// Usually this is just the node's parent, however for expressions appearing
+  /// in cascades, it may be the cascade expression itself.
+  AstNode get _nullShortingExtensionCandidate;
+
+  /// Indicates whether the effect of any null-shorting within [descendant]
+  /// (which should be a descendant of `this`) should extend to include `this`.
+  bool _extendsNullShorting(Expression descendant);
 }
 
 /// The "on" clause in a mixin declaration.
@@ -8276,19 +8272,7 @@ class PropertyAccessImpl extends ExpressionImpl
   }
 
   @override
-  Expression get realTarget {
-    if (isCascaded) {
-      AstNode ancestor = parent;
-      while (ancestor is! CascadeExpression) {
-        if (ancestor == null) {
-          return _target;
-        }
-        ancestor = ancestor.parent;
-      }
-      return (ancestor as CascadeExpression).target;
-    }
-    return _target;
-  }
+  Expression get realTarget => _cascadeExpression?.target ?? _target;
 
   @override
   Expression get target => _target;
@@ -8297,6 +8281,12 @@ class PropertyAccessImpl extends ExpressionImpl
   void set target(Expression expression) {
     _target = _becomeParentOf(expression as ExpressionImpl);
   }
+
+  CascadeExpression get _cascadeExpression =>
+      isCascaded ? thisOrAncestorOfType<CascadeExpression>() : null;
+
+  @override
+  AstNode get _nullShortingExtensionCandidate => _cascadeExpression ?? parent;
 
   @override
   E accept<E>(AstVisitor<E> visitor) => visitor.visitPropertyAccess(this);
