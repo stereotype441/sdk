@@ -122,18 +122,14 @@ void indexNullAwareAssign_nullShorting(C? c, D? d) {
   d?.[0]?.[/*nonNullable*/ d] ??= /*nonNullable*/ d;
 }
 
-void null_aware_cascades_do_not_promote_target(C? c) {
-  // Cascaded invocations act on an invisible temporary variable that
-  // holds the result of evaluating the cascade target.  So
-  // effectively, no promotion happens (because there is no way to
-  // observe a change to the type of that variable).
-  c?..setter = c;
-  c?..getterSetter += c;
-  c?..getterSetter ??= c;
-  c?..[c];
-  c?..[c] = c;
-  c?..[c] += c;
-  c?..[c] ??= c;
+void null_aware_cascades_do_promote_target(C? c) {
+  c?..setter = /*nonNullable*/ c;
+  c?..getterSetter += /*nonNullable*/ c;
+  c?..getterSetter ??= /*nonNullable*/ c;
+  c?..[/*nonNullable*/ c];
+  c?..[/*nonNullable*/ c] = /*nonNullable*/ c;
+  c?..[/*nonNullable*/ c] += /*nonNullable*/ c;
+  c?..[/*nonNullable*/ c] ??= /*nonNullable*/ c;
 }
 
 void null_aware_cascades_do_not_promote_others(C? c, int? i, int? j) {
