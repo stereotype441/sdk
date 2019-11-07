@@ -697,7 +697,7 @@ intptr_t BytecodeReaderHelper::ReadConstantPool(const Function& function,
     kUnused4,
     kUnused5,
     kUnused6,
-    kICData,  // Obsolete in bytecode v20.
+    kUnused6a,
     kUnused7,
     kStaticField,
     kInstanceField,
@@ -725,18 +725,8 @@ intptr_t BytecodeReaderHelper::ReadConstantPool(const Function& function,
     kDirectCallViaDynamicForwarder,
   };
 
-  enum InvocationKind {
-    method,  // x.foo(...) or foo(...)
-    getter,  // x.foo
-    setter   // x.foo = ...
-  };
-
-  const int kInvocationKindMask = 0x3;
-  const int kFlagDynamic = 1 << 2;
-
   Object& obj = Object::Handle(Z);
   Object& elem = Object::Handle(Z);
-  Array& array = Array::Handle(Z);
   Field& field = Field::Handle(Z);
   Class& cls = Class::Handle(Z);
   String& name = String::Handle(Z);
@@ -746,33 +736,6 @@ intptr_t BytecodeReaderHelper::ReadConstantPool(const Function& function,
     switch (tag) {
       case ConstantPoolTag::kInvalid:
         UNREACHABLE();
-      case ConstantPoolTag::kICData: {
-        static_assert(KernelBytecode::kMinSupportedBytecodeFormatVersion < 20,
-                      "Cleanup ICData constant pool entry");
-        intptr_t flags = reader_.ReadByte();
-        InvocationKind kind =
-            static_cast<InvocationKind>(flags & kInvocationKindMask);
-        bool isDynamic = (flags & kFlagDynamic) != 0;
-        name ^= ReadObject();
-        ASSERT(name.IsSymbol());
-        intptr_t arg_desc_index = reader_.ReadUInt();
-        ASSERT(arg_desc_index < i);
-        array ^= pool.ObjectAt(arg_desc_index);
-        // Do not mangle == or call:
-        //   * operator == takes an Object so its either not checked or checked
-        //     at the entry because the parameter is marked covariant, neither
-        //     of those cases require a dynamic invocation forwarder;
-        //   * we assume that all closures are entered in a checked way.
-        if (isDynamic && (kind != InvocationKind::getter) &&
-            I->should_emit_strong_mode_checks() &&
-            (name.raw() != Symbols::EqualOperator().raw()) &&
-            (name.raw() != Symbols::Call().raw())) {
-          name = Function::CreateDynamicInvocationForwarderName(name);
-        }
-        obj = UnlinkedCall::New();
-        UnlinkedCall::Cast(obj).set_target_name(name);
-        UnlinkedCall::Cast(obj).set_args_descriptor(array);
-      } break;
       case ConstantPoolTag::kStaticField:
         obj = ReadObject();
         ASSERT(obj.IsField());
@@ -896,7 +859,6 @@ intptr_t BytecodeReaderHelper::ReadConstantPool(const Function& function,
       case ConstantPoolTag::kDynamicCall: {
         name ^= ReadObject();
         ASSERT(name.IsSymbol());
-        array ^= ReadObject();
         // Do not mangle == or call:
         //   * operator == takes an Object so it is either not checked or
         //     checked at the entry because the parameter is marked covariant,
@@ -907,21 +869,15 @@ intptr_t BytecodeReaderHelper::ReadConstantPool(const Function& function,
             (name.raw() != Symbols::Call().raw())) {
           name = Function::CreateDynamicInvocationForwarderName(name);
         }
-        static_assert(KernelBytecode::kMinSupportedBytecodeFormatVersion < 20,
-                      "Can use 2 slots in object pool");
         // DynamicCall constant occupies 2 entries: selector and arguments
-        // descriptor. For backwards compatibility with ICData constants
-        // selector and arguments descriptor are packaged into UnlinkedCall
-        // object. The 2nd slot is filled with null.
-        obj = UnlinkedCall::New();
-        UnlinkedCall::Cast(obj).set_target_name(name);
-        UnlinkedCall::Cast(obj).set_args_descriptor(array);
+        // descriptor.
         pool.SetTypeAt(i, ObjectPool::EntryType::kTaggedObject,
                        ObjectPool::Patchability::kNotPatchable);
-        pool.SetObjectAt(i, obj);
+        pool.SetObjectAt(i, name);
         ++i;
         ASSERT(i < obj_count);
-        obj = Object::null();
+        // The second entry is used for arguments descriptor.
+        obj = ReadObject();
       } break;
       case ConstantPoolTag::kDirectCallViaDynamicForwarder: {
         // DirectCallViaDynamicForwarder constant occupies 2 entries.
@@ -2000,7 +1956,7 @@ void BytecodeReaderHelper::ReadFieldDeclarations(const Class& cls,
                                                  bool discard_fields) {
   // Field flags, must be in sync with FieldDeclaration constants in
   // pkg/vm/lib/bytecode/declarations.dart.
-  const int kHasInitializerFlag = 1 << 0;
+  const int kHasNontrivialInitializerFlag = 1 << 0;
   const int kHasGetterFlag = 1 << 1;
   const int kHasSetterFlag = 1 << 2;
   const int kIsReflectableFlag = 1 << 3;
@@ -2017,6 +1973,7 @@ void BytecodeReaderHelper::ReadFieldDeclarations(const Class& cls,
   const int kHasAttributesFlag = 1 << 14;
   const int kIsLateFlag = 1 << 15;
   const int kIsExtensionMemberFlag = 1 << 16;
+  const int kHasInitializerFlag = 1 << 17;
 
   const int num_fields = reader_.ReadListLength();
   if ((num_fields == 0) && !cls.is_enum_class()) {
@@ -2037,9 +1994,12 @@ void BytecodeReaderHelper::ReadFieldDeclarations(const Class& cls,
     const bool is_static = (flags & kIsStaticFlag) != 0;
     const bool is_final = (flags & kIsFinalFlag) != 0;
     const bool is_const = (flags & kIsConstFlag) != 0;
-    const bool has_initializer = (flags & kHasInitializerFlag) != 0;
+    const bool is_late = (flags & kIsLateFlag) != 0;
+    const bool has_nontrivial_initializer =
+        (flags & kHasNontrivialInitializerFlag) != 0;
     const bool has_pragma = (flags & kHasPragmaFlag) != 0;
     const bool is_extension_member = (flags & kIsExtensionMemberFlag) != 0;
+    const bool has_initializer = (flags & kHasInitializerFlag) != 0;
 
     name ^= ReadObject();
     type ^= ReadObject();
@@ -2067,11 +2027,12 @@ void BytecodeReaderHelper::ReadFieldDeclarations(const Class& cls,
     field.set_is_covariant((flags & kIsCovariantFlag) != 0);
     field.set_is_generic_covariant_impl((flags & kIsGenericCovariantImplFlag) !=
                                         0);
-    field.set_has_initializer(has_initializer);
+    field.set_has_nontrivial_initializer(has_nontrivial_initializer);
     field.set_is_late((flags & kIsLateFlag) != 0);
     field.set_is_extension_member(is_extension_member);
+    field.set_has_initializer(has_initializer);
 
-    if (!has_initializer) {
+    if (!has_nontrivial_initializer) {
       value ^= ReadObject();
       if (is_static) {
         field.SetStaticValue(value, true);
@@ -2091,13 +2052,7 @@ void BytecodeReaderHelper::ReadFieldDeclarations(const Class& cls,
       }
     }
 
-    static_assert(KernelBytecode::kMinSupportedBytecodeFormatVersion < 14,
-                  "Cleanup support for old bytecode format versions");
-    const bool has_initializer_code =
-        bytecode_component_->GetVersion() >= 14
-            ? (flags & kHasInitializerCodeFlag) != 0
-            : has_initializer && is_static;
-    if (has_initializer_code) {
+    if ((flags & kHasInitializerCodeFlag) != 0) {
       const intptr_t code_offset = reader_.ReadUInt();
       field.set_bytecode_offset(code_offset +
                                 bytecode_component_->GetCodesOffset());
@@ -2122,7 +2077,7 @@ void BytecodeReaderHelper::ReadFieldDeclarations(const Class& cls,
       function.set_accessor_field(field);
       function.set_is_declared_in_bytecode(true);
       function.set_is_extension_member(is_extension_member);
-      if (is_const && has_initializer) {
+      if (is_const && has_nontrivial_initializer) {
         function.set_bytecode_offset(field.bytecode_offset());
       }
       H.SetupFieldAccessorFunction(cls, function, type);
@@ -2130,10 +2085,10 @@ void BytecodeReaderHelper::ReadFieldDeclarations(const Class& cls,
     }
 
     if ((flags & kHasSetterFlag) != 0) {
-      ASSERT((!is_static) && (!is_final) && (!is_const));
+      ASSERT(is_late || ((!is_static) && (!is_final)));
+      ASSERT(!is_const);
       name ^= ReadObject();
-      function = Function::New(name, RawFunction::kImplicitSetter,
-                               false,  // is_static
+      function = Function::New(name, RawFunction::kImplicitSetter, is_static,
                                false,  // is_const
                                false,  // is_abstract
                                false,  // is_external
@@ -3720,7 +3675,7 @@ bool IsStaticFieldGetterGeneratedAsInitializer(const Function& function,
 
   const auto& field = Field::Handle(zone, function.accessor_field());
   return field.is_declared_in_bytecode() && field.is_const() &&
-         field.has_initializer();
+         field.has_nontrivial_initializer();
 }
 
 }  // namespace kernel

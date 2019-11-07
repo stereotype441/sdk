@@ -1971,9 +1971,8 @@ SwitchDispatch:
       RawObject** call_top = SP + 1;
 
       InterpreterHelpers::IncrementUsageCounter(FrameFunction(FP));
-      RawUnlinkedCall* selector = RAW_CAST(UnlinkedCall, LOAD_CONSTANT(kidx));
-      RawString* target_name = selector->ptr()->target_name_;
-      argdesc_ = selector->ptr()->args_descriptor_;
+      RawString* target_name = String::RawCast(LOAD_CONSTANT(kidx));
+      argdesc_ = Array::RawCast(LOAD_CONSTANT(kidx + 1));
       if (!InstanceCall(thread, target_name, call_base, call_top, &pc, &FP,
                         &SP)) {
         HANDLE_EXCEPTION;
@@ -2240,20 +2239,24 @@ SwitchDispatch:
   }
 
   {
-    BYTECODE(StoreStaticTOS, D);
-    RawField* field = reinterpret_cast<RawField*>(LOAD_CONSTANT(rD));
-    RawInstance* value = static_cast<RawInstance*>(*SP--);
-    field->StorePointer(&field->ptr()->value_.static_value_, value, thread);
+    BYTECODE(InitLateField, D);
+    RawField* field = RAW_CAST(Field, LOAD_CONSTANT(rD + 1));
+    RawInstance* instance = reinterpret_cast<RawInstance*>(SP[0]);
+    intptr_t offset_in_words = Smi::Value(field->ptr()->value_.offset_);
+
+    instance->StorePointer(
+        reinterpret_cast<RawObject**>(instance->ptr()) + offset_in_words,
+        Object::RawCast(Object::sentinel().raw()), thread);
+
+    SP -= 1;  // Drop instance.
     DISPATCH();
   }
 
   {
-    static_assert(KernelBytecode::kMinSupportedBytecodeFormatVersion < 19,
-                  "Cleanup PushStatic bytecode instruction");
-    BYTECODE(PushStatic, D);
+    BYTECODE(StoreStaticTOS, D);
     RawField* field = reinterpret_cast<RawField*>(LOAD_CONSTANT(rD));
-    // Note: field is also on the stack, hence no increment.
-    *SP = field->ptr()->value_.static_value_;
+    RawInstance* value = static_cast<RawInstance*>(*SP--);
+    field->StorePointer(&field->ptr()->value_.static_value_, value, thread);
     DISPATCH();
   }
 
@@ -3063,6 +3066,22 @@ SwitchDispatch:
         reinterpret_cast<RawInstance*>(FrameArguments(FP, kArgc)[0]);
     RawObject* value =
         reinterpret_cast<RawObject**>(instance->ptr())[offset_in_words];
+
+    if (UNLIKELY(value == Object::sentinel().raw())) {
+      SP[1] = 0;  // Result slot.
+      SP[2] = instance;
+      SP[3] = field;
+      Exit(thread, FP, SP + 4, pc);
+      INVOKE_RUNTIME(
+          DRT_InitInstanceField,
+          NativeArguments(thread, 2, /* argv */ SP + 2, /* ret val */ SP + 1));
+
+      function = FrameFunction(FP);
+      instance = reinterpret_cast<RawInstance*>(SP[2]);
+      field = reinterpret_cast<RawField*>(SP[3]);
+      offset_in_words = Smi::Value(field->ptr()->value_.offset_);
+      value = reinterpret_cast<RawObject**>(instance->ptr())[offset_in_words];
+    }
 
     *++SP = value;
 

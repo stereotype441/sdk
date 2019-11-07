@@ -3424,6 +3424,9 @@ class Field : public Object {
   bool is_extension_member() const {
     return IsExtensionMemberBit::decode(raw_ptr()->kind_bits_);
   }
+  bool needs_load_guard() const {
+    return NeedsLoadGuardBit::decode(raw_ptr()->kind_bits_);
+  }
   bool is_reflectable() const {
     return ReflectableBit::decode(raw_ptr()->kind_bits_);
   }
@@ -3613,6 +3616,17 @@ class Field : public Object {
 
   RawString* InitializingExpression() const;
 
+  bool has_nontrivial_initializer() const {
+    return HasNontrivialInitializerBit::decode(raw_ptr()->kind_bits_);
+  }
+  // Called by parser after allocating field.
+  void set_has_nontrivial_initializer(bool has_nontrivial_initializer) const {
+    ASSERT(IsOriginal());
+    ASSERT(Thread::Current()->IsMutatorThread());
+    set_kind_bits(HasNontrivialInitializerBit::update(
+        has_nontrivial_initializer, raw_ptr()->kind_bits_));
+  }
+
   bool has_initializer() const {
     return HasInitializerBit::decode(raw_ptr()->kind_bits_);
   }
@@ -3622,6 +3636,10 @@ class Field : public Object {
     ASSERT(Thread::Current()->IsMutatorThread());
     set_kind_bits(
         HasInitializerBit::update(has_initializer, raw_ptr()->kind_bits_));
+  }
+
+  bool has_trivial_initializer() const {
+    return has_initializer() && !has_nontrivial_initializer();
   }
 
   StaticTypeExactnessState static_type_exactness_state() const {
@@ -3710,6 +3728,9 @@ class Field : public Object {
   void set_is_extension_member(bool value) const {
     set_kind_bits(IsExtensionMemberBit::update(value, raw_ptr()->kind_bits_));
   }
+  void set_needs_load_guard(bool value) const {
+    set_kind_bits(NeedsLoadGuardBit::update(value, raw_ptr()->kind_bits_));
+  }
   // Returns false if any value read from this field is guaranteed to be
   // not null.
   // Internally we is_nullable_ field contains either kNullCid (nullable) or
@@ -3761,7 +3782,9 @@ class Field : public Object {
   bool IsUninitialized() const;
 
   // Run initializer and set field value.
-  DART_WARN_UNUSED_RESULT RawError* Initialize() const;
+  DART_WARN_UNUSED_RESULT RawError* InitializeInstance(
+      const Instance& instance) const;
+  DART_WARN_UNUSED_RESULT RawError* InitializeStatic() const;
 
   // Run initializer only.
   DART_WARN_UNUSED_RESULT RawObject* EvaluateInitializer() const;
@@ -3812,7 +3835,7 @@ class Field : public Object {
     kConstBit = 0,
     kStaticBit,
     kFinalBit,
-    kHasInitializerBit,
+    kHasNontrivialInitializerBit,
     kUnboxingCandidateBit,
     kReflectableBit,
     kDoubleInitializedBit,
@@ -3822,12 +3845,14 @@ class Field : public Object {
     kGenericCovariantImplBit,
     kIsLateBit,
     kIsExtensionMemberBit,
+    kNeedsLoadGuardBit,
+    kHasInitializerBit,
   };
   class ConstBit : public BitField<uint16_t, bool, kConstBit, 1> {};
   class StaticBit : public BitField<uint16_t, bool, kStaticBit, 1> {};
   class FinalBit : public BitField<uint16_t, bool, kFinalBit, 1> {};
-  class HasInitializerBit
-      : public BitField<uint16_t, bool, kHasInitializerBit, 1> {};
+  class HasNontrivialInitializerBit
+      : public BitField<uint16_t, bool, kHasNontrivialInitializerBit, 1> {};
   class UnboxingCandidateBit
       : public BitField<uint16_t, bool, kUnboxingCandidateBit, 1> {};
   class ReflectableBit : public BitField<uint16_t, bool, kReflectableBit, 1> {};
@@ -3845,6 +3870,10 @@ class Field : public Object {
   class IsLateBit : public BitField<uint16_t, bool, kIsLateBit, 1> {};
   class IsExtensionMemberBit
       : public BitField<uint16_t, bool, kIsExtensionMemberBit, 1> {};
+  class NeedsLoadGuardBit
+      : public BitField<uint16_t, bool, kNeedsLoadGuardBit, 1> {};
+  class HasInitializerBit
+      : public BitField<uint16_t, bool, kHasInitializerBit, 1> {};
 
   // Update guarded cid and guarded length for this field. Returns true, if
   // deoptimization of dependent code is required.
