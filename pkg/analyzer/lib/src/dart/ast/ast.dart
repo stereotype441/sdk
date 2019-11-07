@@ -1232,7 +1232,7 @@ class CascadeExpressionImpl extends ExpressionImpl
     while (true) {
       var target = _getCascadeTarget(expression);
       if (target == null) {
-        return _isNullAware(target);
+        return _isNullAware(expression);
       }
       expression = target;
     }
@@ -1260,11 +1260,11 @@ class CascadeExpressionImpl extends ExpressionImpl
 
   Expression _getCascadeTarget(Expression expression) {
     if (expression is PropertyAccess) {
-      return expression.realTarget;
+      return expression.target;
     } else if (expression is IndexExpression) {
-      return expression.realTarget;
+      return expression.target;
     } else if (expression is MethodInvocation) {
-      return expression.realTarget;
+      return expression.target;
     } else if (expression is PostfixExpression) {
       return expression.operand;
     } else if (expression is FunctionExpressionInvocation) {

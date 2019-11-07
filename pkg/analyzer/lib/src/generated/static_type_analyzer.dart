@@ -553,6 +553,7 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
   @override
   void visitCascadeExpression(CascadeExpression node) {
     _recordStaticType(node, _getStaticType(node.target));
+    _nullShortingTermination(node);
   }
 
   /**
