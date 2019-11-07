@@ -360,6 +360,26 @@ class FrontendCompiler implements CompilerInterface {
       return false;
     }
 
+    if (options['aot']) {
+      if (!options['link-platform']) {
+        print('Error: --no-link-platform option cannot be used with --aot');
+        return false;
+      }
+      if (options['split-output-by-packages']) {
+        print(
+            'Error: --split-output-by-packages option cannot be used with --aot');
+        return false;
+      }
+      if (options['incremental']) {
+        print('Error: --incremental option cannot be used with --aot');
+        return false;
+      }
+      if (options['import-dill'] != null) {
+        print('Error: --import-dill option cannot be used with --aot');
+        return false;
+      }
+    }
+
     compilerOptions.bytecode = options['gen-bytecode'] ?? options['aot'];
     final BytecodeOptions bytecodeOptions = BytecodeOptions(
       enableAsserts: options['enable-asserts'],
@@ -581,7 +601,10 @@ class FrontendCompiler implements CompilerInterface {
         final IOSink sink = file.openWrite();
         final BinaryPrinter printer = filterExternal
             ? LimitedBinaryPrinter(
-                sink, (lib) => !lib.isExternal, true /* excludeUriToSource */)
+                sink,
+                // ignore: DEPRECATED_MEMBER_USE
+                (lib) => !lib.isExternal,
+                true /* excludeUriToSource */)
             : printerFactory.newBinaryPrinter(sink);
 
         sortComponent(component);
@@ -594,7 +617,10 @@ class FrontendCompiler implements CompilerInterface {
       final IOSink sink = File(filename).openWrite();
       final BinaryPrinter printer = filterExternal
           ? LimitedBinaryPrinter(
-              sink, (lib) => !lib.isExternal, true /* excludeUriToSource */)
+              sink,
+              // ignore: DEPRECATED_MEMBER_USE
+              (lib) => !lib.isExternal,
+              true /* excludeUriToSource */)
           : printerFactory.newBinaryPrinter(sink);
 
       sortComponent(component);

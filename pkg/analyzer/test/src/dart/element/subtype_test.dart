@@ -41,7 +41,7 @@ class NonNullableSubtypingCompoundTest extends _SubtypingCompoundTestBase {
     ];
 
     var subtypes = <DartType>[
-      bottomNone,
+      neverNone,
       nullNone,
       objectNone,
     ];
@@ -96,7 +96,7 @@ class NonNullableSubtypingCompoundTest extends _SubtypingCompoundTestBase {
     ];
 
     var subtypes = <DartType>[
-      bottomNone,
+      neverNone,
     ];
 
     var supertypes = <DartType>[
@@ -110,7 +110,7 @@ class NonNullableSubtypingCompoundTest extends _SubtypingCompoundTestBase {
       nullNone,
       nullStar,
       nullQuestion,
-      bottomQuestion,
+      neverQuestion,
     ];
 
     _checkGroups(
@@ -133,9 +133,9 @@ class NonNullableSubtypingCompoundTest extends _SubtypingCompoundTestBase {
       nullNone,
       nullQuestion,
       nullStar,
-      bottomNone,
-      bottomQuestion,
-      bottomStar,
+      neverNone,
+      neverQuestion,
+      neverStar,
     ];
 
     var supertypes = <DartType>[
@@ -171,9 +171,9 @@ class NonNullableSubtypingCompoundTest extends _SubtypingCompoundTestBase {
       nullNone,
       nullStar,
       nullQuestion,
-      bottomNone,
-      bottomStar,
-      bottomQuestion,
+      neverNone,
+      neverStar,
+      neverQuestion,
     ];
 
     var supertypes = <DartType>[
@@ -202,7 +202,7 @@ class NonNullableSubtypingCompoundTest extends _SubtypingCompoundTestBase {
       nullNone,
       nullQuestion,
       nullStar,
-      bottomQuestion,
+      neverQuestion,
     ];
 
     var supertypes = <DartType>[
@@ -215,7 +215,7 @@ class NonNullableSubtypingCompoundTest extends _SubtypingCompoundTestBase {
     ];
 
     var subtypes = <DartType>[
-      bottomNone,
+      neverNone,
     ];
 
     var unrelated = <DartType>[
@@ -248,7 +248,7 @@ class NonNullableSubtypingCompoundTest extends _SubtypingCompoundTestBase {
     ];
 
     var subtypes = <DartType>[
-      bottomNone,
+      neverNone,
     ];
 
     var unrelated = <DartType>[
@@ -351,13 +351,6 @@ class SubtypeTest extends _SubtypingTestBase {
     expect(typeSystem.isSubtypeOf(T0, T1), isTrue);
   }
 
-  void isSubtype3({
-    String strT0,
-    String strT1,
-  }) {
-    isSubtype2(strT0, strT1);
-  }
-
   InterfaceType iterableStar(DartType type) {
     return typeProvider.iterableElement.instantiate(
       typeArguments: [type],
@@ -398,30 +391,6 @@ class SubtypeTest extends _SubtypingTestBase {
   void setUp() {
     super.setUp();
     _defineTypes();
-  }
-
-  test_bottom_01() {
-    isSubtype(bottomNone, numNone, strT0: 'Never', strT1: 'num');
-  }
-
-  test_bottom_02() {
-    isSubtype(bottomNone, numStar, strT0: 'Never', strT1: 'num*');
-  }
-
-  test_bottom_03() {
-    isSubtype(bottomNone, numQuestion, strT0: 'Never', strT1: 'num?');
-  }
-
-  test_bottom_04() {
-    isSubtype(bottomNone, nullQuestion, strT0: 'Never', strT1: 'Null?');
-  }
-
-  test_bottom_05() {
-    isSubtype(bottomNone, bottomNone, strT0: 'Never', strT1: 'Never');
-  }
-
-  test_bottom_06() {
-    isSubtype(bottomNone, neverNone, strT0: 'Never', strT1: 'Never');
   }
 
   test_functionType_01() {
@@ -636,7 +605,7 @@ class SubtypeTest extends _SubtypingTestBase {
         ],
         returnType: intStar,
       ),
-      strT0: 'int* Function<E0,F0>(int*)*',
+      strT0: 'int* Function<E0, F0>(int*)*',
       strT1: 'int* Function<E1>(int*)*',
     );
   }
@@ -1714,28 +1683,6 @@ class SubtypeTest extends _SubtypingTestBase {
     );
   }
 
-  test_functionType_65() {
-    isSubtype(
-      functionTypeStar(
-        parameters: [
-          namedParameter(name: 'c', type: intStar),
-          namedParameter(name: 'b', type: intStar),
-          namedParameter(name: 'a', type: intStar),
-        ],
-        returnType: voidNone,
-      ),
-      functionTypeStar(
-        parameters: [
-          namedParameter(name: 'a', type: intStar),
-          namedParameter(name: 'c', type: intStar),
-        ],
-        returnType: voidNone,
-      ),
-      strT0: 'void Function({c: int*, b: int*, a: int*})*',
-      strT1: 'void Function({a: int*, c: int*})*',
-    );
-  }
-
   test_functionType_66() {
     isSubtype(
       functionTypeStar(
@@ -1758,28 +1705,6 @@ class SubtypeTest extends _SubtypingTestBase {
     );
   }
 
-  test_functionType_67() {
-    isSubtype(
-      functionTypeStar(
-        parameters: [
-          namedParameter(name: 'c', type: intStar),
-          namedParameter(name: 'b', type: intStar),
-          namedParameter(name: 'a', type: intStar),
-        ],
-        returnType: voidNone,
-      ),
-      functionTypeStar(
-        parameters: [
-          namedParameter(name: 'b', type: intStar),
-          namedParameter(name: 'c', type: intStar),
-        ],
-        returnType: voidNone,
-      ),
-      strT0: 'void Function({c: int*, b: int*, a: int*})*',
-      strT1: 'void Function({b: int*, c: int*})*',
-    );
-  }
-
   test_functionType_68() {
     isSubtype(
       functionTypeStar(
@@ -1797,27 +1722,6 @@ class SubtypeTest extends _SubtypingTestBase {
         returnType: voidNone,
       ),
       strT0: 'void Function({a: int*, b: int*, c: int*})*',
-      strT1: 'void Function({c: int*})*',
-    );
-  }
-
-  test_functionType_69() {
-    isSubtype(
-      functionTypeStar(
-        parameters: [
-          namedParameter(name: 'c', type: intStar),
-          namedParameter(name: 'b', type: intStar),
-          namedParameter(name: 'a', type: intStar),
-        ],
-        returnType: voidNone,
-      ),
-      functionTypeStar(
-        parameters: [
-          namedParameter(name: 'c', type: intStar),
-        ],
-        returnType: voidNone,
-      ),
-      strT0: 'void Function({c: int*, b: int*, a: int*})*',
       strT1: 'void Function({c: int*})*',
     );
   }
@@ -1962,7 +1866,7 @@ class SubtypeTest extends _SubtypingTestBase {
           returnType: typeParameterTypeNone(E1),
         ),
       ),
-      strT0: 'E0 Function(F0)* Function<E0,F0>(E0)*',
+      strT0: 'E0 Function(F0)* Function<E0, F0>(E0)*',
       strT1: 'E1 Function<F1>(F1)* Function<E1>(E1)*',
     );
 
@@ -1991,8 +1895,8 @@ class SubtypeTest extends _SubtypingTestBase {
           returnType: typeParameterTypeNone(E1),
         ),
       ),
-      strT0: 'E0 Function(F0)* Function<E0,F0>(E0)*',
-      strT1: 'E1 Function(F1)* Function<F1,E1>(E1)*',
+      strT0: 'E0 Function(F0)* Function<E0, F0>(E0)*',
+      strT1: 'E1 Function(F1)* Function<F1, E1>(E1)*',
     );
   }
 
@@ -2288,6 +2192,36 @@ class SubtypeTest extends _SubtypingTestBase {
       ),
       strT0: 'Null?',
       strT1: 'num* Function(int*)*',
+    );
+  }
+
+  test_functionType_requiredNamedParameter() {
+    var F0 = functionTypeNone(
+      returnType: voidNone,
+      parameters: [
+        namedRequiredParameter(name: 'a', type: intNone),
+      ],
+    );
+
+    var F1 = functionTypeNone(
+      returnType: voidNone,
+      parameters: [
+        namedParameter(name: 'a', type: intNone),
+      ],
+    );
+
+    isSubtype(
+      F1,
+      F0,
+      strT0: 'void Function({a: int})',
+      strT1: 'void Function({required a: int})',
+    );
+
+    isNotSubtype(
+      F0,
+      F1,
+      strT0: 'void Function({required a: int})',
+      strT1: 'void Function({a: int})',
     );
   }
 
@@ -3033,9 +2967,6 @@ class SubtypeTest extends _SubtypingTestBase {
     isSubtype2('Never', 'num');
     isSubtype2('Never', 'num*');
     isSubtype2('Never', 'num?');
-    isSubtype2('bottom', 'num');
-    isSubtype2('bottom', 'num*');
-    isSubtype2('bottom', 'num?');
 
     isNotSubtype2('int*', 'double*');
     isNotSubtype2('int*', 'Comparable<int*>*');
@@ -3047,7 +2978,6 @@ class SubtypeTest extends _SubtypingTestBase {
   }
 
   test_multi_object_topAndBottom() {
-    isSubtype2('bottom', 'Object');
     isSubtype2('Never', 'Object');
     isSubtype2('Object', 'dynamic');
     isSubtype2('Object', 'void');
@@ -3055,9 +2985,8 @@ class SubtypeTest extends _SubtypingTestBase {
     isSubtype2('Object', 'Object*');
     isSubtype2('Object*', 'Object');
 
-    isNotSubtype2('Object', 'bottom');
-    isNotSubtype2('Object', 'Null?');
     isNotSubtype2('Object', 'Never');
+    isNotSubtype2('Object', 'Null?');
     isNotSubtype2('dynamic', 'Object');
     isNotSubtype2('void', 'Object');
     isNotSubtype2('Object?', 'Object');
@@ -3089,14 +3018,9 @@ class SubtypeTest extends _SubtypingTestBase {
 
   test_multi_topAndBottom() {
     isSubtype2('Null?', 'Null?');
-    isNotSubtype2('Null?', 'bottom');
-    isNotSubtype2('Null?', 'Never');
-    isSubtype2('bottom', 'Null?');
-    isSubtype2('bottom', 'bottom');
-    isSubtype2('bottom', 'Never');
     isSubtype2('Never', 'Null?');
-//    isNotSubtype2('Never', 'bottom');
     isSubtype2('Never', 'Never');
+    isNotSubtype2('Null?', 'Never');
 
     isSubtype2('Null?', 'Never?');
     isSubtype2('Never?', 'Null?');
@@ -3124,26 +3048,18 @@ class SubtypeTest extends _SubtypingTestBase {
     isSubtype2('Never', 'Object*');
     isSubtype2('Never', 'dynamic');
     isSubtype2('Never', 'void');
-    isSubtype2('bottom', 'Object?');
-    isSubtype2('bottom', 'Object*');
-    isSubtype2('bottom', 'dynamic');
-    isSubtype2('bottom', 'void');
     isSubtype2('Null?', 'Object?');
     isSubtype2('Null?', 'Object*');
     isSubtype2('Null?', 'dynamic');
     isSubtype2('Null?', 'void');
 
     isNotSubtype2('Object?', 'Never');
-    isNotSubtype2('Object?', 'bottom');
     isNotSubtype2('Object?', 'Null?');
     isNotSubtype2('Object*', 'Never');
-    isNotSubtype2('Object*', 'bottom');
     isNotSubtype2('Object*', 'Null?');
     isNotSubtype2('dynamic', 'Never');
-    isNotSubtype2('dynamic', 'bottom');
     isNotSubtype2('dynamic', 'Null?');
     isNotSubtype2('void', 'Never');
-    isNotSubtype2('void', 'bottom');
     isNotSubtype2('void', 'Null?');
   }
 
@@ -3351,7 +3267,7 @@ class SubtypeTest extends _SubtypingTestBase {
   }
 
   test_never_29() {
-    isSubtype(bottomNone, nullQuestion, strT0: 'Never', strT1: 'Null?');
+    isSubtype(neverNone, nullQuestion, strT0: 'Never', strT1: 'Null?');
   }
 
   test_null_01() {
@@ -3952,8 +3868,8 @@ class SubtypeTest extends _SubtypingTestBase {
         ],
         returnType: voidNone,
       ),
-      strT0: 'void Function<S extends Object*,T extends void>(S, T)*',
-      strT1: 'void Function<U extends dynamic,V extends Object*>(U, V)*',
+      strT0: 'void Function<S extends Object*, T extends void>(S, T)*',
+      strT1: 'void Function<U extends dynamic, V extends Object*>(U, V)*',
     );
   }
 
@@ -4926,19 +4842,6 @@ class SubtypeTest extends _SubtypingTestBase {
     );
   }
 
-  TypeParameterTypeImpl typeParameterTypeNone(TypeParameterElement element) {
-    return element.instantiate(nullabilitySuffix: NullabilitySuffix.none);
-  }
-
-  TypeParameterTypeImpl typeParameterTypeQuestion(
-      TypeParameterElement element) {
-    return element.instantiate(nullabilitySuffix: NullabilitySuffix.question);
-  }
-
-  TypeParameterTypeImpl typeParameterTypeStar(TypeParameterElement element) {
-    return element.instantiate(nullabilitySuffix: NullabilitySuffix.star);
-  }
-
   void _defineType(String str, DartType type) {
     for (var key in _types.keys) {
       if (key == 'Never' || _typeStr(type) == 'Never') {
@@ -4957,11 +4860,13 @@ class SubtypeTest extends _SubtypingTestBase {
   }
 
   void _defineTypes() {
-    _defineType('bottom', bottomNone);
     _defineType('dynamic', dynamicNone);
     _defineType('void', voidNone);
+
     _defineType('Never', neverNone);
+    _defineType('Never*', neverStar);
     _defineType('Never?', neverQuestion);
+
     _defineType('Null?', nullQuestion);
 
     _defineType('Object', objectNone);
@@ -5157,7 +5062,7 @@ class SubtypeTest extends _SubtypingTestBase {
 @reflectiveTest
 class SubtypingCompoundTest extends _SubtypingCompoundTestBase {
   test_bottom_isBottom() {
-    var equivalents = <DartType>[bottomStar];
+    var equivalents = <DartType>[neverStar];
 
     var supertypes = <DartType>[
       dynamicNone,
@@ -5170,7 +5075,7 @@ class SubtypingCompoundTest extends _SubtypingCompoundTestBase {
     ];
 
     _checkGroups(
-      bottomStar,
+      neverStar,
       equivalents: equivalents,
       supertypes: supertypes,
     );
@@ -5201,7 +5106,7 @@ class SubtypingCompoundTest extends _SubtypingCompoundTestBase {
       numStar,
       stringStar,
       functionStar,
-      bottomStar,
+      neverStar,
     ];
 
     _checkGroups(
@@ -5250,7 +5155,7 @@ class SubtypingCompoundTest extends _SubtypingCompoundTestBase {
       numStar,
       stringStar,
       functionStar,
-      bottomStar,
+      neverStar,
     ];
 
     _checkGroups(
@@ -5331,12 +5236,6 @@ class _SubtypingTestBase with ElementsTypesMixin {
 
   ClassElement _comparableElement;
 
-  BottomTypeImpl get bottomNone => BottomTypeImpl.instance;
-
-  BottomTypeImpl get bottomQuestion => BottomTypeImpl.instanceNullable;
-
-  BottomTypeImpl get bottomStar => BottomTypeImpl.instanceLegacy;
-
   ClassElement get comparableElement {
     return _comparableElement ??=
         typeProvider.intType.element.library.getType('Comparable');
@@ -5416,9 +5315,11 @@ class _SubtypingTestBase with ElementsTypesMixin {
     );
   }
 
-  BottomTypeImpl get neverNone => BottomTypeImpl.instance;
+  NeverTypeImpl get neverNone => NeverTypeImpl.instance;
 
-  BottomTypeImpl get neverQuestion => BottomTypeImpl.instanceNullable;
+  NeverTypeImpl get neverQuestion => NeverTypeImpl.instanceNullable;
+
+  NeverTypeImpl get neverStar => NeverTypeImpl.instanceLegacy;
 
   InterfaceType get nullNone {
     var element = typeProvider.nullType.element;
@@ -5566,9 +5467,6 @@ class _TypeParameterCollector extends DartTypeVisitor<void> {
   }
 
   @override
-  void visitBottomType(BottomTypeImpl type) {}
-
-  @override
   void visitDynamicType(DynamicTypeImpl type) {}
 
   @override
@@ -5591,6 +5489,9 @@ class _TypeParameterCollector extends DartTypeVisitor<void> {
       DartTypeVisitor.visit(typeArgument, this);
     }
   }
+
+  @override
+  void visitNeverType(NeverTypeImpl type) {}
 
   @override
   void visitTypeParameterType(TypeParameterType type) {

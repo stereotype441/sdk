@@ -2421,7 +2421,7 @@ class Parser {
     }
 
     Token token = typeInfo.parseType(beforeType, this);
-    assert(token.next == name);
+    assert(token.next == name || token.next.isEof);
 
     IdentifierContext context = kind == DeclarationKind.TopLevel
         ? IdentifierContext.topLevelVariableDeclaration
@@ -3402,6 +3402,9 @@ class Parser {
         // TODO(danrubel): report invalid constructor name
         // Currently multiple listeners report this error, but that logic should
         // be removed and the error reported here instead.
+        if (isOperator) {
+          isConstructor = false;
+        }
       }
       if (getOrSet != null) {
         // Recovery
