@@ -1227,6 +1227,18 @@ class CascadeExpressionImpl extends ExpressionImpl
   Token get endToken => _cascadeSections.endToken;
 
   @override
+  bool get isNullAware {
+    var expression = _cascadeSections.first;
+    while (true) {
+      var target = _getCascadeTarget(expression);
+      if (target == null) {
+        return _isNullAware(target);
+      }
+      expression = target;
+    }
+  }
+
+  @override
   Precedence get precedence => Precedence.cascade;
 
   @override
@@ -1246,26 +1258,36 @@ class CascadeExpressionImpl extends ExpressionImpl
     _cascadeSections.accept(visitor);
   }
 
-  @override
-  bool get isNullAware {
-    BAD; // I need to figure out what cascade sections can look like :(
-    var firstSection = _cascadeSections.first;
-    if (firstSection is MethodInvocation) {
-      return firstSection.isNullAware;
-    } else if (firstSection is IndexExpression) {
-      return firstSection.isNullAware;
-    } else if (firstSection is PropertyAccess) {
-      return firstSection.isNullAware;
-    } else if (firstSection is AssignmentExpression) {
-      var lhs = firstSection.leftHandSide;
-      if (lhs is PropertyAccess) {
-        return lhs.isNullAware;
-      } else {
-        assert(false, 'Unexpected cascade section assignment LHS: ${lhs.runtimeType}');
-        return false;
-      }
+  Expression _getCascadeTarget(Expression expression) {
+    if (expression is PropertyAccess) {
+      return expression.realTarget;
+    } else if (expression is IndexExpression) {
+      return expression.realTarget;
+    } else if (expression is MethodInvocation) {
+      return expression.realTarget;
+    } else if (expression is PostfixExpression) {
+      return expression.operand;
+    } else if (expression is FunctionExpressionInvocation) {
+      return expression.function;
+    } else if (expression is AssignmentExpression) {
+      return expression.leftHandSide;
     } else {
-      assert(false, 'Unexpected ')
+      throw StateError('Unexpected expression type in cascade spine: '
+          '${expression.runtimeType}');
+    }
+  }
+
+  bool _isNullAware(Expression expression) {
+    if (expression is PropertyAccess) {
+      return expression.isNullAware;
+    } else if (expression is IndexExpression) {
+      return expression.isNullAware;
+    } else if (expression is MethodInvocation) {
+      return expression.isNullAware;
+    } else {
+      throw StateError(
+          'Unexpected expression type at final position in cascade spine: '
+          '${expression.runtimeType}');
     }
   }
 }
