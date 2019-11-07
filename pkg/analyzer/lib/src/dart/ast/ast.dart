@@ -1200,6 +1200,7 @@ class BreakStatementImpl extends StatementImpl implements BreakStatement {
 ///        '[ ' expression '] '
 ///      | identifier
 class CascadeExpressionImpl extends ExpressionImpl
+    with NullShortableExpressionImpl
     implements CascadeExpression {
   /// The target of the cascade sections.
   ExpressionImpl _target;
@@ -1230,16 +1231,8 @@ class CascadeExpressionImpl extends ExpressionImpl
   Token get endToken => _cascadeSections.endToken;
 
   @override
-  bool get isNullAware {
-    var expression = _cascadeSections.first;
-    while (true) {
-      var target = _getCascadeTarget(expression);
-      if (target == null) {
-        return _isNullAware(expression);
-      }
-      expression = target;
-    }
-  }
+  bool get isNullAware =>
+      _isNullAware(_findCascadeSectionBase(_cascadeSections.first));
 
   @override
   Precedence get precedence => Precedence.cascade;
@@ -1253,12 +1246,29 @@ class CascadeExpressionImpl extends ExpressionImpl
   }
 
   @override
+  AstNode get _nullShortingExtensionCandidate => null;
+
+  @override
   E accept<E>(AstVisitor<E> visitor) => visitor.visitCascadeExpression(this);
 
   @override
   void visitChildren(AstVisitor visitor) {
     _target?.accept(visitor);
     _cascadeSections.accept(visitor);
+  }
+
+  @override
+  bool _extendsNullShorting(Expression descendant) =>
+      identical(descendant, _findCascadeSectionBase(_cascadeSections.first));
+
+  Expression _findCascadeSectionBase(Expression expression) {
+    while (true) {
+      var target = _getCascadeTarget(expression);
+      if (target == null) {
+        return expression;
+      }
+      expression = target;
+    }
   }
 
   Expression _getCascadeTarget(Expression expression) {
