@@ -7075,9 +7075,6 @@ class MethodInvocationImpl extends InvocationExpressionImpl
   }
 
   @override
-  AstNode get _nullShortingExtensionCandidate => parent;
-
-  @override
   E accept<E>(AstVisitor<E> visitor) => visitor.visitMethodInvocation(this);
 
   @override
