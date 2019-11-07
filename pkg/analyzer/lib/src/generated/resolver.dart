@@ -23,6 +23,7 @@ import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
 import 'package:analyzer/src/dart/element/member.dart' show ConstructorMember;
 import 'package:analyzer/src/dart/element/type.dart';
+import 'package:analyzer/src/dart/element/type_provider.dart';
 import 'package:analyzer/src/dart/resolver/exit_detector.dart';
 import 'package:analyzer/src/dart/resolver/extension_member_resolver.dart';
 import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
@@ -1359,6 +1360,10 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
   /// `null` if the element doesn't have a deprecated annotation or if the
   /// annotation does not have a message.
   static String _deprecatedMessage(Element element) {
+    // Implicit getters/setters.
+    if (element.isSynthetic && element is PropertyAccessorElement) {
+      element = (element as PropertyAccessorElement).variable;
+    }
     ElementAnnotationImpl annotation = element.metadata.firstWhere(
       (e) => e.isDeprecated,
       orElse: () => null,
@@ -2697,9 +2702,11 @@ class ResolverVisitor extends ScopedVisitor {
   /// or `null` if not in a [SwitchStatement].
   DartType _enclosingSwitchStatementExpressionType;
 
-  InterfaceType _iterableForSetMapDisambiguationCached;
-  InterfaceType _mapForSetMapDisambiguationCached;
-
+  /// Stack of expressions which we have not yet finished visiting, that should
+  /// terminate a null-shorting expression.
+  ///
+  /// The stack contains a `null` sentinel as its first entry so that it is
+  /// always safe to use `.last` to examine the top of the stack.
   final List<Expression> unfinishedNullShorts = [null];
 
   /// Initialize a newly created visitor to resolve the nodes in an AST node.
@@ -2792,31 +2799,6 @@ class ResolverVisitor extends ScopedVisitor {
     return _nonNullableEnabled
         ? NullabilitySuffix.none
         : NullabilitySuffix.star;
-  }
-
-  InterfaceType get _iterableForSetMapDisambiguation {
-    return _iterableForSetMapDisambiguationCached ??=
-        typeProvider.iterableElement.instantiate(
-      typeArguments: [
-        typeProvider.dynamicType,
-      ],
-      nullabilitySuffix: _nonNullableEnabled
-          ? NullabilitySuffix.question
-          : NullabilitySuffix.star,
-    );
-  }
-
-  InterfaceType get _mapForSetMapDisambiguation {
-    return _mapForSetMapDisambiguationCached ??=
-        typeProvider.mapElement.instantiate(
-      typeArguments: [
-        typeProvider.dynamicType,
-        typeProvider.dynamicType,
-      ],
-      nullabilitySuffix: _nonNullableEnabled
-          ? NullabilitySuffix.question
-          : NullabilitySuffix.star,
-    );
   }
 
   /**
@@ -4517,9 +4499,9 @@ class ResolverVisitor extends ScopedVisitor {
       // TODO(brianwilkerson) Find out what the "greatest closure" is and use that
       // where [unwrappedContextType] is used below.
       bool isIterable = typeSystem.isSubtypeOf(
-          unwrappedContextType, _iterableForSetMapDisambiguation);
+          unwrappedContextType, typeProvider.iterableForSetMapDisambiguation);
       bool isMap = typeSystem.isSubtypeOf(
-          unwrappedContextType, _mapForSetMapDisambiguation);
+          unwrappedContextType, typeProvider.mapForSetMapDisambiguation);
       if (isIterable && !isMap) {
         return _LiteralResolution(
             _LiteralResolutionKind.set, unwrappedContextType);
@@ -4842,7 +4824,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
   final Source source;
 
   /// The object used to access the types from the core library.
-  final TypeProvider typeProvider;
+  final TypeProviderImpl typeProvider;
 
   /// The error reporter that will be informed of any errors that are found
   /// during resolution.

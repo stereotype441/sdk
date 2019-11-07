@@ -7795,8 +7795,9 @@ mixin NullShortableExpressionImpl implements NullShortableExpression {
   }
 
   /// Gets the ancestor of this node to which null-shorting might be extended.
-  /// Usually this is just the node's parent, however for expressions appearing
-  /// in cascades, it may be the cascade expression itself.
+  /// Usually this is just the node's parent, however if `this` is the base of
+  /// a cascade section, it will be the cascade expression itself, which may be
+  /// a more distant ancestor.
   AstNode get _nullShortingExtensionCandidate;
 
   /// Indicates whether the effect of any null-shorting within [descendant]
@@ -10054,10 +10055,16 @@ class TypeNameImpl extends TypeAnnotationImpl implements TypeName {
 /// A type parameter.
 ///
 ///    typeParameter ::=
-///        [SimpleIdentifier] ('extends' [TypeName])?
+///        typeParameterVariance? [SimpleIdentifier] ('extends' [TypeName])?
+///
+///    typeParameterVariance ::= 'out' | 'inout' | 'in'
 class TypeParameterImpl extends DeclarationImpl implements TypeParameter {
   /// The name of the type parameter.
   SimpleIdentifierImpl _name;
+
+  /// The token representing the variance modifier keyword, or `null` if
+  /// there is no explicit variance modifier, meaning legacy covariance.
+  Token varianceKeyword;
 
   /// The token representing the 'extends' keyword, or `null` if there is no
   /// explicit upper bound.
