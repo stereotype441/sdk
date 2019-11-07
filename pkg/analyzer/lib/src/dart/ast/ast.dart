@@ -1246,7 +1246,12 @@ class CascadeExpressionImpl extends ExpressionImpl
   }
 
   @override
-  AstNode get _nullShortingExtensionCandidate => null;
+  AstNode get _nullShortingExtensionCandidate {
+    // A `?.` in a cascade never extends to null short any expression outside
+    // the cascade, so we return `null` to prevent null shorting from applying
+    // to the containing expression.
+    return null;
+  }
 
   @override
   E accept<E>(AstVisitor<E> visitor) => visitor.visitCascadeExpression(this);
@@ -1261,6 +1266,9 @@ class CascadeExpressionImpl extends ExpressionImpl
   bool _extendsNullShorting(Expression descendant) =>
       identical(descendant, _findCascadeSectionBase(_cascadeSections.first));
 
+  /// Finds the "base" of the cascade section, in other words its leftmost
+  /// subexpression.  For example, in the cascade section `..a.b()[c]`, the base
+  /// is the property access `..a`.
   Expression _findCascadeSectionBase(Expression expression) {
     while (true) {
       var target = _getCascadeTarget(expression);

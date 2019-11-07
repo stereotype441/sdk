@@ -820,20 +820,41 @@ abstract class BreakStatement implements Statement {
 
 /// A sequence of cascaded expressions: expressions that share a common target.
 ///
-/// There are three kinds of expressions that can be used in a cascade
-/// expression: [IndexExpression], [MethodInvocation] and [PropertyAccess].
+/// A cascade expression consists of a target and a sequence of cascade
+/// sections.  Each cascade section is a nested set of one or more
+/// subexpressions subexpressions sharing a common first token, known as the
+/// "spine" of the cascade section.  The smallest of these (known as the "base"
+/// of the cascade section) has a null target; at runtime this target will be
+/// filled in with the target of the whole cascade.
 ///
-///    cascadeExpression ::=
-///        [Expression] cascadeSection*
+/// Each of the subexpressions in the spine of the cascade section may be one of
+/// [IndexExpression], [MethodInvocation], [PropertyAccess],
+/// [PostfixExpression], [FunctionExpressionInvocation], or
+/// [AssignmentExpression], with the following restrictions:
+/// - Only [PostfixExpression]s using the `!` are allowed
+/// - If an [AssignmentExpression] appears in the spine, it must be the largest
+///   subexpression (that is, it must be the entire cascade section)
+/// - The base subexpression may not be a [PostfixExpression],
+///   [FunctionExpressionInvocation], or [AssignmentExpression].
+///
+///    cascade ::=
+///        cascadeExpression '..' cascadeSection
+///      | conditionalExpression ('?..' | '..') cascadeSection
 ///
 ///    cascadeSection ::=
-///        ('..' | '?..') (cascadeSelector arguments*)
-///        (assignableSelector arguments*)*
-///        (assignmentOperator expressionWithoutCascade)?
+///        cascadeSelector cascadeSectionTail
 ///
 ///    cascadeSelector ::=
 ///        '[ ' expression '] '
 ///      | identifier
+///
+///    cascadeSectionTail ::=
+///        cascadeAssignment
+///      | selector* (assignableSelector cascadeAssignment)?
+///
+///    cascadeAssignment ::=
+///        assignmentOperator expressionWithoutCascade
+///
 ///
 /// Clients may not extend, implement or mix-in this class.
 abstract class CascadeExpression implements NullShortableExpression {
