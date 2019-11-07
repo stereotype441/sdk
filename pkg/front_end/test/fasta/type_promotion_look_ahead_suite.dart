@@ -4,6 +4,14 @@
 
 import 'dart:convert' show jsonDecode;
 
+import 'package:_fe_analyzer_shared/src/messages/severity.dart' show Severity;
+
+import 'package:_fe_analyzer_shared/src/parser/parser.dart' show Parser;
+
+import 'package:_fe_analyzer_shared/src/scanner/scanner.dart' show Token;
+
+import 'package:_fe_analyzer_shared/src/util/colors.dart' as colors;
+
 import 'package:front_end/src/base/processed_options.dart'
     show ProcessedOptions;
 
@@ -13,12 +21,6 @@ import 'package:front_end/src/fasta/compiler_context.dart' show CompilerContext;
 
 import 'package:front_end/src/fasta/messages.dart'
     show LocatedMessage, templateUnspecified;
-
-import 'package:front_end/src/fasta/parser.dart' show Parser;
-
-import 'package:front_end/src/fasta/scanner.dart' show Token;
-
-import 'package:front_end/src/fasta/severity.dart' show Severity;
 
 import 'package:front_end/src/fasta/source/type_promotion_look_ahead_listener.dart'
     show
@@ -56,7 +58,7 @@ Future<ChainContext> createContext(
           (CompilerContext context) =>
               new Future<CompilerContext>.value(context),
           errorOnMissingInput: false);
-  context.disableColors();
+  colors.enableColors = false;
   return new TypePromotionLookAheadContext(
       context, environment["updateExpectations"] == "true");
 }

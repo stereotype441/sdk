@@ -5,10 +5,15 @@
 // TODO(paulberry,johnniwinther): Use the code for extraction of test data from
 // annotated code from CFE.
 
+import 'package:_fe_analyzer_shared/src/testing/annotated_code_helper.dart';
+import 'package:_fe_analyzer_shared/src/testing/id.dart'
+    show ActualData, Id, IdValue, MemberId, NodeId;
+import 'package:_fe_analyzer_shared/src/testing/id_testing.dart';
 import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/dart/ast/ast.dart' hide Annotation;
 import 'package:analyzer/diagnostic/diagnostic.dart';
+import 'package:analyzer/error/error.dart';
 import 'package:analyzer/file_system/file_system.dart';
 import 'package:analyzer/file_system/memory_file_system.dart';
 import 'package:analyzer/src/dart/analysis/byte_store.dart';
@@ -20,10 +25,6 @@ import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/source/package_map_resolver.dart';
 import 'package:analyzer/src/test_utilities/mock_sdk.dart';
-import 'package:front_end/src/testing/annotated_code_helper.dart';
-import 'package:front_end/src/testing/id.dart'
-    show ActualData, Id, IdValue, MemberId, NodeId;
-import 'package:front_end/src/testing/id_testing.dart';
 
 /// Test configuration used for testing the analyzer with constant evaluation.
 final TestConfig analyzerConstantUpdate2018Config = TestConfig(
@@ -141,7 +142,12 @@ Future<bool> runTestForConfig<T>(
   var errors =
       result.errors.where((e) => e.severity == Severity.error).toList();
   if (errors.isNotEmpty) {
-    onFailure('Errors found:\n  ${errors.join('\n  ')}');
+    String _formatError(AnalysisError e) {
+      var locationInfo = result.unit.lineInfo.getLocation(e.offset);
+      return '$locationInfo: ${e.errorCode}: ${e.message}';
+    }
+
+    onFailure('Errors found:\n  ${errors.map(_formatError).join('\n  ')}');
     return true;
   }
   Map<Uri, Map<Id, ActualData<T>>> actualMaps = <Uri, Map<Id, ActualData<T>>>{};
@@ -200,6 +206,10 @@ class AnalyzerCompiledData<T> extends CompiledData<T> {
                   if (variable.name.name == name) {
                     return variable.offset;
                   }
+                }
+              } else if (member is MethodDeclaration) {
+                if (member.name.name == name) {
+                  return member.offset;
                 }
               }
             }

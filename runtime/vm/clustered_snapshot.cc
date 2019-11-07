@@ -605,13 +605,6 @@ class FunctionDeserializationCluster : public DeserializationCluster {
         if (func.HasCode() && !code.IsDisabled()) {
           func.SetInstructions(code);  // Set entrypoint.
           func.SetWasCompiled(true);
-#if !defined(DART_PRECOMPILED_RUNTIME)
-        } else if (FLAG_enable_interpreter && func.HasBytecode()) {
-          // Set the code entry_point to InterpretCall stub.
-          func.SetInstructions(StubCode::InterpretCall());
-        } else if (FLAG_use_bytecode_compiler && func.HasBytecode()) {
-          func.SetInstructions(StubCode::LazyCompile());
-#endif  // !defined(DART_PRECOMPILED_RUNTIME)
         } else {
           func.ClearCode();  // Set code and entrypoint to lazy compile stub.
         }
@@ -1107,7 +1100,7 @@ class ScriptSerializationCluster : public SerializationCluster {
       WriteFromTo(script);
       s->Write<int32_t>(script->ptr()->line_offset_);
       s->Write<int32_t>(script->ptr()->col_offset_);
-      s->Write<uint8_t>(script->ptr()->kind_and_tags_);
+      s->Write<uint8_t>(script->ptr()->flags_);
       s->Write<int32_t>(script->ptr()->kernel_script_index_);
     }
   }
@@ -1140,7 +1133,7 @@ class ScriptDeserializationCluster : public DeserializationCluster {
       ReadFromTo(script);
       script->ptr()->line_offset_ = d->Read<int32_t>();
       script->ptr()->col_offset_ = d->Read<int32_t>();
-      script->ptr()->kind_and_tags_ = d->Read<uint8_t>();
+      script->ptr()->flags_ = d->Read<uint8_t>();
       script->ptr()->kernel_script_index_ = d->Read<int32_t>();
       script->ptr()->load_timestamp_ = 0;
     }
@@ -2931,7 +2924,11 @@ class TypeSerializationCluster : public SerializationCluster {
       AutoTraceObject(type);
       WriteFromTo(type);
       s->WriteTokenPosition(type->ptr()->token_pos_);
-      s->Write<int8_t>(type->ptr()->type_state_);
+      const uint8_t combined =
+          (type->ptr()->type_state_ << 4) | type->ptr()->nullability_;
+      ASSERT(type->ptr()->type_state_ == (combined >> 4));
+      ASSERT(type->ptr()->nullability_ == (combined & 0xf));
+      s->Write<uint8_t>(combined);
     }
     count = objects_.length();
     for (intptr_t i = 0; i < count; i++) {
@@ -2939,7 +2936,11 @@ class TypeSerializationCluster : public SerializationCluster {
       AutoTraceObject(type);
       WriteFromTo(type);
       s->WriteTokenPosition(type->ptr()->token_pos_);
-      s->Write<int8_t>(type->ptr()->type_state_);
+      const uint8_t combined =
+          (type->ptr()->type_state_ << 4) | type->ptr()->nullability_;
+      ASSERT(type->ptr()->type_state_ == (combined >> 4));
+      ASSERT(type->ptr()->nullability_ == (combined & 0xf));
+      s->Write<uint8_t>(combined);
     }
   }
 
@@ -2980,7 +2981,9 @@ class TypeDeserializationCluster : public DeserializationCluster {
                                      is_canonical);
       ReadFromTo(type);
       type->ptr()->token_pos_ = d->ReadTokenPosition();
-      type->ptr()->type_state_ = d->Read<int8_t>();
+      const uint8_t combined = d->Read<uint8_t>();
+      type->ptr()->type_state_ = combined >> 4;
+      type->ptr()->nullability_ = combined & 0xf;
     }
 
     for (intptr_t id = start_index_; id < stop_index_; id++) {
@@ -2990,7 +2993,9 @@ class TypeDeserializationCluster : public DeserializationCluster {
                                      is_canonical);
       ReadFromTo(type);
       type->ptr()->token_pos_ = d->ReadTokenPosition();
-      type->ptr()->type_state_ = d->Read<int8_t>();
+      const uint8_t combined = d->Read<uint8_t>();
+      type->ptr()->type_state_ = combined >> 4;
+      type->ptr()->nullability_ = combined & 0xf;
     }
   }
 
@@ -3144,7 +3149,11 @@ class TypeParameterSerializationCluster : public SerializationCluster {
       s->Write<int32_t>(type->ptr()->parameterized_class_id_);
       s->WriteTokenPosition(type->ptr()->token_pos_);
       s->Write<int16_t>(type->ptr()->index_);
-      s->Write<uint8_t>(type->ptr()->flags_);
+      const uint8_t combined =
+          (type->ptr()->flags_ << 4) | type->ptr()->nullability_;
+      ASSERT(type->ptr()->flags_ == (combined >> 4));
+      ASSERT(type->ptr()->nullability_ == (combined & 0xf));
+      s->Write<uint8_t>(combined);
     }
   }
 
@@ -3178,7 +3187,9 @@ class TypeParameterDeserializationCluster : public DeserializationCluster {
       type->ptr()->parameterized_class_id_ = d->Read<int32_t>();
       type->ptr()->token_pos_ = d->ReadTokenPosition();
       type->ptr()->index_ = d->Read<int16_t>();
-      type->ptr()->flags_ = d->Read<uint8_t>();
+      const uint8_t combined = d->Read<uint8_t>();
+      type->ptr()->flags_ = combined >> 4;
+      type->ptr()->nullability_ = combined & 0xf;
     }
   }
 
@@ -4896,6 +4907,7 @@ void Serializer::AddVMIsolateBaseObjects() {
   }
   AddBaseObject(table->At(kDynamicCid), "Class");
   AddBaseObject(table->At(kVoidCid), "Class");
+  AddBaseObject(table->At(kNeverCid), "Class");
 
   if (!Snapshot::IncludesCode(kind_)) {
     for (intptr_t i = 0; i < StubCode::NumEntries(); i++) {
@@ -5354,6 +5366,7 @@ void Deserializer::AddVMIsolateBaseObjects() {
   }
   AddBaseObject(table->At(kDynamicCid));
   AddBaseObject(table->At(kVoidCid));
+  AddBaseObject(table->At(kNeverCid));
 
   if (!Snapshot::IncludesCode(kind_)) {
     for (intptr_t i = 0; i < StubCode::NumEntries(); i++) {

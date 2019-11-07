@@ -4,6 +4,25 @@
 
 library fasta.outline_builder;
 
+import 'package:_fe_analyzer_shared/src/parser/parser.dart'
+    show
+        Assert,
+        DeclarationKind,
+        FormalParameterKind,
+        IdentifierContext,
+        lengthOfSpan,
+        MemberKind,
+        optional;
+
+import 'package:_fe_analyzer_shared/src/parser/quote.dart' show unescapeString;
+
+import 'package:_fe_analyzer_shared/src/parser/stack_listener.dart'
+    show FixedNullableList, NullValue, ParserRecovery;
+
+import 'package:_fe_analyzer_shared/src/parser/value_kind.dart';
+
+import 'package:_fe_analyzer_shared/src/scanner/scanner.dart' show Token;
+
 import 'package:kernel/ast.dart' show InvalidType, ProcedureKind, Variance;
 
 import '../builder/constructor_reference_builder.dart';
@@ -79,22 +98,7 @@ import '../operator.dart'
         operatorToString,
         operatorRequiredArgumentCount;
 
-import '../parser.dart'
-    show
-        Assert,
-        DeclarationKind,
-        FormalParameterKind,
-        IdentifierContext,
-        lengthOfSpan,
-        MemberKind,
-        offsetForToken,
-        optional;
-
 import '../problems.dart' show unhandled;
-
-import '../quote.dart' show unescapeString;
-
-import '../scanner.dart' show Token;
 
 import 'source_library_builder.dart'
     show
@@ -103,8 +107,7 @@ import 'source_library_builder.dart'
         FieldInfo,
         SourceLibraryBuilder;
 
-import 'stack_listener.dart'
-    show FixedNullableList, NullValue, ParserRecovery, StackListener;
+import 'stack_listener_impl.dart';
 
 import 'value_kinds.dart';
 
@@ -114,7 +117,7 @@ enum MethodBody {
   RedirectingFactoryBody,
 }
 
-class OutlineBuilder extends StackListener {
+class OutlineBuilder extends StackListenerImpl {
   final SourceLibraryBuilder library;
 
   final bool enableNative;
@@ -422,11 +425,14 @@ class OutlineBuilder extends StackListener {
   @override
   void handleQualified(Token period) {
     assert(checkState(period, [
-      /*suffix offset*/ ValueKind.Integer,
-      /*suffix*/ ValueKind.NameOrParserRecovery,
-      /*prefix offset*/ ValueKind.Integer,
-      /*prefix*/ unionOfKinds(
-          [ValueKind.Name, ValueKind.ParserRecovery, ValueKind.QualifiedName]),
+      /*suffix offset*/ ValueKinds.Integer,
+      /*suffix*/ ValueKinds.NameOrParserRecovery,
+      /*prefix offset*/ ValueKinds.Integer,
+      /*prefix*/ unionOfKinds([
+        ValueKinds.Name,
+        ValueKinds.ParserRecovery,
+        ValueKinds.QualifiedName
+      ]),
     ]));
     debugEvent("handleQualified");
     int suffixOffset = pop();
@@ -490,7 +496,7 @@ class OutlineBuilder extends StackListener {
   void beginClassOrMixinBody(DeclarationKind kind, Token token) {
     if (kind == DeclarationKind.Extension) {
       assert(checkState(token, [
-        unionOfKinds([ValueKind.ParserRecovery, ValueKind.TypeBuilder])
+        unionOfKinds([ValueKinds.ParserRecovery, ValueKinds.TypeBuilder])
       ]));
       Object extensionThisType = peek();
       if (extensionThisType is TypeBuilder) {
@@ -642,7 +648,7 @@ class OutlineBuilder extends StackListener {
 
   @override
   void beginExtensionDeclarationPrelude(Token extensionKeyword) {
-    assert(checkState(extensionKeyword, [ValueKind.MetadataListOrNull]));
+    assert(checkState(extensionKeyword, [ValueKinds.MetadataListOrNull]));
     debugEvent("beginExtensionDeclaration");
     library.beginNestedDeclaration(
         TypeParameterScopeKind.extensionDeclaration, "extension");
@@ -651,7 +657,7 @@ class OutlineBuilder extends StackListener {
   @override
   void beginExtensionDeclaration(Token extensionKeyword, Token nameToken) {
     assert(checkState(extensionKeyword,
-        [ValueKind.TypeVariableListOrNull, ValueKind.MetadataListOrNull]));
+        [ValueKinds.TypeVariableListOrNull, ValueKinds.MetadataListOrNull]));
     debugEvent("beginExtensionDeclaration");
     List<TypeVariableBuilder> typeVariables = pop();
     int offset = nameToken?.charOffset ?? extensionKeyword.charOffset;
@@ -669,11 +675,11 @@ class OutlineBuilder extends StackListener {
   void endExtensionDeclaration(
       Token extensionKeyword, Token onKeyword, Token endToken) {
     assert(checkState(extensionKeyword, [
-      unionOfKinds([ValueKind.ParserRecovery, ValueKind.TypeBuilder]),
-      ValueKind.TypeVariableListOrNull,
-      ValueKind.Integer,
-      ValueKind.NameOrNull,
-      ValueKind.MetadataListOrNull
+      unionOfKinds([ValueKinds.ParserRecovery, ValueKinds.TypeBuilder]),
+      ValueKinds.TypeVariableListOrNull,
+      ValueKinds.Integer,
+      ValueKinds.NameOrNull,
+      ValueKinds.MetadataListOrNull
     ]));
     debugEvent("endExtensionDeclaration");
     String documentationComment = getDocumentationComment(extensionKeyword);
@@ -858,7 +864,7 @@ class OutlineBuilder extends StackListener {
   @override
   void endClassMethod(Token getOrSet, Token beginToken, Token beginParam,
       Token beginInitializers, Token endToken) {
-    assert(checkState(beginToken, [ValueKind.MethodBody]));
+    assert(checkState(beginToken, [ValueKinds.MethodBody]));
     debugEvent("Method");
     MethodBody bodyKind = pop();
     if (bodyKind == MethodBody.RedirectingFactoryBody) {
@@ -866,20 +872,20 @@ class OutlineBuilder extends StackListener {
       pop();
     }
     assert(checkState(beginToken, [
-      ValueKind.FormalsOrNull,
-      ValueKind.Integer, // formals offset
-      ValueKind.TypeVariableListOrNull,
-      ValueKind.Integer, // name offset
+      ValueKinds.FormalsOrNull,
+      ValueKinds.Integer, // formals offset
+      ValueKinds.TypeVariableListOrNull,
+      ValueKinds.Integer, // name offset
       unionOfKinds([
-        ValueKind.Name,
-        ValueKind.QualifiedName,
-        ValueKind.Operator,
-        ValueKind.ParserRecovery,
+        ValueKinds.Name,
+        ValueKinds.QualifiedName,
+        ValueKinds.Operator,
+        ValueKinds.ParserRecovery,
       ]),
-      ValueKind.TypeBuilderOrNull,
-      ValueKind.ModifiersOrNull,
-      ValueKind.Integer, // var/final/const offset
-      ValueKind.MetadataListOrNull,
+      ValueKinds.TypeBuilderOrNull,
+      ValueKinds.ModifiersOrNull,
+      ValueKinds.Integer, // var/final/const offset
+      ValueKinds.MetadataListOrNull,
     ]));
     List<FormalParameterBuilder> formals = pop();
     int formalsOffset = pop();

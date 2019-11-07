@@ -625,8 +625,8 @@ namespace dart {
   V(StoreFieldTOS_Wide,                    D, WIDE, lit, ___, ___)             \
   V(StoreIndexedTOS,                       0, ORDN, ___, ___, ___)             \
   V(Unused20,                              0, RESV, ___, ___, ___)             \
-  V(PushStatic,                            D, ORDN, lit, ___, ___)             \
-  V(PushStatic_Wide,                       D, WIDE, lit, ___, ___)             \
+  V(InitLateField,                         D, ORDN, lit, ___, ___)             \
+  V(InitLateField_Wide,                    D, WIDE, lit, ___, ___)             \
   V(StoreStaticTOS,                        D, ORDN, lit, ___, ___)             \
   V(StoreStaticTOS_Wide,                   D, WIDE, lit, ___, ___)             \
   V(Jump,                                  T, ORDN, tgt, ___, ___)             \
@@ -745,11 +745,11 @@ class KernelBytecode {
   // Magic value of bytecode files.
   static const intptr_t kMagicValue = 0x44424332;  // 'DBC2'
   // Minimum bytecode format version supported by VM.
-  static const intptr_t kMinSupportedBytecodeFormatVersion = 10;
+  static const intptr_t kMinSupportedBytecodeFormatVersion = 20;
   // Maximum bytecode format version supported by VM.
   // The range of supported versions should include version produced by bytecode
   // generator (currentBytecodeFormatVersion in pkg/vm/lib/bytecode/dbc.dart).
-  static const intptr_t kMaxSupportedBytecodeFormatVersion = 23;
+  static const intptr_t kMaxSupportedBytecodeFormatVersion = 26;
 
   enum Opcode {
 #define DECLARE_BYTECODE(name, encoding, kind, op1, op2, op3) k##name,

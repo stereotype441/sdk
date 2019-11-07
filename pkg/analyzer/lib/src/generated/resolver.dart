@@ -23,6 +23,7 @@ import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
 import 'package:analyzer/src/dart/element/member.dart' show ConstructorMember;
 import 'package:analyzer/src/dart/element/type.dart';
+import 'package:analyzer/src/dart/element/type_provider.dart';
 import 'package:analyzer/src/dart/resolver/exit_detector.dart';
 import 'package:analyzer/src/dart/resolver/extension_member_resolver.dart';
 import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
@@ -118,11 +119,8 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
             new _InvalidAccessVerifier(_errorReporter, _currentLibrary) {
     _inDeprecatedMember = _currentLibrary.hasDeprecated;
     String libraryPath = _currentLibrary.source.fullName;
-    ContextBuilder builder = new ContextBuilder(
-        resourceProvider, null /* sdkManager */, null /* contentCache */);
-    Workspace workspace =
-        ContextBuilder.createWorkspace(resourceProvider, libraryPath, builder);
-    _workspacePackage = workspace.findPackageFor(libraryPath);
+    _workspacePackage = _getPackage(libraryPath, resourceProvider);
+
     _linterContext = LinterContextImpl(
       null /* allUnits */,
       new LinterContextUnit(content, unit),
@@ -1335,6 +1333,20 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
     }
   }
 
+  WorkspacePackage _getPackage(String root, ResourceProvider resourceProvider) {
+    Workspace workspace = _currentLibrary.session?.analysisContext?.workspace;
+    // If there is no driver setup (as in test environments), we need to create
+    // a workspace ourselves.
+    // todo (pq): fix tests or otherwise de-dup this logic shared w/ library_analyzer.
+    if (workspace == null) {
+      final builder = ContextBuilder(
+          resourceProvider, null /* sdkManager */, null /* contentCache */);
+      workspace =
+          ContextBuilder.createWorkspace(resourceProvider, root, builder);
+    }
+    return workspace?.findPackageFor(root);
+  }
+
   bool _isLibraryInWorkspacePackage(LibraryElement library) {
     if (_workspacePackage == null || library == null) {
       // Better to not make a big claim that they _are_ in the same package,
@@ -1348,6 +1360,10 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
   /// `null` if the element doesn't have a deprecated annotation or if the
   /// annotation does not have a message.
   static String _deprecatedMessage(Element element) {
+    // Implicit getters/setters.
+    if (element.isSynthetic && element is PropertyAccessorElement) {
+      element = (element as PropertyAccessorElement).variable;
+    }
     ElementAnnotationImpl annotation = element.metadata.firstWhere(
       (e) => e.isDeprecated,
       orElse: () => null,
@@ -2351,9 +2367,9 @@ class InstanceFieldResolverVisitor extends ResolverVisitor {
       enclosingClass = node.declaredElement;
       typeAnalyzer.thisType = enclosingClass?.thisType;
       if (enclosingClass == null) {
-        AnalysisEngine.instance.logger.logInformation(
-            "Missing element for class declaration ${node.name.name} in ${definingLibrary.source.fullName}",
-            new CaughtException(new AnalysisException(), null));
+        AnalysisEngine.instance.instrumentationService.logInfo(
+            "Missing element for class declaration ${node.name.name} in "
+            "${definingLibrary.source.fullName}");
         // Don't try to re-resolve the initializers if we cannot set up the
         // right name scope for resolution.
       } else {
@@ -2686,8 +2702,12 @@ class ResolverVisitor extends ScopedVisitor {
   /// or `null` if not in a [SwitchStatement].
   DartType _enclosingSwitchStatementExpressionType;
 
-  InterfaceType _iterableForSetMapDisambiguationCached;
-  InterfaceType _mapForSetMapDisambiguationCached;
+  /// Stack of expressions which we have not yet finished visiting, that should
+  /// terminate a null-shorting expression.
+  ///
+  /// The stack contains a `null` sentinel as its first entry so that it is
+  /// always safe to use `.last` to examine the top of the stack.
+  final List<Expression> unfinishedNullShorts = [null];
 
   /// Initialize a newly created visitor to resolve the nodes in an AST node.
   ///
@@ -2779,31 +2799,6 @@ class ResolverVisitor extends ScopedVisitor {
     return _nonNullableEnabled
         ? NullabilitySuffix.none
         : NullabilitySuffix.star;
-  }
-
-  InterfaceType get _iterableForSetMapDisambiguation {
-    return _iterableForSetMapDisambiguationCached ??=
-        typeProvider.iterableElement.instantiate(
-      typeArguments: [
-        typeProvider.dynamicType,
-      ],
-      nullabilitySuffix: _nonNullableEnabled
-          ? NullabilitySuffix.question
-          : NullabilitySuffix.star,
-    );
-  }
-
-  InterfaceType get _mapForSetMapDisambiguation {
-    return _mapForSetMapDisambiguationCached ??=
-        typeProvider.mapElement.instantiate(
-      typeArguments: [
-        typeProvider.dynamicType,
-        typeProvider.dynamicType,
-      ],
-      nullabilitySuffix: _nonNullableEnabled
-          ? NullabilitySuffix.question
-          : NullabilitySuffix.star,
-    );
   }
 
   /**
@@ -3130,7 +3125,7 @@ class ResolverVisitor extends ScopedVisitor {
       }
 
       if (operator == TokenType.QUESTION_QUESTION) {
-        flow?.ifNullExpression_rightBegin();
+        flow?.ifNullExpression_rightBegin(node.leftOperand);
         right.accept(this);
         flow?.ifNullExpression_end();
       } else {
@@ -3528,6 +3523,9 @@ class ResolverVisitor extends ScopedVisitor {
       // variable cannot be in scope while visiting the iterator.
       //
       iterable?.accept(this);
+      // Note: the iterable could have been rewritten so grab it from
+      // forLoopParts again.
+      iterable = forLoopParts.iterable;
       loopVariable?.accept(this);
       var elementType = typeAnalyzer.computeForEachElementType(
           iterable, node.awaitKeyword != null);
@@ -3617,6 +3615,9 @@ class ResolverVisitor extends ScopedVisitor {
       // cannot be in scope while visiting the iterator.
       //
       iterable?.accept(this);
+      // Note: the iterable could have been rewritten so grab it from
+      // forLoopParts again.
+      iterable = forLoopParts.iterable;
       loopVariable?.accept(this);
       var elementType = typeAnalyzer.computeForEachElementType(
           iterable, node.awaitKeyword != null);
@@ -3823,8 +3824,9 @@ class ResolverVisitor extends ScopedVisitor {
   @override
   void visitIndexExpression(IndexExpression node) {
     node.target?.accept(this);
-    if (node.isNullAware) {
-      _flowAnalysis?.flow?.nullAwareAccess_rightBegin(node.target);
+    if (node.isNullAware && _nonNullableEnabled) {
+      _flowAnalysis.flow.nullAwareAccess_rightBegin(node.target);
+      unfinishedNullShorts.add(node.nullShortingTermination);
     }
     node.accept(elementResolver);
     var method = node.staticElement;
@@ -4020,8 +4022,9 @@ class ResolverVisitor extends ScopedVisitor {
     // to be visited in the context of the property access node.
     //
     node.target?.accept(this);
-    if (node.isNullAware) {
-      _flowAnalysis?.flow?.nullAwareAccess_rightBegin(node.target);
+    if (node.isNullAware && _nonNullableEnabled) {
+      _flowAnalysis.flow.nullAwareAccess_rightBegin(node.target);
+      unfinishedNullShorts.add(node.nullShortingTermination);
     }
     node.accept(elementResolver);
     node.accept(typeAnalyzer);
@@ -4218,24 +4221,29 @@ class ResolverVisitor extends ScopedVisitor {
       flow.tryFinallyStatement_bodyBegin();
     }
 
-    flow.tryCatchStatement_bodyBegin();
+    if (catchClauses.isNotEmpty) {
+      flow.tryCatchStatement_bodyBegin();
+    }
     body.accept(this);
-    flow.tryCatchStatement_bodyEnd(body);
+    if (catchClauses.isNotEmpty) {
+      flow.tryCatchStatement_bodyEnd(body);
 
-    var catchLength = catchClauses.length;
-    for (var i = 0; i < catchLength; ++i) {
-      var catchClause = catchClauses[i];
-      flow.tryCatchStatement_catchBegin(
-          catchClause.exceptionParameter?.staticElement,
-          catchClause.stackTraceParameter?.staticElement);
-      catchClause.accept(this);
-      flow.tryCatchStatement_catchEnd();
+      var catchLength = catchClauses.length;
+      for (var i = 0; i < catchLength; ++i) {
+        var catchClause = catchClauses[i];
+        flow.tryCatchStatement_catchBegin(
+            catchClause.exceptionParameter?.staticElement,
+            catchClause.stackTraceParameter?.staticElement);
+        catchClause.accept(this);
+        flow.tryCatchStatement_catchEnd();
+      }
+
+      flow.tryCatchStatement_end();
     }
 
-    flow.tryCatchStatement_end();
-
     if (finallyBlock != null) {
-      flow.tryFinallyStatement_finallyBegin(body);
+      flow.tryFinallyStatement_finallyBegin(
+          catchClauses.isNotEmpty ? node : body);
       finallyBlock.accept(this);
       flow.tryFinallyStatement_end(finallyBlock);
     }
@@ -4487,9 +4495,9 @@ class ResolverVisitor extends ScopedVisitor {
       // TODO(brianwilkerson) Find out what the "greatest closure" is and use that
       // where [unwrappedContextType] is used below.
       bool isIterable = typeSystem.isSubtypeOf(
-          unwrappedContextType, _iterableForSetMapDisambiguation);
+          unwrappedContextType, typeProvider.iterableForSetMapDisambiguation);
       bool isMap = typeSystem.isSubtypeOf(
-          unwrappedContextType, _mapForSetMapDisambiguation);
+          unwrappedContextType, typeProvider.mapForSetMapDisambiguation);
       if (isIterable && !isMap) {
         return _LiteralResolution(
             _LiteralResolutionKind.set, unwrappedContextType);
@@ -4812,7 +4820,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
   final Source source;
 
   /// The object used to access the types from the core library.
-  final TypeProvider typeProvider;
+  final TypeProviderImpl typeProvider;
 
   /// The error reporter that will be informed of any errors that are found
   /// during resolution.
@@ -4932,8 +4940,9 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
     Scope outerScope = nameScope;
     try {
       if (classElement == null) {
-        AnalysisEngine.instance.logger.logInformation(
-            "Missing element for class declaration ${node.name.name} in ${definingLibrary.source.fullName}",
+        AnalysisEngine.instance.instrumentationService.logInfo(
+            "Missing element for class declaration ${node.name.name} in "
+            "${definingLibrary.source.fullName}",
             new CaughtException(new AnalysisException(), null));
         super.visitClassDeclaration(node);
       } else {
@@ -4994,8 +5003,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
       }
       buffer.write(" in ");
       buffer.write(definingLibrary.source.fullName);
-      AnalysisEngine.instance.logger.logInformation(buffer.toString(),
-          new CaughtException(new AnalysisException(), null));
+      AnalysisEngine.instance.instrumentationService.logInfo(buffer.toString());
     }
     Scope outerScope = nameScope;
     try {
@@ -5059,9 +5067,9 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
     Scope outerScope = nameScope;
     try {
       if (classElement == null) {
-        AnalysisEngine.instance.logger.logInformation(
-            "Missing element for enum declaration ${node.name.name} in ${definingLibrary.source.fullName}",
-            new CaughtException(new AnalysisException(), null));
+        AnalysisEngine.instance.instrumentationService.logInfo(
+            "Missing element for enum declaration ${node.name.name} in "
+            "${definingLibrary.source.fullName}");
         super.visitEnumDeclaration(node);
       } else {
         ClassElement outerClass = enclosingClass;
@@ -5090,10 +5098,9 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
     Scope outerScope = nameScope;
     try {
       if (extensionElement == null) {
-        AnalysisEngine.instance.logger.logInformation(
+        AnalysisEngine.instance.instrumentationService.logInfo(
             "Missing element for extension declaration ${node.name.name} "
-            "in ${definingLibrary.source.fullName}",
-            new CaughtException(new AnalysisException(), null));
+            "in ${definingLibrary.source.fullName}");
         super.visitExtensionDeclaration(node);
       } else {
         ExtensionElement outerExtension = enclosingExtension;
@@ -5205,9 +5212,9 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
     Scope outerScope = nameScope;
     try {
       if (functionElement == null) {
-        AnalysisEngine.instance.logger.logInformation(
-            "Missing element for top-level function ${node.name.name} in ${definingLibrary.source.fullName}",
-            new CaughtException(new AnalysisException(), null));
+        AnalysisEngine.instance.instrumentationService.logInfo(
+            "Missing element for top-level function ${node.name.name} in "
+            "${definingLibrary.source.fullName}");
       } else {
         nameScope = new FunctionScope(nameScope, functionElement);
       }
@@ -5245,8 +5252,8 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
           }
           buffer.write("in ");
           buffer.write(definingLibrary.source.fullName);
-          AnalysisEngine.instance.logger.logInformation(buffer.toString(),
-              new CaughtException(new AnalysisException(), null));
+          AnalysisEngine.instance.instrumentationService
+              .logInfo(buffer.toString());
         } else {
           nameScope = new FunctionScope(nameScope, functionElement);
         }
@@ -5278,9 +5285,9 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
     try {
       ParameterElement parameterElement = node.declaredElement;
       if (parameterElement == null) {
-        AnalysisEngine.instance.logger.logInformation(
-            "Missing element for function typed formal parameter ${node.identifier.name} in ${definingLibrary.source.fullName}",
-            new CaughtException(new AnalysisException(), null));
+        AnalysisEngine.instance.instrumentationService.logInfo(
+            "Missing element for function typed formal parameter "
+            "${node.identifier.name} in ${definingLibrary.source.fullName}");
       } else {
         nameScope = new EnclosedScope(nameScope);
         var typeParameters = parameterElement.typeParameters;
@@ -5309,9 +5316,9 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
     Scope outerScope = nameScope;
     try {
       if (element == null) {
-        AnalysisEngine.instance.logger.logInformation(
-            "Missing element for generic function type in ${definingLibrary.source.fullName}",
-            new CaughtException(new AnalysisException(), null));
+        AnalysisEngine.instance.instrumentationService
+            .logInfo("Missing element for generic function type in "
+                "${definingLibrary.source.fullName}");
         super.visitGenericFunctionType(node);
       } else {
         nameScope = new TypeParameterScope(nameScope, element);
@@ -5328,9 +5335,9 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
     Scope outerScope = nameScope;
     try {
       if (element == null) {
-        AnalysisEngine.instance.logger.logInformation(
-            "Missing element for generic function type in ${definingLibrary.source.fullName}",
-            new CaughtException(new AnalysisException(), null));
+        AnalysisEngine.instance.instrumentationService
+            .logInfo("Missing element for generic function type in "
+                "${definingLibrary.source.fullName}");
         super.visitGenericTypeAlias(node);
       } else {
         nameScope = new TypeParameterScope(nameScope, element);
@@ -5373,9 +5380,9 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
     try {
       ExecutableElement methodElement = node.declaredElement;
       if (methodElement == null) {
-        AnalysisEngine.instance.logger.logInformation(
-            "Missing element for method ${node.name.name} in ${definingLibrary.source.fullName}",
-            new CaughtException(new AnalysisException(), null));
+        AnalysisEngine.instance.instrumentationService
+            .logInfo("Missing element for method ${node.name.name} in "
+                "${definingLibrary.source.fullName}");
       } else {
         nameScope = new FunctionScope(nameScope, methodElement);
       }
@@ -6271,6 +6278,9 @@ class TypeNameResolver {
 /// The interface `TypeProvider` defines the behavior of objects that provide
 /// access to types defined by the language.
 abstract class TypeProvider {
+  /// Return the element representing the built-in class 'bool'.
+  ClassElement get boolElement;
+
   /// Return the type representing the built-in type 'bool'.
   InterfaceType get boolType;
 
@@ -6279,6 +6289,9 @@ abstract class TypeProvider {
 
   /// Return the type representing the built-in type 'Deprecated'.
   InterfaceType get deprecatedType;
+
+  /// Return the element representing the built-in class 'double'.
+  ClassElement get doubleElement;
 
   /// Return the type representing the built-in type 'double'.
   InterfaceType get doubleType;
@@ -6311,6 +6324,9 @@ abstract class TypeProvider {
   /// Return the type representing the built-in type 'Future'.
   @Deprecated('Use futureType2() instead.')
   InterfaceType get futureType;
+
+  /// Return the element representing the built-in class 'int'.
+  ClassElement get intElement;
 
   /// Return the type representing the built-in type 'int'.
   InterfaceType get intType;
@@ -6350,13 +6366,24 @@ abstract class TypeProvider {
 
   /// Return a list containing all of the types that cannot be either extended
   /// or implemented.
+  Set<ClassElement> get nonSubtypableClasses;
+
+  /// Return a list containing all of the types that cannot be either extended
+  /// or implemented.
+  @Deprecated('Use nonSubtypableClasses instead.')
   List<InterfaceType> get nonSubtypableTypes;
+
+  /// Return the element representing the built-in class 'null'.
+  ClassElement get nullElement;
 
   /// Return a [DartObjectImpl] representing the `null` object.
   DartObjectImpl get nullObject;
 
   /// Return the type representing the built-in type 'Null'.
   InterfaceType get nullType;
+
+  /// Return the element representing the built-in class 'num'.
+  ClassElement get numElement;
 
   /// Return the type representing the built-in type 'num'.
   InterfaceType get numType;
@@ -6383,6 +6410,9 @@ abstract class TypeProvider {
   /// Return the type representing the built-in type 'Stream'.
   @Deprecated('Use streamType2() instead.')
   InterfaceType get streamType;
+
+  /// Return the element representing the built-in class 'String'.
+  ClassElement get stringElement;
 
   /// Return the type representing the built-in type 'String'.
   InterfaceType get stringType;
@@ -6861,7 +6891,16 @@ class _InvalidAccessVerifier {
       return;
     }
 
-    Element element = identifier.staticElement;
+    // This is the same logic used in [checkForDeprecatedMemberUseAtIdentifier]
+    // to avoid reporting an error twice for named constructors.
+    AstNode parent = identifier.parent;
+    if (parent is ConstructorName && identical(identifier, parent.name)) {
+      return;
+    }
+    AstNode grandparent = parent?.parent;
+    Element element = grandparent is ConstructorName
+        ? grandparent.staticElement
+        : identifier.staticElement;
     if (element == null || _inCurrentLibrary(element)) {
       return;
     }

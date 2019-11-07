@@ -22,7 +22,13 @@ import 'dart:_interceptors' show JSArray, JSUnmodifiableArray;
 import 'dart:_js_names' show unmangleGlobalNameIfPreservedAnyways;
 
 import 'dart:_js_embedded_names'
-    show JsBuiltin, JsGetName, RtiUniverseFieldNames, RTI_UNIVERSE, TYPES;
+    show
+        JsBuiltin,
+        JsGetName,
+        RtiUniverseFieldNames,
+        CONSTRUCTOR_RTI_CACHE_PROPERTY_NAME,
+        RTI_UNIVERSE,
+        TYPES;
 
 import 'dart:_recipe_syntax';
 
@@ -129,17 +135,18 @@ class Rti {
   static const kindDynamic = 2;
   static const kindVoid = 3; // TODO(sra): Use `dynamic` instead?
   static const kindAny = 4; // Dart1-style 'dynamic' for JS-interop.
+  static const kindErased = 5;
   // Unary terms.
-  static const kindStar = 5;
-  static const kindQuestion = 6;
-  static const kindFutureOr = 7;
+  static const kindStar = 6;
+  static const kindQuestion = 7;
+  static const kindFutureOr = 8;
   // More complex terms.
-  static const kindInterface = 8;
+  static const kindInterface = 9;
   // A vector of type parameters from enclosing functions and closures.
-  static const kindBinding = 9;
-  static const kindFunction = 10;
-  static const kindGenericFunction = 11;
-  static const kindGenericFunctionParameter = 12;
+  static const kindBinding = 10;
+  static const kindFunction = 11;
+  static const kindGenericFunction = 12;
+  static const kindGenericFunctionParameter = 13;
 
   static bool _isUnionOfFunctionType(Rti rti) {
     int kind = Rti._getKind(rti);
@@ -402,6 +409,7 @@ Rti instantiatedGenericFunctionType(
 Rti _instantiate(universe, Rti rti, Object typeArguments, int depth) {
   int kind = Rti._getKind(rti);
   switch (kind) {
+    case Rti.kindErased:
     case Rti.kindNever:
     case Rti.kindDynamic:
     case Rti.kindVoid:
@@ -544,7 +552,8 @@ _FunctionParameters _instantiateFunctionParameters(universe,
 bool _isClosure(object) => _Utils.instanceOf(object,
     JS_BUILTIN('depends:none;effects:none;', JsBuiltin.dartClosureConstructor));
 
-/// Returns the structural function [Rti] of [closure].
+/// Returns the structural function [Rti] of [closure], or `null`.
+/// [closure] must be a subclass of [Closure].
 /// Called from generated code.
 Rti closureFunctionType(closure) {
   var signatureName = JS_GET_NAME(JsGetName.SIGNATURE_NAME);
@@ -556,19 +565,6 @@ Rti closureFunctionType(closure) {
     return _castToRti(JS('', '#[#]()', closure, signatureName));
   }
   return null;
-}
-
-// Subclasses of Closure are synthetic classes. The synthetic classes all
-// extend a 'normal' class (Closure, BoundClosure, StaticClosure), so make
-// them appear to be the superclass.
-// TODO(sra): Can this be done less expensively, e.g. by putting $ti on the
-// prototype of Closure/BoundClosure/StaticClosure classes?
-Rti _closureInterfaceType(closure) {
-  var rti = JS('', r'#[#]', closure, JS_GET_NAME(JsGetName.RTI_NAME));
-  return rti != null
-      ? _castToRti(rti)
-      : _instanceTypeFromConstructor(
-          JS('', '#.__proto__.__proto__.constructor', closure));
 }
 
 /// Returns the Rti type of [object]. Closures have both an interface type
@@ -590,18 +586,16 @@ Rti instanceOrFunctionType(object, Rti testRti) {
 }
 
 /// Returns the Rti type of [object].
+/// This is the general entry for obtaining the interface type of any value.
 /// Called from generated code.
 Rti instanceType(object) {
-  if (_isClosure(object)) return _closureInterfaceType(object);
-  return _nonClosureInstanceType(object);
-}
-
-Rti _nonClosureInstanceType(object) {
-  // TODO(sra): Add specializations of this method. One possible way is to
-  // arrange that the interceptor has a _getType method that is injected into
-  // DartObject, Interceptor and JSArray. Then this method can be replaced-by
-  // `getInterceptor(o)._getType(o)`, allowing interceptor optimizations to
-  // select the specialization.
+  // TODO(sra): Add interceptor-based specializations of this method. Inject a
+  // _getRti method into (Dart)Object, JSArray, and Interceptor. Then calls to
+  // this method can be generated as `getInterceptor(o)._getRti(o)`, allowing
+  // interceptor optimizations to select the specialization. If the only use of
+  // `getInterceptor` is for calling `_getRti`, then `instanceType` can be
+  // called, similar to a one-shot interceptor call. This would improve type
+  // lookup in ListMixin code as the interceptor is JavaScript 'this'.
 
   if (_Utils.instanceOf(
       object,
@@ -615,7 +609,7 @@ Rti _nonClosureInstanceType(object) {
   }
 
   var interceptor = getInterceptor(object);
-  return _instanceTypeFromConstructor(JS('', '#.constructor', interceptor));
+  return _instanceTypeFromConstructor(interceptor);
 }
 
 /// Returns the Rti type of JavaScript Array [object].
@@ -634,9 +628,7 @@ Rti _arrayInstanceType(object) {
 /// Called from generated code.
 Rti _instanceType(object) {
   var rti = JS('', r'#[#]', object, JS_GET_NAME(JsGetName.RTI_NAME));
-  return rti != null
-      ? _castToRti(rti)
-      : _instanceTypeFromConstructor(JS('', '#.constructor', object));
+  return rti != null ? _castToRti(rti) : _instanceTypeFromConstructor(object);
 }
 
 String instanceTypeName(object) {
@@ -644,9 +636,32 @@ String instanceTypeName(object) {
   return _rtiToString(rti, null);
 }
 
-Rti _instanceTypeFromConstructor(constructor) {
-  // TODO(sra): Cache Rti on constructor.
-  return findType(JS('String', '#.name', constructor));
+Rti _instanceTypeFromConstructor(instance) {
+  var constructor = JS('', '#.constructor', instance);
+  var probe = JS('', r'#[#]', constructor, CONSTRUCTOR_RTI_CACHE_PROPERTY_NAME);
+  if (probe != null) return _castToRti(probe);
+  return _instanceTypeFromConstructorMiss(instance, constructor);
+}
+
+@pragma('dart2js:noInline')
+Rti _instanceTypeFromConstructorMiss(instance, constructor) {
+  // Subclasses of Closure are synthetic classes. The synthetic classes all
+  // extend a 'normal' class (Closure, BoundClosure, StaticClosure), so make
+  // them appear to be the superclass. Instantiations have a `$ti` field so
+  // don't reach here.
+  //
+  // TODO(39214): This will need fixing if we ever use instances of
+  // StaticClosure for static tear-offs.
+  //
+  // TODO(sra): Can this test be avoided, e.g. by putting $ti on the
+  // prototype of Closure/BoundClosure/StaticClosure classes?
+  var effectiveConstructor = _isClosure(instance)
+      ? JS('', '#.__proto__.__proto__.constructor', instance)
+      : constructor;
+  Rti rti = _Universe.findErasedType(
+      _theUniverse(), JS('String', '#.name', effectiveConstructor));
+  JS('', r'#[#] = #', constructor, CONSTRUCTOR_RTI_CACHE_PROPERTY_NAME, rti);
+  return rti;
 }
 
 /// Returns the structural function type of [object], or `null` if the object is
@@ -669,7 +684,7 @@ Rti getTypeFromTypesTable(/*int*/ _index) {
 }
 
 Type getRuntimeType(object) {
-  Rti rti = _instanceFunctionType(object) ?? _nonClosureInstanceType(object);
+  Rti rti = _instanceFunctionType(object) ?? instanceType(object);
   return createRuntimeType(rti);
 }
 
@@ -1066,6 +1081,7 @@ String _functionRtiToString(Rti functionType, List<String> genericContext,
 String _rtiToString(Rti rti, List<String> genericContext) {
   int kind = Rti._getKind(rti);
 
+  if (kind == Rti.kindErased) return 'erased';
   if (kind == Rti.kindDynamic) return 'dynamic';
   if (kind == Rti.kindVoid) return 'void';
   if (kind == Rti.kindNever) return 'Never';
@@ -1179,6 +1195,7 @@ String functionParametersToString(_FunctionParameters parameters) {
 String _rtiToDebugString(Rti rti) {
   int kind = Rti._getKind(rti);
 
+  if (kind == Rti.kindErased) return 'erased';
   if (kind == Rti.kindDynamic) return 'dynamic';
   if (kind == Rti.kindVoid) return 'void';
   if (kind == Rti.kindNever) return 'Never';
@@ -1255,10 +1272,12 @@ class _Universe {
         '{'
             '#: new Map(),'
             '#: {},'
+            '#: {},'
             '#: [],' // shared empty array.
             '}',
         RtiUniverseFieldNames.evalCache,
         RtiUniverseFieldNames.typeRules,
+        RtiUniverseFieldNames.erasedTypes,
         RtiUniverseFieldNames.sharedEmptyArray);
   }
 
@@ -1269,6 +1288,9 @@ class _Universe {
 
   static Object typeRules(universe) =>
       JS('', '#.#', universe, RtiUniverseFieldNames.typeRules);
+
+  static Object erasedTypes(universe) =>
+      JS('', '#.#', universe, RtiUniverseFieldNames.erasedTypes);
 
   static Object _findRule(universe, String targetType) =>
       JS('', '#.#', typeRules(universe), targetType);
@@ -1281,16 +1303,31 @@ class _Universe {
     return rule;
   }
 
-  static void addRules(universe, rules) {
-    // TODO(fishythefish): Use `Object.assign()` when IE11 is deprecated.
-    var keys = JS('JSArray', 'Object.keys(#)', rules);
-    int length = _Utils.arrayLength(keys);
-    Object ruleset = typeRules(universe);
-    for (int i = 0; i < length; i++) {
-      String targetType = _Utils.asString(_Utils.arrayAt(keys, i));
-      JS('', '#[#] = #[#]', ruleset, targetType, rules, targetType);
+  static Rti findErasedType(universe, String cls) {
+    Object metadata = erasedTypes(universe);
+    var probe = JS('', '#.#', metadata, cls);
+    if (probe == null) {
+      return eval(universe, cls);
+    } else if (_Utils.isNum(probe)) {
+      int length = _Utils.asInt(probe);
+      Rti erased = _lookupErasedRti(universe);
+      Object arguments = JS('', '[]');
+      for (int i = 0; i < length; i++) {
+        _Utils.arrayPush(arguments, erased);
+      }
+      Rti interface = _lookupInterfaceRti(universe, cls, arguments);
+      JS('', '#.# = #', metadata, cls, interface);
+      return interface;
+    } else {
+      return _castToRti(probe);
     }
   }
+
+  static void addRules(universe, rules) =>
+      _Utils.objectAssign(typeRules(universe), rules);
+
+  static void addErasedTypes(universe, types) =>
+      _Utils.objectAssign(erasedTypes(universe), types);
 
   static Object sharedEmptyArray(universe) =>
       JS('JSArray', '#.#', universe, RtiUniverseFieldNames.sharedEmptyArray);
@@ -1394,6 +1431,7 @@ class _Universe {
   //   for the proposed type.
   // * `createXXX` to create the type if it does not exist.
 
+  static String _canonicalRecipeOfErased() => Recipe.pushErasedString;
   static String _canonicalRecipeOfDynamic() => Recipe.pushDynamicString;
   static String _canonicalRecipeOfVoid() => Recipe.pushVoidString;
   static String _canonicalRecipeOfNever() =>
@@ -1410,6 +1448,11 @@ class _Universe {
 
   static String _canonicalRecipeOfGenericFunctionParameter(int index) =>
       '$index' + Recipe.genericFunctionTypeParameterIndexString;
+
+  static Rti _lookupErasedRti(universe) {
+    return _lookupTerminalRti(
+        universe, Rti.kindErased, _canonicalRecipeOfErased());
+  }
 
   static Rti _lookupDynamicRti(universe) {
     return _lookupTerminalRti(
@@ -1698,6 +1741,8 @@ class _Universe {
 ///
 ///   Used to separate elements.
 ///
+/// '#': --- erasedType
+///
 /// '@': --- dynamicType
 ///
 /// '~': --- voidType
@@ -1856,6 +1901,10 @@ class _Parser {
           case Recipe.genericFunctionTypeParameterIndex:
             push(stack,
                 toGenericFunctionParameter(universe(parser), pop(stack)));
+            break;
+
+          case Recipe.pushErased:
+            push(stack, _Universe._lookupErasedRti(universe(parser)));
             break;
 
           case Recipe.pushDynamic:
@@ -2170,6 +2219,8 @@ bool _isSubtype(universe, Rti s, sEnv, Rti t, tEnv) {
   // Subtyping is reflexive.
   if (_Utils.isIdentical(s, t)) return true;
 
+  // Erased types are treated like `dynamic` and handled by the top type case.
+
   if (isTopType(t)) return true;
 
   if (isJsInteropType(s)) return true;
@@ -2445,8 +2496,13 @@ bool functionParametersEqual(
         _FunctionParameters._getOptionalNamed(tParameters));
 
 bool isTopType(Rti t) =>
-    isDynamicType(t) || isVoidType(t) || isObjectType(t) || isJsInteropType(t);
+    isErasedType(t) ||
+    isDynamicType(t) ||
+    isVoidType(t) ||
+    isObjectType(t) ||
+    isJsInteropType(t);
 
+bool isErasedType(Rti t) => Rti._getKind(t) == Rti.kindErased;
 bool isDynamicType(Rti t) => Rti._getKind(t) == Rti.kindDynamic;
 bool isVoidType(Rti t) => Rti._getKind(t) == Rti.kindVoid;
 bool isJsInteropType(Rti t) => Rti._getKind(t) == Rti.kindAny;
@@ -2496,6 +2552,19 @@ class _Utils {
       JS('bool', '# instanceof #', o, constructor);
 
   static bool isIdentical(s, t) => JS('bool', '# === #', s, t);
+
+  static JSArray objectKeys(Object o) =>
+      JS('returns:JSArray;new:true;', 'Object.keys(#)', o);
+
+  static void objectAssign(Object o, Object other) {
+    // TODO(fishythefish): Use `Object.assign()` when IE11 is deprecated.
+    var keys = objectKeys(other);
+    int length = arrayLength(keys);
+    for (int i = 0; i < length; i++) {
+      String key = asString(arrayAt(keys, i));
+      JS('', '#[#] = #[#]', o, key, other, key);
+    }
+  }
 
   static bool isArray(Object o) => JS('bool', 'Array.isArray(#)', o);
 

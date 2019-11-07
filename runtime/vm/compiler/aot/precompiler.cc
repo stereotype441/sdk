@@ -919,7 +919,7 @@ void Precompiler::AddField(const Field& field) {
       AddConstObject(Instance::Cast(value));
     }
 
-    if (field.has_initializer()) {
+    if (field.has_nontrivial_initializer()) {
       // Should not be in the middle of initialization while precompiling.
       ASSERT(value.raw() != Object::transition_sentinel().raw());
 
@@ -1573,8 +1573,9 @@ void Precompiler::AttachOptimizedTypeTestingStub() {
     const AbstractType& type = types.At(i);
 
     if (type.InVMIsolateHeap()) {
-      // The only important types in the vm isolate are "dynamic"/"void", which
-      // will get their optimized top-type testing stub installed at creation.
+      // The only important types in the vm isolate are
+      // "dynamic"/"void"/"Never", which will get their optimized
+      // testing stub installed at creation.
       continue;
     }
 

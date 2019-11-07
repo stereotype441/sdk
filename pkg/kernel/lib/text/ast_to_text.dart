@@ -466,6 +466,10 @@ class Printer extends Visitor<Null> {
         Library nodeLibrary = node.enclosingLibrary;
         String prefix = syntheticNames.nameLibraryPrefix(nodeLibrary);
         write(prefix + '::' + node.name);
+      } else if (node is Extension) {
+        Library nodeLibrary = node.enclosingLibrary;
+        String prefix = syntheticNames.nameLibraryPrefix(nodeLibrary);
+        write(prefix + '::' + node.name);
       } else if (node is Field) {
         Library nodeLibrary = node.enclosingLibrary;
         String prefix = syntheticNames.nameLibraryPrefix(nodeLibrary);
@@ -505,6 +509,7 @@ class Printer extends Visitor<Null> {
     }
     writeComponentProblems(component);
     for (var library in component.libraries) {
+      // ignore: DEPRECATED_MEMBER_USE_FROM_SAME_PACKAGE
       if (library.isExternal) {
         if (!showExternal) {
           continue;

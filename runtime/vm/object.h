@@ -433,6 +433,7 @@ class Object {
   V(Array, vm_isolate_snapshot_object_table)                                   \
   V(Type, dynamic_type)                                                        \
   V(Type, void_type)                                                           \
+  V(Type, never_type)                                                          \
   V(AbstractType, null_abstract_type)
 
 #define DEFINE_SHARED_READONLY_HANDLE_GETTER(Type, name)                       \
@@ -448,6 +449,7 @@ class Object {
   static RawClass* class_class() { return class_class_; }
   static RawClass* dynamic_class() { return dynamic_class_; }
   static RawClass* void_class() { return void_class_; }
+  static RawClass* never_class() { return never_class_; }
   static RawClass* type_arguments_class() { return type_arguments_class_; }
   static RawClass* patch_class_class() { return patch_class_class_; }
   static RawClass* function_class() { return function_class_; }
@@ -719,6 +721,7 @@ class Object {
   static RawClass* class_class_;             // Class of the Class vm object.
   static RawClass* dynamic_class_;           // Class of the 'dynamic' type.
   static RawClass* void_class_;              // Class of the 'void' type.
+  static RawClass* never_class_;             // Class of the 'Never' type.
   static RawClass* type_arguments_class_;  // Class of TypeArguments vm object.
   static RawClass* patch_class_class_;     // Class of the PatchClass vm object.
   static RawClass* function_class_;        // Class of the Function vm object.
@@ -1038,6 +1041,9 @@ class Class : public Object {
 
   // Check if this class represents the 'void' class.
   bool IsVoidClass() const { return id() == kVoidCid; }
+
+  // Check if this class represents the 'Never' class.
+  bool IsNeverClass() const { return id() == kNeverCid; }
 
   // Check if this class represents the 'Object' class.
   bool IsObjectClass() const { return id() == kInstanceCid; }
@@ -2124,6 +2130,21 @@ class ICData : public Object {
   friend class SnapshotWriter;
 };
 
+// Keep in sync with package:kernel/lib/ast.dart
+enum Nullability {
+  kUndetermined = 0,
+  kNullable = 1,
+  kNonNullable = 2,
+  kLegacy = 3,
+};
+
+// Nullability aware subtype checking modes.
+enum NNBDMode {
+  kUnaware,
+  kWeak,
+  kStrong,
+};
+
 // Often used constants for number of free function type parameters.
 enum {
   kNoneFree = 0,
@@ -2163,7 +2184,8 @@ class Function : public Object {
   // owner class of this function, then its signature type is a parameterized
   // function type with uninstantiated type arguments 'T' and 'R' as elements of
   // its type argument vector.
-  RawType* SignatureType() const;
+  // A function type is non-nullable by default.
+  RawType* SignatureType(Nullability nullability = kNonNullable) const;
   RawType* ExistingSignatureType() const;
 
   // Update the signature type (with a canonical version).
@@ -3402,6 +3424,9 @@ class Field : public Object {
   bool is_extension_member() const {
     return IsExtensionMemberBit::decode(raw_ptr()->kind_bits_);
   }
+  bool needs_load_guard() const {
+    return NeedsLoadGuardBit::decode(raw_ptr()->kind_bits_);
+  }
   bool is_reflectable() const {
     return ReflectableBit::decode(raw_ptr()->kind_bits_);
   }
@@ -3591,6 +3616,17 @@ class Field : public Object {
 
   RawString* InitializingExpression() const;
 
+  bool has_nontrivial_initializer() const {
+    return HasNontrivialInitializerBit::decode(raw_ptr()->kind_bits_);
+  }
+  // Called by parser after allocating field.
+  void set_has_nontrivial_initializer(bool has_nontrivial_initializer) const {
+    ASSERT(IsOriginal());
+    ASSERT(Thread::Current()->IsMutatorThread());
+    set_kind_bits(HasNontrivialInitializerBit::update(
+        has_nontrivial_initializer, raw_ptr()->kind_bits_));
+  }
+
   bool has_initializer() const {
     return HasInitializerBit::decode(raw_ptr()->kind_bits_);
   }
@@ -3600,6 +3636,10 @@ class Field : public Object {
     ASSERT(Thread::Current()->IsMutatorThread());
     set_kind_bits(
         HasInitializerBit::update(has_initializer, raw_ptr()->kind_bits_));
+  }
+
+  bool has_trivial_initializer() const {
+    return has_initializer() && !has_nontrivial_initializer();
   }
 
   StaticTypeExactnessState static_type_exactness_state() const {
@@ -3688,6 +3728,9 @@ class Field : public Object {
   void set_is_extension_member(bool value) const {
     set_kind_bits(IsExtensionMemberBit::update(value, raw_ptr()->kind_bits_));
   }
+  void set_needs_load_guard(bool value) const {
+    set_kind_bits(NeedsLoadGuardBit::update(value, raw_ptr()->kind_bits_));
+  }
   // Returns false if any value read from this field is guaranteed to be
   // not null.
   // Internally we is_nullable_ field contains either kNullCid (nullable) or
@@ -3739,7 +3782,9 @@ class Field : public Object {
   bool IsUninitialized() const;
 
   // Run initializer and set field value.
-  DART_WARN_UNUSED_RESULT RawError* Initialize() const;
+  DART_WARN_UNUSED_RESULT RawError* InitializeInstance(
+      const Instance& instance) const;
+  DART_WARN_UNUSED_RESULT RawError* InitializeStatic() const;
 
   // Run initializer only.
   DART_WARN_UNUSED_RESULT RawObject* EvaluateInitializer() const;
@@ -3790,7 +3835,7 @@ class Field : public Object {
     kConstBit = 0,
     kStaticBit,
     kFinalBit,
-    kHasInitializerBit,
+    kHasNontrivialInitializerBit,
     kUnboxingCandidateBit,
     kReflectableBit,
     kDoubleInitializedBit,
@@ -3800,12 +3845,14 @@ class Field : public Object {
     kGenericCovariantImplBit,
     kIsLateBit,
     kIsExtensionMemberBit,
+    kNeedsLoadGuardBit,
+    kHasInitializerBit,
   };
   class ConstBit : public BitField<uint16_t, bool, kConstBit, 1> {};
   class StaticBit : public BitField<uint16_t, bool, kStaticBit, 1> {};
   class FinalBit : public BitField<uint16_t, bool, kFinalBit, 1> {};
-  class HasInitializerBit
-      : public BitField<uint16_t, bool, kHasInitializerBit, 1> {};
+  class HasNontrivialInitializerBit
+      : public BitField<uint16_t, bool, kHasNontrivialInitializerBit, 1> {};
   class UnboxingCandidateBit
       : public BitField<uint16_t, bool, kUnboxingCandidateBit, 1> {};
   class ReflectableBit : public BitField<uint16_t, bool, kReflectableBit, 1> {};
@@ -3823,6 +3870,10 @@ class Field : public Object {
   class IsLateBit : public BitField<uint16_t, bool, kIsLateBit, 1> {};
   class IsExtensionMemberBit
       : public BitField<uint16_t, bool, kIsExtensionMemberBit, 1> {};
+  class NeedsLoadGuardBit
+      : public BitField<uint16_t, bool, kNeedsLoadGuardBit, 1> {};
+  class HasInitializerBit
+      : public BitField<uint16_t, bool, kHasInitializerBit, 1> {};
 
   // Update guarded cid and guarded length for this field. Returns true, if
   // deoptimization of dependent code is required.
@@ -3882,11 +3933,6 @@ class Script : public Object {
   void LookupSourceAndLineStarts(Zone* zone) const;
   RawGrowableObjectArray* GenerateLineNumberArray() const;
 
-  RawScript::Kind kind() const {
-    return RawScript::KindBits::decode(raw_ptr()->kind_and_tags_);
-  }
-
-  const char* GetKindAsCString() const;
   intptr_t line_offset() const { return raw_ptr()->line_offset_; }
   intptr_t col_offset() const { return raw_ptr()->col_offset_; }
 
@@ -3951,14 +3997,11 @@ class Script : public Object {
     return RoundedAllocationSize(sizeof(RawScript));
   }
 
-  static RawScript* New(const String& url,
-                        const String& source,
-                        RawScript::Kind kind);
+  static RawScript* New(const String& url, const String& source);
 
   static RawScript* New(const String& url,
                         const String& resolved_url,
-                        const String& source,
-                        RawScript::Kind kind);
+                        const String& source);
 
 #if !defined(DART_PRECOMPILED_RUNTIME)
   void LoadSourceFromKernel(const uint8_t* kernel_buffer,
@@ -3971,8 +4014,7 @@ class Script : public Object {
  private:
   void set_resolved_url(const String& value) const;
   void set_source(const String& value) const;
-  void set_kind(RawScript::Kind value) const;
-  void set_kind_and_tags(uint8_t value) const;
+  void set_flags(uint8_t value) const;
   void set_load_timestamp(int64_t value) const;
   RawArray* debug_positions() const;
 
@@ -6771,6 +6813,13 @@ class AbstractType : public Instance {
   virtual void SetIsFinalized() const;
   virtual bool IsBeingFinalized() const;
   virtual void SetIsBeingFinalized() const;
+
+  virtual Nullability nullability() const;
+  virtual bool IsUndetermined() const { return nullability() == kUndetermined; }
+  virtual bool IsNullable() const { return nullability() == kNullable; }
+  virtual bool IsNonNullable() const { return nullability() == kNonNullable; }
+  virtual bool IsLegacy() const { return nullability() == kLegacy; }
+
   virtual bool HasTypeClass() const { return type_class_id() != kIllegalCid; }
   virtual classid_t type_class_id() const;
   virtual RawClass* type_class() const;
@@ -6883,12 +6932,15 @@ class AbstractType : public Instance {
   // Check if this type represents the 'Null' type.
   bool IsNullType() const;
 
+  // Check if this type represents the 'Never' type.
+  bool IsNeverType() const;
+
   // Check if this type represents the 'Object' type.
   bool IsObjectType() const;
 
-  // Check if this type represents a top type, i.e. 'dynamic', 'Object', or
-  // 'void' type.
-  bool IsTopType() const;
+  // Check if this type represents a top type.
+  // TODO(regis): Remove default kUnaware mode as implementation progresses.
+  bool IsTopType(NNBDMode mode = kUnaware) const;
 
   // Check if this type represents the 'bool' type.
   bool IsBoolType() const;
@@ -6996,6 +7048,15 @@ class Type : public AbstractType {
     ASSERT(type_class_id() != kIllegalCid);
     return true;
   }
+  virtual Nullability nullability() const {
+    return static_cast<Nullability>(raw_ptr()->nullability_);
+  }
+  void set_nullability(Nullability value) const {
+    ASSERT(!IsCanonical());
+    ASSERT(value != kUndetermined);
+    StoreNonPointer(&raw_ptr()->nullability_, value);
+  }
+  RawType* ToNullability(Nullability value, Heap::Space space) const;
   virtual classid_t type_class_id() const;
   virtual RawClass* type_class() const;
   void set_type_class(const Class& value) const;
@@ -7045,6 +7106,9 @@ class Type : public AbstractType {
 
   // The 'void' type.
   static RawType* VoidType();
+
+  // The 'Never' type.
+  static RawType* NeverType();
 
   // The 'Object' type.
   static RawType* ObjectType();
@@ -7127,6 +7191,11 @@ class TypeRef : public AbstractType {
     const AbstractType& ref_type = AbstractType::Handle(type());
     return ref_type.IsNull() || ref_type.IsBeingFinalized();
   }
+  virtual Nullability nullability() const {
+    const AbstractType& ref_type = AbstractType::Handle(type());
+    ASSERT(!ref_type.IsNull());
+    return ref_type.nullability();
+  }
   virtual bool HasTypeClass() const {
     return (type() != AbstractType::null()) &&
            AbstractType::Handle(type()).HasTypeClass();
@@ -7203,6 +7272,11 @@ class TypeParameter : public AbstractType {
     return RawTypeParameter::GenericCovariantImplBit::decode(raw_ptr()->flags_);
   }
   void SetGenericCovariantImpl(bool value) const;
+  virtual Nullability nullability() const {
+    return static_cast<Nullability>(raw_ptr()->nullability_);
+  }
+  void set_nullability(Nullability value) const;
+  RawTypeParameter* ToNullability(Nullability value, Heap::Space space) const;
   virtual bool HasTypeClass() const { return false; }
   virtual classid_t type_class_id() const { return kIllegalCid; }
   classid_t parameterized_class_id() const;

@@ -35,6 +35,9 @@ abstract class DartType {
   /// is the function type `(String) -> int`.
   DartType get unaliased => this;
 
+  /// Is `true` if this type is a top type.
+  bool get isTop => false;
+
   /// Is `true` if this type has no non-dynamic type arguments.
   bool get treatAsRaw => true;
 
@@ -43,6 +46,9 @@ abstract class DartType {
 
   /// Is `true` if this type is the dynamic type.
   bool get isDynamic => false;
+
+  /// Is `true` if this type is an erased type.
+  bool get isErased => false;
 
   /// Is `true` if this type is the any type.
   bool get isAny => false;
@@ -178,6 +184,9 @@ class InterfaceType extends DartType {
       : assert(typeArguments.every((e) => e != null));
 
   @override
+  bool get isTop => isObject;
+
+  @override
   bool get isInterfaceType => true;
 
   @override
@@ -244,6 +253,9 @@ class TypedefType extends DartType {
   final FunctionType unaliased;
 
   TypedefType(this.element, this.typeArguments, this.unaliased);
+
+  @override
+  bool get isTop => unaliased.isTop;
 
   @override
   bool get isTypedef => true;
@@ -393,7 +405,12 @@ class FunctionTypeVariable extends DartType {
 }
 
 class VoidType extends DartType {
-  const VoidType();
+  const VoidType._();
+
+  factory VoidType() => const VoidType._();
+
+  @override
+  bool get isTop => true;
 
   @override
   bool get isVoid => true;
@@ -412,7 +429,12 @@ class VoidType extends DartType {
 }
 
 class DynamicType extends DartType {
-  const DynamicType();
+  const DynamicType._();
+
+  factory DynamicType() => const DynamicType._();
+
+  @override
+  bool get isTop => true;
 
   @override
   bool get isDynamic => true;
@@ -433,6 +455,32 @@ class DynamicType extends DartType {
   }
 }
 
+class ErasedType extends DartType {
+  const ErasedType._();
+
+  factory ErasedType() => const ErasedType._();
+
+  @override
+  bool get isTop => true;
+
+  @override
+  bool get treatAsDynamic => true;
+
+  @override
+  bool get isErased => true;
+
+  @override
+  R accept<R, A>(DartTypeVisitor<R, A> visitor, A argument) =>
+      visitor.visitErasedType(this, argument);
+
+  @override
+  int get hashCode => 119;
+
+  @override
+  bool _equals(DartType other, _Assumptions assumptions) =>
+      identical(this, other);
+}
+
 /// Represents a type which is simultaneously top and bottom.
 ///
 /// This is not a standard Dart type, but an extension of the standard Dart type
@@ -445,7 +493,12 @@ class DynamicType extends DartType {
 /// * Representing types appearing as generic method bounds which contain type
 /// variables. (See issue 33422.)
 class AnyType extends DartType {
-  const AnyType();
+  const AnyType._();
+
+  factory AnyType() => const AnyType._();
+
+  @override
+  bool get isTop => true;
 
   @override
   bool get isAny => true;
@@ -592,6 +645,9 @@ class FutureOrType extends DartType {
   FutureOrType(this.typeArgument);
 
   @override
+  bool get isTop => typeArgument.isTop;
+
+  @override
   bool get isFutureOr => true;
 
   @override
@@ -659,6 +715,8 @@ abstract class DartTypeVisitor<R, A> {
 
   R visitDynamicType(covariant DynamicType type, A argument) => null;
 
+  R visitErasedType(covariant ErasedType type, A argument) => null;
+
   R visitAnyType(covariant AnyType type, A argument) => null;
 
   R visitFutureOrType(covariant FutureOrType type, A argument) => null;
@@ -692,6 +750,10 @@ abstract class BaseDartTypeVisitor<R, A> extends DartTypeVisitor<R, A> {
 
   @override
   R visitDynamicType(covariant DynamicType type, A argument) =>
+      visitType(type, argument);
+
+  @override
+  R visitErasedType(covariant ErasedType type, A argument) =>
       visitType(type, argument);
 
   @override
@@ -888,6 +950,9 @@ abstract class DartTypeSubstitutionVisitor<A>
   DartType visitDynamicType(covariant DynamicType type, A argument) => type;
 
   @override
+  DartType visitErasedType(covariant ErasedType type, A argument) => type;
+
+  @override
   DartType visitAnyType(covariant AnyType type, A argument) => type;
 
   @override
@@ -959,6 +1024,7 @@ abstract class DartTypeStructuralPredicateVisitor
   bool handleInterfaceType(InterfaceType type) => false;
   bool handleTypedefType(TypedefType type) => false;
   bool handleDynamicType(DynamicType type) => false;
+  bool handleErasedType(ErasedType type) => false;
   bool handleAnyType(AnyType type) => false;
   bool handleFutureOrType(FutureOrType type) => false;
 
@@ -1019,6 +1085,10 @@ abstract class DartTypeStructuralPredicateVisitor
   bool visitDynamicType(
           DynamicType type, List<FunctionTypeVariable> bindings) =>
       handleDynamicType(type);
+
+  @override
+  bool visitErasedType(ErasedType type, List<FunctionTypeVariable> bindings) =>
+      handleErasedType(type);
 
   @override
   bool visitAnyType(AnyType type, List<FunctionTypeVariable> bindings) =>
@@ -1156,6 +1226,11 @@ class _DartTypeToStringVisitor extends DartTypeVisitor<void, void> {
   @override
   void visitDynamicType(covariant DynamicType type, _) {
     _identifier('dynamic');
+  }
+
+  @override
+  void visitErasedType(covariant ErasedType type, _) {
+    _identifier('erased');
   }
 
   @override

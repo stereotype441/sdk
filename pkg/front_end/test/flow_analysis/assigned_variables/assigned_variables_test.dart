@@ -3,21 +3,26 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'dart:io' show Directory, Platform;
+
+import 'package:_fe_analyzer_shared/src/flow_analysis/flow_analysis.dart';
+import 'package:_fe_analyzer_shared/src/testing/id.dart'
+    show ActualData, Id, IdKind;
+import 'package:_fe_analyzer_shared/src/testing/id_testing.dart'
+    show DataInterpreter, runTests;
+import 'package:_fe_analyzer_shared/src/testing/id_testing.dart';
 import 'package:front_end/src/api_prototype/experimental_flags.dart'
     show ExperimentalFlag;
-import 'package:front_end/src/fasta/flow_analysis/flow_analysis.dart';
-
-import 'package:front_end/src/testing/id.dart' show ActualData, Id;
-import 'package:front_end/src/testing/id_testing.dart'
-    show DataInterpreter, runTests;
-import 'package:front_end/src/testing/id_testing.dart';
-import 'package:front_end/src/testing/id_testing_helper.dart';
 import 'package:front_end/src/fasta/builder/member_builder.dart';
+import 'package:front_end/src/fasta/source/source_loader.dart';
+
+import 'package:front_end/src/testing/id_testing_helper.dart';
 import 'package:front_end/src/testing/id_testing_utils.dart';
 import 'package:kernel/ast.dart' hide Variance;
 
 main(List<String> args) async {
-  Directory dataDir = new Directory.fromUri(Platform.script.resolve('data'));
+  Directory dataDir = new Directory.fromUri(Platform.script.resolve(
+      '../../../../_fe_analyzer_shared/test/flow_analysis/assigned_variables/'
+      'data'));
   await runTests(dataDir,
       args: args,
       supportedMarkers: sharedMarkers,
@@ -58,12 +63,15 @@ class AssignedVariablesDataComputer extends DataComputer<_Data> {
 }
 
 class AssignedVariablesDataExtractor extends CfeDataExtractor<_Data> {
+  final SourceLoaderDataForTesting _sourceLoaderDataForTesting;
   final AssignedVariablesForTesting<TreeNode, VariableDeclaration>
       _assignedVariables;
 
   AssignedVariablesDataExtractor(InternalCompilerResult compilerResult,
       Map<Id, ActualData<_Data>> actualMap, this._assignedVariables)
-      : super(compilerResult, actualMap);
+      : _sourceLoaderDataForTesting =
+            compilerResult.kernelTargetForTesting.loader.dataForTesting,
+        super(compilerResult, actualMap);
 
   @override
   _Data computeMemberValue(Id id, Member member) {
@@ -78,11 +86,19 @@ class AssignedVariablesDataExtractor extends CfeDataExtractor<_Data> {
 
   @override
   _Data computeNodeValue(Id id, TreeNode node) {
-    if (!_assignedVariables.isTracked(node)) return null;
+    switch (id.kind) {
+      case IdKind.iterator:
+      case IdKind.current:
+      case IdKind.moveNext:
+        return null;
+      default:
+    }
+    TreeNode alias = _sourceLoaderDataForTesting.toOriginal(node);
+    if (!_assignedVariables.isTracked(alias)) return null;
     return new _Data(
-        _convertVars(_assignedVariables.declaredInNode(node)),
-        _convertVars(_assignedVariables.writtenInNode(node)),
-        _convertVars(_assignedVariables.capturedInNode(node)));
+        _convertVars(_assignedVariables.declaredInNode(alias)),
+        _convertVars(_assignedVariables.writtenInNode(alias)),
+        _convertVars(_assignedVariables.capturedInNode(alias)));
   }
 }
 

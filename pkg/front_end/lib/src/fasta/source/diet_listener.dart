@@ -4,6 +4,18 @@
 
 library fasta.diet_listener;
 
+import 'package:_fe_analyzer_shared/src/parser/parser.dart'
+    show Assert, DeclarationKind, MemberKind, Parser, optional;
+
+import 'package:_fe_analyzer_shared/src/parser/quote.dart' show unescapeString;
+
+import 'package:_fe_analyzer_shared/src/parser/stack_listener.dart'
+    show FixedNullableList, NullValue, ParserRecovery;
+
+import 'package:_fe_analyzer_shared/src/parser/value_kind.dart';
+
+import 'package:_fe_analyzer_shared/src/scanner/token.dart' show Token;
+
 import 'package:kernel/ast.dart'
     show
         AsyncMarker,
@@ -19,8 +31,6 @@ import 'package:kernel/ast.dart'
 import 'package:kernel/class_hierarchy.dart' show ClassHierarchy;
 
 import 'package:kernel/core_types.dart' show CoreTypes;
-
-import '../../scanner/token.dart' show Token;
 
 import '../builder/builder.dart';
 import '../builder/class_builder.dart';
@@ -52,13 +62,8 @@ import '../ignored_parser_errors.dart' show isIgnoredParserError;
 
 import '../kernel/body_builder.dart' show BodyBuilder;
 
-import '../parser.dart'
-    show Assert, DeclarationKind, MemberKind, Parser, optional;
-
 import '../problems.dart'
     show DebugAbort, internalProblem, unexpected, unhandled;
-
-import '../quote.dart' show unescapeString;
 
 import '../scope.dart';
 
@@ -71,10 +76,9 @@ import '../type_inference/type_inferrer.dart' show TypeInferrer;
 
 import 'source_library_builder.dart' show SourceLibraryBuilder;
 
-import 'stack_listener.dart'
-    show FixedNullableList, NullValue, ParserRecovery, StackListener;
+import 'stack_listener_impl.dart';
 
-class DietListener extends StackListener {
+class DietListener extends StackListenerImpl {
   final SourceLibraryBuilder libraryBuilder;
 
   final ClassHierarchy hierarchy;
@@ -130,7 +134,7 @@ class DietListener extends StackListener {
 
   @override
   void endMetadataStar(int count) {
-    assert(checkState(null, repeatedKinds(ValueKind.Token, count)));
+    assert(checkState(null, repeatedKinds(ValueKinds.Token, count)));
     debugEvent("MetadataStar");
     if (count > 0) {
       discard(count - 1);
@@ -339,7 +343,7 @@ class DietListener extends StackListener {
     checkEmpty(beginToken.charOffset);
     if (name is ParserRecovery) return;
 
-    final StackListener listener =
+    final StackListenerImpl listener =
         createFunctionListener(lookupBuilder(beginToken, getOrSet, name));
     buildFunctionBody(listener, bodyToken, metadata, MemberKind.TopLevelMethod);
   }
@@ -380,12 +384,12 @@ class DietListener extends StackListener {
   @override
   void handleQualified(Token period) {
     assert(checkState(period, [
-      /*suffix*/ ValueKind.NameOrParserRecovery,
+      /*suffix*/ ValueKinds.NameOrParserRecovery,
       /*prefix*/ unionOfKinds([
-        ValueKind.Name,
-        ValueKind.Generator,
-        ValueKind.ParserRecovery,
-        ValueKind.QualifiedName,
+        ValueKinds.Name,
+        ValueKinds.Generator,
+        ValueKinds.ParserRecovery,
+        ValueKinds.QualifiedName,
       ]),
     ]));
     debugEvent("handleQualified");
@@ -666,7 +670,7 @@ class DietListener extends StackListener {
             : MemberKind.NonStaticMethod);
   }
 
-  StackListener createListener(ModifierBuilder builder, Scope memberScope,
+  StackListenerImpl createListener(ModifierBuilder builder, Scope memberScope,
       {bool isDeclarationInstanceMember,
       VariableDeclaration extensionThis,
       List<TypeParameter> extensionTypeParameters,
@@ -694,7 +698,7 @@ class DietListener extends StackListener {
         constantContext);
   }
 
-  StackListener createListenerInternal(
+  StackListenerImpl createListenerInternal(
       ModifierBuilder builder,
       Scope memberScope,
       Scope formalParameterScope,
@@ -719,7 +723,7 @@ class DietListener extends StackListener {
       ..constantContext = constantContext;
   }
 
-  StackListener createFunctionListener(FunctionBuilderImpl builder) {
+  StackListenerImpl createFunctionListener(FunctionBuilderImpl builder) {
     final Scope typeParameterScope =
         builder.computeTypeParameterScope(memberScope);
     final Scope formalParameterScope =
@@ -736,7 +740,7 @@ class DietListener extends StackListener {
 
   void buildRedirectingFactoryMethod(
       Token token, FunctionBuilder builder, MemberKind kind, Token metadata) {
-    final StackListener listener = createFunctionListener(builder);
+    final StackListenerImpl listener = createFunctionListener(builder);
     try {
       Parser parser = new Parser(listener);
       if (metadata != null) {
@@ -797,9 +801,9 @@ class DietListener extends StackListener {
   @override
   void beginClassOrMixinBody(DeclarationKind kind, Token token) {
     assert(checkState(token, [
-      ValueKind.Token,
-      ValueKind.NameOrParserRecovery,
-      ValueKind.TokenOrNull
+      ValueKinds.Token,
+      ValueKinds.NameOrParserRecovery,
+      ValueKinds.TokenOrNull
     ]));
     debugEvent("beginClassOrMixinBody");
     Token beginToken = pop();
@@ -884,14 +888,14 @@ class DietListener extends StackListener {
     checkEmpty(beginToken.charOffset);
   }
 
-  AsyncMarker getAsyncMarker(StackListener listener) => listener.pop();
+  AsyncMarker getAsyncMarker(StackListenerImpl listener) => listener.pop();
 
   /// Invokes the listener's [finishFunction] method.
   ///
   /// This is a separate method so that it may be overridden by a derived class
   /// if more computation must be done before finishing the function.
   void listenerFinishFunction(
-      StackListener listener,
+      StackListenerImpl listener,
       Token token,
       MemberKind kind,
       dynamic formals,
@@ -904,12 +908,12 @@ class DietListener extends StackListener {
   ///
   /// This is a separate method so that it may be overridden by a derived class
   /// if more computation must be done before finishing the function.
-  void listenerFinishFields(StackListener listener, Token startToken,
+  void listenerFinishFields(StackListenerImpl listener, Token startToken,
       Token metadata, bool isTopLevel) {
     listener.finishFields();
   }
 
-  void buildFunctionBody(StackListener listener, Token startToken,
+  void buildFunctionBody(StackListenerImpl listener, Token startToken,
       Token metadata, MemberKind kind) {
     Token token = startToken;
     try {
@@ -939,7 +943,7 @@ class DietListener extends StackListener {
     }
   }
 
-  void parseFields(StackListener listener, Token startToken, Token metadata,
+  void parseFields(StackListenerImpl listener, Token startToken, Token metadata,
       bool isTopLevel) {
     Token token = startToken;
     Parser parser = new Parser(listener);
@@ -963,12 +967,14 @@ class DietListener extends StackListener {
       }
 
       if (getOrSet != null && optional("set", getOrSet)) {
-        declaration = currentDeclaration.scope.setters[name];
+        declaration =
+            currentDeclaration.scope.lookupLocalMember(name, setter: true);
       } else {
-        declaration = currentDeclaration.scope.local[name];
+        declaration =
+            currentDeclaration.scope.lookupLocalMember(name, setter: false);
       }
     } else if (getOrSet != null && optional("set", getOrSet)) {
-      declaration = libraryBuilder.scope.setters[name];
+      declaration = libraryBuilder.scope.lookupLocalMember(name, setter: true);
     } else {
       declaration = libraryBuilder.scopeBuilder[name];
     }
@@ -1049,7 +1055,7 @@ class DietListener extends StackListener {
   List<Expression> parseMetadata(
       ModifierBuilder builder, Token metadata, TreeNode parent) {
     if (metadata != null) {
-      StackListener listener = createListener(builder, memberScope,
+      StackListenerImpl listener = createListener(builder, memberScope,
           isDeclarationInstanceMember: false);
       Parser parser = new Parser(listener);
       parser.parseMetadataStar(parser.syntheticPreviousToken(metadata));

@@ -8,19 +8,20 @@ import 'dart:io' show Directory, File, FileSystemEntity;
 
 import 'dart:typed_data' show Uint8List;
 
-import 'package:front_end/src/fasta/parser.dart' show Parser;
+import 'package:_fe_analyzer_shared/src/parser/parser.dart'
+    show FormalParameterKind, MemberKind, Parser;
 
-import 'package:front_end/src/fasta/parser/listener.dart' show Listener;
+import 'package:_fe_analyzer_shared/src/parser/listener.dart' show Listener;
+
+import 'package:_fe_analyzer_shared/src/scanner/token.dart' show Token;
+
+import 'package:_fe_analyzer_shared/src/scanner/token.dart';
+
+import 'package:_fe_analyzer_shared/src/scanner/utf8_bytes_scanner.dart'
+    show Utf8BytesScanner;
 
 import 'package:front_end/src/fasta/command_line_reporting.dart'
     as command_line_reporting;
-
-import 'package:front_end/src/fasta/scanner/utf8_bytes_scanner.dart'
-    show Utf8BytesScanner;
-
-import 'package:front_end/src/scanner/token.dart' show Token;
-
-import 'package:front_end/src/scanner/token.dart';
 
 import 'package:kernel/kernel.dart';
 
@@ -192,12 +193,12 @@ class LintListener extends Listener {
 }
 
 class ExplicitTypeLintListener extends LintListener {
-  LatestType _latestType;
+  List<LatestType> _latestTypes = new List<LatestType>();
 
   @override
   void beginVariablesDeclaration(
       Token token, Token lateToken, Token varFinalOrConst) {
-    if (!_latestType.type) {
+    if (!_latestTypes.last.type) {
       onProblem(
           varFinalOrConst.offset, varFinalOrConst.length, "No explicit type.");
     }
@@ -205,12 +206,17 @@ class ExplicitTypeLintListener extends LintListener {
 
   @override
   void handleType(Token beginToken, Token questionMark) {
-    _latestType = new LatestType(beginToken, true);
+    _latestTypes.add(new LatestType(beginToken, true));
   }
 
   @override
   void handleNoType(Token lastConsumed) {
-    _latestType = new LatestType(lastConsumed, false);
+    _latestTypes.add(new LatestType(lastConsumed, false));
+  }
+
+  @override
+  void endFunctionType(Token functionToken, Token questionMark) {
+    _latestTypes.add(new LatestType(functionToken, true));
   }
 
   void endTopLevelFields(
@@ -221,18 +227,30 @@ class ExplicitTypeLintListener extends LintListener {
       int count,
       Token beginToken,
       Token endToken) {
-    if (!_latestType.type) {
-      onProblem(
-          varFinalOrConst.offset, varFinalOrConst.length, "No explicit type.");
+    if (!_latestTypes.last.type) {
+      onProblem(beginToken.offset, beginToken.length, "No explicit type.");
     }
+    _latestTypes.removeLast();
   }
 
   void endClassFields(Token staticToken, Token covariantToken, Token lateToken,
       Token varFinalOrConst, int count, Token beginToken, Token endToken) {
-    if (!_latestType.type) {
+    if (!_latestTypes.last.type) {
       onProblem(
           varFinalOrConst.offset, varFinalOrConst.length, "No explicit type.");
     }
+    _latestTypes.removeLast();
+  }
+
+  void endFormalParameter(
+      Token thisKeyword,
+      Token periodAfterThis,
+      Token nameToken,
+      Token initializerStart,
+      Token initializerEnd,
+      FormalParameterKind kind,
+      MemberKind memberKind) {
+    _latestTypes.removeLast();
   }
 }
 

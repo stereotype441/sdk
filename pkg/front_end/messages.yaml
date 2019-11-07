@@ -182,6 +182,10 @@ ConstEvalNotMapInSpread:
   template: "Only maps can be used in spreads in constant maps."
   analyzerCode: CONST_SPREAD_EXPECTED_MAP
 
+ConstEvalExtension:
+  template: "Extension operations can't be used in constant expressions."
+  analyzerCode: NOT_CONSTANT_EXPRESSION
+
 ConstEvalUnevaluated:
   template: "Could not evaluate constant expression."
 
@@ -3626,6 +3630,22 @@ InvalidTypeVariableInSupertypeWithVariance:
   script: >
     class A<out X> {}
     class B<out Y> extends A<Function(Y)> {}
+
+InvalidTypeVariableVariancePosition:
+  template: "Can't use '#string' type variable '#name' in an '#string2' position."
+  script: >
+    class A<out T> {
+      void method(T x) {}
+    }
+
+InvalidTypeVariableVariancePositionInReturnType:
+  template: "Can't use '#string' type variable '#name' in an '#string2' position in the return type."
+  script: >
+    class A<in T> {
+      T method() {
+        return null;
+      }
+    }
 
 IllegalRecursiveType:
   template: "Illegal recursive type '#type'."

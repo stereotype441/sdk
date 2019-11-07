@@ -285,6 +285,7 @@ class _ElementWriter {
     writeIf(e.isExternal, 'external ');
     writeIf(e.isConst, 'const ');
     writeIf(e.isFactory, 'factory ');
+    expect(e.isAbstract, isFalse);
 
     buffer.write(e.enclosingElement.name);
     if (e.name.isNotEmpty) {
@@ -442,14 +443,6 @@ class _ElementWriter {
       } else {
         buffer.write('<null>');
       }
-    } else {
-      buffer.write('typedef ');
-      writeType2(e.returnType);
-
-      writeName(e);
-
-      writeTypeParameterElements(e.typeParameters);
-      writeParameterElements(e.parameters);
     }
 
     buffer.writeln(';');

@@ -334,9 +334,9 @@ class Driver implements ServerStarter {
   static const String TRAIN_USING = "train-using";
 
   /**
-   * The instrumentation server that is to be used by the analysis server.
+   * The instrumentation service that is to be used by the analysis server.
    */
-  InstrumentationServer instrumentationServer;
+  InstrumentationService instrumentationService;
 
   /**
    * The file resolver provider used to override the way file URI's are
@@ -423,8 +423,7 @@ class Driver implements ServerStarter {
       analytics.setSessionValue('cd1', analysisServerOptions.clientVersion);
     }
 
-    // TODO(devoncarew): Replace with the real crash product ID.
-    analysisServerOptions.crashReportSender =
+    final crashReportSender =
         new CrashReportSender('Dart_analysis_server', analytics);
 
     if (telemetry.SHOW_ANALYTICS_UI) {
@@ -466,17 +465,19 @@ class Driver implements ServerStarter {
     // Initialize the instrumentation service.
     //
     String logFilePath = results[INSTRUMENTATION_LOG_FILE];
+    List<InstrumentationService> allInstrumentationServices =
+        instrumentationService == null ? [] : [instrumentationService];
     if (logFilePath != null) {
       _rollLogFiles(logFilePath, 5);
-      FileInstrumentationServer fileBasedServer =
-          new FileInstrumentationServer(logFilePath);
-      instrumentationServer = instrumentationServer != null
-          ? new MulticastInstrumentationServer(
-              [instrumentationServer, fileBasedServer])
-          : fileBasedServer;
+      allInstrumentationServices.add(InstrumentationLogAdapter(
+          new FileInstrumentationLogger(logFilePath)));
     }
-    InstrumentationService instrumentationService =
-        new InstrumentationService(instrumentationServer);
+
+    allInstrumentationServices
+        .add(CrashReportingInstrumentation(crashReportSender));
+    instrumentationService =
+        new MulticastInstrumentationService(allInstrumentationServices);
+
     instrumentationService.logVersion(
         results[TRAIN_USING] != null
             ? 'training-0'
@@ -710,7 +711,7 @@ class Driver implements ServerStarter {
       {void print(String line)}) {
     void errorFunction(Zone self, ZoneDelegate parent, Zone zone,
         dynamic exception, StackTrace stackTrace) {
-      service.logPriorityException(exception, stackTrace);
+      service.logException(exception, stackTrace);
       socketServer.analysisServer.sendServerErrorNotification(
           'Captured exception', exception, stackTrace);
       throw exception;
@@ -743,7 +744,7 @@ class Driver implements ServerStarter {
       dynamic callback()) {
     void errorFunction(Zone self, ZoneDelegate parent, Zone zone,
         dynamic exception, StackTrace stackTrace) {
-      service.logPriorityException(exception, stackTrace);
+      service.logException(exception, stackTrace);
       LspAnalysisServer analysisServer = socketServer.analysisServer;
       analysisServer.sendServerErrorNotification(
           'Captured exception', exception, stackTrace);
@@ -909,14 +910,14 @@ class Driver implements ServerStarter {
         }
       }
     } catch (exception, stackTrace) {
-      service.logPriorityException(exception, stackTrace);
+      service.logException(exception, stackTrace);
     }
     String uuid = _generateUuidString();
     try {
       uuidFile.parent.createSync(recursive: true);
       uuidFile.writeAsStringSync(uuid);
     } catch (exception, stackTrace) {
-      service.logPriorityException(exception, stackTrace);
+      service.logException(exception, stackTrace);
       // Slightly alter the uuid to indicate it was not persisted
       uuid = 'temp-$uuid';
     }

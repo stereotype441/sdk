@@ -9,7 +9,6 @@ import 'package:analyzer/src/test_utilities/find_node.dart';
 import 'package:nnbd_migration/instrumentation.dart';
 import 'package:nnbd_migration/nnbd_migration.dart';
 import 'package:nnbd_migration/nullability_state.dart';
-import 'package:nnbd_migration/src/decorated_type.dart';
 import 'package:test/test.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
 
@@ -43,7 +42,7 @@ class _InstrumentationClient implements NullabilityMigrationInstrumentation {
 
   @override
   void externalDecoratedTypeParameterBound(
-      TypeParameterElement typeParameter, DecoratedType decoratedType) {
+      TypeParameterElement typeParameter, DecoratedTypeInfo decoratedType) {
     expect(test.externalDecoratedTypeParameterBound,
         isNot(contains(typeParameter)));
     test.externalDecoratedTypeParameterBound[typeParameter] = decoratedType;

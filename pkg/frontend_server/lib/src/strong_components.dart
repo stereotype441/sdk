@@ -129,7 +129,7 @@ class StrongComponents {
         continue;
       }
       final packageName = line.substring(0, colon);
-      if (!uri.path.startsWith(packageName)) {
+      if (!uri.path.startsWith('$packageName/')) {
         continue;
       }
       String packagePath;
@@ -157,6 +157,7 @@ class _LibraryGraph implements Graph<Library> {
   Iterable<Library> neighborsOf(Library vertex) {
     return <Library>[
       for (LibraryDependency dependency in vertex.dependencies)
+        // ignore: DEPRECATED_MEMBER_USE
         if (!dependency.targetLibrary.isExternal &&
             dependency.targetLibrary.importUri.scheme != 'dart')
           dependency.targetLibrary

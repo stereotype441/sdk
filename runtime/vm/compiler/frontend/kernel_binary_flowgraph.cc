@@ -993,13 +993,6 @@ FlowGraph* StreamingFlowGraphBuilder::BuildGraph() {
   ActiveTypeParametersScope active_type_params(active_class(), function, Z);
 
   if (function.is_declared_in_bytecode()) {
-    if (!(FLAG_use_bytecode_compiler || FLAG_enable_interpreter)) {
-      FATAL1(
-          "Cannot run bytecode function %s: specify --enable-interpreter or "
-          "--use-bytecode-compiler",
-          function.ToFullyQualifiedCString());
-    }
-
     bytecode_metadata_helper_.ParseBytecodeFunction(parsed_function());
 
     switch (function.kind()) {
@@ -1294,8 +1287,6 @@ Fragment StreamingFlowGraphBuilder::BuildExpression(TokenPosition* position) {
       return BuildNullLiteral(position);
     case kConstantExpression:
       return BuildConstantExpression(position, tag);
-    case kDeprecated_ConstantExpression:
-      return BuildConstantExpression(position, tag);
     case kInstantiation:
       return BuildPartialTearoffInstantiation(position);
     case kLoadLibrary:
@@ -1383,10 +1374,7 @@ Tag KernelReaderHelper::PeekTag(uint8_t* payload) {
 }
 
 Nullability KernelReaderHelper::ReadNullability() {
-  if (translation_helper_.info().kernel_binary_version() >= 28) {
-    return reader_.ReadNullability();
-  }
-  return kLegacy;
+  return reader_.ReadNullability();
 }
 
 Variance KernelReaderHelper::ReadVariance() {
@@ -2623,7 +2611,7 @@ Fragment StreamingFlowGraphBuilder::BuildStaticGet(TokenPosition* p) {
       const String& getter_name = H.DartGetterName(target);
       const Function& getter =
           Function::ZoneHandle(Z, owner.LookupStaticFunction(getter_name));
-      if (getter.IsNull() || !field.has_initializer()) {
+      if (getter.IsNull() || !field.has_nontrivial_initializer()) {
         Fragment instructions = Constant(field);
         return instructions + LoadStaticField();
       } else {

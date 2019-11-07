@@ -10,6 +10,8 @@ import "dart:convert" show JsonEncoder;
 
 import "dart:io" show File, IOSink;
 
+import 'package:_fe_analyzer_shared/src/util/colors.dart' as colors;
+
 import "package:front_end/src/api_prototype/compiler_options.dart"
     show CompilerOptions, DiagnosticMessage;
 
@@ -427,7 +429,7 @@ Future<Context> createContext(
 
   // Disable colors to ensure that expectation files are the same across
   // platforms and independent of stdin/stderr.
-  compilerContext.disableColors();
+  colors.enableColors = false;
 
   return new Context(compilerContext, snapshot, errors, updateExpectations);
 }

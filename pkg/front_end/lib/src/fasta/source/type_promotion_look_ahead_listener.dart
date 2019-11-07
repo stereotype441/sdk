@@ -4,11 +4,9 @@
 
 library fasta.type_promotion_look_ahead_listener;
 
-import '../builder/builder.dart';
+import 'package:_fe_analyzer_shared/src/messages/severity.dart' show Severity;
 
-import '../messages.dart' show LocatedMessage, Message, MessageCode;
-
-import '../parser.dart'
+import 'package:_fe_analyzer_shared/src/parser/parser.dart'
     show
         Assert,
         BlockKind,
@@ -18,13 +16,15 @@ import '../parser.dart'
         Listener,
         MemberKind;
 
+import 'package:_fe_analyzer_shared/src/scanner/scanner.dart' show Token;
+
+import '../builder/builder.dart';
+
+import '../messages.dart' show LocatedMessage, Message, MessageCode;
+
 import '../problems.dart' as problems show unhandled;
 
-import '../scanner.dart' show Token;
-
 import '../scope.dart' show Scope;
-
-import '../severity.dart' show Severity;
 
 final NoArguments noArgumentsSentinel = new NoArguments();
 
@@ -600,13 +600,13 @@ class TypePromotionLookAheadListener extends Listener {
   }
 
   @override
-  void handleForInitializerExpressionStatement(Token token) {
+  void handleForInitializerExpressionStatement(Token token, bool forIn) {
     debugEvent("ForInitializerExpressionStatement", token);
     state.pop(); // Expression.
   }
 
   @override
-  void handleForInitializerLocalVariableDeclaration(Token token) {
+  void handleForInitializerLocalVariableDeclaration(Token token, bool forIn) {
     debugEvent("ForInitializerLocalVariableDeclaration", token);
   }
 

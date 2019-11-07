@@ -258,7 +258,7 @@ class FunctionTypeScope extends EnclosedScope {
       return;
     }
     _parametersDefined = true;
-    for (ParameterElement parameter in _typeElement.parameters) {
+    for (ParameterElement parameter in _typeElement.function.parameters) {
       define(parameter);
     }
   }
@@ -786,7 +786,7 @@ class NamespaceBuilder {
     // which is not possible for `dynamic`.
     if (library.isDartCore) {
       definedNames['dynamic'] = DynamicElementImpl.instance;
-      definedNames['Never'] = BottomTypeImpl.instance.element;
+      definedNames['Never'] = NeverTypeImpl.instance.element;
     }
 
     return new Namespace(definedNames);
@@ -858,7 +858,7 @@ class NamespaceBuilder {
         definedNames = _show(definedNames, combinator.shownNames);
       } else {
         // Internal error.
-        AnalysisEngine.instance.logger
+        AnalysisEngine.instance.instrumentationService
             .logError("Unknown type of combinator: ${combinator.runtimeType}");
       }
     }

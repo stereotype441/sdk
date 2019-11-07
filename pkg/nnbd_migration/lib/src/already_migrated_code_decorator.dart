@@ -32,15 +32,12 @@ class AlreadyMigratedCodeDecorator {
     NullabilityNode node;
     var nullabilitySuffix = (type as TypeImpl).nullabilitySuffix;
     if (nullabilitySuffix == NullabilitySuffix.question) {
-      node = _graph.always;
+      node = NullabilityNode.forAlreadyMigrated();
+      _graph.makeNullable(node, AlreadyMigratedTypeOrigin.forElement(element));
     } else {
-      // Currently, all types passed to this method have nullability suffix `star`
-      // because (a) we don't yet have a migrated SDK, and (b) we haven't added
-      // support to the migrator for analyzing packages that have already been
-      // migrated with NNBD enabled.
-      // TODO(paulberry): fix this assertion when things change.
-      assert(nullabilitySuffix == NullabilitySuffix.star);
-      node = _graph.never;
+      node = NullabilityNode.forAlreadyMigrated();
+      _graph.makeNonNullable(
+          node, AlreadyMigratedTypeOrigin.forElement(element));
     }
     if (type is FunctionType) {
       var typeFormalBounds = type.typeFormals.map((e) {
@@ -69,8 +66,9 @@ class AlreadyMigratedCodeDecorator {
           namedParameters: namedParameters,
           positionalParameters: positionalParameters);
     } else if (type is InterfaceType) {
-      if (type.typeParameters.isNotEmpty) {
-        assert(type.typeArguments.length == type.typeParameters.length);
+      var typeParameters = type.element.typeParameters;
+      if (typeParameters.isNotEmpty) {
+        assert(type.typeArguments.length == typeParameters.length);
         return DecoratedType(type, node, typeArguments: [
           for (var t in type.typeArguments) decorate(t, element)
         ]);

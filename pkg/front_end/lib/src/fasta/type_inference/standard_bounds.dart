@@ -15,7 +15,9 @@ import 'package:kernel/ast.dart'
         InvalidType,
         NamedType,
         Nullability,
+        TypeParameter,
         TypeParameterType,
+        Variance,
         VoidType;
 
 import 'package:kernel/type_algebra.dart' show Substitution;
@@ -109,14 +111,15 @@ abstract class StandardBounds {
       if (type2 is InterfaceType) {
         if (type2.classNode == futureOrClass) {
           // GLB(FutureOr<A>, FutureOr<B>) == FutureOr<GLB(A, B)>
-          return new InterfaceType(futureOrClass, <DartType>[
+          return new InterfaceType(
+              futureOrClass, Nullability.legacy, <DartType>[
             getStandardLowerBound(
                 type1.typeArguments[0], type2.typeArguments[0])
           ]);
         }
         if (type2.classNode == futureClass) {
           // GLB(FutureOr<A>, Future<B>) == Future<GLB(A, B)>
-          return new InterfaceType(futureClass, <DartType>[
+          return new InterfaceType(futureClass, Nullability.legacy, <DartType>[
             getStandardLowerBound(
                 type1.typeArguments[0], type2.typeArguments[0])
           ]);
@@ -133,7 +136,7 @@ abstract class StandardBounds {
     if (type2 is InterfaceType && type2.classNode == futureOrClass) {
       if (type1 is InterfaceType && type1.classNode == futureClass) {
         // GLB(Future<A>, FutureOr<B>) == Future<GLB(B, A)>
-        return new InterfaceType(futureClass, <DartType>[
+        return new InterfaceType(futureClass, Nullability.legacy, <DartType>[
           getStandardLowerBound(type2.typeArguments[0], type1.typeArguments[0])
         ]);
       }
@@ -314,7 +317,8 @@ abstract class StandardBounds {
 
     // Calculate the SLB of the return type.
     DartType returnType = getStandardLowerBound(f.returnType, g.returnType);
-    return new FunctionType(positionalParameters, returnType,
+    return new FunctionType(
+        positionalParameters, returnType, Nullability.legacy,
         namedParameters: namedParameters,
         requiredParameterCount: requiredParameterCount);
   }
@@ -341,7 +345,7 @@ abstract class StandardBounds {
     //   SUB(([int]) -> void, (int) -> void) = (int) -> void
     if (f.requiredParameterCount != g.requiredParameterCount) {
       return new InterfaceType(
-          functionClass, const <DynamicType>[], Nullability.legacy);
+          functionClass, Nullability.legacy, const <DynamicType>[]);
     }
     int requiredParameterCount = f.requiredParameterCount;
 
@@ -388,7 +392,8 @@ abstract class StandardBounds {
 
     // Calculate the SUB of the return type.
     DartType returnType = getStandardUpperBound(f.returnType, g.returnType);
-    return new FunctionType(positionalParameters, returnType,
+    return new FunctionType(
+        positionalParameters, returnType, Nullability.legacy,
         namedParameters: namedParameters,
         requiredParameterCount: requiredParameterCount);
   }
@@ -400,13 +405,17 @@ abstract class StandardBounds {
     // causing pain in real code.  The current algorithm is:
     // 1. If either of the types is a supertype of the other, return it.
     //    This is in fact the best result in this case.
-    // 2. If the two types have the same class element, then take the
-    //    pointwise standard upper bound of the type arguments.  This is again
-    //    the best result, except that the recursive calls may not return
-    //    the true standard upper bounds.  The result is guaranteed to be a
-    //    well-formed type under the assumption that the input types were
-    //    well-formed (and assuming that the recursive calls return
-    //    well-formed types).
+    // 2. If the two types have the same class element and is implicitly or
+    //    explicitly covariant, then take the pointwise standard upper bound of
+    //    the type arguments. This is again the best result, except that the
+    //    recursive calls may not return the true standard upper bounds.  The
+    //    result is guaranteed to be a well-formed type under the assumption
+    //    that the input types were well-formed (and assuming that the
+    //    recursive calls return well-formed types).
+    //    If the variance of the type parameter is contravariant, we take the
+    //    standard lower bound of the type arguments. If the variance of the
+    //    type parameter is invariant, we verify if the type arguments satisfy
+    //    subtyping in both directions, then choose a bound.
     // 3. Otherwise return the spec-defined standard upper bound.  This will
     //    be an upper bound, might (or might not) be least, and might
     //    (or might not) be a well-formed type.
@@ -421,13 +430,30 @@ abstract class StandardBounds {
         identical(type1.classNode, type2.classNode)) {
       List<DartType> tArgs1 = type1.typeArguments;
       List<DartType> tArgs2 = type2.typeArguments;
+      List<TypeParameter> tParams = type1.classNode.typeParameters;
 
       assert(tArgs1.length == tArgs2.length);
+      assert(tArgs1.length == tParams.length);
       List<DartType> tArgs = new List(tArgs1.length);
       for (int i = 0; i < tArgs1.length; i++) {
-        tArgs[i] = getStandardUpperBound(tArgs1[i], tArgs2[i]);
+        if (tParams[i].variance == Variance.contravariant) {
+          tArgs[i] = getStandardLowerBound(tArgs1[i], tArgs2[i]);
+        } else if (tParams[i].variance == Variance.invariant) {
+          if (!isSubtypeOf(tArgs1[i], tArgs2[i],
+                  SubtypeCheckMode.ignoringNullabilities) ||
+              !isSubtypeOf(tArgs2[i], tArgs1[i],
+                  SubtypeCheckMode.ignoringNullabilities)) {
+            // No bound will be valid, find bound at the interface level.
+            return getLegacyLeastUpperBound(type1, type2);
+          }
+          // TODO (kallentu) : Fix asymmetric bounds behavior for invariant type
+          //  parameters.
+          tArgs[i] = tArgs1[i];
+        } else {
+          tArgs[i] = getStandardUpperBound(tArgs1[i], tArgs2[i]);
+        }
       }
-      return new InterfaceType(type1.classNode, tArgs);
+      return new InterfaceType(type1.classNode, Nullability.legacy, tArgs);
     }
     return getLegacyLeastUpperBound(type1, type2);
   }

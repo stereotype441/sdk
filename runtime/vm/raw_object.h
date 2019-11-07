@@ -1139,17 +1139,8 @@ class RawField : public RawObject {
 
 class RawScript : public RawObject {
  public:
-  enum Kind {
-    kScriptTag = 0,
-    kLibraryTag,
-    kSourceTag,
-    kEvaluateTag,
-    kKernelTag,
-  };
   enum {
-    kKindPos = 0,
-    kKindSize = 3,
-    kLazyLookupSourceAndLineStartsPos = kKindPos + kKindSize,
+    kLazyLookupSourceAndLineStartsPos = 0,
     kLazyLookupSourceAndLineStartsSize = 1,
   };
 
@@ -1185,13 +1176,12 @@ class RawScript : public RawObject {
   int32_t line_offset_;
   int32_t col_offset_;
 
-  using KindBits = BitField<uint8_t, Kind, kKindPos, kKindSize>;
   using LazyLookupSourceAndLineStartsBit =
       BitField<uint8_t,
                bool,
                kLazyLookupSourceAndLineStartsPos,
                kLazyLookupSourceAndLineStartsSize>;
-  uint8_t kind_and_tags_;
+  uint8_t flags_;
 
   intptr_t kernel_script_index_;
   int64_t load_timestamp_;
@@ -2010,6 +2000,7 @@ class RawType : public RawAbstractType {
   VISIT_TO(RawObject*, signature_)
   TokenPosition token_pos_;
   int8_t type_state_;
+  int8_t nullability_;
 
   RawObject** to_snapshot(Snapshot::Kind kind) { return to(); }
 
@@ -2050,6 +2041,7 @@ class RawTypeParameter : public RawAbstractType {
   TokenPosition token_pos_;
   int16_t index_;
   uint8_t flags_;
+  int8_t nullability_;
 
   RawObject** to_snapshot(Snapshot::Kind kind) { return to(); }
 

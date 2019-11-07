@@ -5,8 +5,7 @@
 /**
  * Foreign Function Interface for interoperability with the C programming language.
  *
- * **NOTE**: Dart:FFI is in technical preview. The overall feature is incomplete,
- * may contain issues, and breaking API changes are still expected.
+ * **NOTE**: Dart:FFI is in beta, and breaking API changes might still happen.
  *
  * For further details, please see: https://dart.dev/server/c-interop
  *
@@ -15,6 +14,7 @@
 library dart.ffi;
 
 import 'dart:typed_data';
+import 'dart:isolate';
 
 part "native_type.dart";
 part "annotations.dart";
@@ -608,4 +608,14 @@ extension StructPointer<T extends Struct> on Pointer<T> {
   /// The [address] must be aligned according to the struct alignment rules of
   /// the platform.
   external T operator [](int index);
+}
+
+/// Extension to retrieve the native `Dart_Port` from a [SendPort].
+extension NativePort on SendPort {
+  /// The native port of this [SendPort].
+  ///
+  /// The returned native port can for example be used by C code to post
+  /// messages to the connected [ReceivePort] via `Dart_PostCObject()` - see
+  /// `dart_native_api.h`.
+  external int get nativePort;
 }

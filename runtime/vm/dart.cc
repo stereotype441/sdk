@@ -177,15 +177,6 @@ char* Dart::Init(const uint8_t* vm_isolate_snapshot,
     }
   }
 
-#if defined(DEBUG)
-  // Turn on verify_gc_contains if any of the other GC verification flag
-  // is turned on.
-  if (FLAG_verify_before_gc || FLAG_verify_after_gc ||
-      FLAG_verify_on_transition) {
-    FLAG_verify_gc_contains = true;
-  }
-#endif
-
   FrameLayout::Init();
 
   set_thread_exit_callback(thread_exit);
@@ -856,9 +847,6 @@ const char* Dart::FeaturesString(Isolate* isolate,
     buffer.AddString(FLAG_causal_async_stacks ? " causal_async_stacks"
                                               : " no-causal_async_stacks");
 
-    buffer.AddString((FLAG_enable_interpreter || FLAG_use_bytecode_compiler)
-                         ? " bytecode"
-                         : " no-bytecode");
 
 // Generated code must match the host architecture and ABI.
 #if defined(TARGET_ARCH_ARM)

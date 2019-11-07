@@ -233,7 +233,8 @@
         "kernel/lib/.*\\.dart$"
       ],
       "exclude": [
-        "src/fasta/fasta_codes_generated\\.dart$"
+        "src/fasta/fasta_codes_generated\\.dart$",
+        "src/fasta/fasta_codes_cfe_generated\\.dart$"
       ]
     },
     {
@@ -255,6 +256,7 @@
         "test/memory_file_system_test\\.dart$",
         "test/scanner_fasta_test\\.dart$",
         "test/scanner_test\\.dart$",
+        "test/spell_checking_utils_test.dart",
         "test/standard_file_system_test\\.dart$",
         "test/tool/reload\\.dart$",
         "test/type_labeler_test\\.dart$",
@@ -395,7 +397,6 @@
     "options": "analysis_options_no_lints.yaml",
     "uris": [
       "lib/",
-      "../analyzer/lib/src/generated/parser_fasta.dart",
       "tool/",
       "test/",
       "../kernel/lib/",

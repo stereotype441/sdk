@@ -279,7 +279,7 @@ RawObject* CompilationTraceLoader::CompileTriple(const char* uri_cstr,
   if (!field_.IsNull() && field_.is_const() && field_.is_static() &&
       (field_.StaticValue() == Object::sentinel().raw())) {
     processed = true;
-    error_ = field_.Initialize();
+    error_ = field_.InitializeStatic();
     if (error_.IsError()) {
       if (FLAG_trace_compilation_trace) {
         THR_Print(
@@ -336,7 +336,7 @@ RawObject* CompilationTraceLoader::CompileTriple(const char* uri_cstr,
   }
 
   if (!field_.IsNull() && field_.is_static() && !field_.is_const() &&
-      field_.has_initializer()) {
+      field_.has_nontrivial_initializer()) {
     processed = true;
     function_ = field_.EnsureInitializerFunction();
     error_ = CompileFunction(function_);
@@ -449,9 +449,6 @@ static char* CompilerFlags() {
   ADD_FLAG(causal_async_stacks);
   ADD_FLAG(fields_may_be_reset);
 #undef ADD_FLAG
-  buffer.AddString(FLAG_use_bytecode_compiler || FLAG_enable_interpreter
-                       ? " bytecode"
-                       : " no-bytecode");
 
   return buffer.Steal();
 }

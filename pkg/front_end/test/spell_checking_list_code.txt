@@ -448,7 +448,6 @@ json
 juxtaposition
 juxtapositions
 k
-k’s
 kallentu
 kernel's
 kernel2kernel
@@ -456,6 +455,7 @@ klass
 kmillikin
 kustermann
 kv
+k’s
 l
 lacks
 lang
@@ -633,13 +633,14 @@ queries
 quick
 quoted
 r
+r'$creation
 r'\f
 r'\r
 r'\s
 r'\t
 r'\u
 r'\v
-r'$creation
+ra
 radix
 raises
 ran
@@ -647,6 +648,8 @@ randomly
 ranges
 ranked
 ratio
+rb
+rc
 re
 reach
 react
@@ -698,11 +701,10 @@ restriction
 resumed
 rewrites
 rewrote
+rf
 rhs
 ri
 rightmost
-rb
-rc
 rn
 rnystrom
 role
@@ -711,6 +713,7 @@ rooted
 roughly
 rounding
 rparen
+rs
 runnable
 s
 sb
@@ -842,6 +845,7 @@ terminator
 tester
 tex
 th
+thought
 ti
 tick
 ticker

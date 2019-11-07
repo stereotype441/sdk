@@ -503,6 +503,7 @@ abstract class CommonElements {
   FunctionEntity get rtiEvalMethod;
   FunctionEntity get rtiBindMethod;
   FunctionEntity get rtiAddRulesMethod;
+  FunctionEntity get rtiAddErasedTypesMethod;
 
   FunctionEntity get generalIsTestImplementation;
   FunctionEntity get generalAsCheckImplementation;
@@ -1937,6 +1938,11 @@ class CommonElementsImpl
   FunctionEntity get rtiAddRulesMethod =>
       _rtiAddRulesMethod ??= _findClassMember(_rtiUniverseClass, 'addRules');
 
+  FunctionEntity _rtiAddErasedTypesMethod;
+  @override
+  FunctionEntity get rtiAddErasedTypesMethod => _rtiAddErasedTypesMethod ??=
+      _findClassMember(_rtiUniverseClass, 'addErasedTypes');
+
   FunctionEntity _generalIsTestImplementation;
   @override
   FunctionEntity get generalIsTestImplementation =>
@@ -2282,6 +2288,9 @@ abstract class ElementEnvironment {
   /// Returns the 'this type' of [cls]. That is, the instantiation of [cls]
   /// where the type arguments are the type variables of [cls].
   InterfaceType getThisType(ClassEntity cls);
+
+  /// Returns the instantiation of [cls] to bounds.
+  InterfaceType getClassInstantiationToBounds(ClassEntity cls);
 
   /// Returns `true` if [cls] is generic.
   bool isGenericClass(ClassEntity cls);

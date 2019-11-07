@@ -2,6 +2,7 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+import 'package:_fe_analyzer_shared/src/flow_analysis/flow_analysis.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
@@ -11,7 +12,6 @@ import 'package:analyzer/dart/element/type_system.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/generated/type_system.dart' show Dart2TypeSystem;
 import 'package:analyzer/src/generated/variable_type_provider.dart';
-import 'package:front_end/src/fasta/flow_analysis/flow_analysis.dart';
 
 /// Data gathered by flow analysis, retained for testing purposes.
 class FlowAnalysisDataForTesting {
@@ -77,7 +77,7 @@ class FlowAnalysisHelper {
     if (flow == null) return null;
 
     if (node.operator.type == TokenType.QUESTION_QUESTION_EQ) {
-      flow.ifNullExpression_rightBegin();
+      flow.ifNullExpression_rightBegin(node.leftHandSide);
     }
 
     var left = node.leftHandSide;
@@ -442,13 +442,16 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitTryStatement(TryStatement node) {
+    var finallyBlock = node.finallyBlock;
+    bool isDesugared = node.catchClauses.isNotEmpty && finallyBlock != null;
     assignedVariables.beginNode();
+    if (isDesugared) assignedVariables.beginNode();
     node.body.accept(this);
     assignedVariables.endNode(node.body);
 
     node.catchClauses.accept(this);
+    if (isDesugared) assignedVariables.endNode(node);
 
-    var finallyBlock = node.finallyBlock;
     if (finallyBlock != null) {
       assignedVariables.beginNode();
       finallyBlock.accept(this);

@@ -232,7 +232,6 @@ void KernelFingerprintHelper::CalculateDartTypeFingerprint() {
     case kNeverType:
       // those contain nothing.
       break;
-      UNIMPLEMENTED();
     case kInterfaceType:
       CalculateInterfaceTypeFingerprint(false);
       break;
@@ -304,9 +303,7 @@ void KernelFingerprintHelper::CalculateFunctionTypeFingerprint(bool simple) {
       // read string reference (i.e. named_parameters[i].name).
       CalculateStringReferenceFingerprint();
       CalculateDartTypeFingerprint();  // read named_parameters[i].type.
-      if (translation_helper_.info().kernel_binary_version() >= 29) {
-        BuildHash(ReadFlags());  // read flags.
-      }
+      BuildHash(ReadFlags());          // read flags.
     }
   }
 
@@ -572,9 +569,6 @@ void KernelFingerprintHelper::CalculateExpressionFingerprint() {
     case kConstantExpression:
       ReadPosition();
       SkipDartType();
-      SkipConstantReference();
-      return;
-    case kDeprecated_ConstantExpression:
       SkipConstantReference();
       return;
     case kLoadLibrary:

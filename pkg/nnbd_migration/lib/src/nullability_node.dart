@@ -159,6 +159,12 @@ class NullabilityGraph {
   }
 
   /// Creates a graph edge that will try to force the given [node] to be
+  /// non-nullable.
+  void makeNonNullable(NullabilityNode node, EdgeOrigin origin) {
+    connect(node, never, origin, hard: true);
+  }
+
+  /// Creates a graph edge that will try to force the given [node] to be
   /// nullable.
   void makeNullable(NullabilityNode node, EdgeOrigin origin,
       {List<NullabilityNode> guards: const []}) {
@@ -506,6 +512,8 @@ abstract class NullabilityNode implements NullabilityNodeInfo {
   /// annotate the nullability of that type.
   String get debugSuffix => '?($this)';
 
+  Iterable<EdgeInfo> get downstreamEdges => _downstreamEdges;
+
   /// After nullability propagation, this getter can be used to query whether
   /// the type associated with this node should be considered "exact nullable".
   @visibleForTesting
@@ -533,7 +541,7 @@ abstract class NullabilityNode implements NullabilityNodeInfo {
   void recordNamedParameterNotSupplied(List<NullabilityNode> guards,
       NullabilityGraph graph, NamedParameterNotSuppliedOrigin origin) {
     if (isPossiblyOptional) {
-      graph.makeNullable(this, origin, guards: guards);
+      graph.connect(graph.always, this, origin, guards: guards);
     }
   }
 
