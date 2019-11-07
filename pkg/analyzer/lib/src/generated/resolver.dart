@@ -2709,8 +2709,6 @@ class ResolverVisitor extends ScopedVisitor {
   /// always safe to use `.last` to examine the top of the stack.
   final List<Expression> unfinishedNullShorts = [null];
 
-  final List<Expression> unfinishedNullShorts = [null];
-
   /// Initialize a newly created visitor to resolve the nodes in an AST node.
   ///
   /// The [definingLibrary] is the element for the library containing the node
