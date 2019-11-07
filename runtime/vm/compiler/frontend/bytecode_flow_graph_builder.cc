@@ -1065,13 +1065,9 @@ void BytecodeFlowGraphBuilder::BuildDynamicCall() {
 
   // A DebugStepCheck is performed as part of the calling stub.
 
-  const UnlinkedCall& selector =
-      UnlinkedCall::Cast(ConstantAt(DecodeOperandD()).value());
-
+  const String& name = String::Cast(ConstantAt(DecodeOperandD()).value());
   const ArgumentsDescriptor arg_desc(
-      Array::Handle(Z, selector.args_descriptor()));
-
-  const String& name = String::ZoneHandle(Z, selector.target_name());
+      Array::Cast(ConstantAt(DecodeOperandD(), 1).value()));
 
   Token::Kind token_kind;
   intptr_t checked_argument_count;
@@ -1317,13 +1313,30 @@ void BytecodeFlowGraphBuilder::BuildStoreStaticTOS() {
   code_ += B->StoreStaticField(position_, field);
 }
 
+void BytecodeFlowGraphBuilder::BuildInitLateField() {
+  if (is_generating_interpreter()) {
+    UNIMPLEMENTED();  // TODO(alexmarkov): interpreter
+  }
+
+  LoadStackSlots(1);
+  Operand cp_index = DecodeOperandD();
+
+  const Field& field = Field::Cast(ConstantAt(cp_index, 1).value());
+  ASSERT(Smi::Cast(ConstantAt(cp_index).value()).Value() * kWordSize ==
+         field.Offset());
+
+  code_ += B->Constant(Object::sentinel());
+  code_ += B->StoreInstanceField(
+      field, StoreInstanceFieldInstr::Kind::kInitializing, kNoStoreBarrier);
+}
+
 void BytecodeFlowGraphBuilder::BuildLoadStatic() {
   const Constant operand = ConstantAt(DecodeOperandD());
   const auto& field = Field::Cast(operand.value());
   // All constant expressions (including access to const fields) are evaluated
   // in bytecode. However, values of injected cid fields are only available in
   // the VM. In such case, evaluate const fields with known value here.
-  if (field.is_const() && !field.has_initializer()) {
+  if (field.is_const() && !field.has_nontrivial_initializer()) {
     const auto& value = Object::ZoneHandle(Z, field.StaticValue());
     ASSERT((value.raw() != Object::sentinel().raw()) &&
            (value.raw() != Object::transition_sentinel().raw()));
@@ -1331,18 +1344,6 @@ void BytecodeFlowGraphBuilder::BuildLoadStatic() {
     return;
   }
   PushConstant(operand);
-  code_ += B->LoadStaticField();
-}
-
-static_assert(KernelBytecode::kMinSupportedBytecodeFormatVersion < 19,
-              "Cleanup PushStatic bytecode instruction");
-void BytecodeFlowGraphBuilder::BuildPushStatic() {
-  // Note: Field object is both pushed into the stack and
-  // available in constant pool entry D.
-  // TODO(alexmarkov): clean this up. If we stop pushing field object
-  // explicitly, we might need the following code to get it from constant
-  // pool: PushConstant(ConstantAt(DecodeOperandD()));
-
   code_ += B->LoadStaticField();
 }
 

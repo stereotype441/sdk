@@ -217,7 +217,7 @@ class Dart2TypeSystem extends TypeSystem {
 
     // No subtype relation, so no known GLB.
     // TODO(mfairhurst): implement fully NNBD GLB, and return Never (non-legacy)
-    return BottomTypeImpl.instanceLegacy;
+    return NeverTypeImpl.instanceLegacy;
   }
 
   /**
@@ -634,7 +634,7 @@ class Dart2TypeSystem extends TypeSystem {
     }
 
     // Left Bottom: if `T0` is `Never`, then `T0 <: T1`.
-    if (identical(T0, BottomTypeImpl.instance)) {
+    if (identical(T0, NeverTypeImpl.instance)) {
       return true;
     }
 
@@ -1073,11 +1073,21 @@ class Dart2TypeSystem extends TypeSystem {
 
   /// Check that [f1] is a subtype of [f2].
   bool _isFunctionSubtypeOf(FunctionType f1, FunctionType f2) {
-    return FunctionTypeImpl.relate(f1, f2, isSubtypeOf,
-        parameterRelation: (p1, p2) => isSubtypeOf(p2.type, p1.type),
+    return FunctionTypeImpl.relate(
+      f1,
+      f2,
+      isSubtypeOf,
+      parameterRelation: (p1, p2) {
+        if (p1.isRequiredNamed && !p2.isRequiredNamed) {
+          return false;
+        }
+        return isSubtypeOf(p2.type, p1.type);
+      },
+      boundsRelation: (t1, t2, p1, p2) {
         // Type parameter bounds are invariant.
-        boundsRelation: (t1, t2, p1, p2) =>
-            isSubtypeOf(t1, t2) && isSubtypeOf(t2, t1));
+        return isSubtypeOf(t1, t2) && isSubtypeOf(t2, t1);
+      },
+    );
   }
 
   bool _isInterfaceSubtypeOf(
@@ -2671,7 +2681,7 @@ abstract class TypeSystem implements public.TypeSystem {
   /// Returns a non-nullable version of [type].  This is equivalent to the
   /// operation `NonNull` defined in the spec.
   DartType promoteToNonNull(covariant TypeImpl type) {
-    if (type.isDartCoreNull) return BottomTypeImpl.instance;
+    if (type.isDartCoreNull) return NeverTypeImpl.instance;
 
     if (type is TypeParameterTypeImpl) {
       var element = type.element;

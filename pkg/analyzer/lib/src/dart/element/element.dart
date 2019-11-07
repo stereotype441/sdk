@@ -5871,6 +5871,23 @@ class MethodElementImpl extends ExecutableElementImpl implements MethodElement {
         first == 0x24);
   }
 
+  /// Return `true` if this method is `operator==`, and there is no explicit
+  /// type specified for its formal parameter, in this method or in any
+  /// overridden methods other than the one declared in `Object`.
+  bool get isOperatorEqualWithParameterTypeFromObject {
+    if (linkedNode != null) {
+      return linkedContext.hasOperatorEqualParameterTypeFromObject(linkedNode);
+    }
+    return false;
+  }
+
+  /// See [isOperatorEqualWithParameterTypeFromObject].
+  set isOperatorEqualWithParameterTypeFromObject(bool value) {
+    if (linkedNode != null) {
+      linkedContext.setOperatorEqualParameterTypeFromObject(linkedNode, value);
+    }
+  }
+
   @override
   bool get isStatic {
     if (linkedNode != null) {
@@ -6316,7 +6333,7 @@ class MultiplyDefinedElementImpl implements MultiplyDefinedElement {
 class NeverElementImpl extends ElementImpl implements TypeDefiningElement {
   /// Return the unique instance of this class.
   static NeverElementImpl get instance =>
-      BottomTypeImpl.instance.element as NeverElementImpl;
+      NeverTypeImpl.instance.element as NeverElementImpl;
 
   /// Initialize a newly created instance of this class. Instances of this class
   /// should <b>not</b> be created except as part of creating the type
@@ -6342,11 +6359,11 @@ class NeverElementImpl extends ElementImpl implements TypeDefiningElement {
   }) {
     switch (nullabilitySuffix) {
       case NullabilitySuffix.question:
-        return BottomTypeImpl.instanceNullable;
+        return NeverTypeImpl.instanceNullable;
       case NullabilitySuffix.star:
-        return BottomTypeImpl.instanceLegacy;
+        return NeverTypeImpl.instanceLegacy;
       case NullabilitySuffix.none:
-        return BottomTypeImpl.instance;
+        return NeverTypeImpl.instance;
     }
     throw StateError('Unsupported nullability: $nullabilitySuffix');
   }
@@ -7549,11 +7566,17 @@ class TypeParameterElementImpl extends ElementImpl
   }
 
   @override
-  bool operator ==(Object object) {
-    if (identical(this, object)) {
+  bool operator ==(Object other) {
+    if (identical(other, this)) {
       return true;
     }
-    return object is TypeParameterElementImpl && object.location == location;
+    if (other is TypeParameterElement) {
+      if (other.enclosingElement == null || enclosingElement == null) {
+        return identical(other, this);
+      }
+      return other.location == location;
+    }
+    return false;
   }
 
   @override
