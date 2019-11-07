@@ -161,6 +161,16 @@ mixin ElementsTypesMixin {
     return parameter;
   }
 
+  ParameterElement namedRequiredParameter({
+    @required String name,
+    @required DartType type,
+  }) {
+    var parameter = ParameterElementImpl(name, 0);
+    parameter.parameterKind = ParameterKind.NAMED_REQUIRED;
+    parameter.type = type;
+    return parameter;
+  }
+
   ParameterElement positionalParameter({String name, @required DartType type}) {
     var parameter = ParameterElementImpl(name ?? '', 0);
     parameter.parameterKind = ParameterKind.POSITIONAL;
@@ -189,5 +199,18 @@ mixin ElementsTypesMixin {
       element,
       nullabilitySuffix: nullabilitySuffix,
     );
+  }
+
+  TypeParameterTypeImpl typeParameterTypeNone(TypeParameterElement element) {
+    return element.instantiate(nullabilitySuffix: NullabilitySuffix.none);
+  }
+
+  TypeParameterTypeImpl typeParameterTypeQuestion(
+      TypeParameterElement element) {
+    return element.instantiate(nullabilitySuffix: NullabilitySuffix.question);
+  }
+
+  TypeParameterTypeImpl typeParameterTypeStar(TypeParameterElement element) {
+    return element.instantiate(nullabilitySuffix: NullabilitySuffix.star);
   }
 }
