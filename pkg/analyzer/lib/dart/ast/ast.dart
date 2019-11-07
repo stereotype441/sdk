@@ -2,8 +2,6 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'package:analyzer/dart/analysis/features.dart';
-import 'package:analyzer/dart/ast/precedence.dart';
 /// Defines the AST model. The AST (Abstract Syntax Tree) model describes the
 /// syntactic (as opposed to semantic) structure of Dart code. The semantic
 /// structure of the code is modeled by the
@@ -34,6 +32,8 @@ import 'package:analyzer/dart/ast/precedence.dart';
 /// When an AST is resolved, the identifiers in the AST will be associated with
 /// the elements that they refer to and every expression in the AST will have a
 /// type associated with it.
+import 'package:analyzer/dart/analysis/features.dart';
+import 'package:analyzer/dart/ast/precedence.dart';
 import 'package:analyzer/dart/ast/syntactic_entity.dart';
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/element/element.dart';
