@@ -1033,7 +1033,7 @@ int f(int i, int j) => i >> j;
     assertNoUpstreamNullability(decoratedTypeAnnotation('int f').node);
   }
 
-  test_binaryExpression_left_dynamic() async {
+  solo_test_binaryExpression_left_dynamic() async {
     await analyze('''
 Object f(dynamic x, int y) => x + g(y);
 int g(int z) => z;
