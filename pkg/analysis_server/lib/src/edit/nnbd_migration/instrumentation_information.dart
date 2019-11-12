@@ -36,7 +36,7 @@ class InstrumentationInformation {
 
   /// Return information about the given [node].
   NodeInformation nodeInfoFor(NullabilityNodeInfo node) {
-      return nodeInformation[node];
+    return nodeInformation[node];
   }
 
   /// Return the type annotation associated with the [node] or `null` if the
@@ -65,14 +65,15 @@ class NodeInformation {
 
   final String descriptionPrefix;
 
-  NodeInformation(this.filePath, this.astNode, this.element, this.descriptionPrefix);
+  NodeInformation(
+      this.filePath, this.astNode, this.element, this.descriptionPrefix);
 
   /// Return detail text for a fix built from an edge with this node as a
   /// destination.
   String get descriptionForDestination {
-      // TODO(paulberry): describe AST nodes
-      var description = element.toString();
-      return "A nullable value can't be used as $descriptionPrefix$description";
+    // TODO(paulberry): describe AST nodes
+    var description = element.toString();
+    return "A nullable value can't be used as $descriptionPrefix$description";
   }
 }
 
@@ -81,6 +82,8 @@ class NodeInformation {
 class SourceInformation {
   /// A map from the type annotations found in the source code, to the
   /// nullability nodes that are associated with that type.
+  ///
+  /// TODO(paulberry): we should probably get rid of this data structure.
   final Map<TypeAnnotation, NullabilityNodeInfo> explicitTypeNullability = {};
 
   /// A map from the fixes that were decided on to the reasons for the fix.

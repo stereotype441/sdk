@@ -245,8 +245,7 @@ class InfoBuilder {
         NullabilityNodeInfo destination = reason.destinationNode;
         var nodeInfo = info.nodeInfoFor(destination);
         if (nodeInfo != null) {
-          details.add(RegionDetail(
-            nodeInfo.descriptionForDestination,
+          details.add(RegionDetail(nodeInfo.descriptionForDestination,
               _targetForNode(nodeInfo.filePath, nodeInfo.astNode)));
         } else {
           details.add(RegionDetail('node with no info ($destination)', null));
