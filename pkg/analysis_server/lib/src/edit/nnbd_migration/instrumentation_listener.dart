@@ -22,6 +22,7 @@ class InstrumentationListener implements NullabilityMigrationInstrumentation {
   @override
   void explicitTypeNullability(
       Source source, TypeAnnotation typeAnnotation, NullabilityNodeInfo node) {
+    data.blet[node] = NodeInformation(_filePathForSource(source), typeAnnotation, null, 'explicit type ');
     _sourceInfo(source).explicitTypeNullability[typeAnnotation] = node;
   }
 
