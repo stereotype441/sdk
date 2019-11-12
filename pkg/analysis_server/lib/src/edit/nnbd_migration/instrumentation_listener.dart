@@ -29,15 +29,14 @@ class InstrumentationListener implements NullabilityMigrationInstrumentation {
 
   @override
   void externalDecoratedType(Element element, DecoratedTypeInfo decoratedType) {
-    _storeNodeInformation(
-        decoratedType, _filePathForElement(element), null, element, '');
+    _storeNodeInformation(decoratedType, element.source, null, element, '');
   }
 
   @override
   void externalDecoratedTypeParameterBound(
       TypeParameterElement typeParameter, DecoratedTypeInfo decoratedType) {
-    _storeNodeInformation(decoratedType, _filePathForElement(typeParameter),
-        null, typeParameter, 'bound of ');
+    _storeNodeInformation(
+        decoratedType, typeParameter.source, null, typeParameter, 'bound of ');
   }
 
   @override
@@ -60,25 +59,23 @@ class InstrumentationListener implements NullabilityMigrationInstrumentation {
   @override
   void implicitReturnType(
       Source source, AstNode node, DecoratedTypeInfo decoratedReturnType) {
-    _storeNodeInformation(decoratedReturnType, _filePathForSource(source), node,
-        null, 'return type of ');
+    _storeNodeInformation(
+        decoratedReturnType, source, node, null, 'return type of ');
   }
 
   @override
   void implicitType(
       Source source, AstNode node, DecoratedTypeInfo decoratedType) {
-    _storeNodeInformation(
-        decoratedType, _filePathForSource(source), node, null, 'type of ');
+    _storeNodeInformation(decoratedType, source, node, null, 'type of ');
   }
 
   @override
   void implicitTypeArguments(
       Source source, AstNode node, Iterable<DecoratedTypeInfo> types) {
-    var filePath = _filePathForSource(source);
     int i = 0;
     for (var type in types) {
       _storeNodeInformation(
-          type, filePath, node, null, 'implicit type argument $i of ');
+          type, source, node, null, 'implicit type argument $i of ');
       i++;
     }
   }
@@ -86,10 +83,6 @@ class InstrumentationListener implements NullabilityMigrationInstrumentation {
   @override
   void propagationStep(PropagationInfo info) {
     data.propagationSteps.add(info);
-  }
-
-  String _filePathForElement(Element element) {
-    return element.source.toString();
   }
 
   String _filePathForSource(Source source) {
@@ -101,27 +94,29 @@ class InstrumentationListener implements NullabilityMigrationInstrumentation {
   SourceInformation _sourceInfo(Source source) =>
       data.sourceInformation.putIfAbsent(source, () => SourceInformation());
 
-  void _storeNodeInformation(DecoratedTypeInfo decoratedType, String filePath,
+  void _storeNodeInformation(DecoratedTypeInfo decoratedType, Source source,
       AstNode astNode, Element element, String description) {
-    data.nodeInformation[decoratedType.node] =
-        NodeInformation(filePath, astNode, element, description);
+    // Make sure source info exists for the given source.
+    _sourceInfo(source);
+    data.nodeInformation[decoratedType.node] = NodeInformation(
+        _filePathForSource(source), astNode, element, description);
     var dartType = decoratedType.type;
     if (dartType is InterfaceType) {
       for (int i = 0; i < dartType.typeArguments.length; i++) {
-        _storeNodeInformation(decoratedType.typeArgument(i), filePath, astNode,
+        _storeNodeInformation(decoratedType.typeArgument(i), source, astNode,
             element, 'type argument $i of $description');
       }
     } else if (dartType is FunctionType) {
-      _storeNodeInformation(decoratedType.returnType, filePath, astNode,
-          element, 'return type of $description');
+      _storeNodeInformation(decoratedType.returnType, source, astNode, element,
+          'return type of $description');
       int i = 0;
       for (var parameter in dartType.parameters) {
         if (parameter.isNamed) {
           var name = parameter.name;
-          _storeNodeInformation(decoratedType.namedParameter(name), filePath,
+          _storeNodeInformation(decoratedType.namedParameter(name), source,
               astNode, element, 'named parameter $name of $description');
         } else {
-          _storeNodeInformation(decoratedType.positionalParameter(i), filePath,
+          _storeNodeInformation(decoratedType.positionalParameter(i), source,
               astNode, element, 'positional parameter $i of $description');
           i++;
         }
