@@ -1622,7 +1622,9 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
             '(${expression.toSource()}) offset=${expression.offset}');
       }
       EdgeOrigin edgeOrigin;
-      if (!sourceType.type.isDynamic) {
+      if (sourceType.type.isDynamic) {
+        edgeOrigin = DynamicAssignmentOrigin(source, expression);
+      } else {
         if (fromDefaultValue) {
           edgeOrigin = DefaultValueOrigin(source, expression);
         } else {
