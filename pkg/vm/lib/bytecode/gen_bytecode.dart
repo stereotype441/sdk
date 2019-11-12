@@ -1943,6 +1943,14 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
       _handleDefaultTypeArguments(function, done);
 
       asm.bind(done);
+    } else if (isClosure &&
+        !(parentFunction != null &&
+            parentFunction.dartAsyncMarker != AsyncMarker.Sync)) {
+      // Closures can be called dynamically with arbitrary arguments,
+      // so they should check number of type arguments, even if
+      // closure is not generic.
+      // Synthetic async_op closures don't need this check.
+      asm.emitCheckFunctionTypeArgs(0, locals.scratchVarIndexInFrame);
     }
 
     // Open initial scope before the first CheckStack, as VM might
@@ -1956,7 +1964,8 @@ class BytecodeGenerator extends RecursiveVisitor<Null> {
         asm.localVariableTable
             .recordContextVariable(asm.offset, locals.contextVarIndexInFrame);
       }
-      if (locals.hasReceiver) {
+      if (locals.hasReceiver &&
+          (!isClosure || locals.isCaptured(locals.receiverVar))) {
         _declareLocalVariable(locals.receiverVar, function.fileOffset);
       }
       for (var v in function.positionalParameters) {

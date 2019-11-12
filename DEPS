@@ -84,7 +84,7 @@ vars = {
   # For more details, see https://github.com/dart-lang/sdk/issues/30164
   "dart_style_tag": "1.3.2",  # Please see the note above before updating.
 
-  "dartdoc_tag" : "v0.29.0",
+  "dartdoc_tag" : "v0.29.1",
   "ffi_tag": "ea88d71b043ee14b268c3aedff14e9eb32e20959",
   "fixnum_tag": "0.10.9",
   "glob_tag": "1.1.7",
@@ -117,7 +117,7 @@ vars = {
   "ply_rev": "604b32590ffad5cbb82e4afef1d305512d06ae93",
   "pool_tag": "1.3.6",
   "protobuf_rev": "3746c8fd3f2b0147623a8e3db89c3ff4330de760",
-  "pub_rev": "80ac76400ff58fde3c5a335d860d196c3febe837",
+  "pub_rev": "d15067931a6b671a1c9dcc98b5923347676269cf",
   "pub_semver_tag": "1.4.2",
   "quiver-dart_tag": "2.0.0+1",
   "resource_rev": "f8e37558a1c4f54550aa463b88a6a831e3e33cd6",

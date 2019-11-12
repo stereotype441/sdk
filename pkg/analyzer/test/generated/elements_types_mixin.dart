@@ -14,6 +14,12 @@ import 'package:meta/meta.dart';
 mixin ElementsTypesMixin {
   DynamicTypeImpl get dynamicType => typeProvider.dynamicType;
 
+  NeverTypeImpl get neverNone => NeverTypeImpl.instance;
+
+  NeverTypeImpl get neverQuestion => NeverTypeImpl.instanceNullable;
+
+  NeverTypeImpl get neverStar => NeverTypeImpl.instanceLegacy;
+
   TypeProvider get typeProvider;
 
   ClassElementImpl class_({
@@ -40,10 +46,10 @@ mixin ElementsTypesMixin {
     @required DartType returnType,
     @required NullabilitySuffix nullabilitySuffix,
   }) {
-    return FunctionTypeImpl.synthetic(
-      returnType,
-      typeFormals,
-      parameters,
+    return FunctionTypeImpl(
+      typeFormals: typeFormals,
+      parameters: parameters,
+      returnType: returnType,
       nullabilitySuffix: nullabilitySuffix,
     );
   }
