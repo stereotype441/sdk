@@ -72,7 +72,7 @@ class NodeInformation {
   /// destination.
   String get descriptionForDestination {
     // TODO(paulberry): describe AST nodes
-    var description = element.toString();
+    var description = (element ?? '???').toString();
     return "A nullable value can't be used as $descriptionPrefix$description";
   }
 }

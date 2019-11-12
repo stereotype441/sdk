@@ -23,7 +23,7 @@ class InstrumentationListener implements NullabilityMigrationInstrumentation {
   void explicitTypeNullability(
       Source source, TypeAnnotation typeAnnotation, NullabilityNodeInfo node) {
     data.nodeInformation[node] = NodeInformation(
-        _filePathForSource(source), typeAnnotation, null, 'explicit type ');
+        _filePathForSource(source), typeAnnotation, null, 'the explicit type ');
     _sourceInfo(source).explicitTypeNullability[typeAnnotation] = node;
   }
 
