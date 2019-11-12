@@ -5,6 +5,7 @@
 import 'package:analysis_server/src/edit/nnbd_migration/instrumentation_information.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:nnbd_migration/instrumentation.dart';
 import 'package:nnbd_migration/nnbd_migration.dart';
@@ -24,15 +25,19 @@ class InstrumentationListener implements NullabilityMigrationInstrumentation {
     _sourceInfo(source).explicitTypeNullability[typeAnnotation] = node;
   }
 
+  String _filePathForElement(Element element) {
+    return element.source.toString();
+  }
+
   @override
   void externalDecoratedType(Element element, DecoratedTypeInfo decoratedType) {
-    data.externalDecoratedType[element] = decoratedType;
+    _storeBlet(decoratedType, _filePathForElement(element), null, element, '');
   }
 
   @override
   void externalDecoratedTypeParameterBound(
       TypeParameterElement typeParameter, DecoratedTypeInfo decoratedType) {
-    // TODO(paulberry): make use of this information.
+    _storeBlet(decoratedType, _filePathForElement(typeParameter), null, typeParameter, 'bound of ');
   }
 
   @override
@@ -52,22 +57,53 @@ class InstrumentationListener implements NullabilityMigrationInstrumentation {
     data.always = always;
   }
 
+  void _storeBlet(DecoratedTypeInfo decoratedType, String filePath, AstNode astNode, Element element, String description) {
+    data.blet[decoratedType.node] = NodeInformation(filePath, astNode, element, description);
+    var dartType = decoratedType.type;
+    if (dartType is InterfaceType) {
+      for (int i = 0; i < dartType.typeArguments.length; i++) {
+        _storeBlet(decoratedType.typeArgument(i), filePath, astNode, element, 'type argument $i of $description');
+      }
+    } else if (dartType is FunctionType) {
+      _storeBlet(decoratedType.returnType, filePath, astNode, element, 'return type of $description');
+      int i = 0;
+      for (var parameter in dartType.parameters) {
+        if (parameter.isNamed) {
+          var name = parameter.name;
+          _storeBlet(decoratedType.namedParameter(name), filePath, astNode, element, 'named parameter $name of $description');
+        } else {
+          _storeBlet(decoratedType.positionalParameter(i), filePath, astNode, element, 'positional parameter $i of $description');
+          i++;
+        }
+      }
+    }
+  }
+
   @override
   void implicitReturnType(
       Source source, AstNode node, DecoratedTypeInfo decoratedReturnType) {
-    _sourceInfo(source).implicitReturnType[node] = decoratedReturnType;
+    _storeBlet(decoratedReturnType, _filePathForSource(source), node, null, 'return type of ');
+  }
+
+  String _filePathForSource(Source source) {
+    return source.toString();
   }
 
   @override
   void implicitType(
       Source source, AstNode node, DecoratedTypeInfo decoratedType) {
-    _sourceInfo(source).implicitType[node] = decoratedType;
+    _storeBlet(decoratedType, _filePathForSource(source), node, null, 'type of ');
   }
 
   @override
   void implicitTypeArguments(
       Source source, AstNode node, Iterable<DecoratedTypeInfo> types) {
-    _sourceInfo(source).implicitTypeArguments[node] = types.toList();
+    var filePath = _filePathForSource(source);
+    int i = 0;
+    for (var type in types) {
+      _storeBlet(type, filePath, node, null, 'implicit type argument $i of ');
+      i++;
+    }
   }
 
   @override
