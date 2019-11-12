@@ -20,7 +20,8 @@ class InstrumentationInformation {
   /// The node used for type sources that are never `null`.
   NullabilityNodeInfo never;
 
-  Expando<NodeInformation> blet = Expando<NodeInformation>();
+  /// Expando associating [NodeInformation] wich [NullabilityNodeInfo] objects.
+  Expando<NodeInformation> nodeInformation = Expando<NodeInformation>();
 
   /// A list of the steps in the propagation of nullability information through
   /// the nullability graph, to report details of the step that was performed
@@ -35,7 +36,7 @@ class InstrumentationInformation {
 
   /// Return information about the given [node].
   NodeInformation nodeInfoFor(NullabilityNodeInfo node) {
-      return blet[node];
+      return nodeInformation[node];
   }
 
   /// Return the type annotation associated with the [node] or `null` if the

@@ -22,7 +22,7 @@ class InstrumentationListener implements NullabilityMigrationInstrumentation {
   @override
   void explicitTypeNullability(
       Source source, TypeAnnotation typeAnnotation, NullabilityNodeInfo node) {
-    data.blet[node] = NodeInformation(_filePathForSource(source), typeAnnotation, null, 'explicit type ');
+    data.nodeInformation[node] = NodeInformation(_filePathForSource(source), typeAnnotation, null, 'explicit type ');
     _sourceInfo(source).explicitTypeNullability[typeAnnotation] = node;
   }
 
@@ -32,13 +32,13 @@ class InstrumentationListener implements NullabilityMigrationInstrumentation {
 
   @override
   void externalDecoratedType(Element element, DecoratedTypeInfo decoratedType) {
-    _storeBlet(decoratedType, _filePathForElement(element), null, element, '');
+    _storeNodeInformation(decoratedType, _filePathForElement(element), null, element, '');
   }
 
   @override
   void externalDecoratedTypeParameterBound(
       TypeParameterElement typeParameter, DecoratedTypeInfo decoratedType) {
-    _storeBlet(decoratedType, _filePathForElement(typeParameter), null, typeParameter, 'bound of ');
+    _storeNodeInformation(decoratedType, _filePathForElement(typeParameter), null, typeParameter, 'bound of ');
   }
 
   @override
@@ -58,22 +58,22 @@ class InstrumentationListener implements NullabilityMigrationInstrumentation {
     data.always = always;
   }
 
-  void _storeBlet(DecoratedTypeInfo decoratedType, String filePath, AstNode astNode, Element element, String description) {
-    data.blet[decoratedType.node] = NodeInformation(filePath, astNode, element, description);
+  void _storeNodeInformation(DecoratedTypeInfo decoratedType, String filePath, AstNode astNode, Element element, String description) {
+    data.nodeInformation[decoratedType.node] = NodeInformation(filePath, astNode, element, description);
     var dartType = decoratedType.type;
     if (dartType is InterfaceType) {
       for (int i = 0; i < dartType.typeArguments.length; i++) {
-        _storeBlet(decoratedType.typeArgument(i), filePath, astNode, element, 'type argument $i of $description');
+        _storeNodeInformation(decoratedType.typeArgument(i), filePath, astNode, element, 'type argument $i of $description');
       }
     } else if (dartType is FunctionType) {
-      _storeBlet(decoratedType.returnType, filePath, astNode, element, 'return type of $description');
+      _storeNodeInformation(decoratedType.returnType, filePath, astNode, element, 'return type of $description');
       int i = 0;
       for (var parameter in dartType.parameters) {
         if (parameter.isNamed) {
           var name = parameter.name;
-          _storeBlet(decoratedType.namedParameter(name), filePath, astNode, element, 'named parameter $name of $description');
+          _storeNodeInformation(decoratedType.namedParameter(name), filePath, astNode, element, 'named parameter $name of $description');
         } else {
-          _storeBlet(decoratedType.positionalParameter(i), filePath, astNode, element, 'positional parameter $i of $description');
+          _storeNodeInformation(decoratedType.positionalParameter(i), filePath, astNode, element, 'positional parameter $i of $description');
           i++;
         }
       }
@@ -83,7 +83,7 @@ class InstrumentationListener implements NullabilityMigrationInstrumentation {
   @override
   void implicitReturnType(
       Source source, AstNode node, DecoratedTypeInfo decoratedReturnType) {
-    _storeBlet(decoratedReturnType, _filePathForSource(source), node, null, 'return type of ');
+    _storeNodeInformation(decoratedReturnType, _filePathForSource(source), node, null, 'return type of ');
   }
 
   String _filePathForSource(Source source) {
@@ -93,7 +93,7 @@ class InstrumentationListener implements NullabilityMigrationInstrumentation {
   @override
   void implicitType(
       Source source, AstNode node, DecoratedTypeInfo decoratedType) {
-    _storeBlet(decoratedType, _filePathForSource(source), node, null, 'type of ');
+    _storeNodeInformation(decoratedType, _filePathForSource(source), node, null, 'type of ');
   }
 
   @override
@@ -102,7 +102,7 @@ class InstrumentationListener implements NullabilityMigrationInstrumentation {
     var filePath = _filePathForSource(source);
     int i = 0;
     for (var type in types) {
-      _storeBlet(type, filePath, node, null, 'implicit type argument $i of ');
+      _storeNodeInformation(type, filePath, node, null, 'implicit type argument $i of ');
       i++;
     }
   }
