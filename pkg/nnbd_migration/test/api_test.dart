@@ -1030,7 +1030,7 @@ List<int?> f(Iterable<int/*?*/> a) => a;
     await _checkSingleFileChanges(content, expected);
   }
 
-  @FailingTest(issue: '')
+  @FailingTest(issue: 'https://github.com/dart-lang/sdk/issues/39368')
   test_downcast_widest_type_from_top_type_parameters() async {
     var content = '''
 List<int> f1(dynamic a) => a;
@@ -2846,7 +2846,7 @@ Object f(x) => x;
     await _checkSingleFileChanges(content, expected);
   }
 
-  @FailingTest(issue: 'TODO(paulberry)')
+  @FailingTest(issue: 'https://github.com/dart-lang/sdk/issues/39369')
   test_topLevelFunction_returnType_implicit_dynamic() async {
     var content = '''
 f() {}
