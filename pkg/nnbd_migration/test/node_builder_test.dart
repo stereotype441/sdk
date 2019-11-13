@@ -50,7 +50,7 @@ void f() {
 ''');
     var exceptionType =
         variables.decoratedElementType(findNode.simple('ex').staticElement);
-    expect(exceptionType.node, always);
+    expect(exceptionType.node.isImmutable, false);
     var stackTraceType =
         variables.decoratedElementType(findNode.simple('st').staticElement);
     expect(stackTraceType.node, never);
@@ -85,7 +85,7 @@ void f() {
 ''');
     var exceptionType =
         variables.decoratedElementType(findNode.simple('ex').staticElement);
-    expect(exceptionType.node, always);
+    expect(exceptionType.node.isImmutable, false);
   }
 
   test_class_alias_synthetic_constructors_no_parameters() async {
