@@ -203,7 +203,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   DecoratedType getOrComputeElementType(Element element,
       {DecoratedType targetType}) {
     Map<TypeParameterElement, DecoratedType> substitution;
-    Element baseElement = element is Member ? element.baseElement : element;
+    Element baseElement = element.declaration;
     if (targetType != null) {
       var classElement = baseElement.enclosingElement as ClassElement;
       if (classElement.typeParameters.isNotEmpty) {
@@ -386,7 +386,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       var callee = node.staticElement;
       if (callee == null) {
         rightOperand.accept(this);
-        return _makeDynamicType(node);
+        return _makeNullableDynamicType(node);
       } else {
         var calleeType =
             getOrComputeElementType(callee, targetType: targetType);
@@ -763,7 +763,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       // Dynamic dispatch.  The return type is `dynamic`.
       // TODO(paulberry): would it be better to assume a return type of `Never`
       // so that we don't unnecessarily propagate nullabilities everywhere?
-      return _makeDynamicType(node);
+      return _makeNullableDynamicType(node);
     }
     var calleeType = getOrComputeElementType(callee, targetType: targetType);
     // TODO(paulberry): substitute if necessary
@@ -926,7 +926,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       // so that we don't unnecessarily propagate nullabilities everywhere?
       node.typeArguments?.accept(this);
       node.argumentList.accept(this);
-      return _makeDynamicType(node);
+      return _makeNullableDynamicType(node);
     } else if (callee is VariableElement) {
       // Function expression invocation that looks like a method invocation.
       return _handleFunctionExpressionInvocation(node, node.methodName,
@@ -994,7 +994,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         // Dynamic dispatch.  The return type is `dynamic`.
         // TODO(paulberry): would it be better to assume a return type of `Never`
         // so that we don't unnecessarily propagate nullabilities everywhere?
-        writeType = _makeDynamicType(node);
+        writeType = _makeNullableDynamicType(node);
       } else {
         var calleeType =
             getOrComputeElementType(callee, targetType: targetType);
@@ -1039,7 +1039,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         // Dynamic dispatch.  The return type is `dynamic`.
         // TODO(paulberry): would it be better to assume a return type of `Never`
         // so that we don't unnecessarily propagate nullabilities everywhere?
-        staticType = _makeDynamicType(node);
+        staticType = _makeNullableDynamicType(node);
       } else {
         var calleeType =
             getOrComputeElementType(callee, targetType: targetType);
@@ -1464,16 +1464,12 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   DecoratedType _decorateUpperOrLowerBound(AstNode astNode, DartType type,
       DecoratedType left, DecoratedType right, bool isLUB,
       {NullabilityNode node}) {
-    if (type.isDynamic || type.isVoid) {
-      if (type.isDynamic) {
-        _unimplemented(astNode, 'LUB/GLB with dynamic');
-      }
-      return DecoratedType(type, _graph.always);
-    }
     node ??= isLUB
         ? NullabilityNode.forLUB(left.node, right.node)
         : _nullabilityNodeForGLB(astNode, left.node, right.node);
-    if (type is InterfaceType) {
+    if (type.isDynamic || type.isVoid) {
+      return DecoratedType(type, node);
+    } else if (type is InterfaceType) {
       if (type.typeArguments.isEmpty) {
         return DecoratedType(type, node);
       } else {
@@ -1622,7 +1618,9 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
             '(${expression.toSource()}) offset=${expression.offset}');
       }
       EdgeOrigin edgeOrigin;
-      if (!sourceType.type.isDynamic) {
+      if (sourceType.type.isDynamic) {
+        edgeOrigin = DynamicAssignmentOrigin(source, expression);
+      } else {
         if (fromDefaultValue) {
           edgeOrigin = DefaultValueOrigin(source, expression);
         } else {
@@ -1659,7 +1657,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
               destination: destinationType,
               hard: false);
         } else {
-          sourceType = _makeDynamicType(compoundOperatorInfo);
+          sourceType = _makeNullableDynamicType(compoundOperatorInfo);
         }
       } else {
         _checkAssignment(edgeOrigin,
@@ -1702,10 +1700,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   void _handleConstructorRedirection(
       FormalParameterList parameters, ConstructorName redirectedConstructor) {
-    var callee = redirectedConstructor.staticElement;
-    if (callee is ConstructorMember) {
-      callee = (callee as ConstructorMember).baseElement;
-    }
+    var callee = redirectedConstructor.staticElement.declaration;
     var redirectedClass = callee.enclosingElement;
     var calleeType = _variables.decoratedElementType(callee);
     var typeArguments = redirectedConstructor.type.typeArguments;
@@ -1751,10 +1746,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
                 classElement.thisType,
                 Name(classElement.library.source.uri, declaredElement.name)) ??
             const <ExecutableElement>[]) {
-          if (overriddenElement is ExecutableMember) {
-            var member = overriddenElement as ExecutableMember;
-            overriddenElement = member.baseElement;
-          }
+          overriddenElement = overriddenElement.declaration;
           var overriddenClass =
               overriddenElement.enclosingElement as ClassElement;
           var decoratedOverriddenFunctionType =
@@ -1871,7 +1863,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       _flowAnalysis.forEach_bodyBegin(
           node,
           lhsElement is PromotableElement ? lhsElement : null,
-          elementType ?? _makeDynamicType(node));
+          elementType ?? _makeNullableDynamicType(node));
     }
 
     // The condition may fail/iterable may be empty, so the body gets a new
@@ -1903,7 +1895,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       // Invocation of type `dynamic` or `Function`.
       typeArguments?.accept(this);
       argumentList.accept(this);
-      return _makeDynamicType(node);
+      return _makeNullableDynamicType(node);
     }
   }
 
@@ -2012,7 +2004,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     }
     if (callee == null) {
       // Dynamic dispatch.
-      return _makeDynamicType(node);
+      return _makeNullableDynamicType(node);
     }
     var calleeType = getOrComputeElementType(callee, targetType: targetType);
     // TODO(paulberry): substitute if necessary
@@ -2068,7 +2060,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     }
   }
 
-  DecoratedType _makeDynamicType(AstNode astNode) {
+  DecoratedType _makeNullableDynamicType(AstNode astNode) {
     var decoratedType = DecoratedType.forImplicitType(
         typeProvider, typeProvider.dynamicType, _graph);
     _graph.makeNullable(
