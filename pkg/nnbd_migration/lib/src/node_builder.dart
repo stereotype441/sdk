@@ -452,8 +452,6 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
       decoratedBound = bound.accept(this);
     } else {
       var nullabilityNode = NullabilityNode.forInferredType();
-      _graph.union(_graph.always, nullabilityNode,
-          AlwaysNullableTypeOrigin(source, node));
       decoratedBound = DecoratedType(_typeProvider.objectType, nullabilityNode);
     }
     _typeFormalBounds?.add(decoratedBound);

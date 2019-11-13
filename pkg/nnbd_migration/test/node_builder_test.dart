@@ -665,7 +665,7 @@ T f<T>(T t) => t;
     var decoratedType = decoratedFunctionType('f');
     var bound = decoratedTypeParameterBound('T>');
     expect(decoratedType.typeFormalBounds[0], same(bound));
-    assertUnion(always, bound.node);
+    assertNoEdge(always, bound.node);
     expect(bound.type, same(typeProvider.objectType));
   }
 
@@ -1205,7 +1205,7 @@ class C {
     var decoratedType = decoratedMethodType('f');
     var bound = decoratedTypeParameterBound('T>');
     expect(decoratedType.typeFormalBounds[0], same(bound));
-    assertUnion(always, bound.node);
+    assertNoEdge(always, bound.node);
     expect(bound.type, same(typeProvider.objectType));
   }
 
@@ -1528,7 +1528,7 @@ class C<T extends Object> {}
 class C<T> {}
 ''');
     var bound = decoratedTypeParameterBound('T');
-    assertUnion(always, bound.node);
+    assertNoEdge(always, bound.node);
     expect(bound.type, same(typeProvider.objectType));
   }
 
