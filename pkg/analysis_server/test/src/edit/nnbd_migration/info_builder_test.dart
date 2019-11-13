@@ -504,17 +504,11 @@ class A {
   void m(p) {}
 }
 class B extends A {
-  void m(Object? p) {}
+  void m(Object p) {}
 }
 ''');
     List<RegionInfo> regions = unit.fixRegions;
-    expect(regions, hasLength(1));
-    // TODO(brianwilkerson) The detail should read something like
-    //  "The overridden method accepts a nullable type"
-    assertRegion(
-        region: regions[0],
-        offset: 62,
-        details: ["A nullable value is assigned"]);
+    expect(regions, isEmpty);
   }
 
   test_parameter_named_omittedInCall() async {
