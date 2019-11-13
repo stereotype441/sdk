@@ -17,6 +17,7 @@ import 'package:analyzer/src/dart/constant/evaluation.dart';
 import 'package:analyzer/src/dart/constant/value.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type_algebra.dart';
+import 'package:analyzer/src/dart/resolver/variance.dart';
 import 'package:analyzer/src/generated/constant.dart' show EvaluationResultImpl;
 import 'package:analyzer/src/generated/engine.dart'
     show AnalysisContext, AnalysisEngine, AnalysisOptionsImpl;
@@ -1996,6 +1997,9 @@ class ConstructorElementImpl extends ExecutableElementImpl
       List<ConstructorInitializer> constantInitializers) {
     _constantInitializers = constantInitializers;
   }
+
+  @override
+  ConstructorElement get declaration => this;
 
   @override
   String get displayName {
@@ -4333,6 +4337,9 @@ class FieldElementImpl extends PropertyInducingElementImpl
   FieldElementImpl.forNode(Identifier name) : super.forNode(name);
 
   @override
+  FieldElement get declaration => this;
+
+  @override
   bool get isCovariant {
     if (linkedNode != null) {
       return linkedContext.isExplicitlyCovariant(linkedNode);
@@ -4459,6 +4466,9 @@ class FunctionElementImpl extends ExecutableElementImpl
     this.returnType = returnType;
     this.parameters = parameters;
   }
+
+  @override
+  ExecutableElement get declaration => this;
 
   @override
   String get displayName {
@@ -5848,6 +5858,9 @@ class MethodElementImpl extends ExecutableElementImpl implements MethodElement {
   MethodElementImpl.forNode(Identifier name) : super.forNode(name);
 
   @override
+  MethodElement get declaration => this;
+
+  @override
   String get displayName {
     String displayName = super.displayName;
     if ("unary-" == displayName) {
@@ -6561,6 +6574,9 @@ class ParameterElementImpl extends VariableElementImpl
   }
 
   @override
+  ParameterElement get declaration => this;
+
+  @override
   String get defaultValueCode {
     if (linkedNode != null) {
       return linkedContext.getDefaultValueCode(linkedNode);
@@ -7069,6 +7085,9 @@ class PropertyAccessorElementImpl extends ExecutableElementImpl
     return variable.setter;
   }
 
+  @override
+  PropertyAccessorElement get declaration => this;
+
   /// Set whether this accessor is a getter.
   void set getter(bool isGetter) {
     setModifier(Modifier.GETTER, isGetter);
@@ -7472,6 +7491,10 @@ class TypeParameterElementImpl extends ElementImpl
   /// if this parameter does not have an explicit bound.
   DartType _bound;
 
+  /// The value representing the variance modifier keyword, or `null` if
+  /// there is no explicit variance modifier, meaning legacy covariance.
+  Variance _variance;
+
   /// Initialize a newly created method element to have the given [name] and
   /// [offset].
   TypeParameterElementImpl(String name, int offset) : super(name, offset);
@@ -7520,6 +7543,9 @@ class TypeParameterElementImpl extends ElementImpl
     }
     return super.codeOffset;
   }
+
+  @override
+  TypeParameterElement get declaration => this;
 
   /// The default value of the type parameter. It is used to provide the
   /// corresponding missing type argument in type annotations and as the
@@ -7574,6 +7600,12 @@ class TypeParameterElementImpl extends ElementImpl
   void set type(TypeParameterType type) {
     _type = type;
   }
+
+  Variance get variance => _variance ?? Variance.covariant;
+
+  void set variance(Variance newVariance) => _variance = newVariance;
+
+  bool get isLegacyCovariant => _variance == null;
 
   @override
   bool operator ==(Object other) {
@@ -7734,6 +7766,9 @@ abstract class VariableElementImpl extends ElementImpl
 
   @override
   DartObject get constantValue => evaluationResult?.value;
+
+  @override
+  VariableElement get declaration => this;
 
   @override
   String get displayName => name;

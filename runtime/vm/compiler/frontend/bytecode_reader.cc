@@ -502,12 +502,11 @@ void BytecodeReaderHelper::ReadClosureDeclaration(const Function& function,
   closures_->SetAt(closureIndex, closure);
 
   Type& signature_type = Type::Handle(
-      Z, ReadFunctionSignature(closure,
-                               (flags & kHasOptionalPositionalParamsFlag) != 0,
-                               (flags & kHasOptionalNamedParamsFlag) != 0,
-                               (flags & kHasTypeParamsFlag) != 0,
-                               /* has_positional_param_names = */ true,
-                               Nullability::kNonNullable));
+      Z, ReadFunctionSignature(
+             closure, (flags & kHasOptionalPositionalParamsFlag) != 0,
+             (flags & kHasOptionalNamedParamsFlag) != 0,
+             (flags & kHasTypeParamsFlag) != 0,
+             /* has_positional_param_names = */ true, kNonNullable));
 
   closure.SetSignatureType(signature_type);
 
@@ -1509,7 +1508,7 @@ RawObject* BytecodeReaderHelper::ReadObjectContents(uint32_t header) {
       const Nullability nullability =
           bytecode_component_->GetVersion() >= 24
               ? static_cast<Nullability>((flags & kNullabilityMask) / kFlagBit4)
-              : Nullability::kLegacy;
+              : kLegacy;
       return ReadType(tag, nullability);
     }
     default:
@@ -1670,7 +1669,14 @@ RawObject* BytecodeReaderHelper::ReadType(intptr_t tag,
       if (!cls.is_declaration_loaded()) {
         LoadReferencedClass(cls);
       }
-      return cls.DeclarationType(nullability);
+      Type& type = Type::Handle(Z, cls.DeclarationType());
+      // TODO(regis): Remove this workaround once nullability of Null provided
+      // by CFE is always kNullable.
+      if (type.IsNullType()) {
+        ASSERT(type.IsNullable());
+        return type.raw();
+      }
+      return type.ToNullability(nullability, Heap::kOld);
     }
     case kTypeParameter: {
       Object& parent = Object::Handle(Z, ReadObject());
@@ -1704,9 +1710,9 @@ RawObject* BytecodeReaderHelper::ReadType(intptr_t tag,
       }
       const TypeArguments& type_arguments =
           TypeArguments::CheckedHandle(Z, ReadObject());
-      const Type& type =
-          Type::Handle(Z, Type::New(cls, type_arguments,
-                                    TokenPosition::kNoSource, nullability));
+      const Type& type = Type::Handle(
+          Z, Type::New(cls, type_arguments, TokenPosition::kNoSource));
+      type.set_nullability(nullability);
       type.SetIsFinalized();
       return type.Canonicalize();
     }
@@ -1736,9 +1742,9 @@ RawObject* BytecodeReaderHelper::ReadType(intptr_t tag,
       pending_recursive_types_->SetLength(id);
       pending_recursive_types_ = saved_pending_recursive_types;
 
-      Type& type =
-          Type::Handle(Z, Type::New(cls, type_arguments,
-                                    TokenPosition::kNoSource, nullability));
+      Type& type = Type::Handle(
+          Z, Type::New(cls, type_arguments, TokenPosition::kNoSource));
+      type.set_nullability(nullability);
       type_ref.set_type(type);
       type.SetIsFinalized();
       if (id != 0) {
@@ -2029,7 +2035,11 @@ void BytecodeReaderHelper::ReadFieldDeclarations(const Class& cls,
     if (!has_nontrivial_initializer) {
       value ^= ReadObject();
       if (is_static) {
-        field.SetStaticValue(value, true);
+        if (field.is_late() && !has_initializer) {
+          field.SetStaticValue(Object::sentinel(), true);
+        } else {
+          field.SetStaticValue(value, true);
+        }
       } else {
         field.set_saved_initial_value(value);
         // Null-initialized instance fields are tracked separately for each

@@ -365,7 +365,7 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
           node.returnType, node.functionExpression.body, element, node);
 
       // Return types are inferred only on non-recursive local functions.
-      if (node.parent is CompilationUnit) {
+      if (node.parent is CompilationUnit && !node.isSetter) {
         _checkStrictInferenceReturnType(node.returnType, node, node.name.name);
       }
       _checkStrictInferenceInParameters(node.functionExpression.parameters);
@@ -499,7 +499,7 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
       _checkForMissingReturn(node.returnType, node.body, element, node);
       _checkForUnnecessaryNoSuchMethod(node);
 
-      if (_strictInference && !node.isSetter && !elementIsOverride()) {
+      if (!node.isSetter && !elementIsOverride()) {
         _checkStrictInferenceReturnType(node.returnType, node, node.name.name);
       }
       _checkStrictInferenceInParameters(node.parameters);
@@ -4590,7 +4590,7 @@ class ResolverVisitor extends ScopedVisitor {
       // Get back to the uninstantiated generic constructor.
       // TODO(jmesserly): should we store this earlier in resolution?
       // Or look it up, instead of jumping backwards through the Member?
-      var rawElement = originalElement.baseElement;
+      var rawElement = originalElement.declaration;
 
       FunctionType constructorType =
           StaticTypeAnalyzer.constructorToGenericFunctionType(rawElement);
