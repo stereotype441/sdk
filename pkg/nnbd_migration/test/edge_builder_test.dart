@@ -1032,7 +1032,7 @@ int f(int i, int j) => i >> j;
     assertNoUpstreamNullability(decoratedTypeAnnotation('int f').node);
   }
 
-  solo_test_binaryExpression_left_dynamic() async {
+  test_binaryExpression_left_dynamic() async {
     await analyze('''
 Object f(dynamic x, int y) => x + g(y);
 int g(int z) => z;
@@ -1041,7 +1041,8 @@ int g(int z) => z;
         decoratedTypeAnnotation('int z').node,
         hard: true);
     assertNoEdge(decoratedTypeAnnotation('int g').node, anyNode);
-    assertEdge(always, decoratedTypeAnnotation('Object f').node, hard: false);
+    assertEdge(inSet(alwaysPlus), decoratedTypeAnnotation('Object f').node,
+        hard: false);
   }
 
   test_binaryExpression_lt_result_not_null() async {
