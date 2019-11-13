@@ -165,7 +165,7 @@ bool f(int i) {
   else return false;
 }
 void g() {
-  dynamic i;
+  dynamic i = null;
   f(i);
 }
 ''', migratedContent: '''
@@ -174,7 +174,7 @@ bool f(int? i) {
   else return false;
 }
 void g() {
-  dynamic i;
+  dynamic i = null;
   f(i);
 }
 ''');
@@ -183,7 +183,7 @@ void g() {
     assertRegion(region: regions[0], offset: 10, details: [
       "A dynamic value, which is nullable is passed as an argument"
     ]);
-    assertDetail(detail: regions[0].details[0], offset: 97, length: 1);
+    assertDetail(detail: regions[0].details[0], offset: 104, length: 1);
   }
 
   test_expressionFunctionReturnTarget() async {
