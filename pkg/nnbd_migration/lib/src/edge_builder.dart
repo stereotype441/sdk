@@ -1469,16 +1469,12 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   DecoratedType _decorateUpperOrLowerBound(AstNode astNode, DartType type,
       DecoratedType left, DecoratedType right, bool isLUB,
       {NullabilityNode node}) {
-    if (type.isDynamic || type.isVoid) {
-      if (type.isDynamic) {
-        _unimplemented(astNode, 'LUB/GLB with dynamic');
-      }
-      return DecoratedType(type, _graph.always);
-    }
     node ??= isLUB
         ? NullabilityNode.forLUB(left.node, right.node)
         : _nullabilityNodeForGLB(astNode, left.node, right.node);
-    if (type is InterfaceType) {
+    if (type.isDynamic || type.isVoid) {
+      return DecoratedType(type, node);
+    } else if (type is InterfaceType) {
       if (type.typeArguments.isEmpty) {
         return DecoratedType(type, node);
       } else {
