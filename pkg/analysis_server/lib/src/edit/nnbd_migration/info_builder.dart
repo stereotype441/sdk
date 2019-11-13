@@ -15,6 +15,7 @@ import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/analysis/session.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/file_system/file_system.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart'
     show Location, SourceEdit, SourceFileEdit;
@@ -36,6 +37,11 @@ class FixInfo {
 
 /// A builder used to build the migration information for a library.
 class InfoBuilder {
+  /// The resource provider used to access the file system.
+  ResourceProvider provider;
+
+  String includedPath;
+
   /// The instrumentation information gathered while the migration engine was
   /// running.
   final InstrumentationInformation info;
@@ -52,7 +58,8 @@ class InfoBuilder {
   final Map<String, UnitInfo> unitMap = {};
 
   /// Initialize a newly created builder.
-  InfoBuilder(this.info, this.listener, {this.explainNonNullableTypes = false});
+  InfoBuilder(this.provider, this.includedPath, this.info, this.listener,
+      {this.explainNonNullableTypes = false});
 
   /// The analysis server used to get information about libraries.
   AnalysisServer get server => listener.server;
@@ -74,7 +81,10 @@ class InfoBuilder {
         for (ResolvedUnitResult unitResult in result.units) {
           SourceFileEdit edit =
               listener.sourceChange.getFileEdit(unitResult.path);
-          units.add(_explainUnit(sourceInfo, unitResult, edit));
+          UnitInfo unit = _explainUnit(sourceInfo, unitResult, edit);
+          if (provider.pathContext.isWithin(includedPath, unitResult.path)) {
+            units.add(unit);
+          }
         }
       }
     }
@@ -114,8 +124,16 @@ class InfoBuilder {
     } else if (parent is AsExpression) {
       return "The value of the expression is nullable";
     }
-    String nullableValue =
-        node is NullLiteral ? "an explicit 'null'" : "a nullable value";
+
+    // Text indicating the type of nullable value found.
+    String nullableValue;
+    if (node is NullLiteral) {
+      nullableValue = "an explicit 'null'";
+    } else if (origin.kind == EdgeOriginKind.dynamicAssignment) {
+      nullableValue = "a dynamic value, which is nullable";
+    } else {
+      nullableValue = "a nullable value";
+    }
     if (parent is ArgumentList) {
       return capitalize("$nullableValue is passed as an argument");
     }
