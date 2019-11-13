@@ -73,8 +73,8 @@ class InfoBuilderTest extends AbstractAnalysisTest {
   /// in [infos].
   Future<void> buildInfo() async {
     // Compute the analysis results.
-    server.setAnalysisRoots(
-        '0', [resourceProvider.pathContext.dirname(testFile)], [], {});
+    String includedRoot = resourceProvider.pathContext.dirname(testFile);
+    server.setAnalysisRoots('0', [includedRoot], [], {});
     ResolvedUnitResult result = await server
         .getAnalysisDriver(testFile)
         .currentSession
@@ -91,8 +91,9 @@ class InfoBuilderTest extends AbstractAnalysisTest {
     migration.finish();
     // Build the migration info.
     InstrumentationInformation info = instrumentationListener.data;
-    InfoBuilder builder =
-        InfoBuilder(info, listener, explainNonNullableTypes: true);
+    InfoBuilder builder = InfoBuilder(
+        resourceProvider, includedRoot, info, listener,
+        explainNonNullableTypes: true);
     infos = (await builder.explainMigration()).toList();
   }
 
@@ -156,6 +157,34 @@ int? f([num? a]) {
         region: regions[2],
         offset: 36,
         details: ["The value of the expression is nullable"]);
+  }
+
+  test_dynamicValueIsUsed() async {
+    UnitInfo unit = await buildInfoForSingleTestFile('''
+bool f(int i) {
+  if (i == null) return true;
+  else return false;
+}
+void g() {
+  dynamic i = null;
+  f(i);
+}
+''', migratedContent: '''
+bool f(int? i) {
+  if (i == null) return true;
+  else return false;
+}
+void g() {
+  dynamic i = null;
+  f(i);
+}
+''');
+    List<RegionInfo> regions = unit.regions;
+    expect(regions, hasLength(1));
+    assertRegion(region: regions[0], offset: 10, details: [
+      "A dynamic value, which is nullable is passed as an argument"
+    ]);
+    assertDetail(detail: regions[0].details[0], offset: 104, length: 1);
   }
 
   test_expressionFunctionReturnTarget() async {
