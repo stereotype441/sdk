@@ -2546,7 +2546,8 @@ int f(dynamic d, int i) {
 ''');
     // We assume that the index expression might evaluate to anything, including
     // `null`.
-    assertEdge(always, decoratedTypeAnnotation('int f').node, hard: false);
+    assertEdge(inSet(alwaysPlus), decoratedTypeAnnotation('int f').node,
+        hard: false);
   }
 
   test_indexExpression_index() async {
@@ -2788,21 +2789,24 @@ int h(int x) => 0;
     await analyze('''
 int f(dynamic g) => g();
 ''');
-    assertEdge(always, decoratedTypeAnnotation('int f').node, hard: false);
+    assertEdge(inSet(alwaysPlus), decoratedTypeAnnotation('int f').node,
+        hard: false);
   }
 
   test_invocation_dynamic_parenthesized() async {
     await analyze('''
 int f(dynamic g) => (g)();
 ''');
-    assertEdge(always, decoratedTypeAnnotation('int f').node, hard: false);
+    assertEdge(inSet(alwaysPlus), decoratedTypeAnnotation('int f').node,
+        hard: false);
   }
 
   test_invocation_function() async {
     await analyze('''
 int f(Function g) => g();
 ''');
-    assertEdge(always, decoratedTypeAnnotation('int f').node, hard: false);
+    assertEdge(inSet(alwaysPlus), decoratedTypeAnnotation('int f').node,
+        hard: false);
     assertNullCheck(
         checkExpression('g('),
         assertEdge(decoratedTypeAnnotation('Function g').node, never,
@@ -2813,7 +2817,8 @@ int f(Function g) => g();
     await analyze('''
 int f(Function g) => (g)();
 ''');
-    assertEdge(always, decoratedTypeAnnotation('int f').node, hard: false);
+    assertEdge(inSet(alwaysPlus), decoratedTypeAnnotation('int f').node,
+        hard: false);
     assertNullCheck(
         checkExpression('g)('),
         assertEdge(decoratedTypeAnnotation('Function g').node, never,
@@ -3071,7 +3076,8 @@ int f(dynamic d, int j) {
     assertNoEdge(decoratedTypeAnnotation('int g').node,
         decoratedTypeAnnotation('int f').node);
     // We do, however, assume that it might return anything, including `null`.
-    assertEdge(always, decoratedTypeAnnotation('int f').node, hard: false);
+    assertEdge(inSet(alwaysPlus), decoratedTypeAnnotation('int f').node,
+        hard: false);
   }
 
   test_methodInvocation_dynamic_arguments() async {
@@ -4447,7 +4453,7 @@ C test(C c) => -c/*check*/;
     await analyze('''
 Object test(dynamic d) => -d;
 ''');
-    assertEdge(always, decoratedTypeAnnotation('Object test').node,
+    assertEdge(inSet(alwaysPlus), decoratedTypeAnnotation('Object test').node,
         hard: false);
     assertEdge(decoratedTypeAnnotation('dynamic d').node, never, hard: true);
   }
@@ -4509,7 +4515,7 @@ Object f(dynamic d) {
 }
 ''');
     var returnType = decoratedTypeAnnotation('Object f').node;
-    assertEdge(always, returnType, hard: false);
+    assertEdge(inSet(alwaysPlus), returnType, hard: false);
   }
 
   test_prefixExpression_plusPlus_substituted() async {
@@ -4545,7 +4551,8 @@ int f(dynamic d) {
     assertNoEdge(decoratedTypeAnnotation('int get g').node,
         decoratedTypeAnnotation('int f').node);
     // We do, however, assume that it might return anything, including `null`.
-    assertEdge(always, decoratedTypeAnnotation('int f').node, hard: false);
+    assertEdge(inSet(alwaysPlus), decoratedTypeAnnotation('int f').node,
+        hard: false);
   }
 
   test_propertyAccess_object_property() async {
