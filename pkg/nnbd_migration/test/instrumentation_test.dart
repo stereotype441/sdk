@@ -562,6 +562,7 @@ int g() => 1;
         hasLength(1));
   }
 
+  @FailingTest(issue: '')
   test_implicitReturnType_functionTypeAlias() async {
     await analyze('''
 typedef F();

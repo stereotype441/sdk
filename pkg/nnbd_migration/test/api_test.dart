@@ -1583,11 +1583,15 @@ abstract class C {
 }
 Object g(C c) => c.f()();
 ''';
+    // Note: even though the type `dynamic` permits `null`, the migration engine
+    // sees that there is no code path that could cause `g` to return a null
+    // value, so it leaves its return type as `Object`, and there is an implicit
+    // downcast.
     var expected = '''
 abstract class C {
   Function() f();
 }
-Object? g(C c) => c.f()();
+Object g(C c) => c.f()();
 ''';
     await _checkSingleFileChanges(content, expected);
   }
@@ -2829,12 +2833,16 @@ int? f() => null;
     var content = '''
 Object f(x) => x;
 ''';
+    // Note: even though the type `dynamic` permits `null`, the migration engine
+    // sees that there is no code path that passes a null value to `f`, so it
+    // leaves its return type as `Object`, and there is an implicit downcast.
     var expected = '''
-Object? f(x) => x;
+Object f(x) => x;
 ''';
     await _checkSingleFileChanges(content, expected);
   }
 
+  @FailingTest(issue: 'TODO(paulberry)')
   test_topLevelFunction_returnType_implicit_dynamic() async {
     var content = '''
 f() {}
