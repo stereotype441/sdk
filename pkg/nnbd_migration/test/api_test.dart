@@ -1030,13 +1030,17 @@ List<int?> f(Iterable<int/*?*/> a) => a;
     await _checkSingleFileChanges(content, expected);
   }
 
+  @FailingTest(issue: '')
   test_downcast_widest_type_from_top_type_parameters() async {
     var content = '''
 List<int> f1(dynamic a) => a;
 List<int> f2(Object b) => b;
 ''';
+    // Note: even though the type `dynamic` permits `null`, the migration engine
+    // sees that there is no code path that could cause `f1` to be passed a null
+    // value, so it leaves its return type as non-nullable.
     var expected = '''
-List<int?>? f1(dynamic a) => a;
+List<int?> f1(dynamic a) => a;
 List<int?> f2(Object b) => b;
 ''';
     await _checkSingleFileChanges(content, expected);

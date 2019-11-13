@@ -338,8 +338,6 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
     var type = node.type;
     if (type.isVoid || type.isDynamic) {
       var nullabilityNode = NullabilityNode.forTypeAnnotation(node.end);
-      _graph.connect(_graph.always, nullabilityNode,
-          AlwaysNullableTypeOrigin(source, node));
       var decoratedType = DecoratedType(type, nullabilityNode);
       _variables.recordDecoratedTypeAnnotation(
           source, node, decoratedType, null);

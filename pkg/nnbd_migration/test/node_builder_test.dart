@@ -460,7 +460,7 @@ dynamic f() {}
 ''');
     var decoratedType = decoratedTypeAnnotation('dynamic');
     expect(decoratedFunctionType('f').returnType, same(decoratedType));
-    assertEdge(always, decoratedType.node, hard: false);
+    assertNoEdge(always, decoratedType.node);
   }
 
   test_field_type_implicit_dynamic() async {
@@ -1633,6 +1633,6 @@ void f() {}
 ''');
     var decoratedType = decoratedTypeAnnotation('void');
     expect(decoratedFunctionType('f').returnType, same(decoratedType));
-    assertEdge(always, decoratedType.node, hard: false);
+    assertNoEdge(always, decoratedType.node);
   }
 }
