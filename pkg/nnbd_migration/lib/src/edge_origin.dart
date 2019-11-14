@@ -288,6 +288,15 @@ class NamedParameterNotSuppliedOrigin extends EdgeOrigin {
   EdgeOriginKind get kind => EdgeOriginKind.namedParameterNotSupplied;
 }
 
+/// Edge origin resulting from the usage of a value in a circumstance that
+/// requires it to be non-nullable
+class NonNullableUsageOrigin extends EdgeOrigin {
+  NonNullableUsageOrigin(Source source, AstNode node) : super(source, node);
+
+  @override
+  EdgeOriginKind get kind => EdgeOriginKind.nonNullableUsage;
+}
+
 /// Edge origin resulting from the presence of a non-null assertion.
 ///
 /// For example, in the following code snippet:

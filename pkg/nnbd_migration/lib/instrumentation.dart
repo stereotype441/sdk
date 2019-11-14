@@ -145,6 +145,7 @@ enum EdgeOriginKind {
   isCheckResultType,
   literal,
   namedParameterNotSupplied,
+  nonNullableUsage,
   nonNullAssertion,
   nullabilityComment,
   optionalFormalParameter,

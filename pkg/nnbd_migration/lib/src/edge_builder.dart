@@ -119,9 +119,6 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   /// information  used in flow analysis.  Otherwise `null`.
   AssignedVariables<AstNode, PromotableElement> _assignedVariables;
 
-  /// For convenience, a [DecoratedType] representing non-nullable `Object`.
-  final DecoratedType _notNullType;
-
   /// For convenience, a [DecoratedType] representing non-nullable `bool`.
   final DecoratedType _nonNullableBoolType;
 
@@ -201,7 +198,6 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       this.source, this.listener, this._decoratedClassHierarchy,
       {this.instrumentation})
       : _inheritanceManager = InheritanceManager3(_typeSystem),
-        _notNullType = DecoratedType(typeProvider.objectType, _graph.never),
         _nonNullableBoolType =
             DecoratedType(typeProvider.boolType, _graph.never),
         _nonNullableTypeType =
@@ -1461,14 +1457,11 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   ///
   /// Returns the decorated type of [expression].
   DecoratedType _checkExpressionNotNull(Expression expression) {
-    // Note: it's not necessary for `destinationType` to precisely match the
-    // type of the expression, since all we are doing is causing a single graph
-    // edge to be built; it is sufficient to pass in any decorated type whose
-    // node is `never`.
     if (_isPrefix(expression)) {
       throw ArgumentError('cannot check non-nullability of a prefix');
     }
-    return _handleAssignment(expression, destinationType: _notNullType);
+    return _handleAssignment(expression,
+        destinationType: _createNonNullableType(expression));
   }
 
   @override
@@ -1491,6 +1484,19 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
             PromotableElement, DecoratedType>(
         DecoratedTypeOperations(_typeSystem, _variables, _graph),
         _assignedVariables);
+  }
+
+  /// Creates a type that can be used to check that an expression's value is
+  /// non-nullable.
+  DecoratedType _createNonNullableType(Expression expression) {
+    // Note: it's not necessary for the type to precisely match the type of the
+    // expression, since all we are going to do is cause a single graph edge to
+    // be built; it is sufficient to pass in any decorated type whose node is
+    // non-nullable.  So we use `Object`.
+    var nullabilityNode = NullabilityNode.forInferredType();
+    _graph.makeNonNullable(
+        nullabilityNode, NonNullableUsageOrigin(source, expression));
+    return DecoratedType(typeProvider.objectType, nullabilityNode);
   }
 
   DecoratedType _decorateUpperOrLowerBound(AstNode astNode, DartType type,
@@ -1670,7 +1676,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
           _checkAssignment(
               CompoundAssignmentOrigin(source, compoundOperatorInfo),
               source: destinationType,
-              destination: _notNullType,
+              destination: _createNonNullableType(compoundOperatorInfo),
               hard: _postDominatedLocals
                   .isReferenceInScope(destinationExpression));
           DecoratedType compoundOperatorType = getOrComputeElementType(
