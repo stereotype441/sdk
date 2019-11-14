@@ -837,6 +837,21 @@ typedef ZoneGrowableHandlePtrArray<const AbstractType>* TrailPtr;
 // The third string in the triplet is "print" if the triplet should be printed.
 typedef ZoneGrowableHandlePtrArray<const String> URIs;
 
+// Keep in sync with package:kernel/lib/ast.dart
+enum class Nullability {
+  kUndetermined = 0,
+  kNullable = 1,
+  kNonNullable = 2,
+  kLegacy = 3,
+};
+
+// Nullability aware subtype checking modes.
+enum class NNBDMode {
+  kUnaware,
+  kWeak,
+  kStrong,
+};
+
 class Class : public Object {
  public:
   enum InvocationDispatcherEntry {
@@ -935,7 +950,12 @@ class Class : public Object {
   // class B<T, S>
   // class C<R> extends B<R, int>
   // C.DeclarationType() --> C [R, int, R]
-  RawType* DeclarationType() const;
+  // The declaration type is legacy by default, but another nullability
+  // variant may be requested. The first requested type gets cached in the class
+  // and subsequent nullability variants get cached in the object store.
+  // TODO(regis): Is this caching still useful or should we eliminate it?
+  RawType* DeclarationType(
+      Nullability nullability = Nullability::kLegacy) const;
 
   static intptr_t declaration_type_offset() {
     return OFFSET_OF(RawClass, declaration_type_);
@@ -2130,21 +2150,6 @@ class ICData : public Object {
   friend class SnapshotWriter;
 };
 
-// Keep in sync with package:kernel/lib/ast.dart
-enum Nullability {
-  kUndetermined = 0,
-  kNullable = 1,
-  kNonNullable = 2,
-  kLegacy = 3,
-};
-
-// Nullability aware subtype checking modes.
-enum NNBDMode {
-  kUnaware,
-  kWeak,
-  kStrong,
-};
-
 // Often used constants for number of free function type parameters.
 enum {
   kNoneFree = 0,
@@ -2185,7 +2190,8 @@ class Function : public Object {
   // function type with uninstantiated type arguments 'T' and 'R' as elements of
   // its type argument vector.
   // A function type is non-nullable by default.
-  RawType* SignatureType(Nullability nullability = kNonNullable) const;
+  RawType* SignatureType(
+      Nullability nullability = Nullability::kNonNullable) const;
   RawType* ExistingSignatureType() const;
 
   // Update the signature type (with a canonical version).
@@ -5164,18 +5170,24 @@ class CompressedStackMaps : public Object {
  public:
   static const intptr_t kHashBits = 30;
 
-  intptr_t payload_size() const { return raw_ptr()->payload_size_; }
+  uintptr_t payload_size() const { return raw_ptr()->payload_size(); }
 
   bool Equals(const CompressedStackMaps& other) const {
-    if (payload_size() != other.payload_size()) return false;
+    // Both the payload size and the kind of table must match.
+    if (raw_ptr()->flags_and_size_ != other.raw_ptr()->flags_and_size_) {
+      return false;
+    }
     NoSafepointScope no_safepoint;
     return memcmp(raw_ptr(), other.raw_ptr(), InstanceSize(payload_size())) ==
            0;
   }
-  intptr_t Hash() const;
+
+  // Methods to allow use with PointerKeyValueTrait to create sets of CSMs.
+  bool Equals(const CompressedStackMaps* other) const { return Equals(*other); }
+  intptr_t Hashcode() const;
 
   static intptr_t UnroundedSize(RawCompressedStackMaps* maps) {
-    return UnroundedSize(maps->ptr()->payload_size_);
+    return UnroundedSize(maps->ptr()->payload_size());
   }
   static intptr_t UnroundedSize(intptr_t length) {
     return sizeof(RawCompressedStackMaps) + length;
@@ -5190,22 +5202,49 @@ class CompressedStackMaps : public Object {
   }
 
  private:
-  // The encoding logic for CompressedStackMaps entries is in
-  // CompressedStackMapsBuilder, and the decoding logic is in
-  // CompressedStackMapsIterator.
-  static RawCompressedStackMaps* New(const GrowableArray<uint8_t>& bytes);
+  static RawCompressedStackMaps* New(const GrowableArray<uint8_t>& bytes,
+                                     RawCompressedStackMaps::Kind kind);
 
-  void set_payload_size(intptr_t payload_size) const {
-    StoreNonPointer(&raw_ptr()->payload_size_, payload_size);
+  static RawCompressedStackMaps* NewInlined(
+      const GrowableArray<uint8_t>& bytes) {
+    return New(bytes, RawCompressedStackMaps::kInlined);
   }
+  static RawCompressedStackMaps* NewUsingTable(
+      const GrowableArray<uint8_t>& bytes) {
+    return New(bytes, RawCompressedStackMaps::kUsesTable);
+  }
+  static RawCompressedStackMaps* NewGlobalTable(
+      const GrowableArray<uint8_t>& bytes) {
+    return New(bytes, RawCompressedStackMaps::kGlobalTable);
+  }
+
+  void set_payload_size(intptr_t payload_size,
+                        RawCompressedStackMaps::Kind kind) const {
+    ASSERT(RawCompressedStackMaps::SizeField::is_valid(payload_size));
+    const uint32_t encoded_fields =
+        RawCompressedStackMaps::KindField::encode(kind) |
+        RawCompressedStackMaps::SizeField::encode(payload_size);
+    StoreNonPointer(&raw_ptr()->flags_and_size_, encoded_fields);
+  }
+
+  bool UsesGlobalTable() const {
+    return !IsNull() && raw_ptr()->UsesGlobalTable();
+  }
+  bool IsGlobalTable() const { return !IsNull() && raw_ptr()->IsGlobalTable(); }
 
   const uint8_t* Payload() const { return raw_ptr()->data(); }
   void SetPayload(const GrowableArray<uint8_t>& payload) const;
+  uint8_t PayloadByte(uintptr_t offset) const {
+    ASSERT(offset >= 0 && offset < payload_size());
+    return raw_ptr()->data()[offset];
+  }
 
   FINAL_HEAP_OBJECT_IMPLEMENTATION(CompressedStackMaps, Object);
   friend class Class;
   friend class CompressedStackMapsBuilder;
   friend class CompressedStackMapsIterator;
+  friend class ProgramVisitor;
+  friend class StackMapEntry;
 };
 
 class ExceptionHandlers : public Object {
@@ -6815,10 +6854,18 @@ class AbstractType : public Instance {
   virtual void SetIsBeingFinalized() const;
 
   virtual Nullability nullability() const;
-  virtual bool IsUndetermined() const { return nullability() == kUndetermined; }
-  virtual bool IsNullable() const { return nullability() == kNullable; }
-  virtual bool IsNonNullable() const { return nullability() == kNonNullable; }
-  virtual bool IsLegacy() const { return nullability() == kLegacy; }
+  virtual bool IsUndetermined() const {
+    return nullability() == Nullability::kUndetermined;
+  }
+  virtual bool IsNullable() const {
+    return nullability() == Nullability::kNullable;
+  }
+  virtual bool IsNonNullable() const {
+    return nullability() == Nullability::kNonNullable;
+  }
+  virtual bool IsLegacy() const {
+    return nullability() == Nullability::kLegacy;
+  }
 
   virtual bool HasTypeClass() const { return type_class_id() != kIllegalCid; }
   virtual classid_t type_class_id() const;
@@ -6940,7 +6987,7 @@ class AbstractType : public Instance {
 
   // Check if this type represents a top type.
   // TODO(regis): Remove default kUnaware mode as implementation progresses.
-  bool IsTopType(NNBDMode mode = kUnaware) const;
+  bool IsTopType(NNBDMode mode = NNBDMode::kUnaware) const;
 
   // Check if this type represents the 'bool' type.
   bool IsBoolType() const;
@@ -7053,8 +7100,8 @@ class Type : public AbstractType {
   }
   void set_nullability(Nullability value) const {
     ASSERT(!IsCanonical());
-    ASSERT(value != kUndetermined);
-    StoreNonPointer(&raw_ptr()->nullability_, value);
+    ASSERT(value != Nullability::kUndetermined);
+    StoreNonPointer(&raw_ptr()->nullability_, static_cast<int8_t>(value));
   }
   RawType* ToNullability(Nullability value, Heap::Space space) const;
   virtual classid_t type_class_id() const;
@@ -7093,6 +7140,7 @@ class Type : public AbstractType {
   virtual void EnumerateURIs(URIs* uris) const;
 
   virtual intptr_t Hash() const;
+  intptr_t ComputeHash() const;
 
   static intptr_t InstanceSize() {
     return RoundedAllocationSize(sizeof(RawType));
@@ -7153,15 +7201,17 @@ class Type : public AbstractType {
   static RawType* DartTypeType();
 
   // The finalized type of the given non-parameterized class.
-  static RawType* NewNonParameterizedType(const Class& type_class);
+  static RawType* NewNonParameterizedType(
+      const Class& type_class,
+      Nullability nullability = Nullability::kLegacy);
 
   static RawType* New(const Class& clazz,
                       const TypeArguments& arguments,
                       TokenPosition token_pos,
+                      Nullability nullability = Nullability::kLegacy,
                       Heap::Space space = Heap::kOld);
 
  private:
-  intptr_t ComputeHash() const;
   void SetHash(intptr_t value) const;
 
   void set_token_pos(TokenPosition token_pos) const;
@@ -9070,6 +9120,7 @@ class TypedData : public TypedDataBase {
 
   FINAL_HEAP_OBJECT_IMPLEMENTATION(TypedData, TypedDataBase);
   friend class Class;
+  friend class CompressedStackMapsIterator;
   friend class ExternalTypedData;
   friend class TypedDataView;
 };
@@ -9642,6 +9693,23 @@ class StackTrace : public Instance {
   RawSmi* PcOffsetAtFrame(intptr_t frame_index) const;
   void SetPcOffsetAtFrame(intptr_t frame_index, const Smi& pc_offset) const;
 
+  bool skip_sync_start_in_parent_stack() const;
+  void set_skip_sync_start_in_parent_stack(bool value) const;
+
+  // The number of frames that should be cut off the top of an async stack trace
+  // if it's appended to a synchronous stack trace along a sync-async call.
+  //
+  // Without cropping, the border would look like:
+  //
+  // <async function>
+  // ---------------------------
+  // <asynchronous gap marker>
+  // <async function>
+  //
+  // Since it's not actually an async call, we crop off the last two
+  // frames when concatenating the sync and async stacktraces.
+  static constexpr intptr_t kSyncAsyncCroppedFrames = 2;
+
   static intptr_t InstanceSize() {
     return RoundedAllocationSize(sizeof(RawStackTrace));
   }
@@ -9652,6 +9720,7 @@ class StackTrace : public Instance {
   static RawStackTrace* New(const Array& code_array,
                             const Array& pc_offset_array,
                             const StackTrace& async_link,
+                            bool skip_sync_start_in_parent_stack,
                             Heap::Space space = Heap::kNew);
 
  private:
