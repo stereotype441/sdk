@@ -890,7 +890,7 @@ Map<int, String> f() => {1: null};
         explicitTypeNullability[findNode.typeAnnotation('String')];
     expect(
         edges.where((e) =>
-            e.sourceNode == never &&
+            e.sourceNode == neverClosure &&
             e.destinationNode == implicitMapLiteralKeyNode),
         hasLength(1));
     expect(

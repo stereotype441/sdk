@@ -408,7 +408,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   @override
   DecoratedType visitBooleanLiteral(BooleanLiteral node) {
     _flowAnalysis.booleanLiteral(node, node.value);
-    return DecoratedType(node.staticType, _graph.never);
+    return _makeNonNullLiteralType(node);
   }
 
   @override
@@ -576,7 +576,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   DecoratedType visitDoubleLiteral(DoubleLiteral node) {
-    return DecoratedType(node.staticType, _graph.never);
+    return _makeNonNullLiteralType(node);
   }
 
   @override
@@ -813,7 +813,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   DecoratedType visitIntegerLiteral(IntegerLiteral node) {
-    return DecoratedType(node.staticType, _graph.never);
+    return _makeNonNullLiteralType(node);
   }
 
   @override
@@ -875,7 +875,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
             source, node.typeArguments.arguments[0]);
       }
       node.elements.forEach(_handleCollectionElement);
-      return DecoratedType(listType, _graph.never,
+      return _makeNonNullLiteralType(node,
           typeArguments: [_currentLiteralElementType]);
     } finally {
       _currentLiteralElementType = previousLiteralType;
@@ -962,8 +962,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     _flowAnalysis.nullLiteral(node);
     var decoratedType =
         DecoratedType.forImplicitType(typeProvider, node.staticType, _graph);
-    _graph.makeNullable(
-        decoratedType.node, AlwaysNullableTypeOrigin(source, node));
+    _graph.makeNullable(decoratedType.node, LiteralOrigin(source, node));
     return decoratedType;
   }
 
@@ -1130,7 +1129,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
               _variables.decoratedTypeAnnotation(source, typeArguments[0]);
         }
         node.elements.forEach(_handleCollectionElement);
-        return DecoratedType(setOrMapType, _graph.never,
+        return _makeNonNullLiteralType(node,
             typeArguments: [_currentLiteralElementType]);
       } finally {
         _currentLiteralElementType = previousLiteralType;
@@ -1160,7 +1159,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         }
 
         node.elements.forEach(_handleCollectionElement);
-        return DecoratedType(setOrMapType, _graph.never,
+        return _makeNonNullLiteralType(node,
             typeArguments: [_currentMapKeyType, _currentMapValueType]);
       } finally {
         _currentMapKeyType = previousKeyType;
@@ -1233,7 +1232,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   @override
   DecoratedType visitStringLiteral(StringLiteral node) {
     node.visitChildren(this);
-    return DecoratedType(node.staticType, _graph.never);
+    return _makeNonNullLiteralType(node);
   }
 
   @override
@@ -1262,7 +1261,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   @override
   DecoratedType visitSymbolLiteral(SymbolLiteral node) {
-    return DecoratedType(node.staticType, _graph.never);
+    return _makeNonNullLiteralType(node);
   }
 
   @override
@@ -1340,7 +1339,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         }
       }
     }
-    return _nonNullableTypeType;
+    return null;
   }
 
   @override
@@ -2056,6 +2055,14 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     } else {
       return false;
     }
+  }
+
+  DecoratedType _makeNonNullLiteralType(Expression expression,
+      {List<DecoratedType> typeArguments = const []}) {
+    var nullabilityNode = NullabilityNode.forInferredType();
+    _graph.makeNonNullable(nullabilityNode, LiteralOrigin(source, expression));
+    return DecoratedType(expression.staticType, nullabilityNode,
+        typeArguments: typeArguments);
   }
 
   DecoratedType _makeNullableDynamicType(AstNode astNode) {
