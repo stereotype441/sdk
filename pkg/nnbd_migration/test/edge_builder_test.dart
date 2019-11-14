@@ -410,7 +410,8 @@ void f(Object o) {
         decoratedTypeAnnotation('dynamic').node,
         hard: true);
     // TODO(mfairhurst): these should probably be hard edges.
-    assertEdge(decoratedTypeAnnotation('dynamic').node, never, hard: false);
+    assertEdge(decoratedTypeAnnotation('dynamic').node, inSet(neverClosure),
+        hard: false);
   }
 
   test_as_int() async {
@@ -423,7 +424,8 @@ void f(Object o) {
         decoratedTypeAnnotation('int').node,
         hard: true);
     // TODO(mfairhurst): these should probably be hard edges.
-    assertEdge(decoratedTypeAnnotation('int').node, never, hard: false);
+    assertEdge(decoratedTypeAnnotation('int').node, inSet(neverClosure),
+        hard: false);
   }
 
   test_assert_demonstrates_non_null_intent() async {
@@ -622,8 +624,9 @@ abstract class C {
 C f(C y, C z) => (y += z);
 ''';
     await analyze(code);
-    var targetEdge =
-        assertEdge(decoratedTypeAnnotation('C y').node, never, hard: true);
+    var targetEdge = assertEdge(
+        decoratedTypeAnnotation('C y').node, inSet(neverClosure),
+        hard: true);
     expect(
         (graph.getEdgeOrigin(targetEdge) as CompoundAssignmentOrigin)
             .node
@@ -660,8 +663,9 @@ abstract class C<T> {
 C<int> f(C<int> y, C<int> z) => (y += z);
 ''';
     await analyze(code);
-    var targetEdge =
-        assertEdge(decoratedTypeAnnotation('C<int> y').node, never, hard: true);
+    var targetEdge = assertEdge(
+        decoratedTypeAnnotation('C<int> y').node, inSet(neverClosure),
+        hard: true);
     expect(
         (graph.getEdgeOrigin(targetEdge) as CompoundAssignmentOrigin)
             .node
@@ -726,8 +730,10 @@ void f(C c, int i) {
   c.x = i;
 }
 ''');
-    assertNullCheck(checkExpression('c.x'),
-        assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('c.x'),
+        assertEdge(decoratedTypeAnnotation('C c').node, inSet(neverClosure),
+            hard: true));
   }
 
   test_assignmentExpression_field_target_check_cascaded() async {
@@ -739,8 +745,10 @@ void f(C c, int i) {
   c..x = i;
 }
 ''');
-    assertNullCheck(checkExpression('c..x'),
-        assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('c..x'),
+        assertEdge(decoratedTypeAnnotation('C c').node, inSet(neverClosure),
+            hard: true));
   }
 
   test_assignmentExpression_indexExpression_index() async {
@@ -778,8 +786,10 @@ void f(C c, int i, int j) {
   c[i] = j;
 }
 ''');
-    assertNullCheck(checkExpression('c['),
-        assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('c['),
+        assertEdge(decoratedTypeAnnotation('C c').node, inSet(neverClosure),
+            hard: true));
   }
 
   test_assignmentExpression_indexExpression_value() async {
@@ -900,8 +910,10 @@ void f(C c, int i) {
   c.s = i;
 }
 ''');
-    assertNullCheck(checkExpression('c.s'),
-        assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('c.s'),
+        assertEdge(decoratedTypeAnnotation('C c').node, inSet(neverClosure),
+            hard: true));
   }
 
   @failingTest
@@ -1120,8 +1132,10 @@ int f(int i, int j) => i % j;
 int f(int i, int j) => i + j;
 ''');
 
-    assertNullCheck(checkExpression('i +'),
-        assertEdge(decoratedTypeAnnotation('int i').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('i +'),
+        assertEdge(decoratedTypeAnnotation('int i').node, inSet(neverClosure),
+            hard: true));
   }
 
   test_binaryExpression_plus_left_check_custom() async {
@@ -1132,8 +1146,10 @@ class Int {
 Int f(Int i, Int j) => i + j;
 ''');
 
-    assertNullCheck(checkExpression('i +'),
-        assertEdge(decoratedTypeAnnotation('Int i').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('i +'),
+        assertEdge(decoratedTypeAnnotation('Int i').node, inSet(neverClosure),
+            hard: true));
   }
 
   test_binaryExpression_plus_result_custom() async {
@@ -1231,8 +1247,10 @@ class C {
 }
 C f(C x, dynamic y) => x + y;
 ''');
-    assertNullCheck(checkExpression('x +'),
-        assertEdge(decoratedTypeAnnotation('C x').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('x +'),
+        assertEdge(decoratedTypeAnnotation('C x').node, inSet(neverClosure),
+            hard: true));
     assertEdge(decoratedTypeAnnotation('C operator').node,
         decoratedTypeAnnotation('C f').node,
         hard: false);
@@ -1418,7 +1436,8 @@ int f(bool b, int i, int j) {
 
     var nullable_b = decoratedTypeAnnotation('bool b').node;
     var check_b = checkExpression('b ?');
-    assertNullCheck(check_b, assertEdge(nullable_b, never, hard: true));
+    assertNullCheck(
+        check_b, assertEdge(nullable_b, inSet(neverClosure), hard: true));
   }
 
   test_conditionalExpression_functionTyped_namedParameter() async {
@@ -1728,8 +1747,10 @@ void f(bool b) {
 }
 ''');
 
-    assertNullCheck(checkExpression('b);'),
-        assertEdge(decoratedTypeAnnotation('bool b').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('b);'),
+        assertEdge(decoratedTypeAnnotation('bool b').node, inSet(neverClosure),
+            hard: true));
   }
 
   test_doubleLiteral() async {
@@ -1829,7 +1850,8 @@ void f(List<int> l) {
   [for (int i in l) 0];
 }
 ''');
-    assertEdge(decoratedTypeAnnotation('List<int>').node, never, hard: true);
+    assertEdge(decoratedTypeAnnotation('List<int>').node, inSet(neverClosure),
+        hard: true);
     assertEdge(
         substitutionNode(
             decoratedTypeAnnotation('int> l').node, inSet(neverClosure)),
@@ -1848,7 +1870,8 @@ int g(int j) => 0;
     var iMatcher = anyNode;
     assertEdge(iMatcher, jNode, hard: false);
     var iNode = iMatcher.matchingNode;
-    assertEdge(decoratedTypeAnnotation('List<int>').node, never, hard: true);
+    assertEdge(decoratedTypeAnnotation('List<int>').node, inSet(neverClosure),
+        hard: true);
     assertEdge(
         substitutionNode(
             decoratedTypeAnnotation('int> l').node, inSet(neverClosure)),
@@ -1863,7 +1886,8 @@ void f(List<int> l) {
   [for (x in l) 0];
 }
 ''');
-    assertEdge(decoratedTypeAnnotation('List<int>').node, never, hard: true);
+    assertEdge(decoratedTypeAnnotation('List<int>').node, inSet(neverClosure),
+        hard: true);
     assertEdge(
         substitutionNode(
             decoratedTypeAnnotation('int> l').node, inSet(neverClosure)),
@@ -1877,7 +1901,8 @@ void f(List<int> l) {
   for (int i in l) {}
 }
 ''');
-    assertEdge(decoratedTypeAnnotation('List<int>').node, never, hard: true);
+    assertEdge(decoratedTypeAnnotation('List<int>').node, inSet(neverClosure),
+        hard: true);
     assertEdge(
         substitutionNode(
             decoratedTypeAnnotation('int> l').node, inSet(neverClosure)),
@@ -1898,7 +1923,8 @@ void g(int j) {}
     var iMatcher = anyNode;
     assertEdge(iMatcher, jNode, hard: false);
     var iNode = iMatcher.matchingNode;
-    assertEdge(decoratedTypeAnnotation('List<int>').node, never, hard: true);
+    assertEdge(decoratedTypeAnnotation('List<int>').node, inSet(neverClosure),
+        hard: true);
     assertEdge(
         substitutionNode(
             decoratedTypeAnnotation('int> l').node, inSet(neverClosure)),
@@ -1913,7 +1939,8 @@ void f(List<int> l) {
   for (x in l) {}
 }
 ''');
-    assertEdge(decoratedTypeAnnotation('List<int>').node, never, hard: true);
+    assertEdge(decoratedTypeAnnotation('List<int>').node, inSet(neverClosure),
+        hard: true);
     assertEdge(
         substitutionNode(
             decoratedTypeAnnotation('int> l').node, inSet(neverClosure)),
@@ -1930,7 +1957,8 @@ void f(List<int> ints) {
 
     assertNullCheck(
         checkExpression('ints) i'),
-        assertEdge(decoratedTypeAnnotation('List<int> ints').node, never,
+        assertEdge(
+            decoratedTypeAnnotation('List<int> ints').node, inSet(neverClosure),
             hard: true));
     assertEdge(decoratedTypeAnnotation('int i').node,
         decoratedTypeAnnotation('int>[').node,
@@ -1950,11 +1978,13 @@ void f(List<String> strs, List<int> ints) {
 
     assertNullCheck(
         checkExpression('strs)\n'),
-        assertEdge(decoratedTypeAnnotation('List<String> strs').node, never,
+        assertEdge(decoratedTypeAnnotation('List<String> strs').node,
+            inSet(neverClosure),
             hard: true));
     assertNullCheck(
         checkExpression('ints)\n'),
-        assertEdge(decoratedTypeAnnotation('List<int> ints').node, never,
+        assertEdge(
+            decoratedTypeAnnotation('List<int> ints').node, inSet(neverClosure),
             hard: false));
 
     var keyTypeNode = decoratedTypeAnnotation('String, int>{').node;
@@ -1974,7 +2004,8 @@ void f(List<int> ints) {
 
     assertNullCheck(
         checkExpression('ints) i'),
-        assertEdge(decoratedTypeAnnotation('List<int> ints').node, never,
+        assertEdge(
+            decoratedTypeAnnotation('List<int> ints').node, inSet(neverClosure),
             hard: true));
     assertEdge(decoratedTypeAnnotation('int i').node,
         decoratedTypeAnnotation('int>{').node,
@@ -2298,8 +2329,10 @@ void f(bool b) {
 }
 ''');
 
-    assertNullCheck(checkExpression('b) {}'),
-        assertEdge(decoratedTypeAnnotation('bool b').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('b) {}'),
+        assertEdge(decoratedTypeAnnotation('bool b').node, inSet(neverClosure),
+            hard: true));
   }
 
   test_if_conditional_control_flow_after() async {
@@ -2385,8 +2418,10 @@ void f(bool b) {
 }
 ''');
 
-    assertNullCheck(checkExpression('b) i1'),
-        assertEdge(decoratedTypeAnnotation('bool b').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('b) i1'),
+        assertEdge(decoratedTypeAnnotation('bool b').node, inSet(neverClosure),
+            hard: true));
     assertEdge(decoratedTypeAnnotation('int i1').node,
         decoratedTypeAnnotation('int>[').node,
         hard: false);
@@ -2406,8 +2441,10 @@ void f(bool b) {
 }
 ''');
 
-    assertNullCheck(checkExpression('b) s1'),
-        assertEdge(decoratedTypeAnnotation('bool b').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('b) s1'),
+        assertEdge(decoratedTypeAnnotation('bool b').node, inSet(neverClosure),
+            hard: true));
 
     var keyTypeNode = decoratedTypeAnnotation('String, int>{').node;
     var valueTypeNode = decoratedTypeAnnotation('int>{').node;
@@ -2431,11 +2468,13 @@ void f(bool b1, bool b2) {
 }
 ''');
 
-    assertNullCheck(checkExpression('b1)'),
-        assertEdge(decoratedTypeAnnotation('bool b1').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('b1)'),
+        assertEdge(decoratedTypeAnnotation('bool b1').node, inSet(neverClosure),
+            hard: true));
     assertNullCheck(
         checkExpression('b2) i1'),
-        assertEdge(decoratedTypeAnnotation('bool b2').node, never,
+        assertEdge(decoratedTypeAnnotation('bool b2').node, inSet(neverClosure),
             hard: false));
     assertEdge(decoratedTypeAnnotation('int i1').node,
         decoratedTypeAnnotation('int>[').node,
@@ -2457,8 +2496,10 @@ void f(bool b) {
 }
 ''');
 
-    assertNullCheck(checkExpression('b) i1'),
-        assertEdge(decoratedTypeAnnotation('bool b').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('b) i1'),
+        assertEdge(decoratedTypeAnnotation('bool b').node, inSet(neverClosure),
+            hard: true));
     assertEdge(decoratedTypeAnnotation('int i1').node,
         decoratedTypeAnnotation('int>{').node,
         hard: false);
@@ -2593,8 +2634,10 @@ class C {
 }
 int f(C c) => c[0];
 ''');
-    assertNullCheck(checkExpression('c['),
-        assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('c['),
+        assertEdge(decoratedTypeAnnotation('C c').node, inSet(neverClosure),
+            hard: true));
   }
 
   test_indexExpression_target_check_cascaded() async {
@@ -2604,8 +2647,10 @@ class C {
 }
 C f(C c) => c..[0];
 ''');
-    assertNullCheck(checkExpression('c..['),
-        assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('c..['),
+        assertEdge(decoratedTypeAnnotation('C c').node, inSet(neverClosure),
+            hard: true));
   }
 
   test_indexExpression_target_demonstrates_non_null_intent() async {
@@ -2615,7 +2660,8 @@ class C {
 }
 int f(C c) => c[0];
 ''');
-    assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true);
+    assertEdge(decoratedTypeAnnotation('C c').node, inSet(neverClosure),
+        hard: true);
   }
 
   test_indexExpression_target_demonstrates_non_null_intent_cascaded() async {
@@ -2625,7 +2671,8 @@ class C {
 }
 C f(C c) => c..[0];
 ''');
-    assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true);
+    assertEdge(decoratedTypeAnnotation('C c').node, inSet(neverClosure),
+        hard: true);
   }
 
   test_instanceCreation_generic() async {
@@ -2809,7 +2856,8 @@ int f(Function g) => g();
         hard: false);
     assertNullCheck(
         checkExpression('g('),
-        assertEdge(decoratedTypeAnnotation('Function g').node, never,
+        assertEdge(
+            decoratedTypeAnnotation('Function g').node, inSet(neverClosure),
             hard: true));
   }
 
@@ -2821,7 +2869,8 @@ int f(Function g) => (g)();
         hard: false);
     assertNullCheck(
         checkExpression('g)('),
-        assertEdge(decoratedTypeAnnotation('Function g').node, never,
+        assertEdge(
+            decoratedTypeAnnotation('Function g').node, inSet(neverClosure),
             hard: true));
   }
 
@@ -3331,8 +3380,10 @@ void test(C c) {
 }
 ''');
 
-    assertNullCheck(checkExpression('c.m'),
-        assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('c.m'),
+        assertEdge(decoratedTypeAnnotation('C c').node, inSet(neverClosure),
+            hard: true));
   }
 
   test_methodInvocation_target_check_cascaded() async {
@@ -3345,8 +3396,10 @@ void test(C c) {
 }
 ''');
 
-    assertNullCheck(checkExpression('c..m'),
-        assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('c..m'),
+        assertEdge(decoratedTypeAnnotation('C c').node, inSet(neverClosure),
+            hard: true));
   }
 
   test_methodInvocation_target_demonstrates_non_null_intent() async {
@@ -3359,7 +3412,8 @@ void test(C c) {
 }
 ''');
 
-    assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true);
+    assertEdge(decoratedTypeAnnotation('C c').node, inSet(neverClosure),
+        hard: true);
   }
 
   test_methodInvocation_target_demonstrates_non_null_intent_cascaded() async {
@@ -3372,7 +3426,8 @@ void test(C c) {
 }
 ''');
 
-    assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true);
+    assertEdge(decoratedTypeAnnotation('C c').node, inSet(neverClosure),
+        hard: true);
   }
 
   test_methodInvocation_target_generic_in_base_class() async {
@@ -3734,12 +3789,20 @@ void test(bool b1, C _c) {
 }
 ''');
 
-    assertNullCheck(checkExpression('b1/*check*/'),
-        assertEdge(decoratedTypeAnnotation('bool b1').node, never, hard: true));
-    assertNullCheck(checkExpression('b2/*check*/'),
-        assertEdge(decoratedTypeAnnotation('bool b2').node, never, hard: true));
-    assertNullCheck(checkExpression('c.m'),
-        assertEdge(decoratedTypeAnnotation('C c').node, never, hard: false));
+    assertNullCheck(
+        checkExpression('b1/*check*/'),
+        assertEdge(
+            decoratedTypeAnnotation('bool b1').node, inSet(pointsToNever),
+            hard: true));
+    assertNullCheck(
+        checkExpression('b2/*check*/'),
+        assertEdge(
+            decoratedTypeAnnotation('bool b2').node, inSet(pointsToNever),
+            hard: true));
+    assertNullCheck(
+        checkExpression('c.m'),
+        assertEdge(decoratedTypeAnnotation('C c').node, inSet(pointsToNever),
+            hard: false));
   }
 
   test_postDominators_continue() async {
@@ -3759,12 +3822,20 @@ void test(bool b1, C _c) {
 }
 ''');
 
-    assertNullCheck(checkExpression('b1/*check*/'),
-        assertEdge(decoratedTypeAnnotation('bool b1').node, never, hard: true));
-    assertNullCheck(checkExpression('b2/*check*/'),
-        assertEdge(decoratedTypeAnnotation('bool b2').node, never, hard: true));
-    assertNullCheck(checkExpression('c.m'),
-        assertEdge(decoratedTypeAnnotation('C c').node, never, hard: false));
+    assertNullCheck(
+        checkExpression('b1/*check*/'),
+        assertEdge(
+            decoratedTypeAnnotation('bool b1').node, inSet(pointsToNever),
+            hard: true));
+    assertNullCheck(
+        checkExpression('b2/*check*/'),
+        assertEdge(
+            decoratedTypeAnnotation('bool b2').node, inSet(pointsToNever),
+            hard: true));
+    assertNullCheck(
+        checkExpression('c.m'),
+        assertEdge(decoratedTypeAnnotation('C c').node, inSet(pointsToNever),
+            hard: false));
   }
 
   test_postDominators_doWhileStatement_conditional() async {
@@ -3781,10 +3852,14 @@ void test(bool b, C c) {
 }
 ''');
 
-    assertNullCheck(checkExpression('b/*check*/'),
-        assertEdge(decoratedTypeAnnotation('bool b').node, never, hard: false));
-    assertNullCheck(checkExpression('c.m'),
-        assertEdge(decoratedTypeAnnotation('C c').node, never, hard: false));
+    assertNullCheck(
+        checkExpression('b/*check*/'),
+        assertEdge(decoratedTypeAnnotation('bool b').node, inSet(neverClosure),
+            hard: false));
+    assertNullCheck(
+        checkExpression('c.m'),
+        assertEdge(decoratedTypeAnnotation('C c').node, inSet(neverClosure),
+            hard: false));
   }
 
   test_postDominators_doWhileStatement_unconditional() async {
@@ -3803,14 +3878,22 @@ void test(bool b, C c1, C c2) {
 }
 ''');
 
-    assertNullCheck(checkExpression('b/*check*/'),
-        assertEdge(decoratedTypeAnnotation('bool b').node, never, hard: true));
-    assertNullCheck(checkExpression('c1.m'),
-        assertEdge(decoratedTypeAnnotation('C c1').node, never, hard: true));
-    assertNullCheck(checkExpression('c2.m'),
-        assertEdge(decoratedTypeAnnotation('C c2').node, never, hard: true));
-    assertNullCheck(checkExpression('c3.m'),
-        assertEdge(decoratedTypeAnnotation('C c3').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('b/*check*/'),
+        assertEdge(decoratedTypeAnnotation('bool b').node, inSet(neverClosure),
+            hard: true));
+    assertNullCheck(
+        checkExpression('c1.m'),
+        assertEdge(decoratedTypeAnnotation('C c1').node, inSet(neverClosure),
+            hard: true));
+    assertNullCheck(
+        checkExpression('c2.m'),
+        assertEdge(decoratedTypeAnnotation('C c2').node, inSet(neverClosure),
+            hard: true));
+    assertNullCheck(
+        checkExpression('c3.m'),
+        assertEdge(decoratedTypeAnnotation('C c3').node, inSet(neverClosure),
+            hard: true));
   }
 
   test_postDominators_forElement() async {
@@ -3824,12 +3907,18 @@ void test(bool _b, C c1, C c2) {
 }
 ''');
 
-    assertNullCheck(checkExpression('b1/*check*/'),
-        assertEdge(decoratedTypeAnnotation('bool b1').node, never, hard: true));
-    assertNullCheck(checkExpression('c1.m'),
-        assertEdge(decoratedTypeAnnotation('C c1').node, never, hard: false));
-    assertNullCheck(checkExpression('c2.m'),
-        assertEdge(decoratedTypeAnnotation('C c2').node, never, hard: false));
+    assertNullCheck(
+        checkExpression('b1/*check*/'),
+        assertEdge(decoratedTypeAnnotation('bool b1').node, inSet(neverClosure),
+            hard: true));
+    assertNullCheck(
+        checkExpression('c1.m'),
+        assertEdge(decoratedTypeAnnotation('C c1').node, inSet(neverClosure),
+            hard: false));
+    assertNullCheck(
+        checkExpression('c2.m'),
+        assertEdge(decoratedTypeAnnotation('C c2').node, inSet(neverClosure),
+            hard: false));
   }
 
   test_postDominators_forInElement() async {
@@ -3845,12 +3934,17 @@ void test(List<C> l, C c1) {
 
     assertNullCheck(
         checkExpression('l/*check*/'),
-        assertEdge(decoratedTypeAnnotation('List<C> l').node, never,
+        assertEdge(
+            decoratedTypeAnnotation('List<C> l').node, inSet(neverClosure),
             hard: true));
-    assertNullCheck(checkExpression('c1.m'),
-        assertEdge(decoratedTypeAnnotation('C c1').node, never, hard: false));
-    assertNullCheck(checkExpression('c2.m'),
-        assertEdge(decoratedTypeAnnotation('C c2').node, never, hard: false));
+    assertNullCheck(
+        checkExpression('c1.m'),
+        assertEdge(decoratedTypeAnnotation('C c1').node, inSet(neverClosure),
+            hard: false));
+    assertNullCheck(
+        checkExpression('c2.m'),
+        assertEdge(decoratedTypeAnnotation('C c2').node, inSet(neverClosure),
+            hard: false));
   }
 
   test_postDominators_forInStatement_unconditional() async {
@@ -3870,14 +3964,21 @@ void test(List<C> l, C c1, C c2) {
 
     assertNullCheck(
         checkExpression('l/*check*/'),
-        assertEdge(decoratedTypeAnnotation('List<C> l').node, never,
+        assertEdge(
+            decoratedTypeAnnotation('List<C> l').node, inSet(neverClosure),
             hard: true));
-    assertNullCheck(checkExpression('c1.m'),
-        assertEdge(decoratedTypeAnnotation('C c1').node, never, hard: false));
-    assertNullCheck(checkExpression('c2.m'),
-        assertEdge(decoratedTypeAnnotation('C c2').node, never, hard: true));
-    assertNullCheck(checkExpression('c3.m'),
-        assertEdge(decoratedTypeAnnotation('C c3').node, never, hard: false));
+    assertNullCheck(
+        checkExpression('c1.m'),
+        assertEdge(decoratedTypeAnnotation('C c1').node, inSet(neverClosure),
+            hard: false));
+    assertNullCheck(
+        checkExpression('c2.m'),
+        assertEdge(decoratedTypeAnnotation('C c2').node, inSet(neverClosure),
+            hard: true));
+    assertNullCheck(
+        checkExpression('c3.m'),
+        assertEdge(decoratedTypeAnnotation('C c3').node, inSet(neverClosure),
+            hard: false));
   }
 
   test_postDominators_forStatement_conditional() async {
@@ -3897,14 +3998,22 @@ void test(bool b1, C c1, C c2, C c3) {
 }
 ''');
 
-    assertNullCheck(checkExpression('b1/*check*/'),
-        assertEdge(decoratedTypeAnnotation('bool b1').node, never, hard: true));
-    assertNullCheck(checkExpression('c4.m'),
-        assertEdge(decoratedTypeAnnotation('C c4').node, never, hard: true));
-    assertNullCheck(checkExpression('c2.m'),
-        assertEdge(decoratedTypeAnnotation('C c2').node, never, hard: false));
-    assertNullCheck(checkExpression('c3.m'),
-        assertEdge(decoratedTypeAnnotation('C c3').node, never, hard: false));
+    assertNullCheck(
+        checkExpression('b1/*check*/'),
+        assertEdge(decoratedTypeAnnotation('bool b1').node, inSet(neverClosure),
+            hard: true));
+    assertNullCheck(
+        checkExpression('c4.m'),
+        assertEdge(decoratedTypeAnnotation('C c4').node, inSet(neverClosure),
+            hard: true));
+    assertNullCheck(
+        checkExpression('c2.m'),
+        assertEdge(decoratedTypeAnnotation('C c2').node, inSet(neverClosure),
+            hard: false));
+    assertNullCheck(
+        checkExpression('c3.m'),
+        assertEdge(decoratedTypeAnnotation('C c3').node, inSet(neverClosure),
+            hard: false));
   }
 
   test_postDominators_forStatement_unconditional() async {
@@ -3923,18 +4032,27 @@ void test(bool b1, C c1, C c2, C c3) {
 }
 ''');
 
-    assertNullCheck(checkExpression('b1/*check*/'),
-        assertEdge(decoratedTypeAnnotation('bool b1').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('b1/*check*/'),
+        assertEdge(
+            decoratedTypeAnnotation('bool b1').node, inSet(pointsToNever),
+            hard: true));
     //TODO(mfairhurst): enable this check
     //assertNullCheck(checkExpression('b2/*check*/'),
     //    assertEdge(decoratedTypeAnnotation('bool b2').node, never, hard: true));
     //assertEdge(decoratedTypeAnnotation('b3 =').node, never, hard: false);
-    assertNullCheck(checkExpression('c1.m'),
-        assertEdge(decoratedTypeAnnotation('C c1').node, never, hard: false));
-    assertNullCheck(checkExpression('c2.m'),
-        assertEdge(decoratedTypeAnnotation('C c2').node, never, hard: true));
-    assertNullCheck(checkExpression('c3.m'),
-        assertEdge(decoratedTypeAnnotation('C c3').node, never, hard: false));
+    assertNullCheck(
+        checkExpression('c1.m'),
+        assertEdge(decoratedTypeAnnotation('C c1').node, inSet(pointsToNever),
+            hard: false));
+    assertNullCheck(
+        checkExpression('c2.m'),
+        assertEdge(decoratedTypeAnnotation('C c2').node, inSet(pointsToNever),
+            hard: true));
+    assertNullCheck(
+        checkExpression('c3.m'),
+        assertEdge(decoratedTypeAnnotation('C c3').node, inSet(pointsToNever),
+            hard: false));
   }
 
   test_postDominators_ifElement() async {
@@ -3948,14 +4066,20 @@ void test(bool b, C c1, C c2, C c3) {
 }
 ''');
 
-    assertNullCheck(checkExpression('b)'),
-        assertEdge(decoratedTypeAnnotation('bool b').node, never, hard: true));
-    assertNullCheck(checkExpression('c1.m'),
-        assertEdge(decoratedTypeAnnotation('C c1').node, never, hard: false));
-    assertNullCheck(checkExpression('c2.m'),
-        assertEdge(decoratedTypeAnnotation('C c2').node, never, hard: false));
+    assertNullCheck(
+        checkExpression('b)'),
+        assertEdge(decoratedTypeAnnotation('bool b').node, inSet(neverClosure),
+            hard: true));
+    assertNullCheck(
+        checkExpression('c1.m'),
+        assertEdge(decoratedTypeAnnotation('C c1').node, inSet(neverClosure),
+            hard: false));
+    assertNullCheck(
+        checkExpression('c2.m'),
+        assertEdge(decoratedTypeAnnotation('C c2').node, inSet(neverClosure),
+            hard: false));
     assertNullCheck(checkExpression('c3.m'),
-        assertEdge(decoratedTypeAnnotation('C c3').node, never, hard: true));
+        assertEdge(decoratedTypeAnnotation('C c3').node, inSet(neverClosure), hard: true));
   }
 
   test_postDominators_ifStatement_conditional() async {
@@ -3979,16 +4103,22 @@ void test(bool b, C c1, C c2) {
 }
 ''');
 
-    assertNullCheck(checkExpression('b/*check*/'),
-        assertEdge(decoratedTypeAnnotation('bool b').node, never, hard: true));
-    assertNullCheck(checkExpression('c1.m'),
-        assertEdge(decoratedTypeAnnotation('C c1').node, never, hard: false));
-    assertNullCheck(checkExpression('c2.m'),
-        assertEdge(decoratedTypeAnnotation('C c2').node, never, hard: false));
+    assertNullCheck(
+        checkExpression('b/*check*/'),
+        assertEdge(decoratedTypeAnnotation('bool b').node, inSet(neverClosure),
+            hard: true));
+    assertNullCheck(
+        checkExpression('c1.m'),
+        assertEdge(decoratedTypeAnnotation('C c1').node, inSet(neverClosure),
+            hard: false));
+    assertNullCheck(
+        checkExpression('c2.m'),
+        assertEdge(decoratedTypeAnnotation('C c2').node, inSet(neverClosure),
+            hard: false));
     assertNullCheck(checkExpression('c3.m'),
-        assertEdge(decoratedTypeAnnotation('C c3').node, never, hard: true));
+        assertEdge(decoratedTypeAnnotation('C c3').node, inSet(neverClosure), hard: true));
     assertNullCheck(checkExpression('c4.m'),
-        assertEdge(decoratedTypeAnnotation('C c4').node, never, hard: false));
+        assertEdge(decoratedTypeAnnotation('C c4').node, inSet(neverClosure), hard: false));
   }
 
   test_postDominators_ifStatement_unconditional() async {
@@ -4012,16 +4142,22 @@ void test(bool b, C c1, C c2) {
 }
 ''');
 
-    assertNullCheck(checkExpression('b/*check*/'),
-        assertEdge(decoratedTypeAnnotation('bool b').node, never, hard: true));
-    assertNullCheck(checkExpression('c1.m'),
-        assertEdge(decoratedTypeAnnotation('C c1').node, never, hard: false));
-    assertNullCheck(checkExpression('c2.m'),
-        assertEdge(decoratedTypeAnnotation('C c2').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('b/*check*/'),
+        assertEdge(decoratedTypeAnnotation('bool b').node, inSet(neverClosure),
+            hard: true));
+    assertNullCheck(
+        checkExpression('c1.m'),
+        assertEdge(decoratedTypeAnnotation('C c1').node, inSet(neverClosure),
+            hard: false));
+    assertNullCheck(
+        checkExpression('c2.m'),
+        assertEdge(decoratedTypeAnnotation('C c2').node, inSet(neverClosure),
+            hard: true));
     assertNullCheck(checkExpression('c3.m'),
-        assertEdge(decoratedTypeAnnotation('C c3').node, never, hard: true));
+        assertEdge(decoratedTypeAnnotation('C c3').node, inSet(neverClosure), hard: true));
     assertNullCheck(checkExpression('c4.m'),
-        assertEdge(decoratedTypeAnnotation('C c4').node, never, hard: true));
+        assertEdge(decoratedTypeAnnotation('C c4').node, inSet(neverClosure), hard: true));
   }
 
   test_postDominators_inReturn_local() async {
@@ -4034,8 +4170,10 @@ int test(C c) {
 }
 ''');
 
-    assertNullCheck(checkExpression('c.m'),
-        assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('c.m'),
+        assertEdge(decoratedTypeAnnotation('C c').node, inSet(neverClosure),
+            hard: true));
   }
 
   test_postDominators_loopReturn() async {
@@ -4057,14 +4195,24 @@ void test(bool b1, C _c) {
 }
 ''');
 
-    assertNullCheck(checkExpression('b1/*check*/'),
-        assertEdge(decoratedTypeAnnotation('bool b1').node, never, hard: true));
-    assertNullCheck(checkExpression('b2/*check*/'),
-        assertEdge(decoratedTypeAnnotation('bool b2').node, never, hard: true));
-    assertNullCheck(checkExpression('c1.m'),
-        assertEdge(decoratedTypeAnnotation('C c1').node, never, hard: false));
-    assertNullCheck(checkExpression('c2.m'),
-        assertEdge(decoratedTypeAnnotation('C c2').node, never, hard: false));
+    assertNullCheck(
+        checkExpression('b1/*check*/'),
+        assertEdge(
+            decoratedTypeAnnotation('bool b1').node, inSet(pointsToNever),
+            hard: true));
+    assertNullCheck(
+        checkExpression('b2/*check*/'),
+        assertEdge(
+            decoratedTypeAnnotation('bool b2').node, inSet(pointsToNever),
+            hard: true));
+    assertNullCheck(
+        checkExpression('c1.m'),
+        assertEdge(decoratedTypeAnnotation('C c1').node, inSet(pointsToNever),
+            hard: false));
+    assertNullCheck(
+        checkExpression('c2.m'),
+        assertEdge(decoratedTypeAnnotation('C c2').node, inSet(pointsToNever),
+            hard: false));
   }
 
   test_postDominators_multiDeclaration() async {
@@ -4077,7 +4225,8 @@ void test() {
 ''');
 
     // i1.toDouble() cannot be a hard edge or i2 will fail assignment
-    assertEdge(decoratedTypeAnnotation('int i').node, never, hard: false);
+    assertEdge(decoratedTypeAnnotation('int i').node, inSet(neverClosure),
+        hard: false);
     // i2 gets a soft edge to always due to null assignment
     assertEdge(inSet(alwaysPlus), decoratedTypeAnnotation('int i').node,
         hard: false);
@@ -4092,10 +4241,11 @@ Object test(C x, C y) => x.m() ?? y.m();
 ''');
     // There is a hard edge from x to `never` because `x.m()` is unconditionally
     // reachable from the top of `test`.
-    assertEdge(decoratedTypeAnnotation('C x').node, never, hard: true);
+    assertEdge(decoratedTypeAnnotation('C x').node, inSet(neverClosure),
+        hard: true);
     // However, the edge from y to `never` is soft because `y.m()` is only
     // executed if `x.m()` returned `null`.
-    assertEdge(decoratedTypeAnnotation('C y').node, never,
+    assertEdge(decoratedTypeAnnotation('C y').node, inSet(neverClosure),
         hard: false, guards: [decoratedTypeAnnotation('Object m').node]);
   }
 
@@ -4111,11 +4261,15 @@ void test(bool b, int i1, int i2) {
 }
 ''');
 
-    assertNullCheck(checkExpression('i1.toDouble'),
-        assertEdge(decoratedTypeAnnotation('int i1').node, never, hard: false));
+    assertNullCheck(
+        checkExpression('i1.toDouble'),
+        assertEdge(decoratedTypeAnnotation('int i1').node, inSet(neverClosure),
+            hard: false));
 
-    assertNullCheck(checkExpression('i2.toDouble'),
-        assertEdge(decoratedTypeAnnotation('int i2').node, never, hard: false));
+    assertNullCheck(
+        checkExpression('i2.toDouble'),
+        assertEdge(decoratedTypeAnnotation('int i2').node, inSet(neverClosure),
+            hard: false));
   }
 
   test_postDominators_shortCircuitOperators() async {
@@ -4129,17 +4283,21 @@ void test(C c1, C c2, C c3, C c4) {
 }
 ''');
 
-    assertNullCheck(checkExpression('c1.m'),
-        assertEdge(decoratedTypeAnnotation('C c1').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('c1.m'),
+        assertEdge(decoratedTypeAnnotation('C c1').node, inSet(neverClosure),
+            hard: true));
 
-    assertNullCheck(checkExpression('c3.m'),
-        assertEdge(decoratedTypeAnnotation('C c3').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('c3.m'),
+        assertEdge(decoratedTypeAnnotation('C c3').node, inSet(neverClosure),
+            hard: true));
 
     assertNullCheck(checkExpression('c2.m'),
-        assertEdge(decoratedTypeAnnotation('C c2').node, never, hard: false));
+        assertEdge(decoratedTypeAnnotation('C c2').node, inSet(neverClosure), hard: false));
 
     assertNullCheck(checkExpression('c4.m'),
-        assertEdge(decoratedTypeAnnotation('C c4').node, never, hard: false));
+        assertEdge(decoratedTypeAnnotation('C c4').node, inSet(neverClosure), hard: false));
   }
 
   test_postDominators_subFunction() async {
@@ -4154,8 +4312,10 @@ void test() {
 }
 ''');
 
-    assertNullCheck(checkExpression('c.m'),
-        assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('c.m'),
+        assertEdge(decoratedTypeAnnotation('C c').node, inSet(neverClosure),
+            hard: true));
   }
 
   @failingTest
@@ -4195,10 +4355,14 @@ void test() {
 }
 ''');
 
-    assertNullCheck(checkExpression('b/*check*/'),
-        assertEdge(decoratedTypeAnnotation('bool b').node, never, hard: true));
-    assertNullCheck(checkExpression('c.m'),
-        assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('b/*check*/'),
+        assertEdge(decoratedTypeAnnotation('bool b').node, inSet(neverClosure),
+            hard: true));
+    assertNullCheck(
+        checkExpression('c.m'),
+        assertEdge(decoratedTypeAnnotation('C c').node, inSet(neverClosure),
+            hard: true));
   }
 
   test_postDominators_ternaryOperator() async {
@@ -4213,17 +4377,21 @@ void test(C c1, C c2, C c3, C c4) {
 }
 ''');
 
-    assertNullCheck(checkExpression('c1.m'),
-        assertEdge(decoratedTypeAnnotation('C c1').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('c1.m'),
+        assertEdge(decoratedTypeAnnotation('C c1').node, inSet(neverClosure),
+            hard: true));
 
-    assertNullCheck(checkExpression('c4.m'),
-        assertEdge(decoratedTypeAnnotation('C c4').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('c4.m'),
+        assertEdge(decoratedTypeAnnotation('C c4').node, inSet(neverClosure),
+            hard: true));
 
     assertNullCheck(checkExpression('c2.m'),
-        assertEdge(decoratedTypeAnnotation('C c2').node, never, hard: false));
+        assertEdge(decoratedTypeAnnotation('C c2').node, inSet(neverClosure), hard: false));
 
     assertNullCheck(checkExpression('c3.m'),
-        assertEdge(decoratedTypeAnnotation('C c3').node, never, hard: false));
+        assertEdge(decoratedTypeAnnotation('C c3').node, inSet(neverClosure), hard: false));
   }
 
   test_postDominators_tryCatch() async {
@@ -4236,7 +4404,8 @@ void test(int i) {
 ''');
     // Edge should not be hard because the call to `i.isEven` does not
     // post-dominate the declaration of `i`.
-    assertEdge(decoratedTypeAnnotation('int i').node, never, hard: false);
+    assertEdge(decoratedTypeAnnotation('int i').node, inSet(neverClosure),
+        hard: false);
   }
 
   test_postDominators_whileStatement_unconditional() async {
@@ -4255,14 +4424,18 @@ void test(bool b, C c1, C c2) {
 }
 ''');
 
-    assertNullCheck(checkExpression('b/*check*/'),
-        assertEdge(decoratedTypeAnnotation('bool b').node, never, hard: true));
-    assertNullCheck(checkExpression('c1.m'),
-        assertEdge(decoratedTypeAnnotation('C c1').node, never, hard: false));
+    assertNullCheck(
+        checkExpression('b/*check*/'),
+        assertEdge(decoratedTypeAnnotation('bool b').node, inSet(neverClosure),
+            hard: true));
+    assertNullCheck(
+        checkExpression('c1.m'),
+        assertEdge(decoratedTypeAnnotation('C c1').node, inSet(neverClosure),
+            hard: false));
     assertNullCheck(checkExpression('c2.m'),
-        assertEdge(decoratedTypeAnnotation('C c2').node, never, hard: true));
+        assertEdge(decoratedTypeAnnotation('C c2').node, inSet(neverClosure), hard: true));
     assertNullCheck(checkExpression('c3.m'),
-        assertEdge(decoratedTypeAnnotation('C c3').node, never, hard: true));
+        assertEdge(decoratedTypeAnnotation('C c3').node, inSet(neverClosure), hard: true));
   }
 
   test_postfixExpression_minusMinus() async {
@@ -4274,7 +4447,8 @@ int f(int i) {
 
     var declaration = decoratedTypeAnnotation('int i').node;
     var use = checkExpression('i--');
-    assertNullCheck(use, assertEdge(declaration, never, hard: true));
+    assertNullCheck(
+        use, assertEdge(declaration, inSet(neverClosure), hard: true));
 
     var returnType = decoratedTypeAnnotation('int f').node;
     assertEdge(declaration, returnType, hard: false);
@@ -4289,7 +4463,8 @@ int f(int i) {
 
     var declaration = decoratedTypeAnnotation('int i').node;
     var use = checkExpression('i++');
-    assertNullCheck(use, assertEdge(declaration, never, hard: true));
+    assertNullCheck(
+        use, assertEdge(declaration, inSet(neverClosure), hard: true));
 
     var returnType = decoratedTypeAnnotation('int f').node;
     assertEdge(declaration, returnType, hard: false);
@@ -4318,8 +4493,8 @@ C<int> f(C<int> c) {
 
     var cType = decoratedTypeAnnotation('C<int> c');
     var returnType = decoratedTypeAnnotation('C<int> f');
-    assertNullCheck(
-        checkExpression('c++'), assertEdge(cType.node, never, hard: true));
+    assertNullCheck(checkExpression('c++'),
+        assertEdge(cType.node, inSet(neverClosure), hard: true));
     assertEdge(cType.node, returnType.node, hard: false);
     assertEdge(cType.typeArguments[0].node, returnType.typeArguments[0].node,
         hard: false);
@@ -4377,8 +4552,10 @@ void test(C c) {
 }
 ''');
 
-    assertNullCheck(checkExpression('c.x'),
-        assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('c.x'),
+        assertEdge(decoratedTypeAnnotation('C c').node, inSet(neverClosure),
+            hard: true));
   }
 
   test_prefixedIdentifier_target_demonstrates_non_null_intent() async {
@@ -4391,7 +4568,8 @@ void test(C c) {
 }
 ''');
 
-    assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true);
+    assertEdge(decoratedTypeAnnotation('C c').node, inSet(neverClosure),
+        hard: true);
   }
 
   test_prefixedIdentifier_tearoff() async {
@@ -4419,7 +4597,8 @@ bool f(bool b) {
 
     var nullable_b = decoratedTypeAnnotation('bool b').node;
     var check_b = checkExpression('b;');
-    assertNullCheck(check_b, assertEdge(nullable_b, never, hard: true));
+    assertNullCheck(
+        check_b, assertEdge(nullable_b, inSet(neverClosure), hard: true));
 
     var return_f = decoratedTypeAnnotation('bool f').node;
     assertEdge(never, return_f, hard: false);
@@ -4445,8 +4624,10 @@ C test(C c) => -c/*check*/;
     assertEdge(decoratedTypeAnnotation('C operator').node,
         decoratedTypeAnnotation('C test').node,
         hard: false);
-    assertNullCheck(checkExpression('c/*check*/'),
-        assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('c/*check*/'),
+        assertEdge(decoratedTypeAnnotation('C c').node, inSet(neverClosure),
+            hard: true));
   }
 
   test_prefixExpression_minus_dynamic() async {
@@ -4455,7 +4636,8 @@ Object test(dynamic d) => -d;
 ''');
     assertEdge(inSet(alwaysPlus), decoratedTypeAnnotation('Object test').node,
         hard: false);
-    assertEdge(decoratedTypeAnnotation('dynamic d').node, never, hard: true);
+    assertEdge(decoratedTypeAnnotation('dynamic d').node, inSet(neverClosure),
+        hard: true);
   }
 
   test_prefixExpression_minus_substituted() async {
@@ -4470,7 +4652,7 @@ List<int> test(C<int> c) => -c/*check*/;
     var testReturnType = decoratedTypeAnnotation('List<int> test');
     assertEdge(operatorReturnType.node, testReturnType.node, hard: false);
     assertNullCheck(checkExpression('c/*check*/'),
-        assertEdge(cType.node, never, hard: true));
+        assertEdge(cType.node, inSet(neverClosure), hard: true));
     assertEdge(
         substitutionNode(cType.typeArguments[0].node,
             operatorReturnType.typeArguments[0].node),
@@ -4487,7 +4669,8 @@ int f(int i) {
 
     var declaration = decoratedTypeAnnotation('int i').node;
     var use = checkExpression('i;');
-    assertNullCheck(use, assertEdge(declaration, never, hard: true));
+    assertNullCheck(
+        use, assertEdge(declaration, inSet(neverClosure), hard: true));
 
     var returnType = decoratedTypeAnnotation('int f').node;
     assertEdge(inSet(neverClosure), returnType, hard: false);
@@ -4502,7 +4685,8 @@ int f(int i) {
 
     var declaration = decoratedTypeAnnotation('int i').node;
     var use = checkExpression('i;');
-    assertNullCheck(use, assertEdge(declaration, never, hard: true));
+    assertNullCheck(
+        use, assertEdge(declaration, inSet(neverClosure), hard: true));
 
     var returnType = decoratedTypeAnnotation('int f').node;
     assertEdge(inSet(neverClosure), returnType, hard: false);
@@ -4528,7 +4712,7 @@ C<int> f(C<int> x) => ++x;
     var xType = decoratedTypeAnnotation('C<int> x');
     var plusReturnType = decoratedTypeAnnotation('C<T> operator');
     var fReturnType = decoratedTypeAnnotation('C<int> f');
-    assertEdge(xType.node, never, hard: true);
+    assertEdge(xType.node, inSet(neverClosure), hard: true);
     assertEdge(plusReturnType.node, fReturnType.node, hard: false);
     assertEdge(
         substitutionNode(
@@ -4612,8 +4796,10 @@ void test(C c) {
 }
 ''');
 
-    assertNullCheck(checkExpression('c).x'),
-        assertEdge(decoratedTypeAnnotation('C c').node, never, hard: true));
+    assertNullCheck(
+        checkExpression('c).x'),
+        assertEdge(decoratedTypeAnnotation('C c').node, inSet(neverClosure),
+            hard: true));
   }
 
   test_redirecting_constructor_factory() async {
@@ -5079,7 +5265,8 @@ void f(List<int> ints) {
 }
 ''');
 
-    assertEdge(decoratedTypeAnnotation('List<int>').node, never, hard: true);
+    assertEdge(decoratedTypeAnnotation('List<int>').node, inSet(neverClosure),
+        hard: true);
     assertEdge(
         substitutionNode(decoratedTypeAnnotation('int> ints').node, anyNode),
         decoratedTypeAnnotation('int>[').node,
@@ -5094,7 +5281,8 @@ void f(dynamic ints) {
 ''');
 
     // Mostly just check this doesn't crash.
-    assertEdge(decoratedTypeAnnotation('dynamic').node, never, hard: true);
+    assertEdge(decoratedTypeAnnotation('dynamic').node, inSet(neverClosure),
+        hard: true);
   }
 
   test_spread_element_list_nullable() async {
@@ -5118,7 +5306,8 @@ void f(Map<String, int> map) {
 }
 ''');
 
-    assertEdge(decoratedTypeAnnotation('Map<String, int>').node, never,
+    assertEdge(
+        decoratedTypeAnnotation('Map<String, int>').node, inSet(neverClosure),
         hard: true);
     assertEdge(decoratedTypeAnnotation('String, int> map').node,
         decoratedTypeAnnotation('String, int>{').node,
@@ -5135,7 +5324,8 @@ void f(Set<int> ints) {
 }
 ''');
 
-    assertEdge(decoratedTypeAnnotation('Set<int>').node, never, hard: true);
+    assertEdge(decoratedTypeAnnotation('Set<int>').node, inSet(neverClosure),
+        hard: true);
     assertEdge(
         substitutionNode(decoratedTypeAnnotation('int> ints').node, anyNode),
         decoratedTypeAnnotation('int>{').node,
@@ -5150,7 +5340,8 @@ void f(C<dynamic, int> ints) {
 }
 ''');
 
-    assertEdge(decoratedTypeAnnotation('C<dynamic, int>').node, never,
+    assertEdge(
+        decoratedTypeAnnotation('C<dynamic, int>').node, inSet(neverClosure),
         hard: true);
     assertEdge(
         substitutionNode(decoratedTypeAnnotation('int> ints').node,
