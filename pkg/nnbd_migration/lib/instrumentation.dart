@@ -146,6 +146,7 @@ enum EdgeOriginKind {
   nonNullAssertion,
   nullabilityComment,
   optionalFormalParameter,
+  thisOrSuper,
   throw_,
 }
 

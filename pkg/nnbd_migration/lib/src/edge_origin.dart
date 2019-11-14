@@ -314,6 +314,14 @@ class OptionalFormalParameterOrigin extends EdgeOrigin {
   EdgeOriginKind get kind => EdgeOriginKind.optionalFormalParameter;
 }
 
+/// Edge origin resulting from the use of `this` or `super`.
+class ThisOrSuperOrigin extends EdgeOrigin {
+  ThisOrSuperOrigin(Source source, AstNode node) : super(source, node);
+
+  @override
+  EdgeOriginKind get kind => EdgeOriginKind.thisOrSuper;
+}
+
 /// An edge origin used for edges that originated from the type of a `throw` or
 /// `rethrow`.
 class ThrowOrigin extends EdgeOrigin {

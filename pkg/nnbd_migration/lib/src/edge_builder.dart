@@ -2040,14 +2040,20 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   DecoratedType _handleThisOrSuper(Expression node) {
     var type = node.staticType as InterfaceType;
-    // Instantiate the type, and any type arguments, with `_graph.never`,
+    // Instantiate the type, and any type arguments, with non-nullable types,
     // because the type of `this` is always `ClassName<Param, Param, ...>` with
     // no `?`s.  (Even if some of the type parameters are allowed to be
     // instantiated with nullable types at runtime, a reference to `this` can't
     // be migrated in such a way that forces them to be nullable).
-    return DecoratedType(type, _graph.never,
+    NullabilityNode makeNonNullableNode() {
+      var nullabilityNode = NullabilityNode.forInferredType();
+      _graph.makeNonNullable(nullabilityNode, ThisOrSuperOrigin(source, node));
+      return nullabilityNode;
+    }
+
+    return DecoratedType(type, makeNonNullableNode(),
         typeArguments: type.typeArguments
-            .map((t) => DecoratedType(t, _graph.never))
+            .map((t) => DecoratedType(t, makeNonNullableNode()))
             .toList());
   }
 
