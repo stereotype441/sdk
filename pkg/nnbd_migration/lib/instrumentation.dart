@@ -146,6 +146,7 @@ enum EdgeOriginKind {
   nonNullAssertion,
   nullabilityComment,
   optionalFormalParameter,
+  throw_,
 }
 
 /// Interface used by the migration engine to expose information to its client

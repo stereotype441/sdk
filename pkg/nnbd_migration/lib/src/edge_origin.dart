@@ -313,3 +313,12 @@ class OptionalFormalParameterOrigin extends EdgeOrigin {
   @override
   EdgeOriginKind get kind => EdgeOriginKind.optionalFormalParameter;
 }
+
+/// An edge origin used for edges that originated from the type of a `throw` or
+/// `rethrow`.
+class ThrowOrigin extends EdgeOrigin {
+  ThrowOrigin(Source source, AstNode node) : super(source, node);
+
+  @override
+  EdgeOriginKind get kind => EdgeOriginKind.throw_;
+}

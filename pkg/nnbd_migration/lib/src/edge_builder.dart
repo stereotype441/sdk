@@ -1081,7 +1081,9 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   @override
   DecoratedType visitRethrowExpression(RethrowExpression node) {
     _flowAnalysis.handleExit();
-    return DecoratedType(node.staticType, _graph.never);
+    var nullabilityNode = NullabilityNode.forInferredType();
+    _graph.makeNonNullable(nullabilityNode, ThrowOrigin(source, node));
+    return DecoratedType(node.staticType, nullabilityNode);
   }
 
   @override
@@ -1277,7 +1279,9 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     node.expression.accept(this);
     // TODO(paulberry): do we need to check the expression type?  I think not.
     _flowAnalysis.handleExit();
-    return DecoratedType(node.staticType, _graph.never);
+    var nullabilityNode = NullabilityNode.forInferredType();
+    _graph.makeNonNullable(nullabilityNode, ThrowOrigin(source, node));
+    return DecoratedType(node.staticType, nullabilityNode);
   }
 
   @override
