@@ -803,7 +803,10 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         decoratedTypeArguments = const [];
       }
     }
-    var createdType = DecoratedType(node.staticType, _graph.never,
+    var nullabilityNode = NullabilityNode.forInferredType();
+    _graph.makeNonNullable(
+        nullabilityNode, InstanceCreationOrigin(source, node));
+    var createdType = DecoratedType(node.staticType, nullabilityNode,
         typeArguments: decoratedTypeArguments);
     var calleeType = getOrComputeElementType(callee, targetType: createdType);
     _handleInvocationArguments(node, node.argumentList.arguments, typeArguments,

@@ -137,6 +137,7 @@ enum EdgeOriginKind {
   implicitMixinSuperCall,
   inheritance,
   initializerInference,
+  instanceCreation,
   instantiateToBounds,
   isCheckComponentType,
   isCheckMainType,
