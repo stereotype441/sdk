@@ -7,7 +7,16 @@ import 'dart:async';
 import 'package:analysis_server/protocol/protocol.dart';
 import 'package:analysis_server/src/analysis_server.dart';
 import 'package:analysis_server/src/channel/channel.dart';
+import 'package:analysis_server/src/plugin/notification_manager.dart';
+import 'package:analysis_server/src/plugin/plugin_manager.dart';
+import 'package:analyzer/file_system/file_system.dart';
+import 'package:analyzer/instrumentation/instrumentation.dart';
+import 'package:analyzer/src/context/context_root.dart' as analyzer;
+import 'package:analyzer_plugin/protocol/protocol.dart' as plugin;
+import 'package:analyzer_plugin/protocol/protocol_generated.dart' as plugin;
+import 'package:analyzer_plugin/src/protocol/protocol_internal.dart' as plugin;
 import 'package:test/test.dart';
+import 'package:watcher/watcher.dart';
 
 /**
  * A mock [ServerCommunicationChannel] for testing [AnalysisServer].
@@ -15,9 +24,9 @@ import 'package:test/test.dart';
 class MockServerChannel implements ServerCommunicationChannel {
   StreamController<Request> requestController = new StreamController<Request>();
   StreamController<Response> responseController =
-  new StreamController<Response>.broadcast();
+      new StreamController<Response>.broadcast();
   StreamController<Notification> notificationController =
-  new StreamController<Notification>(sync: true);
+      new StreamController<Notification>(sync: true);
   Completer<Response> errorCompleter;
 
   List<Response> responsesReceived = [];
@@ -112,7 +121,7 @@ class MockServerChannel implements ServerCommunicationChannel {
     // have the default behavior be the only behavior.
     String id = request.id;
     Future<Response> response =
-    responseController.stream.firstWhere((response) => response.id == id);
+        responseController.stream.firstWhere((response) => response.id == id);
     if (throwOnError) {
       errorCompleter = new Completer<Response>();
       try {
@@ -132,5 +141,116 @@ class ServerError implements Exception {
 
   String toString() {
     return "Server Error: $message";
+  }
+}
+
+/**
+ * A plugin manager that simulates broadcasting requests to plugins by
+ * hard-coding the responses.
+ */
+class TestPluginManager implements PluginManager {
+  plugin.AnalysisSetPriorityFilesParams analysisSetPriorityFilesParams;
+  plugin.AnalysisSetSubscriptionsParams analysisSetSubscriptionsParams;
+  plugin.AnalysisUpdateContentParams analysisUpdateContentParams;
+  plugin.RequestParams broadcastedRequest;
+  Map<PluginInfo, Future<plugin.Response>> broadcastResults;
+
+  @override
+  String get byteStorePath {
+    fail('Unexpected invocation of byteStorePath');
+  }
+
+  @override
+  InstrumentationService get instrumentationService {
+    fail('Unexpected invocation of instrumentationService');
+  }
+
+  @override
+  NotificationManager get notificationManager {
+    fail('Unexpected invocation of notificationManager');
+  }
+
+  @override
+  List<PluginInfo> get plugins {
+    fail('Unexpected invocation of plugins');
+  }
+
+  @override
+  ResourceProvider get resourceProvider {
+    fail('Unexpected invocation of resourceProvider');
+  }
+
+  @override
+  String get sdkPath {
+    fail('Unexpected invocation of sdkPath');
+  }
+
+  @override
+  Future<void> addPluginToContextRoot(
+      analyzer.ContextRoot contextRoot, String path) async {
+    fail('Unexpected invocation of addPluginToContextRoot');
+  }
+
+  @override
+  Map<PluginInfo, Future<plugin.Response>> broadcastRequest(
+      plugin.RequestParams params,
+      {analyzer.ContextRoot contextRoot}) {
+    broadcastedRequest = params;
+    return broadcastResults ?? <PluginInfo, Future<plugin.Response>>{};
+  }
+
+  @override
+  Future<List<Future<plugin.Response>>> broadcastWatchEvent(
+      WatchEvent watchEvent) async {
+    return <Future<plugin.Response>>[];
+  }
+
+  @override
+  List<String> pathsFor(String pluginPath) {
+    fail('Unexpected invocation of pathsFor');
+  }
+
+  @override
+  List<PluginInfo> pluginsForContextRoot(analyzer.ContextRoot contextRoot) {
+    fail('Unexpected invocation of pluginsForContextRoot');
+  }
+
+  @override
+  void recordPluginFailure(String hostPackageName, String message) {
+    fail('Unexpected invocation of recordPluginFailure');
+  }
+
+  @override
+  void removedContextRoot(analyzer.ContextRoot contextRoot) {
+    fail('Unexpected invocation of removedContextRoot');
+  }
+
+  @override
+  Future<void> restartPlugins() async {
+    // Nothing to restart.
+    return null;
+  }
+
+  @override
+  void setAnalysisSetPriorityFilesParams(
+      plugin.AnalysisSetPriorityFilesParams params) {
+    analysisSetPriorityFilesParams = params;
+  }
+
+  @override
+  void setAnalysisSetSubscriptionsParams(
+      plugin.AnalysisSetSubscriptionsParams params) {
+    analysisSetSubscriptionsParams = params;
+  }
+
+  @override
+  void setAnalysisUpdateContentParams(
+      plugin.AnalysisUpdateContentParams params) {
+    analysisUpdateContentParams = params;
+  }
+
+  @override
+  Future<List<void>> stopAll() async {
+    fail('Unexpected invocation of stopAll');
   }
 }
