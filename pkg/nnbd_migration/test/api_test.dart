@@ -3396,28 +3396,6 @@ class C {
 ''';
     await _checkSingleFileChanges(content, expected);
   }
-
-  test_use_of_unassigned_variable() async {
-    var content = '''
-int f(bool b) {
-  int i;
-  if (b) {
-    i = 1;
-  }
-  return i;
-}
-''';
-    var expected = '''
-int? f(bool b) {
-  int? i;
-  if (b) {
-    i = 1;
-  }
-  return i;
-}
-''';
-    await _checkSingleFileChanges(content, expected);
-  }
 }
 
 @reflectiveTest
