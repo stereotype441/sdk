@@ -6,6 +6,7 @@ import 'package:analysis_server/protocol/protocol.dart';
 import 'package:analysis_server/protocol/protocol_constants.dart';
 import 'package:analysis_server/protocol/protocol_generated.dart';
 import 'package:analysis_server/src/analysis_server.dart';
+import 'package:analysis_server/src/utilities/mocks.dart';
 import 'package:analyzer/file_system/file_system.dart';
 import 'package:analyzer/file_system/physical_file_system.dart';
 import 'package:analyzer/instrumentation/instrumentation.dart';
@@ -15,7 +16,6 @@ import 'package:test/test.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
 
 import '../../../analysis_abstract.dart';
-import '../../../mocks.dart';
 
 main() {
   defineReflectiveSuite(() {
@@ -126,7 +126,8 @@ class MigrationTest extends MigrationBase {
     List<String> packageRoots = [
       '/usr/local/google/home/paulberry/logging-sample'
     ];
-    String outputDir = '/usr/local/google/home/paulberry/tmp/nnbd_migration/logging-sample';
+    String outputDir =
+        '/usr/local/google/home/paulberry/tmp/nnbd_migration/logging-sample';
     await sendAnalysisSetAnalysisRoots(packageRoots);
     await sendEditDartfix(packageRoots, outputDir);
   }
