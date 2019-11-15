@@ -2,6 +2,20 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+/// This executable provides the ability to run the migration tool in process
+/// on a single package.  It should be invoked with two command-line arguments:
+/// a path to a configuration file and the name of a package to migrate.
+///
+/// The configuration file format is a JSON map, with the following keys:
+/// - `sdk_root`: path to the SDK source code on the user's machine (this is the
+///   directory that contains `pkg`, `third_party`, `tests`, etc.
+/// - `output_root`: path to the directory on the user's machine where output
+///   HTML files should go.  A subdirectory will be created for each package
+///   that is migrated.
+/// - `external_packages` a map (name => path) of additional non-SDK packages
+///   that may need to be migrated.
+library migration_runner;
+
 import 'package:analysis_server/protocol/protocol.dart';
 import 'package:analysis_server/protocol/protocol_constants.dart';
 import 'package:analysis_server/protocol/protocol_generated.dart';
@@ -12,14 +26,31 @@ import 'package:analyzer/file_system/physical_file_system.dart';
 import 'package:analyzer/instrumentation/instrumentation.dart';
 import 'package:analyzer/src/dart/sdk/sdk.dart';
 import 'package:analyzer/src/generated/sdk.dart';
+import 'package:path/path.dart' as path;
 import 'package:test/test.dart';
-import 'package:test_reflective_loader/test_reflective_loader.dart';
 
-main() {
-  defineReflectiveSuite(() {
-    defineReflectiveTests(MigrationTest);
-  });
+main(List<String> args) async {
+  if (args.length != 2) {
+    throw StateError(
+        'Exactly two arguments are required: the path to a JSON configuration file, and the name of the package to migrate');
+  }
+  throw 'Need to change the code below';
+  var packageName = args[0];
+  var testInfo = TestInfo(testInfoJson);
+  var packageRoot = testInfo.packageRoot(packageName);
+  String outputDir = path.join(testInfo.outputRoot, packageRoot);
+  await MigrationTest().run(packageRoot, outputDir);
 }
+
+var testInfoJson = {
+  'sdk_root': '/Users/brianwilkerson/src/dart/sdk/sdk',
+  'external_packages': {
+    'logging-sample': '/usr/local/google/home/paulberry/logging-sample',
+    'term_glyph': '/Users/brianwilkerson/src/dart/term_glyph',
+    'vector_math': '/Users/brianwilkerson/src/dart/vector_math.dart',
+  },
+  'output_root': '/usr/local/google/home/paulberry/tmp/nnbd_migration',
+};
 
 class MigrationBase {
   ResourceProvider resourceProvider = PhysicalResourceProvider.INSTANCE;
@@ -87,105 +118,46 @@ class MigrationBase {
   }
 }
 
-@reflectiveTest
 class MigrationTest extends MigrationBase {
-//  @soloTest
-  test_charcode() async {
-    List<String> packageRoots = [
-      '/Users/brianwilkerson/src/dart/sdk/sdk/third_party/pkg/charcode'
-    ];
-    String outputDir = '/Users/brianwilkerson/temp/migration/charcode';
+  Future<void> run(String packageRoot, String outputDir) async {
+    List<String> packageRoots = [packageRoot];
     await sendAnalysisSetAnalysisRoots(packageRoots);
     await sendEditDartfix(packageRoots, outputDir);
   }
+}
 
-//  @soloTest
-  test_collection() async {
-    List<String> packageRoots = [
-      '/Users/brianwilkerson/src/dart/sdk/sdk/third_party/pkg/collection'
-    ];
-    String outputDir = '/Users/brianwilkerson/temp/migration/collection';
-    await sendAnalysisSetAnalysisRoots(packageRoots);
-    await sendEditDartfix(packageRoots, outputDir);
-  }
+class TestInfo {
+  static const Set<String> thirdPartyPackages = {
+    'charcode',
+    'collection',
+    'logging',
+    'meta',
+    'pedantic',
+    'typed_data'
+  };
 
-//  @soloTest
-  test_logging() async {
-    List<String> packageRoots = [
-      '/Users/brianwilkerson/src/dart/sdk/sdk/third_party/pkg/logging'
-    ];
-    String outputDir = '/Users/brianwilkerson/temp/migration/logging';
-    await sendAnalysisSetAnalysisRoots(packageRoots);
-    await sendEditDartfix(packageRoots, outputDir);
-  }
+  static const Set<String> builtInPackages = {'meta', 'path'};
 
-  @soloTest
-  test_logging_sample() async {
-    List<String> packageRoots = [
-      '/usr/local/google/home/paulberry/logging-sample'
-    ];
-    String outputDir =
-        '/usr/local/google/home/paulberry/tmp/nnbd_migration/logging-sample';
-    await sendAnalysisSetAnalysisRoots(packageRoots);
-    await sendEditDartfix(packageRoots, outputDir);
-  }
+  final Map<String, Object> testInfoJson;
 
-//  @soloTest
-  test_meta() async {
-    List<String> packageRoots = [
-      '/Users/brianwilkerson/src/dart/sdk/sdk/pkg/meta'
-    ];
-    String outputDir = '/Users/brianwilkerson/temp/migration/meta';
-    await sendAnalysisSetAnalysisRoots(packageRoots);
-    await sendEditDartfix(packageRoots, outputDir);
-  }
+  TestInfo(this.testInfoJson);
 
-//  @soloTest
-  test_path() async {
-    List<String> packageRoots = [
-      '/Users/brianwilkerson/src/dart/sdk/sdk/third_party/pkg/path'
-    ];
-    String outputDir = '/Users/brianwilkerson/temp/migration/path';
-    await sendAnalysisSetAnalysisRoots(packageRoots);
-    await sendEditDartfix(packageRoots, outputDir);
-  }
+  Map<String, String> get externalPackages =>
+      ((testInfoJson['external_packages'] ?? {}) as Map).cast<String, String>();
 
-//  @soloTest
-  test_pedantic() async {
-    List<String> packageRoots = [
-      '/Users/brianwilkerson/src/dart/sdk/sdk/third_party/pkg/pedantic'
-    ];
-    String outputDir = '/Users/brianwilkerson/temp/migration/pedantic';
-    await sendAnalysisSetAnalysisRoots(packageRoots);
-    await sendEditDartfix(packageRoots, outputDir);
-  }
+  String get outputRoot => testInfoJson['output_root'];
 
-//  @soloTest
-  test_term_glyph() async {
-    List<String> packageRoots = ['/Users/brianwilkerson/src/dart/term_glyph'];
-    String outputDir = '/Users/brianwilkerson/temp/migration/term_glyph';
-    await sendAnalysisSetAnalysisRoots(packageRoots);
-    await sendEditDartfix(packageRoots, outputDir);
-  }
+  String get sdkRoot => testInfoJson['sdk_root'];
 
-//  @soloTest
-  test_typed_data() async {
-    List<String> packageRoots = [
-      '/Users/brianwilkerson/src/dart/sdk/sdk/pkg/typed_data'
-    ];
-    String outputDir = '/Users/brianwilkerson/temp/migration/typed_data';
-    await sendAnalysisSetAnalysisRoots(packageRoots);
-    await sendEditDartfix(packageRoots, outputDir);
-  }
-
-//  @soloTest
-  test_vector_math_dart() async {
-    // Times out.
-    List<String> packageRoots = [
-      '/Users/brianwilkerson/src/dart/vector_math.dart'
-    ];
-    String outputDir = '/Users/brianwilkerson/temp/migration/vector_math.dart';
-    await sendAnalysisSetAnalysisRoots(packageRoots);
-    await sendEditDartfix(packageRoots, outputDir);
+  String packageRoot(String packageName) {
+    if (thirdPartyPackages.contains(packageName)) {
+      return path.join(sdkRoot, 'third_party', 'pkg', packageName);
+    } else if (builtInPackages.contains(packageName)) {
+      return path.join(sdkRoot, 'pkg', packageName);
+    } else if (externalPackages.containsKey(packageName)) {
+      return externalPackages[packageName];
+    } else {
+      throw StateError('Unrecognized package $packageName');
+    }
   }
 }
