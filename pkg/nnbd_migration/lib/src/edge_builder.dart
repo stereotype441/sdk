@@ -1210,7 +1210,9 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         if (promotedType != null) return promotedType;
       }
       var type = getOrComputeElementType(staticElement);
-      if (node.inGetterContext() && !_flowAnalysis.isAssigned(staticElement)) {
+      if (!node.inDeclarationContext() &&
+          node.inGetterContext() &&
+          !_flowAnalysis.isAssigned(staticElement)) {
         _graph.makeNullable(type.node, UninitializedReadOrigin(source, node));
       }
       return type;
