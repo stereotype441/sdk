@@ -1495,8 +1495,10 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
             PromotableElement, DecoratedType>(
         DecoratedTypeOperations(_typeSystem, _variables, _graph),
         _assignedVariables);
-    for (var parameter in parameters.parameters) {
-      _flowAnalysis.initialize(parameter.declaredElement);
+    if (parameters != null) {
+      for (var parameter in parameters.parameters) {
+        _flowAnalysis.initialize(parameter.declaredElement);
+      }
     }
   }
 
