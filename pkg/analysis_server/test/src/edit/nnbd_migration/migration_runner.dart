@@ -9,12 +9,17 @@
 /// The configuration file format is a JSON map, with the following keys:
 /// - `sdk_root`: path to the SDK source code on the user's machine (this is the
 ///   directory that contains `pkg`, `third_party`, `tests`, etc.
-/// - `output_root`: path to the directory on the user's machine where output
-///   HTML files should go.  A subdirectory will be created for each package
-///   that is migrated.
-/// - `external_packages` a map (name => path) of additional non-SDK packages
+/// - `output_root`: if present, path to the directory on the user's machine
+///   where output HTML files should go.  A subdirectory will be created for
+///   each package that is migrated.
+/// - `external_packages`: a map (name => path) of additional non-SDK packages
 ///   that may need to be migrated.
+/// - `port`: if present, the port where a server should be spawned serving HTML
+///   pages.
 library migration_runner;
+
+import 'dart:convert';
+import 'dart:io' as io;
 
 import 'package:analysis_server/protocol/protocol.dart';
 import 'package:analysis_server/protocol/protocol_constants.dart';
@@ -32,25 +37,23 @@ import 'package:test/test.dart';
 main(List<String> args) async {
   if (args.length != 2) {
     throw StateError(
-        'Exactly two arguments are required: the path to a JSON configuration file, and the name of the package to migrate');
+        'Exactly two arguments are required: the path to a JSON configuration '
+        'file, and the name of the package to migrate');
   }
-  throw 'Need to change the code below';
-  var packageName = args[0];
+  var testInfoJsonPath = args[0];
+  var testInfoJson = json.decode(io.File(testInfoJsonPath).readAsStringSync());
+  var packageName = args[1];
   var testInfo = TestInfo(testInfoJson);
   var packageRoot = testInfo.packageRoot(packageName);
-  String outputDir = path.join(testInfo.outputRoot, packageRoot);
-  await MigrationTest().run(packageRoot, outputDir);
+  String outputDir = path.join(testInfo.outputRoot, packageName);
+  print('Preparing to migrate');
+  var migrationTest = MigrationTest();
+  migrationTest.setUp();
+  print('Migrating');
+  await migrationTest.run(packageRoot, outputDir);
+  print('Done');
+  io.exit(0);
 }
-
-var testInfoJson = {
-  'sdk_root': '/Users/brianwilkerson/src/dart/sdk/sdk',
-  'external_packages': {
-    'logging-sample': '/usr/local/google/home/paulberry/logging-sample',
-    'term_glyph': '/Users/brianwilkerson/src/dart/term_glyph',
-    'vector_math': '/Users/brianwilkerson/src/dart/vector_math.dart',
-  },
-  'output_root': '/usr/local/google/home/paulberry/tmp/nnbd_migration',
-};
 
 class MigrationBase {
   ResourceProvider resourceProvider = PhysicalResourceProvider.INSTANCE;
