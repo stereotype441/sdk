@@ -45,14 +45,21 @@ main(List<String> args) async {
   var packageName = args[1];
   var testInfo = TestInfo(testInfoJson);
   var packageRoot = testInfo.packageRoot(packageName);
-  String outputDir = path.join(testInfo.outputRoot, packageName);
+  var outputRoot = testInfo.outputRoot;
+  var port = testInfo.port;
+  String outputDir =
+      outputRoot == null ? null : path.join(outputRoot, packageName);
   print('Preparing to migrate');
   var migrationTest = MigrationTest();
   migrationTest.setUp();
   print('Migrating');
-  await migrationTest.run(packageRoot, outputDir);
-  print('Done');
-  io.exit(0);
+  await migrationTest.run(packageRoot, outputDir, port);
+  if (port == null) {
+    print('Done');
+    io.exit(0);
+  } else {
+    print('Done.  Please point your browser to localhost:$port/\$filePath');
+  }
 }
 
 class MigrationBase {
@@ -84,9 +91,9 @@ class MigrationBase {
     return waitResponse(request);
   }
 
-  Future<Response> sendEditDartfix(List<String> directories, String outputDir) {
+  Future<Response> sendEditDartfix(List<String> directories, String outputDir, int port) {
     var request = EditDartfixParams(directories,
-            includedFixes: ['non-nullable'], outputDir: outputDir, port: 10501)
+            includedFixes: ['non-nullable'], outputDir: outputDir, port: port)
         .toRequest('1');
     return waitResponse(request);
   }
@@ -122,10 +129,10 @@ class MigrationBase {
 }
 
 class MigrationTest extends MigrationBase {
-  Future<void> run(String packageRoot, String outputDir) async {
+  Future<void> run(String packageRoot, String outputDir, int port) async {
     List<String> packageRoots = [packageRoot];
     await sendAnalysisSetAnalysisRoots(packageRoots);
-    await sendEditDartfix(packageRoots, outputDir);
+    await sendEditDartfix(packageRoots, outputDir, port);
   }
 }
 
@@ -149,6 +156,8 @@ class TestInfo {
       ((testInfoJson['external_packages'] ?? {}) as Map).cast<String, String>();
 
   String get outputRoot => testInfoJson['output_root'];
+
+  int get port => testInfoJson['port'];
 
   String get sdkRoot => testInfoJson['sdk_root'];
 
