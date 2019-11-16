@@ -15,6 +15,7 @@ import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/analysis/session.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/file_system/file_system.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart'
     show Location, SourceEdit, SourceFileEdit;
@@ -36,6 +37,11 @@ class FixInfo {
 
 /// A builder used to build the migration information for a library.
 class InfoBuilder {
+  /// The resource provider used to access the file system.
+  ResourceProvider provider;
+
+  String includedPath;
+
   /// The instrumentation information gathered while the migration engine was
   /// running.
   final InstrumentationInformation info;
@@ -52,7 +58,8 @@ class InfoBuilder {
   final Map<String, UnitInfo> unitMap = {};
 
   /// Initialize a newly created builder.
-  InfoBuilder(this.info, this.listener, {this.explainNonNullableTypes = false});
+  InfoBuilder(this.provider, this.includedPath, this.info, this.listener,
+      {this.explainNonNullableTypes = false});
 
   /// The analysis server used to get information about libraries.
   AnalysisServer get server => listener.server;
@@ -74,7 +81,10 @@ class InfoBuilder {
         for (ResolvedUnitResult unitResult in result.units) {
           SourceFileEdit edit =
               listener.sourceChange.getFileEdit(unitResult.path);
-          units.add(_explainUnit(sourceInfo, unitResult, edit));
+          UnitInfo unit = _explainUnit(sourceInfo, unitResult, edit);
+          if (provider.pathContext.isWithin(includedPath, unitResult.path)) {
+            units.add(unit);
+          }
         }
       }
     }
@@ -83,39 +93,51 @@ class InfoBuilder {
 
   /// Return detail text for a fix built from an edge with [node] as a
   /// destination.
-  String _baseDescriptionForOrigin(EdgeOriginInfo origin) {
+  String _baseDescriptionForOrigin(
+      EdgeOriginInfo origin, NullabilityFixKind fixKind) {
     AstNode node = origin.node;
     AstNode parent = node.parent;
 
-    if (node is DefaultFormalParameter) {
+    String aNullableDefault(DefaultFormalParameter node) {
       Expression defaultValue = node.defaultValue;
       if (defaultValue == null) {
-        return "This parameter has an implicit default value of 'null'";
+        return "an implicit default value of 'null'";
       } else if (defaultValue is NullLiteral) {
-        return "This parameter has an explicit default value of 'null'";
+        return "an explicit default value of 'null'";
       }
-      return "This parameter has a nullable default value";
+      return "a nullable default value";
+    }
+
+    if (node is DefaultFormalParameter) {
+      // TODO(srawlins): Is there an enum of fixes I can use? The fix classes
+      //  are subclasses of PotentialModification, e.g. PotentiallyAddRequired.
+      if (fixKind == NullabilityFixKind.addRequired) {
+        return "This parameter is non-nullable, so cannot have "
+            "${aNullableDefault(node)}";
+      } else {
+        return "This parameter has ${aNullableDefault(node)}";
+      }
     } else if (node is FieldFormalParameter) {
       AstNode parent = node.parent;
       if (parent is DefaultFormalParameter) {
-        Expression defaultValue = parent.defaultValue;
-        if (defaultValue == null) {
-          return "This field is initialized by an optional field formal "
-              "parameter that has an implicit default value of 'null'";
-        } else if (defaultValue is NullLiteral) {
-          return "This field is initialized by an optional field formal "
-              "parameter that has an explicit default value of 'null'";
-        }
         return "This field is initialized by an optional field formal "
-            "parameter that has a nullable default value";
+            "parameter that has ${aNullableDefault(parent)}";
       }
       return "This field is initialized by a field formal parameter and a "
           "nullable value is passed as an argument";
     } else if (parent is AsExpression) {
       return "The value of the expression is nullable";
     }
-    String nullableValue =
-        node is NullLiteral ? "an explicit 'null'" : "a nullable value";
+
+    // Text indicating the type of nullable value found.
+    String nullableValue;
+    if (node is NullLiteral) {
+      nullableValue = "an explicit 'null'";
+    } else if (origin.kind == EdgeOriginKind.dynamicAssignment) {
+      nullableValue = "a dynamic value, which is nullable";
+    } else {
+      nullableValue = "a nullable value";
+    }
     if (parent is ArgumentList) {
       return capitalize("$nullableValue is passed as an argument");
     }
@@ -178,13 +200,24 @@ class InfoBuilder {
         return "This field is initialized to $nullableValue";
       }
       return "This variable is initialized to $nullableValue";
+    } else if (node is ConstructorDeclaration &&
+        origin.kind == EdgeOriginKind.fieldNotInitialized) {
+      String constructorName =
+          node.declaredElement.enclosingElement.displayName;
+      if (node.declaredElement.displayName.isNotEmpty) {
+        constructorName =
+            "$constructorName.${node.declaredElement.displayName}";
+      }
+      return "The constructor '$constructorName' does not initialize this "
+          "field in its initializer list";
     }
     return capitalize("$nullableValue is assigned");
   }
 
   /// Return a description of the given [origin].
-  String _buildDescriptionForOrigin(EdgeOriginInfo origin) {
-    String description = _baseDescriptionForOrigin(origin);
+  String _buildDescriptionForOrigin(
+      EdgeOriginInfo origin, NullabilityFixKind fixKind) {
+    String description = _baseDescriptionForOrigin(origin, fixKind);
     if (_inTestCode(origin.node)) {
       // TODO(brianwilkerson) Don't add this if the graph node with which the
       //  origin is associated is also in test code.
@@ -194,7 +227,8 @@ class InfoBuilder {
   }
 
   /// Return a description of the given [origin] associated with the [edge].
-  RegionDetail _buildDetailForOrigin(EdgeOriginInfo origin, EdgeInfo edge) {
+  RegionDetail _buildDetailForOrigin(
+      EdgeOriginInfo origin, EdgeInfo edge, NullabilityFixKind fixKind) {
     AstNode node = origin.node;
     NavigationTarget target;
     // Some nodes don't need a target; default formal parameters
@@ -222,7 +256,7 @@ class InfoBuilder {
       }
       target = _targetForNode(origin.source.fullName, node);
     }
-    return RegionDetail(_buildDescriptionForOrigin(origin), target);
+    return RegionDetail(_buildDescriptionForOrigin(origin, fixKind), target);
   }
 
   /// Compute the details for the fix with the given [fixInfo].
@@ -230,11 +264,40 @@ class InfoBuilder {
     List<RegionDetail> details = [];
     for (FixReasonInfo reason in fixInfo.reasons) {
       if (reason is NullabilityNodeInfo) {
+        if (reason.isExactNullable) {
+          // When the node is exact nullable, that nullability propagated from
+          // downstream.
+          for (EdgeInfo edge in reason.downstreamEdges) {
+            final exactNullableDownstream = edge.destinationNode;
+            if (!exactNullableDownstream.isExactNullable) {
+              // This wasn't the source of the nullability.
+              continue;
+            }
+
+            var nodeInfo = info.nodeInfoFor(exactNullableDownstream);
+            if (nodeInfo != null) {
+              // TODO(mfairhurst): Give a better text description.
+              details.add(RegionDetail('This is later required to accept null.',
+                  _targetForNode(nodeInfo.filePath, nodeInfo.astNode)));
+            } else {
+              details.add(RegionDetail(
+                  'exact nullable node with no info ($exactNullableDownstream)',
+                  null));
+            }
+          }
+        }
+
         for (EdgeInfo edge in reason.upstreamEdges) {
+          if (edge.sourceNode.isExactNullable) {
+            // When an exact nullable points here, the nullability propagated
+            // in the other direction.
+            continue;
+          }
           if (edge.isTriggered) {
             EdgeOriginInfo origin = info.edgeOrigin[edge];
             if (origin != null) {
-              details.add(_buildDetailForOrigin(origin, edge));
+              details.add(_buildDetailForOrigin(
+                  origin, edge, fixInfo.fix.description.kind));
             } else {
               details.add(
                   RegionDetail('upstream edge with no origin ($edge)', null));
@@ -243,10 +306,13 @@ class InfoBuilder {
         }
       } else if (reason is EdgeInfo) {
         NullabilityNodeInfo destination = reason.destinationNode;
-        var nodeInfo = info.nodeInfoFor(destination);
-        if (nodeInfo != null) {
-          details.add(RegionDetail(nodeInfo.descriptionForDestination,
-              _targetForNode(nodeInfo.filePath, nodeInfo.astNode)));
+        NodeInformation nodeInfo = info.nodeInfoFor(destination);
+        if (nodeInfo != null && nodeInfo.astNode != null) {
+          NavigationTarget target;
+          if (destination != info.never && destination != info.always) {
+            target = _targetForNode(nodeInfo.filePath, nodeInfo.astNode);
+          }
+          details.add(RegionDetail(nodeInfo.descriptionForDestination, target));
         } else {
           details.add(RegionDetail('node with no info ($destination)', null));
         }
@@ -340,11 +406,11 @@ class InfoBuilder {
             _computeUpstreamTriggeredDetails(upstreamTriggeredEdgeInfos);
         TypeAnnotation node = nonNullableType.key;
         regions.add(RegionInfo(
+            RegionType.nonNullableType,
             mapper.map(node.offset),
             node.length,
             "This type is not changed; it is determined to be non-nullable",
-            details,
-            RegionType.nonNullableType));
+            details));
       }
     }
   }
@@ -378,11 +444,11 @@ class InfoBuilder {
         String explanation = '${fixInfo.fix.description.appliedMessage}.';
         List<RegionDetail> details = _computeDetails(fixInfo);
         if (length > 0) {
-          regions.add(RegionInfo(mapper.map(offset), length, explanation,
-              details, RegionType.fix));
+          regions.add(RegionInfo(RegionType.fix, mapper.map(offset), length,
+              explanation, details));
         }
-        regions.add(RegionInfo(mapper.map(end), replacement.length, explanation,
-            details, RegionType.fix));
+        regions.add(RegionInfo(RegionType.fix, mapper.map(end),
+            replacement.length, explanation, details));
       }
     }
     if (explainNonNullableTypes) {

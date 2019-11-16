@@ -60,7 +60,6 @@ DEFINE_FLAG(int,
             "The scale of invocation count, by size of the function.");
 DEFINE_FLAG(bool, source_lines, false, "Emit source line as assembly comment.");
 
-DECLARE_FLAG(bool, code_comments);
 DECLARE_FLAG(charp, deoptimize_filter);
 DECLARE_FLAG(bool, intrinsify);
 DECLARE_FLAG(int, regexp_optimization_counter_threshold);
@@ -1117,12 +1116,14 @@ void FlowGraphCompiler::FinalizeVarDescriptors(const Code& code) {
 
 void FlowGraphCompiler::FinalizeCatchEntryMovesMap(const Code& code) {
 #if defined(DART_PRECOMPILER)
-  TypedData& maps = TypedData::Handle(
-      catch_entry_moves_maps_builder_->FinalizeCatchEntryMovesMap());
-  code.set_catch_entry_moves_maps(maps);
-#else
-  code.set_variables(Smi::Handle(Smi::New(flow_graph().variable_count())));
+  if (FLAG_precompiled_mode) {
+    TypedData& maps = TypedData::Handle(
+        catch_entry_moves_maps_builder_->FinalizeCatchEntryMovesMap());
+    code.set_catch_entry_moves_maps(maps);
+    return;
+  }
 #endif
+  code.set_num_variables(flow_graph().variable_count());
 }
 
 void FlowGraphCompiler::FinalizeStaticCallTargetsTable(const Code& code) {

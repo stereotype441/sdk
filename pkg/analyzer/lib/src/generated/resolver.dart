@@ -21,7 +21,8 @@ import 'package:analyzer/src/dart/ast/ast.dart';
 import 'package:analyzer/src/dart/ast/utilities.dart';
 import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
-import 'package:analyzer/src/dart/element/member.dart' show ConstructorMember;
+import 'package:analyzer/src/dart/element/member.dart'
+    show ConstructorMember, ExecutableMember, Member;
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type_provider.dart';
 import 'package:analyzer/src/dart/resolver/exit_detector.dart';
@@ -2060,6 +2061,10 @@ class GatherUsedLocalElementsVisitor extends RecursiveAstVisitor {
       return;
     }
     Element element = node.staticElement;
+    // Store un-parameterized members.
+    if (element is ExecutableMember) {
+      element = element.declaration;
+    }
     bool isIdentifierRead = _isReadIdentifier(node);
     if (element is PropertyAccessorElement &&
         element.isSynthetic &&
@@ -2072,12 +2077,19 @@ class GatherUsedLocalElementsVisitor extends RecursiveAstVisitor {
       }
     } else {
       _useIdentifierElement(node);
-      if (element == null ||
-          element.enclosingElement is ClassElement &&
-              !identical(element, _enclosingExec)) {
-        usedElements.members.add(node.name);
+      if (element == null) {
         if (isIdentifierRead) {
-          usedElements.readMembers.add(node.name);
+          usedElements.unresolvedReadMembers.add(node.name);
+        }
+      } else if (element.enclosingElement is ClassElement &&
+          !identical(element, _enclosingExec)) {
+        usedElements.members.add(element);
+        if (isIdentifierRead) {
+          // Store the corresponding getter.
+          if (element is PropertyAccessorElement && element.isSetter) {
+            element = (element as PropertyAccessorElement).correspondingGetter;
+          }
+          usedElements.readMembers.add(element);
         }
       }
     }
@@ -2914,6 +2926,13 @@ class ResolverVisitor extends ScopedVisitor {
     }
   }
 
+  /// If in a legacy library, return the legacy view on the [element].
+  /// Otherwise, return the original element.
+  T toLegacyElement<T extends Element>(T element) {
+    if (_nonNullableEnabled) return element;
+    return Member.legacy(element);
+  }
+
   @override
   void visitAnnotation(Annotation node) {
     AstNode parent = node.parent;
@@ -3540,7 +3559,7 @@ class ResolverVisitor extends ScopedVisitor {
           node,
           identifierElement is VariableElement
               ? identifierElement
-              : loopVariable.declaredElement,
+              : loopVariable?.declaredElement,
           elementType ?? typeProvider.dynamicType);
       node.body?.accept(this);
       _flowAnalysis?.flow?.forEach_end();
@@ -6481,8 +6500,16 @@ class UnusedLocalElementsVerifier extends RecursiveAstVisitor {
   /// The elements know to be used.
   final UsedLocalElements _usedElements;
 
+  /// The inheritance manager used to find overridden methods.
+  final InheritanceManager3 _inheritanceManager;
+
+  /// The URI of the library being verified.
+  final Uri _libraryUri;
+
   /// Create a new instance of the [UnusedLocalElementsVerifier].
-  UnusedLocalElementsVerifier(this._errorListener, this._usedElements);
+  UnusedLocalElementsVerifier(this._errorListener, this._usedElements,
+      this._inheritanceManager, LibraryElement library)
+      : _libraryUri = library.source.uri;
 
   visitSimpleIdentifier(SimpleIdentifier node) {
     if (node.inDeclarationContext()) {
@@ -6507,6 +6534,8 @@ class UnusedLocalElementsVerifier extends RecursiveAstVisitor {
     }
   }
 
+  /// Returns whether the name of [element] consists only of underscore
+  /// characters.
   bool _isNamedUnderscore(LocalVariableElement element) {
     String name = element.name;
     if (name != null) {
@@ -6521,6 +6550,8 @@ class UnusedLocalElementsVerifier extends RecursiveAstVisitor {
     return false;
   }
 
+  /// Returns whether [element] is a private element which is read somewhere in
+  /// the library.
   bool _isReadMember(Element element) {
     if (element.isPublic) {
       return true;
@@ -6528,7 +6559,15 @@ class UnusedLocalElementsVerifier extends RecursiveAstVisitor {
     if (element.isSynthetic) {
       return true;
     }
-    return _usedElements.readMembers.contains(element.displayName);
+    if (element is FieldElement) {
+      element = (element as FieldElement).getter;
+    }
+    if (_usedElements.readMembers.contains(element) ||
+        _usedElements.unresolvedReadMembers.contains(element.name)) {
+      return true;
+    }
+
+    return _overridesUsedElement(element);
   }
 
   bool _isUsedElement(Element element) {
@@ -6553,10 +6592,32 @@ class UnusedLocalElementsVerifier extends RecursiveAstVisitor {
     if (element.isSynthetic) {
       return true;
     }
-    if (_usedElements.members.contains(element.displayName)) {
+    if (_usedElements.members.contains(element)) {
       return true;
     }
-    return _usedElements.elements.contains(element);
+    if (_usedElements.elements.contains(element)) {
+      return true;
+    }
+
+    return _overridesUsedElement(element);
+  }
+
+  // Check if this is a class member which overrides a super class's class
+  // member which is used.
+  bool _overridesUsedElement(Element element) {
+    Element enclosingElement = element.enclosingElement;
+    if (enclosingElement is ClassElement) {
+      Name name = new Name(_libraryUri, element.name);
+      Iterable<ExecutableElement> overriddenElements = _inheritanceManager
+          .getOverridden(enclosingElement.thisType, name)
+          ?.map((ExecutableElement e) =>
+              (e is ExecutableMember) ? e.declaration : e);
+      if (overriddenElements != null) {
+        return overriddenElements.any((ExecutableElement e) =>
+            _usedElements.members.contains(e) || _overridesUsedElement(e));
+      }
+    }
+    return false;
   }
 
   void _reportErrorForElement(
@@ -6646,13 +6707,14 @@ class UsedLocalElements {
   final HashSet<LocalVariableElement> catchStackTraceElements =
       new HashSet<LocalVariableElement>();
 
-  /// Names of resolved or unresolved class members that are referenced in the
-  /// library.
-  final HashSet<String> members = new HashSet<String>();
+  /// Resolved class members that are referenced in the library.
+  final HashSet<Element> members = new HashSet<Element>();
 
-  /// Names of resolved or unresolved class members that are read in the
-  /// library.
-  final HashSet<String> readMembers = new HashSet<String>();
+  /// Resolved class members that are read in the library.
+  final HashSet<Element> readMembers = new HashSet<Element>();
+
+  /// Unresolved class members that are read in the library.
+  final HashSet<String> unresolvedReadMembers = new HashSet<String>();
 
   UsedLocalElements();
 
@@ -6666,6 +6728,7 @@ class UsedLocalElements {
       result.catchStackTraceElements.addAll(part.catchStackTraceElements);
       result.members.addAll(part.members);
       result.readMembers.addAll(part.readMembers);
+      result.unresolvedReadMembers.addAll(part.unresolvedReadMembers);
     }
     return result;
   }

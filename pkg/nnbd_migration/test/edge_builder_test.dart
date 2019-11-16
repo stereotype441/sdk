@@ -97,7 +97,7 @@ class AssignmentCheckerTest extends Object
     var t2 = typeParameterType(typeParameter('T', bound));
     assign(t1, t2, hard: true);
     assertEdge(t1.node, t2.node, hard: true);
-    assertNoEdge(t1.node, bound.node);
+    assertEdge(t1.node, bound.node, hard: false);
     assertEdge(t1.typeArguments[0].node, bound.typeArguments[0].node,
         hard: false);
   }
@@ -457,7 +457,7 @@ class C<T extends List<int>> {
     var parameterType = decoratedTypeAnnotation('List<int> x');
     var tType = decoratedTypeAnnotation('T f');
     assertEdge(parameterType.node, tType.node, hard: true);
-    assertNoEdge(parameterType.node, boundType.node);
+    assertEdge(parameterType.node, boundType.node, hard: false);
     // TODO(mfairhurst): Confirm we want this edge.
     assertEdge(
         parameterType.typeArguments[0].node, boundType.typeArguments[0].node,
@@ -1041,7 +1041,8 @@ int g(int z) => z;
         decoratedTypeAnnotation('int z').node,
         hard: true);
     assertNoEdge(decoratedTypeAnnotation('int g').node, anyNode);
-    assertEdge(always, decoratedTypeAnnotation('Object f').node, hard: false);
+    assertEdge(inSet(alwaysPlus), decoratedTypeAnnotation('Object f').node,
+        hard: false);
   }
 
   test_binaryExpression_lt_result_not_null() async {
@@ -1508,7 +1509,7 @@ void f(bool b, void Function() x, void Function() y) {
     var yType = decoratedGenericFunctionTypeAnnotation('void Function() y');
     var resultType = decoratedExpressionType('(b ?');
     assertLUB(resultType.node, xType.node, yType.node);
-    expect(resultType.returnType.node, same(always));
+    expect(resultType.returnType.node.isImmutable, false);
   }
 
   test_conditionalExpression_general() async {
@@ -1772,7 +1773,7 @@ class C {
 ''');
     var xType =
         variables.decoratedElementType(findNode.simple('x').staticElement);
-    assertUnion(xType.node, decoratedTypeAnnotation('int').node);
+    assertEdge(decoratedTypeAnnotation('int').node, xType.node, hard: false);
   }
 
   test_fieldFormalParameter_function_typed() async {
@@ -2545,7 +2546,8 @@ int f(dynamic d, int i) {
 ''');
     // We assume that the index expression might evaluate to anything, including
     // `null`.
-    assertEdge(always, decoratedTypeAnnotation('int f').node, hard: false);
+    assertEdge(inSet(alwaysPlus), decoratedTypeAnnotation('int f').node,
+        hard: false);
   }
 
   test_indexExpression_index() async {
@@ -2787,21 +2789,24 @@ int h(int x) => 0;
     await analyze('''
 int f(dynamic g) => g();
 ''');
-    assertEdge(always, decoratedTypeAnnotation('int f').node, hard: false);
+    assertEdge(inSet(alwaysPlus), decoratedTypeAnnotation('int f').node,
+        hard: false);
   }
 
   test_invocation_dynamic_parenthesized() async {
     await analyze('''
 int f(dynamic g) => (g)();
 ''');
-    assertEdge(always, decoratedTypeAnnotation('int f').node, hard: false);
+    assertEdge(inSet(alwaysPlus), decoratedTypeAnnotation('int f').node,
+        hard: false);
   }
 
   test_invocation_function() async {
     await analyze('''
 int f(Function g) => g();
 ''');
-    assertEdge(always, decoratedTypeAnnotation('int f').node, hard: false);
+    assertEdge(inSet(alwaysPlus), decoratedTypeAnnotation('int f').node,
+        hard: false);
     assertNullCheck(
         checkExpression('g('),
         assertEdge(decoratedTypeAnnotation('Function g').node, never,
@@ -2812,7 +2817,8 @@ int f(Function g) => g();
     await analyze('''
 int f(Function g) => (g)();
 ''');
-    assertEdge(always, decoratedTypeAnnotation('int f').node, hard: false);
+    assertEdge(inSet(alwaysPlus), decoratedTypeAnnotation('int f').node,
+        hard: false);
     assertNullCheck(
         checkExpression('g)('),
         assertEdge(decoratedTypeAnnotation('Function g').node, never,
@@ -2878,7 +2884,7 @@ bool f(Iterable<num> iter) => iter is List<int>
 bool f(a) => a is String;
 ''');
     assertNoUpstreamNullability(decoratedTypeAnnotation('bool').node);
-    assertEdge(decoratedTypeAnnotation('String').node, never, hard: false);
+    assertEdge(decoratedTypeAnnotation('String').node, never, hard: true);
   }
 
   test_isExpression_typeName_typeArguments() async {
@@ -2886,7 +2892,7 @@ bool f(a) => a is String;
 bool f(a) => a is List<int>;
 ''');
     assertNoUpstreamNullability(decoratedTypeAnnotation('bool').node);
-    assertEdge(decoratedTypeAnnotation('List').node, never, hard: false);
+    assertEdge(decoratedTypeAnnotation('List').node, never, hard: true);
     assertEdge(always, decoratedTypeAnnotation('int').node, hard: false);
   }
 
@@ -2973,7 +2979,7 @@ main() {
 ''');
     var xType =
         variables.decoratedElementType(findNode.simple('x').staticElement);
-    assertUnion(xType.node, decoratedTypeAnnotation('int').node);
+    assertEdge(decoratedTypeAnnotation('int').node, xType.node, hard: false);
   }
 
   test_method_parameterType_inferred() async {
@@ -3070,7 +3076,8 @@ int f(dynamic d, int j) {
     assertNoEdge(decoratedTypeAnnotation('int g').node,
         decoratedTypeAnnotation('int f').node);
     // We do, however, assume that it might return anything, including `null`.
-    assertEdge(always, decoratedTypeAnnotation('int f').node, hard: false);
+    assertEdge(inSet(alwaysPlus), decoratedTypeAnnotation('int f').node,
+        hard: false);
   }
 
   test_methodInvocation_dynamic_arguments() async {
@@ -4446,7 +4453,7 @@ C test(C c) => -c/*check*/;
     await analyze('''
 Object test(dynamic d) => -d;
 ''');
-    assertEdge(always, decoratedTypeAnnotation('Object test').node,
+    assertEdge(inSet(alwaysPlus), decoratedTypeAnnotation('Object test').node,
         hard: false);
     assertEdge(decoratedTypeAnnotation('dynamic d').node, never, hard: true);
   }
@@ -4508,7 +4515,7 @@ Object f(dynamic d) {
 }
 ''');
     var returnType = decoratedTypeAnnotation('Object f').node;
-    assertEdge(always, returnType, hard: false);
+    assertEdge(inSet(alwaysPlus), returnType, hard: false);
   }
 
   test_prefixExpression_plusPlus_substituted() async {
@@ -4544,7 +4551,8 @@ int f(dynamic d) {
     assertNoEdge(decoratedTypeAnnotation('int get g').node,
         decoratedTypeAnnotation('int f').node);
     // We do, however, assume that it might return anything, including `null`.
-    assertEdge(always, decoratedTypeAnnotation('int f').node, hard: false);
+    assertEdge(inSet(alwaysPlus), decoratedTypeAnnotation('int f').node,
+        hard: false);
   }
 
   test_propertyAccess_object_property() async {
@@ -5199,7 +5207,8 @@ class C<T> extends B<T> {
 ''');
     assertEdge(
         substitutionNode(
-            substitutionNode(never, decoratedTypeAnnotation('T> {').node),
+            substitutionNode(
+                inSet(neverClosure), decoratedTypeAnnotation('T> {').node),
             decoratedTypeAnnotation('U g').node),
         decoratedTypeAnnotation('T f').node,
         hard: false);
@@ -5248,7 +5257,7 @@ void set x(int value) {}
 main() { x = 1; }
 ''');
     var setXType = decoratedTypeAnnotation('int value');
-    assertEdge(never, setXType.node, hard: false);
+    assertEdge(inSet(neverClosure), setXType.node, hard: false);
   }
 
   test_topLevelSetter_nullable() async {
@@ -5301,7 +5310,7 @@ var x = f();
 ''');
     var xType =
         variables.decoratedElementType(findNode.simple('x').staticElement);
-    assertUnion(xType.node, decoratedTypeAnnotation('int').node);
+    assertEdge(decoratedTypeAnnotation('int').node, xType.node, hard: false);
   }
 
   test_type_argument_explicit_bound() async {

@@ -77,6 +77,16 @@ h2 {
   font-weight: bold;
 }
 
+.content {
+  font-family: monospace;
+  /* Vertical margin around content. */
+  margin: 1em 0;
+  /* Offset the margin introduced by the absolutely positioned child div. */
+  margin-left: -0.5em;
+  position: relative;
+  white-space: pre;
+}
+
 .code {
   left: 0.5em;
   /* Increase line height to make room for borders in non-nullable type
@@ -84,14 +94,8 @@ h2 {
    */
   line-height: 1.3;
   padding-left: 60px;
-  position: absolute;
+  position: inherit;
   top: 0.5em;
-}
-
-.content {
-  font-family: monospace;
-  position: relative;
-  white-space: pre;
 }
 
 .regions {
@@ -184,7 +188,7 @@ h2 {
     </style>
   </head>
   <body>
-    <h1>Non-nullable fix instrumentation report</h1>
+    <h1>Non-nullable migration preview</h1>
     <p>Migrated files:</p>
     <div class="navigation">
       {{# links }}
@@ -206,6 +210,9 @@ h2 {
     '{{! the content, to provide tooltips for modified regions. }}'
     '{{{ regionContent }}}'
     '</div></div>'
+    '<div>'
+    '<i>Generated on {{ generationDate }}</i>'
+    '</div>'
     r'''
     {{/ units }}
     <script lang="javascript">
@@ -221,6 +228,9 @@ document.addEventListener("DOMContentLoaded", (event) => {
 /// Instrumentation display output for a library that was migrated to use
 /// non-nullable types.
 class InstrumentationRenderer {
+  /// A flag indicating whether the incremental workflow is currently supported.
+  static const bool supportsIncrementalWorkflow = false;
+
   /// Display information for a compilation unit.
   final UnitInfo unitInfo;
 
@@ -246,6 +256,7 @@ class InstrumentationRenderer {
       'highlightJsPath': migrationInfo.highlightJsPath(unitInfo),
       'highlightStylePath': migrationInfo.highlightStylePath(unitInfo),
       'navContent': _computeNavigationContent(unitInfo),
+      'generationDate': migrationInfo.migrationDate,
     };
     mustacheContext['units'].add({
       'path': unitInfo.path,
@@ -269,12 +280,12 @@ class InstrumentationRenderer {
       if (regionLength > 0) {
         int openOffset = mapper.map(region.offset);
         String openInsertion = openInsertions[openOffset] ?? '';
-        openInsertion = '<a id="o${region.offset}">$openInsertion';
+        openInsertion = '<span id="o${region.offset}">$openInsertion';
         openInsertions[openOffset] = openInsertion;
 
         int closeOffset = openOffset + regionLength;
         String closeInsertion = closeInsertions[closeOffset] ?? '';
-        closeInsertion = '$closeInsertion</a>';
+        closeInsertion = '$closeInsertion</span>';
         closeInsertions[closeOffset] = closeInsertion;
       }
     }
@@ -367,23 +378,30 @@ class InstrumentationRenderer {
           '${content.substring(offset, offset + length)}'
           '<span class="tooltip">'
           '<p>${region.explanation}</p>');
+      //
+      // Write out any details.
+      //
       if (region.details.isNotEmpty) {
         regions.write('<ul>');
-      }
-      for (var detail in region.details) {
-        regions.write('<li>');
-
-        if (detail.target != null) {
-          regions.write('<a href="${_uriForTarget(detail.target, unitDir)}">');
+        for (var detail in region.details) {
+          regions.write('<li>');
+          if (detail.target != null) {
+            String targetUri = _uriForTarget(detail.target, unitDir);
+            regions.write('<a href="$targetUri">');
+          }
+          writeSplitLines(detail.description);
+          if (detail.target != null) {
+            regions.write('</a>');
+          }
+          regions.write('</li>');
         }
-        writeSplitLines(detail.description);
-        if (detail.target != null) {
-          regions.write('</a>');
-        }
-        regions.write('</li>');
-      }
-      if (region.details.isNotEmpty) {
         regions.write('</ul>');
+      }
+      //
+      // Write out any edits.
+      //
+      if (supportsIncrementalWorkflow && region.edits.isNotEmpty) {
+        // TODO(brianwilkerson) Implement this.
       }
       regions.write('</span></span>');
     }
@@ -433,7 +451,10 @@ class MigrationInfo {
   /// The filesystem root used to create relative paths for each unit.
   final String includedRoot;
 
-  MigrationInfo(this.units, this.unitMap, this.pathContext, this.includedRoot);
+  final String migrationDate;
+
+  MigrationInfo(this.units, this.unitMap, this.pathContext, this.includedRoot)
+      : migrationDate = DateTime.now().toString();
 
   /// The path to the highlight.js script, relative to [unitInfo].
   String highlightJsPath(UnitInfo unitInfo) {

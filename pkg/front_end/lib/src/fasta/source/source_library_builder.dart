@@ -214,7 +214,7 @@ import 'source_loader.dart' show SourceLoader;
 
 // TODO(johnniwinther,jensj): Replace this with the correct scheme.
 const int enableNonNullableDefaultMajorVersion = 2;
-const int enableNonNullableDefaultMinorVersion = 6;
+const int enableNonNullableDefaultMinorVersion = 7;
 
 class SourceLibraryBuilder extends LibraryBuilderImpl {
   static const String MALFORMED_URI_SCHEME = "org-dartlang-malformed-uri";
@@ -1783,14 +1783,14 @@ class SourceLibraryBuilder extends LibraryBuilderImpl {
     if (hasInitializer) {
       modifiers |= hasInitializerMask;
     }
-    FieldBuilderImpl fieldBuilder = new FieldBuilderImpl(
+    SourceFieldBuilder fieldBuilder = new SourceFieldBuilder(
         metadata, type, name, modifiers, this, charOffset, charEndOffset);
     fieldBuilder.constInitializerToken = constInitializerToken;
     addBuilder(name, fieldBuilder, charOffset);
     if (type == null && initializerToken != null && fieldBuilder.next == null) {
       // Only the first one (the last one in the linked list of next pointers)
       // are added to the tree, had parent pointers and can infer correctly.
-      fieldBuilder.field.type =
+      fieldBuilder.fieldType =
           new ImplicitFieldType(fieldBuilder, initializerToken);
       (implicitlyTypedFields ??= <FieldBuilder>[]).add(fieldBuilder);
     }

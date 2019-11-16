@@ -20,7 +20,6 @@ import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/source.dart'
     show NonExistingSource, UriKind;
-import 'package:analyzer/src/generated/testing/element_factory.dart';
 import 'package:meta/meta.dart';
 import 'package:path/path.dart' show toUri;
 import 'package:test/test.dart';
@@ -65,22 +64,22 @@ abstract class AbstractTypeSystemTest with ElementsTypesMixin {
 
   DartType futureOrType(DartType T) {
     var futureOrElement = typeProvider.futureOrElement;
-    return interfaceType(futureOrElement, typeArguments: [T]);
+    return interfaceTypeStar(futureOrElement, typeArguments: [T]);
   }
 
   DartType futureType(DartType T) {
     var futureElement = typeProvider.futureElement;
-    return interfaceType(futureElement, typeArguments: [T]);
+    return interfaceTypeStar(futureElement, typeArguments: [T]);
   }
 
   DartType iterableType(DartType T) {
     var iterableElement = typeProvider.iterableElement;
-    return interfaceType(iterableElement, typeArguments: [T]);
+    return interfaceTypeStar(iterableElement, typeArguments: [T]);
   }
 
   DartType listType(DartType T) {
     var listElement = typeProvider.listElement;
-    return interfaceType(listElement, typeArguments: [T]);
+    return interfaceTypeStar(listElement, typeArguments: [T]);
   }
 
   void setUp() {
@@ -106,7 +105,7 @@ class AssignabilityTest extends AbstractTypeSystemTest {
       doubleType,
       numType,
       stringType,
-      interfaceType(A),
+      interfaceTypeStar(A),
       neverStar,
     ];
 
@@ -124,7 +123,7 @@ class AssignabilityTest extends AbstractTypeSystemTest {
     );
 
     _checkIsStrictAssignableTo(
-      interfaceType(B),
+      interfaceTypeStar(B),
       functionTypeStar(
         parameters: [
           requiredParameter(type: intType),
@@ -136,17 +135,17 @@ class AssignabilityTest extends AbstractTypeSystemTest {
 
   void test_isAssignableTo_classes() {
     var classTop = class_(name: 'A');
-    var classLeft = class_(name: 'B', superType: interfaceType(classTop));
-    var classRight = class_(name: 'C', superType: interfaceType(classTop));
+    var classLeft = class_(name: 'B', superType: interfaceTypeStar(classTop));
+    var classRight = class_(name: 'C', superType: interfaceTypeStar(classTop));
     var classBottom = class_(
       name: 'D',
-      superType: interfaceType(classLeft),
-      interfaces: [interfaceType(classRight)],
+      superType: interfaceTypeStar(classLeft),
+      interfaces: [interfaceTypeStar(classRight)],
     );
-    var top = interfaceType(classTop);
-    var left = interfaceType(classLeft);
-    var right = interfaceType(classRight);
-    var bottom = interfaceType(classBottom);
+    var top = interfaceTypeStar(classTop);
+    var left = interfaceTypeStar(classLeft);
+    var right = interfaceTypeStar(classRight);
+    var bottom = interfaceTypeStar(classBottom);
 
     _checkLattice(top, left, right, bottom);
   }
@@ -163,7 +162,7 @@ class AssignabilityTest extends AbstractTypeSystemTest {
     List<DartType> unrelated = <DartType>[
       intType,
       stringType,
-      interfaceType(A),
+      interfaceTypeStar(A),
     ];
 
     _checkGroups(doubleType,
@@ -179,7 +178,7 @@ class AssignabilityTest extends AbstractTypeSystemTest {
       doubleType,
       numType,
       stringType,
-      interfaceType(A),
+      interfaceTypeStar(A),
       neverStar,
     ];
     _checkGroups(dynamicType, interassignable: interassignable);
@@ -194,7 +193,7 @@ class AssignabilityTest extends AbstractTypeSystemTest {
       name: 'M',
       typeParameters: [MT],
       interfaces: [
-        interfaceType(
+        interfaceTypeStar(
           L,
           typeArguments: [
             typeParameterTypeStar(MT),
@@ -203,10 +202,10 @@ class AssignabilityTest extends AbstractTypeSystemTest {
       ],
     );
 
-    var top = interfaceType(L, typeArguments: [dynamicType]);
-    var left = interfaceType(M, typeArguments: [dynamicType]);
-    var right = interfaceType(L, typeArguments: [intType]);
-    var bottom = interfaceType(M, typeArguments: [intType]);
+    var top = interfaceTypeStar(L, typeArguments: [dynamicType]);
+    var left = interfaceTypeStar(M, typeArguments: [dynamicType]);
+    var right = interfaceTypeStar(L, typeArguments: [intType]);
+    var bottom = interfaceTypeStar(M, typeArguments: [intType]);
 
     _checkCrossLattice(top, left, right, bottom);
   }
@@ -223,7 +222,7 @@ class AssignabilityTest extends AbstractTypeSystemTest {
     List<DartType> unrelated = <DartType>[
       doubleType,
       stringType,
-      interfaceType(A),
+      interfaceTypeStar(A),
     ];
 
     _checkGroups(intType,
@@ -324,7 +323,7 @@ class AssignabilityTest extends AbstractTypeSystemTest {
     ];
     List<DartType> unrelated = <DartType>[
       stringType,
-      interfaceType(A),
+      interfaceTypeStar(A),
     ];
 
     _checkGroups(numType,
@@ -822,6 +821,49 @@ class ConstraintMatchingTest extends AbstractTypeSystemTest {
         covariant: true);
   }
 
+  void test_variance_covariant() {
+    // class A<out T>
+    var tCovariant = typeParameter('T', variance: Variance.covariant);
+    var tType = typeParameterType(tCovariant);
+    var A = class_(name: 'A', typeParameters: [tCovariant]);
+
+    // A<num>
+    // A<T>
+    var aNum = interfaceType(A, typeArguments: [numType]);
+    var aT = interfaceType(A, typeArguments: [tType]);
+
+    _checkIsSubtypeMatchOf(aT, aNum, [tType], ['T <: num'], covariant: true);
+  }
+
+  void test_variance_contravariant() {
+    // class A<in T>
+    var tContravariant = typeParameter('T', variance: Variance.contravariant);
+    var tType = typeParameterType(tContravariant);
+    var A = class_(name: 'A', typeParameters: [tContravariant]);
+
+    // A<num>
+    // A<T>
+    var aNum = interfaceType(A, typeArguments: [numType]);
+    var aT = interfaceType(A, typeArguments: [tType]);
+
+    _checkIsSubtypeMatchOf(aT, aNum, [tType], ['num <: T'], covariant: true);
+  }
+
+  void test_variance_invariant() {
+    // class A<inout T>
+    var tInvariant = typeParameter('T', variance: Variance.invariant);
+    var tType = typeParameterType(tInvariant);
+    var A = class_(name: 'A', typeParameters: [tInvariant]);
+
+    // A<num>
+    // A<T>
+    var aNum = interfaceType(A, typeArguments: [numType]);
+    var aT = interfaceType(A, typeArguments: [tType]);
+
+    _checkIsSubtypeMatchOf(aT, aNum, [tType], ['T <: num', 'num <: T'],
+        covariant: true);
+  }
+
   void _checkIsNotSubtypeMatchOf(
       DartType t1, DartType t2, Iterable<TypeParameterType> typeFormals,
       {bool covariant}) {
@@ -892,11 +934,11 @@ class GenericFunctionInferenceTest extends AbstractTypeSystemTest {
 
     // class A {}
     var A = class_(name: 'A', superType: objectType);
-    var typeA = interfaceType(A);
+    var typeA = interfaceTypeStar(A);
 
     // class B extends A {}
     var B = class_(name: 'B', superType: typeA);
-    var typeB = interfaceType(B);
+    var typeB = interfaceTypeStar(B);
 
     // class C<T extends A> {
     var CT = typeParameter('T', bound: typeA);
@@ -922,11 +964,11 @@ class GenericFunctionInferenceTest extends AbstractTypeSystemTest {
     // }
 
     // C<Object> cOfObject;
-    var cOfObject = interfaceType(C, typeArguments: [objectType]);
+    var cOfObject = interfaceTypeStar(C, typeArguments: [objectType]);
     // C<A> cOfA;
-    var cOfA = interfaceType(C, typeArguments: [typeA]);
+    var cOfA = interfaceTypeStar(C, typeArguments: [typeA]);
     // C<B> cOfB;
-    var cOfB = interfaceType(C, typeArguments: [typeB]);
+    var cOfB = interfaceTypeStar(C, typeArguments: [typeB]);
     // B b;
     // cOfB.m(b); // infer <B>
     expect(_inferCall2(cOfB.getMethod('m').type, [typeB]).toString(),
@@ -944,11 +986,11 @@ class GenericFunctionInferenceTest extends AbstractTypeSystemTest {
 
     // class A {}
     var A = class_(name: 'A', superType: objectType);
-    var typeA = interfaceType(A);
+    var typeA = interfaceTypeStar(A);
 
     // class B extends A {}
     var B = class_(name: 'B', superType: typeA);
-    var typeB = interfaceType(B);
+    var typeB = interfaceTypeStar(B);
 
     // class C<T extends A> {
     var CT = typeParameter('T', bound: typeA);
@@ -975,11 +1017,11 @@ class GenericFunctionInferenceTest extends AbstractTypeSystemTest {
     // }
 
     // C<Object> cOfObject;
-    var cOfObject = interfaceType(C, typeArguments: [objectType]);
+    var cOfObject = interfaceTypeStar(C, typeArguments: [objectType]);
     // C<A> cOfA;
-    var cOfA = interfaceType(C, typeArguments: [typeA]);
+    var cOfA = interfaceTypeStar(C, typeArguments: [typeA]);
     // C<B> cOfB;
-    var cOfB = interfaceType(C, typeArguments: [typeB]);
+    var cOfB = interfaceTypeStar(C, typeArguments: [typeB]);
     // List<B> b;
     var listOfB = listType(typeB);
     // cOfB.m(b); // infer <B>
@@ -1001,20 +1043,20 @@ class GenericFunctionInferenceTest extends AbstractTypeSystemTest {
       superType: objectType,
       typeParameters: [T],
     );
-    T.bound = interfaceType(
+    T.bound = interfaceTypeStar(
       A,
       typeArguments: [typeParameterTypeStar(T)],
     );
 
     // class B extends A<B> {}
     var B = class_(name: 'B', superType: null);
-    B.supertype = interfaceType(A, typeArguments: [interfaceType(B)]);
-    var typeB = interfaceType(B);
+    B.supertype = interfaceTypeStar(A, typeArguments: [interfaceTypeStar(B)]);
+    var typeB = interfaceTypeStar(B);
 
     // <S extends A<S>>
     var S = typeParameter('S');
     var typeS = typeParameterTypeStar(S);
-    S.bound = interfaceType(A, typeArguments: [typeS]);
+    S.bound = interfaceTypeStar(A, typeArguments: [typeS]);
 
     // (S, S) -> S
     var clone = functionTypeStar(
@@ -1415,7 +1457,7 @@ class GreatestLowerBoundTest extends BoundTestBase {
 
   void test_bottom_interface() {
     var A = class_(name: 'A');
-    _checkGreatestLowerBound(neverStar, interfaceType(A), neverStar);
+    _checkGreatestLowerBound(neverStar, interfaceTypeStar(A), neverStar);
   }
 
   void test_bottom_typeParam() {
@@ -1486,12 +1528,12 @@ class GreatestLowerBoundTest extends BoundTestBase {
     // class B extends A
     // class C extends B
     var A = class_(name: 'A');
-    var B = class_(name: 'B', superType: interfaceType(A));
-    var C = class_(name: 'C', superType: interfaceType(B));
+    var B = class_(name: 'B', superType: interfaceTypeStar(A));
+    var C = class_(name: 'C', superType: interfaceTypeStar(B));
     _checkGreatestLowerBound(
-      interfaceType(A),
-      interfaceType(C),
-      interfaceType(C),
+      interfaceTypeStar(A),
+      interfaceTypeStar(C),
+      interfaceTypeStar(C),
     );
   }
 
@@ -1500,12 +1542,12 @@ class GreatestLowerBoundTest extends BoundTestBase {
     // class B implements A
     // class C implements B
     var A = class_(name: 'A');
-    var B = class_(name: 'B', interfaces: [interfaceType(A)]);
-    var C = class_(name: 'C', interfaces: [interfaceType(B)]);
+    var B = class_(name: 'B', interfaces: [interfaceTypeStar(A)]);
+    var C = class_(name: 'C', interfaces: [interfaceTypeStar(B)]);
     _checkGreatestLowerBound(
-      interfaceType(A),
-      interfaceType(C),
-      interfaceType(C),
+      interfaceTypeStar(A),
+      interfaceTypeStar(C),
+      interfaceTypeStar(C),
     );
   }
 
@@ -1522,7 +1564,7 @@ class GreatestLowerBoundTest extends BoundTestBase {
 
   void test_dynamic_interface() {
     var A = class_(name: 'A');
-    var typeA = interfaceType(A);
+    var typeA = interfaceTypeStar(A);
     _checkGreatestLowerBound(dynamicType, typeA, typeA);
   }
 
@@ -1849,7 +1891,7 @@ class GreatestLowerBoundTest extends BoundTestBase {
 
   void test_interface_function() {
     var A = class_(name: 'A');
-    var typeA = interfaceType(A);
+    var typeA = interfaceTypeStar(A);
     _checkGreatestLowerBound(
       typeA,
       functionTypeStar(returnType: voidType),
@@ -1863,20 +1905,20 @@ class GreatestLowerBoundTest extends BoundTestBase {
     // class C
     // class D extends A with B, C
     var A = class_(name: 'A');
-    var typeA = interfaceType(A);
+    var typeA = interfaceTypeStar(A);
 
     var B = class_(name: 'B');
-    var typeB = interfaceType(B);
+    var typeB = interfaceTypeStar(B);
 
     var C = class_(name: 'C');
-    var typeC = interfaceType(C);
+    var typeC = interfaceTypeStar(C);
 
     var D = class_(
       name: 'D',
-      superType: interfaceType(A),
+      superType: interfaceTypeStar(A),
       mixins: [typeB, typeC],
     );
-    var typeD = interfaceType(D);
+    var typeD = interfaceTypeStar(D);
 
     _checkGreatestLowerBound(typeA, typeD, typeD);
     _checkGreatestLowerBound(typeB, typeD, typeD);
@@ -1892,7 +1934,7 @@ class GreatestLowerBoundTest extends BoundTestBase {
       voidType,
       neverStar,
       typeParameterTypeStar(T),
-      interfaceType(A),
+      interfaceTypeStar(A),
       functionTypeStar(returnType: voidType),
     ];
 
@@ -1912,13 +1954,13 @@ class GreatestLowerBoundTest extends BoundTestBase {
 
   void test_typeParam_interface_bounded() {
     var A = class_(name: 'A');
-    var typeA = interfaceType(A);
+    var typeA = interfaceTypeStar(A);
 
     var B = class_(name: 'B', superType: typeA);
-    var typeB = interfaceType(B);
+    var typeB = interfaceTypeStar(B);
 
     var C = class_(name: 'C', superType: typeB);
-    var typeC = interfaceType(C);
+    var typeC = interfaceTypeStar(C);
 
     var T = typeParameter('T', bound: typeB);
     _checkGreatestLowerBound(typeParameterTypeStar(T), typeC, neverStar);
@@ -1930,32 +1972,31 @@ class GreatestLowerBoundTest extends BoundTestBase {
     var A = class_(name: 'A');
     _checkGreatestLowerBound(
       typeParameterTypeStar(T),
-      interfaceType(A),
+      interfaceTypeStar(A),
       neverStar,
     );
   }
 
-  void test_typeParameters_different() {
-    // GLB(List<int>, List<double>) = ⊥
-    var listOfIntType = listType(intType);
-    var listOfDoubleType = listType(doubleType);
-    // TODO(rnystrom): Can we do something better here?
-    _checkGreatestLowerBound(listOfIntType, listOfDoubleType, neverStar);
-  }
-
-  void test_typeParameters_same() {
-    // GLB(List<int>, List<int>) = List<int>
-    var listOfIntType = listType(intType);
-    _checkGreatestLowerBound(listOfIntType, listOfIntType, listOfIntType);
-  }
-
-  void test_typeParameters_covariant_same() {
-    // class A<out T>
-    var T = typeParameter('T', variance: Variance.covariant);
+  void test_typeParameters_contravariant_different() {
+    // class A<in T>
+    var T = typeParameter('T', variance: Variance.contravariant);
     var A = class_(name: 'A', typeParameters: [T]);
 
     // A<num>
-    var aNum = interfaceType(A, typeArguments: [numType]);
+    // A<int>
+    var aNum = interfaceTypeStar(A, typeArguments: [numType]);
+    var aInt = interfaceTypeStar(A, typeArguments: [intType]);
+
+    _checkLeastUpperBound(aInt, aNum, aInt);
+  }
+
+  void test_typeParameters_contravariant_same() {
+    // class A<in T>
+    var T = typeParameter('T', variance: Variance.contravariant);
+    var A = class_(name: 'A', typeParameters: [T]);
+
+    // A<num>
+    var aNum = interfaceTypeStar(A, typeArguments: [numType]);
 
     _checkLeastUpperBound(aNum, aNum, aNum);
   }
@@ -1967,45 +2008,29 @@ class GreatestLowerBoundTest extends BoundTestBase {
 
     // A<num>
     // A<int>
-    var aNum = interfaceType(A, typeArguments: [numType]);
-    var aInt = interfaceType(A, typeArguments: [intType]);
+    var aNum = interfaceTypeStar(A, typeArguments: [numType]);
+    var aInt = interfaceTypeStar(A, typeArguments: [intType]);
 
     _checkLeastUpperBound(aInt, aNum, aNum);
   }
 
-  void test_typeParameters_contravariant_same() {
-    // class A<in T>
-    var T = typeParameter('T', variance: Variance.contravariant);
+  void test_typeParameters_covariant_same() {
+    // class A<out T>
+    var T = typeParameter('T', variance: Variance.covariant);
     var A = class_(name: 'A', typeParameters: [T]);
 
     // A<num>
-    var aNum = interfaceType(A, typeArguments: [numType]);
+    var aNum = interfaceTypeStar(A, typeArguments: [numType]);
 
     _checkLeastUpperBound(aNum, aNum, aNum);
   }
 
-  void test_typeParameters_contravariant_different() {
-    // class A<in T>
-    var T = typeParameter('T', variance: Variance.contravariant);
-    var A = class_(name: 'A', typeParameters: [T]);
-
-    // A<num>
-    // A<int>
-    var aNum = interfaceType(A, typeArguments: [numType]);
-    var aInt = interfaceType(A, typeArguments: [intType]);
-
-    _checkLeastUpperBound(aInt, aNum, aInt);
-  }
-
-  void test_typeParameters_invariant_same() {
-    // class A<inout T>
-    var T = typeParameter('T', variance: Variance.invariant);
-    var A = class_(name: 'A', typeParameters: [T]);
-
-    // A<num>
-    var aNum = interfaceType(A, typeArguments: [numType]);
-
-    _checkLeastUpperBound(aNum, aNum, aNum);
+  void test_typeParameters_different() {
+    // GLB(List<int>, List<double>) = ⊥
+    var listOfIntType = listType(intType);
+    var listOfDoubleType = listType(doubleType);
+    // TODO(rnystrom): Can we do something better here?
+    _checkGreatestLowerBound(listOfIntType, listOfDoubleType, neverStar);
   }
 
   void test_typeParameters_invariant_object() {
@@ -2015,10 +2040,21 @@ class GreatestLowerBoundTest extends BoundTestBase {
 
     // A<num>
     // A<int>
-    var aNum = interfaceType(A, typeArguments: [numType]);
-    var aInt = interfaceType(A, typeArguments: [intType]);
+    var aNum = interfaceTypeStar(A, typeArguments: [numType]);
+    var aInt = interfaceTypeStar(A, typeArguments: [intType]);
 
     _checkLeastUpperBound(aNum, aInt, objectType);
+  }
+
+  void test_typeParameters_invariant_same() {
+    // class A<inout T>
+    var T = typeParameter('T', variance: Variance.invariant);
+    var A = class_(name: 'A', typeParameters: [T]);
+
+    // A<num>
+    var aNum = interfaceTypeStar(A, typeArguments: [numType]);
+
+    _checkLeastUpperBound(aNum, aNum, aNum);
   }
 
   void test_typeParameters_multi_basic() {
@@ -2031,13 +2067,13 @@ class GreatestLowerBoundTest extends BoundTestBase {
     // Multi<num, num, num>
     // Multi<int, num, int>
     var multiNumNumNum =
-        interfaceType(Multi, typeArguments: [numType, numType, numType]);
+        interfaceTypeStar(Multi, typeArguments: [numType, numType, numType]);
     var multiIntNumInt =
-        interfaceType(Multi, typeArguments: [intType, numType, intType]);
+        interfaceTypeStar(Multi, typeArguments: [intType, numType, intType]);
 
     // We expect Multi<num, num, int>
     var multiNumNumInt =
-        interfaceType(Multi, typeArguments: [numType, numType, intType]);
+        interfaceTypeStar(Multi, typeArguments: [numType, numType, intType]);
 
     _checkLeastUpperBound(multiNumNumNum, multiIntNumInt, multiNumNumInt);
   }
@@ -2052,9 +2088,9 @@ class GreatestLowerBoundTest extends BoundTestBase {
     // Multi<num, String, num>
     // Multi<int, num, int>
     var multiNumStringNum =
-        interfaceType(Multi, typeArguments: [numType, stringType, numType]);
+        interfaceTypeStar(Multi, typeArguments: [numType, stringType, numType]);
     var multiIntNumInt =
-        interfaceType(Multi, typeArguments: [intType, numType, intType]);
+        interfaceTypeStar(Multi, typeArguments: [intType, numType, intType]);
 
     _checkLeastUpperBound(multiNumStringNum, multiIntNumInt, objectType);
   }
@@ -2069,15 +2105,21 @@ class GreatestLowerBoundTest extends BoundTestBase {
     // Multi<String, num, num>
     // Multi<int, num, int>
     var multiStringNumNum =
-        interfaceType(Multi, typeArguments: [stringType, numType, numType]);
+        interfaceTypeStar(Multi, typeArguments: [stringType, numType, numType]);
     var multiIntNumInt =
-        interfaceType(Multi, typeArguments: [intType, numType, intType]);
+        interfaceTypeStar(Multi, typeArguments: [intType, numType, intType]);
 
     // We expect Multi<Object, num, int>
     var multiObjectNumInt =
-        interfaceType(Multi, typeArguments: [objectType, numType, intType]);
+        interfaceTypeStar(Multi, typeArguments: [objectType, numType, intType]);
 
     _checkLeastUpperBound(multiStringNumNum, multiIntNumInt, multiObjectNumInt);
+  }
+
+  void test_typeParameters_same() {
+    // GLB(List<int>, List<int>) = List<int>
+    var listOfIntType = listType(intType);
+    _checkGreatestLowerBound(listOfIntType, listOfIntType, listOfIntType);
   }
 
   void test_unrelatedClasses() {
@@ -2086,7 +2128,8 @@ class GreatestLowerBoundTest extends BoundTestBase {
     // class C
     var A = class_(name: 'A');
     var B = class_(name: 'B');
-    _checkGreatestLowerBound(interfaceType(A), interfaceType(B), neverStar);
+    _checkGreatestLowerBound(
+        interfaceTypeStar(A), interfaceTypeStar(B), neverStar);
   }
 
   void test_void() {
@@ -2095,7 +2138,7 @@ class GreatestLowerBoundTest extends BoundTestBase {
     List<DartType> types = [
       neverStar,
       functionTypeStar(returnType: voidType),
-      interfaceType(A),
+      interfaceTypeStar(A),
       typeParameterTypeStar(T),
     ];
     for (DartType type in types) {
@@ -2412,7 +2455,7 @@ class LeastUpperBoundTest extends BoundTestBase {
 
   void test_bottom_interface() {
     var A = class_(name: 'A');
-    var typeA = interfaceType(A);
+    var typeA = interfaceTypeStar(A);
     _checkLeastUpperBound(neverStar, typeA, typeA);
   }
 
@@ -2428,13 +2471,13 @@ class LeastUpperBoundTest extends BoundTestBase {
     // class C implements B
 
     var A = class_(name: 'A');
-    var typeA = interfaceType(A);
+    var typeA = interfaceTypeStar(A);
 
     var B = class_(name: 'B', interfaces: [typeA]);
-    var typeB = interfaceType(B);
+    var typeB = interfaceTypeStar(B);
 
     var C = class_(name: 'C', interfaces: [typeB]);
-    var typeC = interfaceType(C);
+    var typeC = interfaceTypeStar(C);
 
     _checkLeastUpperBound(typeB, typeC, typeB);
   }
@@ -2445,31 +2488,22 @@ class LeastUpperBoundTest extends BoundTestBase {
     // class C extends B
 
     var A = class_(name: 'A');
-    var typeA = interfaceType(A);
+    var typeA = interfaceTypeStar(A);
 
     var B = class_(name: 'B', superType: typeA);
-    var typeB = interfaceType(B);
+    var typeB = interfaceTypeStar(B);
 
     var C = class_(name: 'C', superType: typeB);
-    var typeC = interfaceType(C);
+    var typeC = interfaceTypeStar(C);
 
     _checkLeastUpperBound(typeB, typeC, typeB);
   }
 
   void test_directSuperclass_nullability() {
     var aElement = class_(name: 'A');
-    var aQuestion = interfaceType(
-      aElement,
-      nullabilitySuffix: NullabilitySuffix.question,
-    );
-    var aStar = interfaceType(
-      aElement,
-      nullabilitySuffix: NullabilitySuffix.star,
-    );
-    var aNone = interfaceType(
-      aElement,
-      nullabilitySuffix: NullabilitySuffix.none,
-    );
+    var aQuestion = interfaceTypeQuestion(aElement);
+    var aStar = interfaceTypeStar(aElement);
+    var aNone = interfaceTypeNone(aElement);
 
     var bElementStar = class_(name: 'B', superType: aStar);
     var bElementNone = class_(name: 'B', superType: aNone);
@@ -2537,7 +2571,7 @@ class LeastUpperBoundTest extends BoundTestBase {
 
   void test_dynamic_interface() {
     var A = class_(name: 'A');
-    _checkLeastUpperBound(dynamicType, interfaceType(A), dynamicType);
+    _checkLeastUpperBound(dynamicType, interfaceTypeStar(A), dynamicType);
   }
 
   void test_dynamic_typeParam() {
@@ -2552,25 +2586,16 @@ class LeastUpperBoundTest extends BoundTestBase {
 
   void test_interface_function() {
     var A = class_(name: 'A');
-    _checkLeastUpperBound(
-        interfaceType(A), functionTypeStar(returnType: voidType), objectType);
+    _checkLeastUpperBound(interfaceTypeStar(A),
+        functionTypeStar(returnType: voidType), objectType);
   }
 
   void test_interface_sameElement_nullability() {
     var aElement = class_(name: 'A');
 
-    var aQuestion = interfaceType(
-      aElement,
-      nullabilitySuffix: NullabilitySuffix.question,
-    );
-    var aStar = interfaceType(
-      aElement,
-      nullabilitySuffix: NullabilitySuffix.star,
-    );
-    var aNone = interfaceType(
-      aElement,
-      nullabilitySuffix: NullabilitySuffix.none,
-    );
+    var aQuestion = interfaceTypeQuestion(aElement);
+    var aStar = interfaceTypeStar(aElement);
+    var aNone = interfaceTypeNone(aElement);
 
     void assertLUB(DartType type1, DartType type2, DartType expected) {
       expect(typeSystem.getLeastUpperBound(type1, type2), expected);
@@ -2599,31 +2624,25 @@ class LeastUpperBoundTest extends BoundTestBase {
       interfaces: [instA.withNullabilitySuffixNone],
     );
 
-    var mixinM = ElementFactory.mixinElement(
+    var mixinM = mixin_(
       name: 'M',
       constraints: [instA.withNullabilitySuffixNone],
     );
 
     _checkLeastUpperBound(
-      interfaceType(
-        classB,
-        nullabilitySuffix: NullabilitySuffix.star,
-      ),
-      interfaceType(
-        mixinM,
-        nullabilitySuffix: NullabilitySuffix.star,
-      ),
+      interfaceTypeStar(classB),
+      interfaceTypeStar(mixinM),
       instA.withNullability(NullabilitySuffix.star),
     );
   }
 
   void test_mixinAndClass_object() {
     var classA = class_(name: 'A');
-    var mixinM = ElementFactory.mixinElement(name: 'M');
+    var mixinM = mixin_(name: 'M');
 
     _checkLeastUpperBound(
-      interfaceType(classA),
-      interfaceType(mixinM),
+      interfaceTypeStar(classA),
+      interfaceTypeStar(mixinM),
       objectType,
     );
   }
@@ -2637,20 +2656,14 @@ class LeastUpperBoundTest extends BoundTestBase {
       interfaces: [instA.withNullabilitySuffixNone],
     );
 
-    var mixinM = ElementFactory.mixinElement(
+    var mixinM = mixin_(
       name: 'M',
       interfaces: [instA.withNullabilitySuffixNone],
     );
 
     _checkLeastUpperBound(
-      interfaceType(
-        classB,
-        nullabilitySuffix: NullabilitySuffix.star,
-      ),
-      interfaceType(
-        mixinM,
-        nullabilitySuffix: NullabilitySuffix.star,
-      ),
+      interfaceTypeStar(classB),
+      interfaceTypeStar(mixinM),
       instA.withNullability(NullabilitySuffix.star),
     );
   }
@@ -2662,25 +2675,25 @@ class LeastUpperBoundTest extends BoundTestBase {
     // class D extends B with M, N, O, P
 
     var A = class_(name: 'A');
-    var typeA = interfaceType(A);
+    var typeA = interfaceTypeStar(A);
 
     var B = class_(name: 'B', superType: typeA);
-    var typeB = interfaceType(B);
+    var typeB = interfaceTypeStar(B);
 
     var C = class_(name: 'C', superType: typeA);
-    var typeC = interfaceType(C);
+    var typeC = interfaceTypeStar(C);
 
     var D = class_(
       name: 'D',
       superType: typeB,
       mixins: [
-        interfaceType(class_(name: 'M')),
-        interfaceType(class_(name: 'N')),
-        interfaceType(class_(name: 'O')),
-        interfaceType(class_(name: 'P')),
+        interfaceTypeStar(class_(name: 'M')),
+        interfaceTypeStar(class_(name: 'N')),
+        interfaceTypeStar(class_(name: 'O')),
+        interfaceTypeStar(class_(name: 'P')),
       ],
     );
-    var typeD = interfaceType(D);
+    var typeD = interfaceTypeStar(D);
 
     _checkLeastUpperBound(typeD, typeC, typeA);
   }
@@ -2821,8 +2834,8 @@ class LeastUpperBoundTest extends BoundTestBase {
   void test_object() {
     var A = class_(name: 'A');
     var B = class_(name: 'B');
-    var typeA = interfaceType(A);
-    var typeB = interfaceType(B);
+    var typeA = interfaceTypeStar(A);
+    var typeB = interfaceTypeStar(B);
     var typeObject = typeA.element.supertype;
     // assert that object does not have a super type
     expect(typeObject.element.supertype, isNull);
@@ -2841,7 +2854,7 @@ class LeastUpperBoundTest extends BoundTestBase {
       voidType,
       neverStar,
       typeParameterTypeStar(T),
-      interfaceType(A),
+      interfaceTypeStar(A),
       functionTypeStar(returnType: voidType)
     ];
 
@@ -2852,31 +2865,22 @@ class LeastUpperBoundTest extends BoundTestBase {
 
   void test_sharedSuperclass1() {
     var A = class_(name: 'A');
-    var typeA = interfaceType(A);
+    var typeA = interfaceTypeStar(A);
 
     var B = class_(name: 'B', superType: typeA);
-    var typeB = interfaceType(B);
+    var typeB = interfaceTypeStar(B);
 
     var C = class_(name: 'C', superType: typeA);
-    var typeC = interfaceType(C);
+    var typeC = interfaceTypeStar(C);
 
     _checkLeastUpperBound(typeB, typeC, typeA);
   }
 
   void test_sharedSuperclass1_nullability() {
     var aElement = class_(name: 'A');
-    var aQuestion = interfaceType(
-      aElement,
-      nullabilitySuffix: NullabilitySuffix.question,
-    );
-    var aStar = interfaceType(
-      aElement,
-      nullabilitySuffix: NullabilitySuffix.star,
-    );
-    var aNone = interfaceType(
-      aElement,
-      nullabilitySuffix: NullabilitySuffix.none,
-    );
+    var aQuestion = interfaceTypeQuestion(aElement);
+    var aStar = interfaceTypeStar(aElement);
+    var aNone = interfaceTypeNone(aElement);
 
     var bElementNone = class_(name: 'B', superType: aNone);
     var bElementStar = class_(name: 'B', superType: aStar);
@@ -2978,115 +2982,115 @@ class LeastUpperBoundTest extends BoundTestBase {
 
   void test_sharedSuperclass2() {
     var A = class_(name: 'A');
-    var typeA = interfaceType(A);
+    var typeA = interfaceTypeStar(A);
 
     var B = class_(name: 'B', superType: typeA);
-    var typeB = interfaceType(B);
+    var typeB = interfaceTypeStar(B);
 
     var C = class_(name: 'C', superType: typeA);
-    var typeC = interfaceType(C);
+    var typeC = interfaceTypeStar(C);
 
     var D = class_(name: 'D', superType: typeC);
-    var typeD = interfaceType(D);
+    var typeD = interfaceTypeStar(D);
 
     _checkLeastUpperBound(typeB, typeD, typeA);
   }
 
   void test_sharedSuperclass3() {
     var A = class_(name: 'A');
-    var typeA = interfaceType(A);
+    var typeA = interfaceTypeStar(A);
 
     var B = class_(name: 'B', superType: typeA);
-    var typeB = interfaceType(B);
+    var typeB = interfaceTypeStar(B);
 
     var C = class_(name: 'C', superType: typeB);
-    var typeC = interfaceType(C);
+    var typeC = interfaceTypeStar(C);
 
     var D = class_(name: 'D', superType: typeB);
-    var typeD = interfaceType(D);
+    var typeD = interfaceTypeStar(D);
 
     _checkLeastUpperBound(typeC, typeD, typeB);
   }
 
   void test_sharedSuperclass4() {
     var A = class_(name: 'A');
-    var typeA = interfaceType(A);
+    var typeA = interfaceTypeStar(A);
 
     var A2 = class_(name: 'A2');
-    var typeA2 = interfaceType(A2);
+    var typeA2 = interfaceTypeStar(A2);
 
     var A3 = class_(name: 'A3');
-    var typeA3 = interfaceType(A3);
+    var typeA3 = interfaceTypeStar(A3);
 
     var B = class_(name: 'B', superType: typeA, interfaces: [typeA2]);
-    var typeB = interfaceType(B);
+    var typeB = interfaceTypeStar(B);
 
     var C = class_(name: 'C', superType: typeA, interfaces: [typeA3]);
-    var typeC = interfaceType(C);
+    var typeC = interfaceTypeStar(C);
 
     _checkLeastUpperBound(typeB, typeC, typeA);
   }
 
   void test_sharedSuperinterface1() {
     var A = class_(name: 'A');
-    var typeA = interfaceType(A);
+    var typeA = interfaceTypeStar(A);
 
     var B = class_(name: 'B', interfaces: [typeA]);
-    var typeB = interfaceType(B);
+    var typeB = interfaceTypeStar(B);
 
     var C = class_(name: 'C', interfaces: [typeA]);
-    var typeC = interfaceType(C);
+    var typeC = interfaceTypeStar(C);
 
     _checkLeastUpperBound(typeB, typeC, typeA);
   }
 
   void test_sharedSuperinterface2() {
     var A = class_(name: 'A');
-    var typeA = interfaceType(A);
+    var typeA = interfaceTypeStar(A);
 
     var B = class_(name: 'B', interfaces: [typeA]);
-    var typeB = interfaceType(B);
+    var typeB = interfaceTypeStar(B);
 
     var C = class_(name: 'C', interfaces: [typeA]);
-    var typeC = interfaceType(C);
+    var typeC = interfaceTypeStar(C);
 
     var D = class_(name: 'D', interfaces: [typeC]);
-    var typeD = interfaceType(D);
+    var typeD = interfaceTypeStar(D);
 
     _checkLeastUpperBound(typeB, typeD, typeA);
   }
 
   void test_sharedSuperinterface3() {
     var A = class_(name: 'A');
-    var typeA = interfaceType(A);
+    var typeA = interfaceTypeStar(A);
 
     var B = class_(name: 'B', interfaces: [typeA]);
-    var typeB = interfaceType(B);
+    var typeB = interfaceTypeStar(B);
 
     var C = class_(name: 'C', interfaces: [typeB]);
-    var typeC = interfaceType(C);
+    var typeC = interfaceTypeStar(C);
 
     var D = class_(name: 'D', interfaces: [typeB]);
-    var typeD = interfaceType(D);
+    var typeD = interfaceTypeStar(D);
 
     _checkLeastUpperBound(typeC, typeD, typeB);
   }
 
   void test_sharedSuperinterface4() {
     var A = class_(name: 'A');
-    var typeA = interfaceType(A);
+    var typeA = interfaceTypeStar(A);
 
     var A2 = class_(name: 'A2');
-    var typeA2 = interfaceType(A2);
+    var typeA2 = interfaceTypeStar(A2);
 
     var A3 = class_(name: 'A3');
-    var typeA3 = interfaceType(A3);
+    var typeA3 = interfaceTypeStar(A3);
 
     var B = class_(name: 'B', interfaces: [typeA, typeA2]);
-    var typeB = interfaceType(B);
+    var typeB = interfaceTypeStar(B);
 
     var C = class_(name: 'C', interfaces: [typeA, typeA3]);
-    var typeC = interfaceType(C);
+    var typeC = interfaceTypeStar(C);
 
     _checkLeastUpperBound(typeB, typeC, typeA);
   }
@@ -3107,7 +3111,7 @@ class LeastUpperBoundTest extends BoundTestBase {
 
   void test_typeParam_class_implements_Function_ignored() {
     var A = class_(name: 'A', superType: typeProvider.functionType);
-    var T = typeParameter('T', bound: interfaceType(A));
+    var T = typeParameter('T', bound: interfaceTypeStar(A));
     _checkLeastUpperBound(typeParameterTypeStar(T),
         functionTypeStar(returnType: voidType), objectType);
   }
@@ -3118,16 +3122,16 @@ class LeastUpperBoundTest extends BoundTestBase {
 
     var S = typeParameter('S');
     var typeS = typeParameterTypeStar(S);
-    S.bound = interfaceType(A, typeArguments: [typeS]);
+    S.bound = interfaceTypeStar(A, typeArguments: [typeS]);
 
     var U = typeParameter('U');
     var typeU = typeParameterTypeStar(U);
-    U.bound = interfaceType(A, typeArguments: [typeU]);
+    U.bound = interfaceTypeStar(A, typeArguments: [typeU]);
 
     _checkLeastUpperBound(
       typeS,
       typeParameterTypeStar(U),
-      interfaceType(A, typeArguments: [objectType]),
+      interfaceTypeStar(A, typeArguments: [objectType]),
     );
   }
 
@@ -3151,13 +3155,13 @@ class LeastUpperBoundTest extends BoundTestBase {
 
   void test_typeParam_interface_bounded() {
     var A = class_(name: 'A');
-    var typeA = interfaceType(A);
+    var typeA = interfaceTypeStar(A);
 
     var B = class_(name: 'B', superType: typeA);
-    var typeB = interfaceType(B);
+    var typeB = interfaceTypeStar(B);
 
     var C = class_(name: 'C', superType: typeA);
-    var typeC = interfaceType(C);
+    var typeC = interfaceTypeStar(C);
 
     var T = typeParameter('T', bound: typeB);
     var typeT = typeParameterTypeStar(T);
@@ -3170,7 +3174,7 @@ class LeastUpperBoundTest extends BoundTestBase {
     var A = class_(name: 'A');
     _checkLeastUpperBound(
       typeParameterTypeStar(T),
-      interfaceType(A),
+      interfaceTypeStar(A),
       objectType,
     );
   }
@@ -3209,7 +3213,7 @@ class LeastUpperBoundTest extends BoundTestBase {
     List<DartType> types = [
       neverStar,
       functionTypeStar(returnType: voidType),
-      interfaceType(A),
+      interfaceTypeStar(A),
       typeParameterTypeStar(T),
     ];
     for (DartType type in types) {
@@ -3322,23 +3326,20 @@ class SubtypingTestBase extends AbstractTypeSystemTest {
 @reflectiveTest
 class TypeSystemTest extends AbstractTypeSystemTest {
   InterfaceTypeImpl get functionClassTypeNone {
-    return interfaceType(
+    return interfaceTypeNone(
       typeProvider.functionType.element,
-      nullabilitySuffix: NullabilitySuffix.none,
     );
   }
 
   InterfaceTypeImpl get functionClassTypeQuestion {
-    return interfaceType(
+    return interfaceTypeQuestion(
       typeProvider.functionType.element,
-      nullabilitySuffix: NullabilitySuffix.question,
     );
   }
 
   InterfaceTypeImpl get functionClassTypeStar {
-    return interfaceType(
+    return interfaceTypeStar(
       typeProvider.functionType.element,
-      nullabilitySuffix: NullabilitySuffix.star,
     );
   }
 
@@ -3379,75 +3380,60 @@ class TypeSystemTest extends AbstractTypeSystemTest {
       .withNullability(NullabilitySuffix.star);
 
   InterfaceTypeImpl get stringClassTypeNone {
-    return interfaceType(
+    return interfaceTypeNone(
       typeProvider.stringType.element,
-      nullabilitySuffix: NullabilitySuffix.none,
     );
   }
 
   InterfaceTypeImpl get stringClassTypeQuestion {
-    return interfaceType(
+    return interfaceTypeQuestion(
       typeProvider.stringType.element,
-      nullabilitySuffix: NullabilitySuffix.question,
     );
   }
 
   InterfaceTypeImpl get stringClassTypeStar {
-    return interfaceType(
+    return interfaceTypeStar(
       typeProvider.stringType.element,
-      nullabilitySuffix: NullabilitySuffix.star,
     );
   }
 
   InterfaceTypeImpl futureOrTypeNone({@required DartType argument}) {
-    var element = typeProvider.futureOrElement;
-    return interfaceType(
-      element,
+    return typeProvider.futureOrElement.instantiate(
       typeArguments: <DartType>[argument],
       nullabilitySuffix: NullabilitySuffix.none,
     );
   }
 
   InterfaceTypeImpl futureOrTypeQuestion({@required DartType argument}) {
-    var element = typeProvider.futureOrElement;
-    return interfaceType(
-      element,
+    return typeProvider.futureOrElement.instantiate(
       typeArguments: <DartType>[argument],
       nullabilitySuffix: NullabilitySuffix.question,
     );
   }
 
   InterfaceTypeImpl futureOrTypeStar({@required DartType argument}) {
-    var element = typeProvider.futureOrElement;
-    return interfaceType(
-      element,
+    return typeProvider.futureOrElement.instantiate(
       typeArguments: <DartType>[argument],
       nullabilitySuffix: NullabilitySuffix.star,
     );
   }
 
   InterfaceTypeImpl listClassTypeNone(DartType argument) {
-    var element = typeProvider.listElement;
-    return interfaceType(
-      element,
+    return typeProvider.listElement.instantiate(
       typeArguments: <DartType>[argument],
       nullabilitySuffix: NullabilitySuffix.none,
     );
   }
 
   InterfaceTypeImpl listClassTypeQuestion(DartType argument) {
-    var element = typeProvider.listElement;
-    return interfaceType(
-      element,
+    return typeProvider.listElement.instantiate(
       typeArguments: <DartType>[argument],
       nullabilitySuffix: NullabilitySuffix.question,
     );
   }
 
   InterfaceTypeImpl listClassTypeStar(DartType argument) {
-    var element = typeProvider.listElement;
-    return interfaceType(
-      element,
+    return typeProvider.listElement.instantiate(
       typeArguments: <DartType>[argument],
       nullabilitySuffix: NullabilitySuffix.star,
     );

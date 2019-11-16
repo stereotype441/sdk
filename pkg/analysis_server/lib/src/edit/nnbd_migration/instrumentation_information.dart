@@ -20,8 +20,8 @@ class InstrumentationInformation {
   /// The node used for type sources that are never `null`.
   NullabilityNodeInfo never;
 
-  /// Expando associating [NodeInformation] wich [NullabilityNodeInfo] objects.
-  Expando<NodeInformation> nodeInformation = Expando<NodeInformation>();
+  /// A map associating [NodeInformation] with [NullabilityNodeInfo] objects.
+  Map<NullabilityNodeInfo, NodeInformation> nodeInformation = {};
 
   /// A list of the steps in the propagation of nullability information through
   /// the nullability graph, to report details of the step that was performed
@@ -63,17 +63,13 @@ class NodeInformation {
 
   final Element element;
 
-  final String descriptionPrefix;
-
-  NodeInformation(
-      this.filePath, this.astNode, this.element, this.descriptionPrefix);
+  NodeInformation(this.filePath, this.astNode, this.element);
 
   /// Return detail text for a fix built from an edge with this node as a
   /// destination.
   String get descriptionForDestination {
-    // TODO(paulberry): describe AST nodes
-    var description = (element ?? '???').toString();
-    return "A nullable value can't be used as $descriptionPrefix$description";
+    // TODO(paulberry): describe AST nodes.
+    return "A nullable value can't be used here";
   }
 }
 

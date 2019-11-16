@@ -32,6 +32,18 @@ class DartLib {
   final String proto;
   const DartLib(this.name, this.proto);
 
+  static const voidLibs = [
+    DartLib('RangeError.checkNotNegative', 'VISS'),
+    DartLib('RangeError.checkValueInInterval', 'VIIISS'),
+    DartLib('add', 'LI'),
+    DartLib('addAll', 'MM'),
+    DartLib('clear', 'LV'),
+    DartLib('clear', 'MV'),
+    DartLib('clear', 'XV'),
+    DartLib('fillRange', 'LIII'),
+    DartLib('insert', 'LII'),
+    DartLib('removeRange', 'LII'),
+  ];
   static const boolLibs = [
     DartLib('NetworkInterface.listSupported', 'Vv'),
     DartLib('SecurityContext.alpnSupported', 'Vv'),
@@ -771,23 +783,23 @@ class DartLib {
     DartLib('trimRight', 'SV'),
   ];
   static const listLibs = [
-    DartLib('List.filled', 'ViI'),
+    DartLib('List<int>.filled', 'ViI'),
     DartLib('Uri.parseIPv4Address', 'VS'),
     DartLib('Uri.parseIPv6Address', 'VSII'),
     DartLib('codeUnits', 'Sv'),
     DartLib('sublist', 'LII'),
   ];
   static const setLibs = [
-    DartLib('Set.identity', 'VV'),
+    DartLib('Set<int>.identity', 'VV'),
     DartLib('difference', 'XX'),
     DartLib('intersection', 'XX'),
     DartLib('toSet', 'XV'),
     DartLib('union', 'XX'),
   ];
   static const mapLibs = [
-    DartLib('Map.from', 'VM'),
-    DartLib('Map.identity', 'VV'),
-    DartLib('Map.of', 'VM'),
-    DartLib('Map.unmodifiable', 'VM'),
+    DartLib('Map<int, String>.from', 'VM'),
+    DartLib('Map<int, String>.identity', 'VV'),
+    DartLib('Map<int, String>.of', 'VM'),
+    DartLib('Map<int, String>.unmodifiable', 'VM'),
   ];
 }

@@ -29,6 +29,7 @@ class DartLib {
 }
 
 // Lists of recognized methods, organized by return type.
+var voidTable = <DartLib>[];
 var boolTable = <DartLib>[];
 var intTable = <DartLib>[];
 var doubleTable = <DartLib>[];
@@ -53,6 +54,7 @@ main() async {
 
   // Generate the tables in a stand-alone Dart class.
   dumpHeader();
+  dumpTable('voidLibs', voidTable);
   dumpTable('boolLibs', boolTable);
   dumpTable('intLibs', intTable);
   dumpTable('doubleLibs', doubleTable);
@@ -122,7 +124,7 @@ void visitClass(ClassElement classElement) {
         constructor.name.isNotEmpty) {
       addToTable(
           typeString(classElement.thisType),
-          '${classElement.name}.${constructor.name}',
+          '${classString(classElement)}.${constructor.name}',
           protoString(null, constructor.parameters));
     }
   }
@@ -131,7 +133,7 @@ void visitClass(ClassElement classElement) {
       if (method.isStatic) {
         addToTable(
             typeString(method.returnType),
-            '${classElement.name}.${method.name}',
+            '${classString(classElement)}.${method.name}',
             protoString(null, method.parameters));
       } else {
         addToTable(typeString(method.returnType), method.name,
@@ -153,6 +155,20 @@ void visitClass(ClassElement classElement) {
   }
 }
 
+// Function that returns the explicit class name.
+String classString(ClassElement classElement) {
+  switch (typeString(classElement.thisType)) {
+    case 'X':
+      return 'Set<int>';
+    case 'L':
+      return 'List<int>';
+    case 'M':
+      return 'Map<int, String>';
+    default:
+      return classElement.name;
+  }
+}
+
 // Types are represented by an instance of `DartType`. For classes, the type
 // will be an instance of `InterfaceType`, which will provide access to the
 // defining (class) element, as well as any type arguments.
@@ -170,6 +186,8 @@ String typeString(DartType type) {
   // TODO(ajcbik): inspect type structure semantically, not by display name
   //               and unify DartFuzz's DartType with analyzer DartType.
   switch (type.displayName) {
+    case 'void':
+      return 'V';
     case 'E':
       return 'I';
     case 'num':
@@ -209,6 +227,8 @@ String protoString(DartType receiver, List<ParameterElement> parameters) {
 
 List<DartLib> getTable(String ret) {
   switch (ret) {
+    case 'V':
+      return voidTable;
     case 'B':
       return boolTable;
     case 'I':
@@ -235,8 +255,11 @@ void addToTable(String ret, String name, String proto) {
   if (ret.contains('?') || proto.contains('?')) {
     return;
   }
-  // Avoid some obvious false divergences.
-  if (name == 'pid' || name == 'hashCode' || name == 'exitCode') {
+  // Avoid the exit function and other functions that give false divergences.
+  if (name == 'exit' ||
+      name == 'pid' ||
+      name == 'hashCode' ||
+      name == 'exitCode') {
     return;
   }
   // Restrict parameters for a few hardcoded cases,
@@ -244,7 +267,7 @@ void addToTable(String ret, String name, String proto) {
   // allocation in the generated fuzzing program.
   if (name == 'padLeft' || name == 'padRight') {
     proto = proto.replaceFirst('IS', 'is');
-  } else if (name == 'List.filled') {
+  } else if (name == 'List<int>.filled') {
     proto = proto.replaceFirst('I', 'i');
   }
   // Add to table.

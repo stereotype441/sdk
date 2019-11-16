@@ -979,8 +979,10 @@ class ClassHierarchyNodeBuilder {
         if (inheritedType is ImplicitFieldType) {
           SourceLibraryBuilder library = classBuilder.library;
           (library.implicitlyTypedFields ??= <FieldBuilder>[]).add(a);
+          a.fieldType = inheritedType.createAlias(a);
+        } else {
+          a.fieldType = inheritedType;
         }
-        a.field.type = inheritedType;
       }
     }
     return result;
@@ -1204,14 +1206,23 @@ class ClassHierarchyNodeBuilder {
     }
 
     /// Members (excluding setters) declared in [cls].
-    List<ClassMember> localMembers =
-        new List<ClassMember>.from(scope.localMembers)
-          ..sort(compareDeclarations);
+    List<ClassMember> localMembers = <ClassMember>[];
 
     /// Setters declared in [cls].
-    List<ClassMember> localSetters =
-        new List<ClassMember>.from(scope.localSetters)
-          ..sort(compareDeclarations);
+    List<ClassMember> localSetters = <ClassMember>[];
+
+    for (MemberBuilder memberBuilder in scope.localMembers) {
+      localMembers.addAll(memberBuilder.localMembers);
+      localSetters.addAll(memberBuilder.localSetters);
+    }
+
+    for (MemberBuilder memberBuilder in scope.localSetters) {
+      localMembers.addAll(memberBuilder.localMembers);
+      localSetters.addAll(memberBuilder.localSetters);
+    }
+
+    localMembers.sort(compareDeclarations);
+    localSetters.sort(compareDeclarations);
 
     // Add implied setters from fields in [localMembers].
     localSetters = mergeAccessors(localMembers, localSetters);
@@ -2119,20 +2130,20 @@ class DelayedOverrideCheck {
                   hierarchy.getKernelTypeAsInstanceOf(
                       classBuilder.cls.thisType, b.member.enclosingClass))
               .substituteType(type);
-          if (type != a.field.type) {
+          if (type != a.fieldType) {
             if (a.hadTypesInferred) {
               if (b.isSetter &&
                   (!impliesSetter(a) ||
-                      hierarchy.types.isSubtypeOfKernel(type, a.field.type,
+                      hierarchy.types.isSubtypeOfKernel(type, a.fieldType,
                           SubtypeCheckMode.ignoringNullabilities))) {
-                type = a.field.type;
+                type = a.fieldType;
               } else {
                 reportCantInferFieldType(classBuilder, a);
                 type = const InvalidType();
               }
             }
             debug?.log("Inferred type ${type} for ${fullName(a)}");
-            a.field.type = type;
+            a.fieldType = type;
           }
         }
         a.hadTypesInferred = true;

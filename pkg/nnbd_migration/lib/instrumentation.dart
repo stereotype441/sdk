@@ -131,19 +131,26 @@ enum EdgeOriginKind {
   dynamicAssignment,
   expressionChecks,
   fieldFormalParameter,
+  fieldNotInitialized,
   forEachVariable,
   greatestLowerBound,
   ifNull,
   implicitMixinSuperCall,
   inheritance,
   initializerInference,
+  instanceCreation,
   instantiateToBounds,
   isCheckComponentType,
   isCheckMainType,
+  isCheckResultType,
+  literal,
   namedParameterNotSupplied,
   nonNullAssertion,
   nullabilityComment,
   optionalFormalParameter,
+  thisOrSuper,
+  throw_,
+  uninitializedRead,
 }
 
 /// Interface used by the migration engine to expose information to its client
@@ -180,8 +187,8 @@ abstract class NullabilityMigrationInstrumentation {
   /// and why it was created.
   void graphEdge(EdgeInfo edge, EdgeOriginInfo originInfo);
 
-  /// Called when the migration engine start up, to report information about the
-  /// immutable migration nodes [never] and [always] that are used as the
+  /// Called when the migration engine starts up, to report information about
+  /// the immutable migration nodes [never] and [always] that are used as the
   /// starting point for nullability propagation.
   void immutableNodes(NullabilityNodeInfo never, NullabilityNodeInfo always);
 
@@ -226,6 +233,14 @@ abstract class NullabilityMigrationInstrumentation {
 /// Information exposed to the migration client about a single node in the
 /// nullability graph.
 abstract class NullabilityNodeInfo implements FixReasonInfo {
+  /// Some nodes get nullability from downstream, so the downstream edges are
+  /// available to query as well.
+  Iterable<EdgeInfo> get downstreamEdges;
+
+  /// After migration is complete, this getter can be used to query whether
+  /// the type associated with this node was determined to be "exact nullable."
+  bool get isExactNullable;
+
   /// Indicates whether the node is immutable.  The only immutable nodes in the
   /// nullability graph are the nodes `never` and `always` that are used as the
   /// starting points for nullability propagation.
