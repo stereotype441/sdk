@@ -91,7 +91,8 @@ class MigrationBase {
     return waitResponse(request);
   }
 
-  Future<Response> sendEditDartfix(List<String> directories, String outputDir, int port) {
+  Future<Response> sendEditDartfix(
+      List<String> directories, String outputDir, int port) {
     var request = EditDartfixParams(directories,
             includedFixes: ['non-nullable'], outputDir: outputDir, port: port)
         .toRequest('1');
