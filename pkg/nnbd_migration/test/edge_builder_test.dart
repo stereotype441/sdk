@@ -1957,8 +1957,8 @@ void f(List<int> ints) {
 
     assertNullCheck(
         checkExpression('ints) i'),
-        assertEdge(
-            decoratedTypeAnnotation('List<int> ints').node, inSet(pointsToNever),
+        assertEdge(decoratedTypeAnnotation('List<int> ints').node,
+            inSet(pointsToNever),
             hard: true));
     assertEdge(decoratedTypeAnnotation('int i').node,
         decoratedTypeAnnotation('int>[').node,
@@ -1983,8 +1983,8 @@ void f(List<String> strs, List<int> ints) {
             hard: true));
     assertNullCheck(
         checkExpression('ints)\n'),
-        assertEdge(
-            decoratedTypeAnnotation('List<int> ints').node, inSet(pointsToNever),
+        assertEdge(decoratedTypeAnnotation('List<int> ints').node,
+            inSet(pointsToNever),
             hard: false));
 
     var keyTypeNode = decoratedTypeAnnotation('String, int>{').node;
@@ -2004,8 +2004,8 @@ void f(List<int> ints) {
 
     assertNullCheck(
         checkExpression('ints) i'),
-        assertEdge(
-            decoratedTypeAnnotation('List<int> ints').node, inSet(pointsToNever),
+        assertEdge(decoratedTypeAnnotation('List<int> ints').node,
+            inSet(pointsToNever),
             hard: true));
     assertEdge(decoratedTypeAnnotation('int i').node,
         decoratedTypeAnnotation('int>{').node,
@@ -2470,11 +2470,13 @@ void f(bool b1, bool b2) {
 
     assertNullCheck(
         checkExpression('b1)'),
-        assertEdge(decoratedTypeAnnotation('bool b1').node, inSet(pointsToNever),
+        assertEdge(
+            decoratedTypeAnnotation('bool b1').node, inSet(pointsToNever),
             hard: true));
     assertNullCheck(
         checkExpression('b2) i1'),
-        assertEdge(decoratedTypeAnnotation('bool b2').node, inSet(pointsToNever),
+        assertEdge(
+            decoratedTypeAnnotation('bool b2').node, inSet(pointsToNever),
             hard: false));
     assertEdge(decoratedTypeAnnotation('int i1').node,
         decoratedTypeAnnotation('int>[').node,
@@ -3909,7 +3911,8 @@ void test(bool _b, C c1, C c2) {
 
     assertNullCheck(
         checkExpression('b1/*check*/'),
-        assertEdge(decoratedTypeAnnotation('bool b1').node, inSet(pointsToNever),
+        assertEdge(
+            decoratedTypeAnnotation('bool b1').node, inSet(pointsToNever),
             hard: true));
     assertNullCheck(
         checkExpression('c1.m'),
@@ -4000,7 +4003,8 @@ void test(bool b1, C c1, C c2, C c3) {
 
     assertNullCheck(
         checkExpression('b1/*check*/'),
-        assertEdge(decoratedTypeAnnotation('bool b1').node, inSet(pointsToNever),
+        assertEdge(
+            decoratedTypeAnnotation('bool b1').node, inSet(pointsToNever),
             hard: true));
     assertNullCheck(
         checkExpression('c4.m'),
@@ -4078,8 +4082,10 @@ void test(bool b, C c1, C c2, C c3) {
         checkExpression('c2.m'),
         assertEdge(decoratedTypeAnnotation('C c2').node, inSet(pointsToNever),
             hard: false));
-    assertNullCheck(checkExpression('c3.m'),
-        assertEdge(decoratedTypeAnnotation('C c3').node, inSet(pointsToNever), hard: true));
+    assertNullCheck(
+        checkExpression('c3.m'),
+        assertEdge(decoratedTypeAnnotation('C c3').node, inSet(pointsToNever),
+            hard: true));
   }
 
   test_postDominators_ifStatement_conditional() async {
@@ -4115,10 +4121,14 @@ void test(bool b, C c1, C c2) {
         checkExpression('c2.m'),
         assertEdge(decoratedTypeAnnotation('C c2').node, inSet(pointsToNever),
             hard: false));
-    assertNullCheck(checkExpression('c3.m'),
-        assertEdge(decoratedTypeAnnotation('C c3').node, inSet(pointsToNever), hard: true));
-    assertNullCheck(checkExpression('c4.m'),
-        assertEdge(decoratedTypeAnnotation('C c4').node, inSet(pointsToNever), hard: false));
+    assertNullCheck(
+        checkExpression('c3.m'),
+        assertEdge(decoratedTypeAnnotation('C c3').node, inSet(pointsToNever),
+            hard: true));
+    assertNullCheck(
+        checkExpression('c4.m'),
+        assertEdge(decoratedTypeAnnotation('C c4').node, inSet(pointsToNever),
+            hard: false));
   }
 
   test_postDominators_ifStatement_unconditional() async {
@@ -4154,10 +4164,14 @@ void test(bool b, C c1, C c2) {
         checkExpression('c2.m'),
         assertEdge(decoratedTypeAnnotation('C c2').node, inSet(pointsToNever),
             hard: true));
-    assertNullCheck(checkExpression('c3.m'),
-        assertEdge(decoratedTypeAnnotation('C c3').node, inSet(pointsToNever), hard: true));
-    assertNullCheck(checkExpression('c4.m'),
-        assertEdge(decoratedTypeAnnotation('C c4').node, inSet(pointsToNever), hard: true));
+    assertNullCheck(
+        checkExpression('c3.m'),
+        assertEdge(decoratedTypeAnnotation('C c3').node, inSet(pointsToNever),
+            hard: true));
+    assertNullCheck(
+        checkExpression('c4.m'),
+        assertEdge(decoratedTypeAnnotation('C c4').node, inSet(pointsToNever),
+            hard: true));
   }
 
   test_postDominators_inReturn_local() async {
@@ -4293,11 +4307,15 @@ void test(C c1, C c2, C c3, C c4) {
         assertEdge(decoratedTypeAnnotation('C c3').node, inSet(pointsToNever),
             hard: true));
 
-    assertNullCheck(checkExpression('c2.m'),
-        assertEdge(decoratedTypeAnnotation('C c2').node, inSet(pointsToNever), hard: false));
+    assertNullCheck(
+        checkExpression('c2.m'),
+        assertEdge(decoratedTypeAnnotation('C c2').node, inSet(pointsToNever),
+            hard: false));
 
-    assertNullCheck(checkExpression('c4.m'),
-        assertEdge(decoratedTypeAnnotation('C c4').node, inSet(pointsToNever), hard: false));
+    assertNullCheck(
+        checkExpression('c4.m'),
+        assertEdge(decoratedTypeAnnotation('C c4').node, inSet(pointsToNever),
+            hard: false));
   }
 
   test_postDominators_subFunction() async {
@@ -4387,11 +4405,15 @@ void test(C c1, C c2, C c3, C c4) {
         assertEdge(decoratedTypeAnnotation('C c4').node, inSet(pointsToNever),
             hard: true));
 
-    assertNullCheck(checkExpression('c2.m'),
-        assertEdge(decoratedTypeAnnotation('C c2').node, inSet(pointsToNever), hard: false));
+    assertNullCheck(
+        checkExpression('c2.m'),
+        assertEdge(decoratedTypeAnnotation('C c2').node, inSet(pointsToNever),
+            hard: false));
 
-    assertNullCheck(checkExpression('c3.m'),
-        assertEdge(decoratedTypeAnnotation('C c3').node, inSet(pointsToNever), hard: false));
+    assertNullCheck(
+        checkExpression('c3.m'),
+        assertEdge(decoratedTypeAnnotation('C c3').node, inSet(pointsToNever),
+            hard: false));
   }
 
   test_postDominators_tryCatch() async {
@@ -4432,10 +4454,14 @@ void test(bool b, C c1, C c2) {
         checkExpression('c1.m'),
         assertEdge(decoratedTypeAnnotation('C c1').node, inSet(pointsToNever),
             hard: false));
-    assertNullCheck(checkExpression('c2.m'),
-        assertEdge(decoratedTypeAnnotation('C c2').node, inSet(pointsToNever), hard: true));
-    assertNullCheck(checkExpression('c3.m'),
-        assertEdge(decoratedTypeAnnotation('C c3').node, inSet(pointsToNever), hard: true));
+    assertNullCheck(
+        checkExpression('c2.m'),
+        assertEdge(decoratedTypeAnnotation('C c2').node, inSet(pointsToNever),
+            hard: true));
+    assertNullCheck(
+        checkExpression('c3.m'),
+        assertEdge(decoratedTypeAnnotation('C c3').node, inSet(pointsToNever),
+            hard: true));
   }
 
   test_postfixExpression_minusMinus() async {
