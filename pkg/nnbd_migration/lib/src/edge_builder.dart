@@ -119,9 +119,6 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   /// information  used in flow analysis.  Otherwise `null`.
   AssignedVariables<AstNode, PromotableElement> _assignedVariables;
 
-  /// For convenience, a [DecoratedType] representing non-nullable `Type`.
-  final DecoratedType _nonNullableTypeType;
-
   /// The [DecoratedType] of the innermost function or method being visited, or
   /// `null` if the visitor is not inside any function or method.
   ///
@@ -194,9 +191,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   EdgeBuilder(this.typeProvider, this._typeSystem, this._variables, this._graph,
       this.source, this.listener, this._decoratedClassHierarchy,
       {this.instrumentation})
-      : _inheritanceManager = InheritanceManager3(_typeSystem),
-        _nonNullableTypeType =
-            DecoratedType(typeProvider.typeType, _graph.never);
+      : _inheritanceManager = InheritanceManager3(_typeSystem);
 
   /// Gets the decorated type of [element] from [_variables], performing any
   /// necessary substitutions.
@@ -1207,7 +1202,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
           ? elementType.returnType
           : elementType.positionalParameters[0];
     } else if (staticElement is TypeDefiningElement) {
-      return _nonNullableTypeType;
+      return _makeNonNullLiteralType(node);
     } else {
       // TODO(paulberry)
       _unimplemented(node,

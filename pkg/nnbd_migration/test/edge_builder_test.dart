@@ -5588,7 +5588,8 @@ Type f() {
 import 'dart:async' as a;
 Type f() => a.Future;
 ''');
-    assertEdge(never, decoratedTypeAnnotation('Type').node, hard: false);
+    assertEdge(inSet(neverClosure), decoratedTypeAnnotation('Type').node,
+        hard: false);
   }
 
   test_typeName_functionTypeAlias() async {
