@@ -1038,16 +1038,8 @@ void f() {
     var jNode = decoratedTypeAnnotation('int j').node;
     // No edge from i to `never` because i's type is promoted to non-nullable
     assertNoEdge(iNode, inSet(pointsToNever));
-    // But there is an edge from j to a non-nullable node.  Note: this is
-    // slightly tricky to test for because there is also a union edge between
-    // the type of `j` and the argument type of the inferred type of `g`.  So we
-    // have to filter that out.
-    var edges = [
-      for (var edge in getEdges(jNode, inSet(pointsToNever)))
-        if (!edge.isUnion) edge
-    ];
-    expect(edges, hasLength(1));
-    expect(edges.single.isHard, false);
+    // But there is an edge from j to `never`.
+    assertEdge(jNode, inSet(pointsToNever), hard: false);
   }
 
   test_if() async {
