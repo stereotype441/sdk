@@ -91,6 +91,26 @@ class InfoBuilder {
     return units;
   }
 
+  Iterable<EdgeInfo> upstreamTriggeredEdges(NullabilityNodeInfo node,
+      [List<RegionDetail> details]) {
+    var edges = <EdgeInfo>[];
+    for (EdgeInfo edge in node.upstreamEdges) {
+      if (node.isExactNullable && edge.sourceNode.isExactNullable) {
+        // When an exact nullable points here, the nullability propagated
+        // in the other direction.
+        continue;
+      }
+      if (edge.isTriggered) {
+        edges.add(edge);
+      }
+    }
+    for (final containerNode in node.outerCompoundNodes) {
+      edges.addAll(upstreamTriggeredEdges(containerNode, details));
+    }
+
+    return edges;
+  }
+
   /// Return detail text for a fix built from an edge with [node] as a
   /// destination.
   String _baseDescriptionForOrigin(
@@ -138,6 +158,15 @@ class InfoBuilder {
     } else {
       nullableValue = "a nullable value";
     }
+
+    CompilationUnit unit = node.thisOrAncestorOfType<CompilationUnit>();
+    int lineNumber = unit.lineInfo.getLocation(node.offset).lineNumber;
+
+    if (origin.kind == EdgeOriginKind.uninitializedRead) {
+      return "This variable could not be made 'late' because it is used on "
+          "line $lineNumber, when it is possibly uninitialized";
+    }
+
     if (parent is ArgumentList) {
       return capitalize("$nullableValue is passed as an argument");
     }
@@ -167,8 +196,6 @@ class InfoBuilder {
       return (ancestor is TypedLiteral) ? ancestor : null;
     }
 
-    CompilationUnit unit = node.thisOrAncestorOfType<CompilationUnit>();
-    int lineNumber = unit.lineInfo.getLocation(node.offset).lineNumber;
     FunctionBody functionBody = findFunctionBody();
     if (functionBody != null) {
       AstNode function = functionBody.parent;
@@ -287,21 +314,14 @@ class InfoBuilder {
           }
         }
 
-        for (EdgeInfo edge in reason.upstreamEdges) {
-          if (edge.sourceNode.isExactNullable) {
-            // When an exact nullable points here, the nullability propagated
-            // in the other direction.
-            continue;
-          }
-          if (edge.isTriggered) {
-            EdgeOriginInfo origin = info.edgeOrigin[edge];
-            if (origin != null) {
-              details.add(_buildDetailForOrigin(
-                  origin, edge, fixInfo.fix.description.kind));
-            } else {
-              details.add(
-                  RegionDetail('upstream edge with no origin ($edge)', null));
-            }
+        for (EdgeInfo edge in upstreamTriggeredEdges(reason)) {
+          EdgeOriginInfo origin = info.edgeOrigin[edge];
+          if (origin != null) {
+            details.add(_buildDetailForOrigin(
+                origin, edge, fixInfo.fix.description.kind));
+          } else {
+            details.add(
+                RegionDetail('upstream edge with no origin ($edge)', null));
           }
         }
       } else if (reason is EdgeInfo) {
@@ -322,6 +342,20 @@ class InfoBuilder {
       }
     }
     return details;
+  }
+
+  /// Return a list of edits that can be applied.
+  List<EditDetail> _computeEdits(FixInfo fixInfo) {
+    // TODO(brianwilkerson) Add other kinds of edits, such as adding an assert.
+    List<EditDetail> edits = [];
+    SingleNullabilityFix fix = fixInfo.fix;
+    if (fix.description.kind == NullabilityFixKind.makeTypeNullable) {
+      for (Location location in fix.locations) {
+        edits.add(EditDetail(
+            'Force type to be non-nullable.', location.offset, 0, '/*!*/'));
+      }
+    }
+    return edits;
   }
 
   /// Return the navigation sources for the unit associated with the [result].
@@ -443,12 +477,15 @@ class InfoBuilder {
       if (fixInfo != null) {
         String explanation = '${fixInfo.fix.description.appliedMessage}.';
         List<RegionDetail> details = _computeDetails(fixInfo);
+        List<EditDetail> edits = _computeEdits(fixInfo);
         if (length > 0) {
-          regions.add(RegionInfo(RegionType.fix, mapper.map(offset), length,
-              explanation, details));
+          regions.add(RegionInfo(
+              RegionType.fix, mapper.map(offset), length, explanation, details,
+              edits: edits));
         }
         regions.add(RegionInfo(RegionType.fix, mapper.map(end),
-            replacement.length, explanation, details));
+            replacement.length, explanation, details,
+            edits: edits));
       }
     }
     if (explainNonNullableTypes) {
@@ -466,9 +503,10 @@ class InfoBuilder {
   FixInfo _findFixInfo(SourceInformation sourceInfo, int offset) {
     for (MapEntry<SingleNullabilityFix, List<FixReasonInfo>> entry
         in sourceInfo.fixes.entries) {
-      Location location = entry.key.location;
-      if (location.offset == offset) {
-        return FixInfo(entry.key, entry.value);
+      for (Location location in entry.key.locations) {
+        if (location.offset == offset) {
+          return FixInfo(entry.key, entry.value);
+        }
       }
     }
     return null;

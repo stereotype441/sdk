@@ -1514,13 +1514,7 @@ class CodeDeserializationCluster : public DeserializationCluster {
 
       RawInstructions* instr = d->ReadInstructions();
 
-      code->ptr()->entry_point_ = Instructions::EntryPoint(instr);
-      code->ptr()->monomorphic_entry_point_ =
-          Instructions::MonomorphicEntryPoint(instr);
-      code->ptr()->unchecked_entry_point_ =
-          Instructions::UncheckedEntryPoint(instr);
-      code->ptr()->monomorphic_unchecked_entry_point_ =
-          Instructions::MonomorphicUncheckedEntryPoint(instr);
+      Code::InitializeCachedEntryPointsFrom(code, instr);
       NOT_IN_PRECOMPILED(code->ptr()->active_instructions_ = instr);
       code->ptr()->instructions_ = instr;
 
@@ -1528,11 +1522,7 @@ class CodeDeserializationCluster : public DeserializationCluster {
       if (d->kind() == Snapshot::kFullJIT) {
         RawInstructions* instr = d->ReadInstructions();
         code->ptr()->active_instructions_ = instr;
-        code->ptr()->entry_point_ = Instructions::EntryPoint(instr);
-        code->ptr()->monomorphic_entry_point_ =
-            Instructions::MonomorphicEntryPoint(instr);
-        code->ptr()->unchecked_entry_point_ =
-            Instructions::UncheckedEntryPoint(instr);
+        Code::InitializeCachedEntryPointsFrom(code, instr);
       }
 #endif  // !DART_PRECOMPILED_RUNTIME
 
@@ -1575,12 +1565,14 @@ class CodeDeserializationCluster : public DeserializationCluster {
 
 #if !defined(PRODUCT) || defined(FORCE_INCLUDE_DISASSEMBLER)
   void PostLoad(const Array& refs, Snapshot::Kind kind, Zone* zone) {
+#if !defined(PRODUCT)
     if (!CodeObservers::AreActive() && !FLAG_support_disassembler) return;
+#endif
     Code& code = Code::Handle(zone);
     Object& owner = Object::Handle(zone);
     for (intptr_t id = start_index_; id < stop_index_; id++) {
       code ^= refs.At(id);
-#if !defined(DART_PRECOMPILED_RUNTIME)
+#if !defined(DART_PRECOMPILED_RUNTIME) && !defined(PRODUCT)
       if (CodeObservers::AreActive()) {
         Code::NotifyCodeObservers(code, code.is_optimized());
       }

@@ -846,11 +846,11 @@ enum class Nullability {
   kLegacy = 3,
 };
 
-// Nullability aware subtype checking modes.
+// NNBD modes reflecting the status of the library performing type reification
+// or subtype tests. Weak or strong mode is independent of this mode.
 enum class NNBDMode {
-  kUnaware,
-  kWeak,
-  kStrong,
+  kLegacy,
+  kOptedIn,
 };
 
 class Class : public Object {
@@ -1096,7 +1096,8 @@ class Class : public Object {
 
   // Returns true if the type specified by cls and type_arguments is a
   // subtype of the type specified by other class and other_type_arguments.
-  static bool IsSubtypeOf(const Class& cls,
+  static bool IsSubtypeOf(NNBDMode mode,
+                          const Class& cls,
                           const TypeArguments& type_arguments,
                           const Class& other,
                           const TypeArguments& other_type_arguments,
@@ -1106,6 +1107,7 @@ class Class : public Object {
   // subtype of FutureOr<T> specified by other class and other_type_arguments.
   // Returns false if other class is not a FutureOr.
   static bool IsSubtypeOfFutureOr(Zone* zone,
+                                  NNBDMode mode,
                                   const Class& cls,
                                   const TypeArguments& type_arguments,
                                   const Class& other,
@@ -2229,6 +2231,7 @@ class Function : public Object {
 
   // Return a new function with instantiated result and parameter types.
   RawFunction* InstantiateSignatureFrom(
+      NNBDMode mode,
       const TypeArguments& instantiator_type_arguments,
       const TypeArguments& function_type_arguments,
       intptr_t num_free_fun_type_params,
@@ -2791,6 +2794,7 @@ class Function : public Object {
   // Returns a TypeError if the provided arguments don't match the function
   // parameter types, NULL otherwise. Assumes AreValidArguments is called first.
   RawObject* DoArgumentTypesMatch(
+      NNBDMode mode,
       const Array& args,
       const ArgumentsDescriptor& arg_names,
       const TypeArguments& instantiator_type_args) const;
@@ -2798,11 +2802,13 @@ class Function : public Object {
   // Returns true if the type argument count, total argument count and the names
   // of optional arguments are valid for calling this function.
   // Otherwise, it returns false and the reason (if error_message is not NULL).
-  bool AreValidArguments(intptr_t num_type_arguments,
+  bool AreValidArguments(NNBDMode mode,
+                         intptr_t num_type_arguments,
                          intptr_t num_arguments,
                          const Array& argument_names,
                          String* error_message) const;
-  bool AreValidArguments(const ArgumentsDescriptor& args_desc,
+  bool AreValidArguments(NNBDMode mode,
+                         const ArgumentsDescriptor& args_desc,
                          String* error_message) const;
 
   // Fully qualified name uniquely identifying the function under gdb and during
@@ -2815,7 +2821,9 @@ class Function : public Object {
 
   // Returns true if the type of this function is a subtype of the type of
   // the other function.
-  bool IsSubtypeOf(const Function& other, Heap::Space space) const;
+  bool IsSubtypeOf(NNBDMode mode,
+                   const Function& other,
+                   Heap::Space space) const;
 
   bool IsDispatcherOrImplicitAccessor() const {
     switch (kind()) {
@@ -3260,7 +3268,8 @@ class Function : public Object {
   // Returns true if the type of the formal parameter at the given position in
   // this function is contravariant with the type of the other formal parameter
   // at the given position in the other function.
-  bool IsContravariantParameter(intptr_t parameter_position,
+  bool IsContravariantParameter(NNBDMode mode,
+                                intptr_t parameter_position,
                                 const Function& other,
                                 intptr_t other_parameter_position,
                                 Heap::Space space) const;
@@ -3825,6 +3834,13 @@ class Field : public Object {
   static bool IsSetterName(const String& function_name);
   static bool IsInitName(const String& function_name);
 
+#if !defined(DART_PRECOMPILED_RUNTIME)
+  RawSubtypeTestCache* type_test_cache() const {
+    return raw_ptr()->type_test_cache_;
+  }
+  void set_type_test_cache(const SubtypeTestCache& cache) const;
+#endif
+
  private:
   static void InitializeNew(const Field& result,
                             const String& name,
@@ -3968,12 +3984,6 @@ class Script : public Object {
   void set_line_starts(const TypedData& value) const;
 
   void set_debug_positions(const Array& value) const;
-
-  void set_yield_positions(const Array& value) const;
-
-  RawArray* yield_positions() const;
-
-  RawGrowableObjectArray* GetYieldPositions(const Function& function) const;
 
   RawLibrary* FindLibrary() const;
   RawString* GetLine(intptr_t line_number,
@@ -4273,6 +4283,10 @@ class Library : public Object {
   }
   void set_is_nnbd(bool value) const {
     set_flags(RawLibrary::NnbdBit::update(value, raw_ptr()->flags_));
+  }
+
+  NNBDMode nnbd_mode() const {
+    return is_nnbd() ? NNBDMode::kOptedIn : NNBDMode::kLegacy;
   }
 
   RawString* PrivateName(const String& name) const;
@@ -5040,16 +5054,20 @@ class PcDescriptors : public Object {
           cur_kind_(0),
           cur_deopt_id_(0),
           cur_token_pos_(0),
-          cur_try_index_(0) {}
+          cur_try_index_(0),
+          cur_yield_index_(RawPcDescriptors::kInvalidYieldIndex) {}
 
     bool MoveNext() {
       // Moves to record that matches kind_mask_.
       while (byte_index_ < descriptors_.Length()) {
-        int32_t merged_kind_try = descriptors_.DecodeInteger(&byte_index_);
+        const int32_t kind_and_metadata =
+            descriptors_.DecodeInteger(&byte_index_);
         cur_kind_ =
-            RawPcDescriptors::MergedKindTry::DecodeKind(merged_kind_try);
-        cur_try_index_ =
-            RawPcDescriptors::MergedKindTry::DecodeTryIndex(merged_kind_try);
+            RawPcDescriptors::KindAndMetadata::DecodeKind(kind_and_metadata);
+        cur_try_index_ = RawPcDescriptors::KindAndMetadata::DecodeTryIndex(
+            kind_and_metadata);
+        cur_yield_index_ = RawPcDescriptors::KindAndMetadata::DecodeYieldIndex(
+            kind_and_metadata);
 
         cur_pc_offset_ += descriptors_.DecodeInteger(&byte_index_);
 
@@ -5069,6 +5087,7 @@ class PcDescriptors : public Object {
     intptr_t DeoptId() const { return cur_deopt_id_; }
     TokenPosition TokenPos() const { return TokenPosition(cur_token_pos_); }
     intptr_t TryIndex() const { return cur_try_index_; }
+    intptr_t YieldIndex() const { return cur_yield_index_; }
     RawPcDescriptors::Kind Kind() const {
       return static_cast<RawPcDescriptors::Kind>(cur_kind_);
     }
@@ -5086,7 +5105,8 @@ class PcDescriptors : public Object {
           cur_kind_(iter.cur_kind_),
           cur_deopt_id_(iter.cur_deopt_id_),
           cur_token_pos_(iter.cur_token_pos_),
-          cur_try_index_(iter.cur_try_index_) {}
+          cur_try_index_(iter.cur_try_index_),
+          cur_yield_index_(iter.cur_yield_index_) {}
 
     const PcDescriptors& descriptors_;
     const intptr_t kind_mask_;
@@ -5097,6 +5117,7 @@ class PcDescriptors : public Object {
     intptr_t cur_deopt_id_;
     intptr_t cur_token_pos_;
     intptr_t cur_try_index_;
+    intptr_t cur_yield_index_;
   };
 
   intptr_t Length() const;
@@ -5777,6 +5798,10 @@ class Code : public Object {
 #endif
   }
 
+  // Initializes 4 cached entrypoint addresses in 'code' from 'instructions'.
+  static void InitializeCachedEntryPointsFrom(RawCode* code,
+                                              RawInstructions* instructions);
+
   void SetActiveInstructions(const Instructions& instructions) const;
 
   void set_instructions(const Instructions& instructions) const {
@@ -5817,6 +5842,7 @@ class Code : public Object {
   friend class Precompiler;  // for set_object_pool
   friend class FunctionSerializationCluster;
   friend class CodeSerializationCluster;
+  friend class CodeDeserializationCluster;
   friend class StubCode;               // for set_object_pool
   friend class MegamorphicCacheTable;  // for set_object_pool
   friend class CodePatcher;     // for set_instructions
@@ -6236,11 +6262,11 @@ class SubtypeTestCache : public Object {
   static void Init();
   static void Cleanup();
 
+  RawArray* cache() const { return raw_ptr()->cache_; }
+
  private:
   // A VM heap allocated preinitialized empty subtype entry array.
   static RawArray* cached_array_;
-
-  RawArray* cache() const { return raw_ptr()->cache_; }
 
   void set_cache(const Array& value) const;
 
@@ -6464,14 +6490,17 @@ class Instance : public Object {
 
   // Check if the type of this instance is a subtype of the given other type.
   // The type argument vectors are used to instantiate the other type if needed.
-  bool IsInstanceOf(const AbstractType& other,
+  bool IsInstanceOf(NNBDMode mode,
+                    const AbstractType& other,
                     const TypeArguments& other_instantiator_type_arguments,
                     const TypeArguments& other_function_type_arguments) const;
 
   // Returns true if the type of this instance is a subtype of FutureOr<T>
   // specified by instantiated type 'other'.
   // Returns false if other type is not a FutureOr.
-  bool IsFutureOrInstanceOf(Zone* zone, const AbstractType& other) const;
+  bool IsFutureOrInstanceOf(Zone* zone,
+                            NNBDMode mode,
+                            const AbstractType& other) const;
 
   bool IsValidNativeIndex(int index) const {
     return ((index >= 0) && (index < clazz()->ptr()->num_native_fields_));
@@ -6702,7 +6731,8 @@ class TypeArguments : public Instance {
 
   // Check the subtype relationship, considering only a subvector of length
   // 'len' starting at 'from_index'.
-  bool IsSubtypeOf(const TypeArguments& other,
+  bool IsSubtypeOf(NNBDMode mode,
+                   const TypeArguments& other,
                    intptr_t from_index,
                    intptr_t len,
                    Heap::Space space) const;
@@ -6760,6 +6790,7 @@ class TypeArguments : public Instance {
   // type from the various type argument vectors (class instantiator, function,
   // or parent functions via the current context).
   RawTypeArguments* InstantiateFrom(
+      NNBDMode mode,
       const TypeArguments& instantiator_type_arguments,
       const TypeArguments& function_type_arguments,
       intptr_t num_free_fun_type_params,
@@ -6769,6 +6800,7 @@ class TypeArguments : public Instance {
   // Runtime instantiation with canonicalization. Not to be used during type
   // finalization at compile time.
   RawTypeArguments* InstantiateAndCanonicalizeFrom(
+      NNBDMode mode,
       const TypeArguments& instantiator_type_arguments,
       const TypeArguments& function_type_arguments) const;
 
@@ -6868,6 +6900,10 @@ class AbstractType : public Instance {
   virtual bool IsLegacy() const {
     return nullability() == Nullability::kLegacy;
   }
+  virtual RawAbstractType* CheckInstantiatedNullability(
+      NNBDMode mode,
+      const TypeParameter& type_param,
+      Heap::Space space) const;
 
   virtual bool HasTypeClass() const { return type_class_id() != kIllegalCid; }
   virtual classid_t type_class_id() const;
@@ -6903,6 +6939,7 @@ class AbstractType : public Instance {
   //
   // Return a new type, or return 'this' if it is already instantiated.
   virtual RawAbstractType* InstantiateFrom(
+      NNBDMode mode,
       const TypeArguments& instantiator_type_arguments,
       const TypeArguments& function_type_arguments,
       intptr_t num_free_fun_type_params,
@@ -6973,26 +7010,25 @@ class AbstractType : public Instance {
   bool IsNullTypeRef() const;
 
   // Check if this type represents the 'dynamic' type.
-  bool IsDynamicType() const;
+  bool IsDynamicType() const { return type_class_id() == kDynamicCid; }
 
   // Check if this type represents the 'void' type.
-  bool IsVoidType() const;
+  bool IsVoidType() const { return type_class_id() == kVoidCid; }
 
   // Check if this type represents the 'Null' type.
-  bool IsNullType() const;
+  bool IsNullType() const { return type_class_id() == kNullCid; }
 
   // Check if this type represents the 'Never' type.
-  bool IsNeverType() const;
+  bool IsNeverType() const { return type_class_id() == kNeverCid; }
 
   // Check if this type represents the 'Object' type.
-  bool IsObjectType() const;
+  bool IsObjectType() const { return type_class_id() == kInstanceCid; }
 
   // Check if this type represents a top type.
-  // TODO(regis): Remove default kUnaware mode as implementation progresses.
-  bool IsTopType(NNBDMode mode = NNBDMode::kUnaware) const;
+  bool IsTopType() const;
 
   // Check if this type represents the 'bool' type.
-  bool IsBoolType() const;
+  bool IsBoolType() const { return type_class_id() == kBoolCid; }
 
   // Check if this type represents the 'int' type.
   bool IsIntType() const;
@@ -7010,10 +7046,10 @@ class AbstractType : public Instance {
   bool IsInt32x4Type() const;
 
   // Check if this type represents the 'num' type.
-  bool IsNumberType() const;
+  bool IsNumberType() const { return type_class_id() == kNumberCid; }
 
   // Check if this type represents the '_Smi' type.
-  bool IsSmiType() const;
+  bool IsSmiType() const { return type_class_id() == kSmiCid; }
 
   // Check if this type represents the 'String' type.
   bool IsStringType() const;
@@ -7028,11 +7064,14 @@ class AbstractType : public Instance {
   bool IsFfiPointerType() const;
 
   // Check the subtype relationship.
-  bool IsSubtypeOf(const AbstractType& other, Heap::Space space) const;
+  bool IsSubtypeOf(NNBDMode mode,
+                   const AbstractType& other,
+                   Heap::Space space) const;
 
   // Returns true iff subtype is a subtype of supertype, false otherwise or if
   // an error occurred.
   static bool InstantiateAndTestSubtype(
+      NNBDMode mode,
       AbstractType* subtype,
       AbstractType* supertype,
       const TypeArguments& instantiator_type_args,
@@ -7053,6 +7092,7 @@ class AbstractType : public Instance {
   // Returns true if this type is a subtype of FutureOr<T> specified by 'other'.
   // Returns false if other type is not a FutureOr.
   bool IsSubtypeOfFutureOr(Zone* zone,
+                           NNBDMode mode,
                            const AbstractType& other,
                            Heap::Space space) const;
 
@@ -7129,6 +7169,7 @@ class Type : public AbstractType {
     return signature() != Function::null();
   }
   virtual RawAbstractType* InstantiateFrom(
+      NNBDMode mode,
       const TypeArguments& instantiator_type_arguments,
       const TypeArguments& function_type_arguments,
       intptr_t num_free_fun_type_params,
@@ -7276,6 +7317,7 @@ class TypeRef : public AbstractType {
     return !ref_type.IsNull() && ref_type.IsFunctionType();
   }
   virtual RawTypeRef* InstantiateFrom(
+      NNBDMode mode,
       const TypeArguments& instantiator_type_arguments,
       const TypeArguments& function_type_arguments,
       intptr_t num_free_fun_type_params,
@@ -7354,6 +7396,7 @@ class TypeParameter : public AbstractType {
   virtual bool IsEquivalent(const Instance& other, TrailPtr trail = NULL) const;
   virtual bool IsRecursive() const { return false; }
   virtual RawAbstractType* InstantiateFrom(
+      NNBDMode mode,
       const TypeArguments& instantiator_type_arguments,
       const TypeArguments& function_type_arguments,
       intptr_t num_free_fun_type_params,

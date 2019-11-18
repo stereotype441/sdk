@@ -61,6 +61,10 @@ class ResolutionVisitor extends RecursiveAstVisitor<void> {
   final AstRewriter _astRewriter;
   final TypeNameResolver _typeNameResolver;
 
+  /// This index is incremented every time we visit a [LibraryDirective].
+  /// There is just one [LibraryElement], so we can support only one node.
+  int _libraryDirectiveIndex = 0;
+
   /// The provider of pre-built children elements from the element being
   /// visited. For example when we visit a method, its element is resynthesized
   /// from the summary, and we get resynthesized elements for type parameters
@@ -390,10 +394,12 @@ class ResolutionVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitExportDirective(ExportDirective node) {
-    super.visitExportDirective(node);
-    if (node.element != null) {
-      _setElementAnnotations(node.metadata, node.element.metadata);
-    }
+    _withElementWalker(null, () {
+      super.visitExportDirective(node);
+      if (node.element != null) {
+        _setElementAnnotations(node.metadata, node.element.metadata);
+      }
+    });
   }
 
   @override
@@ -703,10 +709,12 @@ class ResolutionVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitImportDirective(ImportDirective node) {
-    super.visitImportDirective(node);
-    if (node.element != null) {
-      _setElementAnnotations(node.metadata, node.element.metadata);
-    }
+    _withElementWalker(null, () {
+      super.visitImportDirective(node);
+      if (node.element != null) {
+        _setElementAnnotations(node.metadata, node.element.metadata);
+      }
+    });
   }
 
   @override
@@ -735,8 +743,13 @@ class ResolutionVisitor extends RecursiveAstVisitor<void> {
   @override
   void visitLibraryDirective(LibraryDirective node) {
     super.visitLibraryDirective(node);
-    if (node.element != null) {
+    ++_libraryDirectiveIndex;
+    if (node.element != null && _libraryDirectiveIndex == 1) {
       _setElementAnnotations(node.metadata, node.element.metadata);
+    } else {
+      for (var annotation in node.metadata) {
+        annotation.elementAnnotation = ElementAnnotationImpl(_unitElement);
+      }
     }
   }
 
@@ -803,10 +816,12 @@ class ResolutionVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitPartDirective(PartDirective node) {
-    super.visitPartDirective(node);
-    if (node.element != null) {
-      _setElementAnnotations(node.metadata, node.element.metadata);
-    }
+    _withElementWalker(null, () {
+      super.visitPartDirective(node);
+      if (node.element != null) {
+        _setElementAnnotations(node.metadata, node.element.metadata);
+      }
+    });
   }
 
   @override
@@ -908,9 +923,6 @@ class ResolutionVisitor extends RecursiveAstVisitor<void> {
       boundNode.accept(this);
       if (_elementWalker == null) {
         element.bound = boundNode.type;
-
-        element.metadata = _createElementAnnotations(node.metadata);
-        _setCodeRange(element, node);
       }
     }
   }
@@ -1050,6 +1062,9 @@ class ResolutionVisitor extends RecursiveAstVisitor<void> {
       } else {
         element = TypeParameterElementImpl.forNode(name);
         _elementHolder.addTypeParameter(element);
+
+        element.metadata = _createElementAnnotations(typeParameter.metadata);
+        _setCodeRange(element, typeParameter);
       }
       name.staticElement = element;
       _nameScope.define(element);

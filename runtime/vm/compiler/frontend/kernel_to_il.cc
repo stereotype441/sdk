@@ -40,8 +40,7 @@ FlowGraphBuilder::FlowGraphBuilder(
     bool optimizing,
     intptr_t osr_id,
     intptr_t first_block_id,
-    bool inlining_unchecked_entry,
-    GrowableObjectArray* record_yield_positions)
+    bool inlining_unchecked_entry)
     : BaseFlowGraphBuilder(parsed_function,
                            first_block_id - 1,
                            osr_id,
@@ -69,7 +68,6 @@ FlowGraphBuilder::FlowGraphBuilder(
       catch_block_(NULL) {
   const Script& script =
       Script::Handle(Z, parsed_function->function().script());
-  record_yield_positions_ = record_yield_positions;
   H.InitFromScript(script);
 }
 
@@ -592,7 +590,8 @@ Fragment FlowGraphBuilder::NativeCall(const String* name,
 }
 
 Fragment FlowGraphBuilder::Return(TokenPosition position,
-                                  bool omit_result_type_check /* = false */) {
+                                  bool omit_result_type_check,
+                                  intptr_t yield_index) {
   Fragment instructions;
   const Function& function = parsed_function_->function();
 
@@ -620,7 +619,7 @@ Fragment FlowGraphBuilder::Return(TokenPosition position,
     instructions += Drop();
   }
 
-  instructions += BaseFlowGraphBuilder::Return(position);
+  instructions += BaseFlowGraphBuilder::Return(position, yield_index);
 
   return instructions;
 }
@@ -806,7 +805,7 @@ FlowGraph* FlowGraphBuilder::BuildGraph() {
   // TODO(alexmarkov): refactor this - StreamingFlowGraphBuilder should not be
   //  used for bytecode functions.
   StreamingFlowGraphBuilder streaming_flow_graph_builder(
-      this, kernel_data, kernel_data_program_offset, record_yield_positions_);
+      this, kernel_data, kernel_data_program_offset);
   return streaming_flow_graph_builder.BuildGraph();
 }
 
@@ -2663,15 +2662,20 @@ FlowGraph* FlowGraphBuilder::BuildGraphOfFieldAccessor(
     }
     body += NullConstant();
   } else if (is_method) {
-#if !defined(PRODUCT)
     if (field.needs_load_guard()) {
+#if defined(PRODUCT)
+      UNREACHABLE();
+#else
       ASSERT(Isolate::Current()->HasAttemptedReload());
       body += LoadLocal(parsed_function_->ParameterVariable(0));
       body += InitInstanceField(field);
-      // TODO(rmacnak): Type check.
-    }
+
+      body += LoadLocal(parsed_function_->ParameterVariable(0));
+      body += LoadField(field);
+      body += CheckAssignable(AbstractType::Handle(Z, field.type()),
+                              Symbols::FunctionResult());
 #endif
-    if (field.is_late() && !field.has_trivial_initializer()) {
+    } else if (field.is_late() && !field.has_trivial_initializer()) {
       body += LoadLateField(field, parsed_function_->ParameterVariable(0));
     } else {
       body += LoadLocal(parsed_function_->ParameterVariable(0));
@@ -2700,6 +2704,15 @@ FlowGraph* FlowGraphBuilder::BuildGraphOfFieldAccessor(
       body += InitStaticField(field);
       body += Constant(field);
       body += LoadStaticField();
+    }
+    if (field.needs_load_guard()) {
+#if defined(PRODUCT)
+      UNREACHABLE();
+#else
+      ASSERT(Isolate::Current()->HasAttemptedReload());
+      body += CheckAssignable(AbstractType::Handle(Z, field.type()),
+                              Symbols::FunctionResult());
+#endif
     }
   }
   body += Return(TokenPosition::kNoSource);
