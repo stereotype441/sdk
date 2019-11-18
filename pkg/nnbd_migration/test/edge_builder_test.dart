@@ -4627,7 +4627,7 @@ bool f(bool b) {
         check_b, assertEdge(nullable_b, inSet(pointsToNever), hard: true));
 
     var return_f = decoratedTypeAnnotation('bool f').node;
-    assertEdge(never, return_f, hard: false);
+    assertEdge(inSet(pointsToNever), return_f, hard: false);
   }
 
   test_prefixExpression_bang_dynamic() async {
@@ -4637,7 +4637,7 @@ Object f(dynamic d) {
 }
 ''');
     var return_f = decoratedTypeAnnotation('Object f').node;
-    assertEdge(never, return_f, hard: false);
+    assertEdge(inSet(pointsToNever), return_f, hard: false);
   }
 
   test_prefixExpression_minus() async {

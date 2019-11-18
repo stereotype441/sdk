@@ -119,9 +119,6 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
   /// information  used in flow analysis.  Otherwise `null`.
   AssignedVariables<AstNode, PromotableElement> _assignedVariables;
 
-  /// For convenience, a [DecoratedType] representing non-nullable `bool`.
-  final DecoratedType _nonNullableBoolType;
-
   /// For convenience, a [DecoratedType] representing non-nullable `Type`.
   final DecoratedType _nonNullableTypeType;
 
@@ -198,8 +195,6 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       this.source, this.listener, this._decoratedClassHierarchy,
       {this.instrumentation})
       : _inheritanceManager = InheritanceManager3(_typeSystem),
-        _nonNullableBoolType =
-            DecoratedType(typeProvider.boolType, _graph.never),
         _nonNullableTypeType =
             DecoratedType(typeProvider.typeType, _graph.never);
 
@@ -355,7 +350,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
             falseDemonstratesNonNullIntent: leftType.node);
         _conditionInfo = notEqual ? conditionInfo.not(node) : conditionInfo;
       }
-      return _nonNullableBoolType;
+      return _makeNonNullableBoolType(node);
     } else if (operatorType == TokenType.AMPERSAND_AMPERSAND ||
         operatorType == TokenType.BAR_BAR) {
       bool isAnd = operatorType == TokenType.AMPERSAND_AMPERSAND;
@@ -364,7 +359,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       _postDominatedLocals.doScoped(
           action: () => _checkExpressionNotNull(rightOperand));
       _flowAnalysis.logicalBinaryOp_end(node, rightOperand, isAnd: isAnd);
-      return _nonNullableBoolType;
+      return _makeNonNullableBoolType(node);
     } else if (operatorType == TokenType.QUESTION_QUESTION) {
       DecoratedType expressionType;
       var leftType = leftOperand.accept(this);
@@ -867,10 +862,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     expression.accept(this);
     _flowAnalysis.isExpression_end(
         node, expression, node.notOperator != null, decoratedType);
-    var nullabilityNode = NullabilityNode.forInferredType();
-    _graph.makeNonNullable(
-        nullabilityNode, IsCheckResultTypeOrigin(source, node));
-    return DecoratedType(node.staticType, nullabilityNode);
+    return _makeNonNullableBoolType(node);
   }
 
   @override
@@ -1054,7 +1046,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     var operatorType = node.operator.type;
     if (operatorType == TokenType.BANG) {
       _flowAnalysis.logicalNot_end(node, operand);
-      return _nonNullableBoolType;
+      return _makeNonNullableBoolType(node);
     } else {
       var callee = node.staticElement;
       var isIncrementOrDecrement = operatorType.isIncrementOperator;
@@ -2112,6 +2104,14 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     } else {
       return false;
     }
+  }
+
+  DecoratedType _makeNonNullableBoolType(Expression expression) {
+    assert(expression.staticType.isDartCoreBool);
+    var nullabilityNode = NullabilityNode.forInferredType();
+    _graph.makeNonNullable(
+        nullabilityNode, NonNullableBoolTypeOrigin(source, expression));
+    return DecoratedType(typeProvider.boolType, nullabilityNode);
   }
 
   DecoratedType _makeNonNullLiteralType(Expression expression,
