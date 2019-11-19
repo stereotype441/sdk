@@ -48,6 +48,9 @@ class VmTarget extends Target {
   bool get supportsSetLiterals => false;
 
   @override
+  bool get supportsLateFields => !flags.forceLateLoweringForTesting;
+
+  @override
   String get name => 'vm';
 
   // This is the order that bootstrap libraries are loaded according to
@@ -348,7 +351,7 @@ class VmTarget extends Target {
           new ListLiteral(elements, typeArgument: typeArgument)
             ..fileOffset = offset
         ], types: [
-          new DynamicType()
+          typeArgument,
         ]));
   }
 

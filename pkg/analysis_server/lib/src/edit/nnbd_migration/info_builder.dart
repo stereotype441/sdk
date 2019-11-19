@@ -91,33 +91,57 @@ class InfoBuilder {
     return units;
   }
 
+  Iterable<EdgeInfo> upstreamTriggeredEdges(NullabilityNodeInfo node,
+      [List<RegionDetail> details]) {
+    var edges = <EdgeInfo>[];
+    for (EdgeInfo edge in node.upstreamEdges) {
+      if (node.isExactNullable && edge.sourceNode.isExactNullable) {
+        // When an exact nullable points here, the nullability propagated
+        // in the other direction.
+        continue;
+      }
+      if (edge.isTriggered) {
+        edges.add(edge);
+      }
+    }
+    for (final containerNode in node.outerCompoundNodes) {
+      edges.addAll(upstreamTriggeredEdges(containerNode, details));
+    }
+
+    return edges;
+  }
+
   /// Return detail text for a fix built from an edge with [node] as a
   /// destination.
-  String _baseDescriptionForOrigin(EdgeOriginInfo origin) {
+  String _baseDescriptionForOrigin(
+      EdgeOriginInfo origin, NullabilityFixKind fixKind) {
     AstNode node = origin.node;
     AstNode parent = node.parent;
 
-    if (node is DefaultFormalParameter) {
+    String aNullableDefault(DefaultFormalParameter node) {
       Expression defaultValue = node.defaultValue;
       if (defaultValue == null) {
-        return "This parameter has an implicit default value of 'null'";
+        return "an implicit default value of 'null'";
       } else if (defaultValue is NullLiteral) {
-        return "This parameter has an explicit default value of 'null'";
+        return "an explicit default value of 'null'";
       }
-      return "This parameter has a nullable default value";
+      return "a nullable default value";
+    }
+
+    if (node is DefaultFormalParameter) {
+      // TODO(srawlins): Is there an enum of fixes I can use? The fix classes
+      //  are subclasses of PotentialModification, e.g. PotentiallyAddRequired.
+      if (fixKind == NullabilityFixKind.addRequired) {
+        return "This parameter is non-nullable, so cannot have "
+            "${aNullableDefault(node)}";
+      } else {
+        return "This parameter has ${aNullableDefault(node)}";
+      }
     } else if (node is FieldFormalParameter) {
       AstNode parent = node.parent;
       if (parent is DefaultFormalParameter) {
-        Expression defaultValue = parent.defaultValue;
-        if (defaultValue == null) {
-          return "This field is initialized by an optional field formal "
-              "parameter that has an implicit default value of 'null'";
-        } else if (defaultValue is NullLiteral) {
-          return "This field is initialized by an optional field formal "
-              "parameter that has an explicit default value of 'null'";
-        }
         return "This field is initialized by an optional field formal "
-            "parameter that has a nullable default value";
+            "parameter that has ${aNullableDefault(parent)}";
       }
       return "This field is initialized by a field formal parameter and a "
           "nullable value is passed as an argument";
@@ -134,6 +158,15 @@ class InfoBuilder {
     } else {
       nullableValue = "a nullable value";
     }
+
+    CompilationUnit unit = node.thisOrAncestorOfType<CompilationUnit>();
+    int lineNumber = unit.lineInfo.getLocation(node.offset).lineNumber;
+
+    if (origin.kind == EdgeOriginKind.uninitializedRead) {
+      return "This variable could not be made 'late' because it is used on "
+          "line $lineNumber, when it is possibly uninitialized";
+    }
+
     if (parent is ArgumentList) {
       return capitalize("$nullableValue is passed as an argument");
     }
@@ -163,8 +196,6 @@ class InfoBuilder {
       return (ancestor is TypedLiteral) ? ancestor : null;
     }
 
-    CompilationUnit unit = node.thisOrAncestorOfType<CompilationUnit>();
-    int lineNumber = unit.lineInfo.getLocation(node.offset).lineNumber;
     FunctionBody functionBody = findFunctionBody();
     if (functionBody != null) {
       AstNode function = functionBody.parent;
@@ -196,13 +227,24 @@ class InfoBuilder {
         return "This field is initialized to $nullableValue";
       }
       return "This variable is initialized to $nullableValue";
+    } else if (node is ConstructorDeclaration &&
+        origin.kind == EdgeOriginKind.fieldNotInitialized) {
+      String constructorName =
+          node.declaredElement.enclosingElement.displayName;
+      if (node.declaredElement.displayName.isNotEmpty) {
+        constructorName =
+            "$constructorName.${node.declaredElement.displayName}";
+      }
+      return "The constructor '$constructorName' does not initialize this "
+          "field in its initializer list";
     }
     return capitalize("$nullableValue is assigned");
   }
 
   /// Return a description of the given [origin].
-  String _buildDescriptionForOrigin(EdgeOriginInfo origin) {
-    String description = _baseDescriptionForOrigin(origin);
+  String _buildDescriptionForOrigin(
+      EdgeOriginInfo origin, NullabilityFixKind fixKind) {
+    String description = _baseDescriptionForOrigin(origin, fixKind);
     if (_inTestCode(origin.node)) {
       // TODO(brianwilkerson) Don't add this if the graph node with which the
       //  origin is associated is also in test code.
@@ -212,7 +254,8 @@ class InfoBuilder {
   }
 
   /// Return a description of the given [origin] associated with the [edge].
-  RegionDetail _buildDetailForOrigin(EdgeOriginInfo origin, EdgeInfo edge) {
+  RegionDetail _buildDetailForOrigin(
+      EdgeOriginInfo origin, EdgeInfo edge, NullabilityFixKind fixKind) {
     AstNode node = origin.node;
     NavigationTarget target;
     // Some nodes don't need a target; default formal parameters
@@ -240,7 +283,7 @@ class InfoBuilder {
       }
       target = _targetForNode(origin.source.fullName, node);
     }
-    return RegionDetail(_buildDescriptionForOrigin(origin), target);
+    return RegionDetail(_buildDescriptionForOrigin(origin, fixKind), target);
   }
 
   /// Compute the details for the fix with the given [fixInfo].
@@ -248,21 +291,43 @@ class InfoBuilder {
     List<RegionDetail> details = [];
     for (FixReasonInfo reason in fixInfo.reasons) {
       if (reason is NullabilityNodeInfo) {
-        for (EdgeInfo edge in reason.upstreamEdges) {
-          if (edge.isTriggered) {
-            EdgeOriginInfo origin = info.edgeOrigin[edge];
-            if (origin != null) {
-              details.add(_buildDetailForOrigin(origin, edge));
-            } else {
-              details.add(
-                  RegionDetail('upstream edge with no origin ($edge)', null));
+        if (reason.isExactNullable) {
+          // When the node is exact nullable, that nullability propagated from
+          // downstream.
+          for (EdgeInfo edge in reason.downstreamEdges) {
+            final exactNullableDownstream = edge.destinationNode;
+            if (!exactNullableDownstream.isExactNullable) {
+              // This wasn't the source of the nullability.
+              continue;
             }
+
+            var nodeInfo = info.nodeInfoFor(exactNullableDownstream);
+            if (nodeInfo != null) {
+              // TODO(mfairhurst): Give a better text description.
+              details.add(RegionDetail('This is later required to accept null.',
+                  _targetForNode(nodeInfo.filePath, nodeInfo.astNode)));
+            } else {
+              details.add(RegionDetail(
+                  'exact nullable node with no info ($exactNullableDownstream)',
+                  null));
+            }
+          }
+        }
+
+        for (EdgeInfo edge in upstreamTriggeredEdges(reason)) {
+          EdgeOriginInfo origin = info.edgeOrigin[edge];
+          if (origin != null) {
+            details.add(_buildDetailForOrigin(
+                origin, edge, fixInfo.fix.description.kind));
+          } else {
+            details.add(
+                RegionDetail('upstream edge with no origin ($edge)', null));
           }
         }
       } else if (reason is EdgeInfo) {
         NullabilityNodeInfo destination = reason.destinationNode;
         NodeInformation nodeInfo = info.nodeInfoFor(destination);
-        if (nodeInfo != null) {
+        if (nodeInfo != null && nodeInfo.astNode != null) {
           NavigationTarget target;
           if (destination != info.never && destination != info.always) {
             target = _targetForNode(nodeInfo.filePath, nodeInfo.astNode);
@@ -277,6 +342,20 @@ class InfoBuilder {
       }
     }
     return details;
+  }
+
+  /// Return a list of edits that can be applied.
+  List<EditDetail> _computeEdits(FixInfo fixInfo) {
+    // TODO(brianwilkerson) Add other kinds of edits, such as adding an assert.
+    List<EditDetail> edits = [];
+    SingleNullabilityFix fix = fixInfo.fix;
+    if (fix.description.kind == NullabilityFixKind.makeTypeNullable) {
+      for (Location location in fix.locations) {
+        edits.add(EditDetail(
+            'Force type to be non-nullable.', location.offset, 0, '/*!*/'));
+      }
+    }
+    return edits;
   }
 
   /// Return the navigation sources for the unit associated with the [result].
@@ -361,11 +440,11 @@ class InfoBuilder {
             _computeUpstreamTriggeredDetails(upstreamTriggeredEdgeInfos);
         TypeAnnotation node = nonNullableType.key;
         regions.add(RegionInfo(
+            RegionType.nonNullableType,
             mapper.map(node.offset),
             node.length,
             "This type is not changed; it is determined to be non-nullable",
-            details,
-            RegionType.nonNullableType));
+            details));
       }
     }
   }
@@ -398,12 +477,15 @@ class InfoBuilder {
       if (fixInfo != null) {
         String explanation = '${fixInfo.fix.description.appliedMessage}.';
         List<RegionDetail> details = _computeDetails(fixInfo);
+        List<EditDetail> edits = _computeEdits(fixInfo);
         if (length > 0) {
-          regions.add(RegionInfo(mapper.map(offset), length, explanation,
-              details, RegionType.fix));
+          regions.add(RegionInfo(
+              RegionType.fix, mapper.map(offset), length, explanation, details,
+              edits: edits));
         }
-        regions.add(RegionInfo(mapper.map(end), replacement.length, explanation,
-            details, RegionType.fix));
+        regions.add(RegionInfo(RegionType.fix, mapper.map(end),
+            replacement.length, explanation, details,
+            edits: edits));
       }
     }
     if (explainNonNullableTypes) {
@@ -421,9 +503,10 @@ class InfoBuilder {
   FixInfo _findFixInfo(SourceInformation sourceInfo, int offset) {
     for (MapEntry<SingleNullabilityFix, List<FixReasonInfo>> entry
         in sourceInfo.fixes.entries) {
-      Location location = entry.key.location;
-      if (location.offset == offset) {
-        return FixInfo(entry.key, entry.value);
+      for (Location location in entry.key.locations) {
+        if (location.offset == offset) {
+          return FixInfo(entry.key, entry.value);
+        }
       }
     }
     return null;

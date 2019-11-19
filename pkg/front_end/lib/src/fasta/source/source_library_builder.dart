@@ -145,7 +145,6 @@ import '../fasta_codes.dart'
         templateIncorrectTypeArgumentInferred,
         templateIncorrectTypeArgumentQualified,
         templateIncorrectTypeArgumentQualifiedInferred,
-        templateIntersectionTypeAsTypeArgument,
         templateLanguageVersionTooHigh,
         templateLoadLibraryHidesMember,
         templateLocalDefinitionHidesExport,
@@ -219,7 +218,9 @@ const int enableNonNullableDefaultMinorVersion = 7;
 class SourceLibraryBuilder extends LibraryBuilderImpl {
   static const String MALFORMED_URI_SCHEME = "org-dartlang-malformed-uri";
 
-  final SourceLoader loader;
+  SourceLoader loader;
+
+  bool issueLexicalErrorsOnBodyBuild = false;
 
   final TypeParameterScopeBuilder libraryDeclaration;
 
@@ -346,7 +347,9 @@ class SourceLibraryBuilder extends LibraryBuilderImpl {
       this._nameOrigin)
       : currentTypeParameterScopeBuilder = libraryDeclaration,
         super(
-            fileUri, libraryDeclaration.toScope(importScope), new Scope.top());
+            fileUri, libraryDeclaration.toScope(importScope), new Scope.top()) {
+    library.isNonNullableByDefault = isNonNullableByDefault;
+  }
 
   SourceLibraryBuilder(
       Uri uri, Uri fileUri, Loader loader, SourceLibraryBuilder actualOrigin,
@@ -1783,14 +1786,14 @@ class SourceLibraryBuilder extends LibraryBuilderImpl {
     if (hasInitializer) {
       modifiers |= hasInitializerMask;
     }
-    FieldBuilderImpl fieldBuilder = new FieldBuilderImpl(
+    SourceFieldBuilder fieldBuilder = new SourceFieldBuilder(
         metadata, type, name, modifiers, this, charOffset, charEndOffset);
     fieldBuilder.constInitializerToken = constInitializerToken;
     addBuilder(name, fieldBuilder, charOffset);
     if (type == null && initializerToken != null && fieldBuilder.next == null) {
       // Only the first one (the last one in the linked list of next pointers)
       // are added to the tree, had parent pointers and can infer correctly.
-      fieldBuilder.field.type =
+      fieldBuilder.fieldType =
           new ImplicitFieldType(fieldBuilder, initializerToken);
       (implicitlyTypedFields ??= <FieldBuilder>[]).add(fieldBuilder);
     }
@@ -2618,15 +2621,6 @@ class SourceLibraryBuilder extends LibraryBuilderImpl {
           message = messageGenericFunctionTypeUsedAsActualTypeArgument;
         }
         typeParameter = null;
-      } else if (argument is TypeParameterType &&
-          argument.promotedBound != null) {
-        addProblem(
-            templateIntersectionTypeAsTypeArgument.withArguments(
-                typeParameter.name, argument, argument.promotedBound),
-            offset,
-            noLength,
-            fileUri);
-        continue;
       } else {
         if (issue.enclosingType == null && targetReceiver != null) {
           if (issueInferred) {
@@ -2897,8 +2891,9 @@ class SourceLibraryBuilder extends LibraryBuilderImpl {
     for (int i = 0; i < instantiatedMethodParameters.length; ++i) {
       instantiatedMethodParameters[i] =
           new TypeParameter(methodParameters[i].name);
-      substitutionMap[methodParameters[i]] = new TypeParameterType(
-          instantiatedMethodParameters[i], Nullability.legacy);
+      substitutionMap[methodParameters[i]] =
+          new TypeParameterType.forAlphaRenaming(
+              methodParameters[i], instantiatedMethodParameters[i]);
     }
     for (int i = 0; i < instantiatedMethodParameters.length; ++i) {
       instantiatedMethodParameters[i].bound =

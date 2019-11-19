@@ -1192,7 +1192,13 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         var promotedType = _flowAnalysis.variableRead(node, staticElement);
         if (promotedType != null) return promotedType;
       }
-      return getOrComputeElementType(staticElement);
+      var type = getOrComputeElementType(staticElement);
+      if (!node.inDeclarationContext() &&
+          node.inGetterContext() &&
+          !_flowAnalysis.isAssigned(staticElement)) {
+        _graph.makeNullable(type.node, UninitializedReadOrigin(source, node));
+      }
+      return type;
     } else if (staticElement is FunctionElement ||
         staticElement is MethodElement) {
       return getOrComputeElementType(staticElement);
@@ -1383,18 +1389,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
             _flowAnalysis.initialize(declaredElement);
           }
           var destinationType = getOrComputeElementType(declaredElement);
-          if (typeAnnotation == null) {
-            var initializerType = initializer.accept(this);
-            if (initializerType == null) {
-              throw StateError(
-                  'No type computed for ${initializer.runtimeType} '
-                  '(${initializer.toSource()}) offset=${initializer.offset}');
-            }
-            _unionDecoratedTypes(initializerType, destinationType,
-                InitializerInferenceOrigin(source, variable));
-          } else {
-            _handleAssignment(initializer, destinationType: destinationType);
-          }
+          _handleAssignment(initializer, destinationType: destinationType);
         }
       } finally {
         if (isTopLevel) {
@@ -1471,6 +1466,11 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
             PromotableElement, DecoratedType>(
         DecoratedTypeOperations(_typeSystem, _variables, _graph),
         _assignedVariables);
+    if (parameters != null) {
+      for (var parameter in parameters.parameters) {
+        _flowAnalysis.initialize(parameter.declaredElement);
+      }
+    }
   }
 
   /// Creates a type that can be used to check that an expression's value is
@@ -1760,7 +1760,9 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     _postDominatedLocals.pushScope(elements: declaredElement.parameters);
     try {
       initializers?.accept(this);
-      if (node is ConstructorDeclaration) {
+      if (declaredElement is ConstructorElement &&
+          !declaredElement.isFactory &&
+          declaredElement.redirectedConstructor == null) {
         _handleUninitializedFields(node, _fieldsNotInitializedByConstructor);
       }
       body.accept(this);

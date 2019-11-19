@@ -13,7 +13,9 @@ import 'package:kernel/ast.dart'
         Nullability,
         TypeParameter,
         Typedef,
-        VariableDeclaration;
+        TypedefType,
+        VariableDeclaration,
+        getAsTypeArguments;
 
 import 'package:kernel/type_algebra.dart'
     show FreshTypeParameters, getFreshTypeParameters, substitute;
@@ -93,6 +95,38 @@ class TypeAliasBuilder extends TypeDeclarationBuilderImpl {
     return typedef;
   }
 
+  TypedefType thisTypedefType(Typedef typedef, LibraryBuilder clientLibrary) {
+    // At this point the bounds of `typedef.typeParameters` may not be assigned
+    // yet, so [getAsTypeArguments] may crash trying to compute the nullability
+    // of the created types from the bounds.  To avoid that, we use "dynamic"
+    // for the bound of all boundless variables and add them to the list for
+    // being recomputed later, when the bounds are assigned.
+    List<DartType> bounds =
+        new List<DartType>.filled(typedef.typeParameters.length, null);
+    for (int i = 0; i < bounds.length; ++i) {
+      bounds[i] = typedef.typeParameters[i].bound;
+      if (bounds[i] == null) {
+        typedef.typeParameters[i].bound = const DynamicType();
+      }
+    }
+    List<DartType> asTypeArguments =
+        getAsTypeArguments(typedef.typeParameters, clientLibrary.library);
+    TypedefType result =
+        new TypedefType(typedef, clientLibrary.nonNullable, asTypeArguments);
+    for (int i = 0; i < bounds.length; ++i) {
+      if (bounds[i] == null) {
+        // If the bound is not assigned yet, put the corresponding
+        // type-parameter type into the list for the nullability re-computation.
+        // At this point, [parent] should be a [SourceLibraryBuilder] because
+        // otherwise it's a compiled library loaded from a dill file, and the
+        // bounds should have been assigned.
+        SourceLibraryBuilder parentLibrary = parent;
+        parentLibrary.pendingNullabilities.add(asTypeArguments[i]);
+      }
+    }
+    return result;
+  }
+
   DartType buildThisType(LibraryBuilder library) {
     if (thisType != null) {
       if (identical(thisType, cyclicTypeAliasMarker)) {
@@ -108,7 +142,8 @@ class TypeAliasBuilder extends TypeDeclarationBuilderImpl {
     thisType = cyclicTypeAliasMarker;
     TypeBuilder type = this.type;
     if (type is FunctionTypeBuilder) {
-      FunctionType builtType = type?.build(library, typedef.thisType);
+      FunctionType builtType =
+          type?.build(library, thisTypedefType(typedef, library));
       if (builtType != null) {
         if (typeVariables != null) {
           for (TypeVariableBuilder tv in typeVariables) {

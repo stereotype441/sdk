@@ -1794,7 +1794,7 @@ class C {
 ''');
     var xType =
         variables.decoratedElementType(findNode.simple('x').staticElement);
-    assertUnion(xType.node, decoratedTypeAnnotation('int').node);
+    assertEdge(decoratedTypeAnnotation('int').node, xType.node, hard: false);
   }
 
   test_fieldFormalParameter_function_typed() async {
@@ -3030,7 +3030,7 @@ main() {
 ''');
     var xType =
         variables.decoratedElementType(findNode.simple('x').staticElement);
-    assertUnion(xType.node, decoratedTypeAnnotation('int').node);
+    assertEdge(decoratedTypeAnnotation('int').node, xType.node, hard: false);
   }
 
   test_method_parameterType_inferred() async {
@@ -5527,7 +5527,7 @@ var x = f();
 ''');
     var xType =
         variables.decoratedElementType(findNode.simple('x').staticElement);
-    assertUnion(xType.node, decoratedTypeAnnotation('int').node);
+    assertEdge(decoratedTypeAnnotation('int').node, xType.node, hard: false);
   }
 
   test_type_argument_explicit_bound() async {

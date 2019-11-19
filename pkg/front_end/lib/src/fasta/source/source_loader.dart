@@ -302,7 +302,10 @@ class SourceLoader extends Loader {
       // We tokenize source files twice to keep memory usage low. This is the
       // second time, and the first time was in [buildOutline] above. So this
       // time we suppress lexical errors.
-      Token tokens = await tokenize(library, suppressLexicalErrors: true);
+      bool suppressLexicalErrors = true;
+      if (library.issueLexicalErrorsOnBodyBuild) suppressLexicalErrors = false;
+      Token tokens =
+          await tokenize(library, suppressLexicalErrors: suppressLexicalErrors);
       if (tokens == null) return;
       DietListener listener = createDietListener(library);
       DietParser parser = new DietParser(listener);
@@ -1105,7 +1108,17 @@ class SourceLoader extends Loader {
 
   void releaseAncillaryResources() {
     hierarchy = null;
+    builderHierarchy = null;
     typeInferenceEngine = null;
+    builders?.clear();
+    libraries?.clear();
+    first = null;
+    sourceBytes?.clear();
+    target?.releaseAncillaryResources();
+    coreTypes = null;
+    instrumentation = null;
+    collectionTransformer = null;
+    setLiteralTransformer = null;
   }
 
   @override

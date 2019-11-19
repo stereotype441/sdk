@@ -84,6 +84,7 @@ algebra
 algorithm
 algorithms
 alias
+aliases
 alignment
 all
 allocated
@@ -105,6 +106,7 @@ alternative
 alternatively
 alternatives
 although
+altogether
 always
 ambiguous
 among
@@ -217,6 +219,7 @@ available
 average
 avoid
 avoided
+avoiding
 avoids
 await
 awaiter
@@ -728,6 +731,7 @@ delimited
 delimiter
 delimiters
 delta
+demote
 demoted
 demoting
 demotion
@@ -762,6 +766,7 @@ deserialization
 deserialize
 deserialized
 designed
+desired
 desugar
 desugared
 desugaring
@@ -916,6 +921,7 @@ encoded
 encoder
 encodes
 encoding
+encodings
 encounter
 encountered
 encountering
@@ -1073,6 +1079,7 @@ failure
 failures
 fake
 fall
+fallback
 falls
 false
 far
@@ -1665,6 +1672,7 @@ lower
 lowercase
 lowered
 lowering
+lowerings
 machine
 made
 magenta
@@ -1849,6 +1857,7 @@ node
 nodes
 non
 none
+nonfunction
 nor
 normal
 normalize
@@ -2410,6 +2419,8 @@ reuses
 reusing
 reverse
 reversed
+revert
+reverts
 review
 revise
 revision
@@ -2515,6 +2526,7 @@ sets
 setter
 setters
 setting
+settings
 settled
 setup
 several
@@ -2636,6 +2648,7 @@ square
 squiggly
 stable
 stack
+stacked
 stage
 stamps
 standalone
@@ -2649,6 +2662,7 @@ starting
 starts
 startup
 state
+stateful
 statement
 statement's
 statements
@@ -2716,6 +2730,7 @@ succeeds
 success
 successful
 successfully
+successively
 succinct
 such
 suffice
