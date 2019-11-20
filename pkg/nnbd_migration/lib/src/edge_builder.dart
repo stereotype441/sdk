@@ -1447,9 +1447,13 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       throw StateError('No type computed for ${expression.runtimeType} '
           '(${expression.toSource()}) offset=${expression.offset}');
     }
-    _graph.makeNonNullable(
-        sourceType.node, _makeEdgeOrigin(sourceType, expression),
-        hard: _postDominatedLocals.isReferenceInScope(expression));
+    var origin = _makeEdgeOrigin(sourceType, expression);
+    var edge = _graph.makeNonNullable(sourceType.node, origin,
+        hard: _postDominatedLocals.isReferenceInScope(expression),
+        guards: _guards);
+    if (origin is ExpressionChecksOrigin) {
+      origin.checks.edges.add(edge);
+    }
     return sourceType;
   }
 
