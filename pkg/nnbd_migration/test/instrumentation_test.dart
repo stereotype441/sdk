@@ -488,7 +488,7 @@ bool f(int x) => x.isEven;
     expect(never.isNullable, false);
     var xNode = explicitTypeNullability[findNode.typeAnnotation('int')];
     var edge = edges.where((e) => e.sourceNode == xNode).single;
-    expect(_pointsToNeverHard(edge.destinationNode), true);
+    expect(edge.destinationNode, never);
   }
 
   test_implicitReturnType_constructor() async {
