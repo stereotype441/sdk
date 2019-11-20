@@ -1442,8 +1442,15 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     if (_isPrefix(expression)) {
       throw ArgumentError('cannot check non-nullability of a prefix');
     }
-    return _handleAssignment(expression,
-        destinationType: _createNonNullableType(expression));
+    DecoratedType sourceType = expression.accept(this);
+    if (sourceType == null) {
+      throw StateError('No type computed for ${expression.runtimeType} '
+          '(${expression.toSource()}) offset=${expression.offset}');
+    }
+    _graph.makeNonNullable(
+        sourceType.node, _makeEdgeOrigin(sourceType, expression),
+        hard: _postDominatedLocals.isReferenceInScope(expression));
+    return sourceType;
   }
 
   @override
@@ -1642,21 +1649,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         throw StateError('No type computed for ${expression.runtimeType} '
             '(${expression.toSource()}) offset=${expression.offset}');
       }
-      EdgeOrigin edgeOrigin;
-      if (sourceType.type.isDynamic) {
-        edgeOrigin = DynamicAssignmentOrigin(source, expression);
-      } else {
-        if (fromDefaultValue) {
-          edgeOrigin = DefaultValueOrigin(source, expression);
-        } else {
-          ExpressionChecksOrigin expressionChecksOrigin =
-              ExpressionChecksOrigin(
-                  source, expression, ExpressionChecks(expression.end));
-          _variables.recordExpressionChecks(
-              source, expression, expressionChecksOrigin);
-          edgeOrigin = expressionChecksOrigin;
-        }
-      }
+      EdgeOrigin edgeOrigin = _makeEdgeOrigin(sourceType, expression);
       if (compoundOperatorInfo != null) {
         var compoundOperatorMethod = compoundOperatorInfo.staticElement;
         if (compoundOperatorMethod != null) {
@@ -2100,6 +2093,18 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       return parameter.type == null;
     } else {
       return false;
+    }
+  }
+
+  EdgeOrigin _makeEdgeOrigin(DecoratedType sourceType, Expression expression) {
+    if (sourceType.type.isDynamic) {
+      return DynamicAssignmentOrigin(source, expression);
+    } else {
+      ExpressionChecksOrigin expressionChecksOrigin = ExpressionChecksOrigin(
+          source, expression, ExpressionChecks(expression.end));
+      _variables.recordExpressionChecks(
+          source, expression, expressionChecksOrigin);
+      return expressionChecksOrigin;
     }
   }
 
