@@ -95,6 +95,8 @@ import 'collections.dart'
 
 import 'implicit_type_argument.dart' show ImplicitTypeArgument;
 
+import 'late_lowering.dart' as late_lowering;
+
 part "inference_visitor.dart";
 
 /// Computes the return type of a (possibly factory) constructor.
@@ -927,7 +929,7 @@ class ShadowTypePromoter extends TypePromoterImpl {
 class VariableDeclarationImpl extends VariableDeclaration {
   final bool forSyntheticToken;
 
-  final bool _implicitlyTyped;
+  final bool implicitlyTyped;
 
   // TODO(ahe): Remove this field. We can get rid of it by recording closure
   // mutation in [BodyBuilder].
@@ -956,7 +958,7 @@ class VariableDeclarationImpl extends VariableDeclaration {
       bool isLocalFunction: false,
       bool isLate: false,
       bool isRequired: false})
-      : _implicitlyTyped = type == null,
+      : implicitlyTyped = type == null,
         _isLocalFunction = isLocalFunction,
         super(name,
             initializer: initializer,
@@ -971,16 +973,19 @@ class VariableDeclarationImpl extends VariableDeclaration {
   VariableDeclarationImpl.forEffect(Expression initializer)
       : forSyntheticToken = false,
         _functionNestingLevel = 0,
-        _implicitlyTyped = false,
+        implicitlyTyped = false,
         _isLocalFunction = false,
         super.forValue(initializer);
 
   VariableDeclarationImpl.forValue(Expression initializer)
       : forSyntheticToken = false,
         _functionNestingLevel = 0,
-        _implicitlyTyped = true,
+        implicitlyTyped = true,
         _isLocalFunction = false,
         super.forValue(initializer);
+
+  VariableDeclaration lateGetter;
+  VariableDeclaration lateSetter;
 
   /// Determine whether the given [VariableDeclarationImpl] had an implicit
   /// type.
@@ -988,7 +993,7 @@ class VariableDeclarationImpl extends VariableDeclaration {
   /// This is static to avoid introducing a method that would be visible to
   /// the kernel.
   static bool isImplicitlyTyped(VariableDeclarationImpl variable) =>
-      variable._implicitlyTyped;
+      variable.implicitlyTyped;
 
   /// Determines whether the given [VariableDeclarationImpl] represents a
   /// local function.
