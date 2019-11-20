@@ -359,9 +359,7 @@ void h(int k) {}
         .single
         .key;
     var unconditionalUsageEdge = edgeOrigin.entries
-        .where((entry) =>
-            entry.value.node == unconditionalUsageNode &&
-            entry.key.destinationNode != never)
+        .where((entry) => entry.value.node == unconditionalUsageNode)
         .single
         .key;
     var gCallEdge = edges
@@ -371,9 +369,7 @@ void h(int k) {}
         .where((e) => e.sourceNode == iNode && e.destinationNode == kNode)
         .single;
     var conditionalUsageEdge = edgeOrigin.entries
-        .where((entry) =>
-            entry.value.node == conditionalUsageNode &&
-            entry.key.destinationNode != never)
+        .where((entry) => entry.value.node == conditionalUsageNode)
         .single
         .key;
     // Both assertEdge and unconditionalUsageEdge are upstream triggered because
