@@ -1470,7 +1470,8 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     }
     var origin = _makeEdgeOrigin(sourceType, expression);
     var edge = _graph.makeNonNullable(sourceType.node, origin,
-        hard: _postDominatedLocals.isReferenceInScope(expression));
+        hard: _postDominatedLocals.isReferenceInScope(expression),
+        guards: _guards);
     if (origin is ExpressionChecksOrigin) {
       origin.checks.edges.add(edge);
     }
