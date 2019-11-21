@@ -355,6 +355,16 @@ class OptionalFormalParameterOrigin extends EdgeOrigin {
   EdgeOriginKind get kind => EdgeOriginKind.optionalFormalParameter;
 }
 
+/// Edge origin resulting from the use of a stacktrace parameter in a catch
+/// directive.  The type of such parameters is fixed by the language as
+/// non-nullable `StackTrace`.
+class StackTraceTypeOrigin extends EdgeOrigin {
+  StackTraceTypeOrigin(Source source, AstNode node) : super(source, node);
+
+  @override
+  EdgeOriginKind get kind => EdgeOriginKind.stackTraceTypeOrigin;
+}
+
 /// Edge origin resulting from the use of `this` or `super`.
 class ThisOrSuperOrigin extends EdgeOrigin {
   ThisOrSuperOrigin(Source source, AstNode node) : super(source, node);

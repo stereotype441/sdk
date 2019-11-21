@@ -150,6 +150,7 @@ enum EdgeOriginKind {
   nonNullAssertion,
   nullabilityComment,
   optionalFormalParameter,
+  stackTraceTypeOrigin,
   thisOrSuper,
   throw_,
   uninitializedRead,

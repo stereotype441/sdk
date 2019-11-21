@@ -63,13 +63,9 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   final TypeProvider _typeProvider;
 
-  /// For convenience, a [DecoratedType] representing non-nullable `StackTrace`.
-  final DecoratedType _nonNullableStackTraceType;
-
   NodeBuilder(this._variables, this.source, this.listener, this._graph,
-      this._typeProvider, {this.instrumentation})
-      : _nonNullableStackTraceType =
-            DecoratedType(_typeProvider.stackTraceType, _graph.never);
+      this._typeProvider,
+      {this.instrumentation});
 
   @override
   DecoratedType visitCatchClause(CatchClause node) {
@@ -87,7 +83,11 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
     }
     if (node.stackTraceParameter != null) {
       // The type of stack traces is always StackTrace (non-nullable).
-      var stackTraceType = _nonNullableStackTraceType;
+      var nullabilityNode = NullabilityNode.forInferredType();
+      _graph.makeNonNullable(nullabilityNode,
+          StackTraceTypeOrigin(source, node.stackTraceParameter));
+      var stackTraceType =
+          DecoratedType(_typeProvider.stackTraceType, nullabilityNode);
       _variables.recordDecoratedElementType(
           node.stackTraceParameter.staticElement, stackTraceType);
       instrumentation?.implicitType(

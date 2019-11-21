@@ -39,7 +39,7 @@ void f() {
     expect(exceptionType.node, TypeMatcher<NullabilityNodeMutable>());
     var stackTraceType =
         variables.decoratedElementType(findNode.simple('st').staticElement);
-    expect(stackTraceType.node, never);
+    assertEdge(stackTraceType.node, never, hard: true);
   }
 
   test_catch_clause_with_stacktrace_without_on() async {
@@ -53,7 +53,7 @@ void f() {
     expect(exceptionType.node.isImmutable, false);
     var stackTraceType =
         variables.decoratedElementType(findNode.simple('st').staticElement);
-    expect(stackTraceType.node, never);
+    assertEdge(stackTraceType.node, never, hard: true);
   }
 
   test_catch_clause_without_catch() async {
