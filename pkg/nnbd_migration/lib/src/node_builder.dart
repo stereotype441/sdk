@@ -420,13 +420,12 @@ class NodeBuilder extends GeneralizingAstVisitor<DecoratedType>
     var commentToken = node.endToken.next.precedingComments;
     switch (_classifyComment(commentToken)) {
       case _NullabilityComment.bang:
-        _graph.connect(decoratedType.node, _graph.never,
-            NullabilityCommentOrigin(source, node),
-            hard: true);
+        _graph.makeNonNullable(
+            decoratedType.node, NullabilityCommentOrigin(source, node));
         break;
       case _NullabilityComment.question:
-        _graph.union(_graph.always, decoratedType.node,
-            NullabilityCommentOrigin(source, node));
+        _graph.makeNullableUnion(
+            decoratedType.node, NullabilityCommentOrigin(source, node));
         break;
       case _NullabilityComment.none:
         break;
