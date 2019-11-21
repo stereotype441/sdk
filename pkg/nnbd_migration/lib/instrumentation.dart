@@ -145,6 +145,7 @@ enum EdgeOriginKind {
   literal,
   namedParameterNotSupplied,
   nonNullableBoolType,
+  nonNullableObjectSuperclass,
   nonNullableUsage,
   nonNullAssertion,
   nullabilityComment,

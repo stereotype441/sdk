@@ -312,7 +312,7 @@ class C<T, U> {}
     var types = decoratedDirectSupertypes('C');
     var decorated = types[typeProvider.objectType.element];
     expect(decorated.type.toString(), 'Object');
-    expect(decorated.node, same(never));
+    assertEdge(decorated.node, never, hard: true);
     expect(decorated.typeArguments, isEmpty);
   }
 
@@ -418,7 +418,7 @@ mixin C<T, U> {}
     var types = decoratedDirectSupertypes('C');
     var decorated = types[typeProvider.objectType.element];
     expect(decorated.type.toString(), 'Object');
-    expect(decorated.node, same(never));
+    assertEdge(decorated.node, never, hard: true);
     expect(decorated.typeArguments, isEmpty);
   }
 
