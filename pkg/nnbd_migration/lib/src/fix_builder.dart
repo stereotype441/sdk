@@ -66,7 +66,9 @@ class CompoundAssignmentReadNullable implements Problem {
 /// to figure out what changes need to be made to the code.  It doesn't actually
 /// make the changes; it simply reports what changes are necessary through
 /// abstract methods.
-abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
+class FixBuilder {}
+
+abstract class FixBuilderOld extends GeneralizingAstVisitor<DartType>
     with ResolutionUtils {
   /// The decorated class hierarchy for this migration run.
   final DecoratedClassHierarchy _decoratedClassHierarchy;
@@ -96,7 +98,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   /// The file being analyzed.
   final Source source;
 
-  FixBuilder(this.source, this._decoratedClassHierarchy,
+  FixBuilderOld(this.source, this._decoratedClassHierarchy,
       TypeProvider typeProvider, this._typeSystem, this._variables)
       : typeProvider =
             (typeProvider as TypeProviderImpl).asNonNullableByDefault;

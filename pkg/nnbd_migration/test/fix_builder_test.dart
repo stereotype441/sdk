@@ -2103,8 +2103,7 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
       {Map<AstNode, NodeChange> changes = const <Expression, NodeChange>{},
       Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
     _FixBuilder fixBuilder = _createFixBuilder(node);
-    var type = node.accept(fixBuilder);
-    expect(type, null);
+    fixBuilder.visitStatement(node);
     expect(fixBuilder.changes, changes);
     expect(fixBuilder.problems, problems);
   }
@@ -2125,7 +2124,7 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
       {Map<AstNode, NodeChange> changes = const <AstNode, NodeChange>{},
       Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
     _FixBuilder fixBuilder = _createFixBuilder(node);
-    var type = node.accept(fixBuilder);
+    var type = fixBuilder.visitTypeAnnotation(node);
     expect((type as TypeImpl).toString(withNullability: true), expectedType);
     expect(fixBuilder.changes, changes);
     expect(fixBuilder.problems, problems);
@@ -2152,8 +2151,7 @@ class _FixBuilder extends FixBuilder {
 
   _FixBuilder(Source source, DecoratedClassHierarchy decoratedClassHierarchy,
       TypeProvider typeProvider, TypeSystemImpl typeSystem, Variables variables)
-      : super(source, decoratedClassHierarchy, typeProvider, typeSystem,
-            variables);
+      : super();
 
   @override
   void addChange(AstNode node, NodeChange change) {
@@ -2165,5 +2163,26 @@ class _FixBuilder extends FixBuilder {
   void addProblem(AstNode node, Problem problem) {
     var newlyAdded = (problems[node] ??= {}).add(problem);
     expect(newlyAdded, true);
+  }
+
+  void createFlowAnalysis(
+      Declaration declaration, FormalParameterList parameters) {
+    fail('TODO(paulberry)');
+  }
+
+  AssignmentTargetInfo visitAssignmentTarget(Expression node, bool param1) {
+    fail('TODO(paulberry)');
+  }
+
+  void visitStatement(Statement node) {
+    fail('TODO(paulberry)');
+  }
+
+  DartType visitSubexpression(Expression node, DartType contextType) {
+    fail('TODO(paulberry)');
+  }
+
+  DartType visitTypeAnnotation(TypeAnnotation node) {
+    fail('TODO(paulberry)');
   }
 }
