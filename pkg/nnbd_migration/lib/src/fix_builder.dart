@@ -9,6 +9,8 @@ import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
+import 'package:analyzer/error/listener.dart';
+import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type_algebra.dart';
 import 'package:analyzer/src/dart/element/type_provider.dart';
@@ -66,7 +68,61 @@ class CompoundAssignmentReadNullable implements Problem {
 /// to figure out what changes need to be made to the code.  It doesn't actually
 /// make the changes; it simply reports what changes are necessary through
 /// abstract methods.
-class FixBuilder {}
+class FixBuilder {
+  final ResolverVisitor _resolver;
+
+  FixBuilder(
+      Source source,
+      DecoratedClassHierarchy decoratedClassHierarchy,
+      TypeProvider typeProvider,
+      TypeSystem typeSystem,
+      Variables variables,
+      LibraryElement definingLibrary)
+      : this._(
+            _makeResolver(typeSystem, definingLibrary, source, typeProvider));
+
+  FixBuilder._(this._resolver);
+
+  DartType visitSubexpression(Expression node, DartType contextType) {
+    var startingNode = _findStartingNode(node);
+    while (true) {
+      startingNode.accept(_resolver);
+      node.accept(_TypeComparer());
+    }
+    throw 'TODO(paulberry)';
+  }
+
+  AstNode _findStartingNode(AstNode node) {
+    while (node != null) {
+      if (node is Expression || node is FunctionBody) {
+      } else if (node is MethodDeclaration) {
+        return node;
+      } else {
+        throw 'TODO(paulberry): ${node.runtimeType}';
+      }
+      node = node.parent;
+    }
+  }
+
+  static ResolverVisitor _makeResolver(
+      TypeSystem typeSystem,
+      LibraryElement definingLibrary,
+      Source source,
+      TypeProvider typeProvider) {
+    var inheritanceManager = InheritanceManager3(typeSystem);
+    // TODO(paulberry): is it a bad idea to throw away errors?
+    var errorListener = AnalysisErrorListener.NULL_LISTENER;
+    return ResolverVisitor(inheritanceManager, definingLibrary, source,
+        typeProvider, errorListener);
+  }
+}
+
+class _TypeComparer extends GeneralizingAstVisitor<void> {
+  @override
+  void visitAssignmentExpression(AssignmentExpression node) {
+    print('here');
+  }
+}
 
 abstract class FixBuilderOld extends GeneralizingAstVisitor<DartType>
     with ResolutionUtils {

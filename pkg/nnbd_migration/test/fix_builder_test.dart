@@ -3,7 +3,10 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
+import 'package:analyzer/dart/element/type_system.dart';
+import 'package:analyzer/src/dart/analysis/session.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type_provider.dart';
 import 'package:analyzer/src/generated/resolver.dart';
@@ -39,7 +42,7 @@ class FixBuilderTest extends EdgeBuilderTestBase {
     return unit;
   }
 
-  test_assignmentExpression_compound_combined_nullable_noProblem() async {
+  solo_test_assignmentExpression_compound_combined_nullable_noProblem() async {
     await analyze('''
 abstract class _C {
   _D/*?*/ operator+(int/*!*/ value);
@@ -863,8 +866,7 @@ _f(int/*?*/ x, int/*?*/ y) {
   { // block
     x + 1;
     y + 1;
-  }
-}
+  }}
 ''');
     visitStatement(findNode.statement('{ // block'), changes: {
       findNode.simple('x + 1'): NullCheck(),
@@ -2131,8 +2133,22 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
   }
 
   _FixBuilder _createFixBuilder(AstNode node) {
+    var definingLibrary =
+        node.thisOrAncestorOfType<CompilationUnit>().declaredElement.library;
+    var typeProvider = (definingLibrary.typeProvider as TypeProviderImpl)
+        .asNonNullableByDefault;
+    var unmigratedTypeSystem = definingLibrary.typeSystem as TypeSystemImpl;
+    // TODO(paulberry): do we want to support migration of libraries with
+    // implicit casts disabled?  If so we need to test it more thoroughly
+    // TODO(paulberry): do we want to support both possible values of
+    // strictInference?
+    var typeSystem = TypeSystemImpl(
+        implicitCasts: unmigratedTypeSystem.implicitCasts,
+        isNonNullableByDefault: true,
+        strictInference: unmigratedTypeSystem.strictInference,
+        typeProvider: typeProvider);
     var fixBuilder = _FixBuilder(testSource, decoratedClassHierarchy,
-        typeProvider, typeSystem, variables);
+        typeProvider, typeSystem, variables, definingLibrary);
     var body = node.thisOrAncestorOfType<FunctionBody>();
     var declaration = body.thisOrAncestorOfType<Declaration>();
     FormalParameterList parameters;
@@ -2149,9 +2165,15 @@ class _FixBuilder extends FixBuilder {
 
   final Map<AstNode, Set<Problem>> problems = {};
 
-  _FixBuilder(Source source, DecoratedClassHierarchy decoratedClassHierarchy,
-      TypeProvider typeProvider, TypeSystemImpl typeSystem, Variables variables)
-      : super();
+  _FixBuilder(
+      Source source,
+      DecoratedClassHierarchy decoratedClassHierarchy,
+      TypeProvider typeProvider,
+      TypeSystemImpl typeSystem,
+      Variables variables,
+      LibraryElement definingLibrary)
+      : super(source, decoratedClassHierarchy, typeProvider, typeSystem,
+            variables, definingLibrary);
 
   @override
   void addChange(AstNode node, NodeChange change) {
@@ -2167,7 +2189,7 @@ class _FixBuilder extends FixBuilder {
 
   void createFlowAnalysis(
       Declaration declaration, FormalParameterList parameters) {
-    fail('TODO(paulberry)');
+    // Do nothing.  TODO(paulberry): remove this method and callers.
   }
 
   AssignmentTargetInfo visitAssignmentTarget(Expression node, bool param1) {
@@ -2175,10 +2197,6 @@ class _FixBuilder extends FixBuilder {
   }
 
   void visitStatement(Statement node) {
-    fail('TODO(paulberry)');
-  }
-
-  DartType visitSubexpression(Expression node, DartType contextType) {
     fail('TODO(paulberry)');
   }
 
