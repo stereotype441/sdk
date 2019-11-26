@@ -42,7 +42,7 @@ class FixBuilderTest extends EdgeBuilderTestBase {
     return unit;
   }
 
-  solo_test_assignmentExpression_compound_combined_nullable_noProblem() async {
+  test_assignmentExpression_compound_combined_nullable_noProblem() async {
     await analyze('''
 abstract class _C {
   _D/*?*/ operator+(int/*!*/ value);
@@ -69,7 +69,7 @@ abstract class _E {
     visitSubexpression(assignment, 'dynamic');
   }
 
-  test_assignmentExpression_compound_combined_nullable_problem() async {
+  solo_test_assignmentExpression_compound_combined_nullable_problem() async {
     await analyze('''
 abstract class _C {
   _D/*?*/ operator+(int/*!*/ value);

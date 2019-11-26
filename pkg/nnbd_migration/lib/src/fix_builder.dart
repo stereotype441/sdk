@@ -81,13 +81,15 @@ class FixBuilder {
 
   FixBuilder(Source source, this._decoratedClassHierarchy, this.typeProvider,
       this.typeSystem, this._variables, LibraryElement definingLibrary) {
+    assert((typeSystem as TypeSystemImpl).isNonNullableByDefault);
+    assert((typeProvider as TypeProviderImpl).isNonNullableByDefault);
     _resolver = _makeResolver(definingLibrary, source);
   }
 
   DartType visitSubexpression(Expression node, DartType contextType) {
     var startingNode = _findStartingNode(node);
     startingNode.accept(_resolver);
-    node.accept(_TypeComparer());
+    node.accept(_TypeComparer(typeSystem));
     return node.staticType;
   }
 
@@ -946,6 +948,26 @@ class NullCheck implements NodeChange {
 abstract class Problem {}
 
 class _TypeComparer extends ThrowingAstVisitor<void> {
+  MapEntry<AstNode, Problem> _problem;
+
+  final TypeSystem _typeSystem;
+
+  _TypeComparer(this._typeSystem);
+
   @override
-  void visitAssignmentExpression(AssignmentExpression node) {}
+  void visitAssignmentExpression(AssignmentExpression node) {
+    assert(node.operator.type != TokenType.QUESTION_QUESTION_EQ,
+        'TODO(paulberry)');
+    var context = InferenceContext.getContext(node) ?? DynamicTypeImpl.instance;
+    if (_doesAssignmentNeedCheck(from: node.staticType, to: context)) {
+      _problem ??= MapEntry(node, const CompoundAssignmentCombinedNullable());
+    }
+  }
+
+  bool _doesAssignmentNeedCheck(
+      {@required DartType from, @required DartType to}) {
+    return !from.isDynamic &&
+        _typeSystem.isNullable(from) &&
+        !_typeSystem.isNullable(to);
+  }
 }
