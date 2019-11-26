@@ -2446,6 +2446,12 @@ class InstanceFieldResolverVisitor extends ResolverVisitor {
   }
 }
 
+abstract class MigratedTypeProvider {
+  DartType getElementReturnType(FunctionTypedElement element);
+
+  DartType variableType(VariableElement variable);
+}
+
 /// Instances of the class `OverrideVerifier` visit all of the declarations in a
 /// compilation unit to verify that if they have an override annotation it is
 /// being used correctly.
@@ -2783,7 +2789,9 @@ class ResolverVisitor extends ScopedVisitor {
             nameScope,
             propagateTypes,
             reportConstEvaluationErrors,
-            flowAnalysisHelper);
+            flowAnalysisHelper,
+            (self, featureSet, flowAnalysis) =>
+                StaticTypeAnalyzer(self, featureSet, flowAnalysis));
 
   ResolverVisitor._(
       this.inheritance,
@@ -2795,7 +2803,10 @@ class ResolverVisitor extends ScopedVisitor {
       Scope nameScope,
       bool propagateTypes,
       reportConstEvaluationErrors,
-      this._flowAnalysis)
+      this._flowAnalysis,
+      StaticTypeAnalyzer Function(
+              ResolverVisitor, FeatureSet, FlowAnalysisHelper)
+          makeStaticTypeAnalyzer)
       : _analysisOptions = definingLibrary.context.analysisOptions,
         _featureSet = featureSet,
         _uiAsCodeEnabled =
@@ -2814,7 +2825,7 @@ class ResolverVisitor extends ScopedVisitor {
       strongModeHints = options.strongModeHints;
     }
     this.inferenceContext = new InferenceContext._(this, strongModeHints);
-    this.typeAnalyzer = new StaticTypeAnalyzer(this, featureSet, _flowAnalysis);
+    this.typeAnalyzer = makeStaticTypeAnalyzer(this, featureSet, _flowAnalysis);
   }
 
   /// Return the element representing the function containing the current node,
@@ -4860,6 +4871,36 @@ class ResolverVisitor extends ScopedVisitor {
     }
     return resolvedParameters;
   }
+}
+
+class ResolverVisitorForMigration extends ResolverVisitor {
+  ResolverVisitorForMigration(
+      InheritanceManager3 inheritanceManager,
+      LibraryElement definingLibrary,
+      Source source,
+      TypeProvider typeProvider,
+      AnalysisErrorListener errorListener,
+      TypeSystem typeSystem,
+      MigratedTypeProvider migratedTypeProvider,
+      {FeatureSet featureSet,
+      Scope nameScope,
+      bool propagateTypes: true,
+      reportConstEvaluationErrors: true})
+      : super._(
+            inheritanceManager,
+            definingLibrary,
+            source,
+            typeProvider,
+            errorListener,
+            featureSet ??
+                definingLibrary.context.analysisOptions.contextFeatures,
+            nameScope,
+            propagateTypes,
+            reportConstEvaluationErrors,
+            FlowAnalysisHelperForMigration(
+                typeSystem, false, migratedTypeProvider),
+            (self, featureSet, flowAnalysis) => StaticTypeAnalyzerForMigration(
+                self, featureSet, flowAnalysis, migratedTypeProvider));
 }
 
 /// The abstract class `ScopedVisitor` maintains name and label scopes as an AST

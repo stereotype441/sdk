@@ -69,25 +69,69 @@ class CompoundAssignmentReadNullable implements Problem {
 /// make the changes; it simply reports what changes are necessary through
 /// abstract methods.
 class FixBuilder {
-  final ResolverVisitor _resolver;
+  ResolverVisitor _resolver;
 
-  FixBuilder(
-      Source source,
-      DecoratedClassHierarchy decoratedClassHierarchy,
-      TypeProvider typeProvider,
-      TypeSystem typeSystem,
-      Variables variables,
-      LibraryElement definingLibrary)
-      : this._(
-            _makeResolver(typeSystem, definingLibrary, source, typeProvider));
+  final TypeSystem typeSystem;
 
-  FixBuilder._(this._resolver);
+  final TypeProvider typeProvider;
+
+  final Variables _variables;
+
+  final DecoratedClassHierarchy _decoratedClassHierarchy;
+
+  FixBuilder(Source source, this._decoratedClassHierarchy, this.typeProvider,
+      this.typeSystem, this._variables, LibraryElement definingLibrary) {
+    _resolver = _makeResolver(definingLibrary, source);
+  }
 
   DartType visitSubexpression(Expression node, DartType contextType) {
     var startingNode = _findStartingNode(node);
     startingNode.accept(_resolver);
     node.accept(_TypeComparer());
     return node.staticType;
+  }
+
+  /// Computes the type that [element] will have after migration.
+  ///
+  /// If [targetType] is present, and [element] is a class member, it is the
+  /// type of the class within which [element] is being accessed; this is used
+  /// to perform the correct substitutions.
+  DartType _computeMigratedType(Element element, {DartType targetType}) {
+    element = element.declaration;
+    DartType type;
+    if (element is ClassElement || element is TypeParameterElement) {
+      return typeProvider.typeType;
+    } else if (element is PropertyAccessorElement) {
+      if (element.isSynthetic) {
+        type = _variables
+            .decoratedElementType(element.variable)
+            .toFinalType(typeProvider);
+      } else {
+        var functionType = _variables.decoratedElementType(element);
+        var decoratedType = element.isGetter
+            ? functionType.returnType
+            : functionType.positionalParameters[0];
+        type = decoratedType.toFinalType(typeProvider);
+      }
+    } else {
+      type = _variables.decoratedElementType(element).toFinalType(typeProvider);
+    }
+    if (targetType is InterfaceType && targetType.typeArguments.isNotEmpty) {
+      var superclass = element.enclosingElement as ClassElement;
+      var class_ = targetType.element;
+      if (class_ != superclass) {
+        var supertype = _decoratedClassHierarchy
+            .getDecoratedSupertype(class_, superclass)
+            .toFinalType(typeProvider) as InterfaceType;
+        type = Substitution.fromInterfaceType(supertype).substituteType(type);
+      }
+      return substitute(type, {
+        for (int i = 0; i < targetType.typeArguments.length; i++)
+          class_.typeParameters[i]: targetType.typeArguments[i]
+      });
+    } else {
+      return type;
+    }
   }
 
   AstNode _findStartingNode(AstNode node) {
@@ -100,18 +144,21 @@ class FixBuilder {
       }
       node = node.parent;
     }
+    throw 'TODO(paulberry)';
   }
 
-  static ResolverVisitor _makeResolver(
-      TypeSystem typeSystem,
-      LibraryElement definingLibrary,
-      Source source,
-      TypeProvider typeProvider) {
+  ResolverVisitor _makeResolver(LibraryElement definingLibrary, Source source) {
     var inheritanceManager = InheritanceManager3(typeSystem);
     // TODO(paulberry): is it a bad idea to throw away errors?
     var errorListener = AnalysisErrorListener.NULL_LISTENER;
-    return ResolverVisitorForMigration(inheritanceManager, definingLibrary, source,
-        typeProvider, errorListener);
+    return ResolverVisitorForMigration(
+        inheritanceManager,
+        definingLibrary,
+        source,
+        typeProvider,
+        errorListener,
+        typeSystem,
+        MigratedTypeProviderImpl(this));
   }
 }
 
@@ -864,6 +911,23 @@ class MakeNullable implements NodeChange {
   factory MakeNullable() => const MakeNullable._();
 
   const MakeNullable._();
+}
+
+class MigratedTypeProviderImpl extends MigratedTypeProvider {
+  final FixBuilder _fixBuilder;
+
+  MigratedTypeProviderImpl(this._fixBuilder);
+
+  @override
+  DartType getElementReturnType(FunctionTypedElement element) {
+    return (_fixBuilder._computeMigratedType(element) as FunctionType)
+        .returnType;
+  }
+
+  @override
+  DartType variableType(VariableElement variable) {
+    return _fixBuilder._computeMigratedType(variable);
+  }
 }
 
 /// Base class representing a change the FixBuilder wishes to make to an AST

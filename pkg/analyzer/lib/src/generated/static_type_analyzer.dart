@@ -397,7 +397,7 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
       _recordStaticType(node, _nonNullable(_typeProvider.boolType));
     } else {
       var operatorElement = node.staticElement;
-      var type = operatorElement?.returnType ?? _dynamicType;
+      var type = _getElementReturnType(operatorElement);
       type = _typeSystem.refineBinaryExpressionType(
         _getStaticType(node.leftHandSide, read: true),
         operator,
@@ -1456,6 +1456,9 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
     return null;
   }
 
+  DartType _getElementReturnType(FunctionTypedElement element) =>
+      element?.returnType ?? _dynamicType;
+
   /**
    * Gets the definite type of expression, which can be used in cases where
    * the most precise type is desired, for example computing the least upper
@@ -2202,6 +2205,21 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
       return type;
     }
   }
+}
+
+class StaticTypeAnalyzerForMigration extends StaticTypeAnalyzer {
+  final MigratedTypeProvider migratedTypeProvider;
+
+  StaticTypeAnalyzerForMigration(
+      ResolverVisitor resolver,
+      FeatureSet featureSet,
+      FlowAnalysisHelper flowAnalysis,
+      this.migratedTypeProvider)
+      : super(resolver, featureSet, flowAnalysis);
+
+  @override
+  DartType _getElementReturnType(FunctionTypedElement element) =>
+   element == null ? super._getElementReturnType(element) : migratedTypeProvider.getElementReturnType(element);
 }
 
 class _InferredCollectionElementTypeInformation {

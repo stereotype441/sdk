@@ -10,6 +10,7 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/dart/element/type_system.dart';
 import 'package:analyzer/src/dart/element/type.dart';
+import 'package:analyzer/src/generated/resolver.dart' show MigratedTypeProvider;
 import 'package:analyzer/src/generated/type_system.dart' show TypeSystemImpl;
 import 'package:analyzer/src/generated/variable_type_provider.dart';
 
@@ -53,10 +54,9 @@ class FlowAnalysisHelper {
   FlowAnalysis<AstNode, Statement, Expression, PromotableElement, DartType>
       flow;
 
-  factory FlowAnalysisHelper(TypeSystem typeSystem, bool retainDataForTesting) {
-    return FlowAnalysisHelper._(TypeSystemTypeOperations(typeSystem),
-        retainDataForTesting ? FlowAnalysisDataForTesting() : null);
-  }
+  FlowAnalysisHelper(TypeSystem typeSystem, bool retainDataForTesting)
+      : this._(TypeSystemTypeOperations(typeSystem),
+            retainDataForTesting ? FlowAnalysisDataForTesting() : null);
 
   FlowAnalysisHelper._(this._typeOperations, this.dataForTesting);
 
@@ -278,6 +278,19 @@ class FlowAnalysisHelper {
       }
     }
     return null;
+  }
+}
+
+class FlowAnalysisHelperForMigration extends FlowAnalysisHelper {
+  FlowAnalysisHelperForMigration(
+      TypeSystem typeSystem, bool retainDataForTesting, this.migratedTypeProvider)
+      : super(typeSystem, retainDataForTesting);
+
+  final MigratedTypeProvider migratedTypeProvider;
+
+  @override
+  LocalVariableTypeProvider get localVariableTypeProvider {
+    return _LocalVariableTypeProviderForMigration(this, migratedTypeProvider);
   }
 }
 
@@ -538,6 +551,23 @@ class _LocalVariableTypeProvider implements LocalVariableTypeProvider {
       var promotedType = _manager.flow?.variableRead(node, variable);
       if (promotedType != null) return promotedType;
     }
+    return _getDeclaredType(variable);
+  }
+
+  DartType _getDeclaredType(VariableElement variable) {
     return variable.type;
+  }
+}
+
+class _LocalVariableTypeProviderForMigration
+    extends _LocalVariableTypeProvider {
+  _LocalVariableTypeProviderForMigration(FlowAnalysisHelper manager, this.migratedTypeProvider)
+      : super(manager);
+
+  final MigratedTypeProvider migratedTypeProvider;
+
+  @override
+  DartType _getDeclaredType(VariableElement variable) {
+    return migratedTypeProvider.variableType(variable);
   }
 }
