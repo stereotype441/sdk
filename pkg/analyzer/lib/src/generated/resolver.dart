@@ -2705,7 +2705,7 @@ class ResolverVisitor extends ScopedVisitor {
   ElementResolver elementResolver;
 
   /// The object used to compute the type associated with the current node.
-  StaticTypeAnalyzerApi typeAnalyzer;
+  StaticTypeAnalyzer typeAnalyzer;
 
   /// The type system in use during resolution.
   TypeSystemImpl typeSystem;
