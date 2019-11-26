@@ -85,11 +85,9 @@ class FixBuilder {
 
   DartType visitSubexpression(Expression node, DartType contextType) {
     var startingNode = _findStartingNode(node);
-    while (true) {
-      startingNode.accept(_resolver);
-      node.accept(_TypeComparer());
-    }
-    throw 'TODO(paulberry)';
+    startingNode.accept(_resolver);
+    node.accept(_TypeComparer());
+    return node.staticType;
   }
 
   AstNode _findStartingNode(AstNode node) {
@@ -112,15 +110,8 @@ class FixBuilder {
     var inheritanceManager = InheritanceManager3(typeSystem);
     // TODO(paulberry): is it a bad idea to throw away errors?
     var errorListener = AnalysisErrorListener.NULL_LISTENER;
-    return ResolverVisitor(inheritanceManager, definingLibrary, source,
+    return ResolverVisitorForMigration(inheritanceManager, definingLibrary, source,
         typeProvider, errorListener);
-  }
-}
-
-class _TypeComparer extends GeneralizingAstVisitor<void> {
-  @override
-  void visitAssignmentExpression(AssignmentExpression node) {
-    print('here');
   }
 }
 
@@ -889,3 +880,8 @@ class NullCheck implements NodeChange {
 
 /// Common supertype for problems reported by [FixBuilder.addProblem].
 abstract class Problem {}
+
+class _TypeComparer extends ThrowingAstVisitor<void> {
+  @override
+  void visitAssignmentExpression(AssignmentExpression node) {}
+}
