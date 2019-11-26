@@ -34,7 +34,8 @@ import 'package:meta/meta.dart';
  * * Every node representing an expression should be resolved to the Type of the expression.
  * </ol>
  */
-class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
+class StaticTypeAnalyzer extends SimpleAstVisitor<void>
+    implements StaticTypeAnalyzerApi {
   /**
    * The resolver driving the resolution and type analysis.
    */
@@ -2205,6 +2206,22 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
       return type;
     }
   }
+}
+
+abstract class StaticTypeAnalyzerApi implements AstVisitor<void> {
+  set thisType(InterfaceType thisType);
+
+  DartType computeForEachElementType(Expression iterable, bool isAsync);
+
+  bool inferFormalParameterList(
+      FormalParameterList node, DartType functionType);
+
+  DartType inferListType(ListLiteral node, {bool downwards: false});
+
+  InterfaceType inferMapTypeDownwards(
+      SetOrMapLiteral node, DartType contextType);
+
+  DartType inferSetTypeDownwards(SetOrMapLiteral node, DartType contextType);
 }
 
 class StaticTypeAnalyzerForMigration extends StaticTypeAnalyzer {
