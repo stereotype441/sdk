@@ -10,7 +10,7 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/dart/element/type_system.dart';
 import 'package:analyzer/src/dart/element/type.dart';
-import 'package:analyzer/src/generated/resolver.dart' show MigratedTypeProvider;
+import 'package:analyzer/src/generated/resolver.dart' show MigrationResolutionHooks;
 import 'package:analyzer/src/generated/type_system.dart' show TypeSystemImpl;
 import 'package:analyzer/src/generated/variable_type_provider.dart';
 
@@ -283,14 +283,14 @@ class FlowAnalysisHelper {
 
 class FlowAnalysisHelperForMigration extends FlowAnalysisHelper {
   FlowAnalysisHelperForMigration(
-      TypeSystem typeSystem, bool retainDataForTesting, this.migratedTypeProvider)
+      TypeSystem typeSystem, bool retainDataForTesting, this.migrationResolutionHooks)
       : super(typeSystem, retainDataForTesting);
 
-  final MigratedTypeProvider migratedTypeProvider;
+  final MigrationResolutionHooks migrationResolutionHooks;
 
   @override
   LocalVariableTypeProvider get localVariableTypeProvider {
-    return _LocalVariableTypeProviderForMigration(this, migratedTypeProvider);
+    return _LocalVariableTypeProviderForMigration(this, migrationResolutionHooks);
   }
 }
 
@@ -561,13 +561,13 @@ class _LocalVariableTypeProvider implements LocalVariableTypeProvider {
 
 class _LocalVariableTypeProviderForMigration
     extends _LocalVariableTypeProvider {
-  _LocalVariableTypeProviderForMigration(FlowAnalysisHelper manager, this.migratedTypeProvider)
+  _LocalVariableTypeProviderForMigration(FlowAnalysisHelper manager, this.migrationResolutionHooks)
       : super(manager);
 
-  final MigratedTypeProvider migratedTypeProvider;
+  final MigrationResolutionHooks migrationResolutionHooks;
 
   @override
   DartType _getDeclaredType(VariableElement variable) {
-    return migratedTypeProvider.variableType(variable);
+    return migrationResolutionHooks.getVariableType(variable);
   }
 }

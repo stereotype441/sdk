@@ -42,6 +42,24 @@ class FixBuilderTest extends EdgeBuilderTestBase {
     return unit;
   }
 
+  solo_test_assignmentExpression_compound_combined_nullable_problem() async {
+    await analyze('''
+abstract class _C {
+  _D/*?*/ operator+(int/*!*/ value);
+}
+abstract class _D extends _C {}
+abstract class _E {
+  _C/*!*/ get x;
+  void set x(_C/*!*/ value);
+  f(int/*!*/ y) => x += y;
+}
+''');
+    var assignment = findNode.assignment('+=');
+    visitSubexpression(assignment, '_D', problems: {
+      assignment: {const CompoundAssignmentCombinedNullable()}
+    });
+  }
+
   test_assignmentExpression_compound_combined_nullable_noProblem() async {
     await analyze('''
 abstract class _C {
@@ -67,24 +85,6 @@ abstract class _E {
 ''');
     var assignment = findNode.assignment('+=');
     visitSubexpression(assignment, 'dynamic');
-  }
-
-  solo_test_assignmentExpression_compound_combined_nullable_problem() async {
-    await analyze('''
-abstract class _C {
-  _D/*?*/ operator+(int/*!*/ value);
-}
-abstract class _D extends _C {}
-abstract class _E {
-  _C/*!*/ get x;
-  void set x(_C/*!*/ value);
-  f(int/*!*/ y) => x += y;
-}
-''');
-    var assignment = findNode.assignment('+=');
-    visitSubexpression(assignment, '_D', problems: {
-      assignment: {const CompoundAssignmentCombinedNullable()}
-    });
   }
 
   test_assignmentExpression_compound_dynamic() async {
@@ -2116,7 +2116,8 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
       Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
     contextType ??= dynamicType;
     _FixBuilder fixBuilder = _createFixBuilder(node);
-    var type = fixBuilder.visitSubexpression(node, contextType);
+    fixBuilder.visitAll(node.thisOrAncestorOfType<CompilationUnit>());
+    var type = node.staticType;
     expect((type as TypeImpl).toString(withNullability: true), expectedType);
     expect(fixBuilder.changes, changes);
     expect(fixBuilder.problems, problems);

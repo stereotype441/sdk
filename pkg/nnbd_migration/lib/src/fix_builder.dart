@@ -68,7 +68,7 @@ class CompoundAssignmentReadNullable implements Problem {
 /// to figure out what changes need to be made to the code.  It doesn't actually
 /// make the changes; it simply reports what changes are necessary through
 /// abstract methods.
-class FixBuilder {
+abstract class FixBuilder {
   ResolverVisitor _resolver;
 
   final TypeSystem typeSystem;
@@ -86,11 +86,14 @@ class FixBuilder {
     _resolver = _makeResolver(definingLibrary, source);
   }
 
-  DartType visitSubexpression(Expression node, DartType contextType) {
-    var startingNode = _findStartingNode(node);
-    startingNode.accept(_resolver);
-    node.accept(_TypeComparer(typeSystem));
-    return node.staticType;
+  /// Called whenever an AST node is found that needs to be changed.
+  void addChange(AstNode node, NodeChange change);
+
+  /// Called whenever code is found that can't be automatically fixed.
+  void addProblem(AstNode node, Problem problem);
+
+  void visitAll(CompilationUnit unit) {
+    unit.accept(_resolver);
   }
 
   /// Computes the type that [element] will have after migration.
@@ -136,6 +139,15 @@ class FixBuilder {
     }
   }
 
+  /// Determines whether a null check is needed when assigning a value of type
+  /// [from] to a context of type [to].
+  bool _doesAssignmentNeedCheck(
+      {@required DartType from, @required DartType to}) {
+    return !from.isDynamic &&
+        typeSystem.isNullable(from) &&
+        !typeSystem.isNullable(to);
+  }
+
   AstNode _findStartingNode(AstNode node) {
     while (node != null) {
       if (node is Expression || node is FunctionBody) {
@@ -160,7 +172,7 @@ class FixBuilder {
         typeProvider,
         errorListener,
         typeSystem,
-        MigratedTypeProviderImpl(this));
+        MigrationResolutionHooksImpl(this));
   }
 }
 
@@ -915,10 +927,10 @@ class MakeNullable implements NodeChange {
   const MakeNullable._();
 }
 
-class MigratedTypeProviderImpl extends MigratedTypeProvider {
+class MigrationResolutionHooksImpl extends MigrationResolutionHooks {
   final FixBuilder _fixBuilder;
 
-  MigratedTypeProviderImpl(this._fixBuilder);
+  MigrationResolutionHooksImpl(this._fixBuilder);
 
   @override
   DartType getElementReturnType(FunctionTypedElement element) {
@@ -927,8 +939,27 @@ class MigratedTypeProviderImpl extends MigratedTypeProvider {
   }
 
   @override
-  DartType variableType(VariableElement variable) {
+  DartType getVariableType(VariableElement variable) {
     return _fixBuilder._computeMigratedType(variable);
+  }
+
+  @override
+  DartType modifyExpressionType(Expression node, DartType type) {
+    var context = InferenceContext.getContext(node) ?? DynamicTypeImpl.instance;
+    if (_fixBuilder._doesAssignmentNeedCheck(from: type, to: context)) {
+      _fixBuilder.addChange(node, NullCheck());
+      return _fixBuilder.typeSystem.promoteToNonNull(type as TypeImpl);
+    }
+    return type;
+  }
+
+  @override
+  DartType handleCompoundAssignment(DartType type, DartType leftWriteType, AssignmentExpression node) {
+    if (_fixBuilder._doesAssignmentNeedCheck(from: type, to: leftWriteType)) {
+      _fixBuilder.addProblem(node, const CompoundAssignmentCombinedNullable());
+      return _fixBuilder.typeSystem.promoteToNonNull(type as TypeImpl);
+    }
+    return type;
   }
 }
 
@@ -946,28 +977,3 @@ class NullCheck implements NodeChange {
 
 /// Common supertype for problems reported by [FixBuilder.addProblem].
 abstract class Problem {}
-
-class _TypeComparer extends ThrowingAstVisitor<void> {
-  MapEntry<AstNode, Problem> _problem;
-
-  final TypeSystem _typeSystem;
-
-  _TypeComparer(this._typeSystem);
-
-  @override
-  void visitAssignmentExpression(AssignmentExpression node) {
-    assert(node.operator.type != TokenType.QUESTION_QUESTION_EQ,
-        'TODO(paulberry)');
-    var context = InferenceContext.getContext(node) ?? DynamicTypeImpl.instance;
-    if (_doesAssignmentNeedCheck(from: node.staticType, to: context)) {
-      _problem ??= MapEntry(node, const CompoundAssignmentCombinedNullable());
-    }
-  }
-
-  bool _doesAssignmentNeedCheck(
-      {@required DartType from, @required DartType to}) {
-    return !from.isDynamic &&
-        _typeSystem.isNullable(from) &&
-        !_typeSystem.isNullable(to);
-  }
-}

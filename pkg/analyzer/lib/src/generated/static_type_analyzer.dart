@@ -408,14 +408,7 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
       _recordStaticType(node, type);
 
       var leftWriteType = _getStaticType(node.leftHandSide);
-      if (!_typeSystem.isAssignableTo(type, leftWriteType,
-          featureSet: _featureSet)) {
-        _resolver.errorReporter.reportTypeErrorForNode(
-          StaticTypeWarningCode.INVALID_ASSIGNMENT,
-          node.rightHandSide,
-          [type, leftWriteType],
-        );
-      }
+      _handleCompoundAssignment(type, leftWriteType, node);
     }
     _nullShortingTermination(node);
   }
@@ -931,7 +924,7 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
     } else if (staticElement is ExecutableElement) {
       staticType = staticElement.type;
     } else if (staticElement is VariableElement) {
-      staticType = staticElement.type;
+      staticType = _getPromotableElementType(staticElement);
     }
 
     staticType = _inferTearOff(node, node.identifier, staticType);
@@ -1488,6 +1481,8 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
     return null;
   }
 
+  DartType _getPromotableElementType(PromotableElement element) => element.type;
+
   /**
    * Return the static type of the given [expression].
    */
@@ -1500,7 +1495,7 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
         var element = expression.staticElement;
         if (element is PromotableElement) {
           // We're writing to the element so ignore promotions.
-          type = element.type;
+          type = _getPromotableElementType(element);
         } else {
           type = expression.staticType;
         }
@@ -1559,6 +1554,18 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
       return _dynamicType;
     }
     return functionType.returnType;
+  }
+
+  void _handleCompoundAssignment(
+      DartType type, DartType leftWriteType, AssignmentExpression node) {
+    if (!_typeSystem.isAssignableTo(type, leftWriteType,
+        featureSet: _featureSet)) {
+      _resolver.errorReporter.reportTypeErrorForNode(
+        StaticTypeWarningCode.INVALID_ASSIGNMENT,
+        node.rightHandSide,
+        [type, leftWriteType],
+      );
+    }
   }
 
   _InferredCollectionElementTypeInformation _inferCollectionElementType(
@@ -2208,18 +2215,41 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
 }
 
 class StaticTypeAnalyzerForMigration extends StaticTypeAnalyzer {
-  final MigratedTypeProvider migratedTypeProvider;
+  final MigrationResolutionHooks migrationResolutionHooks;
 
   StaticTypeAnalyzerForMigration(
       ResolverVisitor resolver,
       FeatureSet featureSet,
       FlowAnalysisHelper flowAnalysis,
-      this.migratedTypeProvider)
+      this.migrationResolutionHooks)
       : super(resolver, featureSet, flowAnalysis);
 
   @override
   DartType _getElementReturnType(FunctionTypedElement element) =>
-   element == null ? super._getElementReturnType(element) : migratedTypeProvider.getElementReturnType(element);
+      element == null
+          ? super._getElementReturnType(element)
+          : migrationResolutionHooks.getElementReturnType(element);
+
+  DartType _getPromotableElementType(PromotableElement element) =>
+      migrationResolutionHooks.getVariableType(element);
+
+  @override
+  void _handleCompoundAssignment(
+      DartType type, DartType leftWriteType, AssignmentExpression node) {
+    super._handleCompoundAssignment(
+        migrationResolutionHooks.handleCompoundAssignment(
+            type, leftWriteType, node),
+        leftWriteType,
+        node);
+  }
+
+  @override
+  void _recordStaticType(Expression expression, DartType type) {
+    super._recordStaticType(
+        expression,
+        migrationResolutionHooks.modifyExpressionType(
+            expression, type ?? _dynamicType));
+  }
 }
 
 class _InferredCollectionElementTypeInformation {

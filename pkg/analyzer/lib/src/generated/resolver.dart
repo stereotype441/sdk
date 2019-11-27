@@ -2446,10 +2446,14 @@ class InstanceFieldResolverVisitor extends ResolverVisitor {
   }
 }
 
-abstract class MigratedTypeProvider {
+abstract class MigrationResolutionHooks {
   DartType getElementReturnType(FunctionTypedElement element);
 
-  DartType variableType(VariableElement variable);
+  DartType getVariableType(VariableElement variable);
+
+  DartType modifyExpressionType(Expression expression, DartType dartType);
+
+  DartType handleCompoundAssignment(DartType type, DartType leftWriteType, AssignmentExpression node);
 }
 
 /// Instances of the class `OverrideVerifier` visit all of the declarations in a
@@ -4881,7 +4885,7 @@ class ResolverVisitorForMigration extends ResolverVisitor {
       TypeProvider typeProvider,
       AnalysisErrorListener errorListener,
       TypeSystem typeSystem,
-      MigratedTypeProvider migratedTypeProvider,
+      MigrationResolutionHooks migratedTypeProvider,
       {FeatureSet featureSet,
       Scope nameScope,
       bool propagateTypes: true,
