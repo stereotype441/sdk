@@ -665,7 +665,7 @@ class _C {
   _f() => x = 0;
 }
 ''');
-    visitAssignmentTarget(findNode.simple('x '), 'int', 'int');
+    visitAssignmentTarget(findNode.simple('x '), null, 'int');
   }
 
   test_assignmentTarget_simpleIdentifier_setter_nullable() async {
