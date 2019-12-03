@@ -452,7 +452,10 @@ class _C {
 }
 _f(_C c) => (c).x += 1;
 ''');
-    visitAssignmentTarget(findNode.propertyAccess('(c).x'), 'int?', 'int?');
+    visitAssignmentTarget(findNode.propertyAccess('(c).x'), 'int?', 'int?',
+        problems: {
+          findNode.assignment('(c).x'): {const CompoundAssignmentReadNullable()}
+        });
   }
 
   test_assignmentTarget_propertyAccess_getter_nullable() async {

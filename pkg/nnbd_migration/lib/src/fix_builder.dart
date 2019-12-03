@@ -344,6 +344,12 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   }
 
   @override
+  DartType visitFieldDeclaration(FieldDeclaration node) {
+    // TODO(paulberry): implement this
+    return null;
+  }
+
+  @override
   DartType visitFormalParameterList(FormalParameterList node) {
     // TODO(paulberry): implement this.
     return null;
@@ -662,8 +668,9 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
           addChange(node, MakeNullable());
         }
         return InterfaceTypeImpl.explicit(element, arguments,
-            nullabilitySuffix:
-            isNullable ? NullabilitySuffix.question : NullabilitySuffix.none);
+            nullabilitySuffix: isNullable
+                ? NullabilitySuffix.question
+                : NullabilitySuffix.none);
       } else {
         // TODO(paulberry): implement this
       }
