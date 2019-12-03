@@ -2087,7 +2087,7 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
       Expression node, String expectedReadType, String expectedWriteType,
       {Map<AstNode, NodeChange> changes = const <Expression, NodeChange>{},
       Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
-    var fixBuilder = _FixBuilder(testSource, decoratedClassHierarchy,
+    var fixBuilder = _FixBuilder(node, testSource, decoratedClassHierarchy,
         typeProvider, typeSystem, variables);
     node.thisOrAncestorOfType<CompilationUnit>().accept(fixBuilder);
     var targetInfo = fixBuilder.assignmentTargetInfo[node];
@@ -2136,7 +2136,7 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
   }
 
   _FixBuilder _createFixBuilder(AstNode node) {
-    var fixBuilder = _FixBuilder(testSource, decoratedClassHierarchy,
+    var fixBuilder = _FixBuilder(node, testSource, decoratedClassHierarchy,
         typeProvider, typeSystem, variables);
     var body = node.thisOrAncestorOfType<FunctionBody>();
     var declaration = body.thisOrAncestorOfType<Declaration>();
@@ -2150,25 +2150,34 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
 }
 
 class _FixBuilder extends FixBuilder {
+  final AstNode scope;
+
   final Map<AstNode, NodeChange> changes = {};
 
   final Map<AstNode, Set<Problem>> problems = {};
 
   Map<Expression, AssignmentTargetInfo> assignmentTargetInfo = {};
 
-  _FixBuilder(Source source, DecoratedClassHierarchy decoratedClassHierarchy,
-      TypeProvider typeProvider, TypeSystemImpl typeSystem, Variables variables)
+  _FixBuilder(
+      this.scope,
+      Source source,
+      DecoratedClassHierarchy decoratedClassHierarchy,
+      TypeProvider typeProvider,
+      TypeSystemImpl typeSystem,
+      Variables variables)
       : super(source, decoratedClassHierarchy, typeProvider, typeSystem,
             variables);
 
   @override
   void addChange(AstNode node, NodeChange change) {
+    if (!_isInScope(node)) return;
     expect(changes, isNot(contains(node)));
     changes[node] = change;
   }
 
   @override
   void addProblem(AstNode node, Problem problem) {
+    if (!_isInScope(node)) return;
     var newlyAdded = (problems[node] ??= {}).add(problem);
     expect(newlyAdded, true);
   }
@@ -2177,5 +2186,11 @@ class _FixBuilder extends FixBuilder {
   AssignmentTargetInfo visitAssignmentTarget(Expression node, bool isCompound) {
     return assignmentTargetInfo[node] =
         super.visitAssignmentTarget(node, isCompound);
+  }
+
+  bool _isInScope(AstNode node) {
+    return node
+            .thisOrAncestorMatching((ancestor) => identical(ancestor, scope)) !=
+        null;
   }
 }

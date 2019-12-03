@@ -332,6 +332,12 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   }
 
   @override
+  DartType visitEmptyFunctionBody(EmptyFunctionBody node) {
+    // TODO(paulberry): implement this
+    return null;
+  }
+
+  @override
   DartType visitExpressionFunctionBody(ExpressionFunctionBody node) {
     node.expression.accept(this);
     return null;
