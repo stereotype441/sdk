@@ -2086,7 +2086,7 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
       Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
     var fixBuilder = _FixBuilder(node, testSource, decoratedClassHierarchy,
         typeProvider, typeSystem, variables);
-    node.thisOrAncestorOfType<CompilationUnit>().accept(fixBuilder);
+    fixBuilder.visitAll(node.thisOrAncestorOfType<CompilationUnit>());
     var targetInfo = fixBuilder.assignmentTargetInfo[node];
     if (expectedReadType == null) {
       expect(targetInfo.readType, null);

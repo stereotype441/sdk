@@ -63,7 +63,7 @@ class CompoundAssignmentReadNullable implements Problem {
 }
 
 /// TODO(paulberry): document
-class FixBuilder {
+abstract class FixBuilder {
   /// The decorated class hierarchy for this migration run.
   final DecoratedClassHierarchy _decoratedClassHierarchy;
 
@@ -79,27 +79,46 @@ class FixBuilder {
   /// The file being analyzed.
   final Source source;
 
-  factory FixBuilder(
+  ResolverVisitor _resolver;
+
+  FixBuilder(
       Source source,
       DecoratedClassHierarchy decoratedClassHierarchy,
       TypeProvider typeProvider,
       Dart2TypeSystem typeSystem,
-      Variables variables) {
-    var nnbdTypeProvider =
-        (typeProvider as TypeProviderImpl).asNonNullableByDefault;
+      Variables variables)
+      : this._(
+            decoratedClassHierarchy,
+            _makeNnbdTypeSystem(
+                (typeProvider as TypeProviderImpl).asNonNullableByDefault,
+                typeSystem),
+            variables,
+            source);
+
+  FixBuilder._(this._decoratedClassHierarchy, this._typeSystem, this._variables,
+      this.source)
+      : typeProvider = _typeSystem.typeProvider;
+
+  /// Called whenever an AST node is found that needs to be changed.
+  void addChange(AstNode node, NodeChange change);
+
+  /// Called whenever code is found that can't be automatically fixed.
+  void addProblem(AstNode node, Problem problem);
+
+  void visitAll(CompilationUnit unit) {
+    unit.accept(_resolver);
+  }
+
+  static TypeSystemImpl _makeNnbdTypeSystem(
+      TypeProvider nnbdTypeProvider, Dart2TypeSystem typeSystem) {
     // TODO(paulberry): do we need to test both possible values of
     // strictInference?
-    var nnbdTypeSystem = TypeSystemImpl(
+    return TypeSystemImpl(
         implicitCasts: typeSystem.implicitCasts,
         isNonNullableByDefault: true,
         strictInference: typeSystem.strictInference,
         typeProvider: nnbdTypeProvider);
-    return FixBuilder._(decoratedClassHierarchy, nnbdTypeProvider,
-        nnbdTypeSystem, variables, source);
   }
-
-  FixBuilder._(this._decoratedClassHierarchy, this.typeProvider,
-      this._typeSystem, this._variables, this.source);
 }
 
 /// [NodeChange] reprensenting a type annotation that needs to have a question
