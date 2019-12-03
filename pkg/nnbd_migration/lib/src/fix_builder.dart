@@ -332,6 +332,19 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   }
 
   @override
+  DartType visitConstructorDeclaration(ConstructorDeclaration node) {
+    createFlowAnalysis(node, node.parameters);
+    try {
+      node.visitChildren(this);
+      _flowAnalysis.finish();
+    } finally {
+      _flowAnalysis = null;
+      _assignedVariables = null;
+    }
+    return null;
+  }
+
+  @override
   DartType visitEmptyFunctionBody(EmptyFunctionBody node) {
     // TODO(paulberry): implement this
     return null;
