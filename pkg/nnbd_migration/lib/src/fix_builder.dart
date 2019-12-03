@@ -350,6 +350,12 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   }
 
   @override
+  DartType visitExtendsClause(ExtendsClause node) {
+    // TODO(paulberry): implement this
+    return null;
+  }
+
+  @override
   DartType visitFieldDeclaration(FieldDeclaration node) {
     // TODO(paulberry): implement this
     return null;
@@ -415,6 +421,12 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
       node.elseStatement.accept(this);
     }
     _flowAnalysis.ifStatement_end(hasElse);
+    return null;
+  }
+
+  @override
+  DartType visitImplementsClause(ImplementsClause node) {
+    // TODO(paulberry): implement this
     return null;
   }
 
@@ -644,6 +656,20 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
     } finally {
       _contextType = oldContextType;
     }
+  }
+
+  @override
+  DartType visitSuperExpression(SuperExpression node) {
+    // TODO(paulberry): implement this.
+    node.visitChildren(this);
+    return typeProvider.dynamicType;
+  }
+
+  @override
+  DartType visitThisExpression(ThisExpression node) {
+    // TODO(paulberry): implement this.
+    node.visitChildren(this);
+    return typeProvider.dynamicType;
   }
 
   @override
