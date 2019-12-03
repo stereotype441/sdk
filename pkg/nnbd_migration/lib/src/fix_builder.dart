@@ -655,15 +655,25 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
       // Already nullable.  Nothing to do.
       return decoratedType.type;
     } else {
-      var element = decoratedType.type.element as ClassElement;
-      bool isNullable = decoratedType.node.isNullable;
-      if (isNullable) {
-        addChange(node, MakeNullable());
+      var element = decoratedType.type.element;
+      if (element is ClassElement) {
+        bool isNullable = decoratedType.node.isNullable;
+        if (isNullable) {
+          addChange(node, MakeNullable());
+        }
+        return InterfaceTypeImpl.explicit(element, arguments,
+            nullabilitySuffix:
+            isNullable ? NullabilitySuffix.question : NullabilitySuffix.none);
+      } else {
+        // TODO(paulberry): implement this
       }
-      return InterfaceTypeImpl.explicit(element, arguments,
-          nullabilitySuffix:
-              isNullable ? NullabilitySuffix.question : NullabilitySuffix.none);
     }
+  }
+
+  @override
+  DartType visitTypeParameterList(TypeParameterList node) {
+    // TODO(paulberry): implement this.
+    return null;
   }
 
   @override
