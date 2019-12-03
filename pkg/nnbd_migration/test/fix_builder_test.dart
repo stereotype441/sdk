@@ -2084,9 +2084,10 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
       Expression node, String expectedReadType, String expectedWriteType,
       {Map<AstNode, NodeChange> changes = const <Expression, NodeChange>{},
       Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
-    _FixBuilder fixBuilder = _createFixBuilder(node);
-    var targetInfo =
-        fixBuilder.visitAssignmentTarget(node, expectedReadType != null);
+    var fixBuilder = _FixBuilder(testSource, decoratedClassHierarchy,
+        typeProvider, typeSystem, variables);
+    node.thisOrAncestorOfType<CompilationUnit>().accept(fixBuilder);
+    var targetInfo = fixBuilder.assignmentTargetInfo[node];
     if (expectedReadType == null) {
       expect(targetInfo.readType, null);
     } else {
@@ -2150,6 +2151,8 @@ class _FixBuilder extends FixBuilder {
 
   final Map<AstNode, Set<Problem>> problems = {};
 
+  Map<Expression, AssignmentTargetInfo> assignmentTargetInfo = {};
+
   _FixBuilder(Source source, DecoratedClassHierarchy decoratedClassHierarchy,
       TypeProvider typeProvider, TypeSystemImpl typeSystem, Variables variables)
       : super(source, decoratedClassHierarchy, typeProvider, typeSystem,
@@ -2165,5 +2168,11 @@ class _FixBuilder extends FixBuilder {
   void addProblem(AstNode node, Problem problem) {
     var newlyAdded = (problems[node] ??= {}).add(problem);
     expect(newlyAdded, true);
+  }
+
+  @override
+  AssignmentTargetInfo visitAssignmentTarget(Expression node, bool isCompound) {
+    return assignmentTargetInfo[node] =
+        super.visitAssignmentTarget(node, isCompound);
   }
 }

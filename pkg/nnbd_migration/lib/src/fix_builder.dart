@@ -303,6 +303,24 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   }
 
   @override
+  DartType visitBlockFunctionBody(BlockFunctionBody node) {
+    node.visitChildren(this);
+    return null;
+  }
+
+  @override
+  DartType visitClassDeclaration(ClassDeclaration node) {
+    node.visitChildren(this);
+    return null;
+  }
+
+  @override
+  DartType visitCompilationUnit(CompilationUnit node) {
+    node.visitChildren(this);
+    return null;
+  }
+
+  @override
   DartType visitConditionalExpression(ConditionalExpression node) {
     visitSubexpression(node.condition, typeProvider.boolType);
     _flowAnalysis.conditional_thenBegin(node.condition);
@@ -314,8 +332,47 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   }
 
   @override
+  DartType visitExpressionFunctionBody(ExpressionFunctionBody node) {
+    node.expression.accept(this);
+    return null;
+  }
+
+  @override
   DartType visitExpressionStatement(ExpressionStatement node) {
     visitSubexpression(node.expression, UnknownInferredType.instance);
+    return null;
+  }
+
+  @override
+  DartType visitFormalParameterList(FormalParameterList node) {
+    // TODO(paulberry): implement this.
+    return null;
+  }
+
+  @override
+  DartType visitFunctionDeclaration(FunctionDeclaration node) {
+    if (_flowAnalysis != null) {
+      // This is a local function.
+      node.functionExpression.accept(this);
+    } else {
+      createFlowAnalysis(node, node.functionExpression.parameters);
+      // Initialize a new postDominator scope that contains only the parameters.
+      try {
+        node.functionExpression.accept(this);
+        _flowAnalysis.finish();
+      } finally {
+        _flowAnalysis = null;
+        _assignedVariables = null;
+      }
+    }
+    return null;
+  }
+
+  @override
+  DartType visitFunctionExpression(FunctionExpression node) {
+    node.parameters?.accept(this);
+    _addParametersToFlowAnalysis(node.parameters);
+    node.body.accept(this);
     return null;
   }
 
@@ -413,6 +470,19 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
     }
     return (node.staticType as TypeImpl)
         .withNullability(NullabilitySuffix.none);
+  }
+
+  @override
+  DartType visitMethodDeclaration(MethodDeclaration node) {
+    createFlowAnalysis(node, node.parameters);
+    try {
+      node.visitChildren(this);
+      _flowAnalysis.finish();
+    } finally {
+      _flowAnalysis = null;
+      _assignedVariables = null;
+    }
+    return null;
   }
 
   @override
@@ -620,6 +690,14 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
       VariableDeclarationStatement node) {
     node.variables.accept(this);
     return null;
+  }
+
+  void _addParametersToFlowAnalysis(FormalParameterList parameters) {
+    if (parameters != null) {
+      for (var parameter in parameters.parameters) {
+        _flowAnalysis.initialize(parameter.declaredElement);
+      }
+    }
   }
 
   /// Computes the type that [element] will have after migration.
