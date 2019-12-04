@@ -2109,7 +2109,7 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
       Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
     _FixBuilder fixBuilder = _FixBuilder(node, testSource,
         decoratedClassHierarchy, typeProvider, typeSystem, variables);
-    node.thisOrAncestorOfType<CompilationUnit>().accept(fixBuilder);
+    fixBuilder.visitAll(node.thisOrAncestorOfType<CompilationUnit>());
     var type = fixBuilder.expressionType[node];
     expect((type as TypeImpl).toString(withNullability: true), expectedType);
     expect(fixBuilder.changes, changes);
