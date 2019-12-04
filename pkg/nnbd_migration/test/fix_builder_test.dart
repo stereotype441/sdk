@@ -2127,19 +2127,6 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
     expect(fixBuilder.changes, changes);
     expect(fixBuilder.problems, problems);
   }
-
-  _FixBuilder _createFixBuilder(AstNode node) {
-    var fixBuilder = _FixBuilder(node, testSource, decoratedClassHierarchy,
-        typeProvider, typeSystem, variables);
-    var body = node.thisOrAncestorOfType<FunctionBody>();
-    var declaration = body.thisOrAncestorOfType<Declaration>();
-    FormalParameterList parameters;
-    if (declaration is FunctionDeclaration) {
-      parameters = declaration.functionExpression.parameters;
-    }
-    fixBuilder.createFlowAnalysis(declaration, parameters);
-    return fixBuilder;
-  }
 }
 
 class _FixBuilder extends FixBuilder {
