@@ -348,7 +348,6 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
 
   @override
   DartType visitEmptyFunctionBody(EmptyFunctionBody node) {
-    // TODO(paulberry): implement this
     return null;
   }
 
@@ -366,19 +365,25 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
 
   @override
   DartType visitExtendsClause(ExtendsClause node) {
-    // TODO(paulberry): implement this
+    // TODO(paulberry): this is a hack to allow tests to continue passing while
+    // we prepare to rewrite FixBuilder.  If this had been a real implementation
+    // we would need to actually visit the node's children.
     return null;
   }
 
   @override
   DartType visitFieldDeclaration(FieldDeclaration node) {
-    // TODO(paulberry): implement this
+    // TODO(paulberry): this is a hack to allow tests to continue passing while
+    // we prepare to rewrite FixBuilder.  If this had been a real implementation
+    // we would need to actually visit the node's children.
     return null;
   }
 
   @override
   DartType visitFormalParameterList(FormalParameterList node) {
-    // TODO(paulberry): implement this.
+    // TODO(paulberry): this is a hack to allow tests to continue passing while
+    // we prepare to rewrite FixBuilder.  If this had been a real implementation
+    // we would need to actually visit the node's children.
     return null;
   }
 
@@ -441,7 +446,9 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
 
   @override
   DartType visitImplementsClause(ImplementsClause node) {
-    // TODO(paulberry): implement this
+    // TODO(paulberry): this is a hack to allow tests to continue passing while
+    // we prepare to rewrite FixBuilder.  If this had been a real implementation
+    // we would need to actually visit the node's children.
     return null;
   }
 
@@ -643,6 +650,18 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   }
 
   @override
+  DartType visitReturnStatement(ReturnStatement node) {
+    // TODO(paulberry): this is a hack to allow tests to continue passing while
+    // we prepare to rewrite FixBuilder.  If this had been a real implementation
+    // we would need to compute the correct context to pass to
+    // visitSubexpression.
+    if (node.expression != null) {
+      visitSubexpression(node.expression, UnknownInferredType.instance);
+    }
+    return null;
+  }
+
+  @override
   DartType visitSimpleIdentifier(SimpleIdentifier node) {
     assert(!node.inSetterContext(),
         'Should use visitAssignmentTarget in setter contexts');
@@ -678,14 +697,18 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
 
   @override
   DartType visitSuperExpression(SuperExpression node) {
-    // TODO(paulberry): implement this.
+    // TODO(paulberry): this is a hack to allow tests to continue passing while
+    // we prepare to rewrite FixBuilder.  If this had been a real implementation
+    // we would need to compute the correct type to return.
     node.visitChildren(this);
     return typeProvider.dynamicType;
   }
 
   @override
   DartType visitThisExpression(ThisExpression node) {
-    // TODO(paulberry): implement this.
+    // TODO(paulberry): this is a hack to allow tests to continue passing while
+    // we prepare to rewrite FixBuilder.  If this had been a real implementation
+    // we would need to compute the correct type to return.
     node.visitChildren(this);
     return typeProvider.dynamicType;
   }
@@ -722,14 +745,19 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
                 ? NullabilitySuffix.question
                 : NullabilitySuffix.none);
       } else {
-        // TODO(paulberry): implement this
+        // TODO(paulberry): this is a hack to allow tests to continue passing
+        // while we prepare to rewrite FixBuilder.  If this had been a real
+        // implementation we would need to actually visit the node's children
+        // and compute a type.
       }
     }
   }
 
   @override
   DartType visitTypeParameterList(TypeParameterList node) {
-    // TODO(paulberry): implement this.
+    // TODO(paulberry): this is a hack to allow tests to continue passing while
+    // we prepare to rewrite FixBuilder.  If this had been a real implementation
+    // we would need to actually visit the node's children.
     return null;
   }
 
