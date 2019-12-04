@@ -125,6 +125,8 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
 
   void setExpressionType(Expression node, DartType type);
 
+  void setTypeAnnotationType(TypeAnnotation node, DartType type);
+
   @override
   DartType visitArgumentList(ArgumentList node) {
     for (var argument in node.arguments) {
@@ -751,6 +753,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
     }
     if (decoratedType.type.isDynamic || decoratedType.type.isVoid) {
       // Already nullable.  Nothing to do.
+      setTypeAnnotationType(node, decoratedType.type);
       return decoratedType.type;
     } else {
       var element = decoratedType.type.element;
@@ -759,10 +762,12 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
         if (isNullable) {
           addChange(node, MakeNullable());
         }
-        return InterfaceTypeImpl.explicit(element, arguments,
+        var migratedType = InterfaceTypeImpl.explicit(element, arguments,
             nullabilitySuffix: isNullable
                 ? NullabilitySuffix.question
                 : NullabilitySuffix.none);
+        setTypeAnnotationType(node, migratedType);
+        return migratedType;
       } else {
         // TODO(paulberry): this is a hack to allow tests to continue passing
         // while we prepare to rewrite FixBuilder.  If this had been a real
