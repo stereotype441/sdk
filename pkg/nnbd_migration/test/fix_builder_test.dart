@@ -2103,9 +2103,9 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
   void visitStatement(Statement node,
       {Map<AstNode, NodeChange> changes = const <Expression, NodeChange>{},
       Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
-    _FixBuilder fixBuilder = _createFixBuilder(node);
-    var type = node.accept(fixBuilder);
-    expect(type, null);
+    _FixBuilder fixBuilder = _FixBuilder(node, testSource, decoratedClassHierarchy,
+        typeProvider, typeSystem, variables);
+    node.thisOrAncestorOfType<CompilationUnit>().accept(fixBuilder);
     expect(fixBuilder.changes, changes);
     expect(fixBuilder.problems, problems);
   }
