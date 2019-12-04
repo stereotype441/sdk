@@ -504,7 +504,7 @@ class ResolverVisitor extends ScopedVisitor {
   StaticTypeAnalyzer typeAnalyzer;
 
   /// The type system in use during resolution.
-  TypeSystemImpl typeSystem;
+  final TypeSystemImpl typeSystem;
 
   /// The class declaration representing the class containing the current node,
   /// or `null` if the current node is not contained in a class.
@@ -578,6 +578,7 @@ class ResolverVisitor extends ScopedVisitor {
             inheritanceManager,
             definingLibrary,
             source,
+            definingLibrary.typeSystem,
             typeProvider,
             errorListener,
             featureSet ??
@@ -593,6 +594,7 @@ class ResolverVisitor extends ScopedVisitor {
       this.inheritance,
       LibraryElement definingLibrary,
       Source source,
+      this.typeSystem,
       TypeProvider typeProvider,
       AnalysisErrorListener errorListener,
       FeatureSet featureSet,
@@ -610,7 +612,6 @@ class ResolverVisitor extends ScopedVisitor {
                 featureSet.isEnabled(Feature.spread_collections),
         super(definingLibrary, source, typeProvider, errorListener,
             nameScope: nameScope) {
-    this.typeSystem = definingLibrary.typeSystem;
     this._promoteManager = TypePromotionManager(typeSystem);
     this.extensionResolver = ExtensionMemberResolver(this);
     this.elementResolver = new ElementResolver(this,
@@ -2685,6 +2686,7 @@ class ResolverVisitorForMigration extends ResolverVisitor {
             inheritanceManager,
             definingLibrary,
             source,
+            typeSystem,
             typeProvider,
             errorListener,
             featureSet,
