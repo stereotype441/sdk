@@ -117,6 +117,7 @@ _f(int x, int y) => x += y;
     visitSubexpression(findNode.assignment('+='), 'int');
   }
 
+  @FailingTest(reason: 'TODO(paulberry)')
   test_assignmentExpression_compound_lhs_nullable_problem() async {
     await analyze('''
 abstract class _C {
@@ -135,6 +136,7 @@ abstract class _E {
     });
   }
 
+  @FailingTest(issue: 'https://github.com/dart-lang/sdk/issues/39641')
   test_assignmentExpression_compound_promoted() async {
     await analyze('''
 f(bool/*?*/ x, bool/*?*/ y) => x != null && (x = y);

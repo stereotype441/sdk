@@ -207,13 +207,14 @@ class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
 
   @override
   DartType modifyExpressionType(Expression node, DartType type) {
+    if (type.isDynamic) return type;
+    if (!_fixBuilder._typeSystem.isNullable(type)) return type;
     if (_needsNullCheckDueToStructure(node)) {
       _fixBuilder.addChange(node, NullCheck());
       return _fixBuilder._typeSystem.promoteToNonNull(type as TypeImpl);
     }
     var context = InferenceContext.getContext(node) ?? DynamicTypeImpl.instance;
-    if (_fixBuilder._doesAssignmentNeedCheck(from: type, to: context)) {
-      throw 'TODO(paulberry): make sure this branch is tested';
+    if (!_fixBuilder._typeSystem.isNullable(context)) {
       _fixBuilder.addChange(node, NullCheck());
       return _fixBuilder._typeSystem.promoteToNonNull(type as TypeImpl);
     }
@@ -224,8 +225,11 @@ class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
     var parent = node.parent;
     if (parent is BinaryExpression) {
       if (identical(node, parent.leftOperand)) {
-        if (parent.operator.type == TokenType.QUESTION_QUESTION) {
-          throw 'TODO(paulberry)';
+        var operatorType = parent.operator.type;
+        if (operatorType == TokenType.QUESTION_QUESTION ||
+            operatorType == TokenType.EQ_EQ ||
+            operatorType == TokenType.BANG_EQ) {
+          return false;
         } else {
           return true;
         }
