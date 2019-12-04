@@ -98,7 +98,7 @@ abstract class FixBuilder {
     // TODO(paulberry): once the feature is no longer experimental, change the
     // way we enable it in the resolver.
     var featureSet = FeatureSet.forTesting(
-        sdkVersion: '2.6', additionalFeatures: [Feature.non_nullable]);
+        sdkVersion: '2.6.0', additionalFeatures: [Feature.non_nullable]);
     _resolver = ResolverVisitorForMigration(
         inheritanceManager,
         definingLibrary,
@@ -118,6 +118,49 @@ abstract class FixBuilder {
 
   void visitAll(CompilationUnit unit) {
     unit.accept(_resolver);
+  }
+
+  /// Computes the type that [element] will have after migration.
+  ///
+  /// If [targetType] is present, and [element] is a class member, it is the
+  /// type of the class within which [element] is being accessed; this is used
+  /// to perform the correct substitutions.
+  DartType _computeMigratedType(Element element, {DartType targetType}) {
+    element = element.declaration;
+    DartType type;
+    if (element is ClassElement || element is TypeParameterElement) {
+      return typeProvider.typeType;
+    } else if (element is PropertyAccessorElement) {
+      if (element.isSynthetic) {
+        type = _variables
+            .decoratedElementType(element.variable)
+            .toFinalType(typeProvider);
+      } else {
+        var functionType = _variables.decoratedElementType(element);
+        var decoratedType = element.isGetter
+            ? functionType.returnType
+            : functionType.positionalParameters[0];
+        type = decoratedType.toFinalType(typeProvider);
+      }
+    } else {
+      type = _variables.decoratedElementType(element).toFinalType(typeProvider);
+    }
+    if (targetType is InterfaceType && targetType.typeArguments.isNotEmpty) {
+      var superclass = element.enclosingElement as ClassElement;
+      var class_ = targetType.element;
+      if (class_ != superclass) {
+        var supertype = _decoratedClassHierarchy
+            .getDecoratedSupertype(class_, superclass)
+            .toFinalType(typeProvider) as InterfaceType;
+        type = Substitution.fromInterfaceType(supertype).substituteType(type);
+      }
+      return substitute(type, {
+        for (int i = 0; i < targetType.typeArguments.length; i++)
+          class_.typeParameters[i]: targetType.typeArguments[i]
+      });
+    } else {
+      return type;
+    }
   }
 
   static TypeSystemImpl _makeNnbdTypeSystem(
@@ -144,6 +187,14 @@ class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
   final FixBuilder _fixBuilder;
 
   MigrationResolutionHooksImpl(this._fixBuilder);
+
+  @override
+  DartType getElementReturnType(FunctionTypedElement element) =>
+      (_fixBuilder._computeMigratedType(element) as FunctionType).returnType;
+
+  @override
+  DartType getVariableType(VariableElement variable) =>
+      _fixBuilder._computeMigratedType(variable);
 }
 
 /// Base class representing a change the FixBuilder wishes to make to an AST
