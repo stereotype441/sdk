@@ -121,6 +121,8 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
         DartType>(TypeSystemTypeOperations(_typeSystem), _assignedVariables);
   }
 
+  void setExpressionType(Expression node, DartType type);
+
   @override
   DartType visitArgumentList(ArgumentList node) {
     for (var argument in node.arguments) {
@@ -352,7 +354,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
 
   @override
   DartType visitExpressionFunctionBody(ExpressionFunctionBody node) {
-    node.expression.accept(this);
+    visitSubexpression(node.expression, UnknownInferredType.instance);
     return null;
   }
 
@@ -662,8 +664,11 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
       if (_doesAssignmentNeedCheck(from: type, to: contextType)) {
         addChange(subexpression, NullCheck());
         _flowAnalysis.nonNullAssert_end(subexpression);
-        return _typeSystem.promoteToNonNull(type as TypeImpl);
+        var promotedType = _typeSystem.promoteToNonNull(type as TypeImpl);
+        setExpressionType(subexpression, promotedType);
+        return promotedType;
       } else {
+        setExpressionType(subexpression, type);
         return type;
       }
     } finally {
