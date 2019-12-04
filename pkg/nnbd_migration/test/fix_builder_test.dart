@@ -2119,8 +2119,10 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
   void visitTypeAnnotation(TypeAnnotation node, String expectedType,
       {Map<AstNode, NodeChange> changes = const <AstNode, NodeChange>{},
       Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
-    _FixBuilder fixBuilder = _createFixBuilder(node);
-    var type = node.accept(fixBuilder);
+    _FixBuilder fixBuilder = _FixBuilder(node, testSource,
+        decoratedClassHierarchy, typeProvider, typeSystem, variables);
+    node.thisOrAncestorOfType<CompilationUnit>().accept(fixBuilder);
+    var type = fixBuilder.typeAnnotationType[node];
     expect((type as TypeImpl).toString(withNullability: true), expectedType);
     expect(fixBuilder.changes, changes);
     expect(fixBuilder.problems, problems);
@@ -2151,6 +2153,8 @@ class _FixBuilder extends FixBuilder {
 
   Map<Expression, DartType> expressionType = {};
 
+  Map<TypeAnnotation, DartType> typeAnnotationType = {};
+
   _FixBuilder(
       this.scope,
       Source source,
@@ -2178,6 +2182,11 @@ class _FixBuilder extends FixBuilder {
   @override
   void setExpressionType(Expression node, DartType type) {
     expressionType[node] = type;
+  }
+
+  @override
+  void setTypeAnnotationType(TypeAnnotation node, DartType type) {
+    typeAnnotationType[node] = type;
   }
 
   @override
