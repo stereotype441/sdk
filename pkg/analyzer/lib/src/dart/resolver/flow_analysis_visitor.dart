@@ -287,6 +287,12 @@ class FlowAnalysisHelperForMigration extends FlowAnalysisHelper {
   FlowAnalysisHelperForMigration(
       TypeSystem typeSystem, this.migrationResolutionHooks)
       : super(typeSystem, false);
+
+  @override
+  LocalVariableTypeProvider get localVariableTypeProvider {
+    return _LocalVariableTypeProviderForMigration(
+        this, migrationResolutionHooks);
+  }
 }
 
 class TypeSystemTypeOperations
@@ -546,6 +552,22 @@ class _LocalVariableTypeProvider implements LocalVariableTypeProvider {
       var promotedType = _manager.flow?.variableRead(node, variable);
       if (promotedType != null) return promotedType;
     }
-    return variable.type;
+    return _getDeclaredType(variable);
+  }
+
+  DartType _getDeclaredType(VariableElement variable) => variable.type;
+}
+
+class _LocalVariableTypeProviderForMigration
+    extends _LocalVariableTypeProvider {
+  final MigrationResolutionHooks _migrationResolutionHooks;
+
+  _LocalVariableTypeProviderForMigration(
+      FlowAnalysisHelper manager, this._migrationResolutionHooks)
+      : super(manager);
+
+  @override
+  DartType _getDeclaredType(VariableElement variable) {
+    return _migrationResolutionHooks.getVariableType(variable);
   }
 }
