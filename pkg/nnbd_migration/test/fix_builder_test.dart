@@ -100,7 +100,7 @@ abstract class _E {
     });
   }
 
-  solo_test_assignmentExpression_compound_dynamic() async {
+  test_assignmentExpression_compound_dynamic() async {
     // To confirm that the RHS is visited, we check that a null check was
     // properly inserted into a subexpression of the RHS.
     await analyze('''
