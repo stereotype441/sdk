@@ -3,6 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type_provider.dart';
@@ -2092,8 +2093,7 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
       Expression node, String expectedReadType, String expectedWriteType,
       {Map<AstNode, NodeChange> changes = const <Expression, NodeChange>{},
       Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
-    var fixBuilder = _FixBuilder(node, testSource, decoratedClassHierarchy,
-        typeProvider, typeSystem, variables);
+    var fixBuilder = _createFixBuilder(node);
     fixBuilder.visitAll(node.thisOrAncestorOfType<CompilationUnit>());
     var targetInfo = _computeAssignmentTargetInfo(node);
     if (expectedReadType == null) {
@@ -2111,8 +2111,7 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
   void visitStatement(Statement node,
       {Map<AstNode, NodeChange> changes = const <Expression, NodeChange>{},
       Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
-    _FixBuilder fixBuilder = _FixBuilder(node, testSource,
-        decoratedClassHierarchy, typeProvider, typeSystem, variables);
+    _FixBuilder fixBuilder = _createFixBuilder(node);
     fixBuilder.visitAll(node.thisOrAncestorOfType<CompilationUnit>());
     expect(fixBuilder.changes, changes);
     expect(fixBuilder.problems, problems);
@@ -2121,8 +2120,7 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
   void visitSubexpression(Expression node, String expectedType,
       {Map<AstNode, NodeChange> changes = const <Expression, NodeChange>{},
       Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
-    _FixBuilder fixBuilder = _FixBuilder(node, testSource,
-        decoratedClassHierarchy, typeProvider, typeSystem, variables);
+    _FixBuilder fixBuilder = _createFixBuilder(node);
     fixBuilder.visitAll(node.thisOrAncestorOfType<CompilationUnit>());
     var type = node.staticType;
     expect((type as TypeImpl).toString(withNullability: true), expectedType);
@@ -2133,8 +2131,7 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
   void visitTypeAnnotation(TypeAnnotation node, String expectedType,
       {Map<AstNode, NodeChange> changes = const <AstNode, NodeChange>{},
       Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
-    _FixBuilder fixBuilder = _FixBuilder(node, testSource,
-        decoratedClassHierarchy, typeProvider, typeSystem, variables);
+    _FixBuilder fixBuilder = _createFixBuilder(node);
     fixBuilder.visitAll(node.thisOrAncestorOfType<CompilationUnit>());
     var type = node.type;
     expect((type as TypeImpl).toString(withNullability: true), expectedType);
@@ -2145,10 +2142,19 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
   AssignmentTargetInfo _computeAssignmentTargetInfo(Expression node) {
     throw UnimplementedError('TODO(paulberry)');
   }
+
+  _FixBuilder _createFixBuilder(AstNode scope) {
+    var unit = scope.thisOrAncestorOfType<CompilationUnit>();
+    var definingLibrary = unit.declaredElement.library;
+    return _FixBuilder(scope, unit, testSource, decoratedClassHierarchy,
+        typeProvider, typeSystem, variables, definingLibrary);
+  }
 }
 
 class _FixBuilder extends FixBuilder {
   final AstNode scope;
+
+  final CompilationUnit unit;
 
   final Map<AstNode, NodeChange> changes = {};
 
@@ -2156,13 +2162,15 @@ class _FixBuilder extends FixBuilder {
 
   _FixBuilder(
       this.scope,
+      this.unit,
       Source source,
       DecoratedClassHierarchy decoratedClassHierarchy,
       TypeProvider typeProvider,
       TypeSystemImpl typeSystem,
-      Variables variables)
+      Variables variables,
+      LibraryElement definingLibrary)
       : super(source, decoratedClassHierarchy, typeProvider, typeSystem,
-            variables);
+            variables, definingLibrary);
 
   @override
   void addChange(AstNode node, NodeChange change) {

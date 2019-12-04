@@ -3,6 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'package:_fe_analyzer_shared/src/flow_analysis/flow_analysis.dart';
+import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
@@ -15,6 +16,7 @@ import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type_algebra.dart';
 import 'package:analyzer/src/dart/element/type_provider.dart';
 import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
+import 'package:analyzer/src/generated/migration.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:meta/meta.dart';
@@ -74,30 +76,37 @@ abstract class FixBuilder {
       DecoratedClassHierarchy decoratedClassHierarchy,
       TypeProvider typeProvider,
       Dart2TypeSystem typeSystem,
-      Variables variables)
+      Variables variables,
+      LibraryElement definingLibrary)
       : this._(
             decoratedClassHierarchy,
             _makeNnbdTypeSystem(
                 (typeProvider as TypeProviderImpl).asNonNullableByDefault,
                 typeSystem),
             variables,
-            source);
+            source,
+            definingLibrary);
 
   FixBuilder._(this._decoratedClassHierarchy, this._typeSystem, this._variables,
-      this.source)
+      this.source, LibraryElement definingLibrary)
       : typeProvider = _typeSystem.typeProvider {
     assert(_typeSystem.isNonNullableByDefault);
     assert((typeProvider as TypeProviderImpl).isNonNullableByDefault);
     var inheritanceManager = InheritanceManager3();
     // TODO(paulberry): is it a bad idea to throw away errors?
     var errorListener = AnalysisErrorListener.NULL_LISTENER;
+    // TODO(paulberry): once the feature is no longer experimental, change the
+    // way we enable it in the resolver.
+    var featureSet = FeatureSet.forTesting(
+        sdkVersion: '2.6', additionalFeatures: [Feature.non_nullable]);
     _resolver = ResolverVisitorForMigration(
         inheritanceManager,
         definingLibrary,
         source,
         typeProvider,
         errorListener,
-        typeSystem,
+        _typeSystem,
+        featureSet,
         MigrationResolutionHooksImpl(this));
   }
 
@@ -129,6 +138,12 @@ class MakeNullable implements NodeChange {
   factory MakeNullable() => const MakeNullable._();
 
   const MakeNullable._();
+}
+
+class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
+  final FixBuilder _fixBuilder;
+
+  MigrationResolutionHooksImpl(this._fixBuilder);
 }
 
 /// Base class representing a change the FixBuilder wishes to make to an AST
