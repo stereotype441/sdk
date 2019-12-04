@@ -10,6 +10,7 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/dart/element/type_system.dart';
 import 'package:analyzer/src/dart/element/type.dart';
+import 'package:analyzer/src/generated/migration.dart';
 import 'package:analyzer/src/generated/type_system.dart' show TypeSystemImpl;
 import 'package:analyzer/src/generated/variable_type_provider.dart';
 
@@ -53,10 +54,9 @@ class FlowAnalysisHelper {
   FlowAnalysis<AstNode, Statement, Expression, PromotableElement, DartType>
       flow;
 
-  factory FlowAnalysisHelper(TypeSystem typeSystem, bool retainDataForTesting) {
-    return FlowAnalysisHelper._(TypeSystemTypeOperations(typeSystem),
-        retainDataForTesting ? FlowAnalysisDataForTesting() : null);
-  }
+  FlowAnalysisHelper(TypeSystem typeSystem, bool retainDataForTesting)
+      : this._(TypeSystemTypeOperations(typeSystem),
+            retainDataForTesting ? FlowAnalysisDataForTesting() : null);
 
   FlowAnalysisHelper._(this._typeOperations, this.dataForTesting);
 
@@ -279,6 +279,14 @@ class FlowAnalysisHelper {
     }
     return null;
   }
+}
+
+class FlowAnalysisHelperForMigration extends FlowAnalysisHelper {
+  final MigrationResolutionHooks migrationResolutionHooks;
+
+  FlowAnalysisHelperForMigration(
+      TypeSystem typeSystem, this.migrationResolutionHooks)
+      : super(typeSystem, false);
 }
 
 class TypeSystemTypeOperations
