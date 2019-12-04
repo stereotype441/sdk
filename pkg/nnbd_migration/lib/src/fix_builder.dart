@@ -163,6 +163,15 @@ abstract class FixBuilder {
     }
   }
 
+  /// Determines whether a null check is needed when assigning a value of type
+  /// [from] to a context of type [to].
+  bool _doesAssignmentNeedCheck(
+      {@required DartType from, @required DartType to}) {
+    return !from.isDynamic &&
+        _typeSystem.isNullable(from) &&
+        !_typeSystem.isNullable(to);
+  }
+
   static TypeSystemImpl _makeNnbdTypeSystem(
       TypeProvider nnbdTypeProvider, Dart2TypeSystem typeSystem) {
     // TODO(paulberry): do we need to test both possible values of
@@ -195,6 +204,35 @@ class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
   @override
   DartType getVariableType(VariableElement variable) =>
       _fixBuilder._computeMigratedType(variable);
+
+  @override
+  DartType modifyExpressionType(Expression node, DartType type) {
+    if (_needsNullCheckDueToStructure(node)) {
+      _fixBuilder.addChange(node, NullCheck());
+      return _fixBuilder._typeSystem.promoteToNonNull(type as TypeImpl);
+    }
+    var context = InferenceContext.getContext(node) ?? DynamicTypeImpl.instance;
+    if (_fixBuilder._doesAssignmentNeedCheck(from: type, to: context)) {
+      throw 'TODO(paulberry): make sure this branch is tested';
+      _fixBuilder.addChange(node, NullCheck());
+      return _fixBuilder._typeSystem.promoteToNonNull(type as TypeImpl);
+    }
+    return type;
+  }
+
+  bool _needsNullCheckDueToStructure(Expression node) {
+    var parent = node.parent;
+    if (parent is BinaryExpression) {
+      if (identical(node, parent.leftOperand)) {
+        if (parent.operator.type == TokenType.QUESTION_QUESTION) {
+          throw 'TODO(paulberry)';
+        } else {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
 }
 
 /// Base class representing a change the FixBuilder wishes to make to an AST

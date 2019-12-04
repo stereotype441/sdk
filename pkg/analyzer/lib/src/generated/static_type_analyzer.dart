@@ -2218,6 +2218,14 @@ class StaticTypeAnalyzerForMigration extends StaticTypeAnalyzer {
       element == null
           ? super._getElementReturnType(element)
           : migrationResolutionHooks.getElementReturnType(element);
+
+  @override
+  void _recordStaticType(Expression expression, DartType type) {
+    super._recordStaticType(
+        expression,
+        migrationResolutionHooks.modifyExpressionType(
+            expression, type ?? _dynamicType));
+  }
 }
 
 class _InferredCollectionElementTypeInformation {
