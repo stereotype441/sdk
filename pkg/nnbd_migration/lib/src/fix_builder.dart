@@ -9,6 +9,8 @@ import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
+import 'package:analyzer/error/listener.dart';
+import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type_algebra.dart';
 import 'package:analyzer/src/dart/element/type_provider.dart';
@@ -83,7 +85,21 @@ abstract class FixBuilder {
 
   FixBuilder._(this._decoratedClassHierarchy, this._typeSystem, this._variables,
       this.source)
-      : typeProvider = _typeSystem.typeProvider;
+      : typeProvider = _typeSystem.typeProvider {
+    assert(_typeSystem.isNonNullableByDefault);
+    assert((typeProvider as TypeProviderImpl).isNonNullableByDefault);
+    var inheritanceManager = InheritanceManager3();
+    // TODO(paulberry): is it a bad idea to throw away errors?
+    var errorListener = AnalysisErrorListener.NULL_LISTENER;
+    _resolver = ResolverVisitorForMigration(
+        inheritanceManager,
+        definingLibrary,
+        source,
+        typeProvider,
+        errorListener,
+        typeSystem,
+        MigrationResolutionHooksImpl(this));
+  }
 
   /// Called whenever an AST node is found that needs to be changed.
   void addChange(AstNode node, NodeChange change);

@@ -53,7 +53,7 @@ class FixBuilderTest extends EdgeBuilderTestBase {
     return unit;
   }
 
-  test_assignmentExpression_compound_combined_nullable_noProblem() async {
+  solo_test_assignmentExpression_compound_combined_nullable_noProblem() async {
     await analyze('''
 abstract class _C {
   _D/*?*/ operator+(int/*!*/ value);
