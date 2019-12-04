@@ -606,6 +606,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   @override
   DartType visitParenthesizedExpression(ParenthesizedExpression node) {
     var result = node.expression.accept(this);
+    setExpressionType(node.expression, result);
     _flowAnalysis.parenthesizedExpression(node, node.expression);
     return result;
   }
