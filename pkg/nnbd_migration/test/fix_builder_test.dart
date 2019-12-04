@@ -23,6 +23,20 @@ main() {
   });
 }
 
+/// Information about the target of an assignment expression analyzed by
+/// [FixBuilder].
+class AssignmentTargetInfo {
+  /// The type that the assignment target has when read.  This is only relevant
+  /// for compound assignments (since they both read and write the assignment
+  /// target)
+  final DartType readType;
+
+  /// The type that the assignment target has when written to.
+  final DartType writeType;
+
+  AssignmentTargetInfo(this.readType, this.writeType);
+}
+
 @reflectiveTest
 class FixBuilderTest extends EdgeBuilderTestBase {
   DartType get dynamicType => postMigrationTypeProvider.dynamicType;
@@ -2081,7 +2095,7 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
     var fixBuilder = _FixBuilder(node, testSource, decoratedClassHierarchy,
         typeProvider, typeSystem, variables);
     fixBuilder.visitAll(node.thisOrAncestorOfType<CompilationUnit>());
-    var targetInfo = fixBuilder.assignmentTargetInfo[node];
+    var targetInfo = _computeAssignmentTargetInfo(node);
     if (expectedReadType == null) {
       expect(targetInfo.readType, null);
     } else {
@@ -2110,7 +2124,7 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
     _FixBuilder fixBuilder = _FixBuilder(node, testSource,
         decoratedClassHierarchy, typeProvider, typeSystem, variables);
     fixBuilder.visitAll(node.thisOrAncestorOfType<CompilationUnit>());
-    var type = fixBuilder.expressionType[node];
+    var type = node.staticType;
     expect((type as TypeImpl).toString(withNullability: true), expectedType);
     expect(fixBuilder.changes, changes);
     expect(fixBuilder.problems, problems);
@@ -2122,10 +2136,14 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
     _FixBuilder fixBuilder = _FixBuilder(node, testSource,
         decoratedClassHierarchy, typeProvider, typeSystem, variables);
     fixBuilder.visitAll(node.thisOrAncestorOfType<CompilationUnit>());
-    var type = fixBuilder.typeAnnotationType[node];
+    var type = node.type;
     expect((type as TypeImpl).toString(withNullability: true), expectedType);
     expect(fixBuilder.changes, changes);
     expect(fixBuilder.problems, problems);
+  }
+
+  AssignmentTargetInfo _computeAssignmentTargetInfo(Expression node) {
+    throw UnimplementedError('TODO(paulberry)');
   }
 }
 
@@ -2135,12 +2153,6 @@ class _FixBuilder extends FixBuilder {
   final Map<AstNode, NodeChange> changes = {};
 
   final Map<AstNode, Set<Problem>> problems = {};
-
-  Map<Expression, AssignmentTargetInfo> assignmentTargetInfo = {};
-
-  Map<Expression, DartType> expressionType = {};
-
-  Map<TypeAnnotation, DartType> typeAnnotationType = {};
 
   _FixBuilder(
       this.scope,
@@ -2164,22 +2176,6 @@ class _FixBuilder extends FixBuilder {
     if (!_isInScope(node)) return;
     var newlyAdded = (problems[node] ??= {}).add(problem);
     expect(newlyAdded, true);
-  }
-
-  @override
-  void setExpressionType(Expression node, DartType type) {
-    expressionType[node] = type;
-  }
-
-  @override
-  void setTypeAnnotationType(TypeAnnotation node, DartType type) {
-    typeAnnotationType[node] = type;
-  }
-
-  @override
-  AssignmentTargetInfo visitAssignmentTarget(Expression node, bool isCompound) {
-    return assignmentTargetInfo[node] =
-        super.visitAssignmentTarget(node, isCompound);
   }
 
   bool _isInScope(AstNode node) {

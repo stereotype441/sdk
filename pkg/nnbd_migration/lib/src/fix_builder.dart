@@ -20,20 +20,6 @@ import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
 import 'package:nnbd_migration/src/utilities/resolution_utils.dart';
 import 'package:nnbd_migration/src/variables.dart';
 
-/// Information about the target of an assignment expression analyzed by
-/// [FixBuilder].
-class AssignmentTargetInfo {
-  /// The type that the assignment target has when read.  This is only relevant
-  /// for compound assignments (since they both read and write the assignment
-  /// target)
-  final DartType readType;
-
-  /// The type that the assignment target has when written to.
-  final DartType writeType;
-
-  AssignmentTargetInfo(this.readType, this.writeType);
-}
-
 /// Problem reported by [FixBuilder] when encountering a compound assignment
 /// for which the combination result is nullable.  This occurs if the compound
 /// assignment resolves to a user-defined operator that returns a nullable type,
