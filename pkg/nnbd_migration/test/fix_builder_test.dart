@@ -2105,7 +2105,7 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
       Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
     _FixBuilder fixBuilder = _FixBuilder(node, testSource, decoratedClassHierarchy,
         typeProvider, typeSystem, variables);
-    node.thisOrAncestorOfType<CompilationUnit>().accept(fixBuilder);
+    fixBuilder.visitAll(node.thisOrAncestorOfType<CompilationUnit>());
     expect(fixBuilder.changes, changes);
     expect(fixBuilder.problems, problems);
   }
