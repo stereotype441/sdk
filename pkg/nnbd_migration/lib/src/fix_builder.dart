@@ -96,6 +96,8 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   /// The file being analyzed.
   final Source source;
 
+  DartType _returnContext;
+
   FixBuilder(this.source, this._decoratedClassHierarchy,
       TypeProvider typeProvider, this._typeSystem, this._variables)
       : typeProvider =
@@ -335,6 +337,9 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
 
   @override
   DartType visitConstructorDeclaration(ConstructorDeclaration node) {
+    // TODO(paulberry): this is a hack to allow tests to continue passing while
+    // we prepare to rewrite FixBuilder.  If this had been a real implementation
+    // we would need to set an appropriate value for _returnContext.
     createFlowAnalysis(node, node.parameters);
     try {
       node.visitChildren(this);
@@ -394,13 +399,17 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
       node.functionExpression.accept(this);
     } else {
       createFlowAnalysis(node, node.functionExpression.parameters);
-      // Initialize a new postDominator scope that contains only the parameters.
+      var oldReturnContext = _returnContext;
       try {
+        _returnContext =
+            (_computeMigratedType(node.declaredElement) as FunctionType)
+                .returnType;
         node.functionExpression.accept(this);
         _flowAnalysis.finish();
       } finally {
         _flowAnalysis = null;
         _assignedVariables = null;
+        _returnContext = oldReturnContext;
       }
     }
     return null;
@@ -521,12 +530,17 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   @override
   DartType visitMethodDeclaration(MethodDeclaration node) {
     createFlowAnalysis(node, node.parameters);
+    var oldReturnContext = _returnContext;
     try {
+      _returnContext = (_computeMigratedType(node.declaredElement,
+              unwrapPropertyAccessor: false) as FunctionType)
+          .returnType;
       node.visitChildren(this);
       _flowAnalysis.finish();
     } finally {
       _flowAnalysis = null;
       _assignedVariables = null;
+      _returnContext = oldReturnContext;
     }
     return null;
   }
@@ -651,12 +665,8 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
 
   @override
   DartType visitReturnStatement(ReturnStatement node) {
-    // TODO(paulberry): this is a hack to allow tests to continue passing while
-    // we prepare to rewrite FixBuilder.  If this had been a real implementation
-    // we would need to compute the correct context to pass to
-    // visitSubexpression.
     if (node.expression != null) {
-      visitSubexpression(node.expression, UnknownInferredType.instance);
+      visitSubexpression(node.expression, _returnContext);
     }
     return null;
   }
@@ -800,12 +810,13 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   /// If [targetType] is present, and [element] is a class member, it is the
   /// type of the class within which [element] is being accessed; this is used
   /// to perform the correct substitutions.
-  DartType _computeMigratedType(Element element, {DartType targetType}) {
+  DartType _computeMigratedType(Element element,
+      {DartType targetType, bool unwrapPropertyAccessor = true}) {
     element = element.declaration;
     DartType type;
     if (element is ClassElement || element is TypeParameterElement) {
       return typeProvider.typeType;
-    } else if (element is PropertyAccessorElement) {
+    } else if (element is PropertyAccessorElement && unwrapPropertyAccessor) {
       if (element.isSynthetic) {
         type = _variables
             .decoratedElementType(element.variable)
