@@ -293,6 +293,19 @@ class FlowAnalysisHelperForMigration extends FlowAnalysisHelper {
     return _LocalVariableTypeProviderForMigration(
         this, migrationResolutionHooks);
   }
+
+  @override
+  void topLevelDeclaration_enter(
+      Declaration node, FormalParameterList parameters, FunctionBody body) {
+    super.topLevelDeclaration_enter(node, parameters, body);
+    migrationResolutionHooks.setFlowAnalysis(flow);
+  }
+
+  @override
+  void topLevelDeclaration_exit() {
+    super.topLevelDeclaration_exit();
+    migrationResolutionHooks.setFlowAnalysis(null);
+  }
 }
 
 class TypeSystemTypeOperations

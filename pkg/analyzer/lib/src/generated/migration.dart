@@ -2,6 +2,7 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+import 'package:_fe_analyzer_shared/src/flow_analysis/flow_analysis.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
@@ -13,4 +14,8 @@ abstract class MigrationResolutionHooks {
   DartType getVariableType(VariableElement variable);
 
   DartType modifyExpressionType(Expression expression, DartType dartType);
+
+  void setFlowAnalysis(
+      FlowAnalysis<AstNode, Statement, Expression, PromotableElement, DartType>
+          flowAnalysis);
 }

@@ -195,6 +195,9 @@ class MakeNullable implements NodeChange {
 class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
   final FixBuilder _fixBuilder;
 
+  FlowAnalysis<AstNode, Statement, Expression, PromotableElement, DartType>
+      _flowAnalysis;
+
   MigrationResolutionHooksImpl(this._fixBuilder);
 
   @override
@@ -210,15 +213,26 @@ class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
     if (type.isDynamic) return type;
     if (!_fixBuilder._typeSystem.isNullable(type)) return type;
     if (_needsNullCheckDueToStructure(node)) {
-      _fixBuilder.addChange(node, NullCheck());
-      return _fixBuilder._typeSystem.promoteToNonNull(type as TypeImpl);
+      return _addNullCheck(node, type);
     }
     var context = InferenceContext.getContext(node) ?? DynamicTypeImpl.instance;
     if (!_fixBuilder._typeSystem.isNullable(context)) {
-      _fixBuilder.addChange(node, NullCheck());
-      return _fixBuilder._typeSystem.promoteToNonNull(type as TypeImpl);
+      return _addNullCheck(node, type);
     }
     return type;
+  }
+
+  @override
+  void setFlowAnalysis(
+      FlowAnalysis<AstNode, Statement, Expression, PromotableElement, DartType>
+          flowAnalysis) {
+    _flowAnalysis = flowAnalysis;
+  }
+
+  DartType _addNullCheck(Expression node, DartType type) {
+    _fixBuilder.addChange(node, NullCheck());
+    _flowAnalysis.nonNullAssert_end(node);
+    return _fixBuilder._typeSystem.promoteToNonNull(type as TypeImpl);
   }
 
   bool _needsNullCheckDueToStructure(Expression node) {
@@ -233,6 +247,11 @@ class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
         } else {
           return true;
         }
+      }
+    } else if (parent is PrefixedIdentifier) {
+      if (identical(node, parent.prefix)) {
+        // TODO(paulberry): ok for toString etc. if the shape is correct
+        return true;
       }
     }
     return false;
