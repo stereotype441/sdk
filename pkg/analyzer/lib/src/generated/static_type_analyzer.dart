@@ -18,6 +18,7 @@ import 'package:analyzer/src/dart/element/type_provider.dart';
 import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
 import 'package:analyzer/src/error/codes.dart';
 import 'package:analyzer/src/generated/engine.dart';
+import 'package:analyzer/src/generated/migration.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/utilities_dart.dart';
 import 'package:analyzer/src/generated/variable_type_provider.dart';
@@ -2197,6 +2198,17 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
       return type;
     }
   }
+}
+
+class StaticTypeAnalyzerForMigration extends StaticTypeAnalyzer {
+  final MigrationResolutionHooks migrationResolutionHooks;
+
+  StaticTypeAnalyzerForMigration(
+      ResolverVisitor resolver,
+      FeatureSet featureSet,
+      FlowAnalysisHelper flowAnalysis,
+      this.migrationResolutionHooks)
+      : super(resolver, featureSet, flowAnalysis);
 }
 
 class _InferredCollectionElementTypeInformation {
