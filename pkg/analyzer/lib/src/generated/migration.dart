@@ -6,11 +6,10 @@ import 'package:_fe_analyzer_shared/src/flow_analysis/flow_analysis.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
+import 'package:analyzer/src/generated/element_type_provider.dart';
 
 /// Hooks used by resolution to communicate with the migration engine.
-abstract class MigrationResolutionHooks {
-  DartType getElementReturnType(FunctionTypedElement element);
-
+abstract class MigrationResolutionHooks implements ElementTypeProvider {
   DartType getVariableType(VariableElement variable);
 
   DartType modifyExpressionType(Expression expression, DartType dartType);
