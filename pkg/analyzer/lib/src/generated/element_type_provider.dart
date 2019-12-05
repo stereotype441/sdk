@@ -14,5 +14,7 @@ class ElementTypeProvider {
   DartType getExecutableReturnType(FunctionTypedElement element) =>
       element.returnType;
 
+  FunctionType getExecutableType(FunctionTypedElement element) => element.type;
+
   DartType getVariableType(VariableElement variable) => variable.type;
 }
