@@ -52,7 +52,10 @@ DartType getExpressionType(
 DartType getReadType(Expression expression,
     {ElementTypeProvider elementTypeProvider: const ElementTypeProvider()}) {
   if (expression is IndexExpression) {
-    return expression.auxiliaryElements?.staticElement?.returnType;
+    var staticElement = expression.auxiliaryElements?.staticElement;
+    return staticElement == null
+        ? null
+        : elementTypeProvider.getExecutableReturnType(staticElement);
   }
   {
     Element setter;
@@ -66,7 +69,7 @@ DartType getReadType(Expression expression,
     if (setter is PropertyAccessorElement && setter.isSetter) {
       var getter = setter.variable.getter;
       if (getter != null) {
-        return elementTypeProvider.getElementReturnType(getter);
+        return elementTypeProvider.getExecutableReturnType(getter);
       }
     }
   }
@@ -76,7 +79,7 @@ DartType getReadType(Expression expression,
       var staticElement = aux.staticElement;
       return staticElement == null
           ? null
-          : elementTypeProvider.getElementReturnType(staticElement);
+          : elementTypeProvider.getExecutableReturnType(staticElement);
     }
   }
   return expression.staticType;

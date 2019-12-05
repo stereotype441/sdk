@@ -8,7 +8,10 @@ import 'package:analyzer/dart/element/type.dart';
 class ElementTypeProvider {
   const ElementTypeProvider();
 
-  DartType getElementReturnType(FunctionTypedElement element) =>
+  List<ParameterElement> getExecutableParameters(ExecutableElement element) =>
+      element.parameters;
+
+  DartType getExecutableReturnType(FunctionTypedElement element) =>
       element.returnType;
 
   FunctionType getExecutableType(FunctionTypedElement element) => element.type;
