@@ -10,6 +10,7 @@ import 'package:analyzer/src/dart/element/type_provider.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/generated/type_system.dart';
+import 'package:analyzer/src/task/strong/checker.dart';
 import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
 import 'package:nnbd_migration/src/fix_builder.dart';
 import 'package:nnbd_migration/src/variables.dart';
@@ -216,7 +217,7 @@ abstract class _F {
     visitSubexpression(findNode.assignment('??='), '_C');
   }
 
-  solo_test_assignmentExpression_null_aware_rhs_nullable() async {
+  test_assignmentExpression_null_aware_rhs_nullable() async {
     await analyze('''
 abstract class _B {}
 abstract class _C extends _B {}
@@ -260,6 +261,7 @@ _f(int/*?*/ x, int/*?*/ y) => x = y;
     visitSubexpression(findNode.assignment('= '), 'int?');
   }
 
+  @FailingTest(issue: 'https://github.com/dart-lang/sdk/issues/39641')
   test_assignmentExpression_simple_promoted() async {
     await analyze('''
 _f(bool/*?*/ x, bool/*?*/ y) => x != null && (x = y) != null;
@@ -2099,7 +2101,7 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
       Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
     var fixBuilder = _createFixBuilder(node);
     fixBuilder.visitAll(node.thisOrAncestorOfType<CompilationUnit>());
-    var targetInfo = _computeAssignmentTargetInfo(node);
+    var targetInfo = _computeAssignmentTargetInfo(node, fixBuilder);
     if (expectedReadType == null) {
       expect(targetInfo.readType, null);
     } else {
@@ -2143,8 +2145,12 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
     expect(fixBuilder.problems, problems);
   }
 
-  AssignmentTargetInfo _computeAssignmentTargetInfo(Expression node) {
-    throw UnimplementedError('TODO(paulberry)');
+  AssignmentTargetInfo _computeAssignmentTargetInfo(
+      Expression node, _FixBuilder fixBuilder) {
+    var readType = getReadType(node,
+        elementTypeProvider: MigrationResolutionHooksImpl(fixBuilder));
+    var writeType = node.staticType;
+    return AssignmentTargetInfo(readType, writeType);
   }
 
   _FixBuilder _createFixBuilder(AstNode scope) {
