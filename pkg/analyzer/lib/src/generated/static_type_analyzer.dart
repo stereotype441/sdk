@@ -398,7 +398,7 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
       _recordStaticType(node, _nonNullable(_typeProvider.boolType));
     } else {
       var operatorElement = node.staticElement;
-      var type = _getElementReturnType(operatorElement);
+      var type = _getExecutableReturnType(operatorElement);
       type = _typeSystem.refineBinaryExpressionType(
         _getStaticType(node.leftHandSide, read: true),
         operator,
@@ -1452,11 +1452,10 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
     return null;
   }
 
-  List<ParameterElement> _getElementParameters(FunctionTypedElement element) =>
-      element?.parameters;
-
-  DartType _getElementReturnType(FunctionTypedElement element) =>
+  DartType _getExecutableReturnType(FunctionTypedElement element) =>
       element?.returnType ?? _dynamicType;
+
+  FunctionType _getExecutableType(ExecutableElement element) => element.type;
 
   /**
    * Gets the definite type of expression, which can be used in cases where
@@ -1535,19 +1534,29 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
    * @return the type that should be recorded for a node that resolved to the given accessor
    */
   DartType _getTypeOfProperty(PropertyAccessorElement accessor) {
+    FunctionType functionType = _getExecutableType(accessor);
+    if (functionType == null) {
+      // TODO(brianwilkerson) Report this internal error. This happens when we
+      // are analyzing a reference to a property before we have analyzed the
+      // declaration of the property or when the property does not have a
+      // defined type.
+      return _dynamicType;
+    }
     if (accessor.isSetter) {
-      var parameters = _getElementParameters(accessor);
-      if (parameters != null && parameters.isNotEmpty) {
-        return parameters[0].type;
+      List<DartType> parameterTypes = functionType.normalParameterTypes;
+      if (parameterTypes != null && parameterTypes.isNotEmpty) {
+        return parameterTypes[0];
       }
       PropertyAccessorElement getter = accessor.variable.getter;
       if (getter != null) {
-        var returnType = _getElementReturnType(getter);
-        if (returnType != null) return returnType;
+        functionType = _getExecutableType(getter);
+        if (functionType != null) {
+          return functionType.returnType;
+        }
       }
       return _dynamicType;
     }
-    return _getElementReturnType(accessor);
+    return functionType.returnType;
   }
 
   _InferredCollectionElementTypeInformation _inferCollectionElementType(
@@ -1896,7 +1905,7 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
     if (inferredElement == null || inferredElement.isStatic) {
       return false;
     }
-    DartType inferredType = inferredElement.type.returnType;
+    DartType inferredType = _getExecutableType(inferredElement).returnType;
     if (nodeType != null &&
         nodeType.isDynamic &&
         inferredType is InterfaceType &&
@@ -2207,21 +2216,14 @@ class StaticTypeAnalyzerForMigration extends StaticTypeAnalyzer {
       : super(resolver, featureSet, flowAnalysis);
 
   @override
-  List<ParameterElement> _getElementParameters(FunctionTypedElement element) =>
+  DartType _getExecutableReturnType(FunctionTypedElement element) =>
       element == null
-          ? super._getElementParameters(element)
-          : migrationResolutionHooks.getElementParameters(element);
-
-  @override
-  DartType _getElementReturnType(FunctionTypedElement element) =>
-      element == null
-          ? super._getElementReturnType(element)
+          ? super._getExecutableReturnType(element)
           : migrationResolutionHooks.getElementReturnType(element);
 
   @override
-  DartType _getExpressionType(Expression expr, {bool read: false}) =>
-      getExpressionType(expr, _typeSystem, _typeProvider,
-          read: read, elementTypeProvider: migrationResolutionHooks);
+  FunctionType _getExecutableType(ExecutableElement element) =>
+      migrationResolutionHooks.getExecutableType(element);
 
   @override
   void _recordStaticType(Expression expression, DartType type) {
