@@ -125,21 +125,25 @@ abstract class FixBuilder {
   /// If [targetType] is present, and [element] is a class member, it is the
   /// type of the class within which [element] is being accessed; this is used
   /// to perform the correct substitutions.
-  DartType _computeMigratedType(Element element, {DartType targetType}) {
+  DartType _computeMigratedType(Element element,
+      {DartType targetType, bool unwrapAccessors: true}) {
     element = element.declaration;
     DartType type;
     if (element is ClassElement || element is TypeParameterElement) {
       return typeProvider.typeType;
     } else if (element is PropertyAccessorElement) {
       if (element.isSynthetic) {
+        assert(unwrapAccessors); // TODO(paulberry)
         type = _variables
             .decoratedElementType(element.variable)
             .toFinalType(typeProvider);
       } else {
         var functionType = _variables.decoratedElementType(element);
-        var decoratedType = element.isGetter
-            ? functionType.returnType
-            : functionType.positionalParameters[0];
+        var decoratedType = unwrapAccessors
+            ? element.isGetter
+                ? functionType.returnType
+                : functionType.positionalParameters[0]
+            : functionType;
         type = decoratedType.toFinalType(typeProvider);
       }
     } else {
@@ -201,8 +205,16 @@ class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
   MigrationResolutionHooksImpl(this._fixBuilder);
 
   @override
+  List<ParameterElement> getElementParameters(FunctionTypedElement element) =>
+      (_fixBuilder._computeMigratedType(element, unwrapAccessors: false)
+              as FunctionType)
+          .parameters;
+
+  @override
   DartType getElementReturnType(FunctionTypedElement element) =>
-      (_fixBuilder._computeMigratedType(element) as FunctionType).returnType;
+      (_fixBuilder._computeMigratedType(element, unwrapAccessors: false)
+              as FunctionType)
+          .returnType;
 
   @override
   DartType getVariableType(VariableElement variable) =>
