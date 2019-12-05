@@ -216,7 +216,7 @@ abstract class _F {
     visitSubexpression(findNode.assignment('??='), '_C');
   }
 
-  test_assignmentExpression_null_aware_rhs_nullable() async {
+  solo_test_assignmentExpression_null_aware_rhs_nullable() async {
     await analyze('''
 abstract class _B {}
 abstract class _C extends _B {}
