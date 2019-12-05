@@ -32,6 +32,50 @@ import 'package:analyzer/src/summary/idl.dart';
 
 import 'ast_properties.dart';
 
+/// Given an [expression] and a corresponding [typeSystem] and [typeProvider],
+/// gets the known static type of the expression.
+DartType getExpressionType(
+    Expression expression, TypeSystemImpl typeSystem, TypeProvider typeProvider,
+    {bool read: false}) {
+  DartType type;
+  if (read) {
+    type = getReadType(expression);
+  } else {
+    type = expression.staticType;
+  }
+  type ??= DynamicTypeImpl.instance;
+  return type;
+}
+
+DartType getReadType(Expression expression) {
+  if (expression is IndexExpression) {
+    return expression.auxiliaryElements?.staticElement?.returnType;
+  }
+  {
+    Element setter;
+    if (expression is PrefixedIdentifier) {
+      setter = expression.staticElement;
+    } else if (expression is PropertyAccess) {
+      setter = expression.propertyName.staticElement;
+    } else if (expression is SimpleIdentifier) {
+      setter = expression.staticElement;
+    }
+    if (setter is PropertyAccessorElement && setter.isSetter) {
+      var getter = setter.variable.getter;
+      if (getter != null) {
+        return getter.returnType;
+      }
+    }
+  }
+  if (expression is SimpleIdentifier) {
+    var aux = expression.auxiliaryElements;
+    if (aux != null) {
+      return aux.staticElement?.returnType;
+    }
+  }
+  return expression.staticType;
+}
+
 DartType _elementType(Element e) {
   if (e == null) {
     // Malformed code - just return dynamic.
@@ -86,9 +130,6 @@ class CodeChecker extends RecursiveAstVisitor {
   bool _failure = false;
   bool _hasImplicitCasts;
   HashSet<ExecutableElement> _covariantPrivateMembers;
-
-  final ExpressionTypeProvider _expressionTypeProvider =
-      ExpressionTypeProvider();
 
   CodeChecker(TypeProvider typeProvider, TypeSystemImpl rules, this.inheritance,
       AnalysisErrorListener reporter, this._options)
@@ -1021,7 +1062,7 @@ class CodeChecker extends RecursiveAstVisitor {
   }
 
   DartType _getExpressionType(Expression expr) =>
-      _expressionTypeProvider.getExpressionType(expr, rules, typeProvider);
+      getExpressionType(expr, rules, typeProvider);
 
   DartType _getInstanceTypeArgument(
       DartType expressionType, ClassElement instanceType) {
@@ -1368,52 +1409,6 @@ class CodeChecker extends RecursiveAstVisitor {
       _checkImplicitCast(loopVariable, loopVariableElement.type,
           from: elementType);
     }
-  }
-}
-
-class ExpressionTypeProvider {
-  /// Given an [expression] and a corresponding [typeSystem] and [typeProvider],
-  /// gets the known static type of the expression.
-  DartType getExpressionType(Expression expression, TypeSystemImpl typeSystem,
-      TypeProvider typeProvider,
-      {bool read: false}) {
-    DartType type;
-    if (read) {
-      type = getReadType(expression);
-    } else {
-      type = expression.staticType;
-    }
-    type ??= DynamicTypeImpl.instance;
-    return type;
-  }
-
-  DartType getReadType(Expression expression) {
-    if (expression is IndexExpression) {
-      return expression.auxiliaryElements?.staticElement?.returnType;
-    }
-    {
-      Element setter;
-      if (expression is PrefixedIdentifier) {
-        setter = expression.staticElement;
-      } else if (expression is PropertyAccess) {
-        setter = expression.propertyName.staticElement;
-      } else if (expression is SimpleIdentifier) {
-        setter = expression.staticElement;
-      }
-      if (setter is PropertyAccessorElement && setter.isSetter) {
-        var getter = setter.variable.getter;
-        if (getter != null) {
-          return getter.returnType;
-        }
-      }
-    }
-    if (expression is SimpleIdentifier) {
-      var aux = expression.auxiliaryElements;
-      if (aux != null) {
-        return aux.staticElement?.returnType;
-      }
-    }
-    return expression.staticType;
   }
 }
 
