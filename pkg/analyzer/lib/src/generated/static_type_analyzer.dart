@@ -646,12 +646,12 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
   void visitIndexExpression(IndexExpression node) {
     DartType type;
     if (node.inSetterContext()) {
-      var parameters = node.staticElement?.parameters;
+      var parameters = _getExecutableParameters(node.staticElement);
       if (parameters?.length == 2) {
         type = parameters[1].type;
       }
     } else {
-      type = node.staticElement?.returnType;
+      type = _getExecutableReturnType(node.staticElement);
     }
 
     type ??= _dynamicType;
@@ -1452,6 +1452,9 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
     return null;
   }
 
+  List<ParameterElement> _getExecutableParameters(ExecutableElement element) =>
+      element?.parameters;
+
   DartType _getExecutableReturnType(FunctionTypedElement element) =>
       element?.returnType ?? _dynamicType;
 
@@ -2216,10 +2219,16 @@ class StaticTypeAnalyzerForMigration extends StaticTypeAnalyzer {
       : super(resolver, featureSet, flowAnalysis);
 
   @override
+  List<ParameterElement> _getExecutableParameters(ExecutableElement element) =>
+      element == null
+          ? super._getExecutableParameters(element)
+          : migrationResolutionHooks.getExecutableParameters(element);
+
+  @override
   DartType _getExecutableReturnType(FunctionTypedElement element) =>
       element == null
           ? super._getExecutableReturnType(element)
-          : migrationResolutionHooks.getElementReturnType(element);
+          : migrationResolutionHooks.getExecutableReturnType(element);
 
   @override
   FunctionType _getExecutableType(ExecutableElement element) =>
