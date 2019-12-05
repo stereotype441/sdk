@@ -116,6 +116,9 @@ class ElementResolver extends SimpleAstVisitor<void> {
 
   final MethodInvocationResolver _methodInvocationResolver;
 
+  final ExpressionTypeProvider _expressionTypeProvider =
+      ExpressionTypeProvider();
+
   /**
    * Initialize a newly created visitor to work for the given [_resolver] to
    * resolve the nodes in a compilation unit.
@@ -1101,7 +1104,9 @@ class ElementResolver extends SimpleAstVisitor<void> {
     if (expression is NullLiteral) {
       return _resolver.typeProvider.nullType;
     }
-    DartType type = read ? getReadType(expression) : expression.staticType;
+    DartType type = read
+        ? _expressionTypeProvider.getReadType(expression)
+        : expression.staticType;
     return _resolveTypeParameter(type);
   }
 
