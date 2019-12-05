@@ -25,12 +25,62 @@ import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type_algebra.dart';
 import 'package:analyzer/src/dart/resolver/variance.dart';
 import 'package:analyzer/src/error/codes.dart' show StrongModeCode;
+import 'package:analyzer/src/generated/element_type_provider.dart';
 import 'package:analyzer/src/generated/engine.dart' show AnalysisOptionsImpl;
 import 'package:analyzer/src/generated/resolver.dart' show TypeProvider;
 import 'package:analyzer/src/generated/type_system.dart';
 import 'package:analyzer/src/summary/idl.dart';
 
 import 'ast_properties.dart';
+
+/// Given an [expression] and a corresponding [typeSystem] and [typeProvider],
+/// gets the known static type of the expression.
+DartType getExpressionType(
+    Expression expression, TypeSystemImpl typeSystem, TypeProvider typeProvider,
+    {bool read: false,
+    ElementTypeProvider elementTypeProvider: const ElementTypeProvider()}) {
+  DartType type;
+  if (read) {
+    type = getReadType(expression, elementTypeProvider: elementTypeProvider);
+  } else {
+    type = expression.staticType;
+  }
+  type ??= DynamicTypeImpl.instance;
+  return type;
+}
+
+DartType getReadType(Expression expression,
+    {ElementTypeProvider elementTypeProvider: const ElementTypeProvider()}) {
+  if (expression is IndexExpression) {
+    return expression.auxiliaryElements?.staticElement?.returnType;
+  }
+  {
+    Element setter;
+    if (expression is PrefixedIdentifier) {
+      setter = expression.staticElement;
+    } else if (expression is PropertyAccess) {
+      setter = expression.propertyName.staticElement;
+    } else if (expression is SimpleIdentifier) {
+      setter = expression.staticElement;
+    }
+    if (setter is PropertyAccessorElement && setter.isSetter) {
+      var getter = setter.variable.getter;
+      if (getter != null) {
+        return elementTypeProvider.getElementReturnType(getter);
+      }
+    }
+  }
+  if (expression is SimpleIdentifier) {
+    var aux = expression.auxiliaryElements;
+    if (aux != null) {
+      var staticElement = aux.staticElement;
+      return staticElement == null
+          ? null
+          : elementTypeProvider.getElementReturnType(staticElement);
+    }
+  }
+  return expression.staticType;
+}
 
 DartType _elementType(Element e) {
   if (e == null) {
@@ -86,9 +136,6 @@ class CodeChecker extends RecursiveAstVisitor {
   bool _failure = false;
   bool _hasImplicitCasts;
   HashSet<ExecutableElement> _covariantPrivateMembers;
-
-  final ExpressionTypeProvider _expressionTypeProvider =
-      ExpressionTypeProvider();
 
   CodeChecker(TypeProvider typeProvider, TypeSystemImpl rules, this.inheritance,
       AnalysisErrorListener reporter, this._options)
@@ -1021,7 +1068,7 @@ class CodeChecker extends RecursiveAstVisitor {
   }
 
   DartType _getExpressionType(Expression expr) =>
-      _expressionTypeProvider.getExpressionType(expr, rules, typeProvider);
+      getExpressionType(expr, rules, typeProvider);
 
   DartType _getInstanceTypeArgument(
       DartType expressionType, ClassElement instanceType) {
@@ -1368,52 +1415,6 @@ class CodeChecker extends RecursiveAstVisitor {
       _checkImplicitCast(loopVariable, loopVariableElement.type,
           from: elementType);
     }
-  }
-}
-
-class ExpressionTypeProvider {
-  /// Given an [expression] and a corresponding [typeSystem] and [typeProvider],
-  /// gets the known static type of the expression.
-  DartType getExpressionType(Expression expression, TypeSystemImpl typeSystem,
-      TypeProvider typeProvider,
-      {bool read: false}) {
-    DartType type;
-    if (read) {
-      type = getReadType(expression);
-    } else {
-      type = expression.staticType;
-    }
-    type ??= DynamicTypeImpl.instance;
-    return type;
-  }
-
-  DartType getReadType(Expression expression) {
-    if (expression is IndexExpression) {
-      return expression.auxiliaryElements?.staticElement?.returnType;
-    }
-    {
-      Element setter;
-      if (expression is PrefixedIdentifier) {
-        setter = expression.staticElement;
-      } else if (expression is PropertyAccess) {
-        setter = expression.propertyName.staticElement;
-      } else if (expression is SimpleIdentifier) {
-        setter = expression.staticElement;
-      }
-      if (setter is PropertyAccessorElement && setter.isSetter) {
-        var getter = setter.variable.getter;
-        if (getter != null) {
-          return getter.returnType;
-        }
-      }
-    }
-    if (expression is SimpleIdentifier) {
-      var aux = expression.auxiliaryElements;
-      if (aux != null) {
-        return aux.staticElement?.returnType;
-      }
-    }
-    return expression.staticType;
   }
 }
 
