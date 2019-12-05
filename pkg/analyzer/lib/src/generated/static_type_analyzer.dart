@@ -23,7 +23,7 @@ import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/utilities_dart.dart';
 import 'package:analyzer/src/generated/variable_type_provider.dart';
 import 'package:analyzer/src/task/strong/checker.dart'
-    show getExpressionType, getReadType;
+    show ExpressionTypeProvider;
 import 'package:meta/meta.dart';
 
 /**
@@ -78,6 +78,9 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
   LocalVariableTypeProvider _localVariableTypeProvider;
 
   final FlowAnalysisHelper _flowAnalysis;
+
+  final ExpressionTypeProvider _expressionTypeProvider =
+      ExpressionTypeProvider();
 
   /**
    * Initialize a newly created static type analyzer to analyze types for the
@@ -1464,7 +1467,8 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
    * equivalent to [_getStaticType].
    */
   DartType _getExpressionType(Expression expr, {bool read: false}) =>
-      getExpressionType(expr, _typeSystem, _typeProvider, read: read);
+      _expressionTypeProvider
+          .getExpressionType(expr, _typeSystem, _typeProvider, read: read);
 
   /**
    * If the given argument list contains at least one argument, and if the argument is a simple
@@ -1490,7 +1494,7 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
   DartType _getStaticType(Expression expression, {bool read: false}) {
     DartType type;
     if (read) {
-      type = getReadType(expression);
+      type = _expressionTypeProvider.getReadType(expression);
     } else {
       if (expression is SimpleIdentifier && expression.inSetterContext()) {
         var element = expression.staticElement;

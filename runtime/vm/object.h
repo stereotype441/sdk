@@ -1374,8 +1374,7 @@ class Class : public Object {
   // (type_)param_names, and is invoked with the (type)argument values given in
   // (type_)param_values.
   RawObject* EvaluateCompiledExpression(
-      const uint8_t* kernel_bytes,
-      intptr_t kernel_length,
+      const ExternalTypedData& kernel_buffer,
       const Array& type_definitions,
       const Array& param_values,
       const TypeArguments& type_param_values) const;
@@ -4154,8 +4153,7 @@ class Library : public Object {
   // parameters given in (type_)param_names, and is invoked with the (type)
   // argument values given in (type_)param_values.
   RawObject* EvaluateCompiledExpression(
-      const uint8_t* kernel_bytes,
-      intptr_t kernel_length,
+      const ExternalTypedData& kernel_buffer,
       const Array& type_definitions,
       const Array& param_values,
       const TypeArguments& type_param_values) const;
@@ -4581,6 +4579,7 @@ class KernelProgramInfo : public Object {
                                    const Array& scripts,
                                    const Array& libraries_cache,
                                    const Array& classes_cache,
+                                   const Object& retained_kernel_blob,
                                    const uint32_t binary_version);
 
   static intptr_t InstanceSize() {
@@ -6037,6 +6036,7 @@ class Context : public Object {
 
   static const intptr_t kAwaitJumpVarIndex = 0;
   static const intptr_t kAsyncCompleterIndex = 1;
+  static const intptr_t kControllerIndex = 1;
 
   static intptr_t variable_offset(intptr_t context_index) {
     return OFFSET_OF_RETURNED_VALUE(RawContext, data) +
@@ -6553,8 +6553,7 @@ class Instance : public Object {
   // argument values given in (type_)param_values.
   RawObject* EvaluateCompiledExpression(
       const Class& method_cls,
-      const uint8_t* kernel_bytes,
-      intptr_t kernel_length,
+      const ExternalTypedData& kernel_buffer,
       const Array& type_definitions,
       const Array& param_values,
       const TypeArguments& type_param_values) const;
@@ -9231,6 +9230,8 @@ class ExternalTypedData : public TypedDataBase {
                                    uint8_t* data,
                                    intptr_t len,
                                    Heap::Space space = Heap::kNew);
+
+  static RawExternalTypedData* NewFinalizeWithFree(uint8_t* data, intptr_t len);
 
   static bool IsExternalTypedData(const Instance& obj) {
     ASSERT(!obj.IsNull());
