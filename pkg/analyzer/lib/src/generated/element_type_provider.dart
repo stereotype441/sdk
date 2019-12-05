@@ -8,6 +8,9 @@ import 'package:analyzer/dart/element/type.dart';
 class ElementTypeProvider {
   const ElementTypeProvider();
 
+  List<ParameterElement> getElementParameters(FunctionTypedElement element) =>
+      element.parameters;
+
   DartType getElementReturnType(FunctionTypedElement element) =>
       element.returnType;
 
