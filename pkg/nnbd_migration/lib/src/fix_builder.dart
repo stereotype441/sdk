@@ -205,16 +205,13 @@ class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
   MigrationResolutionHooksImpl(this._fixBuilder);
 
   @override
-  List<ParameterElement> getElementParameters(FunctionTypedElement element) =>
-      (_fixBuilder._computeMigratedType(element, unwrapAccessors: false)
-              as FunctionType)
-          .parameters;
+  DartType getElementReturnType(FunctionTypedElement element) =>
+      getExecutableType(element).returnType;
 
   @override
-  DartType getElementReturnType(FunctionTypedElement element) =>
-      (_fixBuilder._computeMigratedType(element, unwrapAccessors: false)
-              as FunctionType)
-          .returnType;
+  FunctionType getExecutableType(FunctionTypedElement element) =>
+      _fixBuilder._computeMigratedType(element, unwrapAccessors: false)
+          as FunctionType;
 
   @override
   DartType getVariableType(VariableElement variable) =>
