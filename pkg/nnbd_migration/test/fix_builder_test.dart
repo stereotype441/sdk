@@ -2148,7 +2148,8 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
   AssignmentTargetInfo _computeAssignmentTargetInfo(
       Expression node, _FixBuilder fixBuilder) {
     var readType = getReadType(node,
-        elementTypeProvider: MigrationResolutionHooksImpl(fixBuilder));
+            elementTypeProvider: MigrationResolutionHooksImpl(fixBuilder)) ??
+        typeProvider.dynamicType;
     var writeType = node.staticType;
     return AssignmentTargetInfo(readType, writeType);
   }
