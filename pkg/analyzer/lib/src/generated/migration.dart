@@ -10,8 +10,6 @@ import 'package:analyzer/src/generated/element_type_provider.dart';
 
 /// Hooks used by resolution to communicate with the migration engine.
 abstract class MigrationResolutionHooks implements ElementTypeProvider {
-  DartType getVariableType(VariableElement variable);
-
   DartType modifyExpressionType(Expression expression, DartType dartType);
 
   void setFlowAnalysis(

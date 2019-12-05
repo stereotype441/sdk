@@ -10,4 +10,6 @@ class ElementTypeProvider {
 
   DartType getElementReturnType(FunctionTypedElement element) =>
       element.returnType;
+
+  DartType getVariableType(VariableElement variable) => variable.type;
 }
