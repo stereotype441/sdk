@@ -790,7 +790,8 @@ _f(int/*?*/ x, int/*?*/ y) =>
         changes: {findNode.simple('y +'): NullCheck()});
   }
 
-  solo_test_binaryExpression_question_question_nullChecked() async {
+  @FailingTest(issue: 'https://github.com/dart-lang/sdk/issues/39642')
+  test_binaryExpression_question_question_nullChecked() async {
     await analyze('''
 Object/*!*/ _f(int/*?*/ x, double/*?*/ y) {
   return x ?? y;
