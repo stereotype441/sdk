@@ -32,6 +32,7 @@ import 'package:analyzer/src/diagnostic/diagnostic_factory.dart';
 import 'package:analyzer/src/error/codes.dart';
 import 'package:analyzer/src/generated/constant.dart';
 import 'package:analyzer/src/generated/element_resolver.dart';
+import 'package:analyzer/src/generated/element_type_provider.dart';
 import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/generated/static_type_analyzer.dart';
@@ -493,6 +494,8 @@ class ResolverVisitor extends ScopedVisitor {
 
   final bool _uiAsCodeEnabled;
 
+  final ElementTypeProvider _elementTypeProvider = const ElementTypeProvider();
+
   /// Helper for extension method resolution.
   ExtensionMemberResolver extensionResolver;
 
@@ -778,7 +781,8 @@ class ResolverVisitor extends ScopedVisitor {
     node.constructorName?.accept(this);
     Element element = node.element;
     if (element is ExecutableElement) {
-      InferenceContext.setType(node.arguments, element.type);
+      InferenceContext.setType(
+          node.arguments, _elementTypeProvider.getExecutableType(element));
     }
     node.arguments?.accept(this);
     node.accept(elementResolver);
@@ -1134,7 +1138,8 @@ class ResolverVisitor extends ScopedVisitor {
       _flowAnalysis?.executableDeclaration_enter(node, node.parameters, false);
       _promoteManager.enterFunctionBody(node.body);
       _enclosingFunction = node.declaredElement;
-      FunctionType type = _enclosingFunction.type;
+      FunctionType type =
+          _elementTypeProvider.getExecutableType(_enclosingFunction);
       InferenceContext.setType(node.body, type.returnType);
       super.visitConstructorDeclaration(node);
     } finally {
@@ -1197,7 +1202,8 @@ class ResolverVisitor extends ScopedVisitor {
 
   @override
   void visitDefaultFormalParameter(DefaultFormalParameter node) {
-    InferenceContext.setType(node.defaultValue, node.declaredElement?.type);
+    InferenceContext.setType(
+        node.defaultValue, _safeVariableType(node.declaredElement));
     super.visitDefaultFormalParameter(node);
     ParameterElement element = node.declaredElement;
 
@@ -1358,10 +1364,12 @@ class ResolverVisitor extends ScopedVisitor {
         identifier?.accept(this);
         identifierElement = identifier?.staticElement;
         if (identifierElement is VariableElement) {
-          valueType = identifierElement.type;
+          valueType = _elementTypeProvider.getVariableType(identifierElement);
         } else if (identifierElement is PropertyAccessorElement) {
-          if (identifierElement.parameters.isNotEmpty) {
-            valueType = identifierElement.parameters[0].type;
+          var parameters =
+              _elementTypeProvider.getExecutableParameters(identifierElement);
+          if (parameters.isNotEmpty) {
+            valueType = parameters[0].type;
           }
         }
       }
@@ -1451,10 +1459,12 @@ class ResolverVisitor extends ScopedVisitor {
       if (identifier != null) {
         identifierElement = identifier.staticElement;
         if (identifierElement is VariableElement) {
-          valueType = identifierElement.type;
+          valueType = _elementTypeProvider.getVariableType(identifierElement);
         } else if (identifierElement is PropertyAccessorElement) {
-          if (identifierElement.parameters.isNotEmpty) {
-            valueType = identifierElement.parameters[0].type;
+          var parameters =
+              _elementTypeProvider.getExecutableParameters(identifierElement);
+          if (parameters.isNotEmpty) {
+            valueType = parameters[0].type;
           }
         }
       }
@@ -1521,8 +1531,8 @@ class ResolverVisitor extends ScopedVisitor {
       }
       _promoteManager.enterFunctionBody(node.functionExpression.body);
       _enclosingFunction = functionName.staticElement as ExecutableElement;
-      InferenceContext.setType(
-          node.functionExpression, _enclosingFunction.type);
+      InferenceContext.setType(node.functionExpression,
+          _elementTypeProvider.getExecutableType(_enclosingFunction));
       super.visitFunctionDeclaration(node);
     } finally {
       if (_flowAnalysis != null) {
@@ -1684,9 +1694,12 @@ class ResolverVisitor extends ScopedVisitor {
     }
     node.accept(elementResolver);
     var method = node.staticElement;
-    if (method != null && method.parameters.isNotEmpty) {
-      var indexParam = node.staticElement.parameters[0];
-      InferenceContext.setType(node.index, indexParam.type);
+    if (method != null) {
+      var parameters = _elementTypeProvider.getExecutableParameters(method);
+      if (parameters.isNotEmpty) {
+        var indexParam = parameters[0];
+        InferenceContext.setType(node.index, indexParam.type);
+      }
     }
     node.index?.accept(this);
     node.accept(typeAnalyzer);
@@ -1749,8 +1762,9 @@ class ResolverVisitor extends ScopedVisitor {
       _flowAnalysis?.executableDeclaration_enter(node, node.parameters, false);
       _promoteManager.enterFunctionBody(node.body);
       _enclosingFunction = node.declaredElement;
-      DartType returnType =
-          _computeReturnOrYieldType(_enclosingFunction.type?.returnType);
+      DartType returnType = _computeReturnOrYieldType(_elementTypeProvider
+          .getExecutableType(_enclosingFunction)
+          ?.returnType);
       InferenceContext.setType(node.body, returnType);
       super.visitMethodDeclaration(node);
     } finally {
@@ -1893,7 +1907,8 @@ class ResolverVisitor extends ScopedVisitor {
     // invocation.
     //
     node.accept(elementResolver);
-    InferenceContext.setType(node.argumentList, node.staticElement?.type);
+    InferenceContext.setType(
+        node.argumentList, _safeExecutableType(node.staticElement));
     node.argumentList?.accept(this);
     node.accept(typeAnalyzer);
   }
@@ -2003,7 +2018,8 @@ class ResolverVisitor extends ScopedVisitor {
     // invocation.
     //
     node.accept(elementResolver);
-    InferenceContext.setType(node.argumentList, node.staticElement?.type);
+    InferenceContext.setType(
+        node.argumentList, _safeExecutableType(node.staticElement));
     node.argumentList?.accept(this);
     node.accept(typeAnalyzer);
   }
@@ -2139,7 +2155,7 @@ class ResolverVisitor extends ScopedVisitor {
     _flowAnalysis?.variableDeclarationList(node);
     for (VariableDeclaration decl in node.variables) {
       VariableElement variableElement = decl.declaredElement;
-      InferenceContext.setType(decl, variableElement?.type);
+      InferenceContext.setType(decl, _safeVariableType(variableElement));
     }
     super.visitVariableDeclarationList(node);
   }
@@ -2475,7 +2491,8 @@ class ResolverVisitor extends ScopedVisitor {
     }
 
     if (inferred == null) {
-      InferenceContext.setType(node.argumentList, originalElement?.type);
+      InferenceContext.setType(
+          node.argumentList, _safeExecutableType(originalElement));
     }
   }
 
@@ -2554,6 +2571,12 @@ class ResolverVisitor extends ScopedVisitor {
           valueType: valueType);
     }
   }
+
+  FunctionType _safeExecutableType(ExecutableElement element) =>
+      element == null ? null : _elementTypeProvider.getExecutableType(element);
+
+  DartType _safeVariableType(VariableElement variable) =>
+      variable == null ? null : _elementTypeProvider.getVariableType(variable);
 
   /// Continues resolution of the [FunctionExpressionInvocation] node after
   /// resolving its function.
