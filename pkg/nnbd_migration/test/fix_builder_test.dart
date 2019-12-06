@@ -3,6 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type.dart';
@@ -2147,9 +2148,14 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
 
   AssignmentTargetInfo _computeAssignmentTargetInfo(
       Expression node, _FixBuilder fixBuilder) {
-    var readType = getReadType(node,
-            elementTypeProvider: MigrationResolutionHooksImpl(fixBuilder)) ??
-        typeProvider.dynamicType;
+    var assignment = node.thisOrAncestorOfType<AssignmentExpression>();
+    var isReadWrite = assignment.operator.type != TokenType.EQ;
+    var readType = isReadWrite
+        ? getReadType(node,
+                elementTypeProvider:
+                    MigrationResolutionHooksImpl(fixBuilder)) ??
+            typeProvider.dynamicType
+        : null;
     var writeType = node.staticType;
     return AssignmentTargetInfo(readType, writeType);
   }
