@@ -167,15 +167,6 @@ abstract class FixBuilder {
     }
   }
 
-  /// Determines whether a null check is needed when assigning a value of type
-  /// [from] to a context of type [to].
-  bool _doesAssignmentNeedCheck(
-      {@required DartType from, @required DartType to}) {
-    return !from.isDynamic &&
-        _typeSystem.isNullable(from) &&
-        !_typeSystem.isNullable(to);
-  }
-
   static TypeSystemImpl _makeNnbdTypeSystem(
       TypeProvider nnbdTypeProvider, Dart2TypeSystem typeSystem) {
     // TODO(paulberry): do we need to test both possible values of
@@ -264,6 +255,11 @@ class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
     } else if (parent is PrefixedIdentifier) {
       if (identical(node, parent.prefix)) {
         // TODO(paulberry): ok for toString etc. if the shape is correct
+        return true;
+      }
+    } else if (parent is IndexExpression) {
+      if (identical(node, parent.target)) {
+        // TODO(paulberry): what about cascaded?
         return true;
       }
     }
