@@ -495,7 +495,7 @@ class ResolverVisitor extends ScopedVisitor {
 
   final bool _uiAsCodeEnabled;
 
-  final ElementTypeProvider _elementTypeProvider = const ElementTypeProvider();
+  final ElementTypeProvider _elementTypeProvider;
 
   /// Helper for extension method resolution.
   ExtensionMemberResolver extensionResolver;
@@ -590,6 +590,7 @@ class ResolverVisitor extends ScopedVisitor {
             propagateTypes,
             reportConstEvaluationErrors,
             flowAnalysisHelper,
+            const ElementTypeProvider(),
             (self, featureSet, flowAnalysis) =>
                 StaticTypeAnalyzer(self, featureSet, flowAnalysis));
 
@@ -605,6 +606,7 @@ class ResolverVisitor extends ScopedVisitor {
       bool propagateTypes,
       reportConstEvaluationErrors,
       this._flowAnalysis,
+      this._elementTypeProvider,
       StaticTypeAnalyzer Function(
               ResolverVisitor, FeatureSet, FlowAnalysisHelper)
           makeStaticTypeAnalyzer)
@@ -2718,6 +2720,7 @@ class ResolverVisitorForMigration extends ResolverVisitor {
             true,
             FlowAnalysisHelperForMigration(
                 typeSystem, migrationResolutionHooks),
+            migrationResolutionHooks,
             (self, featureSet, flowAnalysis) => StaticTypeAnalyzerForMigration(
                 self, featureSet, flowAnalysis, migrationResolutionHooks));
 }
