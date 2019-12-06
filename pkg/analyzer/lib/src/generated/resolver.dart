@@ -209,18 +209,18 @@ class InferenceContext {
 /// initialized in the field formal, and finally, initialized in the
 /// initializers list.
 class INIT_STATE implements Comparable<INIT_STATE> {
-  static const INIT_STATE NOT_INIT = const INIT_STATE('NOT_INIT', 0);
+  static const INIT_STATE NOT_INIT = INIT_STATE('NOT_INIT', 0);
 
   static const INIT_STATE INIT_IN_DECLARATION =
-      const INIT_STATE('INIT_IN_DECLARATION', 1);
+      INIT_STATE('INIT_IN_DECLARATION', 1);
 
   static const INIT_STATE INIT_IN_FIELD_FORMAL =
-      const INIT_STATE('INIT_IN_FIELD_FORMAL', 2);
+      INIT_STATE('INIT_IN_FIELD_FORMAL', 2);
 
   static const INIT_STATE INIT_IN_INITIALIZERS =
-      const INIT_STATE('INIT_IN_INITIALIZERS', 3);
+      INIT_STATE('INIT_IN_INITIALIZERS', 3);
 
-  static const List<INIT_STATE> values = const [
+  static const List<INIT_STATE> values = [
     NOT_INIT,
     INIT_IN_DECLARATION,
     INIT_IN_FIELD_FORMAL,
@@ -297,7 +297,7 @@ class InstanceFieldResolverVisitor extends ResolverVisitor {
         // Don't try to re-resolve the initializers if we cannot set up the
         // right name scope for resolution.
       } else {
-        nameScope = new ClassScope(nameScope, enclosingClass);
+        nameScope = ClassScope(nameScope, enclosingClass);
         NodeList<ClassMember> members = node.members;
         int length = members.length;
         for (int i = 0; i < length; i++) {
@@ -437,12 +437,12 @@ class PartialResolverVisitor extends ResolverVisitor {
 /// how the problem can be corrected.
 class ResolverErrorCode extends ErrorCode {
   static const ResolverErrorCode BREAK_LABEL_ON_SWITCH_MEMBER =
-      const ResolverErrorCode('BREAK_LABEL_ON_SWITCH_MEMBER',
+      ResolverErrorCode('BREAK_LABEL_ON_SWITCH_MEMBER',
           "Break label resolves to case or default statement");
 
-  static const ResolverErrorCode CONTINUE_LABEL_ON_SWITCH =
-      const ResolverErrorCode('CONTINUE_LABEL_ON_SWITCH',
-          "A continue label resolves to switch, must be loop or switch member");
+  static const ResolverErrorCode CONTINUE_LABEL_ON_SWITCH = ResolverErrorCode(
+      'CONTINUE_LABEL_ON_SWITCH',
+      "A continue label resolves to switch, must be loop or switch member");
 
   /// Parts: It is a static warning if the referenced part declaration
   /// <i>p</i> names a library that does not have a library tag.
@@ -450,14 +450,13 @@ class ResolverErrorCode extends ErrorCode {
   /// Parameters:
   /// 0: the URI of the expected library
   /// 1: the non-matching actual library name from the "part of" declaration
-  static const ResolverErrorCode PART_OF_UNNAMED_LIBRARY =
-      const ResolverErrorCode(
-          'PART_OF_UNNAMED_LIBRARY',
-          "Library is unnamed. Expected a URI not a library name '{0}' in the "
-              "part-of directive.",
-          correction:
-              "Try changing the part-of directive to a URI, or try including a"
-              " different part.");
+  static const ResolverErrorCode PART_OF_UNNAMED_LIBRARY = ResolverErrorCode(
+      'PART_OF_UNNAMED_LIBRARY',
+      "Library is unnamed. Expected a URI not a library name '{0}' in the "
+          "part-of directive.",
+      correction:
+          "Try changing the part-of directive to a URI, or try including a"
+          " different part.");
 
   /// Initialize a newly created error code to have the given [name]. The
   /// message associated with the error will be created from the given [message]
@@ -570,8 +569,8 @@ class ResolverVisitor extends ScopedVisitor {
       AnalysisErrorListener errorListener,
       {FeatureSet featureSet,
       Scope nameScope,
-      bool propagateTypes: true,
-      reportConstEvaluationErrors: true,
+      bool propagateTypes = true,
+      reportConstEvaluationErrors = true,
       FlowAnalysisHelper flowAnalysisHelper})
       : this._(
             inheritanceManager,
@@ -607,15 +606,15 @@ class ResolverVisitor extends ScopedVisitor {
     this.typeSystem = definingLibrary.typeSystem;
     this._promoteManager = TypePromotionManager(typeSystem);
     this.extensionResolver = ExtensionMemberResolver(this);
-    this.elementResolver = new ElementResolver(this,
+    this.elementResolver = ElementResolver(this,
         reportConstEvaluationErrors: reportConstEvaluationErrors);
     bool strongModeHints = false;
     AnalysisOptions options = _analysisOptions;
     if (options is AnalysisOptionsImpl) {
       strongModeHints = options.strongModeHints;
     }
-    this.inferenceContext = new InferenceContext._(this, strongModeHints);
-    this.typeAnalyzer = new StaticTypeAnalyzer(this, featureSet, _flowAnalysis);
+    this.inferenceContext = InferenceContext._(this, strongModeHints);
+    this.typeAnalyzer = StaticTypeAnalyzer(this, featureSet, _flowAnalysis);
   }
 
   /// Return the element representing the function containing the current node,
@@ -2262,11 +2261,11 @@ class ResolverVisitor extends ScopedVisitor {
         _fromTypeArguments(literal.typeArguments);
     DartType contextType = InferenceContext.getContext(literal);
     _LiteralResolution contextResolution = _fromContextType(contextType);
-    _LeafElements elementCounts = new _LeafElements(literal.elements);
+    _LeafElements elementCounts = _LeafElements(literal.elements);
     _LiteralResolution elementResolution = elementCounts.resolution;
 
     List<_LiteralResolution> unambiguousResolutions = [];
-    Set<_LiteralResolutionKind> kinds = new Set<_LiteralResolutionKind>();
+    Set<_LiteralResolutionKind> kinds = Set<_LiteralResolutionKind>();
     if (typeArgumentsResolution.kind != _LiteralResolutionKind.ambiguous) {
       unambiguousResolutions.add(typeArgumentsResolution);
       kinds.add(typeArgumentsResolution.kind);
@@ -2315,7 +2314,7 @@ class ResolverVisitor extends ScopedVisitor {
   /// Return a newly created cloner that can be used to clone constant
   /// expressions.
   ConstantAstCloner _createCloner() {
-    return new ConstantAstCloner();
+    return ConstantAstCloner();
   }
 
   /// Creates a union of `T | Future<T>`, unless `T` is already a
@@ -2394,7 +2393,7 @@ class ResolverVisitor extends ScopedVisitor {
 
   FunctionType _inferArgumentTypesForGeneric(AstNode inferenceNode,
       DartType uninstantiatedType, TypeArgumentList typeArguments,
-      {AstNode errorNode, bool isConst: false}) {
+      {AstNode errorNode, bool isConst = false}) {
     errorNode ??= inferenceNode;
     if (typeArguments == null &&
         uninstantiatedType is FunctionType &&
@@ -2582,7 +2581,7 @@ class ResolverVisitor extends ScopedVisitor {
     }
     int requiredParameterCount = 0;
     int unnamedParameterCount = 0;
-    List<ParameterElement> unnamedParameters = new List<ParameterElement>();
+    List<ParameterElement> unnamedParameters = List<ParameterElement>();
     Map<String, ParameterElement> namedParameters;
     int length = parameters.length;
     for (int i = 0; i < length; i++) {
@@ -2595,7 +2594,7 @@ class ResolverVisitor extends ScopedVisitor {
         unnamedParameters.add(parameter);
         unnamedParameterCount++;
       } else {
-        namedParameters ??= new HashMap<String, ParameterElement>();
+        namedParameters ??= HashMap<String, ParameterElement>();
         namedParameters[parameter.name] = parameter;
       }
     }
@@ -2603,7 +2602,7 @@ class ResolverVisitor extends ScopedVisitor {
     NodeList<Expression> arguments = argumentList.arguments;
     int argumentCount = arguments.length;
     List<ParameterElement> resolvedParameters =
-        new List<ParameterElement>(argumentCount);
+        List<ParameterElement>(argumentCount);
     int positionalArgumentCount = 0;
     HashSet<String> usedNames;
     bool noBlankArguments = true;
@@ -2623,7 +2622,7 @@ class ResolverVisitor extends ScopedVisitor {
           resolvedParameters[i] = element;
           nameNode.staticElement = element;
         }
-        usedNames ??= new HashSet<String>();
+        usedNames ??= HashSet<String>();
         if (!usedNames.add(name)) {
           if (onError != null) {
             onError(CompileTimeErrorCode.DUPLICATE_NAMED_ARGUMENT, nameNode,
@@ -2716,9 +2715,9 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
       AnalysisErrorListener errorListener,
       {Scope nameScope})
       : source = source,
-        errorReporter = new ErrorReporter(errorListener, source) {
+        errorReporter = ErrorReporter(errorListener, source) {
     if (nameScope == null) {
-      this.nameScope = new LibraryScope(definingLibrary);
+      this.nameScope = LibraryScope(definingLibrary);
     } else {
       this.nameScope = nameScope;
     }
@@ -2740,7 +2739,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
   ///
   /// @return the new [Scope].
   Scope pushNameScope() {
-    Scope newScope = new EnclosedScope(nameScope);
+    Scope newScope = EnclosedScope(nameScope);
     nameScope = newScope;
     return nameScope;
   }
@@ -2749,7 +2748,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
   void visitBlock(Block node) {
     Scope outerScope = nameScope;
     try {
-      EnclosedScope enclosedScope = new BlockScope(nameScope, node);
+      EnclosedScope enclosedScope = BlockScope(nameScope, node);
       nameScope = enclosedScope;
       super.visitBlock(node);
     } finally {
@@ -2774,7 +2773,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
     if (exception != null) {
       Scope outerScope = nameScope;
       try {
-        nameScope = new EnclosedScope(nameScope);
+        nameScope = EnclosedScope(nameScope);
         nameScope.define(exception.staticElement);
         SimpleIdentifier stackTrace = node.stackTraceParameter;
         if (stackTrace != null) {
@@ -2798,15 +2797,15 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
         AnalysisEngine.instance.instrumentationService.logInfo(
             "Missing element for class declaration ${node.name.name} in "
             "${definingLibrary.source.fullName}",
-            new CaughtException(new AnalysisException(), null));
+            CaughtException(AnalysisException(), null));
         super.visitClassDeclaration(node);
       } else {
         ClassElement outerClass = enclosingClass;
         try {
           enclosingClass = node.declaredElement;
-          nameScope = new TypeParameterScope(nameScope, classElement);
+          nameScope = TypeParameterScope(nameScope, classElement);
           visitClassDeclarationInScope(node);
-          nameScope = new ClassScope(nameScope, classElement);
+          nameScope = ClassScope(nameScope, classElement);
           visitClassMembersInScope(node);
         } finally {
           enclosingClass = outerClass;
@@ -2837,8 +2836,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
     Scope outerScope = nameScope;
     try {
       ClassElement element = node.declaredElement;
-      nameScope =
-          new ClassScope(new TypeParameterScope(nameScope, element), element);
+      nameScope = ClassScope(TypeParameterScope(nameScope, element), element);
       super.visitClassTypeAlias(node);
     } finally {
       nameScope = outerScope;
@@ -2849,7 +2847,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
   void visitConstructorDeclaration(ConstructorDeclaration node) {
     ConstructorElement constructorElement = node.declaredElement;
     if (constructorElement == null) {
-      StringBuffer buffer = new StringBuffer();
+      StringBuffer buffer = StringBuffer();
       buffer.write("Missing element for constructor ");
       buffer.write(node.returnType.name);
       if (node.name != null) {
@@ -2863,7 +2861,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
     Scope outerScope = nameScope;
     try {
       if (constructorElement != null) {
-        nameScope = new FunctionScope(nameScope, constructorElement);
+        nameScope = FunctionScope(nameScope, constructorElement);
       }
       node.documentationComment?.accept(this);
       node.metadata.accept(this);
@@ -2874,7 +2872,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
       try {
         if (constructorElement != null) {
           nameScope =
-              new ConstructorInitializerScope(nameScope, constructorElement);
+              ConstructorInitializerScope(nameScope, constructorElement);
         }
         node.initializers.accept(this);
       } finally {
@@ -2930,7 +2928,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
         ClassElement outerClass = enclosingClass;
         try {
           enclosingClass = node.declaredElement;
-          nameScope = new ClassScope(nameScope, classElement);
+          nameScope = ClassScope(nameScope, classElement);
           visitEnumMembersInScope(node);
         } finally {
           enclosingClass = outerClass;
@@ -2961,7 +2959,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
         ExtensionElement outerExtension = enclosingExtension;
         try {
           enclosingExtension = extensionElement;
-          nameScope = new TypeParameterScope(nameScope, extensionElement);
+          nameScope = TypeParameterScope(nameScope, extensionElement);
           visitExtensionDeclarationInScope(node);
           nameScope = ExtensionScope(nameScope, extensionElement);
           visitExtensionMembersInScope(node);
@@ -3000,7 +2998,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
   void visitForElement(ForElement node) {
     Scope outerNameScope = nameScope;
     try {
-      nameScope = new EnclosedScope(nameScope);
+      nameScope = EnclosedScope(nameScope);
       visitForElementInScope(node);
     } finally {
       nameScope = outerNameScope;
@@ -3038,7 +3036,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
     Scope outerNameScope = nameScope;
     ImplicitLabelScope outerImplicitScope = _implicitLabelScope;
     try {
-      nameScope = new EnclosedScope(nameScope);
+      nameScope = EnclosedScope(nameScope);
       _implicitLabelScope = _implicitLabelScope.nest(node);
       visitForStatementInScope(node);
     } finally {
@@ -3071,7 +3069,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
             "Missing element for top-level function ${node.name.name} in "
             "${definingLibrary.source.fullName}");
       } else {
-        nameScope = new FunctionScope(nameScope, functionElement);
+        nameScope = FunctionScope(nameScope, functionElement);
       }
       visitFunctionDeclarationInScope(node);
     } finally {
@@ -3093,7 +3091,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
       try {
         ExecutableElement functionElement = node.declaredElement;
         if (functionElement == null) {
-          StringBuffer buffer = new StringBuffer();
+          StringBuffer buffer = StringBuffer();
           buffer.write("Missing element for function ");
           AstNode parent = node.parent;
           while (parent != null) {
@@ -3110,7 +3108,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
           AnalysisEngine.instance.instrumentationService
               .logInfo(buffer.toString());
         } else {
-          nameScope = new FunctionScope(nameScope, functionElement);
+          nameScope = FunctionScope(nameScope, functionElement);
         }
         super.visitFunctionExpression(node);
       } finally {
@@ -3123,7 +3121,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
   void visitFunctionTypeAlias(FunctionTypeAlias node) {
     Scope outerScope = nameScope;
     try {
-      nameScope = new FunctionTypeScope(nameScope, node.declaredElement);
+      nameScope = FunctionTypeScope(nameScope, node.declaredElement);
       visitFunctionTypeAliasInScope(node);
     } finally {
       nameScope = outerScope;
@@ -3144,7 +3142,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
             "Missing element for function typed formal parameter "
             "${node.identifier.name} in ${definingLibrary.source.fullName}");
       } else {
-        nameScope = new EnclosedScope(nameScope);
+        nameScope = EnclosedScope(nameScope);
         var typeParameters = parameterElement.typeParameters;
         int length = typeParameters.length;
         for (int i = 0; i < length; i++) {
@@ -3176,7 +3174,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
                 "${definingLibrary.source.fullName}");
         super.visitGenericFunctionType(node);
       } else {
-        nameScope = new TypeParameterScope(nameScope, element);
+        nameScope = TypeParameterScope(nameScope, element);
         super.visitGenericFunctionType(node);
       }
     } finally {
@@ -3195,12 +3193,12 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
                 "${definingLibrary.source.fullName}");
         super.visitGenericTypeAlias(node);
       } else {
-        nameScope = new TypeParameterScope(nameScope, element);
+        nameScope = TypeParameterScope(nameScope, element);
         super.visitGenericTypeAlias(node);
 
         GenericFunctionTypeElement functionElement = element.function;
         if (functionElement != null) {
-          nameScope = new FunctionScope(nameScope, functionElement)
+          nameScope = FunctionScope(nameScope, functionElement)
             ..defineParameters();
           visitGenericTypeAliasInFunctionScope(node);
         }
@@ -3239,7 +3237,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
             .logInfo("Missing element for method ${node.name.name} in "
                 "${definingLibrary.source.fullName}");
       } else {
-        nameScope = new FunctionScope(nameScope, methodElement);
+        nameScope = FunctionScope(nameScope, methodElement);
       }
       visitMethodDeclarationInScope(node);
     } finally {
@@ -3260,10 +3258,10 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
     try {
       enclosingClass = element;
 
-      nameScope = new TypeParameterScope(nameScope, element);
+      nameScope = TypeParameterScope(nameScope, element);
       visitMixinDeclarationInScope(node);
 
-      nameScope = new ClassScope(nameScope, element);
+      nameScope = ClassScope(nameScope, element);
       visitMixinMembersInScope(node);
     } finally {
       nameScope = outerScope;
@@ -3297,7 +3295,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
     } else if (node != null) {
       Scope outerNameScope = nameScope;
       try {
-        nameScope = new EnclosedScope(nameScope);
+        nameScope = EnclosedScope(nameScope);
         node.accept(this);
       } finally {
         nameScope = outerNameScope;
@@ -3310,7 +3308,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
     node.expression.accept(this);
     Scope outerNameScope = nameScope;
     try {
-      nameScope = new EnclosedScope(nameScope);
+      nameScope = EnclosedScope(nameScope);
       node.statements.accept(this);
     } finally {
       nameScope = outerNameScope;
@@ -3321,7 +3319,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
   void visitSwitchDefault(SwitchDefault node) {
     Scope outerNameScope = nameScope;
     try {
-      nameScope = new EnclosedScope(nameScope);
+      nameScope = EnclosedScope(nameScope);
       node.statements.accept(this);
     } finally {
       nameScope = outerNameScope;
@@ -3339,7 +3337,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
           SimpleIdentifier labelName = label.label;
           LabelElement labelElement = labelName.staticElement as LabelElement;
           labelScope =
-              new LabelScope(labelScope, labelName.name, member, labelElement);
+              LabelScope(labelScope, labelName.name, member, labelElement);
         }
       }
       visitSwitchStatementInScope(node);
@@ -3387,7 +3385,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<void> {
       SimpleIdentifier labelNameNode = label.label;
       String labelName = labelNameNode.name;
       LabelElement labelElement = labelNameNode.staticElement as LabelElement;
-      labelScope = new LabelScope(labelScope, labelName, node, labelElement);
+      labelScope = LabelScope(labelScope, labelName, node, labelElement);
     }
     return outerScope;
   }
@@ -3428,7 +3426,7 @@ class TypeNameResolver {
       this.definingLibrary,
       this.source,
       this.errorListener,
-      {this.shouldUseWithClauseInferredTypes: true})
+      {this.shouldUseWithClauseInferredTypes = true})
       : dynamicType = typeProvider.dynamicType,
         analysisOptions = definingLibrary.context.analysisOptions;
 
@@ -3444,8 +3442,8 @@ class TypeNameResolver {
   ///        message
   void reportErrorForNode(ErrorCode errorCode, AstNode node,
       [List<Object> arguments]) {
-    errorListener.onError(new AnalysisError(
-        source, node.offset, node.length, errorCode, arguments));
+    errorListener.onError(
+        AnalysisError(source, node.offset, node.length, errorCode, arguments));
   }
 
   /// Resolve the given [TypeName] - set its element and static type. Only the
@@ -3710,7 +3708,7 @@ class TypeNameResolver {
         } else if (element is LocalVariableElement ||
             (element is FunctionElement &&
                 element.enclosingElement is ExecutableElement)) {
-          errorListener.onError(new DiagnosticFactory()
+          errorListener.onError(DiagnosticFactory()
               .referencedBeforeDeclaration(source, typeName, element: element));
         } else {
           reportErrorForNode(
@@ -3731,7 +3729,7 @@ class TypeNameResolver {
       NodeList<TypeAnnotation> arguments = argumentList.arguments;
       int argumentCount = arguments.length;
       int parameterCount = parameters.length;
-      List<DartType> typeArguments = new List<DartType>(parameterCount);
+      List<DartType> typeArguments = List<DartType>(parameterCount);
       if (argumentCount == parameterCount) {
         for (int i = 0; i < parameterCount; i++) {
           typeArguments[i] = _getType(arguments[i]);
@@ -3979,7 +3977,7 @@ class TypeNameResolver {
       var argumentNodes = argumentList.arguments;
       var argumentCount = argumentNodes.length;
 
-      typeArguments = new List<DartType>(parameterCount);
+      typeArguments = List<DartType>(parameterCount);
       if (argumentCount == parameterCount) {
         for (int i = 0; i < parameterCount; i++) {
           typeArguments[i] = _getType(argumentNodes[i]);

@@ -3603,6 +3603,7 @@ class Field : public Object {
                        bool is_final,
                        bool is_const,
                        bool is_reflectable,
+                       bool is_late,
                        const Object& owner,
                        const AbstractType& type,
                        TokenPosition token_pos,
@@ -3611,6 +3612,7 @@ class Field : public Object {
   static RawField* NewTopLevel(const String& name,
                                bool is_final,
                                bool is_const,
+                               bool is_late,
                                const Object& owner,
                                TokenPosition token_pos,
                                TokenPosition end_token_pos);
@@ -3854,6 +3856,7 @@ class Field : public Object {
                             bool is_final,
                             bool is_const,
                             bool is_reflectable,
+                            bool is_late,
                             const Object& owner,
                             TokenPosition token_pos,
                             TokenPosition end_token_pos);
@@ -6099,8 +6102,17 @@ class ContextScope : public Object {
   RawString* NameAt(intptr_t scope_index) const;
   void SetNameAt(intptr_t scope_index, const String& name) const;
 
+  void ClearFlagsAt(intptr_t scope_index) const;
+
   bool IsFinalAt(intptr_t scope_index) const;
   void SetIsFinalAt(intptr_t scope_index, bool is_final) const;
+
+  bool IsLateAt(intptr_t scope_index) const;
+  void SetIsLateAt(intptr_t scope_index, bool is_late) const;
+
+  intptr_t LateInitOffsetAt(intptr_t scope_index) const;
+  void SetLateInitOffsetAt(intptr_t scope_index,
+                           intptr_t late_init_offset) const;
 
   bool IsConstAt(intptr_t scope_index) const;
   void SetIsConstAt(intptr_t scope_index, bool is_const) const;
@@ -6148,6 +6160,9 @@ class ContextScope : public Object {
     ASSERT((index >= 0) && (index < num_variables()));
     return raw_ptr()->VariableDescAddr(index);
   }
+
+  bool GetFlagAt(intptr_t scope_index, intptr_t mask) const;
+  void SetFlagAt(intptr_t scope_index, intptr_t mask, bool value) const;
 
   FINAL_HEAP_OBJECT_IMPLEMENTATION(ContextScope, Object);
   friend class Class;

@@ -65,6 +65,9 @@ class CoreTypes {
   Constructor _fallThroughErrorUrlAndLineConstructor;
   Procedure _objectEquals;
   Procedure _mapUnmodifiable;
+  Procedure _iterableGetIterator;
+  Procedure _iteratorMoveNext;
+  Procedure _iteratorGetCurrent;
 
   Class _internalSymbolClass;
 
@@ -155,9 +158,6 @@ class CoreTypes {
   InterfaceType _streamLegacyRawType;
   InterfaceType _streamNullableRawType;
   InterfaceType _streamNonNullableRawType;
-  InterfaceType _asyncAwaitCompleterLegacyRawType;
-  InterfaceType _asyncAwaitCompleterNullableRawType;
-  InterfaceType _asyncAwaitCompleterNonNullableRawType;
   InterfaceType _futureOrLegacyRawType;
   InterfaceType _futureOrNullableRawType;
   InterfaceType _futureOrNonNullableRawType;
@@ -174,6 +174,8 @@ class CoreTypes {
       new Map<Class, InterfaceType>.identity();
   final Map<Typedef, TypedefType> _thisTypedefTypes =
       new Map<Typedef, TypedefType>.identity();
+  final Map<Class, InterfaceType> _bottomInterfaceTypes =
+      new Map<Class, InterfaceType>.identity();
 
   CoreTypes(Component component)
       : index = new LibraryIndex.coreLibraries(component);
@@ -324,8 +326,23 @@ class CoreTypes {
     return _iterableClass ??= index.getClass('dart:core', 'Iterable');
   }
 
+  Procedure get iterableGetIterator {
+    return _iterableGetIterator ??=
+        index.getMember('dart:core', 'Iterable', 'get:iterator');
+  }
+
   Class get iteratorClass {
     return _iteratorClass ??= index.getClass('dart:core', 'Iterator');
+  }
+
+  Procedure get iteratorMoveNext {
+    return _iteratorMoveNext ??=
+        index.getMember('dart:core', 'Iterator', 'moveNext');
+  }
+
+  Procedure get iteratorGetCurrent {
+    return _iteratorGetCurrent ??=
+        index.getMember('dart:core', 'Iterator', 'get:current');
   }
 
   Class get listClass {
@@ -1090,45 +1107,6 @@ class CoreTypes {
     }
   }
 
-  InterfaceType get asyncAwaitCompleterLegacyRawType {
-    return _asyncAwaitCompleterLegacyRawType ??=
-        _legacyRawTypes[asyncAwaitCompleterClass] ??= new InterfaceType(
-            asyncAwaitCompleterClass,
-            Nullability.legacy,
-            const <DartType>[const DynamicType()]);
-  }
-
-  InterfaceType get asyncAwaitCompleterNullableRawType {
-    return _asyncAwaitCompleterNullableRawType ??=
-        _nullableRawTypes[asyncAwaitCompleterClass] ??= new InterfaceType(
-            asyncAwaitCompleterClass,
-            Nullability.nullable,
-            const <DartType>[const DynamicType()]);
-  }
-
-  InterfaceType get asyncAwaitCompleterNonNullableRawType {
-    return _asyncAwaitCompleterNonNullableRawType ??=
-        _nonNullableRawTypes[asyncAwaitCompleterClass] ??= new InterfaceType(
-            asyncAwaitCompleterClass,
-            Nullability.nonNullable,
-            const <DartType>[const DynamicType()]);
-  }
-
-  InterfaceType asyncAwaitCompleterRawType(Nullability nullability) {
-    switch (nullability) {
-      case Nullability.legacy:
-        return asyncAwaitCompleterLegacyRawType;
-      case Nullability.nullable:
-        return asyncAwaitCompleterNullableRawType;
-      case Nullability.nonNullable:
-        return asyncAwaitCompleterNonNullableRawType;
-      case Nullability.undetermined:
-      default:
-        throw new StateError(
-            "Unsupported nullability $nullability on an InterfaceType.");
-    }
-  }
-
   InterfaceType get futureOrLegacyRawType {
     return _futureOrLegacyRawType ??= _legacyRawTypes[futureOrClass] ??=
         new InterfaceType(futureOrClass, Nullability.legacy,
@@ -1263,5 +1241,20 @@ class CoreTypes {
   Constructor get lateInitializationErrorConstructor {
     return _lateInitializationErrorConstructor ??=
         index.getMember('dart:_internal', 'LateInitializationErrorImpl', '');
+  }
+
+  InterfaceType bottomInterfaceType(Class klass, Nullability nullability) {
+    InterfaceType result = _bottomInterfaceTypes[klass];
+    if (result == null) {
+      return _bottomInterfaceTypes[klass] = new InterfaceType(
+          klass,
+          nullability,
+          new List<DartType>.filled(
+              klass.typeParameters.length, const BottomType()));
+    }
+    if (result.nullability != nullability) {
+      return _bottomInterfaceTypes[klass] = result.withNullability(nullability);
+    }
+    return result;
   }
 }

@@ -21,7 +21,7 @@ import 'package:analyzer/src/manifest/manifest_warning_code.dart';
 export 'package:_fe_analyzer_shared/src/base/errors.dart'
     show ErrorCode, ErrorSeverity, ErrorType;
 
-const List<ErrorCode> errorCodeValues = const [
+const List<ErrorCode> errorCodeValues = [
   //
   // Manually generated. You can mostly reproduce this list by running the
   // following command from the root of the analyzer package:
@@ -844,7 +844,7 @@ HashMap<String, ErrorCode> _uniqueNameToCodeMap;
  */
 ErrorCode errorCodeByUniqueName(String uniqueName) {
   if (_uniqueNameToCodeMap == null) {
-    _uniqueNameToCodeMap = new HashMap<String, ErrorCode>();
+    _uniqueNameToCodeMap = HashMap<String, ErrorCode>();
     for (ErrorCode errorCode in errorCodeValues) {
       _uniqueNameToCodeMap[errorCode.uniqueName] = errorCode;
     }
@@ -861,7 +861,7 @@ class AnalysisError implements Diagnostic {
   /**
    * An empty array of errors used when no errors are expected.
    */
-  static const List<AnalysisError> NO_ERRORS = const <AnalysisError>[];
+  static const List<AnalysisError> NO_ERRORS = <AnalysisError>[];
 
   /**
    * A [Comparator] that sorts by the name of the file that the [AnalysisError]
@@ -932,7 +932,7 @@ class AnalysisError implements Diagnostic {
     if (correctionTemplate != null) {
       this._correction = formatList(correctionTemplate, arguments);
     }
-    _problemMessage = new DiagnosticMessageImpl(
+    _problemMessage = DiagnosticMessageImpl(
         filePath: source?.fullName,
         length: length,
         message: message,
@@ -946,7 +946,7 @@ class AnalysisError implements Diagnostic {
   AnalysisError.forValues(this.source, int offset, int length, this.errorCode,
       String message, this._correction,
       {List<DiagnosticMessage> contextMessages = const []}) {
-    _problemMessage = new DiagnosticMessageImpl(
+    _problemMessage = DiagnosticMessageImpl(
         filePath: source?.fullName,
         length: length,
         message: message,
@@ -1005,8 +1005,7 @@ class AnalysisError implements Diagnostic {
       case ErrorSeverity.INFO:
         return Severity.info;
       default:
-        throw new StateError(
-            'Invalid error severity: ${errorCode.errorSeverity}');
+        throw StateError('Invalid error severity: ${errorCode.errorSeverity}');
     }
   }
 
@@ -1039,7 +1038,7 @@ class AnalysisError implements Diagnostic {
 
   @override
   String toString() {
-    StringBuffer buffer = new StringBuffer();
+    StringBuffer buffer = StringBuffer();
     buffer.write((source != null) ? source.fullName : "<unknown source>");
     buffer.write("(");
     buffer.write(offset);
@@ -1056,7 +1055,7 @@ class AnalysisError implements Diagnostic {
    * a single list of errors.
    */
   static List<AnalysisError> mergeLists(List<List<AnalysisError>> errorLists) {
-    Set<AnalysisError> errors = new HashSet<AnalysisError>();
+    Set<AnalysisError> errors = HashSet<AnalysisError>();
     for (List<AnalysisError> errorList in errorLists) {
       errors.addAll(errorList);
     }

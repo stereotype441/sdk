@@ -1325,8 +1325,13 @@ class FixProcessor extends BaseProcessor {
               });
             });
             _addFixFromBuilder(
-                changeBuilder, DartFixKind.CHANGE_TYPE_ANNOTATION,
-                args: [typeNode.type, newType.displayName]);
+              changeBuilder,
+              DartFixKind.CHANGE_TYPE_ANNOTATION,
+              args: [
+                typeNode.type,
+                newType.getDisplayString(withNullability: false),
+              ],
+            );
           }
         }
       }
@@ -2168,6 +2173,9 @@ class FixProcessor extends BaseProcessor {
     // prepare target declaration
     var targetDeclarationResult =
         await sessionHelper.getElementDeclaration(targetElement);
+    if (targetDeclarationResult == null) {
+      return;
+    }
     if (targetDeclarationResult.node is! ClassOrMixinDeclaration &&
         targetDeclarationResult.node is! ExtensionDeclaration) {
       return;

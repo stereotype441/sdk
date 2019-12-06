@@ -13,7 +13,6 @@ import 'package:kernel/ast.dart'
         LoadLibrary,
         Member,
         Name,
-        Nullability,
         Procedure,
         ProcedureKind,
         ReturnStatement;
@@ -51,11 +50,11 @@ class LoadLibraryBuilder extends BuilderImpl {
     LoadLibrary expression = createLoadLibrary(charOffset, forest, null);
     String prefix = expression.import.name;
     tearoff = new Procedure(
-        new Name('__loadLibrary_$prefix', parent.library),
+        new Name('_#loadLibrary_$prefix', parent.library),
         ProcedureKind.Method,
         new FunctionNode(new ReturnStatement(expression),
             returnType: new InterfaceType(parent.loader.coreTypes.futureClass,
-                Nullability.legacy, <DartType>[const DynamicType()])),
+                parent.nonNullable, <DartType>[const DynamicType()])),
         fileUri: parent.library.fileUri,
         isStatic: true)
       ..startFileOffset = charOffset

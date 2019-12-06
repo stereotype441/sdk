@@ -10,41 +10,85 @@
 
 import 'dart:io';
 
-import 'package:analyzer/dart/analysis/analysis_context_collection.dart';
+import 'package:analyzer/src/dart/analysis/analysis_context_collection.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart';
+import 'package:args/args.dart';
 import 'package:nnbd_migration/nnbd_migration.dart';
+import 'package:path/path.dart' as path;
+
+import 'src/package.dart';
 
 main(List<String> args) async {
-  if (args.length > 1) {
+  ArgParser argParser = ArgParser();
+  ArgResults parsedArgs;
+
+  argParser.addFlag('help', abbr: 'h', help: 'Display options');
+
+  argParser.addOption('sdk',
+      abbr: 's',
+      defaultsTo: path.dirname(path.dirname(Platform.resolvedExecutable)),
+      help: 'Select the root of the SDK to analyze against for this run '
+          '(compiled with --nnbd).  For example: ../../xcodebuild/DebugX64NNBD/dart-sdk');
+
+  argParser.addMultiOption(
+    'packages',
+    abbr: 'p',
+    defaultsTo: [
+      'charcode',
+      'collection',
+      'logging',
+      'meta',
+      'path',
+      'term_glyph',
+      'typed_data',
+      'async',
+      'source_span',
+      'stack_trace',
+      'matcher',
+      'stream_channel',
+      'boolean_selector',
+      path.join('test', 'pkgs', 'test_api'),
+    ],
+    help: 'The list of packages to run the migration against.',
+    splitCommas: true,
+  );
+
+  try {
+    parsedArgs = argParser.parse(args);
+  } on ArgParserException {
+    stderr.writeln(argParser.usage);
+    exit(1);
+  }
+  if (parsedArgs['help'] as bool) {
+    print(argParser.usage);
+    exit(0);
+  }
+
+  if (parsedArgs.rest.length > 1) {
     throw 'invalid args. Specify *one* argument to get exceptions of interest.';
   }
 
+  Sdk sdk = Sdk(parsedArgs['sdk'] as String);
+
   warnOnNoAssertions();
-  String categoryOfInterest = args.isEmpty ? null : args.single;
-  var rootUri = Platform.script.resolve('../../..');
+  warnOnNoSdkNnbd(sdk);
+
+  List<Package> packages = (parsedArgs['packages'] as Iterable<String>)
+      .map((n) => SdkPackage(n))
+      .toList(growable: false);
+
+  String categoryOfInterest =
+      parsedArgs.rest.isEmpty ? null : parsedArgs.rest.single;
+
   var listener = _Listener(categoryOfInterest);
-  for (var testPath in [
-    'third_party/pkg/charcode',
-    'third_party/pkg/collection',
-    'third_party/pkg/logging',
-    'pkg/meta',
-    'third_party/pkg/path',
-    'third_party/pkg/term_glyph',
-    'third_party/pkg/typed_data',
-    'third_party/pkg/async',
-    'third_party/pkg/source_span',
-    'third_party/pkg/stack_trace',
-    'third_party/pkg/matcher',
-    'third_party/pkg/stream_channel',
-    'third_party/pkg/boolean_selector',
-    'third_party/pkg/test/pkgs/test_api',
-  ]) {
-    print('Migrating $testPath');
-    var testUri = rootUri.resolve(testPath);
-    var contextCollection =
-        AnalysisContextCollection(includedPaths: [testUri.toFilePath()]);
+  for (var package in packages) {
+    print('Migrating $package');
+    var testUri = thisSdkUri.resolve(package.packagePath);
+    var contextCollection = AnalysisContextCollectionImpl(
+        includedPaths: [testUri.toFilePath()], sdkPath: sdk.sdkPath);
+
     var context = contextCollection.contexts.single;
     var files = context.contextRoot
         .analyzedFiles()
@@ -85,6 +129,14 @@ main(List<String> args) async {
   }
 }
 
+void printWarning(String warn) {
+  stderr.writeln('''
+!!!
+!!! Warning! $warn
+!!!
+''');
+}
+
 void warnOnNoAssertions() {
   try {
     assert(false);
@@ -92,11 +144,18 @@ void warnOnNoAssertions() {
     return;
   }
 
-  print('''
-!!!
-!!! Warning! You didn't --enable-asserts!
-!!!
-''');
+  printWarning("You didn't --enable-asserts!");
+}
+
+void warnOnNoSdkNnbd(Sdk sdk) {
+  try {
+    if (sdk.isNnbdSdk) return;
+  } catch (e) {
+    printWarning('Unable to determine whether this SDK supports NNBD');
+    return;
+  }
+  printWarning(
+      'SDK at ${sdk.sdkPath} not compiled with --nnbd, use --sdk option');
 }
 
 class _Listener implements NullabilityMigrationListener {

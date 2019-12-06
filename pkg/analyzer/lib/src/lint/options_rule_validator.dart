@@ -19,9 +19,9 @@ import 'package:yaml/yaml.dart';
  * Parameters:
  * 0: the rule name
  */
-const AnalysisOptionsHintCode DEPRECATED_LINT_HINT =
-    const AnalysisOptionsHintCode('DEPRECATED_LINT_HINT',
-        "'{0}' is a deprecated lint rule and should not be used");
+const AnalysisOptionsHintCode DEPRECATED_LINT_HINT = AnalysisOptionsHintCode(
+    'DEPRECATED_LINT_HINT',
+    "'{0}' is a deprecated lint rule and should not be used");
 
 /**
  * Duplicate rules.
@@ -29,7 +29,7 @@ const AnalysisOptionsHintCode DEPRECATED_LINT_HINT =
  * Parameters:
  * 0: the rule name
  */
-const AnalysisOptionsHintCode DUPLICATE_RULE_HINT = const AnalysisOptionsHintCode(
+const AnalysisOptionsHintCode DUPLICATE_RULE_HINT = AnalysisOptionsHintCode(
     'DUPLICATE_RULE',
     "The rule {0} is already specified and doesn't need to be specified again.",
     correction: "Try removing all but one specification of the rule.");
@@ -41,7 +41,7 @@ const AnalysisOptionsHintCode DUPLICATE_RULE_HINT = const AnalysisOptionsHintCod
  * 0: the rule name
  */
 const AnalysisOptionsWarningCode UNDEFINED_LINT_WARNING =
-    const AnalysisOptionsWarningCode(
+    AnalysisOptionsWarningCode(
         'UNDEFINED_LINT_WARNING', "'{0}' is not a recognized lint rule");
 
 /**
@@ -77,7 +77,7 @@ class LinterRuleOptionsValidator extends OptionsValidator {
 
   validateRules(YamlNode rules, ErrorReporter reporter) {
     if (rules is YamlList) {
-      Set<String> seenRules = new HashSet<String>();
+      Set<String> seenRules = HashSet<String>();
       rules.nodes.forEach((YamlNode ruleNode) {
         Object value = ruleNode.value;
         if (value != null) {

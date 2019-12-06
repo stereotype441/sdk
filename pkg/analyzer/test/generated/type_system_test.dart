@@ -853,7 +853,7 @@ class ConstraintMatchingTest extends AbstractTypeSystemTest {
   void _checkIsNotSubtypeMatchOf(
       DartType t1, DartType t2, Iterable<TypeParameterType> typeFormals,
       {bool covariant}) {
-    var inferrer = new GenericInferrer(
+    var inferrer = GenericInferrer(
         typeProvider, typeSystem, typeFormals.map((t) => t.element));
     var success =
         inferrer.tryMatchSubtypeOf(t1, t2, null, covariant: covariant);
@@ -869,7 +869,7 @@ class ConstraintMatchingTest extends AbstractTypeSystemTest {
       Iterable<TypeParameterType> typeFormals,
       Iterable<String> expectedConstraints,
       {bool covariant}) {
-    var inferrer = new GenericInferrer(
+    var inferrer = GenericInferrer(
         typeProvider, typeSystem, typeFormals.map((t) => t.element));
     var success =
         inferrer.tryMatchSubtypeOf(t1, t2, null, covariant: covariant);
@@ -1438,13 +1438,11 @@ class GenericFunctionInferenceTest extends AbstractTypeSystemTest {
   }
 
   List<DartType> _inferCall(FunctionTypeImpl ft, List<DartType> arguments,
-      {DartType returnType, bool expectError: false}) {
-    var listener = new RecordingErrorListener();
+      {DartType returnType, bool expectError = false}) {
+    var listener = RecordingErrorListener();
 
-    var reporter = new ErrorReporter(
-        listener,
-        new NonExistingSource(
-            '/test.dart', toUri('/test.dart'), UriKind.FILE_URI));
+    var reporter = ErrorReporter(listener,
+        NonExistingSource('/test.dart', toUri('/test.dart'), UriKind.FILE_URI));
 
     var typeArguments = typeSystem.inferGenericFunctionOrType(
       typeParameters: ft.typeFormals,
@@ -1453,7 +1451,7 @@ class GenericFunctionInferenceTest extends AbstractTypeSystemTest {
       argumentTypes: arguments,
       contextReturnType: returnType,
       errorReporter: reporter,
-      errorNode: astFactory.nullLiteral(new KeywordToken(Keyword.NULL, 0)),
+      errorNode: astFactory.nullLiteral(KeywordToken(Keyword.NULL, 0)),
       isNonNullableByDefault: false,
     );
 
@@ -1468,7 +1466,7 @@ class GenericFunctionInferenceTest extends AbstractTypeSystemTest {
   }
 
   FunctionType _inferCall2(FunctionTypeImpl ft, List<DartType> arguments,
-      {DartType returnType, bool expectError: false}) {
+      {DartType returnType, bool expectError = false}) {
     var typeArguments = _inferCall(
       ft,
       arguments,
@@ -2348,20 +2346,17 @@ class LeastUpperBoundFunctionsTest extends BoundTestBase {
 
 @reflectiveTest
 class LeastUpperBoundTest extends BoundTestBase {
-  @FailingTest(reason: 'With new rules UP(Never*, T)=T?')
   void test_bottom_function() {
     _checkLeastUpperBound(neverStar, functionTypeStar(returnType: voidNone),
         functionTypeStar(returnType: voidNone));
   }
 
-  @FailingTest(reason: 'With new rules UP(Never*, T)=T?')
   void test_bottom_interface() {
     var A = class_(name: 'A');
     var typeA = interfaceTypeStar(A);
     _checkLeastUpperBound(neverStar, typeA, typeA);
   }
 
-  @FailingTest(reason: 'With new rules UP(Never*, T)=T?')
   void test_bottom_typeParam() {
     var T = typeParameter('T');
     var typeT = typeParameterTypeStar(T);
