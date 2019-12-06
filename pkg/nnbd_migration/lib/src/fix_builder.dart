@@ -253,8 +253,9 @@ class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
         return true;
       }
     } else if (parent is PropertyAccess) {
-      if (identical(node, parent.target)) {
-        // TODO(paulberry): what about cascaded?
+      // TODO(paulberry): what about cascaded?
+      if (parent.operator.type == TokenType.PERIOD &&
+          identical(node, parent.target)) {
         // TODO(paulberry): ok for toString etc. if the shape is correct
         return true;
       }
