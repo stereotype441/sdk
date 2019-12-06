@@ -790,7 +790,7 @@ _f(int/*?*/ x, int/*?*/ y) =>
         changes: {findNode.simple('y +'): NullCheck()});
   }
 
-  test_binaryExpression_question_question_nullChecked() async {
+  solo_test_binaryExpression_question_question_nullChecked() async {
     await analyze('''
 Object/*!*/ _f(int/*?*/ x, double/*?*/ y) {
   return x ?? y;

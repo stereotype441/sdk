@@ -211,10 +211,12 @@ class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
   DartType modifyExpressionType(Expression node, DartType type) {
     if (type.isDynamic) return type;
     if (!_fixBuilder._typeSystem.isNullable(type)) return type;
-    if (_needsNullCheckDueToStructure(node)) {
+    var ancestor = _findNullabilityContextAncestor(node);
+    if (_needsNullCheckDueToStructure(ancestor)) {
       return _addNullCheck(node, type);
     }
-    var context = InferenceContext.getContext(node) ?? DynamicTypeImpl.instance;
+    var context =
+        InferenceContext.getContext(ancestor) ?? DynamicTypeImpl.instance;
     if (!_fixBuilder._typeSystem.isNullable(context)) {
       return _addNullCheck(node, type);
     }
@@ -232,6 +234,19 @@ class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
     _fixBuilder.addChange(node, NullCheck());
     _flowAnalysis.nonNullAssert_end(node);
     return _fixBuilder._typeSystem.promoteToNonNull(type as TypeImpl);
+  }
+
+  Expression _findNullabilityContextAncestor(Expression node) {
+    while (true) {
+      var parent = node.parent;
+      if (parent is BinaryExpression &&
+          parent.operator.type == TokenType.QUESTION_QUESTION &&
+          identical(node, parent.rightOperand)) {
+        node = parent;
+        continue;
+      }
+      return node;
+    }
   }
 
   bool _needsNullCheckDueToStructure(Expression node) {
