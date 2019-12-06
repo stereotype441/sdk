@@ -12,6 +12,7 @@ import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/error/listener.dart';
 import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
+import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type_algebra.dart';
 import 'package:analyzer/src/dart/element/type_provider.dart';
@@ -125,45 +126,15 @@ abstract class FixBuilder {
   /// If [targetType] is present, and [element] is a class member, it is the
   /// type of the class within which [element] is being accessed; this is used
   /// to perform the correct substitutions.
-  DartType _computeMigratedType(Element element,
-      {DartType targetType, bool unwrapAccessors: true}) {
+  DartType _computeMigratedType(Element element) {
     element = element.declaration;
     DartType type;
     if (element is ClassElement || element is TypeParameterElement) {
       return typeProvider.typeType;
-    } else if (element is PropertyAccessorElement) {
-      if (element.isSynthetic) {
-        assert(unwrapAccessors); // TODO(paulberry)
-        type = _variables
-            .decoratedElementType(element.variable)
-            .toFinalType(typeProvider);
-      } else {
-        var functionType = _variables.decoratedElementType(element);
-        var decoratedType = unwrapAccessors
-            ? element.isGetter
-                ? functionType.returnType
-                : functionType.positionalParameters[0]
-            : functionType;
-        type = decoratedType.toFinalType(typeProvider);
-      }
+    } else if (element is PropertyAccessorElement && element.isSynthetic) {
+      throw new UnimplementedError('TODO(paulberry)');
     } else {
-      type = _variables.decoratedElementType(element).toFinalType(typeProvider);
-    }
-    if (targetType is InterfaceType && targetType.typeArguments.isNotEmpty) {
-      var superclass = element.enclosingElement as ClassElement;
-      var class_ = targetType.element;
-      if (class_ != superclass) {
-        var supertype = _decoratedClassHierarchy
-            .getDecoratedSupertype(class_, superclass)
-            .toFinalType(typeProvider) as InterfaceType;
-        type = Substitution.fromInterfaceType(supertype).substituteType(type);
-      }
-      return substitute(type, {
-        for (int i = 0; i < targetType.typeArguments.length; i++)
-          class_.typeParameters[i]: targetType.typeArguments[i]
-      });
-    } else {
-      return type;
+      return _variables.decoratedElementType(element).toFinalType(typeProvider);
     }
   }
 
@@ -204,9 +175,14 @@ class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
       getExecutableType(element).returnType;
 
   @override
-  FunctionType getExecutableType(FunctionTypedElement element) =>
-      _fixBuilder._computeMigratedType(element, unwrapAccessors: false)
-          as FunctionType;
+  FunctionType getExecutableType(FunctionTypedElement element) {
+    var type = _fixBuilder._computeMigratedType(element);
+    Element baseElement = element;
+    if (baseElement is Member) {
+      type = baseElement.substitution.substituteType(type);
+    }
+    return type as FunctionType;
+  }
 
   @override
   DartType getVariableType(VariableElement variable) =>
