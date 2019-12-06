@@ -11,6 +11,7 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/error/listener.dart';
+import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
 import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/dart/element/type.dart';
@@ -20,6 +21,7 @@ import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
 import 'package:analyzer/src/generated/migration.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/source.dart';
+import 'package:analyzer/src/generated/utilities_dart.dart';
 import 'package:meta/meta.dart';
 import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
 import 'package:nnbd_migration/src/utilities/resolution_utils.dart';
@@ -128,11 +130,28 @@ abstract class FixBuilder {
   /// to perform the correct substitutions.
   DartType _computeMigratedType(Element element) {
     element = element.declaration;
-    DartType type;
     if (element is ClassElement || element is TypeParameterElement) {
       return typeProvider.typeType;
     } else if (element is PropertyAccessorElement && element.isSynthetic) {
-      throw new UnimplementedError('TODO(paulberry)');
+      var variableType = _variables
+          .decoratedElementType(element.variable)
+          .toFinalType(typeProvider);
+      if (element.isSetter) {
+        return FunctionTypeImpl(
+            returnType: typeProvider.voidType,
+            typeFormals: [],
+            parameters: [
+              ParameterElementImpl.synthetic(
+                  'value', variableType, ParameterKind.REQUIRED)
+            ],
+            nullabilitySuffix: NullabilitySuffix.none);
+      } else {
+        return FunctionTypeImpl(
+            returnType: variableType,
+            typeFormals: [],
+            parameters: [],
+            nullabilitySuffix: NullabilitySuffix.none);
+      }
     } else {
       return _variables.decoratedElementType(element).toFinalType(typeProvider);
     }
