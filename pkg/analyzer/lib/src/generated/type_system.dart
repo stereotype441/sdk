@@ -2888,7 +2888,7 @@ class GenericInferrer {
   /// Otherwise, return the original type.
   DartType _toLegacyType(DartType type) {
     if (isNonNullableByDefault) return type;
-    return NullabilityEliminator.perform(type);
+    return NullabilityEliminator.perform(typeProvider, type);
   }
 
   static String _formatConstraints(Iterable<_TypeConstraint> constraints) {
@@ -3798,7 +3798,11 @@ class UnknownInferredType extends TypeImpl {
   bool operator ==(Object object) => identical(object, this);
 
   @override
-  void appendTo(StringBuffer buffer, {bool withNullability = false}) {
+  void appendTo(
+    StringBuffer buffer, {
+    bool withNullability = false,
+    @required bool skipAllDynamicArguments,
+  }) {
     buffer.write('?');
   }
 
