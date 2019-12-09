@@ -225,7 +225,7 @@ class SynchronousSession {
   SynchronousSession(this.analysisOptions, this.declaredVariables);
 
   InheritanceManager3 get inheritanceManager {
-    return _inheritanceManager ??= InheritanceManager3(typeSystem);
+    return _inheritanceManager ??= InheritanceManager3();
   }
 
   @Deprecated('Use LibraryElement.typeProvider')

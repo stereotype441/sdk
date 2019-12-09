@@ -358,7 +358,7 @@ abstract class AbstractClassElementImpl extends ElementImpl
   /// Object contains a definition of the method it will occur last.
   Iterable<MethodElement> _implementationsOfMethod(String methodName) sync* {
     ClassElement classElement = this;
-    HashSet<ClassElement> visitedClasses = new HashSet<ClassElement>();
+    HashSet<ClassElement> visitedClasses = HashSet<ClassElement>();
     while (classElement != null && visitedClasses.add(classElement)) {
       MethodElement method = classElement.getMethod(methodName);
       if (method != null) {

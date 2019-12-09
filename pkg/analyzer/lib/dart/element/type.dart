@@ -340,9 +340,9 @@ abstract class InterfaceType implements ParameterizedType {
   PropertyAccessorElement lookUpGetter2(
     String name,
     LibraryElement library, {
-    bool concrete: false,
-    bool inherited: false,
-    bool recoveryStatic: false,
+    bool concrete = false,
+    bool inherited = false,
+    bool recoveryStatic = false,
   });
 
   /// Return the element representing the getter that results from looking up
@@ -445,9 +445,9 @@ abstract class InterfaceType implements ParameterizedType {
   MethodElement lookUpMethod2(
     String name,
     LibraryElement library, {
-    bool concrete: false,
-    bool inherited: false,
-    bool recoveryStatic: false,
+    bool concrete = false,
+    bool inherited = false,
+    bool recoveryStatic = false,
   });
 
   /// Return the element representing the method that results from looking up
@@ -498,9 +498,9 @@ abstract class InterfaceType implements ParameterizedType {
   PropertyAccessorElement lookUpSetter2(
     String name,
     LibraryElement library, {
-    bool concrete: false,
-    bool inherited: false,
-    bool recoveryStatic: false,
+    bool concrete = false,
+    bool inherited = false,
+    bool recoveryStatic = false,
   });
 
   /// Return the element representing the setter that results from looking up

@@ -8,7 +8,6 @@ import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
-import 'package:analyzer/src/dart/analysis/restricted_analysis_context.dart';
 import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
 import 'package:analyzer/src/dart/element/member.dart';
@@ -1130,11 +1129,7 @@ class InterfaceTypeImpl extends TypeImpl implements InterfaceType {
   List<TypeParameterElement> get typeParameters => element.typeParameters;
 
   InheritanceManager3 get _inheritanceManager {
-    var context = element.context;
-    if (context is RestrictedAnalysisContext) {
-      return context.inheritanceManager;
-    }
-    return InheritanceManager3(context.typeSystem);
+    return InheritanceManager3();
   }
 
   @override
@@ -1257,9 +1252,9 @@ class InterfaceTypeImpl extends TypeImpl implements InterfaceType {
   PropertyAccessorElement lookUpGetter2(
     String name,
     LibraryElement library, {
-    bool concrete: false,
+    bool concrete = false,
     bool inherited = false,
-    bool recoveryStatic: false,
+    bool recoveryStatic = false,
   }) {
     var inheritance = _inheritanceManager;
     var nameObj = Name(library.source.uri, name);
@@ -1334,7 +1329,7 @@ class InterfaceTypeImpl extends TypeImpl implements InterfaceType {
     LibraryElement library, {
     bool forSuper = false,
     bool forSuperRecovery = false,
-    bool withStaticLookup: false,
+    bool withStaticLookup = false,
   }) {
     var inheritance = _inheritanceManager;
     var nameObj = Name(library.source.uri, name);
@@ -1524,7 +1519,7 @@ class InterfaceTypeImpl extends TypeImpl implements InterfaceType {
     LibraryElement library, {
     bool concrete = false,
     bool inherited = false,
-    bool recoveryStatic: false,
+    bool recoveryStatic = false,
   }) {
     var inheritance = _inheritanceManager;
     var nameObj = Name(library.source.uri, name);
@@ -1611,7 +1606,7 @@ class InterfaceTypeImpl extends TypeImpl implements InterfaceType {
     LibraryElement library, {
     bool concrete = false,
     bool inherited = false,
-    bool recoveryStatic: false,
+    bool recoveryStatic = false,
   }) {
     var inheritance = _inheritanceManager;
     var nameObj = Name(library.source.uri, '$name=');
