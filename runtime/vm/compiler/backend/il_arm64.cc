@@ -138,6 +138,9 @@ void ReturnInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
   __ Bind(&stack_ok);
 #endif
   ASSERT(__ constant_pool_allowed());
+  if (yield_index() != RawPcDescriptors::kInvalidYieldIndex) {
+    compiler->EmitYieldPositionMetadata(token_pos(), yield_index());
+  }
   __ LeaveDartFrame();  // Disallows constant pool use.
   __ ret();
   // This ReturnInstr may be emitted out of order by the optimizer. The next
@@ -842,19 +845,9 @@ void NativeCallInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
     entry = reinterpret_cast<uword>(native_c_function());
     if (is_bootstrap_native()) {
       stub = &StubCode::CallBootstrapNative();
-#if defined(USING_SIMULATOR)
-      entry = Simulator::RedirectExternalReference(
-          entry, Simulator::kBootstrapNativeCall, NativeEntry::kNumArguments);
-#endif
     } else if (is_auto_scope()) {
-      // In the case of non bootstrap native methods the CallNativeCFunction
-      // stub generates the redirection address when running under the simulator
-      // and hence we do not change 'entry' here.
       stub = &StubCode::CallAutoScopeNative();
     } else {
-      // In the case of non bootstrap native methods the CallNativeCFunction
-      // stub generates the redirection address when running under the simulator
-      // and hence we do not change 'entry' here.
       stub = &StubCode::CallNoScopeNative();
     }
   }
@@ -947,10 +940,8 @@ void FfiCallInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
     __ blr(TMP);
   }
 
-  // Refresh write barrier mask.
-  __ ldr(BARRIER_MASK,
-         compiler::Address(
-             THR, compiler::target::Thread::write_barrier_mask_offset()));
+  // Refresh pinned registers values (inc. write barrier mask and null object).
+  __ RestorePinnedRegisters();
 
   // Although PP is a callee-saved register, it may have been moved by the GC.
   __ LeaveDartFrame(compiler::kRestoreCallerPP);
@@ -974,10 +965,8 @@ void NativeReturnInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
   // These can be anything besides the return register (R0) and THR (R26).
   const Register vm_tag_reg = R1, old_exit_frame_reg = R2, tmp = R3;
 
-  __ Pop(old_exit_frame_reg);
-
   // Restore top_resource.
-  __ Pop(tmp);
+  __ PopPair(old_exit_frame_reg, tmp);
   __ StoreToOffset(tmp, THR, compiler::target::Thread::top_resource_offset());
 
   __ Pop(vm_tag_reg);
@@ -1109,18 +1098,15 @@ void NativeEntryInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
   // Now that we have THR, we can set CSP.
   __ SetupCSPFromThread(THR);
 
-  // Refresh write barrier mask.
-  __ ldr(BARRIER_MASK,
-         compiler::Address(
-             THR, compiler::target::Thread::write_barrier_mask_offset()));
+  // Refresh pinned registers values (inc. write barrier mask and null object).
+  __ RestorePinnedRegisters();
 
   // Save the current VMTag on the stack.
-  __ LoadFromOffset(R0, THR, compiler::target::Thread::vm_tag_offset());
-  __ Push(R0);
-
+  __ LoadFromOffset(TMP, THR, compiler::target::Thread::vm_tag_offset());
   // Save the top resource.
   __ LoadFromOffset(R0, THR, compiler::target::Thread::top_resource_offset());
-  __ Push(R0);
+  __ PushPair(R0, TMP);
+
   __ StoreToOffset(ZR, THR, compiler::target::Thread::top_resource_offset());
 
   // Save the top exit frame info. We don't set it to 0 yet:
@@ -1873,8 +1859,7 @@ void GuardFieldClassInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
       __ CompareImmediate(TMP, kDynamicCid);
       __ b(&ok, EQ);
 
-      __ Push(field_reg);
-      __ Push(value_reg);
+      __ PushPair(value_reg, field_reg);
       __ CallRuntime(kUpdateFieldCidRuntimeEntry, 2);
       __ Drop(2);  // Drop the field and the value.
     } else {
@@ -1974,8 +1959,7 @@ void GuardFieldLengthInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
     if (deopt == NULL) {
       __ b(&ok, EQ);
 
-      __ Push(field_reg);
-      __ Push(value_reg);
+      __ PushPair(value_reg, field_reg);
       __ CallRuntime(kUpdateFieldCidRuntimeEntry, 2);
       __ Drop(2);  // Drop the field and the value.
     } else {
@@ -2417,9 +2401,8 @@ void CreateArrayInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
       compiler::Label slow_path, done;
       InlineArrayAllocation(compiler, length, &slow_path, &done);
       __ Bind(&slow_path);
-      __ PushObject(Object::null_object());  // Make room for the result.
-      __ Push(kLengthReg);                   // length.
-      __ Push(kElemTypeReg);
+      __ PushObject(Object::null_object());   // Make room for the result.
+      __ PushPair(kElemTypeReg, kLengthReg);  // length.
       compiler->GenerateRuntimeCall(token_pos(), deopt_id(),
                                     kAllocateArrayRuntimeEntry, 2, locs());
       __ Drop(2);
@@ -2576,8 +2559,8 @@ void InstantiateTypeInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
   // 'instantiator_type_args_reg' is a TypeArguments object (or null).
   // 'function_type_args_reg' is a TypeArguments object (or null).
   // A runtime call to instantiate the type is required.
-  __ PushObject(Object::null_object());  // Make room for the result.
-  __ PushObject(type());
+  __ LoadObject(TMP, type());
+  __ PushPair(TMP, NULL_REG);
   __ PushPair(function_type_args_reg, instantiator_type_args_reg);
   compiler->GenerateRuntimeCall(token_pos(), deopt_id(),
                                 kInstantiateTypeRuntimeEntry, 3, locs());
@@ -2655,8 +2638,8 @@ void InstantiateTypeArgumentsInstr::EmitNativeCode(
   __ Bind(&slow_case);
   // Instantiate non-null type arguments.
   // A runtime call to instantiate the type arguments is required.
-  __ PushObject(Object::null_object());  // Make room for the result.
-  __ PushObject(type_arguments());
+  __ LoadObject(TMP, type_arguments());
+  __ PushPair(TMP, NULL_REG);
   __ PushPair(function_type_args_reg, instantiator_type_args_reg);
   compiler->GenerateRuntimeCall(token_pos(), deopt_id(),
                                 kInstantiateTypeArgumentsRuntimeEntry, 3,
@@ -2770,8 +2753,7 @@ void InitInstanceFieldInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
   __ CompareObject(temp, Object::sentinel());
   __ b(&no_call, NE);
 
-  __ Push(ZR);  // Make room for (unused) result.
-  __ Push(instance);
+  __ PushPair(instance, ZR);  // Make room for (unused) result.
   __ PushObject(Field::ZoneHandle(field().Original()));
   compiler->GenerateRuntimeCall(token_pos(), deopt_id(),
                                 kInitInstanceFieldRuntimeEntry, 2, locs());
@@ -2803,8 +2785,7 @@ void InitStaticFieldInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
   __ b(&no_call, NE);
 
   __ Bind(&call_runtime);
-  __ PushObject(Object::null_object());  // Make room for (unused) result.
-  __ Push(field);
+  __ PushPair(field, NULL_REG);
   compiler->GenerateRuntimeCall(token_pos(), deopt_id(),
                                 kInitStaticFieldRuntimeEntry, 1, locs());
   __ Drop(2);  // Remove argument and result placeholder.
@@ -2826,12 +2807,11 @@ void CloneContextInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
   const Register context_value = locs()->in(0).reg();
   const Register result = locs()->out(0).reg();
 
-  __ PushObject(Object::null_object());  // Make room for the result.
-  __ Push(context_value);
+  __ PushPair(context_value, NULL_REG);
   compiler->GenerateRuntimeCall(token_pos(), deopt_id(),
                                 kCloneContextRuntimeEntry, 1, locs());
-  __ Drop(1);      // Remove argument.
-  __ Pop(result);  // Get result (cloned context).
+  // Remove argument and result (cloned context).
+  __ PopPair(ZR, result);
 }
 
 LocationSummary* CatchBlockEntryInstr::MakeLocationSummary(Zone* zone,
@@ -3132,8 +3112,7 @@ class CheckedSmiSlowPath : public TemplateSlowPathCode<CheckedSmiOpInstr> {
           compiler->SlowPathEnvironmentFor(instruction(), kNumSlowPathArgs);
       compiler->pending_deoptimization_env_ = env;
     }
-    __ Push(locs->in(0).reg());
-    __ Push(locs->in(1).reg());
+    __ PushPair(locs->in(1).reg(), locs->in(0).reg());
     const auto& selector = String::Handle(instruction()->call()->Selector());
     const auto& arguments_descriptor = Array::Handle(
         ArgumentsDescriptor::New(/*type_args_len=*/0, /*num_arguments=*/2));
@@ -3280,8 +3259,7 @@ class CheckedSmiComparisonSlowPath
       compiler->pending_deoptimization_env_ =
           compiler->SlowPathEnvironmentFor(env_, locs, kNumSlowPathArgs);
     }
-    __ Push(locs->in(0).reg());
-    __ Push(locs->in(1).reg());
+    __ PushPair(locs->in(1).reg(), locs->in(0).reg());
     const auto& selector = String::Handle(instruction()->call()->Selector());
     const auto& arguments_descriptor = Array::Handle(
         ArgumentsDescriptor::New(/*type_args_len=*/0, /*num_arguments=*/2));
@@ -4087,7 +4065,7 @@ DEFINE_EMIT(SimdBinaryOp, (VRegister result, VRegister left, VRegister right)) {
       __ vdups(result, VTMP, 0);
       __ vmuls(result, result, right);
       break;
-    case SimdOpInstr::kFloat64x2Constructor:
+    case SimdOpInstr::kFloat64x2FromDoubles:
       __ vinsd(result, 0, left, 0);
       __ vinsd(result, 1, right, 0);
       break;
@@ -4211,7 +4189,7 @@ DEFINE_EMIT(Simd32x4GetSignMask,
 }
 
 DEFINE_EMIT(
-    Float32x4Constructor,
+    Float32x4FromDoubles,
     (VRegister r, VRegister v0, VRegister v1, VRegister v2, VRegister v3)) {
   __ fcvtsd(VTMP, v0);
   __ vinss(r, 0, VTMP, 0);
@@ -4287,7 +4265,7 @@ DEFINE_EMIT(Float64x2With,
 }
 
 DEFINE_EMIT(
-    Int32x4Constructor,
+    Int32x4FromInts,
     (VRegister result, Register v0, Register v1, Register v2, Register v3)) {
   __ veor(result, result, result);
   __ vinsw(result, 0, v0);
@@ -4296,7 +4274,7 @@ DEFINE_EMIT(
   __ vinsw(result, 3, v3);
 }
 
-DEFINE_EMIT(Int32x4BoolConstructor,
+DEFINE_EMIT(Int32x4FromBools,
             (VRegister result,
              Register v0,
              Register v1,
@@ -4395,7 +4373,7 @@ DEFINE_EMIT(Int32x4WithFlag,
   CASE(Float32x4LessThan)                                                      \
   CASE(Float32x4LessThanOrEqual)                                               \
   CASE(Float32x4Scale)                                                         \
-  CASE(Float64x2Constructor)                                                   \
+  CASE(Float64x2FromDoubles)                                                   \
   CASE(Float64x2Scale)                                                         \
   ____(SimdBinaryOp)                                                           \
   SIMD_OP_SIMPLE_UNARY(CASE)                                                   \
@@ -4415,8 +4393,8 @@ DEFINE_EMIT(Int32x4WithFlag,
   CASE(Float32x4GetSignMask)                                                   \
   CASE(Int32x4GetSignMask)                                                     \
   ____(Simd32x4GetSignMask)                                                    \
-  CASE(Float32x4Constructor)                                                   \
-  ____(Float32x4Constructor)                                                   \
+  CASE(Float32x4FromDoubles)                                                   \
+  ____(Float32x4FromDoubles)                                                   \
   CASE(Float32x4Zero)                                                          \
   CASE(Float64x2Zero)                                                          \
   ____(SimdZero)                                                               \
@@ -4435,10 +4413,10 @@ DEFINE_EMIT(Int32x4WithFlag,
   CASE(Float64x2WithX)                                                         \
   CASE(Float64x2WithY)                                                         \
   ____(Float64x2With)                                                          \
-  CASE(Int32x4Constructor)                                                     \
-  ____(Int32x4Constructor)                                                     \
-  CASE(Int32x4BoolConstructor)                                                 \
-  ____(Int32x4BoolConstructor)                                                 \
+  CASE(Int32x4FromInts)                                                        \
+  ____(Int32x4FromInts)                                                        \
+  CASE(Int32x4FromBools)                                                       \
+  ____(Int32x4FromBools)                                                       \
   CASE(Int32x4GetFlagX)                                                        \
   CASE(Int32x4GetFlagY)                                                        \
   CASE(Int32x4GetFlagZ)                                                        \

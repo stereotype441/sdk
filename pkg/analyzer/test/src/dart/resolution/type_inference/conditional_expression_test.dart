@@ -32,7 +32,7 @@ void f(bool a, int b, int c) {
 class ConditionalExpressionWithNnbdTest extends ConditionalExpressionTest {
   @override
   AnalysisOptionsImpl get analysisOptions => AnalysisOptionsImpl()
-    ..contextFeatures = new FeatureSet.forTesting(
+    ..contextFeatures = FeatureSet.forTesting(
         sdkVersion: '2.3.0', additionalFeatures: [Feature.non_nullable]);
 
   @override
@@ -48,5 +48,14 @@ void f(int b, int c) {
 T a<T>() => throw '';
 ''');
     assertInvokeType(findNode.methodInvocation('d)'), 'bool Function()');
+  }
+
+  test_type() async {
+    await assertNoErrorsInCode('''
+main(bool b) {
+  return b ? 42 : null;
+}
+''');
+    assertType(findNode.conditionalExpression('b ?'), 'int?');
   }
 }

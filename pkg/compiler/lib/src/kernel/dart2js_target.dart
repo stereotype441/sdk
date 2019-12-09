@@ -54,6 +54,9 @@ class Dart2jsTarget extends Target {
   bool get enableNoSuchMethodForwarders => true;
 
   @override
+  bool get supportsLateFields => false;
+
+  @override
   List<String> get extraRequiredLibraries => _requiredLibraries[name];
 
   @override

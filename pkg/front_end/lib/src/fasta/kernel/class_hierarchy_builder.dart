@@ -12,6 +12,7 @@ import 'package:kernel/ast.dart'
         FunctionNode,
         InterfaceType,
         InvalidType,
+        Library,
         Member,
         Name,
         Nullability,
@@ -29,6 +30,8 @@ import 'package:kernel/core_types.dart' show CoreTypes;
 import 'package:kernel/type_algebra.dart' show Substitution;
 import 'package:kernel/type_environment.dart';
 
+import 'package:kernel/src/future_or.dart';
+
 import '../builder/builder.dart';
 import '../builder/class_builder.dart';
 import '../builder/field_builder.dart';
@@ -38,6 +41,7 @@ import '../builder/member_builder.dart';
 import '../builder/named_type_builder.dart';
 import '../builder/nullability_builder.dart';
 import '../builder/procedure_builder.dart';
+import '../builder/type_alias_builder.dart';
 import '../builder/type_builder.dart';
 import '../builder/type_declaration_builder.dart';
 import '../builder/type_variable_builder.dart';
@@ -159,7 +163,8 @@ bool hasSameSignature(FunctionNode a, FunctionNode b) {
   if (typeParameterCount != 0) {
     List<DartType> types = new List<DartType>(typeParameterCount);
     for (int i = 0; i < typeParameterCount; i++) {
-      types[i] = new TypeParameterType(aTypeParameters[i]);
+      types[i] = new TypeParameterType.forAlphaRenaming(
+          bTypeParameters[i], aTypeParameters[i]);
     }
     substitution = Substitution.fromPairs(bTypeParameters, types);
     for (int i = 0; i < typeParameterCount; i++) {
@@ -288,17 +293,18 @@ class ClassHierarchyBuilder {
   }
 
   InterfaceType getKernelTypeAsInstanceOf(
-      InterfaceType type, Class superclass) {
+      InterfaceType type, Class superclass, Library clientLibrary) {
     Class kernelClass = type.classNode;
     if (kernelClass == superclass) return type;
     if (kernelClass == nullClass) {
       if (superclass.typeParameters.isEmpty) {
-        return coreTypes.legacyRawType(superclass);
+        return coreTypes.rawType(superclass, clientLibrary.nullable);
       } else {
         // This is a safe fall-back for dealing with `Null`. It will likely be
         // faster to check for `Null` before calling this method.
         return new InterfaceType(
             superclass,
+            clientLibrary.nullable,
             new List<DartType>.filled(
                 superclass.typeParameters.length, coreTypes.nullType));
       }
@@ -306,15 +312,49 @@ class ClassHierarchyBuilder {
     NamedTypeBuilder supertype = asSupertypeOf(kernelClass, superclass);
     if (supertype == null) return null;
     if (supertype.arguments == null && superclass.typeParameters.isEmpty) {
-      return coreTypes.legacyRawType(superclass);
+      return coreTypes.rawType(superclass, type.nullability);
     }
     return Substitution.fromInterfaceType(type)
-        .substituteType(supertype.build(null));
+        .substituteType(supertype.build(null))
+        .withNullability(type.nullability);
+  }
+
+  List<DartType> getKernelTypeArgumentsAsInstanceOf(
+      InterfaceType type, Class superclass) {
+    Class kernelClass = type.classNode;
+    if (kernelClass == superclass) return type.typeArguments;
+    if (kernelClass == nullClass) {
+      if (superclass.typeParameters.isEmpty) return const <DartType>[];
+      return new List<DartType>.filled(
+          superclass.typeParameters.length, coreTypes.nullType);
+    }
+    NamedTypeBuilder supertype = asSupertypeOf(kernelClass, superclass);
+    if (supertype == null) return null;
+    if (supertype.arguments == null && superclass.typeParameters.isEmpty) {
+      return const <DartType>[];
+    }
+    return (Substitution.fromInterfaceType(type)
+            .substituteType(supertype.build(null)) as InterfaceType)
+        .typeArguments;
   }
 
   InterfaceType getKernelLegacyLeastUpperBound(
-      InterfaceType type1, InterfaceType type2) {
+      InterfaceType type1, InterfaceType type2, Library clientLibrary) {
     if (type1 == type2) return type1;
+
+    // LLUB(Null, List<dynamic>*) works differently for opt-in and opt-out
+    // libraries.  In opt-out libraries the legacy behavior is preserved, so
+    // LLUB(Null, List<dynamic>*) = List<dynamic>*.  In opt-out libraries the
+    // rules imply that LLUB(Null, List<dynamic>*) = List<dynamic>?.
+    if (!clientLibrary.isNonNullableByDefault) {
+      if (type1 is InterfaceType && type1.classNode == nullClass) {
+        return type2;
+      }
+      if (type2 is InterfaceType && type2.classNode == nullClass) {
+        return type1;
+      }
+    }
+
     ClassHierarchyNode node1 = getNodeFromKernelClass(type1.classNode);
     ClassHierarchyNode node2 = getNodeFromKernelClass(type2.classNode);
     Set<ClassHierarchyNode> nodes1 = node1.computeAllSuperNodes(this).toSet();
@@ -325,30 +365,37 @@ class ClassHierarchyBuilder {
       ClassHierarchyNode node = nodes2[i];
       if (node == null) continue;
       if (nodes1.contains(node)) {
-        DartType candidate1 =
-            getKernelTypeAsInstanceOf(type1, node.classBuilder.cls);
-        DartType candidate2 =
-            getKernelTypeAsInstanceOf(type2, node.classBuilder.cls);
+        DartType candidate1 = getKernelTypeAsInstanceOf(
+            type1, node.classBuilder.cls, clientLibrary);
+        DartType candidate2 = getKernelTypeAsInstanceOf(
+            type2, node.classBuilder.cls, clientLibrary);
         if (candidate1 == candidate2) {
           common.add(node);
         }
       }
     }
 
-    if (common.length == 1) return coreTypes.objectLegacyRawType;
+    if (common.length == 1) {
+      return coreTypes.objectRawType(
+          uniteNullabilities(type1.nullability, type2.nullability));
+    }
     common.sort(ClassHierarchyNode.compareMaxInheritancePath);
 
     for (int i = 0; i < common.length - 1; i++) {
       ClassHierarchyNode node = common[i];
       if (node.maxInheritancePath != common[i + 1].maxInheritancePath) {
-        return getKernelTypeAsInstanceOf(type1, node.classBuilder.cls);
+        return getKernelTypeAsInstanceOf(
+                type1, node.classBuilder.cls, clientLibrary)
+            .withNullability(
+                uniteNullabilities(type1.nullability, type2.nullability));
       } else {
         do {
           i++;
         } while (node.maxInheritancePath == common[i + 1].maxInheritancePath);
       }
     }
-    return coreTypes.objectLegacyRawType;
+    return coreTypes.objectRawType(
+        uniteNullabilities(type1.nullability, type2.nullability));
   }
 
   Member getInterfaceMemberKernel(Class cls, Name name, bool isSetter) {
@@ -658,7 +705,8 @@ class ClassHierarchyNodeBuilder {
       }
       List<DartType> types = new List<DartType>(typeParameterCount);
       for (int i = 0; i < typeParameterCount; i++) {
-        types[i] = new TypeParameterType(aTypeParameters[i]);
+        types[i] = new TypeParameterType.forAlphaRenaming(
+            bTypeParameters[i], aTypeParameters[i]);
       }
       substitution = Substitution.fromPairs(bTypeParameters, types);
       for (int i = 0; i < typeParameterCount; i++) {
@@ -977,8 +1025,10 @@ class ClassHierarchyNodeBuilder {
         if (inheritedType is ImplicitFieldType) {
           SourceLibraryBuilder library = classBuilder.library;
           (library.implicitlyTypedFields ??= <FieldBuilder>[]).add(a);
+          a.fieldType = inheritedType.createAlias(a);
+        } else {
+          a.fieldType = inheritedType;
         }
-        a.field.type = inheritedType;
       }
     }
     return result;
@@ -1196,20 +1246,33 @@ class ClassHierarchyNodeBuilder {
         // recordSupertype(named.mixedInType);
         mixin = named.mixedInType.declaration;
       }
+      if (mixin is TypeAliasBuilder) {
+        TypeAliasBuilder aliasBuilder = mixin;
+        mixin = aliasBuilder.unaliasDeclaration;
+      }
       if (mixin is ClassBuilder) {
         scope = mixin.scope.computeMixinScope();
       }
     }
 
     /// Members (excluding setters) declared in [cls].
-    List<ClassMember> localMembers =
-        new List<ClassMember>.from(scope.localMembers)
-          ..sort(compareDeclarations);
+    List<ClassMember> localMembers = <ClassMember>[];
 
     /// Setters declared in [cls].
-    List<ClassMember> localSetters =
-        new List<ClassMember>.from(scope.localSetters)
-          ..sort(compareDeclarations);
+    List<ClassMember> localSetters = <ClassMember>[];
+
+    for (MemberBuilder memberBuilder in scope.localMembers) {
+      localMembers.addAll(memberBuilder.localMembers);
+      localSetters.addAll(memberBuilder.localSetters);
+    }
+
+    for (MemberBuilder memberBuilder in scope.localSetters) {
+      localMembers.addAll(memberBuilder.localMembers);
+      localSetters.addAll(memberBuilder.localSetters);
+    }
+
+    localMembers.sort(compareDeclarations);
+    localSetters.sort(compareDeclarations);
 
     // Add implied setters from fields in [localMembers].
     localSetters = mergeAccessors(localMembers, localSetters);
@@ -1371,6 +1434,10 @@ class ClassHierarchyNodeBuilder {
       debug?.log("In ${this.classBuilder.fullNameForErrors} "
           "recordSupertype(${supertype.fullNameForErrors})");
       Builder declaration = supertype.declaration;
+      if (declaration is TypeAliasBuilder) {
+        TypeAliasBuilder aliasBuilder = declaration;
+        declaration = aliasBuilder.unaliasDeclaration;
+      }
       if (declaration is! ClassBuilder) return supertype;
       ClassBuilder classBuilder = declaration;
       if (classBuilder.isMixinApplication) {
@@ -1404,6 +1471,15 @@ class ClassHierarchyNodeBuilder {
   List<TypeBuilder> substSupertypes(
       NamedTypeBuilder supertype, List<TypeBuilder> supertypes) {
     Builder declaration = supertype.declaration;
+    // TODO(eernst): perform substitution through the chain, like:
+    //typedef A1<T> = A<T>
+    //typedef A2<T> = A1<A<T>>
+    //typedef A3<T> = A2<A<T>>
+    //class B extends A3<B> {} // B extends A<A<A<B>>> and not just A<B>
+    if (declaration is TypeAliasBuilder) {
+      TypeAliasBuilder aliasBuilder = declaration;
+      declaration = aliasBuilder.unaliasDeclaration;
+    }
     if (declaration is! ClassBuilder) return supertypes;
     ClassBuilder cls = declaration;
     List<TypeVariableBuilder> typeVariables = cls.typeVariables;
@@ -1440,14 +1516,24 @@ class ClassHierarchyNodeBuilder {
   }
 
   List<TypeBuilder> computeDefaultTypeArguments(TypeBuilder type) {
-    ClassBuilder cls = type.declaration;
-    List<TypeBuilder> result = new List<TypeBuilder>(cls.typeVariables.length);
-    for (int i = 0; i < result.length; ++i) {
-      TypeVariableBuilder tv = cls.typeVariables[i];
-      result[i] = tv.defaultType ??
-          cls.library.loader.computeTypeBuilder(tv.parameter.defaultType);
+    TypeDeclarationBuilder cls = type.declaration;
+    if (cls is TypeAliasBuilder) {
+      TypeAliasBuilder aliasBuilder = cls;
+      cls = aliasBuilder.unaliasDeclaration;
     }
-    return result;
+    if (cls is ClassBuilder) {
+      List<TypeBuilder> result =
+          new List<TypeBuilder>(cls.typeVariables.length);
+      for (int i = 0; i < result.length; ++i) {
+        TypeVariableBuilder tv = cls.typeVariables[i];
+        result[i] = tv.defaultType ??
+            cls.library.loader.computeTypeBuilder(tv.parameter.defaultType);
+      }
+      return result;
+    } else {
+      return unhandled("${cls.runtimeType}", "$cls", classBuilder.charOffset,
+          classBuilder.fileUri);
+    }
   }
 
   TypeBuilder addInterface(List<TypeBuilder> interfaces,
@@ -1675,8 +1761,8 @@ class ClassHierarchyNodeBuilder {
     new BuilderMixinInferrer(
             classBuilder,
             hierarchy.coreTypes,
-            new TypeBuilderConstraintGatherer(
-                hierarchy, mixedInType.classNode.typeParameters))
+            new TypeBuilderConstraintGatherer(hierarchy,
+                mixedInType.classNode.typeParameters, cls.enclosingLibrary))
         .infer(cls);
     List<TypeBuilder> inferredArguments =
         new List<TypeBuilder>(typeArguments.length);
@@ -1766,12 +1852,20 @@ class ClassHierarchyNode {
         1 + superclasses.length + interfaces.length);
     for (int i = 0; i < superclasses.length; i++) {
       Builder declaration = superclasses[i].declaration;
+      if (declaration is TypeAliasBuilder) {
+        TypeAliasBuilder aliasBuilder = declaration;
+        declaration = aliasBuilder.unaliasDeclaration;
+      }
       if (declaration is ClassBuilder) {
         result[i] = hierarchy.getNodeFromClass(declaration);
       }
     }
     for (int i = 0; i < interfaces.length; i++) {
       Builder declaration = interfaces[i].declaration;
+      if (declaration is TypeAliasBuilder) {
+        TypeAliasBuilder aliasBuilder = declaration;
+        declaration = aliasBuilder.unaliasDeclaration;
+      }
       if (declaration is ClassBuilder) {
         result[i + superclasses.length] =
             hierarchy.getNodeFromClass(declaration);
@@ -1780,8 +1874,8 @@ class ClassHierarchyNode {
     return result..last = this;
   }
 
-  String toString([StringBuffer sb]) {
-    sb ??= new StringBuffer();
+  String toString() {
+    StringBuffer sb = new StringBuffer();
     sb
       ..write(classBuilder.fullNameForErrors)
       ..writeln(":");
@@ -1949,10 +2043,10 @@ class BuilderMixinInferrer extends MixinInferrer {
       : super(coreTypes, gatherer);
 
   Supertype asInstantiationOf(Supertype type, Class superclass) {
-    InterfaceType interfaceType =
-        gatherer.getTypeAsInstanceOf(type.asInterfaceType, superclass);
-    if (interfaceType == null) return null;
-    return new Supertype(interfaceType.classNode, interfaceType.typeArguments);
+    List<DartType> arguments =
+        gatherer.getTypeArgumentsAsInstanceOf(type.asInterfaceType, superclass);
+    if (arguments == null) return null;
+    return new Supertype(superclass, arguments);
   }
 
   void reportProblem(Message message, Class kernelClass) {
@@ -1965,9 +2059,9 @@ class TypeBuilderConstraintGatherer extends TypeConstraintGatherer
     with StandardBounds {
   final ClassHierarchyBuilder hierarchy;
 
-  TypeBuilderConstraintGatherer(
-      this.hierarchy, Iterable<TypeParameter> typeParameters)
-      : super.subclassing(typeParameters);
+  TypeBuilderConstraintGatherer(this.hierarchy,
+      Iterable<TypeParameter> typeParameters, Library currentLibrary)
+      : super.subclassing(typeParameters, currentLibrary);
 
   @override
   Class get objectClass => hierarchy.objectClass;
@@ -1988,21 +2082,27 @@ class TypeBuilderConstraintGatherer extends TypeConstraintGatherer
   InterfaceType get nullType => hierarchy.coreTypes.nullType;
 
   @override
-  InterfaceType get objectLegacyRawType =>
-      hierarchy.coreTypes.objectLegacyRawType;
-
-  @override
-  InterfaceType get functionLegacyRawType =>
-      hierarchy.coreTypes.functionLegacyRawType;
-
-  @override
-  void addLowerBound(TypeConstraint constraint, DartType lower) {
-    constraint.lower = getStandardUpperBound(constraint.lower, lower);
+  InterfaceType get objectLegacyRawType {
+    return hierarchy.coreTypes.objectLegacyRawType;
   }
 
   @override
-  void addUpperBound(TypeConstraint constraint, DartType upper) {
-    constraint.upper = getStandardLowerBound(constraint.upper, upper);
+  InterfaceType get functionLegacyRawType {
+    return hierarchy.coreTypes.functionLegacyRawType;
+  }
+
+  @override
+  void addLowerBound(
+      TypeConstraint constraint, DartType lower, Library clientLibrary) {
+    constraint.lower =
+        getStandardUpperBound(constraint.lower, lower, clientLibrary);
+  }
+
+  @override
+  void addUpperBound(
+      TypeConstraint constraint, DartType upper, Library clientLibrary) {
+    constraint.upper =
+        getStandardLowerBound(constraint.upper, upper, clientLibrary);
   }
 
   @override
@@ -2011,14 +2111,21 @@ class TypeBuilderConstraintGatherer extends TypeConstraintGatherer
   }
 
   @override
-  InterfaceType getTypeAsInstanceOf(InterfaceType type, Class superclass) {
-    return hierarchy.getKernelTypeAsInstanceOf(type, superclass);
+  InterfaceType getTypeAsInstanceOf(InterfaceType type, Class superclass,
+      Library clientLibrary, CoreTypes coreTypes) {
+    return hierarchy.getKernelTypeAsInstanceOf(type, superclass, clientLibrary);
+  }
+
+  @override
+  List<DartType> getTypeArgumentsAsInstanceOf(
+      InterfaceType type, Class superclass) {
+    return hierarchy.getKernelTypeArgumentsAsInstanceOf(type, superclass);
   }
 
   @override
   InterfaceType futureType(DartType type, Nullability nullability) {
     return new InterfaceType(
-        hierarchy.futureClass, <DartType>[type], nullability);
+        hierarchy.futureClass, nullability, <DartType>[type]);
   }
 
   @override
@@ -2029,8 +2136,9 @@ class TypeBuilderConstraintGatherer extends TypeConstraintGatherer
 
   @override
   InterfaceType getLegacyLeastUpperBound(
-      InterfaceType type1, InterfaceType type2) {
-    return hierarchy.getKernelLegacyLeastUpperBound(type1, type2);
+      InterfaceType type1, InterfaceType type2, Library clientLibrary) {
+    return hierarchy.getKernelLegacyLeastUpperBound(
+        type1, type2, clientLibrary);
   }
 }
 
@@ -2069,7 +2177,10 @@ class DelayedOverrideCheck {
           if (type != null) {
             type = Substitution.fromInterfaceType(
                     hierarchy.getKernelTypeAsInstanceOf(
-                        classBuilder.cls.thisType, b.member.enclosingClass))
+                        hierarchy.coreTypes.thisInterfaceType(
+                            classBuilder.cls, classBuilder.library.nonNullable),
+                        b.member.enclosingClass,
+                        classBuilder.library.library))
                 .substituteType(type);
             if (!a.hadTypesInferred || !b.isSetter) {
               inferReturnType(
@@ -2091,7 +2202,10 @@ class DelayedOverrideCheck {
           if (type != null) {
             type = Substitution.fromInterfaceType(
                     hierarchy.getKernelTypeAsInstanceOf(
-                        classBuilder.cls.thisType, b.member.enclosingClass))
+                        hierarchy.coreTypes.thisInterfaceType(
+                            classBuilder.cls, classBuilder.library.nonNullable),
+                        b.member.enclosingClass,
+                        classBuilder.library.library))
                 .substituteType(type);
             if (!a.hadTypesInferred || !b.isGetter) {
               inferParameterType(classBuilder, a, a.formals.single, type,
@@ -2115,22 +2229,25 @@ class DelayedOverrideCheck {
         if (type != null) {
           type = Substitution.fromInterfaceType(
                   hierarchy.getKernelTypeAsInstanceOf(
-                      classBuilder.cls.thisType, b.member.enclosingClass))
+                      hierarchy.coreTypes.thisInterfaceType(
+                          classBuilder.cls, classBuilder.library.nonNullable),
+                      b.member.enclosingClass,
+                      classBuilder.library.library))
               .substituteType(type);
-          if (type != a.field.type) {
+          if (type != a.fieldType) {
             if (a.hadTypesInferred) {
               if (b.isSetter &&
                   (!impliesSetter(a) ||
-                      hierarchy.types.isSubtypeOfKernel(type, a.field.type,
+                      hierarchy.types.isSubtypeOfKernel(type, a.fieldType,
                           SubtypeCheckMode.ignoringNullabilities))) {
-                type = a.field.type;
+                type = a.fieldType;
               } else {
                 reportCantInferFieldType(classBuilder, a);
                 type = const InvalidType();
               }
             }
             debug?.log("Inferred type ${type} for ${fullName(a)}");
-            a.field.type = type;
+            a.fieldType = type;
           }
         }
         a.hadTypesInferred = true;
@@ -2296,7 +2413,7 @@ class InterfaceConflict extends DelayedMember {
           classBuilder.fileUri);
     }
     return Substitution.fromInterfaceType(hierarchy.getKernelTypeAsInstanceOf(
-            thisType, member.enclosingClass))
+            thisType, member.enclosingClass, classBuilder.library.library))
         .substituteType(type);
   }
 
@@ -2318,7 +2435,8 @@ class InterfaceConflict extends DelayedMember {
     if (classBuilder.library is! SourceLibraryBuilder) {
       return combinedMemberSignatureResult = declarations.first.member;
     }
-    DartType thisType = classBuilder.cls.thisType;
+    DartType thisType = hierarchy.coreTypes
+        .thisInterfaceType(classBuilder.cls, classBuilder.library.nonNullable);
     ClassMember bestSoFar;
     DartType bestTypeSoFar;
     for (int i = declarations.length - 1; i >= 0; i--) {
@@ -2665,6 +2783,10 @@ void reportCantInferFieldType(ClassBuilder cls, FieldBuilder member) {
 
 ClassBuilder getClass(TypeBuilder type) {
   Builder declaration = type.declaration;
+  if (declaration is TypeAliasBuilder) {
+    TypeAliasBuilder aliasBuilder = declaration;
+    declaration = aliasBuilder.unaliasDeclaration;
+  }
   return declaration is ClassBuilder ? declaration : null;
 }
 

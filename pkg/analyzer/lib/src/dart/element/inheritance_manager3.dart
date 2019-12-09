@@ -4,7 +4,8 @@
 
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
-import 'package:analyzer/src/generated/type_system.dart';
+import 'package:analyzer/dart/element/type_system.dart';
+import 'package:analyzer/src/generated/type_system.dart' show TypeSystemImpl;
 import 'package:analyzer/src/generated/utilities_general.dart';
 
 /// Description of a failure to find a valid override from superinterfaces.
@@ -32,16 +33,14 @@ class Conflict {
 class InheritanceManager3 {
   static final _noSuchMethodName = Name(null, 'noSuchMethod');
 
-  final TypeSystem _typeSystem;
-
   /// Cached instance interfaces for [InterfaceType].
   final Map<InterfaceType, Interface> _interfaces = {};
 
   /// The set of classes that are currently being processed, used to detect
   /// self-referencing cycles.
-  final Set<ClassElement> _processingClasses = new Set<ClassElement>();
+  final Set<ClassElement> _processingClasses = Set<ClassElement>();
 
-  InheritanceManager3(this._typeSystem);
+  InheritanceManager3([@deprecated TypeSystem typeSystem]);
 
   /// Return the most specific signature of the member with the given [name]
   /// that the [type] inherits from the mixins, superclasses, or interfaces;
@@ -69,6 +68,7 @@ class InheritanceManager3 {
     if (interface._inheritedMap == null) {
       interface._inheritedMap = {};
       _findMostSpecificFromNamedCandidates(
+        type.element.library.typeSystem,
         interface._inheritedMap,
         interface._overridden,
       );
@@ -93,6 +93,8 @@ class InheritanceManager3 {
     if (!_processingClasses.add(classElement)) {
       return Interface._empty;
     }
+
+    var typeSystem = classElement.library.typeSystem;
 
     Map<Name, List<ExecutableElement>> namedCandidates = {};
     List<Map<Name, ExecutableElement>> superImplemented = [];
@@ -123,7 +125,11 @@ class InheritanceManager3 {
         // `mixin M on S1, S2 {}` can call using `super` any instance member
         // from its superclass constraints, whether it is abstract or concrete.
         var superClass = <Name, ExecutableElement>{};
-        _findMostSpecificFromNamedCandidates(superClass, superClassCandidates);
+        _findMostSpecificFromNamedCandidates(
+          typeSystem,
+          superClass,
+          superClassCandidates,
+        );
         superImplemented.add(superClass);
       } else {
         if (type.superclass != null) {
@@ -170,8 +176,9 @@ class InheritanceManager3 {
     // super-interfaces that is a valid override of all the other
     // super-interface signatures with the same name. That "most specific"
     // signature becomes the signature of the class's interface.
-    Map<Name, ExecutableElement> map = new Map.of(declared);
+    Map<Name, ExecutableElement> map = Map.of(declared);
     List<Conflict> conflicts = _findMostSpecificFromNamedCandidates(
+      typeSystem,
       map,
       namedCandidates,
     );
@@ -195,7 +202,7 @@ class InheritanceManager3 {
       }
     }
 
-    var interface = new Interface._(
+    var interface = Interface._(
       map,
       declared,
       implemented,
@@ -223,9 +230,9 @@ class InheritanceManager3 {
   ExecutableElement getMember(
     InterfaceType type,
     Name name, {
-    bool concrete: false,
-    int forMixinIndex: -1,
-    bool forSuper: false,
+    bool concrete = false,
+    int forMixinIndex = -1,
+    bool forSuper = false,
   }) {
     var interface = getInterface(type);
     if (forSuper) {
@@ -280,7 +287,7 @@ class InheritanceManager3 {
 
     void addMember(ExecutableElement member) {
       if (!member.isAbstract && !member.isStatic) {
-        var name = new Name(libraryUri, member.name);
+        var name = Name(libraryUri, member.name);
         implemented[name] = member;
       }
     }
@@ -331,7 +338,7 @@ class InheritanceManager3 {
         method ??= candidate;
       }
     }
-    return new Conflict(name, candidates, getter, method);
+    return Conflict(name, candidates, getter, method);
   }
 
   /// The given [namedCandidates] maps names to candidates from direct
@@ -340,6 +347,7 @@ class InheritanceManager3 {
   /// such single most specific signature (i.e. no valid override), then add a
   /// new conflict description.
   List<Conflict> _findMostSpecificFromNamedCandidates(
+      TypeSystemImpl typeSystem,
       Map<Name, ExecutableElement> map,
       Map<Name, List<ExecutableElement>> namedCandidates) {
     List<Conflict> conflicts;
@@ -374,7 +382,7 @@ class InheritanceManager3 {
         validOverride = candidates[i];
         for (var j = 0; j < candidates.length; j++) {
           var candidate = candidates[j];
-          if (!_typeSystem.isOverrideSubtypeOf(
+          if (!typeSystem.isOverrideSubtypeOf(
               validOverride.type, candidate.type)) {
             validOverride = null;
             break;
@@ -389,7 +397,7 @@ class InheritanceManager3 {
         map[name] = validOverride;
       } else {
         conflicts ??= <Conflict>[];
-        conflicts.add(new Conflict(name, candidates));
+        conflicts.add(Conflict(name, candidates));
       }
     }
 
@@ -404,7 +412,7 @@ class InheritanceManager3 {
     for (var i = 0; i < methods.length; i++) {
       var method = methods[i];
       if (!method.isStatic) {
-        var name = new Name(libraryUri, method.name);
+        var name = Name(libraryUri, method.name);
         declared[name] = method;
       }
     }
@@ -413,7 +421,7 @@ class InheritanceManager3 {
     for (var i = 0; i < accessors.length; i++) {
       var accessor = accessors[i];
       if (!accessor.isStatic) {
-        var name = new Name(libraryUri, accessor.name);
+        var name = Name(libraryUri, accessor.name);
         declared[name] = accessor;
       }
     }
@@ -514,9 +522,9 @@ class Name {
   factory Name(Uri libraryUri, String name) {
     if (name.startsWith('_')) {
       var hashCode = JenkinsSmiHash.hash2(libraryUri.hashCode, name.hashCode);
-      return new Name._internal(libraryUri, name, false, hashCode);
+      return Name._internal(libraryUri, name, false, hashCode);
     } else {
-      return new Name._internal(null, name, true, name.hashCode);
+      return Name._internal(null, name, true, name.hashCode);
     }
   }
 

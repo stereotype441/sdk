@@ -226,6 +226,23 @@ class _RecipeGenerator implements DartTypeVisitor<void, void> {
   void visit(DartType type, _) => type.accept(this, _);
 
   @override
+  void visitLegacyType(LegacyType type, _) {
+    visit(type.baseType, _);
+    _emitCode(Recipe.wrapStar);
+  }
+
+  @override
+  void visitNullableType(NullableType type, _) {
+    visit(type.baseType, _);
+    _emitCode(Recipe.wrapQuestion);
+  }
+
+  @override
+  void visitNeverType(NeverType type, _) {
+    _emitExtensionOp(Recipe.pushNeverExtension);
+  }
+
+  @override
   void visitTypeVariableType(TypeVariableType type, _) {
     TypeEnvironmentStructure environment = _environment;
     if (environment is SingletonTypeEnvironmentStructure) {
@@ -616,5 +633,29 @@ class RulesetEncoder {
         js.quoteName(_emitter.typeAccessNewRti(entry.key)),
         _colon,
         js.number(entry.value),
+      ]);
+
+  jsAst.StringConcatenation encodeTypeParameterVariances(
+          Map<ClassEntity, List<Variance>> typeParameterVariances) =>
+      js.concatenateStrings([
+        _quote,
+        _leftBrace,
+        ...js.joinLiterals(
+            typeParameterVariances.entries
+                .map(_encodeTypeParameterVariancesForClass),
+            _comma),
+        _rightBrace,
+        _quote,
+      ]);
+
+  jsAst.StringConcatenation _encodeTypeParameterVariancesForClass(
+          MapEntry<ClassEntity, List<Variance>> classEntry) =>
+      js.concatenateStrings([
+        js.quoteName(_emitter.typeAccessNewRti(classEntry.key)),
+        _colon,
+        _leftBracket,
+        ...js.joinLiterals(
+            classEntry.value.map((v) => js.number(v.index)), _comma),
+        _rightBracket
       ]);
 }

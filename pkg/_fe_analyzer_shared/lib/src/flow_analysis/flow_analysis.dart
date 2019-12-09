@@ -808,10 +808,9 @@ class FlowAnalysisDebug<Node, Statement extends Node, Expression, Variable,
   @override
   void finish() {
     if (_exceptionOccurred) {
-      print('finish() (skipped)');
+      _wrap('finish() (skipped)', () {}, isPure: true);
     } else {
-      print('finish()');
-      _wrapped.finish();
+      _wrap('finish()', () => _wrapped.finish(), isPure: true);
     }
   }
 
@@ -1336,7 +1335,8 @@ class FlowModel<Variable, Type> {
     if (newType == null || typeOperations.isSameType(newType, previousType)) {
       return new ExpressionInfo<Variable, Type>(this, this, this);
     }
-    assert(typeOperations.isSubtypeOf(newType, previousType));
+    assert(typeOperations.isSubtypeOf(newType, previousType),
+        "Expected $newType to be a subtype of $previousType.");
     return _finishTypeTest(typeOperations, variable, info, newType);
   }
 

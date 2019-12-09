@@ -11,7 +11,8 @@ import 'package:kernel/target/targets.dart';
 import 'package:kernel/ast.dart' hide Statement, StatementVisitor;
 import 'package:kernel/ast.dart' as ast show Statement, StatementVisitor;
 import 'package:kernel/class_hierarchy.dart' show ClassHierarchy;
-import 'package:kernel/type_environment.dart' show TypeEnvironment;
+import 'package:kernel/type_environment.dart'
+    show StaticTypeContext, TypeEnvironment;
 import 'package:kernel/type_algebra.dart' show Substitution;
 
 import 'calls.dart';
@@ -32,11 +33,12 @@ const bool kPartialMixinResolution = true;
 /// * Eliminates joins with a single input.
 class _SummaryNormalizer extends StatementVisitor {
   final Summary _summary;
+  final TypesBuilder _typesBuilder;
   Set<Statement> _processed = new Set<Statement>();
   Set<Statement> _pending = new Set<Statement>();
   bool _inLoop = false;
 
-  _SummaryNormalizer(this._summary);
+  _SummaryNormalizer(this._summary, this._typesBuilder);
 
   void normalize() {
     final List<Statement> statements = _summary.statements;
@@ -132,7 +134,7 @@ class _SummaryNormalizer extends StatementVisitor {
       _inLoop = false;
       debugPrint("Approximated ${st} with ${st.staticType}");
       Statistics.joinsApproximatedToBreakLoops++;
-      return new Type.fromStatic(st.staticType);
+      return _typesBuilder.fromStaticType(st.staticType, true);
     } else {
       // Step back until Join is found.
       _inLoop = true;
@@ -295,6 +297,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
   final TypeEnvironment _environment;
   final ClassHierarchy _hierarchy;
   final EntryPointsListener _entryPointsListener;
+  final TypesBuilder _typesBuilder;
   final NativeCodeOracle _nativeCodeOracle;
   final GenericInterfacesInfo _genericInterfacesInfo;
 
@@ -310,6 +313,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
   Parameter _receiver;
   ConstantAllocationCollector constantAllocationCollector;
   RuntimeTypeTranslator _translator;
+  StaticTypeContext _staticTypeContext;
 
   // Currently only used for factory constructors.
   Map<TypeParameter, TypeExpr> _fnTypeVariables;
@@ -319,6 +323,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
       this._environment,
       this._hierarchy,
       this._entryPointsListener,
+      this._typesBuilder,
       this._nativeCodeOracle,
       this._genericInterfacesInfo) {
     assertx(_genericInterfacesInfo != null);
@@ -330,6 +335,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
     debugPrint("===== ${member} =====");
     assertx(!member.isAbstract);
 
+    _staticTypeContext = new StaticTypeContext(member, _environment);
     _variableJoins = <VariableDeclaration, Join>{};
     _variables = <VariableDeclaration, TypeExpr>{};
     _returnValue = null;
@@ -347,7 +353,6 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
         _receiver = _declareParameter("this",
             _environment.coreTypes.legacyRawType(member.enclosingClass), null,
             isReceiver: true);
-        _environment.thisType = member.enclosingClass?.thisType;
       } else {
         _summary = new Summary();
       }
@@ -361,8 +366,8 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
       } else {
         Parameter valueParam = _declareParameter("value", member.type, null);
         TypeExpr runtimeType = _translator.translate(member.type);
-        final check = new TypeCheck(
-            valueParam, runtimeType, member, Type.fromStatic(member.type));
+        final check = new TypeCheck(valueParam, runtimeType, member,
+            _typesBuilder.fromStaticType(member.type, true));
         _summary.add(check);
         _summary.result = check;
       }
@@ -394,7 +399,6 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
         _receiver = _declareParameter("this",
             _environment.coreTypes.legacyRawType(member.enclosingClass), null,
             isReceiver: true);
-        _environment.thisType = member.enclosingClass?.thisType;
       }
 
       _translator = new RuntimeTypeTranslator(
@@ -468,7 +472,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
 
       if (function.body == null) {
         Type type = _nativeCodeOracle.handleNativeProcedure(
-            member, _entryPointsListener);
+            member, _entryPointsListener, _typesBuilder);
         if (type is! ConcreteType) {
           // Runtime type could be more precise than static type, so
           // calculate intersection.
@@ -488,14 +492,15 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
       }
 
       _summary.result = _returnValue;
-      _environment.thisType = null;
     }
+
+    _staticTypeContext = null;
 
     debugPrint("------------ SUMMARY ------------");
     debugPrint(_summary);
     debugPrint("---------------------------------");
 
-    new _SummaryNormalizer(_summary).normalize();
+    new _SummaryNormalizer(_summary, _typesBuilder).normalize();
 
     debugPrint("---------- NORM SUMMARY ---------");
     debugPrint(_summary);
@@ -524,8 +529,8 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
 
     if (hasReceiverArg(member)) {
       assertx(member.enclosingClass != null);
-      Type receiver = new Type.cone(
-          _environment.coreTypes.legacyRawType(member.enclosingClass));
+      final receiver =
+          new ConeType(_typesBuilder.getTFClass(member.enclosingClass));
       args.add(receiver);
     }
 
@@ -605,7 +610,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
       {bool isReceiver: false}) {
     Type staticType;
     if (type != null) {
-      staticType = isReceiver ? new ConeType(type) : new Type.fromStatic(type);
+      staticType = _typesBuilder.fromStaticType(type, !isReceiver);
     }
     final param = new Parameter(name, staticType);
     _summary.add(param);
@@ -615,8 +620,12 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
         if (initializer is ConstantExpression) {
           param.defaultValue =
               constantAllocationCollector.typeFor(initializer.constant);
+        } else if (initializer is BasicLiteral ||
+            initializer is SymbolLiteral ||
+            initializer is TypeLiteral) {
+          param.defaultValue = _visit(initializer);
         } else {
-          param.defaultValue = _staticType(initializer);
+          throw 'Unexpected parameter $name default value ${initializer.runtimeType} $initializer';
         }
       } else {
         param.defaultValue = _nullType;
@@ -639,8 +648,8 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
     TypeExpr variable = join;
     if (useTypeCheck) {
       TypeExpr runtimeType = _translator.translate(type);
-      variable = new TypeCheck(
-          variable, runtimeType, decl, Type.fromStatic(decl.type));
+      variable = new TypeCheck(variable, runtimeType, decl,
+          _typesBuilder.fromStaticType(decl.type, true));
       _summary.add(variable);
     }
 
@@ -659,7 +668,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
   // TODO(alexmarkov): Avoid declaring variables with static types.
   void _declareVariableWithStaticType(VariableDeclaration decl) {
     Join v = _declareVariable(decl);
-    v.values.add(new Type.fromStatic(v.staticType));
+    v.values.add(_typesBuilder.fromStaticType(v.staticType, true));
   }
 
   Call _makeCall(TreeNode node, Selector selector, Args<TypeExpr> args) {
@@ -696,58 +705,89 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
     }
   }
 
-  DartType _staticDartType(Expression node) {
-    // TODO(dartbug.com/34496): Remove this try/catch once
-    // getStaticType() is reliable.
-    try {
-      return node.getStaticType(_environment);
-    } catch (e) {
-      return const DynamicType();
-    }
-  }
+  DartType _staticDartType(Expression node) =>
+      node.getStaticType(_staticTypeContext);
 
   Type _staticType(Expression node) =>
-      new Type.fromStatic(_staticDartType(node));
+      _typesBuilder.fromStaticType(_staticDartType(node), true);
 
-  Type _cachedBoolType;
-  Type get _boolType => _cachedBoolType ??=
-      new Type.cone(_environment.coreTypes.boolLegacyRawType);
+  ConcreteType _cachedBoolType;
+  ConcreteType get _boolType => _cachedBoolType ??=
+      _entryPointsListener.addAllocatedClass(_environment.coreTypes.boolClass);
+
+  ConcreteType _cachedBoolTrue;
+  ConcreteType get _boolTrue => _cachedBoolTrue ??=
+      new ConcreteType(_boolType.cls, null, BoolConstant(true));
+
+  ConcreteType _cachedBoolFalse;
+  ConcreteType get _boolFalse => _cachedBoolFalse ??=
+      new ConcreteType(_boolType.cls, null, BoolConstant(false));
 
   Type _cachedDoubleType;
-  Type get _doubleType => _cachedDoubleType ??=
-      new Type.cone(_environment.coreTypes.doubleLegacyRawType);
+  Type get _doubleType => _cachedDoubleType ??= new ConeType(
+      _typesBuilder.getTFClass(_environment.coreTypes.doubleClass));
 
   Type _cachedIntType;
-  Type get _intType =>
-      _cachedIntType ??= new Type.cone(_environment.coreTypes.intLegacyRawType);
+  Type get _intType => _cachedIntType ??=
+      new ConeType(_typesBuilder.getTFClass(_environment.coreTypes.intClass));
 
   Type _cachedStringType;
-  Type get _stringType => _cachedStringType ??=
-      new Type.cone(_environment.coreTypes.stringLegacyRawType);
+  Type get _stringType => _cachedStringType ??= new ConeType(
+      _typesBuilder.getTFClass(_environment.coreTypes.stringClass));
 
   Type _cachedSymbolType;
-  Type get _symbolType => _cachedSymbolType ??=
-      new Type.cone(_environment.coreTypes.symbolLegacyRawType);
+  Type get _symbolType => _cachedSymbolType ??= new ConeType(
+      _typesBuilder.getTFClass(_environment.coreTypes.symbolClass));
+
+  Type _cachedTypeType;
+  Type get _typeType => _cachedTypeType ??=
+      new ConeType(_typesBuilder.getTFClass(_environment.coreTypes.typeClass));
 
   Type _cachedNullType;
-  Type get _nullType => _cachedNullType ??= new Type.nullable(new Type.empty());
+  Type get _nullType =>
+      _cachedNullType ??= new Type.nullable(const EmptyType());
 
-  Class get _superclass => _environment.thisType.classNode.superclass;
+  Class get _superclass => _staticTypeContext.thisType.classNode.superclass;
 
-  Type _intLiteralType(int value) {
-    Class concreteClass =
+  Type _boolLiteralType(bool value) => value ? _boolTrue : _boolFalse;
+
+  Type _intLiteralType(int value, Constant constant) {
+    final Class concreteClass =
         target.concreteIntLiteralClass(_environment.coreTypes, value);
-    return concreteClass != null
-        ? _entryPointsListener.addAllocatedClass(concreteClass)
-        : _intType;
+    if (concreteClass != null) {
+      constant ??= IntConstant(value);
+      return new ConcreteType(
+          _entryPointsListener.addAllocatedClass(concreteClass).cls,
+          null,
+          constant);
+    }
+    return _intType;
   }
 
-  Type _stringLiteralType(String value) {
-    Class concreteClass =
+  Type _doubleLiteralType(double value, Constant constant) {
+    final Class concreteClass =
+        target.concreteDoubleLiteralClass(_environment.coreTypes, value);
+    if (concreteClass != null) {
+      constant ??= DoubleConstant(value);
+      return new ConcreteType(
+          _entryPointsListener.addAllocatedClass(concreteClass).cls,
+          null,
+          constant);
+    }
+    return _doubleType;
+  }
+
+  Type _stringLiteralType(String value, Constant constant) {
+    final Class concreteClass =
         target.concreteStringLiteralClass(_environment.coreTypes, value);
-    return concreteClass != null
-        ? _entryPointsListener.addAllocatedClass(concreteClass)
-        : _stringType;
+    if (concreteClass != null) {
+      constant ??= StringConstant(value);
+      return new ConcreteType(
+          _entryPointsListener.addAllocatedClass(concreteClass).cls,
+          null,
+          constant);
+    }
+    return _stringType;
   }
 
   void _handleNestedFunctionNode(FunctionNode node) {
@@ -779,7 +819,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
   @override
   TypeExpr visitAsExpression(AsExpression node) {
     TypeExpr operand = _visit(node.operand);
-    Type type = new Type.fromStatic(node.type);
+    Type type = _typesBuilder.fromStaticType(node.type, true);
     TypeExpr runtimeType = _translator.translate(node.type);
     TypeExpr result = new TypeCheck(operand, runtimeType, node, type);
     explicitCasts[node] = result;
@@ -789,17 +829,17 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
 
   @override
   TypeExpr visitBoolLiteral(BoolLiteral node) {
-    return _boolType;
+    return _boolLiteralType(node.value);
   }
 
   @override
   TypeExpr visitIntLiteral(IntLiteral node) {
-    return _intLiteralType(node.value);
+    return _intLiteralType(node.value, null);
   }
 
   @override
   TypeExpr visitDoubleLiteral(DoubleLiteral node) {
-    return _doubleType;
+    return _doubleLiteralType(node.value, null);
   }
 
   @override
@@ -888,7 +928,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
 
   @override
   TypeExpr visitInvalidExpression(InvalidExpression node) {
-    return new Type.empty();
+    return const EmptyType();
   }
 
   @override
@@ -1009,7 +1049,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
     }
     switch (elementTypes.length) {
       case 0:
-        return new Type.empty();
+        return const EmptyType();
       case 1:
         return elementTypes.single;
       default:
@@ -1066,7 +1106,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
     // Re-resolve target due to partial mixin resolution.
     final target = _hierarchy.getDispatchTarget(_superclass, node.name);
     if (target == null) {
-      return new Type.empty();
+      return const EmptyType();
     } else {
       if ((target is Field) || ((target is Procedure) && target.isGetter)) {
         // Call via field/getter.
@@ -1094,7 +1134,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
     // Re-resolve target due to partial mixin resolution.
     final target = _hierarchy.getDispatchTarget(_superclass, node.name);
     if (target == null) {
-      return new Type.empty();
+      return const EmptyType();
     } else {
       return _makeCall(node,
           new DirectSelector(target, callKind: CallKind.PropertyGet), args);
@@ -1132,7 +1172,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
 
   @override
   TypeExpr visitRethrow(Rethrow node) {
-    return new Type.empty();
+    return const EmptyType();
   }
 
   @override
@@ -1171,7 +1211,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
 
   @override
   TypeExpr visitStringLiteral(StringLiteral node) {
-    return _stringLiteralType(node.value);
+    return _stringLiteralType(node.value, null);
   }
 
   @override
@@ -1188,12 +1228,12 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
   @override
   TypeExpr visitThrow(Throw node) {
     _visit(node.expression);
-    return new Type.empty();
+    return const EmptyType();
   }
 
   @override
   TypeExpr visitTypeLiteral(TypeLiteral node) {
-    return new Type.cone(_environment.coreTypes.typeLegacyRawType);
+    return _typeType;
   }
 
   @override
@@ -1205,7 +1245,8 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
 
     if ((node.promotedType != null) &&
         (node.promotedType != const DynamicType())) {
-      return _makeNarrow(v, new Type.cone(node.promotedType));
+      return _makeNarrow(
+          v, _typesBuilder.fromStaticType(node.promotedType, false));
     }
 
     return v;
@@ -1303,7 +1344,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
     Join v = _declareVariable(node.variable);
     // TODO(alexmarkov): support function types.
     // v.values.add(_concreteType(node.function.functionType));
-    v.values.add(new Type.fromStatic(v.staticType));
+    v.values.add(_typesBuilder.fromStaticType(v.staticType, true));
     _handleNestedFunctionNode(node.function);
     return null;
   }
@@ -1472,7 +1513,7 @@ class RuntimeTypeTranslator extends DartTypeVisitor<TypeExpr> {
 
     // This function is very similar to 'visitInterfaceType', but with
     // many small differences.
-    final klass = type.classNode;
+    final klass = type.cls.classNode;
     final substitution = Substitution.fromPairs(klass.typeParameters, typeArgs);
     final flattenedTypeArgs =
         genericInterfacesInfo.flattenedTypeArgumentsFor(klass);
@@ -1491,10 +1532,10 @@ class RuntimeTypeTranslator extends DartTypeVisitor<TypeExpr> {
     if (allAnyType) return type;
 
     if (createConcreteType) {
-      return new ConcreteType(type.classId, type.classNode,
-          new List<Type>.from(flattenedTypeExprs));
+      return new ConcreteType(
+          type.cls, new List<Type>.from(flattenedTypeExprs));
     } else {
-      final instantiate = new CreateConcreteType(type, flattenedTypeExprs);
+      final instantiate = new CreateConcreteType(type.cls, flattenedTypeExprs);
       summary.add(instantiate);
       return instantiate;
     }
@@ -1532,6 +1573,8 @@ class RuntimeTypeTranslator extends DartTypeVisitor<TypeExpr> {
   TypeExpr visitVoidType(VoidType type) => new RuntimeType(type, null);
   @override
   TypeExpr visitBottomType(BottomType type) => new RuntimeType(type, null);
+  @override
+  TypeExpr visitNeverType(NeverType type) => new RuntimeType(type, null);
 
   @override
   visitTypedefType(TypedefType node) => translate(node.unalias);
@@ -1556,7 +1599,8 @@ class RuntimeTypeTranslator extends DartTypeVisitor<TypeExpr> {
     }
 
     if (createRuntimeType) {
-      return new RuntimeType(new InterfaceType(type.classNode),
+      return new RuntimeType(
+          new InterfaceType(type.classNode, Nullability.legacy),
           new List<RuntimeType>.from(flattenedTypeExprs));
     } else {
       final instantiate =
@@ -1582,51 +1626,6 @@ class RuntimeTypeTranslator extends DartTypeVisitor<TypeExpr> {
   }
 }
 
-class EmptyEntryPointsListener implements EntryPointsListener {
-  final Map<Class, IntClassId> _classIds = <Class, IntClassId>{};
-  int _classIdCounter = 0;
-
-  @override
-  void addRawCall(Selector selector) {}
-
-  @override
-  void addDirectFieldAccess(Field field, Type value) {}
-
-  @override
-  ConcreteType addAllocatedClass(Class c) {
-    final classId = (_classIds[c] ??= new IntClassId(++_classIdCounter));
-    return new ConcreteType(classId, c, null);
-  }
-
-  @override
-  void recordMemberCalledViaInterfaceSelector(Member target) {}
-
-  @override
-  void recordMemberCalledViaThis(Member target) {}
-}
-
-class CreateAllSummariesVisitor extends RecursiveVisitor<Null> {
-  final TypeEnvironment _environment;
-  final SummaryCollector _summaryCollector;
-
-  CreateAllSummariesVisitor(Target target, this._environment,
-      ClassHierarchy hierarchy, GenericInterfacesInfo genericInterfacesInfo)
-      : _summaryCollector = new SummaryCollector(
-            target,
-            _environment,
-            hierarchy,
-            new EmptyEntryPointsListener(),
-            new NativeCodeOracle(null, null),
-            genericInterfacesInfo);
-
-  @override
-  defaultMember(Member m) {
-    if (!m.isAbstract && !(m is Field && m.initializer == null)) {
-      _summaryCollector.createSummary(m);
-    }
-  }
-}
-
 class ConstantAllocationCollector extends ConstantVisitor<Type> {
   final SummaryCollector summaryCollector;
 
@@ -1640,6 +1639,10 @@ class ConstantAllocationCollector extends ConstantVisitor<Type> {
     return constants.putIfAbsent(constant, () => constant.accept(this));
   }
 
+  Type _getStaticType(Constant constant) =>
+      summaryCollector._typesBuilder.fromStaticType(
+          constant.getType(summaryCollector._staticTypeContext), false);
+
   @override
   defaultConstant(Constant constant) {
     throw 'There is no support for constant "$constant" in TFA yet!';
@@ -1652,22 +1655,22 @@ class ConstantAllocationCollector extends ConstantVisitor<Type> {
 
   @override
   Type visitBoolConstant(BoolConstant constant) {
-    return summaryCollector._boolType;
+    return summaryCollector._boolLiteralType(constant.value);
   }
 
   @override
   Type visitIntConstant(IntConstant constant) {
-    return summaryCollector._intLiteralType(constant.value);
+    return summaryCollector._intLiteralType(constant.value, constant);
   }
 
   @override
   Type visitDoubleConstant(DoubleConstant constant) {
-    return summaryCollector._doubleType;
+    return summaryCollector._doubleLiteralType(constant.value, constant);
   }
 
   @override
   Type visitStringConstant(StringConstant constant) {
-    return summaryCollector._stringLiteralType(constant.value);
+    return summaryCollector._stringLiteralType(constant.value, constant);
   }
 
   @override
@@ -1685,22 +1688,28 @@ class ConstantAllocationCollector extends ConstantVisitor<Type> {
     for (final Constant entry in constant.entries) {
       typeFor(entry);
     }
-    Class concreteClass = summaryCollector.target
+    final Class concreteClass = summaryCollector.target
         .concreteConstListLiteralClass(summaryCollector._environment.coreTypes);
-    return concreteClass != null
-        ? summaryCollector._entryPointsListener.addAllocatedClass(concreteClass)
-        : new Type.cone(constant.getType(summaryCollector._environment));
+    if (concreteClass != null) {
+      return new ConcreteType(
+          summaryCollector._entryPointsListener
+              .addAllocatedClass(concreteClass)
+              .cls,
+          null,
+          constant);
+    }
+    return _getStaticType(constant);
   }
 
   @override
   Type visitInstanceConstant(InstanceConstant constant) {
-    final resultType = summaryCollector._entryPointsListener
+    final resultClass = summaryCollector._entryPointsListener
         .addAllocatedClass(constant.classNode);
     constant.fieldValues.forEach((Reference fieldReference, Constant value) {
       summaryCollector._entryPointsListener
           .addDirectFieldAccess(fieldReference.asField, typeFor(value));
     });
-    return resultType;
+    return new ConcreteType(resultClass.cls, null, constant);
   }
 
   @override
@@ -1708,18 +1717,18 @@ class ConstantAllocationCollector extends ConstantVisitor<Type> {
     final Procedure procedure = constant.procedure;
     summaryCollector._entryPointsListener
         .addRawCall(new DirectSelector(procedure));
-    return new Type.cone(constant.getType(summaryCollector._environment));
+    return _getStaticType(constant);
   }
 
   @override
   Type visitPartialInstantiationConstant(
       PartialInstantiationConstant constant) {
     constant.tearOffConstant.accept(this);
-    return new Type.cone(constant.getType(summaryCollector._environment));
+    return _getStaticType(constant);
   }
 
   @override
   Type visitTypeLiteralConstant(TypeLiteralConstant constant) {
-    return new Type.cone(constant.getType(summaryCollector._environment));
+    return summaryCollector._typeType;
   }
 }

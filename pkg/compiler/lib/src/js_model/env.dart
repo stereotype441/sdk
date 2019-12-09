@@ -16,6 +16,7 @@ import '../elements/types.dart';
 import '../ir/element_map.dart';
 import '../ir/static_type_cache.dart';
 import '../ir/visitors.dart';
+import '../ir/util.dart';
 import '../js_model/element_map.dart';
 import '../ordered_typeset.dart';
 import '../serialization/serialization.dart';
@@ -442,6 +443,7 @@ abstract class JClassData {
   InterfaceType get thisType;
   InterfaceType get jsInteropType;
   InterfaceType get rawType;
+  InterfaceType get instantiationToBounds;
   InterfaceType get supertype;
   InterfaceType get mixedInType;
   List<InterfaceType> get interfaces;
@@ -450,6 +452,8 @@ abstract class JClassData {
 
   bool get isEnumClass;
   bool get isMixinApplication;
+
+  List<Variance> getVariances();
 }
 
 class JClassDataImpl implements JClassData {
@@ -471,6 +475,8 @@ class JClassDataImpl implements JClassData {
   @override
   InterfaceType rawType;
   @override
+  InterfaceType instantiationToBounds;
+  @override
   InterfaceType supertype;
   @override
   InterfaceType mixedInType;
@@ -478,6 +484,8 @@ class JClassDataImpl implements JClassData {
   List<InterfaceType> interfaces;
   @override
   OrderedTypeSet orderedTypeSet;
+
+  List<Variance> _variances;
 
   JClassDataImpl(this.cls, this.definition);
 
@@ -503,6 +511,10 @@ class JClassDataImpl implements JClassData {
 
   @override
   DartType get callType => null;
+
+  @override
+  List<Variance> getVariances() =>
+      _variances ??= cls.typeParameters.map(convertVariance).toList();
 }
 
 /// Enum used for identifying [JMemberData] subclasses in serialization.
@@ -609,8 +621,8 @@ abstract class FunctionDataTypeVariablesMixin implements FunctionData {
         } else {
           _typeVariables = functionNode.typeParameters
               .map<TypeVariableType>((ir.TypeParameter typeParameter) {
-            return elementMap
-                .getDartType(new ir.TypeParameterType(typeParameter));
+            return elementMap.getDartType(
+                new ir.TypeParameterType(typeParameter, ir.Nullability.legacy));
           }).toList();
         }
       }
@@ -759,7 +771,8 @@ class SignatureFunctionData implements FunctionData {
   List<TypeVariableType> getFunctionTypeVariables(IrToElementMap elementMap) {
     return typeParameters
         .map<TypeVariableType>((ir.TypeParameter typeParameter) {
-      return elementMap.getDartType(new ir.TypeParameterType(typeParameter));
+      return elementMap.getDartType(
+          new ir.TypeParameterType(typeParameter, ir.Nullability.legacy));
     }).toList();
   }
 

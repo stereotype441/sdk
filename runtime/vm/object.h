@@ -63,6 +63,7 @@ class FlowGraphCompiler;
 class HierarchyInfo;
 class LocalScope;
 class CodeStatistics;
+class IsolateGroupReloadContext;
 
 #define REUSABLE_FORWARD_DECLARATION(name) class Reusable##name##HandleScope;
 REUSABLE_HANDLE_LIST(REUSABLE_FORWARD_DECLARATION)
@@ -718,10 +719,10 @@ class Object {
   // isolates. They are all allocated in the non-GC'd Dart::vm_isolate_.
   static RawObject* null_;
 
-  static RawClass* class_class_;             // Class of the Class vm object.
-  static RawClass* dynamic_class_;           // Class of the 'dynamic' type.
-  static RawClass* void_class_;              // Class of the 'void' type.
-  static RawClass* never_class_;             // Class of the 'Never' type.
+  static RawClass* class_class_;           // Class of the Class vm object.
+  static RawClass* dynamic_class_;         // Class of the 'dynamic' type.
+  static RawClass* void_class_;            // Class of the 'void' type.
+  static RawClass* never_class_;           // Class of the 'Never' type.
   static RawClass* type_arguments_class_;  // Class of TypeArguments vm object.
   static RawClass* patch_class_class_;     // Class of the PatchClass vm object.
   static RawClass* function_class_;        // Class of the Function vm object.
@@ -730,10 +731,10 @@ class Object {
   static RawClass* redirection_data_class_;  // Class of RedirectionData vm obj.
   static RawClass* ffi_trampoline_data_class_;  // Class of FfiTrampolineData
                                                 // vm obj.
-  static RawClass* field_class_;             // Class of the Field vm object.
-  static RawClass* script_class_;        // Class of the Script vm object.
-  static RawClass* library_class_;       // Class of the Library vm object.
-  static RawClass* namespace_class_;     // Class of Namespace vm object.
+  static RawClass* field_class_;                // Class of the Field vm object.
+  static RawClass* script_class_;     // Class of the Script vm object.
+  static RawClass* library_class_;    // Class of the Library vm object.
+  static RawClass* namespace_class_;  // Class of Namespace vm object.
   static RawClass* kernel_program_info_class_;  // Class of KernelProgramInfo vm
                                                 // object.
   static RawClass* code_class_;                 // Class of the Code vm object.
@@ -743,13 +744,13 @@ class Object {
   static RawClass* pc_descriptors_class_;   // Class of PcDescriptors vm object.
   static RawClass* code_source_map_class_;  // Class of CodeSourceMap vm object.
   static RawClass*
-      compressed_stackmaps_class_;          // Class of CompressedStackMaps.
-  static RawClass* var_descriptors_class_;  // Class of LocalVarDescriptors.
+      compressed_stackmaps_class_;             // Class of CompressedStackMaps.
+  static RawClass* var_descriptors_class_;     // Class of LocalVarDescriptors.
   static RawClass* exception_handlers_class_;  // Class of ExceptionHandlers.
   static RawClass* deopt_info_class_;          // Class of DeoptInfo.
-  static RawClass* context_class_;        // Class of the Context vm object.
-  static RawClass* context_scope_class_;  // Class of ContextScope vm object.
-  static RawClass* dyncalltypecheck_class_;     // Class of ParameterTypeCheck.
+  static RawClass* context_class_;           // Class of the Context vm object.
+  static RawClass* context_scope_class_;     // Class of ContextScope vm object.
+  static RawClass* dyncalltypecheck_class_;  // Class of ParameterTypeCheck.
   static RawClass* singletargetcache_class_;    // Class of SingleTargetCache.
   static RawClass* unlinkedcall_class_;         // Class of UnlinkedCall.
   static RawClass* icdata_class_;               // Class of ICData.
@@ -836,6 +837,21 @@ typedef ZoneGrowableHandlePtrArray<const AbstractType>* TrailPtr;
 // The second string in the triplet is the URI of the type.
 // The third string in the triplet is "print" if the triplet should be printed.
 typedef ZoneGrowableHandlePtrArray<const String> URIs;
+
+// Keep in sync with package:kernel/lib/ast.dart
+enum class Nullability {
+  kUndetermined = 0,
+  kNullable = 1,
+  kNonNullable = 2,
+  kLegacy = 3,
+};
+
+// NNBD modes reflecting the status of the library performing type reification
+// or subtype tests. Weak or strong mode is independent of this mode.
+enum class NNBDMode {
+  kLegacy,
+  kOptedIn,
+};
 
 class Class : public Object {
  public:
@@ -935,7 +951,12 @@ class Class : public Object {
   // class B<T, S>
   // class C<R> extends B<R, int>
   // C.DeclarationType() --> C [R, int, R]
-  RawType* DeclarationType() const;
+  // The declaration type is legacy by default, but another nullability
+  // variant may be requested. The first requested type gets cached in the class
+  // and subsequent nullability variants get cached in the object store.
+  // TODO(regis): Is this caching still useful or should we eliminate it?
+  RawType* DeclarationType(
+      Nullability nullability = Nullability::kLegacy) const;
 
   static intptr_t declaration_type_offset() {
     return OFFSET_OF(RawClass, declaration_type_);
@@ -1075,7 +1096,8 @@ class Class : public Object {
 
   // Returns true if the type specified by cls and type_arguments is a
   // subtype of the type specified by other class and other_type_arguments.
-  static bool IsSubtypeOf(const Class& cls,
+  static bool IsSubtypeOf(NNBDMode mode,
+                          const Class& cls,
                           const TypeArguments& type_arguments,
                           const Class& other,
                           const TypeArguments& other_type_arguments,
@@ -1085,6 +1107,7 @@ class Class : public Object {
   // subtype of FutureOr<T> specified by other class and other_type_arguments.
   // Returns false if other class is not a FutureOr.
   static bool IsSubtypeOfFutureOr(Zone* zone,
+                                  NNBDMode mode,
                                   const Class& cls,
                                   const TypeArguments& type_arguments,
                                   const Class& other,
@@ -1351,8 +1374,7 @@ class Class : public Object {
   // (type_)param_names, and is invoked with the (type)argument values given in
   // (type_)param_values.
   RawObject* EvaluateCompiledExpression(
-      const uint8_t* kernel_bytes,
-      intptr_t kernel_length,
+      const ExternalTypedData& kernel_buffer,
       const Array& type_definitions,
       const Array& param_values,
       const TypeArguments& type_param_values) const;
@@ -2130,21 +2152,6 @@ class ICData : public Object {
   friend class SnapshotWriter;
 };
 
-// Keep in sync with package:kernel/lib/ast.dart
-enum Nullability {
-  kUndetermined = 0,
-  kNullable = 1,
-  kNonNullable = 2,
-  kLegacy = 3,
-};
-
-// Nullability aware subtype checking modes.
-enum NNBDMode {
-  kUnaware,
-  kWeak,
-  kStrong,
-};
-
 // Often used constants for number of free function type parameters.
 enum {
   kNoneFree = 0,
@@ -2185,7 +2192,8 @@ class Function : public Object {
   // function type with uninstantiated type arguments 'T' and 'R' as elements of
   // its type argument vector.
   // A function type is non-nullable by default.
-  RawType* SignatureType(Nullability nullability = kNonNullable) const;
+  RawType* SignatureType(
+      Nullability nullability = Nullability::kNonNullable) const;
   RawType* ExistingSignatureType() const;
 
   // Update the signature type (with a canonical version).
@@ -2222,6 +2230,7 @@ class Function : public Object {
 
   // Return a new function with instantiated result and parameter types.
   RawFunction* InstantiateSignatureFrom(
+      NNBDMode mode,
       const TypeArguments& instantiator_type_arguments,
       const TypeArguments& function_type_arguments,
       intptr_t num_free_fun_type_params,
@@ -2493,6 +2502,10 @@ class Function : public Object {
   // of arguments have not been checked.
   bool CanReceiveDynamicInvocation() const {
     return IsClosureFunction() || IsFfiTrampoline();
+  }
+
+  bool HasThisParameter() const {
+    return IsDynamicFunction() || IsGenerativeConstructor();
   }
 
   bool IsDynamicFunction(bool allow_abstract = false) const {
@@ -2784,6 +2797,7 @@ class Function : public Object {
   // Returns a TypeError if the provided arguments don't match the function
   // parameter types, NULL otherwise. Assumes AreValidArguments is called first.
   RawObject* DoArgumentTypesMatch(
+      NNBDMode mode,
       const Array& args,
       const ArgumentsDescriptor& arg_names,
       const TypeArguments& instantiator_type_args) const;
@@ -2791,11 +2805,13 @@ class Function : public Object {
   // Returns true if the type argument count, total argument count and the names
   // of optional arguments are valid for calling this function.
   // Otherwise, it returns false and the reason (if error_message is not NULL).
-  bool AreValidArguments(intptr_t num_type_arguments,
+  bool AreValidArguments(NNBDMode mode,
+                         intptr_t num_type_arguments,
                          intptr_t num_arguments,
                          const Array& argument_names,
                          String* error_message) const;
-  bool AreValidArguments(const ArgumentsDescriptor& args_desc,
+  bool AreValidArguments(NNBDMode mode,
+                         const ArgumentsDescriptor& args_desc,
                          String* error_message) const;
 
   // Fully qualified name uniquely identifying the function under gdb and during
@@ -2808,7 +2824,9 @@ class Function : public Object {
 
   // Returns true if the type of this function is a subtype of the type of
   // the other function.
-  bool IsSubtypeOf(const Function& other, Heap::Space space) const;
+  bool IsSubtypeOf(NNBDMode mode,
+                   const Function& other,
+                   Heap::Space space) const;
 
   bool IsDispatcherOrImplicitAccessor() const {
     switch (kind()) {
@@ -2909,24 +2927,24 @@ class Function : public Object {
   }
 
   bool IsFfiLoad() const {
-    const auto kind = MethodRecognizer::RecognizeKind(*this);
+    const auto kind = recognized_kind();
     return MethodRecognizer::kFfiLoadInt8 <= kind &&
            kind <= MethodRecognizer::kFfiLoadPointer;
   }
 
   bool IsFfiStore() const {
-    const auto kind = MethodRecognizer::RecognizeKind(*this);
+    const auto kind = recognized_kind();
     return MethodRecognizer::kFfiStoreInt8 <= kind &&
            kind <= MethodRecognizer::kFfiStorePointer;
   }
 
   bool IsFfiFromAddress() const {
-    const auto kind = MethodRecognizer::RecognizeKind(*this);
+    const auto kind = recognized_kind();
     return kind == MethodRecognizer::kFfiFromAddress;
   }
 
   bool IsFfiGetAddress() const {
-    const auto kind = MethodRecognizer::RecognizeKind(*this);
+    const auto kind = recognized_kind();
     return kind == MethodRecognizer::kFfiGetAddress;
   }
 
@@ -3253,7 +3271,8 @@ class Function : public Object {
   // Returns true if the type of the formal parameter at the given position in
   // this function is contravariant with the type of the other formal parameter
   // at the given position in the other function.
-  bool IsContravariantParameter(intptr_t parameter_position,
+  bool IsContravariantParameter(NNBDMode mode,
+                                intptr_t parameter_position,
                                 const Function& other,
                                 intptr_t other_parameter_position,
                                 Heap::Space space) const;
@@ -3584,6 +3603,7 @@ class Field : public Object {
                        bool is_final,
                        bool is_const,
                        bool is_reflectable,
+                       bool is_late,
                        const Object& owner,
                        const AbstractType& type,
                        TokenPosition token_pos,
@@ -3592,6 +3612,7 @@ class Field : public Object {
   static RawField* NewTopLevel(const String& name,
                                bool is_final,
                                bool is_const,
+                               bool is_late,
                                const Object& owner,
                                TokenPosition token_pos,
                                TokenPosition end_token_pos);
@@ -3616,6 +3637,17 @@ class Field : public Object {
 
   RawString* InitializingExpression() const;
 
+  bool has_nontrivial_initializer() const {
+    return HasNontrivialInitializerBit::decode(raw_ptr()->kind_bits_);
+  }
+  // Called by parser after allocating field.
+  void set_has_nontrivial_initializer(bool has_nontrivial_initializer) const {
+    ASSERT(IsOriginal());
+    ASSERT(Thread::Current()->IsMutatorThread());
+    set_kind_bits(HasNontrivialInitializerBit::update(
+        has_nontrivial_initializer, raw_ptr()->kind_bits_));
+  }
+
   bool has_initializer() const {
     return HasInitializerBit::decode(raw_ptr()->kind_bits_);
   }
@@ -3625,6 +3657,10 @@ class Field : public Object {
     ASSERT(Thread::Current()->IsMutatorThread());
     set_kind_bits(
         HasInitializerBit::update(has_initializer, raw_ptr()->kind_bits_));
+  }
+
+  bool has_trivial_initializer() const {
+    return has_initializer() && !has_nontrivial_initializer();
   }
 
   StaticTypeExactnessState static_type_exactness_state() const {
@@ -3687,6 +3723,9 @@ class Field : public Object {
     ASSERT(!r || is_final());
     return r;
   }
+
+  bool NeedsSetter() const;
+  bool NeedsGetter() const;
 
   const char* GuardedPropertiesAsCString() const;
 
@@ -3803,6 +3842,13 @@ class Field : public Object {
   static bool IsSetterName(const String& function_name);
   static bool IsInitName(const String& function_name);
 
+#if !defined(DART_PRECOMPILED_RUNTIME)
+  RawSubtypeTestCache* type_test_cache() const {
+    return raw_ptr()->type_test_cache_;
+  }
+  void set_type_test_cache(const SubtypeTestCache& cache) const;
+#endif
+
  private:
   static void InitializeNew(const Field& result,
                             const String& name,
@@ -3810,6 +3856,7 @@ class Field : public Object {
                             bool is_final,
                             bool is_const,
                             bool is_reflectable,
+                            bool is_late,
                             const Object& owner,
                             TokenPosition token_pos,
                             TokenPosition end_token_pos);
@@ -3820,7 +3867,7 @@ class Field : public Object {
     kConstBit = 0,
     kStaticBit,
     kFinalBit,
-    kHasInitializerBit,
+    kHasNontrivialInitializerBit,
     kUnboxingCandidateBit,
     kReflectableBit,
     kDoubleInitializedBit,
@@ -3831,12 +3878,13 @@ class Field : public Object {
     kIsLateBit,
     kIsExtensionMemberBit,
     kNeedsLoadGuardBit,
+    kHasInitializerBit,
   };
   class ConstBit : public BitField<uint16_t, bool, kConstBit, 1> {};
   class StaticBit : public BitField<uint16_t, bool, kStaticBit, 1> {};
   class FinalBit : public BitField<uint16_t, bool, kFinalBit, 1> {};
-  class HasInitializerBit
-      : public BitField<uint16_t, bool, kHasInitializerBit, 1> {};
+  class HasNontrivialInitializerBit
+      : public BitField<uint16_t, bool, kHasNontrivialInitializerBit, 1> {};
   class UnboxingCandidateBit
       : public BitField<uint16_t, bool, kUnboxingCandidateBit, 1> {};
   class ReflectableBit : public BitField<uint16_t, bool, kReflectableBit, 1> {};
@@ -3856,6 +3904,8 @@ class Field : public Object {
       : public BitField<uint16_t, bool, kIsExtensionMemberBit, 1> {};
   class NeedsLoadGuardBit
       : public BitField<uint16_t, bool, kNeedsLoadGuardBit, 1> {};
+  class HasInitializerBit
+      : public BitField<uint16_t, bool, kHasInitializerBit, 1> {};
 
   // Update guarded cid and guarded length for this field. Returns true, if
   // deoptimization of dependent code is required.
@@ -3943,12 +3993,6 @@ class Script : public Object {
   void set_line_starts(const TypedData& value) const;
 
   void set_debug_positions(const Array& value) const;
-
-  void set_yield_positions(const Array& value) const;
-
-  RawArray* yield_positions() const;
-
-  RawGrowableObjectArray* GetYieldPositions(const Function& function) const;
 
   RawLibrary* FindLibrary() const;
   RawString* GetLine(intptr_t line_number,
@@ -4112,8 +4156,7 @@ class Library : public Object {
   // parameters given in (type_)param_names, and is invoked with the (type)
   // argument values given in (type_)param_values.
   RawObject* EvaluateCompiledExpression(
-      const uint8_t* kernel_bytes,
-      intptr_t kernel_length,
+      const ExternalTypedData& kernel_buffer,
       const Array& type_definitions,
       const Array& param_values,
       const TypeArguments& type_param_values) const;
@@ -4248,6 +4291,10 @@ class Library : public Object {
   }
   void set_is_nnbd(bool value) const {
     set_flags(RawLibrary::NnbdBit::update(value, raw_ptr()->flags_));
+  }
+
+  NNBDMode nnbd_mode() const {
+    return is_nnbd() ? NNBDMode::kOptedIn : NNBDMode::kLegacy;
   }
 
   RawString* PrivateName(const String& name) const;
@@ -4535,6 +4582,7 @@ class KernelProgramInfo : public Object {
                                    const Array& scripts,
                                    const Array& libraries_cache,
                                    const Array& classes_cache,
+                                   const Object& retained_kernel_blob,
                                    const uint32_t binary_version);
 
   static intptr_t InstanceSize() {
@@ -5015,16 +5063,20 @@ class PcDescriptors : public Object {
           cur_kind_(0),
           cur_deopt_id_(0),
           cur_token_pos_(0),
-          cur_try_index_(0) {}
+          cur_try_index_(0),
+          cur_yield_index_(RawPcDescriptors::kInvalidYieldIndex) {}
 
     bool MoveNext() {
       // Moves to record that matches kind_mask_.
       while (byte_index_ < descriptors_.Length()) {
-        int32_t merged_kind_try = descriptors_.DecodeInteger(&byte_index_);
+        const int32_t kind_and_metadata =
+            descriptors_.DecodeInteger(&byte_index_);
         cur_kind_ =
-            RawPcDescriptors::MergedKindTry::DecodeKind(merged_kind_try);
-        cur_try_index_ =
-            RawPcDescriptors::MergedKindTry::DecodeTryIndex(merged_kind_try);
+            RawPcDescriptors::KindAndMetadata::DecodeKind(kind_and_metadata);
+        cur_try_index_ = RawPcDescriptors::KindAndMetadata::DecodeTryIndex(
+            kind_and_metadata);
+        cur_yield_index_ = RawPcDescriptors::KindAndMetadata::DecodeYieldIndex(
+            kind_and_metadata);
 
         cur_pc_offset_ += descriptors_.DecodeInteger(&byte_index_);
 
@@ -5044,6 +5096,7 @@ class PcDescriptors : public Object {
     intptr_t DeoptId() const { return cur_deopt_id_; }
     TokenPosition TokenPos() const { return TokenPosition(cur_token_pos_); }
     intptr_t TryIndex() const { return cur_try_index_; }
+    intptr_t YieldIndex() const { return cur_yield_index_; }
     RawPcDescriptors::Kind Kind() const {
       return static_cast<RawPcDescriptors::Kind>(cur_kind_);
     }
@@ -5061,7 +5114,8 @@ class PcDescriptors : public Object {
           cur_kind_(iter.cur_kind_),
           cur_deopt_id_(iter.cur_deopt_id_),
           cur_token_pos_(iter.cur_token_pos_),
-          cur_try_index_(iter.cur_try_index_) {}
+          cur_try_index_(iter.cur_try_index_),
+          cur_yield_index_(iter.cur_yield_index_) {}
 
     const PcDescriptors& descriptors_;
     const intptr_t kind_mask_;
@@ -5072,6 +5126,7 @@ class PcDescriptors : public Object {
     intptr_t cur_deopt_id_;
     intptr_t cur_token_pos_;
     intptr_t cur_try_index_;
+    intptr_t cur_yield_index_;
   };
 
   intptr_t Length() const;
@@ -5146,18 +5201,24 @@ class CompressedStackMaps : public Object {
  public:
   static const intptr_t kHashBits = 30;
 
-  intptr_t payload_size() const { return raw_ptr()->payload_size_; }
+  uintptr_t payload_size() const { return raw_ptr()->payload_size(); }
 
   bool Equals(const CompressedStackMaps& other) const {
-    if (payload_size() != other.payload_size()) return false;
+    // Both the payload size and the kind of table must match.
+    if (raw_ptr()->flags_and_size_ != other.raw_ptr()->flags_and_size_) {
+      return false;
+    }
     NoSafepointScope no_safepoint;
     return memcmp(raw_ptr(), other.raw_ptr(), InstanceSize(payload_size())) ==
            0;
   }
-  intptr_t Hash() const;
+
+  // Methods to allow use with PointerKeyValueTrait to create sets of CSMs.
+  bool Equals(const CompressedStackMaps* other) const { return Equals(*other); }
+  intptr_t Hashcode() const;
 
   static intptr_t UnroundedSize(RawCompressedStackMaps* maps) {
-    return UnroundedSize(maps->ptr()->payload_size_);
+    return UnroundedSize(maps->ptr()->payload_size());
   }
   static intptr_t UnroundedSize(intptr_t length) {
     return sizeof(RawCompressedStackMaps) + length;
@@ -5172,22 +5233,49 @@ class CompressedStackMaps : public Object {
   }
 
  private:
-  // The encoding logic for CompressedStackMaps entries is in
-  // CompressedStackMapsBuilder, and the decoding logic is in
-  // CompressedStackMapsIterator.
-  static RawCompressedStackMaps* New(const GrowableArray<uint8_t>& bytes);
+  static RawCompressedStackMaps* New(const GrowableArray<uint8_t>& bytes,
+                                     RawCompressedStackMaps::Kind kind);
 
-  void set_payload_size(intptr_t payload_size) const {
-    StoreNonPointer(&raw_ptr()->payload_size_, payload_size);
+  static RawCompressedStackMaps* NewInlined(
+      const GrowableArray<uint8_t>& bytes) {
+    return New(bytes, RawCompressedStackMaps::kInlined);
   }
+  static RawCompressedStackMaps* NewUsingTable(
+      const GrowableArray<uint8_t>& bytes) {
+    return New(bytes, RawCompressedStackMaps::kUsesTable);
+  }
+  static RawCompressedStackMaps* NewGlobalTable(
+      const GrowableArray<uint8_t>& bytes) {
+    return New(bytes, RawCompressedStackMaps::kGlobalTable);
+  }
+
+  void set_payload_size(intptr_t payload_size,
+                        RawCompressedStackMaps::Kind kind) const {
+    ASSERT(RawCompressedStackMaps::SizeField::is_valid(payload_size));
+    const uint32_t encoded_fields =
+        RawCompressedStackMaps::KindField::encode(kind) |
+        RawCompressedStackMaps::SizeField::encode(payload_size);
+    StoreNonPointer(&raw_ptr()->flags_and_size_, encoded_fields);
+  }
+
+  bool UsesGlobalTable() const {
+    return !IsNull() && raw_ptr()->UsesGlobalTable();
+  }
+  bool IsGlobalTable() const { return !IsNull() && raw_ptr()->IsGlobalTable(); }
 
   const uint8_t* Payload() const { return raw_ptr()->data(); }
   void SetPayload(const GrowableArray<uint8_t>& payload) const;
+  uint8_t PayloadByte(uintptr_t offset) const {
+    ASSERT(offset >= 0 && offset < payload_size());
+    return raw_ptr()->data()[offset];
+  }
 
   FINAL_HEAP_OBJECT_IMPLEMENTATION(CompressedStackMaps, Object);
   friend class Class;
   friend class CompressedStackMapsBuilder;
   friend class CompressedStackMapsIterator;
+  friend class ProgramVisitor;
+  friend class StackMapEntry;
 };
 
 class ExceptionHandlers : public Object {
@@ -5380,13 +5468,13 @@ class Code : public Object {
   }
   void set_deopt_info_array(const Array& array) const;
 
-#if !defined(DART_PRECOMPILED_RUNTIME) && !defined(DART_PRECOMPILER)
-  RawSmi* variables() const { return raw_ptr()->catch_entry_.variables_; }
-  void set_variables(const Smi& smi) const;
-#else
-  RawTypedData* catch_entry_moves_maps() const {
-    return raw_ptr()->catch_entry_.catch_entry_moves_maps_;
-  }
+#if !defined(DART_PRECOMPILED_RUNTIME)
+  intptr_t num_variables() const;
+  void set_num_variables(intptr_t num_variables) const;
+#endif
+
+#if defined(DART_PRECOMPILED_RUNTIME) || defined(DART_PRECOMPILER)
+  RawTypedData* catch_entry_moves_maps() const;
   void set_catch_entry_moves_maps(const TypedData& maps) const;
 #endif
 
@@ -5511,7 +5599,7 @@ class Code : public Object {
       intptr_t pc_offset,
       GrowableArray<const Function*>* functions,
       GrowableArray<TokenPosition>* token_positions) const;
-  // Same as above, expect the pc is interpreted as a return address (as needed
+  // Same as above, except the pc is interpreted as a return address (as needed
   // for a stack trace or the bottom frames of a profiler sample).
   void GetInlinedFunctionsAtReturnAddress(
       intptr_t pc_offset,
@@ -5522,7 +5610,7 @@ class Code : public Object {
 
   NOT_IN_PRODUCT(void PrintJSONInlineIntervals(JSONObject* object) const);
   void DumpInlineIntervals() const;
-  void DumpSourcePositions() const;
+  void DumpSourcePositions(bool relative_addresses = false) const;
 
   RawLocalVarDescriptors* var_descriptors() const {
 #if defined(PRODUCT)
@@ -5719,6 +5807,10 @@ class Code : public Object {
 #endif
   }
 
+  // Initializes 4 cached entrypoint addresses in 'code' from 'instructions'.
+  static void InitializeCachedEntryPointsFrom(RawCode* code,
+                                              RawInstructions* instructions);
+
   void SetActiveInstructions(const Instructions& instructions) const;
 
   void set_instructions(const Instructions& instructions) const {
@@ -5759,10 +5851,11 @@ class Code : public Object {
   friend class Precompiler;  // for set_object_pool
   friend class FunctionSerializationCluster;
   friend class CodeSerializationCluster;
+  friend class CodeDeserializationCluster;
   friend class StubCode;               // for set_object_pool
   friend class MegamorphicCacheTable;  // for set_object_pool
-  friend class CodePatcher;     // for set_instructions
-  friend class ProgramVisitor;  // for set_instructions
+  friend class CodePatcher;            // for set_instructions
+  friend class ProgramVisitor;         // for set_instructions
   // So that the RawFunction pointer visitor can determine whether code the
   // function points to is optimized.
   friend class RawFunction;
@@ -5944,6 +6037,10 @@ class Context : public Object {
   static const intptr_t kBytesPerElement = kWordSize;
   static const intptr_t kMaxElements = kSmiMax / kBytesPerElement;
 
+  static const intptr_t kAwaitJumpVarIndex = 0;
+  static const intptr_t kAsyncCompleterIndex = 1;
+  static const intptr_t kControllerIndex = 1;
+
   static intptr_t variable_offset(intptr_t context_index) {
     return OFFSET_OF_RETURNED_VALUE(RawContext, data) +
            (kWordSize * context_index);
@@ -6005,8 +6102,17 @@ class ContextScope : public Object {
   RawString* NameAt(intptr_t scope_index) const;
   void SetNameAt(intptr_t scope_index, const String& name) const;
 
+  void ClearFlagsAt(intptr_t scope_index) const;
+
   bool IsFinalAt(intptr_t scope_index) const;
   void SetIsFinalAt(intptr_t scope_index, bool is_final) const;
+
+  bool IsLateAt(intptr_t scope_index) const;
+  void SetIsLateAt(intptr_t scope_index, bool is_late) const;
+
+  intptr_t LateInitOffsetAt(intptr_t scope_index) const;
+  void SetLateInitOffsetAt(intptr_t scope_index,
+                           intptr_t late_init_offset) const;
 
   bool IsConstAt(intptr_t scope_index) const;
   void SetIsConstAt(intptr_t scope_index, bool is_const) const;
@@ -6054,6 +6160,9 @@ class ContextScope : public Object {
     ASSERT((index >= 0) && (index < num_variables()));
     return raw_ptr()->VariableDescAddr(index);
   }
+
+  bool GetFlagAt(intptr_t scope_index, intptr_t mask) const;
+  void SetFlagAt(intptr_t scope_index, intptr_t mask, bool value) const;
 
   FINAL_HEAP_OBJECT_IMPLEMENTATION(ContextScope, Object);
   friend class Class;
@@ -6178,11 +6287,11 @@ class SubtypeTestCache : public Object {
   static void Init();
   static void Cleanup();
 
+  RawArray* cache() const { return raw_ptr()->cache_; }
+
  private:
   // A VM heap allocated preinitialized empty subtype entry array.
   static RawArray* cached_array_;
-
-  RawArray* cache() const { return raw_ptr()->cache_; }
 
   void set_cache(const Array& value) const;
 
@@ -6406,14 +6515,17 @@ class Instance : public Object {
 
   // Check if the type of this instance is a subtype of the given other type.
   // The type argument vectors are used to instantiate the other type if needed.
-  bool IsInstanceOf(const AbstractType& other,
+  bool IsInstanceOf(NNBDMode mode,
+                    const AbstractType& other,
                     const TypeArguments& other_instantiator_type_arguments,
                     const TypeArguments& other_function_type_arguments) const;
 
   // Returns true if the type of this instance is a subtype of FutureOr<T>
   // specified by instantiated type 'other'.
   // Returns false if other type is not a FutureOr.
-  bool IsFutureOrInstanceOf(Zone* zone, const AbstractType& other) const;
+  bool IsFutureOrInstanceOf(Zone* zone,
+                            NNBDMode mode,
+                            const AbstractType& other) const;
 
   bool IsValidNativeIndex(int index) const {
     return ((index >= 0) && (index < clazz()->ptr()->num_native_fields_));
@@ -6456,8 +6568,7 @@ class Instance : public Object {
   // argument values given in (type_)param_values.
   RawObject* EvaluateCompiledExpression(
       const Class& method_cls,
-      const uint8_t* kernel_bytes,
-      intptr_t kernel_length,
+      const ExternalTypedData& kernel_buffer,
       const Array& type_definitions,
       const Array& param_values,
       const TypeArguments& type_param_values) const;
@@ -6519,6 +6630,9 @@ class Instance : public Object {
     StorePointer(RawFieldAddrAtOffset(offset), value.raw());
   }
 
+  static RawInstance* NewFromCidAndSize(SharedClassTable* shared_class_table,
+                                        classid_t cid);
+
   // TODO(iposva): Determine if this gets in the way of Smi.
   HEAP_OBJECT_IMPLEMENTATION(Instance, Object);
   friend class ByteBuffer;
@@ -6548,8 +6662,6 @@ class LibraryPrefix : public Instance {
 
   RawLibrary* GetLibrary(int index) const;
   void AddImport(const Namespace& import) const;
-  RawObject* LookupObject(const String& name) const;
-  RawClass* LookupClass(const String& class_name) const;
 
   bool is_deferred_load() const { return raw_ptr()->is_deferred_load_; }
 
@@ -6643,7 +6755,8 @@ class TypeArguments : public Instance {
 
   // Check the subtype relationship, considering only a subvector of length
   // 'len' starting at 'from_index'.
-  bool IsSubtypeOf(const TypeArguments& other,
+  bool IsSubtypeOf(NNBDMode mode,
+                   const TypeArguments& other,
                    intptr_t from_index,
                    intptr_t len,
                    Heap::Space space) const;
@@ -6701,6 +6814,7 @@ class TypeArguments : public Instance {
   // type from the various type argument vectors (class instantiator, function,
   // or parent functions via the current context).
   RawTypeArguments* InstantiateFrom(
+      NNBDMode mode,
       const TypeArguments& instantiator_type_arguments,
       const TypeArguments& function_type_arguments,
       intptr_t num_free_fun_type_params,
@@ -6710,6 +6824,7 @@ class TypeArguments : public Instance {
   // Runtime instantiation with canonicalization. Not to be used during type
   // finalization at compile time.
   RawTypeArguments* InstantiateAndCanonicalizeFrom(
+      NNBDMode mode,
       const TypeArguments& instantiator_type_arguments,
       const TypeArguments& function_type_arguments) const;
 
@@ -6797,10 +6912,22 @@ class AbstractType : public Instance {
   virtual void SetIsBeingFinalized() const;
 
   virtual Nullability nullability() const;
-  virtual bool IsUndetermined() const { return nullability() == kUndetermined; }
-  virtual bool IsNullable() const { return nullability() == kNullable; }
-  virtual bool IsNonNullable() const { return nullability() == kNonNullable; }
-  virtual bool IsLegacy() const { return nullability() == kLegacy; }
+  virtual bool IsUndetermined() const {
+    return nullability() == Nullability::kUndetermined;
+  }
+  virtual bool IsNullable() const {
+    return nullability() == Nullability::kNullable;
+  }
+  virtual bool IsNonNullable() const {
+    return nullability() == Nullability::kNonNullable;
+  }
+  virtual bool IsLegacy() const {
+    return nullability() == Nullability::kLegacy;
+  }
+  virtual RawAbstractType* CheckInstantiatedNullability(
+      NNBDMode mode,
+      const TypeParameter& type_param,
+      Heap::Space space) const;
 
   virtual bool HasTypeClass() const { return type_class_id() != kIllegalCid; }
   virtual classid_t type_class_id() const;
@@ -6836,6 +6963,7 @@ class AbstractType : public Instance {
   //
   // Return a new type, or return 'this' if it is already instantiated.
   virtual RawAbstractType* InstantiateFrom(
+      NNBDMode mode,
       const TypeArguments& instantiator_type_arguments,
       const TypeArguments& function_type_arguments,
       intptr_t num_free_fun_type_params,
@@ -6906,26 +7034,25 @@ class AbstractType : public Instance {
   bool IsNullTypeRef() const;
 
   // Check if this type represents the 'dynamic' type.
-  bool IsDynamicType() const;
+  bool IsDynamicType() const { return type_class_id() == kDynamicCid; }
 
   // Check if this type represents the 'void' type.
-  bool IsVoidType() const;
+  bool IsVoidType() const { return type_class_id() == kVoidCid; }
 
   // Check if this type represents the 'Null' type.
-  bool IsNullType() const;
+  bool IsNullType() const { return type_class_id() == kNullCid; }
 
   // Check if this type represents the 'Never' type.
-  bool IsNeverType() const;
+  bool IsNeverType() const { return type_class_id() == kNeverCid; }
 
   // Check if this type represents the 'Object' type.
-  bool IsObjectType() const;
+  bool IsObjectType() const { return type_class_id() == kInstanceCid; }
 
   // Check if this type represents a top type.
-  // TODO(regis): Remove default kUnaware mode as implementation progresses.
-  bool IsTopType(NNBDMode mode = kUnaware) const;
+  bool IsTopType() const;
 
   // Check if this type represents the 'bool' type.
-  bool IsBoolType() const;
+  bool IsBoolType() const { return type_class_id() == kBoolCid; }
 
   // Check if this type represents the 'int' type.
   bool IsIntType() const;
@@ -6943,10 +7070,10 @@ class AbstractType : public Instance {
   bool IsInt32x4Type() const;
 
   // Check if this type represents the 'num' type.
-  bool IsNumberType() const;
+  bool IsNumberType() const { return type_class_id() == kNumberCid; }
 
   // Check if this type represents the '_Smi' type.
-  bool IsSmiType() const;
+  bool IsSmiType() const { return type_class_id() == kSmiCid; }
 
   // Check if this type represents the 'String' type.
   bool IsStringType() const;
@@ -6961,11 +7088,14 @@ class AbstractType : public Instance {
   bool IsFfiPointerType() const;
 
   // Check the subtype relationship.
-  bool IsSubtypeOf(const AbstractType& other, Heap::Space space) const;
+  bool IsSubtypeOf(NNBDMode mode,
+                   const AbstractType& other,
+                   Heap::Space space) const;
 
   // Returns true iff subtype is a subtype of supertype, false otherwise or if
   // an error occurred.
   static bool InstantiateAndTestSubtype(
+      NNBDMode mode,
       AbstractType* subtype,
       AbstractType* supertype,
       const TypeArguments& instantiator_type_args,
@@ -6986,6 +7116,7 @@ class AbstractType : public Instance {
   // Returns true if this type is a subtype of FutureOr<T> specified by 'other'.
   // Returns false if other type is not a FutureOr.
   bool IsSubtypeOfFutureOr(Zone* zone,
+                           NNBDMode mode,
                            const AbstractType& other,
                            Heap::Space space) const;
 
@@ -7035,8 +7166,8 @@ class Type : public AbstractType {
   }
   void set_nullability(Nullability value) const {
     ASSERT(!IsCanonical());
-    ASSERT(value != kUndetermined);
-    StoreNonPointer(&raw_ptr()->nullability_, value);
+    ASSERT(value != Nullability::kUndetermined);
+    StoreNonPointer(&raw_ptr()->nullability_, static_cast<int8_t>(value));
   }
   RawType* ToNullability(Nullability value, Heap::Space space) const;
   virtual classid_t type_class_id() const;
@@ -7062,6 +7193,7 @@ class Type : public AbstractType {
     return signature() != Function::null();
   }
   virtual RawAbstractType* InstantiateFrom(
+      NNBDMode mode,
       const TypeArguments& instantiator_type_arguments,
       const TypeArguments& function_type_arguments,
       intptr_t num_free_fun_type_params,
@@ -7075,6 +7207,7 @@ class Type : public AbstractType {
   virtual void EnumerateURIs(URIs* uris) const;
 
   virtual intptr_t Hash() const;
+  intptr_t ComputeHash() const;
 
   static intptr_t InstanceSize() {
     return RoundedAllocationSize(sizeof(RawType));
@@ -7135,15 +7268,17 @@ class Type : public AbstractType {
   static RawType* DartTypeType();
 
   // The finalized type of the given non-parameterized class.
-  static RawType* NewNonParameterizedType(const Class& type_class);
+  static RawType* NewNonParameterizedType(
+      const Class& type_class,
+      Nullability nullability = Nullability::kLegacy);
 
   static RawType* New(const Class& clazz,
                       const TypeArguments& arguments,
                       TokenPosition token_pos,
+                      Nullability nullability = Nullability::kLegacy,
                       Heap::Space space = Heap::kOld);
 
  private:
-  intptr_t ComputeHash() const;
   void SetHash(intptr_t value) const;
 
   void set_token_pos(TokenPosition token_pos) const;
@@ -7206,6 +7341,7 @@ class TypeRef : public AbstractType {
     return !ref_type.IsNull() && ref_type.IsFunctionType();
   }
   virtual RawTypeRef* InstantiateFrom(
+      NNBDMode mode,
       const TypeArguments& instantiator_type_arguments,
       const TypeArguments& function_type_arguments,
       intptr_t num_free_fun_type_params,
@@ -7284,6 +7420,7 @@ class TypeParameter : public AbstractType {
   virtual bool IsEquivalent(const Instance& other, TrailPtr trail = NULL) const;
   virtual bool IsRecursive() const { return false; }
   virtual RawAbstractType* InstantiateFrom(
+      NNBDMode mode,
       const TypeArguments& instantiator_type_arguments,
       const TypeArguments& function_type_arguments,
       intptr_t num_free_fun_type_params,
@@ -9052,6 +9189,7 @@ class TypedData : public TypedDataBase {
 
   FINAL_HEAP_OBJECT_IMPLEMENTATION(TypedData, TypedDataBase);
   friend class Class;
+  friend class CompressedStackMapsIterator;
   friend class ExternalTypedData;
   friend class TypedDataView;
 };
@@ -9107,6 +9245,8 @@ class ExternalTypedData : public TypedDataBase {
                                    uint8_t* data,
                                    intptr_t len,
                                    Heap::Space space = Heap::kNew);
+
+  static RawExternalTypedData* NewFinalizeWithFree(uint8_t* data, intptr_t len);
 
   static bool IsExternalTypedData(const Instance& obj) {
     ASSERT(!obj.IsNull());
@@ -9624,6 +9764,23 @@ class StackTrace : public Instance {
   RawSmi* PcOffsetAtFrame(intptr_t frame_index) const;
   void SetPcOffsetAtFrame(intptr_t frame_index, const Smi& pc_offset) const;
 
+  bool skip_sync_start_in_parent_stack() const;
+  void set_skip_sync_start_in_parent_stack(bool value) const;
+
+  // The number of frames that should be cut off the top of an async stack trace
+  // if it's appended to a synchronous stack trace along a sync-async call.
+  //
+  // Without cropping, the border would look like:
+  //
+  // <async function>
+  // ---------------------------
+  // <asynchronous gap marker>
+  // <async function>
+  //
+  // Since it's not actually an async call, we crop off the last two
+  // frames when concatenating the sync and async stacktraces.
+  static constexpr intptr_t kSyncAsyncCroppedFrames = 2;
+
   static intptr_t InstanceSize() {
     return RoundedAllocationSize(sizeof(RawStackTrace));
   }
@@ -9634,6 +9791,7 @@ class StackTrace : public Instance {
   static RawStackTrace* New(const Array& code_array,
                             const Array& pc_offset_array,
                             const StackTrace& async_link,
+                            bool skip_sync_start_in_parent_stack,
                             Heap::Space space = Heap::kNew);
 
  private:
@@ -10220,8 +10378,7 @@ class ArrayOfTuplesView {
   class TupleView {
    public:
     TupleView(const Array& array, intptr_t index)
-        : array_(array), index_(index) {
-    }
+        : array_(array), index_(index) {}
 
     template <EnumType kElement>
     typename std::tuple_element<kElement, TupleT>::type::RawObjectType* Get()

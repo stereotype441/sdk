@@ -18,6 +18,7 @@ import 'package:analyzer/src/dart/element/type_provider.dart';
 import 'package:analyzer/src/generated/engine.dart' show AnalysisOptionsImpl;
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/source.dart';
+import 'package:meta/meta.dart';
 
 /// A concrete implementation of an analysis session.
 class AnalysisSessionImpl implements AnalysisSession {
@@ -28,7 +29,7 @@ class AnalysisSessionImpl implements AnalysisSession {
   TypeProvider _typeProvider;
 
   /// The type system being used by the analysis driver.
-  TypeSystem _typeSystem;
+  TypeSystemImpl _typeSystem;
 
   /// The URI converter used to convert between URI's and file paths.
   UriConverter _uriConverter;
@@ -51,6 +52,7 @@ class AnalysisSessionImpl implements AnalysisSession {
   @override
   SourceFactory get sourceFactory => _driver.sourceFactory;
 
+  @Deprecated('Use LibraryElement.typeProvider')
   @override
   Future<TypeProvider> get typeProvider async {
     // TODO(brianwilkerson) Determine whether this await is necessary.
@@ -59,25 +61,36 @@ class AnalysisSessionImpl implements AnalysisSession {
     if (_typeProvider == null) {
       LibraryElement coreLibrary = await _driver.getLibraryByUri('dart:core');
       LibraryElement asyncLibrary = await _driver.getLibraryByUri('dart:async');
-      _typeProvider = new TypeProviderImpl(coreLibrary, asyncLibrary);
+      _typeProvider = TypeProviderImpl(
+        coreLibrary: coreLibrary,
+        asyncLibrary: asyncLibrary,
+        isNonNullableByDefault: false,
+      );
     }
     return _typeProvider;
   }
 
+  @Deprecated('Use LibraryElement.typeSystem')
   @override
-  Future<TypeSystem> get typeSystem async {
+  Future<TypeSystemImpl> get typeSystem async {
     // TODO(brianwilkerson) Determine whether this await is necessary.
     await null;
     _checkConsistency();
     if (_typeSystem == null) {
-      _typeSystem = new Dart2TypeSystem(await typeProvider);
+      var typeProvider = await this.typeProvider;
+      _typeSystem = TypeSystemImpl(
+        implicitCasts: true,
+        isNonNullableByDefault: false,
+        strictInference: false,
+        typeProvider: typeProvider,
+      );
     }
     return _typeSystem;
   }
 
   @override
   UriConverter get uriConverter {
-    return _uriConverter ??= new DriverBasedUriConverter(_driver);
+    return _uriConverter ??= DriverBasedUriConverter(_driver);
   }
 
   @deprecated
@@ -181,13 +194,13 @@ class AnalysisSessionImpl implements AnalysisSession {
   /// an [InconsistentAnalysisException] if they might not be.
   void _checkConsistency() {
     if (_driver.currentSession != this) {
-      throw new InconsistentAnalysisException();
+      throw InconsistentAnalysisException();
     }
   }
 
   void _checkElementOfThisSession(Element element) {
     if (element.session != this) {
-      throw new ArgumentError(
+      throw ArgumentError(
           '(${element.runtimeType}) $element was not produced by '
           'this session.');
     }
@@ -201,9 +214,11 @@ class SynchronousSession {
 
   final DeclaredVariables declaredVariables;
 
-  TypeProvider _typeProvider;
+  TypeProvider _typeProviderLegacy;
+  TypeProvider _typeProviderNonNullableByDefault;
 
-  TypeSystem _typeSystem;
+  TypeSystemImpl _typeSystemLegacy;
+  TypeSystemImpl _typeSystemNonNullableByDefault;
 
   InheritanceManager3 _inheritanceManager;
 
@@ -213,26 +228,64 @@ class SynchronousSession {
     return _inheritanceManager ??= InheritanceManager3(typeSystem);
   }
 
-  TypeProvider get typeProvider => _typeProvider;
+  @Deprecated('Use LibraryElement.typeProvider')
+  TypeProvider get typeProvider => _typeProviderLegacy;
 
-  set typeProvider(TypeProvider typeProvider) {
-    if (_typeProvider != null) {
-      throw StateError('TypeProvider can be set only once.');
-    }
-    _typeProvider = typeProvider;
+  TypeProvider get typeProviderLegacy {
+    return _typeProviderLegacy;
   }
 
-  TypeSystem get typeSystem {
-    return _typeSystem ??= Dart2TypeSystem(
-      typeProvider,
-      implicitCasts: analysisOptions.implicitCasts,
-      strictInference: analysisOptions.strictInference,
-    );
+  TypeProvider get typeProviderNonNullableByDefault {
+    return _typeProviderNonNullableByDefault;
+  }
+
+  @Deprecated('Use LibraryElement.typeSystem')
+  TypeSystemImpl get typeSystem {
+    return typeSystemLegacy;
+  }
+
+  TypeSystemImpl get typeSystemLegacy {
+    return _typeSystemLegacy;
+  }
+
+  TypeSystemImpl get typeSystemNonNullableByDefault {
+    return _typeSystemNonNullableByDefault;
   }
 
   void clearTypeProvider() {
-    _typeProvider = null;
-    _typeSystem = null;
+    _typeProviderLegacy = null;
+    _typeProviderNonNullableByDefault = null;
+
+    _typeSystemLegacy = null;
+    _typeSystemNonNullableByDefault = null;
+
     _inheritanceManager = null;
+  }
+
+  void setTypeProviders({
+    @required TypeProvider legacy,
+    @required TypeProvider nonNullableByDefault,
+  }) {
+    if (_typeProviderLegacy != null ||
+        _typeProviderNonNullableByDefault != null) {
+      throw StateError('TypeProvider(s) can be set only once.');
+    }
+
+    _typeProviderLegacy = legacy;
+    _typeProviderNonNullableByDefault = nonNullableByDefault;
+
+    _typeSystemLegacy = TypeSystemImpl(
+      implicitCasts: analysisOptions.implicitCasts,
+      isNonNullableByDefault: false,
+      strictInference: analysisOptions.strictInference,
+      typeProvider: _typeProviderLegacy,
+    );
+
+    _typeSystemNonNullableByDefault = TypeSystemImpl(
+      implicitCasts: analysisOptions.implicitCasts,
+      isNonNullableByDefault: true,
+      strictInference: analysisOptions.strictInference,
+      typeProvider: _typeProviderNonNullableByDefault,
+    );
   }
 }

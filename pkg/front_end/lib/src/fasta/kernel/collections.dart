@@ -18,7 +18,7 @@ import 'package:kernel/ast.dart'
         transformList,
         visitList;
 
-import 'package:kernel/type_environment.dart' show TypeEnvironment;
+import 'package:kernel/type_environment.dart' show StaticTypeContext;
 
 import 'package:kernel/visitor.dart'
     show
@@ -29,7 +29,7 @@ import 'package:kernel/visitor.dart'
         Visitor;
 
 import '../messages.dart'
-    show templateExpectedAfterButGot, templateExpectedButGot;
+    show noLength, templateExpectedAfterButGot, templateExpectedButGot;
 
 import '../problems.dart' show getFileUri, unsupported;
 
@@ -45,7 +45,7 @@ mixin ControlFlowElement on Expression {
   /// Spread and control-flow elements are not expressions and do not have a
   /// static type.
   @override
-  DartType getStaticType(TypeEnvironment types) {
+  DartType getStaticType(StaticTypeContext context) {
     return unsupported("getStaticType", fileOffset, getFileUri(this));
   }
 
@@ -566,7 +566,8 @@ MapEntry convertToMapEntry(Expression element, InferenceHelper helper,
         templateExpectedAfterButGot.withArguments(':'),
         element.fileOffset,
         // TODO(danrubel): what is the length of the expression?
-        1,
+        noLength,
       ),
-      new NullLiteral());
+      new NullLiteral()..fileOffset = element.fileOffset)
+    ..fileOffset = element.fileOffset;
 }

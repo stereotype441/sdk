@@ -12,15 +12,6 @@ import 'package:analyzer/src/dart/ast/ast.dart';
 import 'package:analyzer/src/dart/ast/token.dart';
 import 'package:analyzer/src/dart/ast/utilities.dart';
 import 'package:analyzer/src/dart/constant/evaluation.dart';
-import 'package:analyzer/src/dart/element/element.dart';
-import 'package:analyzer/src/dart/element/member.dart';
-
-ConstructorElementImpl getConstructorImpl(ConstructorElement constructor) {
-  while (constructor is ConstructorMember) {
-    constructor = (constructor as ConstructorMember).baseElement;
-  }
-  return constructor;
-}
 
 /// Callback used by [ReferenceFinder] to report that a dependency was found.
 typedef void ReferenceFinderCallback(ConstantEvaluationTarget dependency);
@@ -58,9 +49,9 @@ class ConstantAstCloner extends AstCloner {
         super.visitInstanceCreationExpression(node);
     if (node.keyword == null) {
       if (node.isConst) {
-        expression.keyword = new KeywordToken(Keyword.CONST, node.offset);
+        expression.keyword = KeywordToken(Keyword.CONST, node.offset);
       } else {
-        expression.keyword = new KeywordToken(Keyword.NEW, node.offset);
+        expression.keyword = KeywordToken(Keyword.NEW, node.offset);
       }
     }
     expression.staticElement = node.staticElement;
@@ -79,7 +70,7 @@ class ConstantAstCloner extends AstCloner {
     ListLiteral literal = super.visitListLiteral(node);
     literal.staticType = node.staticType;
     if (node.constKeyword == null && node.isConst) {
-      literal.constKeyword = new KeywordToken(Keyword.CONST, node.offset);
+      literal.constKeyword = KeywordToken(Keyword.CONST, node.offset);
     }
     return literal;
   }
@@ -112,7 +103,7 @@ class ConstantAstCloner extends AstCloner {
     SetOrMapLiteral literal = super.visitSetOrMapLiteral(node);
     literal.staticType = node.staticType;
     if (node.constKeyword == null && node.isConst) {
-      literal.constKeyword = new KeywordToken(Keyword.CONST, node.offset);
+      literal.constKeyword = KeywordToken(Keyword.CONST, node.offset);
     }
     return literal;
   }
@@ -149,7 +140,7 @@ class ConstantAstCloner extends AstCloner {
 class ConstantExpressionsDependenciesFinder extends RecursiveAstVisitor {
   /// The constants whose values need to be computed.
   HashSet<ConstantEvaluationTarget> dependencies =
-      new HashSet<ConstantEvaluationTarget>();
+      HashSet<ConstantEvaluationTarget>();
 
   @override
   void visitInstanceCreationExpression(InstanceCreationExpression node) {
@@ -200,7 +191,7 @@ class ConstantExpressionsDependenciesFinder extends RecursiveAstVisitor {
   /// of [CollectionElement]).
   void _find(CollectionElement node) {
     if (node != null) {
-      ReferenceFinder referenceFinder = new ReferenceFinder(dependencies.add);
+      ReferenceFinder referenceFinder = ReferenceFinder(dependencies.add);
       node.accept(referenceFinder);
     }
   }
@@ -304,7 +295,7 @@ class ReferenceFinder extends RecursiveAstVisitor<void> {
   @override
   void visitInstanceCreationExpression(InstanceCreationExpression node) {
     if (node.isConst) {
-      ConstructorElement constructor = getConstructorImpl(node.staticElement);
+      ConstructorElement constructor = node.staticElement?.declaration;
       if (constructor != null) {
         _callback(constructor);
       }
@@ -325,7 +316,7 @@ class ReferenceFinder extends RecursiveAstVisitor<void> {
   void visitRedirectingConstructorInvocation(
       RedirectingConstructorInvocation node) {
     super.visitRedirectingConstructorInvocation(node);
-    ConstructorElement target = getConstructorImpl(node.staticElement);
+    ConstructorElement target = node.staticElement?.declaration;
     if (target != null) {
       _callback(target);
     }
@@ -345,7 +336,7 @@ class ReferenceFinder extends RecursiveAstVisitor<void> {
   @override
   void visitSuperConstructorInvocation(SuperConstructorInvocation node) {
     super.visitSuperConstructorInvocation(node);
-    ConstructorElement constructor = getConstructorImpl(node.staticElement);
+    ConstructorElement constructor = node.staticElement?.declaration;
     if (constructor != null) {
       _callback(constructor);
     }

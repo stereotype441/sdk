@@ -2,6 +2,8 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+// @dart = 2.6
+
 part of dart.convert;
 
 /// A [base64](https://tools.ietf.org/html/rfc4648) encoder and decoder.
@@ -402,7 +404,8 @@ class _BufferCachingBase64Encoder extends _Base64Encoder {
       bufferCache = Uint8List(bufferLength);
     }
     // Return a view of the buffer, so it has the requested length.
-    return Uint8List.view(bufferCache.buffer, 0, bufferLength);
+    return Uint8List.view(
+        bufferCache.buffer, bufferCache.offsetInBytes, bufferLength);
   }
 }
 

@@ -6,7 +6,7 @@ library fasta.named_type_builder;
 
 import 'package:_fe_analyzer_shared/src/messages/severity.dart' show Severity;
 
-import 'package:kernel/ast.dart' show DartType, Supertype;
+import 'package:kernel/ast.dart' show DartType, Supertype, TypedefType;
 
 import '../fasta_codes.dart'
     show
@@ -37,6 +37,7 @@ import 'invalid_type_declaration_builder.dart';
 import 'library_builder.dart';
 import 'nullability_builder.dart';
 import 'prefix_builder.dart';
+import 'type_alias_builder.dart';
 import 'type_builder.dart';
 import 'type_declaration_builder.dart';
 import 'type_variable_builder.dart';
@@ -61,6 +62,26 @@ class NamedTypeBuilder extends TypeBuilder {
   @override
   void bind(TypeDeclarationBuilder declaration) {
     this.declaration = declaration?.origin;
+  }
+
+  int get nameOffset {
+    if (name is Identifier) {
+      Identifier identifier = name;
+      return identifier.charOffset;
+    }
+    return -1; // TODO(eernst): make it possible to get offset.
+  }
+
+  int get nameLength {
+    if (name is Identifier) {
+      Identifier identifier = name;
+      return identifier.name.length;
+    } else if (name is String) {
+      String nameString = name;
+      return nameString.length;
+    } else {
+      return noLength;
+    }
   }
 
   @override
@@ -204,7 +225,8 @@ class NamedTypeBuilder extends TypeBuilder {
     return null;
   }
 
-  DartType build(LibraryBuilder library) {
+  // TODO(johnniwinther): Store [origin] on the built type.
+  DartType build(LibraryBuilder library, [TypedefType origin]) {
     assert(declaration != null, "Declaration has not been resolved on $this.");
     return declaration.buildType(library, nullabilityBuilder, arguments);
   }
@@ -214,6 +236,12 @@ class NamedTypeBuilder extends TypeBuilder {
     TypeDeclarationBuilder declaration = this.declaration;
     if (declaration is ClassBuilder) {
       return declaration.buildSupertype(library, arguments);
+    } else if (declaration is TypeAliasBuilder) {
+      TypeDeclarationBuilder declarationBuilder =
+          declaration.unaliasDeclaration;
+      if (declarationBuilder is ClassBuilder) {
+        return declarationBuilder.buildSupertype(library, arguments);
+      }
     } else if (declaration is InvalidTypeDeclarationBuilder) {
       library.addProblem(
           declaration.message.messageObject,
@@ -222,14 +250,17 @@ class NamedTypeBuilder extends TypeBuilder {
           declaration.message.uri,
           severity: Severity.error);
       return null;
-    } else {
-      return handleInvalidSupertype(library, charOffset, fileUri);
     }
+    return handleInvalidSupertype(library, charOffset, fileUri);
   }
 
   Supertype buildMixedInType(
       LibraryBuilder library, int charOffset, Uri fileUri) {
     TypeDeclarationBuilder declaration = this.declaration;
+    if (declaration is TypeAliasBuilder) {
+      TypeAliasBuilder aliasBuilder = declaration;
+      declaration = aliasBuilder.unaliasDeclaration;
+    }
     if (declaration is ClassBuilder) {
       return declaration.buildMixedInType(library, arguments);
     } else if (declaration is InvalidTypeDeclarationBuilder) {

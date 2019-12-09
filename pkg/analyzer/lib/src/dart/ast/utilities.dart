@@ -10,6 +10,7 @@ import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/exception/exception.dart';
 import 'package:analyzer/src/dart/ast/ast.dart';
+import 'package:analyzer/src/dart/ast/ast_factory.dart';
 import 'package:analyzer/src/dart/ast/to_source_visitor.dart';
 import 'package:analyzer/src/dart/ast/token.dart';
 import 'package:analyzer/src/generated/engine.dart' show AnalysisEngine;
@@ -38,7 +39,7 @@ class AstCloner implements AstVisitor<AstNode> {
   /**
    * Mapping from original tokes to cloned.
    */
-  final Map<Token, Token> _clonedTokens = new Map<Token, Token>.identity();
+  final Map<Token, Token> _clonedTokens = Map<Token, Token>.identity();
 
   /**
    * The next original token to clone.
@@ -79,7 +80,7 @@ class AstCloner implements AstVisitor<AstNode> {
    */
   List<E> cloneNodeList<E extends AstNode>(List<E> nodes) {
     int count = nodes.length;
-    List<E> clonedNodes = new List<E>();
+    List<E> clonedNodes = List<E>();
     for (int i = 0; i < count; i++) {
       clonedNodes.add((nodes[i]).accept(this) as E);
     }
@@ -264,7 +265,7 @@ class AstCloner implements AstVisitor<AstNode> {
     // Clone the tokens in that stream here and add them to _clondedTokens
     // for use when cloning the comment reference.
     Token token = node.beginToken;
-    Token lastCloned = new Token.eof(-1);
+    Token lastCloned = Token.eof(-1);
     while (token != null) {
       Token clone = token.copy();
       _clonedTokens[token] = clone;
@@ -1019,12 +1020,16 @@ class AstCloner implements AstVisitor<AstNode> {
 
   @override
   TypeParameter visitTypeParameter(TypeParameter node) =>
-      astFactory.typeParameter(
-          cloneNode(node.documentationComment),
-          cloneNodeList(node.metadata),
-          cloneNode(node.name),
-          cloneToken(node.extendsKeyword),
-          cloneNode(node.bound));
+      // TODO (kallentu) : Clean up TypeParameterImpl and AstFactoryImpl casting
+      // once variance is added to the interface.
+      (astFactory as AstFactoryImpl).typeParameter2(
+          comment: cloneNode(node.documentationComment),
+          metadata: cloneNodeList(node.metadata),
+          name: cloneNode(node.name),
+          extendsKeyword: cloneToken(node.extendsKeyword),
+          bound: cloneNode(node.bound),
+          varianceKeyword:
+              cloneToken((node as TypeParameterImpl).varianceKeyword));
 
   @override
   TypeParameterList visitTypeParameterList(TypeParameterList node) =>
@@ -1092,7 +1097,7 @@ class AstCloner implements AstVisitor<AstNode> {
 
     token = nonComment(token);
     if (_lastCloned == null) {
-      _lastCloned = new Token.eof(-1);
+      _lastCloned = Token.eof(-1);
     }
     while (token != null) {
       Token clone = token.copy();
@@ -1124,7 +1129,7 @@ class AstCloner implements AstVisitor<AstNode> {
    * Return a clone of the given [node].
    */
   static AstNode clone(AstNode node) {
-    return node.accept(new AstCloner());
+    return node.accept(AstCloner());
   }
 }
 
@@ -2269,10 +2274,14 @@ class AstComparator implements AstVisitor<bool> {
   @override
   bool visitTypeParameter(TypeParameter node) {
     TypeParameter other = _other as TypeParameter;
+    // TODO (kallentu) : Clean up TypeParameterImpl casting once variance is
+    // added to the interface.
     return isEqualNodes(
             node.documentationComment, other.documentationComment) &&
         _isEqualNodeLists(node.metadata, other.metadata) &&
         isEqualNodes(node.name, other.name) &&
+        isEqualTokens((node as TypeParameterImpl).varianceKeyword,
+            (other as TypeParameterImpl).varianceKeyword) &&
         isEqualTokens(node.extendsKeyword, other.extendsKeyword) &&
         isEqualNodes(node.bound, other.bound);
   }
@@ -2382,7 +2391,7 @@ class AstComparator implements AstVisitor<bool> {
    * Return `true` if the [first] and [second] nodes are equal.
    */
   static bool equalNodes(AstNode first, AstNode second) {
-    AstComparator comparator = new AstComparator();
+    AstComparator comparator = AstComparator();
     return comparator.isEqualNodes(first, second);
   }
 }
@@ -2439,7 +2448,7 @@ class ExceptionHandlingDelegatingAstVisitor<T> extends DelegatingAstVisitor<T> {
       Iterable<AstVisitor<T>> delegates, this.handler)
       : super(delegates) {
     if (handler == null) {
-      throw new ArgumentError('A handler must be provided');
+      throw ArgumentError('A handler must be provided');
     }
   }
 
@@ -2462,7 +2471,7 @@ class ExceptionHandlingDelegatingAstVisitor<T> extends DelegatingAstVisitor<T> {
    */
   static void logException(
       AstNode node, Object visitor, dynamic exception, StackTrace stackTrace) {
-    StringBuffer buffer = new StringBuffer();
+    StringBuffer buffer = StringBuffer();
     buffer.write('Exception while using a ${visitor.runtimeType} to visit a ');
     AstNode currentNode = node;
     bool first = true;
@@ -2475,9 +2484,9 @@ class ExceptionHandlingDelegatingAstVisitor<T> extends DelegatingAstVisitor<T> {
       buffer.write(currentNode.runtimeType);
       currentNode = currentNode.parent;
     }
+    // TODO(39284): should this exception be silent?
     AnalysisEngine.instance.instrumentationService.logException(
-        new CaughtException.withMessage(
-            buffer.toString(), exception, stackTrace));
+        SilentException(buffer.toString(), exception, stackTrace));
   }
 }
 
@@ -2531,8 +2540,9 @@ class NodeLocator extends UnifyingAstVisitor<void> {
     try {
       node.accept(this);
     } catch (exception, stackTrace) {
+      // TODO(39284): should this exception be silent?
       AnalysisEngine.instance.instrumentationService.logException(
-          new CaughtException.withMessage(
+          SilentException(
               "Unable to locate element at offset ($_startOffset - $_endOffset)",
               exception,
               stackTrace));
@@ -2571,11 +2581,10 @@ class NodeLocator extends UnifyingAstVisitor<void> {
     } catch (exception, stackTrace) {
       // Ignore the exception and proceed in order to visit the rest of the
       // structure.
+      // TODO(39284): should this exception be silent?
       AnalysisEngine.instance.instrumentationService.logException(
-          new CaughtException.withMessage(
-              "Exception caught while traversing an AST structure.",
-              exception,
-              stackTrace));
+          SilentException("Exception caught while traversing an AST structure.",
+              exception, stackTrace));
     }
     // Found a child.
     if (_foundNode != null) {
@@ -2631,8 +2640,9 @@ class NodeLocator2 extends UnifyingAstVisitor<void> {
     try {
       node.accept(this);
     } catch (exception, stackTrace) {
+      // TODO(39284): should this exception be silent?
       AnalysisEngine.instance.instrumentationService.logException(
-          new CaughtException.withMessage(
+          SilentException(
               "Unable to locate element at offset ($_startOffset - $_endOffset)",
               exception,
               stackTrace));
@@ -2671,11 +2681,10 @@ class NodeLocator2 extends UnifyingAstVisitor<void> {
     } catch (exception, stackTrace) {
       // Ignore the exception and proceed in order to visit the rest of the
       // structure.
+      // TODO(39284): should this exception be silent?
       AnalysisEngine.instance.instrumentationService.logException(
-          new CaughtException.withMessage(
-              "Exception caught while traversing an AST structure.",
-              exception,
-              stackTrace));
+          SilentException("Exception caught while traversing an AST structure.",
+              exception, stackTrace));
     }
     // Found a child.
     if (_foundNode != null) {
@@ -3663,7 +3672,7 @@ class NodeReplacer implements AstVisitor<bool> {
   }
 
   bool visitNode(AstNode node) {
-    throw new ArgumentError("The old node is not a child of it's parent");
+    throw ArgumentError("The old node is not a child of it's parent");
   }
 
   bool visitNormalFormalParameter(NormalFormalParameter node) {
@@ -4051,15 +4060,15 @@ class NodeReplacer implements AstVisitor<bool> {
    */
   static bool replace(AstNode oldNode, AstNode newNode) {
     if (oldNode == null || newNode == null) {
-      throw new ArgumentError("The old and new nodes must be non-null");
+      throw ArgumentError("The old and new nodes must be non-null");
     } else if (identical(oldNode, newNode)) {
       return true;
     }
     AstNode parent = oldNode.parent;
     if (parent == null) {
-      throw new ArgumentError("The old node is not a child of another node");
+      throw ArgumentError("The old node is not a child of another node");
     }
-    NodeReplacer replacer = new NodeReplacer(oldNode, newNode);
+    NodeReplacer replacer = NodeReplacer(oldNode, newNode);
     return parent.accept(replacer);
   }
 }
@@ -5409,10 +5418,14 @@ class ResolutionCopier implements AstVisitor<bool> {
   @override
   bool visitTypeParameter(TypeParameter node) {
     TypeParameter toNode = this._toNode as TypeParameter;
+    // TODO (kallentu) : Clean up TypeParameterImpl casting once variance is
+    // added to the interface.
     return _and(
         _isEqualNodes(node.documentationComment, toNode.documentationComment),
         _isEqualNodeLists(node.metadata, toNode.metadata),
         _isEqualNodes(node.name, toNode.name),
+        _isEqualTokens((node as TypeParameterImpl).varianceKeyword,
+            (toNode as TypeParameterImpl).varianceKeyword),
         _isEqualTokens(node.extendsKeyword, toNode.extendsKeyword),
         _isEqualNodes(node.bound, toNode.bound));
   }
@@ -5603,7 +5616,7 @@ class ResolutionCopier implements AstVisitor<bool> {
    * Copy resolution data from the [fromNode] to the [toNode].
    */
   static void copyResolutionData(AstNode fromNode, AstNode toNode) {
-    ResolutionCopier copier = new ResolutionCopier();
+    ResolutionCopier copier = ResolutionCopier();
     copier._isEqualNodes(fromNode, toNode);
   }
 }
@@ -5622,8 +5635,7 @@ class ScopedNameFinder extends GeneralizingAstVisitor<void> {
 
   AstNode _immediateChild;
 
-  Map<String, SimpleIdentifier> _locals =
-      new HashMap<String, SimpleIdentifier>();
+  Map<String, SimpleIdentifier> _locals = HashMap<String, SimpleIdentifier>();
 
   final int _position;
 

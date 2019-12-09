@@ -2,6 +2,8 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+// @dart = 2.6
+
 /// Contains the names of globals that are embedded into the output by the
 /// compiler.
 ///
@@ -459,5 +461,6 @@ class RtiUniverseFieldNames {
   static String evalCache = 'eC';
   static String typeRules = 'tR';
   static String erasedTypes = 'eT';
+  static String typeParameterVariances = 'tPV';
   static String sharedEmptyArray = 'sEA';
 }

@@ -24,6 +24,9 @@ class DevCompilerTarget extends Target {
   bool get enableSuperMixins => true;
 
   @override
+  bool get supportsLateFields => false;
+
+  @override
   String get name => 'dartdevc';
 
   @override

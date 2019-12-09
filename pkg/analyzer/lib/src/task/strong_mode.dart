@@ -8,8 +8,8 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
+import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type_algebra.dart';
-import 'package:analyzer/src/generated/resolver.dart' show TypeProvider;
 import 'package:analyzer/src/summary/format.dart';
 import 'package:analyzer/src/summary/idl.dart';
 import 'package:analyzer/src/summary2/lazy_ast.dart';
@@ -19,22 +19,25 @@ import 'package:analyzer/src/summary2/lazy_ast.dart';
  * instance methods within a single compilation unit.
  */
 class InstanceMemberInferrer {
-  final TypeProvider typeProvider;
   final InheritanceManager3 inheritance;
-  final Set<ClassElement> elementsBeingInferred = new HashSet<ClassElement>();
+  final Set<ClassElement> elementsBeingInferred = HashSet<ClassElement>();
 
+  bool isNonNullableLibrary;
   InterfaceType interfaceType;
 
   /**
    * Initialize a newly create inferrer.
    */
-  InstanceMemberInferrer(this.typeProvider, this.inheritance);
+  InstanceMemberInferrer(this.inheritance);
+
+  DartType get _dynamicType => DynamicTypeImpl.instance;
 
   /**
    * Infer type information for all of the instance members in the given
    * compilation [unit].
    */
   void inferCompilationUnit(CompilationUnitElement unit) {
+    isNonNullableLibrary = unit.library.isNonNullableByDefault;
     _inferClasses(unit.mixins);
     _inferClasses(unit.types);
   }
@@ -64,14 +67,14 @@ class InstanceMemberInferrer {
 
     var overriddenGetters = inheritance.getOverridden(
       interfaceType,
-      new Name(accessor.library.source.uri, name),
+      Name(accessor.library.source.uri, name),
     );
 
     List<ExecutableElement> overriddenSetters;
     if (overriddenGetters == null || !accessor.variable.isFinal) {
       overriddenSetters = inheritance.getOverridden(
         interfaceType,
-        new Name(accessor.library.source.uri, '$name='),
+        Name(accessor.library.source.uri, '$name='),
       );
     }
 
@@ -94,7 +97,7 @@ class InstanceMemberInferrer {
     for (ExecutableElement overriddenElement in overriddenElements) {
       var overriddenElementKind = overriddenElement.kind;
       if (overriddenElement == null) {
-        return new _FieldOverrideInferenceResult(false, null, true);
+        return _FieldOverrideInferenceResult(false, null, true);
       }
 
       DartType type;
@@ -107,17 +110,17 @@ class InstanceMemberInferrer {
           isCovariant = isCovariant || parameter.isCovariant;
         }
       } else {
-        return new _FieldOverrideInferenceResult(false, null, true);
+        return _FieldOverrideInferenceResult(false, null, true);
       }
 
       if (impliedType == null) {
         impliedType = type;
       } else if (type != impliedType) {
-        return new _FieldOverrideInferenceResult(false, null, true);
+        return _FieldOverrideInferenceResult(false, null, true);
       }
     }
 
-    return new _FieldOverrideInferenceResult(isCovariant, impliedType, false);
+    return _FieldOverrideInferenceResult(isCovariant, impliedType, false);
   }
 
   /**
@@ -137,7 +140,7 @@ class InstanceMemberInferrer {
     for (int i = 0; i < length; i++) {
       ParameterElement matchingParameter = _getCorrespondingParameter(
           parameter, index, overriddenTypes[i].parameters);
-      DartType type = matchingParameter?.type ?? typeProvider.dynamicType;
+      DartType type = matchingParameter?.type ?? _dynamicType;
       if (parameterType == null) {
         parameterType = type;
       } else if (parameterType != type) {
@@ -149,10 +152,10 @@ class InstanceMemberInferrer {
             ),
           );
         }
-        return typeProvider.dynamicType;
+        return _dynamicType;
       }
     }
-    return parameterType ?? typeProvider.dynamicType;
+    return parameterType ?? _dynamicType;
   }
 
   /**
@@ -167,15 +170,15 @@ class InstanceMemberInferrer {
     DartType returnType;
     for (DartType type in overriddenReturnTypes) {
       if (type == null) {
-        type = typeProvider.dynamicType;
+        type = _dynamicType;
       }
       if (returnType == null) {
         returnType = type;
       } else if (returnType != type) {
-        return typeProvider.dynamicType;
+        return _dynamicType;
       }
     }
-    return returnType ?? typeProvider.dynamicType;
+    return returnType ?? _dynamicType;
   }
 
   /**
@@ -261,7 +264,7 @@ class InstanceMemberInferrer {
         // inherit from any class in the cycle. We could potentially limit the
         // algorithm to only not inferring types in the classes in the cycle,
         // but it isn't clear that the results would be significantly better.
-        throw new _CycleException();
+        throw _CycleException();
       }
       try {
         //
@@ -325,7 +328,7 @@ class InstanceMemberInferrer {
    * getter or setter, infer the return type and any parameter type(s) where
    * they were not provided.
    */
-  void _inferExecutable(ExecutableElement element) {
+  void _inferExecutable(MethodElementImpl element) {
     if (element.isSynthetic || element.isStatic) {
       return;
     }
@@ -334,7 +337,7 @@ class InstanceMemberInferrer {
 
     List<ExecutableElement> overriddenElements = inheritance.getOverridden(
       interfaceType,
-      new Name(element.library.source.uri, element.name),
+      Name(element.library.source.uri, element.name),
     );
     if (overriddenElements == null ||
         !_allSameElementKind(element, overriddenElements)) {
@@ -351,11 +354,8 @@ class InstanceMemberInferrer {
     // Infer the return type.
     //
     if (element.hasImplicitReturnType && element.displayName != '[]=') {
-      (element as ExecutableElementImpl).returnType =
+      element.returnType =
           _computeReturnType(overriddenTypes.map((t) => t.returnType));
-      if (element is PropertyAccessorElement) {
-        _updateSyntheticVariableType(element);
-      }
     }
     //
     // Infer the parameter types.
@@ -369,12 +369,11 @@ class InstanceMemberInferrer {
 
         if (parameter.hasImplicitType) {
           parameter.type = _computeParameterType(parameter, i, overriddenTypes);
-          if (element is PropertyAccessorElement) {
-            _updateSyntheticVariableType(element);
-          }
         }
       }
     }
+
+    _resetOperatorEqualParameterTypeToDynamic(element, overriddenElements);
   }
 
   /**
@@ -411,7 +410,7 @@ class InstanceMemberInferrer {
       }
 
       if (newType == null || newType.isBottom || newType.isDartCoreNull) {
-        newType = typeProvider.dynamicType;
+        newType = _dynamicType;
       }
 
       field.type = newType;
@@ -445,6 +444,56 @@ class InstanceMemberInferrer {
         _inferClass(element);
       }
     }
+  }
+
+  /// In legacy mode, an override of `operator==` with no explicit parameter
+  /// type inherits the parameter type of the overridden method if any override
+  /// of `operator==` between the overriding method and `Object.==` has an
+  /// explicit parameter type.  Otherwise, the parameter type of the
+  /// overriding method is `dynamic`.
+  ///
+  /// https://github.com/dart-lang/language/issues/569
+  void _resetOperatorEqualParameterTypeToDynamic(
+    MethodElementImpl element,
+    List<ExecutableElement> overriddenElements,
+  ) {
+    if (element.name != '==') return;
+
+    var parameters = element.parameters;
+    if (parameters.length != 1) {
+      element.isOperatorEqualWithParameterTypeFromObject = false;
+      return;
+    }
+
+    ParameterElementImpl parameter = parameters[0];
+    if (!parameter.hasImplicitType) {
+      element.isOperatorEqualWithParameterTypeFromObject = false;
+      return;
+    }
+
+    for (MethodElement overridden in overriddenElements) {
+      overridden = overridden.declaration;
+
+      // Skip Object itself.
+      var enclosingElement = overridden.enclosingElement;
+      if (enclosingElement is ClassElement &&
+          enclosingElement.isDartCoreObject) {
+        continue;
+      }
+
+      // Keep the type if it is not directly from Object.
+      if (overridden is MethodElementImpl &&
+          !overridden.isOperatorEqualWithParameterTypeFromObject) {
+        element.isOperatorEqualWithParameterTypeFromObject = false;
+        return;
+      }
+    }
+
+    // Reset the type.
+    if (!isNonNullableLibrary) {
+      parameter.type = _dynamicType;
+    }
+    element.isOperatorEqualWithParameterTypeFromObject = true;
   }
 
   /**
@@ -492,33 +541,6 @@ class InstanceMemberInferrer {
       overriddenTypes.add(overriddenType);
     }
     return overriddenTypes;
-  }
-
-  /**
-   * If the given [element] is a non-synthetic getter or setter, update its
-   * synthetic variable's type to match the getter's return type, or if no
-   * corresponding getter exists, use the setter's parameter type.
-   *
-   * In general, the type of the synthetic variable should not be used, because
-   * getters and setters are independent methods. But this logic matches what
-   * `TypeResolverVisitor.visitMethodDeclaration` would fill in there.
-   */
-  void _updateSyntheticVariableType(PropertyAccessorElement element) {
-    assert(!element.isSynthetic);
-    PropertyAccessorElement getter = element;
-    if (element.isSetter) {
-      // See if we can find any getter.
-      getter = element.correspondingGetter;
-    }
-    DartType newType;
-    if (getter != null) {
-      newType = getter.returnType;
-    } else if (element.isSetter && element.parameters.isNotEmpty) {
-      newType = element.parameters[0].type;
-    }
-    if (newType != null) {
-      (element.variable as VariableElementImpl).type = newType;
-    }
   }
 }
 

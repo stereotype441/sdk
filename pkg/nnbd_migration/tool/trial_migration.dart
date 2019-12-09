@@ -10,35 +10,97 @@
 
 import 'dart:io';
 
-import 'package:analyzer/dart/analysis/analysis_context_collection.dart';
+import 'package:analyzer/src/dart/analysis/analysis_context_collection.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart';
+import 'package:args/args.dart';
 import 'package:nnbd_migration/nnbd_migration.dart';
+import 'package:path/path.dart' as path;
 
-main() async {
-  var rootUri = Platform.script.resolve('../../..');
-  var listener = _Listener();
-  for (var testPath in [
-    'third_party/pkg/charcode',
-    'third_party/pkg/collection',
-    'third_party/pkg/logging',
-    'pkg/meta',
-    'third_party/pkg/path',
-    'third_party/pkg/term_glyph',
-//    'third_party/pkg/typed_data', - TODO(paulberry): fatal exception
-    'third_party/pkg/async',
-    'third_party/pkg/source_span',
-    'third_party/pkg/stack_trace',
-    'third_party/pkg/matcher',
-    'third_party/pkg/stream_channel',
-    'third_party/pkg/boolean_selector',
-    'third_party/pkg/test/pkgs/test_api',
-  ]) {
-    print('Migrating $testPath');
-    var testUri = rootUri.resolve(testPath);
-    var contextCollection =
-        AnalysisContextCollection(includedPaths: [testUri.toFilePath()]);
+import 'src/package.dart';
+
+main(List<String> args) async {
+  ArgParser argParser = ArgParser();
+  ArgResults parsedArgs;
+
+  argParser.addFlag('help', abbr: 'h', help: 'Display options');
+
+  argParser.addOption('sdk',
+      abbr: 's',
+      defaultsTo: path.dirname(path.dirname(Platform.resolvedExecutable)),
+      help: 'Select the root of the SDK to analyze against for this run '
+          '(compiled with --nnbd).  For example: ../../xcodebuild/DebugX64NNBD/dart-sdk');
+
+  argParser.addMultiOption(
+    'manual_packages',
+    abbr: 'm',
+    defaultsTo: [],
+    help: 'Run migration against packages in these directories.  Does not '
+        'run pub get, any git commands, or any other preparation.',
+    splitCommas: true,
+  );
+
+  argParser.addMultiOption(
+    'packages',
+    abbr: 'p',
+    defaultsTo: [
+      'charcode',
+      'collection',
+      'logging',
+      'meta',
+      'path',
+      'term_glyph',
+      'typed_data',
+      'async',
+      'source_span',
+      'stack_trace',
+      'matcher',
+      'stream_channel',
+      'boolean_selector',
+      path.join('test', 'pkgs', 'test_api'),
+    ],
+    help: 'The list of packages to run the migration against.',
+    splitCommas: true,
+  );
+
+  try {
+    parsedArgs = argParser.parse(args);
+  } on ArgParserException {
+    stderr.writeln(argParser.usage);
+    exit(1);
+  }
+  if (parsedArgs['help'] as bool) {
+    print(argParser.usage);
+    exit(0);
+  }
+
+  if (parsedArgs.rest.length > 1) {
+    throw 'invalid args. Specify *one* argument to get exceptions of interest.';
+  }
+
+  Sdk sdk = Sdk(parsedArgs['sdk'] as String);
+
+  warnOnNoAssertions();
+  warnOnNoSdkNnbd(sdk);
+
+  List<Package> packages = [
+    for (String package in parsedArgs['packages'] as Iterable<String>)
+      SdkPackage(package),
+    for (String package in parsedArgs['manual_packages'] as Iterable<String>)
+      ManualPackage(package),
+  ];
+
+  String categoryOfInterest =
+      parsedArgs.rest.isEmpty ? null : parsedArgs.rest.single;
+
+  var listener = _Listener(categoryOfInterest);
+  for (var package in packages) {
+    print('Migrating $package');
+    var testUri = thisSdkUri.resolve(package.packagePath);
+    var contextCollection = AnalysisContextCollectionImpl(
+        includedPaths: [testUri.toFilePath()], sdkPath: sdk.sdkPath);
+
     var context = contextCollection.contexts.single;
     var files = context.contextRoot
         .analyzedFiles()
@@ -72,18 +134,53 @@ main() async {
   for (var entry in sortedExceptions) {
     print('  ${entry.key} (x${entry.value.length})');
   }
+
+  if (categoryOfInterest == null) {
+    print('\n(Note: to show stack traces & nodes for a particular failure,'
+        ' rerun with a search string as an argument.)');
+  }
 }
 
-/// Set this to a non-null value to cause any exception to be printed in full
-/// if its category contains the string.
-const String categoryOfInterest = null;
+void printWarning(String warn) {
+  stderr.writeln('''
+!!!
+!!! Warning! $warn
+!!!
+''');
+}
 
-/// Set this to `true` to cause just the exception nodes to be printed when
-/// `categoryOfInterest` is non-null.  Set this to `false` to cause the full
-/// stack trace to be printed.
-const bool printExceptionNodeOnly = false;
+void warnOnNoAssertions() {
+  try {
+    assert(false);
+  } catch (e) {
+    return;
+  }
+
+  printWarning("You didn't --enable-asserts!");
+}
+
+void warnOnNoSdkNnbd(Sdk sdk) {
+  try {
+    if (sdk.isNnbdSdk) return;
+  } catch (e) {
+    printWarning('Unable to determine whether this SDK supports NNBD');
+    return;
+  }
+  printWarning(
+      'SDK at ${sdk.sdkPath} not compiled with --nnbd, use --sdk option');
+}
 
 class _Listener implements NullabilityMigrationListener {
+  /// Set this to `true` to cause just the exception nodes to be printed when
+  /// `_Listener.categoryOfInterest` is non-null.  Set this to `false` to cause
+  /// the full stack trace to be printed.
+  /// TODO(mfairhurst): make this a cli flag?
+  static const bool printExceptionNodeOnly = false;
+
+  /// Set this to a non-null value to cause any exception to be printed in full
+  /// if its category contains the string.
+  final String categoryOfInterest;
+
   final groupedExceptions = <String, List<String>>{};
 
   int numExceptions = 0;
@@ -97,6 +194,8 @@ class _Listener implements NullabilityMigrationListener {
   int numRequiredAnnotationsAdded = 0;
 
   int numDeadCodeSegmentsFound = 0;
+
+  _Listener(this.categoryOfInterest);
 
   @override
   void addEdit(SingleNullabilityFix fix, SourceEdit edit) {

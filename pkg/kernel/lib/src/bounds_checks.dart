@@ -124,10 +124,8 @@ DartType instantiateToBounds(DartType type, Class objectClass) {
         return type;
       }
     }
-    return new InterfaceType.byReference(
-        type.className,
-        calculateBounds(type.classNode.typeParameters, objectClass),
-        type.nullability);
+    return new InterfaceType.byReference(type.className, type.nullability,
+        calculateBounds(type.classNode.typeParameters, objectClass));
   }
   if (type is TypedefType) {
     if (type.typeArguments.isEmpty) return type;
@@ -136,10 +134,8 @@ DartType instantiateToBounds(DartType type, Class objectClass) {
         return type;
       }
     }
-    return new TypedefType.byReference(
-        type.typedefReference,
-        calculateBounds(type.typedefNode.typeParameters, objectClass),
-        type.nullability);
+    return new TypedefType.byReference(type.typedefReference, type.nullability,
+        calculateBounds(type.typedefNode.typeParameters, objectClass));
   }
   return type;
 }
@@ -231,8 +227,8 @@ List<TypeArgumentIssue> findTypeArgumentIssues(
     // definition in that case.  For details, see [link]
     // (https://github.com/dart-lang/sdk/blob/master/docs/language/informal/super-bounded-types.md).
     FunctionType functionType = type;
-    FunctionType cloned = new FunctionType(
-        functionType.positionalParameters, functionType.returnType,
+    FunctionType cloned = new FunctionType(functionType.positionalParameters,
+        functionType.returnType, functionType.nullability,
         namedParameters: functionType.namedParameters,
         typeParameters: functionType.typeParameters,
         requiredParameterCount: functionType.requiredParameterCount,
@@ -426,7 +422,8 @@ DartType convertSuperBoundedToRegularBounded(
           typeEnvironment, type.typeArguments[i],
           isCovariant: isCovariant);
     }
-    return new InterfaceType(type.classNode, replacedTypeArguments);
+    return new InterfaceType(
+        type.classNode, type.nullability, replacedTypeArguments);
   } else if (type is TypedefType && type.typedefNode.typeParameters != null) {
     List<DartType> replacedTypeArguments =
         new List<DartType>(type.typeArguments.length);
@@ -435,7 +432,8 @@ DartType convertSuperBoundedToRegularBounded(
           typeEnvironment, type.typeArguments[i],
           isCovariant: isCovariant);
     }
-    return new TypedefType(type.typedefNode, replacedTypeArguments);
+    return new TypedefType(
+        type.typedefNode, type.nullability, replacedTypeArguments);
   } else if (type is FunctionType) {
     var replacedReturnType = convertSuperBoundedToRegularBounded(
         typeEnvironment, type.returnType,
@@ -456,7 +454,8 @@ DartType convertSuperBoundedToRegularBounded(
               typeEnvironment, type.namedParameters[i].type,
               isCovariant: !isCovariant));
     }
-    return new FunctionType(replacedPositionalParameters, replacedReturnType,
+    return new FunctionType(
+        replacedPositionalParameters, replacedReturnType, type.nullability,
         namedParameters: replacedNamedParameters,
         typeParameters: type.typeParameters,
         requiredParameterCount: type.requiredParameterCount,

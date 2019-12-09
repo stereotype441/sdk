@@ -9,6 +9,7 @@
 
 #include "vm/bit_vector.h"
 #include "vm/compiler/frontend/bytecode_reader.h"
+#include "vm/compiler/frontend/constant_reader.h"
 #include "vm/compiler/frontend/kernel_translation_helper.h"
 #include "vm/hash_map.h"
 #include "vm/kernel.h"
@@ -105,11 +106,6 @@ class LibraryIndex {
     }
     UNREACHABLE();
     return -1;
-  }
-
-  bool HasSourceReferences() {
-    if (binary_version_ < 25) return false;
-    return true;
   }
 
   intptr_t SourceReferencesOffset() { return source_references_offset_; }
@@ -283,10 +279,8 @@ class KernelLoader : public ValueObject {
     // Start reading library.
     // Note that this needs to be keep in sync with LibraryHelper.
     reader.ReadFlags();
-    if (program_->binary_version() >= 27) {
-      reader.ReadUInt();  // Read major language version.
-      reader.ReadUInt();  // Read minor language version.
-    }
+    reader.ReadUInt();  // Read major language version.
+    reader.ReadUInt();  // Read minor language version.
     return reader.ReadCanonicalNameReference();
   }
 
@@ -340,6 +334,7 @@ class KernelLoader : public ValueObject {
   void GenerateFieldAccessors(const Class& klass,
                               const Field& field,
                               FieldHelper* field_helper);
+  bool FieldNeedsSetter(FieldHelper* field_helper);
 
   void LoadLibraryImportsAndExports(Library* library,
                                     const Class& toplevel_class);
@@ -412,6 +407,7 @@ class KernelLoader : public ValueObject {
   BuildingTranslationHelper translation_helper_;
   KernelReaderHelper helper_;
   TypeTranslator type_translator_;
+  ConstantReader constant_reader_;
   InferredTypeMetadataHelper inferred_type_metadata_helper_;
   BytecodeMetadataHelper bytecode_metadata_helper_;
 

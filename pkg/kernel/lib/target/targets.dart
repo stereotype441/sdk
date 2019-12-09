@@ -11,8 +11,11 @@ final List<String> targetNames = targets.keys.toList();
 
 class TargetFlags {
   final bool trackWidgetCreation;
+  final bool forceLateLoweringForTesting;
 
-  TargetFlags({this.trackWidgetCreation = false});
+  TargetFlags(
+      {this.trackWidgetCreation = false,
+      this.forceLateLoweringForTesting = false});
 }
 
 typedef Target _TargetBuilder(TargetFlags flags);
@@ -223,6 +226,13 @@ abstract class Target {
   /// literals (for const set literals).
   bool get supportsSetLiterals => true;
 
+  /// Whether late fields and variable are support by this target.
+  ///
+  /// If `false`, late fields and variables are lowered fields, getter, setters
+  /// etc. that provide equivalent semantics. See `pkg/kernel/nnbd_api.md` for
+  /// details.
+  bool get supportsLateFields;
+
   /// Builds an expression that instantiates an [Invocation] that can be passed
   /// to [noSuchMethod].
   Expression instantiateInvocation(CoreTypes coreTypes, Expression receiver,
@@ -254,6 +264,7 @@ abstract class Target {
   Class concreteConstMapLiteralClass(CoreTypes coreTypes) => null;
 
   Class concreteIntLiteralClass(CoreTypes coreTypes, int value) => null;
+  Class concreteDoubleLiteralClass(CoreTypes coreTypes, double value) => null;
   Class concreteStringLiteralClass(CoreTypes coreTypes, String value) => null;
 
   ConstantsBackend constantsBackend(CoreTypes coreTypes);
@@ -268,8 +279,9 @@ class NoneConstantsBackend extends ConstantsBackend {
 
 class NoneTarget extends Target {
   final TargetFlags flags;
+  final bool supportsLateFields;
 
-  NoneTarget(this.flags);
+  NoneTarget(this.flags, {this.supportsLateFields: true});
 
   String get name => 'none';
   List<String> get extraRequiredLibraries => <String>[];

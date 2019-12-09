@@ -7,6 +7,8 @@ import 'package:front_end/src/api_unstable/dart2js.dart' show Link, LinkBuilder;
 import 'package:kernel/ast.dart' as ir;
 import 'package:kernel/class_hierarchy.dart' as ir;
 import 'package:kernel/core_types.dart' as ir;
+import 'package:kernel/src/bounds_checks.dart' as ir;
+
 import 'package:kernel/type_algebra.dart' as ir;
 import 'package:kernel/type_environment.dart' as ir;
 
@@ -83,6 +85,7 @@ class JsKernelToElementMap implements JsToElementMap, IrToElementMap {
   DartTypeConverter _typeConverter;
   JsConstantEnvironment _constantEnvironment;
   KernelDartTypes _types;
+  ir.CoreTypes _coreTypes;
   ir.TypeEnvironment _typeEnvironment;
   ir.ClassHierarchy _classHierarchy;
   ConstantValuefier _constantValuefier;
@@ -728,6 +731,20 @@ class JsKernelToElementMap implements JsToElementMap, IrToElementMap {
     }
   }
 
+  void _ensureClassInstantiationToBounds(ClassEntity cls, JClassData data) {
+    assert(checkFamily(cls));
+    if (data is JClassDataImpl && data.instantiationToBounds == null) {
+      ir.Class node = data.cls;
+      if (node.typeParameters.isEmpty) {
+        _ensureThisAndRawType(cls, data);
+        data.instantiationToBounds = data.thisType;
+      } else {
+        data.instantiationToBounds = getInterfaceType(ir.instantiateToBounds(
+            coreTypes.legacyRawType(node), coreTypes.objectClass));
+      }
+    }
+  }
+
   @override
   TypeVariableEntity getTypeVariable(ir.TypeParameter node) =>
       getTypeVariableInternal(node);
@@ -943,8 +960,8 @@ class JsKernelToElementMap implements JsToElementMap, IrToElementMap {
     if (node.typeParameters.isNotEmpty) {
       List<DartType> typeParameters = <DartType>[];
       for (ir.TypeParameter typeParameter in node.typeParameters) {
-        typeParameters
-            .add(getDartType(new ir.TypeParameterType(typeParameter)));
+        typeParameters.add(getDartType(
+            new ir.TypeParameterType(typeParameter, ir.Nullability.legacy)));
       }
       typeVariables = new List<FunctionTypeVariable>.generate(
           node.typeParameters.length,
@@ -1021,6 +1038,13 @@ class JsKernelToElementMap implements JsToElementMap, IrToElementMap {
     return data.rawType;
   }
 
+  InterfaceType _getClassInstantiationToBounds(IndexedClass cls) {
+    assert(checkFamily(cls));
+    JClassData data = classes.getData(cls);
+    _ensureClassInstantiationToBounds(cls, data);
+    return data.instantiationToBounds;
+  }
+
   FunctionType _getFunctionType(IndexedFunction function) {
     assert(checkFamily(function));
     FunctionData data = members.getData(function);
@@ -1044,6 +1068,13 @@ class JsKernelToElementMap implements JsToElementMap, IrToElementMap {
     assert(checkFamily(typeVariable));
     JTypeVariableData data = typeVariables.getData(typeVariable);
     return data.getBound(this);
+  }
+
+  @override
+  List<Variance> getTypeVariableVariances(IndexedClass cls) {
+    assert(checkFamily(cls));
+    JClassData data = classes.getData(cls);
+    return data.getVariances();
   }
 
   DartType _getTypeVariableDefaultType(IndexedTypeVariable typeVariable) {
@@ -1178,32 +1209,32 @@ class JsKernelToElementMap implements JsToElementMap, IrToElementMap {
     return data.imports[node];
   }
 
-  ir.TypeEnvironment get typeEnvironment {
-    if (_typeEnvironment == null) {
-      _typeEnvironment ??= new ir.TypeEnvironment(
-          new ir.CoreTypes(programEnv.mainComponent), classHierarchy);
-    }
-    return _typeEnvironment;
-  }
+  @override
+  ir.CoreTypes get coreTypes =>
+      _coreTypes ??= ir.CoreTypes(programEnv.mainComponent);
 
-  ir.ClassHierarchy get classHierarchy {
-    if (_classHierarchy == null) {
-      _classHierarchy ??= new ir.ClassHierarchy(programEnv.mainComponent);
-    }
-    return _classHierarchy;
+  ir.TypeEnvironment get typeEnvironment =>
+      _typeEnvironment ??= ir.TypeEnvironment(coreTypes, classHierarchy);
+
+  ir.ClassHierarchy get classHierarchy =>
+      _classHierarchy ??= ir.ClassHierarchy(programEnv.mainComponent);
+
+  ir.StaticTypeContext getStaticTypeContext(ir.Member node) {
+    // TODO(johnniwinther): Cache the static type context.
+    return new ir.StaticTypeContext(node, typeEnvironment);
   }
 
   @override
   StaticTypeProvider getStaticTypeProvider(MemberEntity member) {
     MemberDefinition memberDefinition = members.getData(member).definition;
     StaticTypeCache cachedStaticTypes;
-    ir.InterfaceType thisType;
+    ir.StaticTypeContext staticTypeContext;
     switch (memberDefinition.kind) {
       case MemberKind.regular:
       case MemberKind.constructor:
       case MemberKind.constructorBody:
         ir.Member node = memberDefinition.node;
-        thisType = node.enclosingClass?.thisType;
+        staticTypeContext = getStaticTypeContext(node);
         cachedStaticTypes = members.getData(member).staticTypes;
         break;
       case MemberKind.closureCall:
@@ -1211,7 +1242,7 @@ class JsKernelToElementMap implements JsToElementMap, IrToElementMap {
         while (node != null) {
           if (node is ir.Member) {
             ir.Member member = node;
-            thisType = member.enclosingClass?.thisType;
+            staticTypeContext = getStaticTypeContext(member);
             cachedStaticTypes = members.getData(getMember(member)).staticTypes;
             break;
           }
@@ -1222,12 +1253,26 @@ class JsKernelToElementMap implements JsToElementMap, IrToElementMap {
       case MemberKind.signature:
       case MemberKind.generatorBody:
         cachedStaticTypes = const StaticTypeCache();
+        ir.TreeNode node = memberDefinition.node;
+        while (node != null) {
+          if (node is ir.Member) {
+            ir.Member member = node;
+            staticTypeContext = getStaticTypeContext(member);
+            break;
+          } else if (node is ir.Library) {
+            // Closure field may use class nodes or type parameter nodes as
+            // the definition node.
+            staticTypeContext =
+                new ir.StaticTypeContext.forAnnotations(node, typeEnvironment);
+          }
+          node = node.parent;
+        }
         break;
     }
-
     assert(cachedStaticTypes != null, "No static types cached for $member.");
-    return new CachedStaticType(typeEnvironment, cachedStaticTypes,
-        new ThisInterfaceType.from(thisType));
+    assert(staticTypeContext != null, "No static types context for $member.");
+    return new CachedStaticType(staticTypeContext, cachedStaticTypes,
+        new ThisInterfaceType.from(staticTypeContext.thisType));
   }
 
   @override
@@ -2212,6 +2257,10 @@ class JsElementEnvironment extends ElementEnvironment
   }
 
   @override
+  InterfaceType getClassInstantiationToBounds(ClassEntity cls) =>
+      elementMap._getClassInstantiationToBounds(cls);
+
+  @override
   bool isGenericClass(ClassEntity cls) {
     return getThisType(cls).typeArguments.isNotEmpty;
   }
@@ -2243,6 +2292,11 @@ class JsElementEnvironment extends ElementEnvironment
   @override
   DartType getTypeVariableBound(TypeVariableEntity typeVariable) {
     return elementMap.getTypeVariableBound(typeVariable);
+  }
+
+  @override
+  List<Variance> getTypeVariableVariances(ClassEntity cls) {
+    return elementMap.getTypeVariableVariances(cls);
   }
 
   @override
@@ -2762,9 +2816,7 @@ class ClosedEntityReader extends EntityReader {
 class ClosedEntityWriter extends EntityWriter {
   final int _earlyMemberIndexLimit;
 
-  final JsKernelToElementMap _elementMap;
-
-  ClosedEntityWriter(this._elementMap, this._earlyMemberIndexLimit);
+  ClosedEntityWriter(this._earlyMemberIndexLimit);
 
   @override
   void writeMemberToDataSink(DataSink sink, IndexedMember value) {

@@ -12,7 +12,6 @@ import 'package:analyzer/error/listener.dart';
 import 'package:analyzer/src/dart/constant/value.dart';
 import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
-import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/error/codes.dart';
 import 'package:analyzer/src/generated/resolver.dart';
@@ -21,7 +20,7 @@ import 'package:analyzer/src/generated/type_system.dart';
 class InheritanceOverrideVerifier {
   static const _missingOverridesKey = 'missingOverrides';
 
-  final TypeSystem _typeSystem;
+  final TypeSystemImpl _typeSystem;
   final TypeProvider _typeProvider;
   final InheritanceManager3 _inheritance;
   final ErrorReporter _reporter;
@@ -34,7 +33,7 @@ class InheritanceOverrideVerifier {
     var library = unit.declaredElement.library;
     for (var declaration in unit.declarations) {
       if (declaration is ClassDeclaration) {
-        new _ClassVerifier(
+        _ClassVerifier(
           typeSystem: _typeSystem,
           typeProvider: _typeProvider,
           inheritance: _inheritance,
@@ -48,7 +47,7 @@ class InheritanceOverrideVerifier {
           withClause: declaration.withClause,
         ).verify();
       } else if (declaration is ClassTypeAlias) {
-        new _ClassVerifier(
+        _ClassVerifier(
           typeSystem: _typeSystem,
           typeProvider: _typeProvider,
           inheritance: _inheritance,
@@ -61,7 +60,7 @@ class InheritanceOverrideVerifier {
           withClause: declaration.withClause,
         ).verify();
       } else if (declaration is MixinDeclaration) {
-        new _ClassVerifier(
+        _ClassVerifier(
           typeSystem: _typeSystem,
           typeProvider: _typeProvider,
           inheritance: _inheritance,
@@ -85,7 +84,7 @@ class InheritanceOverrideVerifier {
 }
 
 class _ClassVerifier {
-  final TypeSystem typeSystem;
+  final TypeSystemImpl typeSystem;
   final TypeProvider typeProvider;
   final InheritanceManager3 inheritance;
   final ErrorReporter reporter;
@@ -104,7 +103,7 @@ class _ClassVerifier {
 
   /// The set of unique supertypes of the current class.
   /// It is used to decide when to add a new element to [allSuperinterfaces].
-  final Set<InterfaceType> allSupertypes = new Set<InterfaceType>();
+  final Set<InterfaceType> allSupertypes = Set<InterfaceType>();
 
   /// The list of all superinterfaces, collected so far.
   final List<Interface> allSuperinterfaces = [];
@@ -118,7 +117,7 @@ class _ClassVerifier {
     this.library,
     this.classNameNode,
     this.implementsClause,
-    this.members: const [],
+    this.members = const [],
     this.onClause,
     this.superclass,
     this.withClause,
@@ -235,9 +234,9 @@ class _ClassVerifier {
             [
               name.name,
               interfaceElement.enclosingElement.name,
-              interfaceElement.type.displayName,
+              interfaceElement.type,
               concreteElement.enclosingElement.name,
-              concreteElement.type.displayName,
+              concreteElement.type,
             ],
           );
         }
@@ -271,7 +270,7 @@ class _ClassVerifier {
     if (member == null) return;
     if (member.isStatic) return;
 
-    var name = new Name(libraryUri, member.name);
+    var name = Name(libraryUri, member.name);
     for (var superInterface in allSuperinterfaces) {
       var superMember = superInterface.declared[name];
       if (superMember != null) {
@@ -288,9 +287,9 @@ class _ClassVerifier {
             [
               name.name,
               member.enclosingElement.name,
-              member.type.displayName,
+              member.type,
               superMember.enclosingElement.name,
-              superMember.type.displayName
+              superMember.type,
             ],
           );
         }
@@ -333,7 +332,7 @@ class _ClassVerifier {
     DartType type = typeName.type;
     if (type is InterfaceType &&
         typeProvider.nonSubtypableClasses.contains(type.element)) {
-      reporter.reportErrorForNode(errorCode, typeName, [type.displayName]);
+      reporter.reportErrorForNode(errorCode, typeName, [type]);
       return true;
     }
 
@@ -393,12 +392,11 @@ class _ClassVerifier {
       var getter = interface.map[name];
       if (getter.kind == ElementKind.GETTER) {
         // TODO(scheglov) We should separate getters and setters.
-        var setter = interface.map[new Name(libraryUri, '${name.name}=')];
+        var setter = interface.map[Name(libraryUri, '${name.name}=')];
         if (setter != null && setter.parameters.length == 1) {
           var getterType = getter.returnType;
           var setterType = setter.parameters[0].type;
-          if (!typeSystem.isAssignableTo(getterType, setterType,
-              featureSet: featureSet)) {
+          if (!typeSystem.isAssignableTo(getterType, setterType)) {
             Element errorElement;
             if (getter.enclosingElement == classElement) {
               errorElement = getter;
@@ -451,10 +449,7 @@ class _ClassVerifier {
     for (var i = 0; i < baseParameterElements.length; ++i) {
       var baseParameter = baseParameterElements[i];
       if (baseParameter.isOptional) {
-        if (baseParameter is ParameterMember) {
-          baseParameter = (baseParameter as ParameterMember).baseElement;
-        }
-        baseOptionalElements.add(baseParameter);
+        baseOptionalElements.add(baseParameter.declaration);
       }
     }
 
@@ -533,7 +528,7 @@ class _ClassVerifier {
         // Construct a string showing the cyclic implements path:
         // "A, B, C, D, A"
         String separator = ", ";
-        StringBuffer buffer = new StringBuffer();
+        StringBuffer buffer = StringBuffer();
         for (int i = 0; i < size; i++) {
           buffer.write(path[i].displayName);
           buffer.write(separator);

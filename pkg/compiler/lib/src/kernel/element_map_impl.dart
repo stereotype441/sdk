@@ -9,6 +9,7 @@ import 'package:js_runtime/shared/embedded_names.dart';
 import 'package:kernel/ast.dart' as ir;
 import 'package:kernel/class_hierarchy.dart' as ir;
 import 'package:kernel/core_types.dart' as ir;
+import 'package:kernel/src/bounds_checks.dart' as ir;
 import 'package:kernel/type_algebra.dart' as ir;
 import 'package:kernel/type_environment.dart' as ir;
 
@@ -74,6 +75,7 @@ class KernelToElementMapImpl implements KernelToElementMap, IrToElementMap {
   DartTypeConverter _typeConverter;
   KernelConstantEnvironment _constantEnvironment;
   KernelDartTypes _types;
+  ir.CoreTypes _coreTypes;
   ir.TypeEnvironment _typeEnvironment;
   ir.ClassHierarchy _classHierarchy;
   Dart2jsConstantEvaluator _constantEvaluator;
@@ -299,6 +301,20 @@ class KernelToElementMapImpl implements KernelToElementMap, IrToElementMap {
     }
   }
 
+  void _ensureClassInstantiationToBounds(ClassEntity cls, KClassData data) {
+    assert(checkFamily(cls));
+    if (data is KClassDataImpl && data.instantiationToBounds == null) {
+      ir.Class node = data.node;
+      if (node.typeParameters.isEmpty) {
+        _ensureThisAndRawType(cls, data);
+        data.instantiationToBounds = data.thisType;
+      } else {
+        data.instantiationToBounds = getInterfaceType(ir.instantiateToBounds(
+            coreTypes.legacyRawType(node), coreTypes.objectClass));
+      }
+    }
+  }
+
   @override
   TypeVariableEntity getTypeVariable(ir.TypeParameter node) =>
       getTypeVariableInternal(node);
@@ -517,8 +533,8 @@ class KernelToElementMapImpl implements KernelToElementMap, IrToElementMap {
     if (node.typeParameters.isNotEmpty) {
       List<DartType> typeParameters = <DartType>[];
       for (ir.TypeParameter typeParameter in node.typeParameters) {
-        typeParameters
-            .add(getDartType(new ir.TypeParameterType(typeParameter)));
+        typeParameters.add(getDartType(
+            new ir.TypeParameterType(typeParameter, ir.Nullability.legacy)));
       }
       typeVariables = new List<FunctionTypeVariable>.generate(
           node.typeParameters.length,
@@ -595,6 +611,13 @@ class KernelToElementMapImpl implements KernelToElementMap, IrToElementMap {
     return data.rawType;
   }
 
+  InterfaceType _getClassInstantiationToBounds(IndexedClass cls) {
+    assert(checkFamily(cls));
+    KClassData data = classes.getData(cls);
+    _ensureClassInstantiationToBounds(cls, data);
+    return data.instantiationToBounds;
+  }
+
   DartType _getFieldType(IndexedField field) {
     assert(checkFamily(field));
     KFieldData data = members.getData(field);
@@ -618,6 +641,13 @@ class KernelToElementMapImpl implements KernelToElementMap, IrToElementMap {
     assert(checkFamily(typeVariable));
     KTypeVariableData data = typeVariables.getData(typeVariable);
     return data.getBound(this);
+  }
+
+  @override
+  List<Variance> getTypeVariableVariances(IndexedClass cls) {
+    assert(checkFamily(cls));
+    KClassData data = classes.getData(cls);
+    return data.getVariances();
   }
 
   ClassEntity getAppliedMixin(IndexedClass cls) {
@@ -767,14 +797,20 @@ class KernelToElementMapImpl implements KernelToElementMap, IrToElementMap {
   }
 
   @override
-  ir.TypeEnvironment get typeEnvironment {
-    return _typeEnvironment ??= new ir.TypeEnvironment(
-        new ir.CoreTypes(env.mainComponent), classHierarchy);
-  }
+  ir.CoreTypes get coreTypes => _coreTypes ??= ir.CoreTypes(env.mainComponent);
 
   @override
-  ir.ClassHierarchy get classHierarchy {
-    return _classHierarchy ??= new ir.ClassHierarchy(env.mainComponent);
+  ir.TypeEnvironment get typeEnvironment =>
+      _typeEnvironment ??= ir.TypeEnvironment(coreTypes, classHierarchy);
+
+  @override
+  ir.ClassHierarchy get classHierarchy =>
+      _classHierarchy ??= ir.ClassHierarchy(env.mainComponent);
+
+  @override
+  ir.StaticTypeContext getStaticTypeContext(MemberEntity member) {
+    // TODO(johnniwinther): Cache the static type context.
+    return new ir.StaticTypeContext(getMemberNode(member), typeEnvironment);
   }
 
   Dart2jsConstantEvaluator get constantEvaluator {
@@ -1042,13 +1078,14 @@ class KernelToElementMapImpl implements KernelToElementMap, IrToElementMap {
   }
 
   @override
-  ConstantValue getConstantValue(ir.Expression node,
+  ConstantValue getConstantValue(
+      ir.StaticTypeContext staticTypeContext, ir.Expression node,
       {bool requireConstant: true,
       bool implicitNull: false,
       bool checkCasts: true}) {
     if (node is ir.ConstantExpression) {
-      ir.Constant constant =
-          constantEvaluator.evaluate(node, requireConstant: requireConstant);
+      ir.Constant constant = constantEvaluator.evaluate(staticTypeContext, node,
+          requireConstant: requireConstant);
       if (constant == null) {
         if (requireConstant) {
           throw new UnsupportedError(
@@ -1088,13 +1125,15 @@ class KernelToElementMapImpl implements KernelToElementMap, IrToElementMap {
   }
 
   /// Converts [annotations] into a list of [ConstantValue]s.
-  List<ConstantValue> getMetadata(List<ir.Expression> annotations) {
+  List<ConstantValue> getMetadata(
+      ir.StaticTypeContext staticTypeContext, List<ir.Expression> annotations) {
     if (annotations.isEmpty) return const <ConstantValue>[];
     List<ConstantValue> metadata = <ConstantValue>[];
     annotations.forEach((ir.Expression node) {
       // We skip the implicit cast checks for metadata to avoid circular
       // dependencies in the js-interop class registration.
-      metadata.add(getConstantValue(node, checkCasts: false));
+      metadata
+          .add(getConstantValue(staticTypeContext, node, checkCasts: false));
     });
     return metadata;
   }
@@ -1394,7 +1433,14 @@ class KernelToElementMapImpl implements KernelToElementMap, IrToElementMap {
       ImpactData impactData = impactBuilderData.impactData;
       memberData.staticTypes = impactBuilderData.cachedStaticTypes;
       KernelImpactConverter converter = new KernelImpactConverter(
-          this, member, reporter, options, _constantValuefier);
+          this,
+          member,
+          reporter,
+          options,
+          _constantValuefier,
+          // TODO(johnniwinther): Pull the static type context from the cached
+          // static types.
+          new ir.StaticTypeContext(node, typeEnvironment));
       return converter.convert(impactData);
     } else {
       KernelImpactBuilder builder = new KernelImpactBuilder(
@@ -1402,6 +1448,7 @@ class KernelToElementMapImpl implements KernelToElementMap, IrToElementMap {
           member,
           reporter,
           options,
+          new ir.StaticTypeContext(node, typeEnvironment),
           variableScopeModel,
           annotations,
           _constantValuefier);
@@ -1678,6 +1725,10 @@ class KernelElementEnvironment extends ElementEnvironment
   }
 
   @override
+  InterfaceType getClassInstantiationToBounds(ClassEntity cls) =>
+      elementMap._getClassInstantiationToBounds(cls);
+
+  @override
   bool isGenericClass(ClassEntity cls) {
     return getThisType(cls).typeArguments.isNotEmpty;
   }
@@ -1696,6 +1747,11 @@ class KernelElementEnvironment extends ElementEnvironment
   DartType getTypeVariableBound(TypeVariableEntity typeVariable) {
     if (typeVariable is KLocalTypeVariable) return typeVariable.bound;
     return elementMap.getTypeVariableBound(typeVariable);
+  }
+
+  @override
+  List<Variance> getTypeVariableVariances(ClassEntity cls) {
+    return elementMap.getTypeVariableVariances(cls);
   }
 
   @override

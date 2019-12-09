@@ -19,15 +19,15 @@ import 'package:analyzer/src/summary2/named_type_builder.dart';
 /// mapping to be used for replacing other types to use the new type parameters.
 FreshTypeParameters getFreshTypeParameters(
     List<TypeParameterElement> typeParameters) {
-  var freshParameters = new List<TypeParameterElementImpl>.generate(
+  var freshParameters = List<TypeParameterElementImpl>.generate(
     typeParameters.length,
-    (i) => new TypeParameterElementImpl(typeParameters[i].name, -1),
+    (i) => TypeParameterElementImpl(typeParameters[i].name, -1),
     growable: true,
   );
 
   var map = <TypeParameterElement, DartType>{};
   for (int i = 0; i < typeParameters.length; ++i) {
-    map[typeParameters[i]] = new TypeParameterTypeImpl(
+    map[typeParameters[i]] = TypeParameterTypeImpl(
       freshParameters[i],
       nullabilitySuffix: NullabilitySuffix.none,
     );
@@ -36,14 +36,21 @@ FreshTypeParameters getFreshTypeParameters(
   var substitution = Substitution.fromMap(map);
 
   for (int i = 0; i < typeParameters.length; ++i) {
-    var bound = typeParameters[i].bound;
+    // TODO (kallentu) : Clean up TypeParameterElementImpl casting once
+    // variance is added to the interface.
+    var typeParameter = typeParameters[i] as TypeParameterElementImpl;
+    if (!typeParameter.isLegacyCovariant) {
+      freshParameters[i].variance = typeParameter.variance;
+    }
+
+    var bound = typeParameter.bound;
     if (bound != null) {
       var newBound = substitution.substituteType(bound);
       freshParameters[i].bound = newBound;
     }
   }
 
-  return new FreshTypeParameters(freshParameters, substitution);
+  return FreshTypeParameters(freshParameters, substitution);
 }
 
 /// Given a generic function [type] of a class member (so that it does not
@@ -75,10 +82,10 @@ FunctionType replaceTypeParameters(
     )..isExplicitlyCovariant = p.isCovariant;
   }
 
-  return FunctionTypeImpl.synthetic(
-    substitution.substituteType(type.returnType),
-    newTypeParameters,
-    type.parameters.map(transformParameter).toList(),
+  return FunctionTypeImpl(
+    typeFormals: newTypeParameters,
+    parameters: type.parameters.map(transformParameter).toList(),
+    returnType: substitution.substituteType(type.returnType),
     nullabilitySuffix: type.nullabilitySuffix,
   );
 }
@@ -109,10 +116,9 @@ class FreshTypeParameters {
   FreshTypeParameters(this.freshTypeParameters, this.substitution);
 
   FunctionType applyToFunctionType(FunctionType type) {
-    return new FunctionTypeImpl.synthetic(
-      substitute(type.returnType),
-      freshTypeParameters,
-      type.parameters.map((parameter) {
+    return FunctionTypeImpl(
+      typeFormals: freshTypeParameters,
+      parameters: type.parameters.map((parameter) {
         return ParameterElementImpl.synthetic(
           parameter.name,
           substitute(parameter.type),
@@ -120,6 +126,7 @@ class FreshTypeParameters {
           parameter.parameterKind,
         );
       }).toList(),
+      returnType: substitute(type.returnType),
       nullabilitySuffix: (type as TypeImpl).nullabilitySuffix,
     );
   }
@@ -141,8 +148,8 @@ abstract class Substitution {
 
   DartType getSubstitute(TypeParameterElement parameter, bool upperBound);
 
-  DartType substituteType(DartType type, {bool contravariant: false}) {
-    return new _TopSubstitutor(this, contravariant).visit(type);
+  DartType substituteType(DartType type, {bool contravariant = false}) {
+    return _TopSubstitutor(this, contravariant).visit(type);
   }
 
   /// Substitutes both variables from [first] and [second], favoring those from
@@ -156,7 +163,7 @@ abstract class Substitution {
   static Substitution combine(Substitution first, Substitution second) {
     if (first == _NullSubstitution.instance) return second;
     if (second == _NullSubstitution.instance) return first;
-    return new _CombinedSubstitution(first, second);
+    return _CombinedSubstitution(first, second);
   }
 
   /// Substitutes the type parameters on the class of [type] with the
@@ -173,7 +180,7 @@ abstract class Substitution {
     if (map.isEmpty) {
       return _NullSubstitution.instance;
     }
-    return new _MapSubstitution(map);
+    return _MapSubstitution(map);
   }
 
   /// Substitutes the Nth parameter in [parameters] with the Nth type in
@@ -187,7 +194,7 @@ abstract class Substitution {
       return _NullSubstitution.instance;
     }
     return fromMap(
-      new Map<TypeParameterElement, DartType>.fromIterables(
+      Map<TypeParameterElement, DartType>.fromIterables(
         parameters,
         types,
       ),
@@ -211,7 +218,7 @@ abstract class Substitution {
     if (upper.isEmpty && lower.isEmpty) {
       return _NullSubstitution.instance;
     }
-    return new _UpperLowerBoundsSubstitution(upper, lower);
+    return _UpperLowerBoundsSubstitution(upper, lower);
   }
 }
 
@@ -242,7 +249,9 @@ class _FreshTypeParametersSubstitutor extends _TypeSubstitutor {
 
     var freshElements = List<TypeParameterElement>(elements.length);
     for (var i = 0; i < elements.length; i++) {
-      var element = elements[i];
+      // TODO (kallentu) : Clean up TypeParameterElementImpl casting once
+      // variance is added to the interface.
+      var element = elements[i] as TypeParameterElementImpl;
       var freshElement = TypeParameterElementImpl(element.name, -1);
       freshElements[i] = freshElement;
       var freshType = freshElement.instantiate(
@@ -250,6 +259,10 @@ class _FreshTypeParametersSubstitutor extends _TypeSubstitutor {
       );
       freshElement.type = freshType;
       substitution[element] = freshType;
+
+      if (!element.isLegacyCovariant) {
+        freshElement.variance = element.variance;
+      }
     }
 
     for (var i = 0; i < freshElements.length; i++) {
@@ -282,7 +295,7 @@ class _MapSubstitution extends MapSubstitution {
 }
 
 class _NullSubstitution extends MapSubstitution {
-  static const _NullSubstitution instance = const _NullSubstitution();
+  static const _NullSubstitution instance = _NullSubstitution();
 
   const _NullSubstitution();
 
@@ -290,11 +303,11 @@ class _NullSubstitution extends MapSubstitution {
   Map<TypeParameterElement, DartType> get map => const {};
 
   DartType getSubstitute(TypeParameterElement parameter, bool upperBound) {
-    return new TypeParameterTypeImpl(parameter);
+    return TypeParameterTypeImpl(parameter);
   }
 
   @override
-  DartType substituteType(DartType type, {bool contravariant: false}) => type;
+  DartType substituteType(DartType type, {bool contravariant = false}) => type;
 
   @override
   String toString() => "Substitution.empty";
@@ -368,7 +381,7 @@ abstract class _TypeSubstitutor extends DartTypeVisitor<DartType> {
   DartType lookup(TypeParameterElement parameter, bool upperBound);
 
   _FreshTypeParametersSubstitutor newInnerEnvironment() {
-    return new _FreshTypeParametersSubstitutor(this);
+    return _FreshTypeParametersSubstitutor(this);
   }
 
   DartType visit(DartType type) {
@@ -415,13 +428,13 @@ abstract class _TypeSubstitutor extends DartTypeVisitor<DartType> {
 
     if (this.useCounter == before) return type;
 
-    return FunctionTypeImpl.synthetic(
-      returnType,
-      typeFormals,
-      parameters,
+    return FunctionTypeImpl(
+      typeFormals: typeFormals,
+      parameters: parameters,
+      returnType: returnType,
+      nullabilitySuffix: (type as TypeImpl).nullabilitySuffix,
       element: type.element,
       typeArguments: typeArguments,
-      nullabilitySuffix: (type as TypeImpl).nullabilitySuffix,
     );
   }
 
@@ -481,7 +494,7 @@ abstract class _TypeSubstitutor extends DartTypeVisitor<DartType> {
       return type;
     }
 
-    return new InterfaceTypeImpl.explicit(type.element, typeArguments,
+    return InterfaceTypeImpl.explicit(type.element, typeArguments,
         nullabilitySuffix: (type as TypeImpl).nullabilitySuffix);
   }
 
@@ -497,7 +510,7 @@ abstract class _TypeSubstitutor extends DartTypeVisitor<DartType> {
       return type;
     }
 
-    return new NamedTypeBuilder(
+    return NamedTypeBuilder(
       type.isNNBD,
       type.element,
       arguments,

@@ -53,6 +53,7 @@ actually
 acyclic
 ad
 adapt
+adapted
 add
 added
 adding
@@ -73,6 +74,7 @@ advances
 advancing
 advice
 affect
+affected
 affects
 after
 again
@@ -84,6 +86,8 @@ algebra
 algorithm
 algorithms
 alias
+aliased
+aliases
 alignment
 all
 allocated
@@ -105,6 +109,7 @@ alternative
 alternatively
 alternatives
 although
+altogether
 always
 ambiguous
 among
@@ -112,6 +117,7 @@ amongst
 amount
 ampersand
 an
+analog
 analogously
 analysis
 analyze
@@ -209,12 +215,14 @@ attempted
 attempting
 attempts
 attention
+attribute
 authors
 automatically
 available
 average
 avoid
 avoided
+avoiding
 avoids
 await
 awaiter
@@ -227,6 +235,7 @@ backends
 backslash
 backslashes
 backspace
+backup
 backward
 backwards
 bad
@@ -377,12 +386,12 @@ catch
 catches
 categories
 category
-caveats
 caught
 cause
 caused
 causes
 causing
+caveats
 certain
 chain
 chained
@@ -526,6 +535,7 @@ concretely
 concurrent
 condition
 conditional
+conditionals
 conditionally
 conditions
 configurable
@@ -609,6 +619,7 @@ convertible
 converting
 converts
 cookie
+coordinate
 cope
 copied
 copier
@@ -726,6 +737,7 @@ delimited
 delimiter
 delimiters
 delta
+demote
 demoted
 demoting
 demotion
@@ -760,6 +772,7 @@ deserialization
 deserialize
 deserialized
 designed
+desired
 desugar
 desugared
 desugaring
@@ -914,6 +927,7 @@ encoded
 encoder
 encodes
 encoding
+encodings
 encounter
 encountered
 encountering
@@ -1071,6 +1085,7 @@ failure
 failures
 fake
 fall
+fallback
 falls
 false
 far
@@ -1083,6 +1098,7 @@ feature
 features
 feed
 feel
+fetch
 few
 fewer
 field
@@ -1216,8 +1232,8 @@ glorified
 go
 goes
 going
-good
 gone
+good
 got
 gotten
 governed
@@ -1551,6 +1567,7 @@ labelled
 labels
 lack
 lacking
+landed
 lands
 language
 large
@@ -1662,6 +1679,7 @@ lower
 lowercase
 lowered
 lowering
+lowerings
 machine
 made
 magenta
@@ -1776,6 +1794,7 @@ modulo
 moment
 mongolian
 more
+moreover
 most
 mostly
 motivation
@@ -1846,6 +1865,7 @@ node
 nodes
 non
 none
+nonfunction
 nor
 normal
 normalize
@@ -2234,11 +2254,11 @@ real
 realigned
 realized
 really
-reassign
 reason
 reasonable
 reasoning
 reasons
+reassign
 receive
 receiver
 recent
@@ -2294,6 +2314,7 @@ registry
 regress
 regression
 regular
+reinsert
 reissue
 rejected
 rejects
@@ -2407,6 +2428,8 @@ reuses
 reusing
 reverse
 reversed
+revert
+reverts
 review
 revise
 revision
@@ -2441,6 +2464,8 @@ safety
 said
 sake
 same
+sample
+samples
 sanity
 satisfied
 satisfies
@@ -2512,6 +2537,7 @@ sets
 setter
 setters
 setting
+settings
 settled
 setup
 several
@@ -2633,6 +2659,7 @@ square
 squiggly
 stable
 stack
+stacked
 stage
 stamps
 standalone
@@ -2646,6 +2673,7 @@ starting
 starts
 startup
 state
+stateful
 statement
 statement's
 statements
@@ -2713,6 +2741,7 @@ succeeds
 success
 successful
 successfully
+successively
 succinct
 such
 suffice
@@ -2894,6 +2923,7 @@ treating
 treatment
 treats
 tree
+tri
 trick
 tried
 tries
@@ -2929,6 +2959,8 @@ types
 typically
 typing
 unable
+unalias
+unaliased
 unambiguous
 unary
 unbalanced
@@ -2962,6 +2994,8 @@ union
 unioned
 unique
 unit
+unite
+united
 units
 unix
 unknown

@@ -9,12 +9,15 @@ import 'dart:io' show Directory, File;
 import 'package:_fe_analyzer_shared/src/messages/diagnostic_message.dart'
     show DiagnosticMessage, getMessageCodeObject;
 
+import 'package:_fe_analyzer_shared/src/util/colors.dart' as colors;
+
 import 'package:_fe_analyzer_shared/src/messages/severity.dart' show Severity;
 
 import 'package:expect/expect.dart' show Expect;
 
 import 'package:front_end/src/api_prototype/compiler_options.dart'
-    show CompilerOptions;
+    show CompilerOptions, parseExperimentalArguments, parseExperimentalFlags;
+import 'package:front_end/src/api_prototype/experimental_flags.dart';
 
 import "package:front_end/src/api_prototype/memory_file_system.dart"
     show MemoryFileSystem;
@@ -76,7 +79,10 @@ main([List<String> arguments = const []]) =>
 
 Future<Context> createContext(
     Chain suite, Map<String, String> environment) async {
-  return new Context();
+  // Disable colors to ensure that expectation files are the same across
+  // platforms and independent of stdin/stderr.
+  colors.enableColors = false;
+  return new Context(environment["updateExpectations"] == "true");
 }
 
 class Context extends ChainContext {
@@ -84,6 +90,9 @@ class Context extends ChainContext {
     const ReadTest(),
     const RunCompilations(),
   ];
+
+  final bool updateExpectations;
+  Context(this.updateExpectations);
 
   @override
   Future<void> cleanUp(TestDescription description, Result result) async {
@@ -96,6 +105,7 @@ class Context extends ChainContext {
 class TestData {
   YamlMap map;
   Directory outDir;
+  Uri loadedFrom;
 }
 
 class ReadTest extends Step<TestDescription, TestData, Context> {
@@ -108,6 +118,7 @@ class ReadTest extends Step<TestDescription, TestData, Context> {
     Uri uri = description.uri;
     String contents = await new File.fromUri(uri).readAsString();
     TestData data = new TestData();
+    data.loadedFrom = uri;
     data.map = loadYamlNode(contents, sourceUrl: uri);
     data.outDir =
         Directory.systemTemp.createTempSync("incremental_load_from_dill_test");
@@ -144,6 +155,8 @@ class RunCompilations extends Step<TestData, TestData, Context> {
           "incrementalSerialization"
         ]);
         await newWorldTest(
+          data,
+          context,
           map["worlds"],
           map["modules"],
           map["omitPlatform"],
@@ -286,8 +299,14 @@ Future<Map<String, List<int>>> createModules(
   return moduleResult;
 }
 
-Future<Null> newWorldTest(List worlds, Map modules, bool omitPlatform,
-    String targetName, bool incrementalSerialization) async {
+Future<Null> newWorldTest(
+    TestData data,
+    Context context,
+    List worlds,
+    Map modules,
+    bool omitPlatform,
+    String targetName,
+    bool incrementalSerialization) async {
   final Uri sdkRoot = computePlatformBinariesLocation(forceBuildDir: true);
   final Uri base = Uri.parse("org-dartlang-test:///");
   final Uri sdkSummary = base.resolve("vm_platform_strong.dill");
@@ -400,6 +419,12 @@ Future<Null> newWorldTest(List worlds, Map modules, bool omitPlatform,
       options.sdkRoot = null;
       options.sdkSummary = sdkSummary;
       options.omitPlatform = omitPlatform != false;
+      if (world["experiments"] != null) {
+        Map<ExperimentalFlag, bool> experimentalFlags = parseExperimentalFlags(
+            parseExperimentalArguments([world["experiments"]]),
+            onError: (e) => throw "Error on parsing experiments flags: $e");
+        options.experimentalFlags = experimentalFlags;
+      }
     }
     if (packagesUri != null) {
       options.packagesFileUri = packagesUri;
@@ -463,6 +488,11 @@ Future<Null> newWorldTest(List worlds, Map modules, bool omitPlatform,
       }
     }
 
+    compiler.useExperimentalInvalidation = false;
+    if (world["useExperimentalInvalidation"] == true) {
+      compiler.useExperimentalInvalidation = true;
+    }
+
     List<Uri> invalidated = new List<Uri>();
     if (world["invalidate"] != null) {
       for (String filename in world["invalidate"]) {
@@ -502,7 +532,8 @@ Future<Null> newWorldTest(List worlds, Map modules, bool omitPlatform,
     performErrorAndWarningCheck(
         world, gotError, formattedErrors, gotWarning, formattedWarnings);
     util.throwOnEmptyMixinBodies(component);
-    util.throwOnInsufficientUriToSource(component);
+    await util.throwOnInsufficientUriToSource(component,
+        fileSystem: gotError ? null : fs);
     print("Compile took ${stopwatch.elapsedMilliseconds} ms");
 
     checkExpectedContent(world, component);
@@ -528,8 +559,9 @@ Future<Null> newWorldTest(List worlds, Map modules, bool omitPlatform,
 
     newestWholeComponentData = util.postProcess(component);
     newestWholeComponent = component;
+    String actualSerialized = componentToStringSdkFiltered(component);
     print("*****\n\ncomponent:\n"
-        "${componentToStringSdkFiltered(component)}\n\n\n");
+        "${actualSerialized}\n\n\n");
 
     if (world["uriToSourcesDoesntInclude"] != null) {
       for (String filename in world["uriToSourcesDoesntInclude"]) {
@@ -555,6 +587,26 @@ Future<Null> newWorldTest(List worlds, Map modules, bool omitPlatform,
               "${component.uriToSource[uri]}";
         }
       }
+    }
+
+    Uri uri = data.loadedFrom
+        .resolve(data.loadedFrom.pathSegments.last + ".world.$worldNum.expect");
+    String expected;
+    File file = new File.fromUri(uri);
+    if (context.updateExpectations) {
+      file.writeAsStringSync(actualSerialized);
+    }
+    if (file.existsSync()) {
+      expected = file.readAsStringSync();
+    }
+    if (context.updateExpectations) {
+      file.writeAsStringSync(actualSerialized);
+    } else if (expected != actualSerialized) {
+      String extra = "";
+      if (expected == null) extra = "Expect file did not exist.\n";
+      throw "${extra}Unexpected serialized representation. "
+          "Fix or update $uri to contain the below:\n\n"
+          "$actualSerialized";
     }
 
     int nonSyntheticLibraries = countNonSyntheticLibraries(component);
@@ -588,6 +640,13 @@ Future<Null> newWorldTest(List worlds, Map modules, bool omitPlatform,
             "libraries, got ${syntheticLibraries}";
       }
     }
+
+    if (world["expectsRebuildBodiesOnly"] != null) {
+      bool didRebuildBodiesOnly = compiler.rebuildBodiesCount > 0;
+      Expect.equals(world["expectsRebuildBodiesOnly"], didRebuildBodiesOnly,
+          "Whether we expected to rebuild bodies only.");
+    }
+
     if (!noFullComponent) {
       List<Library> entryLib = component.libraries
           .where((Library lib) =>
@@ -708,7 +767,7 @@ Future<Null> newWorldTest(List worlds, Map modules, bool omitPlatform,
       performErrorAndWarningCheck(
           world, gotError, formattedErrors, gotWarning, formattedWarnings);
       util.throwOnEmptyMixinBodies(component3);
-      util.throwOnInsufficientUriToSource(component3);
+      await util.throwOnInsufficientUriToSource(component3);
       print("Compile took ${stopwatch.elapsedMilliseconds} ms");
 
       util.postProcess(component3);
@@ -1108,7 +1167,7 @@ Future<Component> normalCompileToComponent(Uri input,
   Component component =
       await normalCompilePlain(input, options: options, compiler: compiler);
   util.throwOnEmptyMixinBodies(component);
-  util.throwOnInsufficientUriToSource(component);
+  await util.throwOnInsufficientUriToSource(component);
   return component;
 }
 
@@ -1130,7 +1189,7 @@ Future<bool> initializedCompile(
   }
   Component initializedComponent = await compiler.computeDelta();
   util.throwOnEmptyMixinBodies(initializedComponent);
-  util.throwOnInsufficientUriToSource(initializedComponent);
+  await util.throwOnInsufficientUriToSource(initializedComponent);
   bool result = compiler.initializedFromDill;
   new File.fromUri(output)
       .writeAsBytesSync(util.postProcess(initializedComponent));
@@ -1146,7 +1205,7 @@ Future<bool> initializedCompile(
   Component initializedFullComponent =
       await compiler.computeDelta(fullComponent: true);
   util.throwOnEmptyMixinBodies(initializedFullComponent);
-  util.throwOnInsufficientUriToSource(initializedFullComponent);
+  await util.throwOnInsufficientUriToSource(initializedFullComponent);
   Expect.equals(initializedComponent.libraries.length,
       initializedFullComponent.libraries.length);
   Expect.equals(initializedComponent.uriToSource.length,
@@ -1158,7 +1217,7 @@ Future<bool> initializedCompile(
 
   Component partialComponent = await compiler.computeDelta();
   util.throwOnEmptyMixinBodies(partialComponent);
-  util.throwOnInsufficientUriToSource(partialComponent);
+  await util.throwOnInsufficientUriToSource(partialComponent);
   actuallyInvalidatedCount = (compiler
           .getFilteredInvalidatedImportUrisForTesting(invalidateUris)
           ?.length ??
@@ -1170,7 +1229,7 @@ Future<bool> initializedCompile(
 
   Component emptyComponent = await compiler.computeDelta();
   util.throwOnEmptyMixinBodies(emptyComponent);
-  util.throwOnInsufficientUriToSource(emptyComponent);
+  await util.throwOnInsufficientUriToSource(emptyComponent);
 
   List<Uri> fullLibUris =
       initializedComponent.libraries.map((lib) => lib.importUri).toList();
@@ -1190,6 +1249,7 @@ Future<bool> initializedCompile(
 
 class TestIncrementalCompiler extends IncrementalCompiler {
   Set<Uri> invalidatedImportUrisForTesting;
+  int rebuildBodiesCount;
   final Uri entryPoint;
 
   /// Filter out the automatically added entryPoint, unless it's explicitly
@@ -1248,6 +1308,11 @@ class TestIncrementalCompiler extends IncrementalCompiler {
       throw "Loaders builder should contain the sdk, "
           "but didn't even contain dart:core.";
     }
+  }
+
+  @override
+  void recordRebuildBodiesCountForTesting(int count) {
+    rebuildBodiesCount = count;
   }
 
   @override

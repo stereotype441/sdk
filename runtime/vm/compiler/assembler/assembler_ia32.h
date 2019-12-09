@@ -574,6 +574,15 @@ class Assembler : public AssemblerBase {
   void PushRegister(Register r);
   void PopRegister(Register r);
 
+  void PushRegisterPair(Register r0, Register r1) {
+    PushRegister(r1);
+    PushRegister(r0);
+  }
+  void PopRegisterPair(Register r0, Register r1) {
+    PopRegister(r0);
+    PopRegister(r1);
+  }
+
   void AddImmediate(Register reg, const Immediate& imm);
   void SubImmediate(Register reg, const Immediate& imm);
 
@@ -809,15 +818,6 @@ class Assembler : public AssemblerBase {
                             Register temp_reg,
                             Label* trace,
                             bool near_jump);
-
-  void UpdateAllocationStats(intptr_t cid, Register temp_reg);
-
-  void UpdateAllocationStatsWithSize(intptr_t cid,
-                                     Register size_reg,
-                                     Register temp_reg);
-  void UpdateAllocationStatsWithSize(intptr_t cid,
-                                     intptr_t instance_size,
-                                     Register temp_reg);
 
   // Inlined allocation of an instance of class 'cls', code has no runtime
   // calls. Jump to 'failure' if the instance cannot be allocated here.

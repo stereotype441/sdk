@@ -10,7 +10,7 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/dart/element/type_system.dart';
 import 'package:analyzer/src/dart/element/type.dart';
-import 'package:analyzer/src/generated/type_system.dart' show Dart2TypeSystem;
+import 'package:analyzer/src/generated/type_system.dart' show TypeSystemImpl;
 import 'package:analyzer/src/generated/variable_type_provider.dart';
 
 /// Data gathered by flow analysis, retained for testing purposes.
@@ -283,7 +283,7 @@ class FlowAnalysisHelper {
 
 class TypeSystemTypeOperations
     implements TypeOperations<PromotableElement, DartType> {
-  final Dart2TypeSystem typeSystem;
+  final TypeSystemImpl typeSystem;
 
   TypeSystemTypeOperations(this.typeSystem);
 
@@ -491,7 +491,7 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
       } else if (forLoopParts is ForPartsWithDeclarations) {
         forLoopParts.variables?.accept(this);
       } else {
-        throw new StateError('Unrecognized for loop parts');
+        throw StateError('Unrecognized for loop parts');
       }
 
       assignedVariables.beginNode();
@@ -514,13 +514,13 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
         assignedVariables.declare(variable);
         assignedVariables.write(variable);
       } else {
-        throw new StateError('Unrecognized for loop parts');
+        throw StateError('Unrecognized for loop parts');
       }
       assignedVariables.beginNode();
       body.accept(this);
       assignedVariables.endNode(node);
     } else {
-      throw new StateError('Unrecognized for loop parts');
+      throw StateError('Unrecognized for loop parts');
     }
   }
 }

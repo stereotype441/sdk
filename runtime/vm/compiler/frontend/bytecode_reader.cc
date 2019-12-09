@@ -489,10 +489,12 @@ void BytecodeReaderHelper::ReadClosureDeclaration(const Function& function,
     closure.set_modifier(RawFunction::kSyncGen);
   } else if ((flags & kIsAsyncFlag) != 0) {
     closure.set_modifier(RawFunction::kAsync);
-    closure.set_is_inlinable(!FLAG_causal_async_stacks);
+    closure.set_is_inlinable(!FLAG_causal_async_stacks &&
+                             !FLAG_lazy_async_stacks);
   } else if ((flags & kIsAsyncStarFlag) != 0) {
     closure.set_modifier(RawFunction::kAsyncGen);
-    closure.set_is_inlinable(!FLAG_causal_async_stacks);
+    closure.set_is_inlinable(!FLAG_causal_async_stacks &&
+                             !FLAG_lazy_async_stacks);
   }
   if (Function::Cast(parent).IsAsyncOrGenerator()) {
     closure.set_is_generated_body(true);
@@ -502,11 +504,12 @@ void BytecodeReaderHelper::ReadClosureDeclaration(const Function& function,
   closures_->SetAt(closureIndex, closure);
 
   Type& signature_type = Type::Handle(
-      Z, ReadFunctionSignature(
-             closure, (flags & kHasOptionalPositionalParamsFlag) != 0,
-             (flags & kHasOptionalNamedParamsFlag) != 0,
-             (flags & kHasTypeParamsFlag) != 0,
-             /* has_positional_param_names = */ true, kNonNullable));
+      Z, ReadFunctionSignature(closure,
+                               (flags & kHasOptionalPositionalParamsFlag) != 0,
+                               (flags & kHasOptionalNamedParamsFlag) != 0,
+                               (flags & kHasTypeParamsFlag) != 0,
+                               /* has_positional_param_names = */ true,
+                               Nullability::kNonNullable));
 
   closure.SetSignatureType(signature_type);
 
@@ -970,10 +973,12 @@ void BytecodeReaderHelper::ReadExceptionsTable(const Bytecode& bytecode,
       }
       pc_descriptors_list->AddDescriptor(RawPcDescriptors::kOther, start_pc,
                                          DeoptId::kNone,
-                                         TokenPosition::kNoSource, try_index);
+                                         TokenPosition::kNoSource, try_index,
+                                         RawPcDescriptors::kInvalidYieldIndex);
       pc_descriptors_list->AddDescriptor(RawPcDescriptors::kOther, end_pc,
                                          DeoptId::kNone,
-                                         TokenPosition::kNoSource, try_index);
+                                         TokenPosition::kNoSource, try_index,
+                                         RawPcDescriptors::kInvalidYieldIndex);
 
       // The exception handler keeps a zone handle of the types array, rather
       // than a raw pointer. Do not share the handle across iterations to avoid
@@ -1019,7 +1024,7 @@ void BytecodeReaderHelper::ReadLocalVariables(const Bytecode& bytecode,
 
 RawTypedData* BytecodeReaderHelper::NativeEntry(const Function& function,
                                                 const String& external_name) {
-  MethodRecognizer::Kind kind = MethodRecognizer::RecognizeKind(function);
+  MethodRecognizer::Kind kind = function.recognized_kind();
   // This list of recognized methods must be kept in sync with the list of
   // methods handled specially by the NativeCall bytecode in the interpreter.
   switch (kind) {
@@ -1508,7 +1513,7 @@ RawObject* BytecodeReaderHelper::ReadObjectContents(uint32_t header) {
       const Nullability nullability =
           bytecode_component_->GetVersion() >= 24
               ? static_cast<Nullability>((flags & kNullabilityMask) / kFlagBit4)
-              : kLegacy;
+              : Nullability::kLegacy;
       return ReadType(tag, nullability);
     }
     default:
@@ -1669,14 +1674,7 @@ RawObject* BytecodeReaderHelper::ReadType(intptr_t tag,
       if (!cls.is_declaration_loaded()) {
         LoadReferencedClass(cls);
       }
-      Type& type = Type::Handle(Z, cls.DeclarationType());
-      // TODO(regis): Remove this workaround once nullability of Null provided
-      // by CFE is always kNullable.
-      if (type.IsNullType()) {
-        ASSERT(type.IsNullable());
-        return type.raw();
-      }
-      return type.ToNullability(nullability, Heap::kOld);
+      return cls.DeclarationType(nullability);
     }
     case kTypeParameter: {
       Object& parent = Object::Handle(Z, ReadObject());
@@ -1710,9 +1708,9 @@ RawObject* BytecodeReaderHelper::ReadType(intptr_t tag,
       }
       const TypeArguments& type_arguments =
           TypeArguments::CheckedHandle(Z, ReadObject());
-      const Type& type = Type::Handle(
-          Z, Type::New(cls, type_arguments, TokenPosition::kNoSource));
-      type.set_nullability(nullability);
+      const Type& type =
+          Type::Handle(Z, Type::New(cls, type_arguments,
+                                    TokenPosition::kNoSource, nullability));
       type.SetIsFinalized();
       return type.Canonicalize();
     }
@@ -1742,9 +1740,9 @@ RawObject* BytecodeReaderHelper::ReadType(intptr_t tag,
       pending_recursive_types_->SetLength(id);
       pending_recursive_types_ = saved_pending_recursive_types;
 
-      Type& type = Type::Handle(
-          Z, Type::New(cls, type_arguments, TokenPosition::kNoSource));
-      type.set_nullability(nullability);
+      Type& type =
+          Type::Handle(Z, Type::New(cls, type_arguments,
+                                    TokenPosition::kNoSource, nullability));
       type_ref.set_type(type);
       type.SetIsFinalized();
       if (id != 0) {
@@ -1956,7 +1954,7 @@ void BytecodeReaderHelper::ReadFieldDeclarations(const Class& cls,
                                                  bool discard_fields) {
   // Field flags, must be in sync with FieldDeclaration constants in
   // pkg/vm/lib/bytecode/declarations.dart.
-  const int kHasInitializerFlag = 1 << 0;
+  const int kHasNontrivialInitializerFlag = 1 << 0;
   const int kHasGetterFlag = 1 << 1;
   const int kHasSetterFlag = 1 << 2;
   const int kIsReflectableFlag = 1 << 3;
@@ -1973,6 +1971,7 @@ void BytecodeReaderHelper::ReadFieldDeclarations(const Class& cls,
   const int kHasAttributesFlag = 1 << 14;
   const int kIsLateFlag = 1 << 15;
   const int kIsExtensionMemberFlag = 1 << 16;
+  const int kHasInitializerFlag = 1 << 17;
 
   const int num_fields = reader_.ReadListLength();
   if ((num_fields == 0) && !cls.is_enum_class()) {
@@ -1993,9 +1992,12 @@ void BytecodeReaderHelper::ReadFieldDeclarations(const Class& cls,
     const bool is_static = (flags & kIsStaticFlag) != 0;
     const bool is_final = (flags & kIsFinalFlag) != 0;
     const bool is_const = (flags & kIsConstFlag) != 0;
-    const bool has_initializer = (flags & kHasInitializerFlag) != 0;
+    const bool is_late = (flags & kIsLateFlag) != 0;
+    const bool has_nontrivial_initializer =
+        (flags & kHasNontrivialInitializerFlag) != 0;
     const bool has_pragma = (flags & kHasPragmaFlag) != 0;
     const bool is_extension_member = (flags & kIsExtensionMemberFlag) != 0;
+    const bool has_initializer = (flags & kHasInitializerFlag) != 0;
 
     name ^= ReadObject();
     type ^= ReadObject();
@@ -2015,22 +2017,26 @@ void BytecodeReaderHelper::ReadFieldDeclarations(const Class& cls,
     }
 
     field = Field::New(name, is_static, is_final, is_const,
-                       (flags & kIsReflectableFlag) != 0, script_class, type,
-                       position, end_position);
+                       (flags & kIsReflectableFlag) != 0, is_late, script_class,
+                       type, position, end_position);
 
     field.set_is_declared_in_bytecode(true);
     field.set_has_pragma(has_pragma);
     field.set_is_covariant((flags & kIsCovariantFlag) != 0);
     field.set_is_generic_covariant_impl((flags & kIsGenericCovariantImplFlag) !=
                                         0);
-    field.set_has_initializer(has_initializer);
-    field.set_is_late((flags & kIsLateFlag) != 0);
+    field.set_has_nontrivial_initializer(has_nontrivial_initializer);
     field.set_is_extension_member(is_extension_member);
+    field.set_has_initializer(has_initializer);
 
-    if (!has_initializer) {
+    if (!has_nontrivial_initializer) {
       value ^= ReadObject();
       if (is_static) {
-        field.SetStaticValue(value, true);
+        if (field.is_late() && !has_initializer) {
+          field.SetStaticValue(Object::sentinel(), true);
+        } else {
+          field.SetStaticValue(value, true);
+        }
       } else {
         field.set_saved_initial_value(value);
         // Null-initialized instance fields are tracked separately for each
@@ -2072,7 +2078,7 @@ void BytecodeReaderHelper::ReadFieldDeclarations(const Class& cls,
       function.set_accessor_field(field);
       function.set_is_declared_in_bytecode(true);
       function.set_is_extension_member(is_extension_member);
-      if (is_const && has_initializer) {
+      if (is_const && has_nontrivial_initializer) {
         function.set_bytecode_offset(field.bytecode_offset());
       }
       H.SetupFieldAccessorFunction(cls, function, type);
@@ -2080,10 +2086,10 @@ void BytecodeReaderHelper::ReadFieldDeclarations(const Class& cls,
     }
 
     if ((flags & kHasSetterFlag) != 0) {
-      ASSERT((!is_static) && (!is_final) && (!is_const));
+      ASSERT(is_late || ((!is_static) && (!is_final)));
+      ASSERT(!is_const);
       name ^= ReadObject();
-      function = Function::New(name, RawFunction::kImplicitSetter,
-                               false,  // is_static
+      function = Function::New(name, RawFunction::kImplicitSetter, is_static,
                                false,  // is_const
                                false,  // is_abstract
                                false,  // is_external
@@ -2127,13 +2133,13 @@ void BytecodeReaderHelper::ReadFieldDeclarations(const Class& cls,
 
   if (cls.is_enum_class()) {
     // Add static field 'const _deleted_enum_sentinel'.
-    field =
-        Field::New(Symbols::_DeletedEnumSentinel(),
-                   /* is_static = */ true,
-                   /* is_final = */ true,
-                   /* is_const = */ true,
-                   /* is_reflectable = */ false, cls, Object::dynamic_type(),
-                   TokenPosition::kNoSource, TokenPosition::kNoSource);
+    field = Field::New(Symbols::_DeletedEnumSentinel(),
+                       /* is_static = */ true,
+                       /* is_final = */ true,
+                       /* is_const = */ true,
+                       /* is_reflectable = */ false,
+                       /* is_late = */ false, cls, Object::dynamic_type(),
+                       TokenPosition::kNoSource, TokenPosition::kNoSource);
 
     fields.SetAt(num_fields, field);
   }
@@ -2270,10 +2276,12 @@ void BytecodeReaderHelper::ReadFunctionDeclarations(const Class& cls) {
       function.set_modifier(RawFunction::kSyncGen);
     } else if ((flags & kIsAsyncFlag) != 0) {
       function.set_modifier(RawFunction::kAsync);
-      function.set_is_inlinable(!FLAG_causal_async_stacks);
+      function.set_is_inlinable(!FLAG_causal_async_stacks &&
+                                !FLAG_lazy_async_stacks);
     } else if ((flags & kIsAsyncStarFlag) != 0) {
       function.set_modifier(RawFunction::kAsyncGen);
-      function.set_is_inlinable(!FLAG_causal_async_stacks);
+      function.set_is_inlinable(!FLAG_causal_async_stacks &&
+                                !FLAG_lazy_async_stacks);
     }
 
     if ((flags & kHasTypeParamsFlag) != 0) {
@@ -3670,7 +3678,7 @@ bool IsStaticFieldGetterGeneratedAsInitializer(const Function& function,
 
   const auto& field = Field::Handle(zone, function.accessor_field());
   return field.is_declared_in_bytecode() && field.is_const() &&
-         field.has_initializer();
+         field.has_nontrivial_initializer();
 }
 
 }  // namespace kernel

@@ -26,7 +26,7 @@ main() {
 abstract class BaseExtensionMethodsTest extends DriverResolutionTest {
   @override
   AnalysisOptionsImpl get analysisOptions => AnalysisOptionsImpl()
-    ..contextFeatures = new FeatureSet.forTesting(
+    ..contextFeatures = FeatureSet.forTesting(
         sdkVersion: '2.3.0', additionalFeatures: [Feature.extension_methods]);
 }
 
@@ -302,15 +302,13 @@ extension E on C {
   int get a => 1;
 }
 ''');
-    await assertErrorsInCode('''
+    await assertNoErrorsInCode('''
 import 'lib.dart' as p;
 
 f(p.C c) {
   c.a;
 }
-''', [
-      error(StaticTypeWarningCode.UNDEFINED_GETTER, 40, 1),
-    ]);
+''');
   }
 }
 
@@ -320,7 +318,7 @@ f(p.C c) {
 class ExtensionMethodsDeclarationWithNnbdTest extends BaseExtensionMethodsTest {
   @override
   AnalysisOptionsImpl get analysisOptions => AnalysisOptionsImpl()
-    ..contextFeatures = new FeatureSet.forTesting(
+    ..contextFeatures = FeatureSet.forTesting(
         sdkVersion: '2.6.0', additionalFeatures: [Feature.non_nullable]);
 
   @override

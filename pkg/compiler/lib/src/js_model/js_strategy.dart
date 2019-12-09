@@ -252,7 +252,7 @@ class JsBackendStrategy implements BackendStrategy {
     ElementEnvironment elementEnvironment = closedWorld.elementEnvironment;
     CommonElements commonElements = closedWorld.commonElements;
     BackendImpacts impacts =
-        new BackendImpacts(commonElements, _compiler.options.experimentNewRti);
+        new BackendImpacts(commonElements, _compiler.options);
     _customElementsCodegenAnalysis = new CustomElementsCodegenAnalysis(
         commonElements, elementEnvironment, closedWorld.nativeData);
     return new CodegenEnqueuer(
@@ -306,13 +306,12 @@ class JsBackendStrategy implements BackendStrategy {
     emitterTask.createEmitter(_namer, codegen, closedWorld);
     // TODO(johnniwinther): Share the impact object created in
     // createCodegenEnqueuer.
-    BackendImpacts impacts = new BackendImpacts(
-        closedWorld.commonElements, _compiler.options.experimentNewRti);
+    BackendImpacts impacts =
+        new BackendImpacts(closedWorld.commonElements, _compiler.options);
 
     _codegenImpactTransformer = new CodegenImpactTransformer(
         closedWorld,
         closedWorld.elementEnvironment,
-        closedWorld.commonElements,
         impacts,
         closedWorld.nativeData,
         closedWorld.backendUsage,
@@ -413,7 +412,7 @@ class JsBackendStrategy implements BackendStrategy {
   EntityWriter forEachCodegenMember(void Function(MemberEntity member) f) {
     int earlyMemberIndexLimit = _elementMap.prepareForCodegenSerialization();
     ClosedEntityWriter entityWriter =
-        new ClosedEntityWriter(_elementMap, earlyMemberIndexLimit);
+        new ClosedEntityWriter(earlyMemberIndexLimit);
     for (int memberIndex = 0;
         memberIndex < _elementMap.members.length;
         memberIndex++) {

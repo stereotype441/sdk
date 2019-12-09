@@ -24,13 +24,13 @@ import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
+import 'package:analyzer/dart/element/type_system.dart';
 import 'package:analyzer/src/dart/analysis/session_helper.dart';
 import 'package:analyzer/src/dart/ast/utilities.dart';
 import 'package:analyzer/src/generated/java_core.dart';
-import 'package:analyzer/src/generated/resolver.dart' show ExitDetector;
-import 'package:analyzer/src/generated/resolver.dart';
+import 'package:analyzer/src/generated/resolver.dart'
+    show ExitDetector, TypeProvider;
 import 'package:analyzer/src/generated/source.dart';
-import 'package:analyzer/src/generated/type_system.dart';
 import 'package:analyzer_plugin/utilities/range_factory.dart';
 
 const String _TOKEN_SEPARATOR = '\uFFFF';
@@ -758,7 +758,7 @@ class ExtractMethodRefactoringImpl extends RefactoringImpl
     }
     // maybe ends with "return" statement
     if (_selectionStatements != null) {
-      TypeSystem typeSystem = await resolveResult.session.typeSystem;
+      TypeSystem typeSystem = await resolveResult.typeSystem;
       _ReturnTypeComputer returnTypeComputer =
           new _ReturnTypeComputer(typeSystem);
       _selectionStatements.forEach((statement) {
@@ -799,7 +799,7 @@ class ExtractMethodRefactoringImpl extends RefactoringImpl
   Future<void> _initializeReturnType() async {
     // TODO(brianwilkerson) Determine whether this await is necessary.
     await null;
-    TypeProvider typeProvider = await resolveResult.session.typeProvider;
+    TypeProvider typeProvider = await resolveResult.typeProvider;
     if (_selectionFunctionExpression != null) {
       variableType = '';
       returnType = '';
@@ -1375,7 +1375,7 @@ class _ReturnTypeComputer extends RecursiveAstVisitor {
       if (returnType is InterfaceType && type is InterfaceType) {
         returnType = InterfaceType.getSmartLeastUpperBound(returnType, type);
       } else {
-        returnType = typeSystem.getLeastUpperBound(returnType, type);
+        returnType = typeSystem.leastUpperBound(returnType, type);
       }
     }
   }

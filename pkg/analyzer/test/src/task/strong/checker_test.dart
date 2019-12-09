@@ -146,7 +146,7 @@ class A {
   static const num n = 3.0;
   // The severe error is from constant evaluation where we know the
   // concrete type.
-  static const int /*error:VARIABLE_TYPE_MISMATCH*/i = /*info:ASSIGNMENT_CAST*/n;
+  static const int i = /*info:ASSIGNMENT_CAST, error:VARIABLE_TYPE_MISMATCH*/n;
   final int fi;
   const A(num a) : this.fi = /*info:DOWN_CAST_IMPLICIT*/a;
 }
@@ -184,7 +184,7 @@ abstract class I1 {
     m(A a);
 }
 
-class /*error:NON_ABSTRACT_CLASS_INHERITS_ABSTRACT_MEMBER_ONE*/Base
+class /*error:NON_ABSTRACT_CLASS_INHERITS_ABSTRACT_MEMBER*/Base
     implements I1 {}
 
 class T1 extends Base {
@@ -752,7 +752,7 @@ class Child extends Base {
   dynamic get /*error:INVALID_OVERRIDE*/f4 => null;
 }
 
-class /*error:NON_ABSTRACT_CLASS_INHERITS_ABSTRACT_MEMBER_FOUR*/Child2 implements Base {
+class /*error:NON_ABSTRACT_CLASS_INHERITS_ABSTRACT_MEMBER*/Child2 implements Base {
   A get /*error:INVALID_OVERRIDE*/f1 => null;
   C get f2 => null;
   get f3 => null;
@@ -2605,15 +2605,15 @@ class T4 extends Base {
   B /*error:INVALID_OVERRIDE, error:INVALID_OVERRIDE*/f;
 }
 
-class /*error:NON_ABSTRACT_CLASS_INHERITS_ABSTRACT_MEMBER_ONE*/T5 implements Base {
+class /*error:NON_ABSTRACT_CLASS_INHERITS_ABSTRACT_MEMBER*/T5 implements Base {
   /**/B get /*error:INVALID_OVERRIDE, error:MISMATCHED_GETTER_AND_SETTER_TYPES*/f => null;
 }
 
-class /*error:NON_ABSTRACT_CLASS_INHERITS_ABSTRACT_MEMBER_ONE*/T6 implements Base {
+class /*error:NON_ABSTRACT_CLASS_INHERITS_ABSTRACT_MEMBER*/T6 implements Base {
   set /*error:INVALID_OVERRIDE, error:MISMATCHED_GETTER_AND_SETTER_TYPES*/f(B b) => null;
 }
 
-class /*error:NON_ABSTRACT_CLASS_INHERITS_ABSTRACT_MEMBER_ONE*/T7 implements Base {
+class /*error:NON_ABSTRACT_CLASS_INHERITS_ABSTRACT_MEMBER*/T7 implements Base {
   final B /*error:INVALID_OVERRIDE, error:MISMATCHED_GETTER_AND_SETTER_TYPES*/f = null;
 }
 class T8 implements Base {
@@ -3433,7 +3433,7 @@ abstract class I1 {
     m(A a);
 }
 
-class /*error:NON_ABSTRACT_CLASS_INHERITS_ABSTRACT_MEMBER_ONE*/Base
+class /*error:NON_ABSTRACT_CLASS_INHERITS_ABSTRACT_MEMBER*/Base
     implements I1 {}
 
 class M {

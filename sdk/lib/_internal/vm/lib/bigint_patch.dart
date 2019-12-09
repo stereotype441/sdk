@@ -2,6 +2,8 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+// @dart = 2.6
+
 // part of dart.core;
 
 // Copyright 2009 The Go Authors. All rights reserved.
@@ -93,6 +95,18 @@ class _BigIntImpl implements BigInt {
   static final _BigIntImpl _oneBillion = new _BigIntImpl._fromInt(1000000000);
   static const int _minInt = -0x8000000000000000;
   static const int _maxInt = 0x7fffffffffffffff;
+
+  /// Certain methods of _BigIntImpl class are intrinsified by the VM
+  /// depending on the runtime flags. They return number of processed
+  /// digits (2) which is different from non-intrinsic implementation (1).
+  /// This flag is used to confuse constant propagation at compile time and
+  /// avoid propagating return value to the callers. It should not be
+  /// evaluated to a constant.
+  /// Note that [_isIntrinsified] is still false if intrinsification occurs,
+  /// so it should be used only inside methods which are replaced by
+  /// intrinsification.
+  static final bool _isIntrinsified =
+      new bool.fromEnvironment('dart.vm.not.a.compile.time.constant');
 
   // Result cache for last _divRem call.
   // Result cache for last _divRem call.
@@ -1112,7 +1126,7 @@ class _BigIntImpl implements BigInt {
     int x = xDigits[xIndex];
     if (x == 0) {
       // No-op if x is 0.
-      return 1;
+      return _isIntrinsified ? 2 : 1;
     }
     int carry = 0;
     int xl = x & _halfDigitMask;
@@ -1133,7 +1147,7 @@ class _BigIntImpl implements BigInt {
       carry = l >> _digitBits;
       accumulatorDigits[j++] = l & _digitMask;
     }
-    return 1;
+    return _isIntrinsified ? 2 : 1;
   }
 
   /// Multiplies `xDigits[i]` with `xDigits` and adds the result to
@@ -1156,7 +1170,7 @@ class _BigIntImpl implements BigInt {
   static int _sqrAdd(
       Uint32List xDigits, int i, Uint32List acculumatorDigits, int used) {
     int x = xDigits[i];
-    if (x == 0) return 1;
+    if (x == 0) return _isIntrinsified ? 2 : 1;
     int j = 2 * i;
     int carry = 0;
     int xl = x & _halfDigitMask;
@@ -1191,7 +1205,7 @@ class _BigIntImpl implements BigInt {
     } else {
       acculumatorDigits[i + used] = carry;
     }
-    return 1;
+    return _isIntrinsified ? 2 : 1;
   }
 
   /// Multiplication operator.
@@ -1291,7 +1305,7 @@ class _BigIntImpl implements BigInt {
         args[_quotientDigit] = quotientDigit;
       }
     }
-    return 1;
+    return _isIntrinsified ? 2 : 1;
   }
 
   /// Returns `trunc(this / other)`, with `other != 0`.
@@ -2625,7 +2639,7 @@ class _BigIntMontgomeryReduction implements _BigIntReduction {
             (((dl * rhoh + dh * rhol) & _BigIntImpl._halfDigitMask) <<
                 _BigIntImpl._halfDigitBits)) &
         _BigIntImpl._digitMask;
-    return 1;
+    return _BigIntImpl._isIntrinsified ? 2 : 1;
   }
 
   // result = x*R mod _modulus.

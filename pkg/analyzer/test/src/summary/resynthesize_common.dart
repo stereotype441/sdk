@@ -27,13 +27,13 @@ import 'test_strategies.dart';
  * The return type separator: →
  */
 abstract class AbstractResynthesizeTest with ResourceProviderMixin {
-  DeclaredVariables declaredVariables = new DeclaredVariables();
+  DeclaredVariables declaredVariables = DeclaredVariables();
   SourceFactory sourceFactory;
   MockSdk sdk;
 
   String testFile;
   Source testSource;
-  Set<Source> otherLibrarySources = new Set<Source>();
+  Set<Source> otherLibrarySources = Set<Source>();
 
   /**
    * Tests may set this to `true` to indicate that a missing file at the time of
@@ -42,7 +42,7 @@ abstract class AbstractResynthesizeTest with ResourceProviderMixin {
   bool allowMissingFiles = false;
 
   AbstractResynthesizeTest() {
-    sdk = new MockSdk(resourceProvider: resourceProvider);
+    sdk = MockSdk(resourceProvider: resourceProvider);
 
     sourceFactory = SourceFactory(
       [
@@ -1639,6 +1639,38 @@ notSimplyBounded class C<T extends List<U>, U> {
     var library = await checkLibrary('class C<T extends U, U> {}');
     checkElementText(library, r'''
 notSimplyBounded class C<T extends U, U> {
+}
+''');
+  }
+
+  test_class_type_parameters_variance_covariant() async {
+    var library = await checkLibrary('class C<out T> {}');
+    checkElementText(library, r'''
+class C<out T> {
+}
+''');
+  }
+
+  test_class_type_parameters_variance_contravariant() async {
+    var library = await checkLibrary('class C<in T> {}');
+    checkElementText(library, r'''
+class C<in T> {
+}
+''');
+  }
+
+  test_class_type_parameters_variance_invariant() async {
+    var library = await checkLibrary('class C<inout T> {}');
+    checkElementText(library, r'''
+class C<inout T> {
+}
+''');
+  }
+
+  test_class_type_parameters_variance_multiple() async {
+    var library = await checkLibrary('class C<inout T, in U, out V> {}');
+    checkElementText(library, r'''
+class C<inout T, in U, out V> {
 }
 ''');
   }
@@ -5472,7 +5504,7 @@ Exports:
   }
 
   test_export_configurations_useDefault() async {
-    declaredVariables = new DeclaredVariables.fromMap({
+    declaredVariables = DeclaredVariables.fromMap({
       'dart.library.io': 'false',
     });
     addLibrarySource('/foo.dart', 'class A {}');
@@ -5497,7 +5529,7 @@ Exports:
   }
 
   test_export_configurations_useFirst() async {
-    declaredVariables = new DeclaredVariables.fromMap({
+    declaredVariables = DeclaredVariables.fromMap({
       'dart.library.io': 'true',
       'dart.library.html': 'true',
     });
@@ -5523,7 +5555,7 @@ Exports:
   }
 
   test_export_configurations_useSecond() async {
-    declaredVariables = new DeclaredVariables.fromMap({
+    declaredVariables = DeclaredVariables.fromMap({
       'dart.library.io': 'false',
       'dart.library.html': 'true',
     });
@@ -5730,7 +5762,7 @@ Exports:
   }
 
   test_exportImport_configurations_useDefault() async {
-    declaredVariables = new DeclaredVariables.fromMap({
+    declaredVariables = DeclaredVariables.fromMap({
       'dart.library.io': 'false',
     });
     addLibrarySource('/foo.dart', 'class A {}');
@@ -5755,7 +5787,7 @@ class B extends A {
   }
 
   test_exportImport_configurations_useFirst() async {
-    declaredVariables = new DeclaredVariables.fromMap({
+    declaredVariables = DeclaredVariables.fromMap({
       'dart.library.io': 'true',
       'dart.library.html': 'false',
     });
@@ -5781,7 +5813,7 @@ class B extends A {
   }
 
   test_exportImport_configurations_useSecond() async {
-    declaredVariables = new DeclaredVariables.fromMap({
+    declaredVariables = DeclaredVariables.fromMap({
       'dart.library.io': 'false',
       'dart.library.html': 'true',
     });
@@ -6602,7 +6634,7 @@ int get x {}
   }
 
   test_import_configurations_useDefault() async {
-    declaredVariables = new DeclaredVariables.fromMap({
+    declaredVariables = DeclaredVariables.fromMap({
       'dart.library.io': 'false',
     });
     addLibrarySource('/foo.dart', 'class A {}');
@@ -6625,7 +6657,7 @@ class B extends A {
   }
 
   test_import_configurations_useFirst() async {
-    declaredVariables = new DeclaredVariables.fromMap({
+    declaredVariables = DeclaredVariables.fromMap({
       'dart.library.io': 'true',
       'dart.library.html': 'true',
     });
@@ -6649,7 +6681,7 @@ class B extends A {
   }
 
   test_import_configurations_useFirst_eqTrue() async {
-    declaredVariables = new DeclaredVariables.fromMap({
+    declaredVariables = DeclaredVariables.fromMap({
       'dart.library.io': 'true',
       'dart.library.html': 'true',
     });
@@ -6673,7 +6705,7 @@ class B extends A {
   }
 
   test_import_configurations_useSecond() async {
-    declaredVariables = new DeclaredVariables.fromMap({
+    declaredVariables = DeclaredVariables.fromMap({
       'dart.library.io': 'false',
       'dart.library.html': 'true',
     });
@@ -6697,7 +6729,7 @@ class B extends A {
   }
 
   test_import_configurations_useSecond_eqTrue() async {
-    declaredVariables = new DeclaredVariables.fromMap({
+    declaredVariables = DeclaredVariables.fromMap({
       'dart.library.io': 'false',
       'dart.library.html': 'true',
     });
@@ -7510,6 +7542,75 @@ void f() {
     checkElementText(library, r'''
 void f() {}
 ''');
+  }
+
+  test_instanceInference_operator_equal_legacy() async {
+    var library = await checkLibrary(r'''
+class A1 {
+  bool operator==(other) => false;
+}
+class A2 {
+  bool operator==(int other) => false;
+}
+class B1 extends A1 {
+  bool operator==(other) => false;
+}
+class B2 extends A2 {
+  bool operator==(other) => false;
+}
+''');
+    checkElementText(
+        library,
+        r'''
+class A1 {
+  bool* ==(dynamic other) {}
+}
+class A2 {
+  bool* ==(int* other) {}
+}
+class B1 extends A1* {
+  bool* ==(dynamic other) {}
+}
+class B2 extends A2* {
+  bool* ==(int* other) {}
+}
+''',
+        annotateNullability: true);
+  }
+
+  test_instanceInference_operator_equal_nnbd() async {
+    featureSet = enableNnbd;
+    var library = await checkLibrary(r'''
+class A1 {
+  bool operator==(other) => false;
+}
+class A2 {
+  bool operator==(int other) => false;
+}
+class B1 extends A1 {
+  bool operator==(other) => false;
+}
+class B2 extends A2 {
+  bool operator==(other) => false;
+}
+''');
+    checkElementText(
+        library,
+        r'''
+class A1 {
+  bool ==(Object other) {}
+}
+class A2 {
+  bool ==(int other) {}
+}
+class B1 extends A1 {
+  bool ==(Object other) {}
+}
+class B2 extends A2 {
+  bool ==(int other) {}
+}
+''',
+        annotateNullability: true);
   }
 
   test_instantiateToBounds_boundRefersToEarlierTypeArgument() async {
@@ -9064,6 +9165,38 @@ class A {
 }
 mixin B on A {
   void A() {}
+}
+''');
+  }
+
+  test_mixin_type_parameters_variance_covariant() async {
+    var library = await checkLibrary('mixin M<out T> {}');
+    checkElementText(library, r'''
+mixin M<out T> on Object {
+}
+''');
+  }
+
+  test_mixin_type_parameters_variance_contravariant() async {
+    var library = await checkLibrary('mixin M<in T> {}');
+    checkElementText(library, r'''
+mixin M<in T> on Object {
+}
+''');
+  }
+
+  test_mixin_type_parameters_variance_invariant() async {
+    var library = await checkLibrary('mixin M<inout T> {}');
+    checkElementText(library, r'''
+mixin M<inout T> on Object {
+}
+''');
+  }
+
+  test_mixin_type_parameters_variance_multiple() async {
+    var library = await checkLibrary('mixin M<inout T, in U, out V> {}');
+    checkElementText(library, r'''
+mixin M<inout T, in U, out V> on Object {
 }
 ''');
   }
@@ -11295,7 +11428,7 @@ int j;
 /// to be applied to a class implementing [ResynthesizeTestStrategy].
 mixin ResynthesizeTestHelpers implements ResynthesizeTestStrategy {
   Future<LibraryElementImpl> checkLibrary(String text,
-      {bool allowErrors: false, bool dumpSummaries: false}) async {
+      {bool allowErrors = false, bool dumpSummaries = false}) async {
     throw 42;
 //    Source source = addTestSource(text);
 //    SummaryResynthesizer resynthesizer = encodeLibrary(source);

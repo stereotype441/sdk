@@ -103,6 +103,16 @@ Message _withArgumentsAccessError(String name) {
 }
 
 // DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const Code<Null> codeAnnotationOnFunctionTypeTypeVariable =
+    messageAnnotationOnFunctionTypeTypeVariable;
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const MessageCode messageAnnotationOnFunctionTypeTypeVariable =
+    const MessageCode("AnnotationOnFunctionTypeTypeVariable",
+        message:
+            r"""A type variable on a function type can't have annotations.""");
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
 const Code<Null> codeAnonymousBreakTargetOutsideFunction =
     messageAnonymousBreakTargetOutsideFunction;
 
@@ -1358,8 +1368,9 @@ const Code<Null> codeConstructorWithTypeParameters =
 // DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
 const MessageCode messageConstructorWithTypeParameters = const MessageCode(
     "ConstructorWithTypeParameters",
-    analyzerCodes: <String>["TYPE_PARAMETER_ON_CONSTRUCTOR"],
-    message: r"""Constructors can't have type parameters.""");
+    index: 99,
+    message: r"""Constructors can't have type parameters.""",
+    tip: r"""Try removing the type parameters.""");
 
 // DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
 const Code<Null> codeConstructorWithWrongName = messageConstructorWithWrongName;
@@ -1675,6 +1686,35 @@ const MessageCode messageDeferredAfterPrefix = const MessageCode(
     message:
         r"""The deferred keyword should come immediately before the prefix ('as' clause).""",
     tip: r"""Try moving the deferred keyword before the prefix.""");
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const Template<
+    Message Function(
+        String
+            name)> templateDeferredExtensionImport = const Template<
+        Message Function(String name)>(
+    messageTemplate:
+        r"""Extension '#name' cannot be imported through a deferred import.""",
+    tipTemplate: r"""Try adding the `hide #name` to the import.""",
+    withArguments: _withArgumentsDeferredExtensionImport);
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const Code<Message Function(String name)> codeDeferredExtensionImport =
+    const Code<Message Function(String name)>(
+  "DeferredExtensionImport",
+  templateDeferredExtensionImport,
+);
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+Message _withArgumentsDeferredExtensionImport(String name) {
+  if (name.isEmpty) throw 'No name provided';
+  name = demangleMixinApplicationName(name);
+  return new Message(codeDeferredExtensionImport,
+      message:
+          """Extension '${name}' cannot be imported through a deferred import.""",
+      tip: """Try adding the `hide ${name}` to the import.""",
+      arguments: {'name': name});
+}
 
 // DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
 const Template<
@@ -2895,6 +2935,27 @@ Message _withArgumentsExtendingRestricted(String name) {
 }
 
 // DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const Code<Null> codeExtendsFutureOr = messageExtendsFutureOr;
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const MessageCode messageExtendsFutureOr = const MessageCode("ExtendsFutureOr",
+    message: r"""The type 'FutureOr' can't be used in an 'extends' clause.""");
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const Code<Null> codeExtendsNever = messageExtendsNever;
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const MessageCode messageExtendsNever = const MessageCode("ExtendsNever",
+    message: r"""The type 'Never' can't be used in an 'extends' clause.""");
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const Code<Null> codeExtendsVoid = messageExtendsVoid;
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const MessageCode messageExtendsVoid = const MessageCode("ExtendsVoid",
+    message: r"""The type 'void' can't be used in an 'extends' clause.""");
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
 const Code<Null> codeExtensionDeclaresAbstractMember =
     messageExtensionDeclaresAbstractMember;
 
@@ -3864,7 +3925,15 @@ const Code<Null> codeImplementsFutureOr = messageImplementsFutureOr;
 // DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
 const MessageCode messageImplementsFutureOr = const MessageCode(
     "ImplementsFutureOr",
-    message: r"""'FutureOr' can't be used in an 'implements' clause.""");
+    message:
+        r"""The type 'FutureOr' can't be used in an 'implements' clause.""");
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const Code<Null> codeImplementsNever = messageImplementsNever;
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const MessageCode messageImplementsNever = const MessageCode("ImplementsNever",
+    message: r"""The type 'Never' can't be used in an 'implements' clause.""");
 
 // DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
 const Template<Message Function(String name, int count)>
@@ -3918,6 +3987,13 @@ Message _withArgumentsImplementsSuperClass(String name) {
       tip: """Try removing one of the occurrences.""",
       arguments: {'name': name});
 }
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const Code<Null> codeImplementsVoid = messageImplementsVoid;
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const MessageCode messageImplementsVoid = const MessageCode("ImplementsVoid",
+    message: r"""The type 'void' can't be used in an 'implements' clause.""");
 
 // DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
 const Template<
@@ -7857,6 +7933,14 @@ const MessageCode messageTypedefNotFunction = const MessageCode(
     "TypedefNotFunction",
     analyzerCodes: <String>["INVALID_GENERIC_FUNCTION_TYPE"],
     message: r"""Can't create typedef from non-function type.""");
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const Code<Null> codeTypedefNotType = messageTypedefNotType;
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const MessageCode messageTypedefNotType = const MessageCode("TypedefNotType",
+    analyzerCodes: <String>["INVALID_TYPE_IN_TYPEDEF"],
+    message: r"""Can't create typedef from non-type.""");
 
 // DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
 const Code<Null> codeUnexpectedDollarInString = messageUnexpectedDollarInString;

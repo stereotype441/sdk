@@ -139,6 +139,9 @@ void ReturnInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
   __ Bind(&stack_ok);
 #endif
   ASSERT(__ constant_pool_allowed());
+  if (yield_index() != RawPcDescriptors::kInvalidYieldIndex) {
+    compiler->EmitYieldPositionMetadata(token_pos(), yield_index());
+  }
   __ LeaveDartFrameAndReturn();  // Disallows constant pool use.
   // This ReturnInstr may be emitted out of order by the optimizer. The next
   // block may be a target expecting a properly set constant pool pointer.
@@ -963,19 +966,9 @@ void NativeCallInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
     entry = reinterpret_cast<uword>(native_c_function());
     if (is_bootstrap_native()) {
       stub = &StubCode::CallBootstrapNative();
-#if defined(USING_SIMULATOR)
-      entry = Simulator::RedirectExternalReference(
-          entry, Simulator::kBootstrapNativeCall, NativeEntry::kNumArguments);
-#endif
     } else if (is_auto_scope()) {
-      // In the case of non bootstrap native methods the CallNativeCFunction
-      // stub generates the redirection address when running under the simulator
-      // and hence we do not change 'entry' here.
       stub = &StubCode::CallAutoScopeNative();
     } else {
-      // In the case of non bootstrap native methods the CallNativeCFunction
-      // stub generates the redirection address when running under the simulator
-      // and hence we do not change 'entry' here.
       stub = &StubCode::CallNoScopeNative();
     }
   }
@@ -4959,7 +4952,7 @@ DEFINE_EMIT(Simd32x4GetSignMask,
 
 // Low (< 7) Q registers are needed for the vcvtsd instruction.
 // TODO(dartbug.com/30953) support register range constraints in the regalloc.
-DEFINE_EMIT(Float32x4Constructor,
+DEFINE_EMIT(Float32x4FromDoubles,
             (FixedQRegisterView<Q6> out,
              QRegisterView q0,
              QRegisterView q1,
@@ -5069,7 +5062,7 @@ DEFINE_EMIT(Float64x2Splat, (QRegisterView result, QRegisterView value)) {
   __ vmovd(result.d(1), value.d(0));
 }
 
-DEFINE_EMIT(Float64x2Constructor,
+DEFINE_EMIT(Float64x2FromDoubles,
             (QRegisterView r, QRegisterView q0, QRegisterView q1)) {
   __ vmovd(r.d(0), q0.d(0));
   __ vmovd(r.d(1), q1.d(0));
@@ -5166,7 +5159,7 @@ DEFINE_EMIT(Float64x2Binary,
   }
 }
 
-DEFINE_EMIT(Int32x4Constructor,
+DEFINE_EMIT(Int32x4FromInts,
             (QRegisterView result,
              Register v0,
              Register v1,
@@ -5177,7 +5170,7 @@ DEFINE_EMIT(Int32x4Constructor,
   __ vmovdrr(result.d(1), v2, v3);
 }
 
-DEFINE_EMIT(Int32x4BoolConstructor,
+DEFINE_EMIT(Int32x4FromBools,
             (QRegisterView result,
              Register v0,
              Register v1,
@@ -5312,7 +5305,7 @@ DEFINE_EMIT(Int32x4WithFlag,
   CASE(Float32x4GetSignMask)                                                   \
   CASE(Int32x4GetSignMask)                                                     \
   ____(Simd32x4GetSignMask)                                                    \
-  SIMPLE(Float32x4Constructor)                                                 \
+  SIMPLE(Float32x4FromDoubles)                                                 \
   SIMPLE(Float32x4Zero)                                                        \
   SIMPLE(Float32x4Splat)                                                       \
   SIMPLE(Float32x4Sqrt)                                                        \
@@ -5335,7 +5328,7 @@ DEFINE_EMIT(Int32x4WithFlag,
   ____(Simd64x2Shuffle)                                                        \
   SIMPLE(Float64x2Zero)                                                        \
   SIMPLE(Float64x2Splat)                                                       \
-  SIMPLE(Float64x2Constructor)                                                 \
+  SIMPLE(Float64x2FromDoubles)                                                 \
   SIMPLE(Float64x2ToFloat32x4)                                                 \
   SIMPLE(Float32x4ToFloat64x2)                                                 \
   SIMPLE(Float64x2GetSignMask)                                                 \
@@ -5349,8 +5342,8 @@ DEFINE_EMIT(Int32x4WithFlag,
   CASE(Float64x2Min)                                                           \
   CASE(Float64x2Max)                                                           \
   ____(Float64x2Binary)                                                        \
-  SIMPLE(Int32x4Constructor)                                                   \
-  SIMPLE(Int32x4BoolConstructor)                                               \
+  SIMPLE(Int32x4FromInts)                                                      \
+  SIMPLE(Int32x4FromBools)                                                     \
   CASE(Int32x4GetFlagX)                                                        \
   CASE(Int32x4GetFlagY)                                                        \
   CASE(Int32x4GetFlagZ)                                                        \

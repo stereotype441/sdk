@@ -8,6 +8,7 @@ import 'package:analyzer/dart/ast/standard_ast_factory.dart';
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
+import 'package:analyzer/src/dart/ast/ast_factory.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/generated/testing/token_factory.dart';
 import 'package:analyzer/src/generated/utilities_dart.dart';
@@ -283,9 +284,9 @@ class AstTestFactory {
           beginToken: TokenFactory.tokenFromType(TokenType.EOF),
           scriptTag:
               scriptTag == null ? null : AstTestFactory.scriptTag(scriptTag),
-          directives: directives == null ? new List<Directive>() : directives,
+          directives: directives == null ? List<Directive>() : directives,
           declarations: declarations == null
-              ? new List<CompilationUnitMember>()
+              ? List<CompilationUnitMember>()
               : declarations,
           endToken: TokenFactory.tokenFromType(TokenType.EOF),
           featureSet: null);
@@ -299,9 +300,9 @@ class AstTestFactory {
           beginToken: TokenFactory.tokenFromType(TokenType.EOF),
           scriptTag:
               scriptTag == null ? null : AstTestFactory.scriptTag(scriptTag),
-          directives: directives == null ? new List<Directive>() : directives,
+          directives: directives == null ? List<Directive>() : directives,
           declarations: declarations == null
-              ? new List<CompilationUnitMember>()
+              ? List<CompilationUnitMember>()
               : declarations,
           endToken: TokenFactory.tokenFromType(TokenType.EOF),
           featureSet: featureSet);
@@ -333,9 +334,7 @@ class AstTestFactory {
           initializers == null || initializers.isEmpty
               ? null
               : TokenFactory.tokenFromType(TokenType.PERIOD),
-          initializers == null
-              ? new List<ConstructorInitializer>()
-              : initializers,
+          initializers == null ? List<ConstructorInitializer>() : initializers,
           null,
           emptyFunctionBody());
 
@@ -364,9 +363,7 @@ class AstTestFactory {
           initializers == null || initializers.isEmpty
               ? null
               : TokenFactory.tokenFromType(TokenType.PERIOD),
-          initializers == null
-              ? new List<ConstructorInitializer>()
-              : initializers,
+          initializers == null ? List<ConstructorInitializer>() : initializers,
           null,
           body);
 
@@ -452,7 +449,7 @@ class AstTestFactory {
       String name, List<String> constantNames) {
     int count = constantNames.length;
     List<EnumConstantDeclaration> constants =
-        new List<EnumConstantDeclaration>(count);
+        List<EnumConstantDeclaration>(count);
     for (int i = 0; i < count; i++) {
       constants[i] = astFactory.enumConstantDeclaration(
           null, null, identifier3(constantNames[i]));
@@ -559,7 +556,7 @@ class AstTestFactory {
 
   static ForElement forElement(
           ForLoopParts forLoopParts, CollectionElement body,
-          {bool hasAwait: false}) =>
+          {bool hasAwait = false}) =>
       astFactory.forElement(
           awaitKeyword:
               hasAwait ? TokenFactory.tokenFromKeyword(Keyword.AWAIT) : null,
@@ -665,7 +662,7 @@ class AstTestFactory {
 
   static GenericFunctionType genericFunctionType(TypeAnnotation returnType,
           TypeParameterList typeParameters, FormalParameterList parameters,
-          {bool question: false}) =>
+          {bool question = false}) =>
       astFactory.genericFunctionType(returnType,
           TokenFactory.tokenFromString("Function"), typeParameters, parameters,
           question:
@@ -870,8 +867,7 @@ class AstTestFactory {
           TokenFactory.tokenFromType(TokenType.SEMICOLON));
 
   static LibraryDirective libraryDirective2(String libraryName) =>
-      libraryDirective(
-          new List<Annotation>(), libraryIdentifier2([libraryName]));
+      libraryDirective(List<Annotation>(), libraryIdentifier2([libraryName]));
 
   static LibraryIdentifier libraryIdentifier(
           List<SimpleIdentifier> components) =>
@@ -974,11 +970,11 @@ class AstTestFactory {
           body);
 
   static MethodDeclaration methodDeclaration4(
-          {bool external: false,
+          {bool external = false,
           Keyword modifier,
           TypeAnnotation returnType,
           Keyword property,
-          bool operator: false,
+          bool operator = false,
           String name,
           FormalParameterList parameters,
           FunctionBody body}) =>
@@ -1066,10 +1062,10 @@ class AstTestFactory {
           TokenFactory.tokenFromType(TokenType.SEMICOLON));
 
   static PartDirective partDirective2(String url) =>
-      partDirective(new List<Annotation>(), url);
+      partDirective(List<Annotation>(), url);
 
   static PartOfDirective partOfDirective(LibraryIdentifier libraryName) =>
-      partOfDirective2(new List<Annotation>(), libraryName);
+      partOfDirective2(List<Annotation>(), libraryName);
 
   static PartOfDirective partOfDirective2(
           List<Annotation> metadata, LibraryIdentifier libraryName) =>
@@ -1203,7 +1199,7 @@ class AstTestFactory {
 
   static SwitchCase switchCase(
           Expression expression, List<Statement> statements) =>
-      switchCase2(new List<Label>(), expression, statements);
+      switchCase2(List<Label>(), expression, statements);
 
   static SwitchCase switchCase2(List<Label> labels, Expression expression,
           List<Statement> statements) =>
@@ -1219,7 +1215,7 @@ class AstTestFactory {
           statements);
 
   static SwitchDefault switchDefault2(List<Statement> statements) =>
-      switchDefault(new List<Label>(), statements);
+      switchDefault(List<Label>(), statements);
 
   static SwitchStatement switchStatement(
           Expression expression, List<SwitchMember> members) =>
@@ -1233,7 +1229,7 @@ class AstTestFactory {
           TokenFactory.tokenFromType(TokenType.CLOSE_CURLY_BRACKET));
 
   static SymbolLiteral symbolLiteral(List<String> components) {
-    List<Token> identifierList = new List<Token>();
+    List<Token> identifierList = List<Token>();
     for (String component in components) {
       identifierList.add(
           TokenFactory.tokenFromTypeAndString(TokenType.IDENTIFIER, component));
@@ -1284,7 +1280,7 @@ class AstTestFactory {
           TokenFactory.tokenFromType(TokenType.SEMICOLON));
 
   static TryStatement tryStatement(Block body, Block finallyClause) =>
-      tryStatement3(body, new List<CatchClause>(), finallyClause);
+      tryStatement3(body, List<CatchClause>(), finallyClause);
 
   static TryStatement tryStatement2(
           Block body, List<CatchClause> catchClauses) =>
@@ -1360,10 +1356,21 @@ class AstTestFactory {
       astFactory.typeParameter(null, null, identifier3(name),
           TokenFactory.tokenFromKeyword(Keyword.EXTENDS), bound);
 
+  static TypeParameter typeParameter3(String name, String varianceLexeme) =>
+      // TODO (kallentu) : Clean up AstFactoryImpl casting once variance is
+      // added to the interface.
+      (astFactory as AstFactoryImpl).typeParameter2(
+          comment: null,
+          metadata: null,
+          name: identifier3(name),
+          extendsKeyword: null,
+          bound: null,
+          varianceKeyword: TokenFactory.tokenFromString(varianceLexeme));
+
   static TypeParameterList typeParameterList([List<String> typeNames]) {
     List<TypeParameter> typeParameters;
     if (typeNames != null && typeNames.isNotEmpty) {
-      typeParameters = new List<TypeParameter>();
+      typeParameters = List<TypeParameter>();
       for (String typeName in typeNames) {
         typeParameters.add(typeParameter(typeName));
       }

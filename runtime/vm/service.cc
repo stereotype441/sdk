@@ -2870,6 +2870,12 @@ static const MethodParameter* evaluate_compiled_expression_params[] = {
     NULL,
 };
 
+RawExternalTypedData* DecodeKernelBuffer(const char* kernel_buffer_base64) {
+  intptr_t kernel_length;
+  uint8_t* kernel_buffer = DecodeBase64(kernel_buffer_base64, &kernel_length);
+  return ExternalTypedData::NewFinalizeWithFree(kernel_buffer, kernel_length);
+}
+
 static bool EvaluateCompiledExpression(Thread* thread, JSONStream* js) {
   if (CheckDebuggerDisabled(thread, js)) {
     return true;
@@ -2898,9 +2904,8 @@ static bool EvaluateCompiledExpression(Thread* thread, JSONStream* js) {
   const GrowableObjectArray& type_params_names =
       GrowableObjectArray::Handle(zone, GrowableObjectArray::New());
 
-  intptr_t kernel_length;
-  const char* kernel_bytes_str = js->LookupParam("kernelBytes");
-  uint8_t* kernel_bytes = DecodeBase64(zone, kernel_bytes_str, &kernel_length);
+  const ExternalTypedData& kernel_data = ExternalTypedData::Handle(
+      zone, DecodeKernelBuffer(js->LookupParam("kernelBytes")));
 
   if (js->HasParam("frameIndex")) {
     DebuggerStackTrace* stack = isolate->debugger()->StackTrace();
@@ -2918,7 +2923,7 @@ static bool EvaluateCompiledExpression(Thread* thread, JSONStream* js) {
     const Object& result = Object::Handle(
         zone,
         frame->EvaluateCompiledExpression(
-            kernel_bytes, kernel_length,
+            kernel_data,
             Array::Handle(zone, Array::MakeFixedLength(type_params_names)),
             Array::Handle(zone, Array::MakeFixedLength(param_values)),
             type_arguments));
@@ -2951,7 +2956,7 @@ static bool EvaluateCompiledExpression(Thread* thread, JSONStream* js) {
       const Object& result = Object::Handle(
           zone,
           lib.EvaluateCompiledExpression(
-              kernel_bytes, kernel_length,
+              kernel_data,
               Array::Handle(zone, Array::MakeFixedLength(type_params_names)),
               Array::Handle(zone, Array::MakeFixedLength(param_values)),
               type_arguments));
@@ -2963,7 +2968,7 @@ static bool EvaluateCompiledExpression(Thread* thread, JSONStream* js) {
       const Object& result = Object::Handle(
           zone,
           cls.EvaluateCompiledExpression(
-              kernel_bytes, kernel_length,
+              kernel_data,
               Array::Handle(zone, Array::MakeFixedLength(type_params_names)),
               Array::Handle(zone, Array::MakeFixedLength(param_values)),
               type_arguments));
@@ -2978,7 +2983,7 @@ static bool EvaluateCompiledExpression(Thread* thread, JSONStream* js) {
       const Object& result = Object::Handle(
           zone,
           instance.EvaluateCompiledExpression(
-              receiver_cls, kernel_bytes, kernel_length,
+              receiver_cls, kernel_data,
               Array::Handle(zone, Array::MakeFixedLength(type_params_names)),
               Array::Handle(zone, Array::MakeFixedLength(param_values)),
               type_arguments));
@@ -3201,12 +3206,15 @@ static bool ReloadSources(Thread* thread, JSONStream* js) {
     return true;
   }
 
-  Isolate* isolate = thread->isolate();
-  if (!isolate->HasTagHandler()) {
+  IsolateGroup* isolate_group = thread->isolate_group();
+  if (isolate_group->library_tag_handler() == nullptr) {
     js->PrintError(kFeatureDisabled,
                    "A library tag handler must be installed.");
     return true;
   }
+  // TODO(dartbug.com/36097): We need to change the "reloadSources" service-api
+  // call to accept an isolate group instead of an isolate.
+  Isolate* isolate = thread->isolate();
   if ((isolate->sticky_error() != Error::null()) ||
       (Thread::Current()->sticky_error() != Error::null())) {
     js->PrintError(kIsolateReloadBarred,
@@ -3214,7 +3222,7 @@ static bool ReloadSources(Thread* thread, JSONStream* js) {
                    "was an unhandled exception error. Restart the isolate.");
     return true;
   }
-  if (isolate->IsReloading()) {
+  if (isolate_group->IsReloading()) {
     js->PrintError(kIsolateIsReloading, "This isolate is being reloaded.");
     return true;
   }
@@ -3226,8 +3234,8 @@ static bool ReloadSources(Thread* thread, JSONStream* js) {
   const bool force_reload =
       BoolParameter::Parse(js->LookupParam("force"), false);
 
-  isolate->ReloadSources(js, force_reload, js->LookupParam("rootLibUri"),
-                         js->LookupParam("packagesUri"));
+  isolate_group->ReloadSources(js, force_reload, js->LookupParam("rootLibUri"),
+                               js->LookupParam("packagesUri"));
 
   Service::CheckForPause(isolate, js);
 
@@ -3961,7 +3969,6 @@ static bool GetAllocationProfileImpl(Thread* thread,
   Isolate* isolate = thread->isolate();
   if (should_reset_accumulator) {
     isolate->UpdateLastAllocationProfileAccumulatorResetTimestamp();
-    isolate->shared_class_table()->ResetAllocationAccumulators();
   }
   if (should_collect) {
     isolate->UpdateLastAllocationProfileGCTimestamp();

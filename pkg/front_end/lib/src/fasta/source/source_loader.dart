@@ -37,6 +37,7 @@ import 'package:kernel/ast.dart'
         InterfaceType,
         Library,
         LibraryDependency,
+        Nullability,
         ProcedureKind,
         Supertype,
         TreeNode;
@@ -63,6 +64,7 @@ import '../builder/library_builder.dart';
 import '../builder/member_builder.dart';
 import '../builder/named_type_builder.dart';
 import '../builder/procedure_builder.dart';
+import '../builder/type_alias_builder.dart';
 import '../builder/type_builder.dart';
 import '../builder/type_declaration_builder.dart';
 
@@ -141,12 +143,23 @@ class SourceLoader extends Loader {
 
   ClassHierarchyBuilder builderHierarchy;
 
-  // Used when building directly to kernel.
+  /// Used when building directly to kernel.
   ClassHierarchy hierarchy;
-  CoreTypes coreTypes;
-  // Used when checking whether a return type of an async function is valid.
+  CoreTypes _coreTypes;
+
+  /// Used when checking whether a return type of an async function is valid.
+  ///
+  /// The said return type is valid if it's a subtype of [futureOfBottom].
   DartType futureOfBottom;
+
+  /// Used when checking whether a return type of a sync* function is valid.
+  ///
+  /// The said return type is valid if it's a subtype of [iterableOfBottom].
   DartType iterableOfBottom;
+
+  /// Used when checking whether a return type of an async* function is valid.
+  ///
+  /// The said return type is valid if it's a subtype of [streamOfBottom].
   DartType streamOfBottom;
 
   TypeInferenceEngineImpl typeInferenceEngine;
@@ -163,6 +176,11 @@ class SourceLoader extends Loader {
       : dataForTesting =
             retainDataForTesting ? new SourceLoaderDataForTesting() : null,
         super(target);
+
+  CoreTypes get coreTypes {
+    assert(_coreTypes != null, "CoreTypes has not been computed.");
+    return _coreTypes;
+  }
 
   Template<SummaryTemplate> get outlineSummaryTemplate =>
       templateSourceOutlineSummary;
@@ -301,7 +319,10 @@ class SourceLoader extends Loader {
       // We tokenize source files twice to keep memory usage low. This is the
       // second time, and the first time was in [buildOutline] above. So this
       // time we suppress lexical errors.
-      Token tokens = await tokenize(library, suppressLexicalErrors: true);
+      bool suppressLexicalErrors = true;
+      if (library.issueLexicalErrorsOnBodyBuild) suppressLexicalErrors = false;
+      Token tokens =
+          await tokenize(library, suppressLexicalErrors: suppressLexicalErrors);
       if (tokens == null) return;
       DietListener listener = createDietListener(library);
       DietParser parser = new DietParser(listener);
@@ -669,11 +690,34 @@ class SourceLoader extends Loader {
     return classes;
   }
 
+  void _checkConstructorsForMixin(
+      SourceClassBuilder cls, ClassBuilder builder) {
+    for (Builder constructor in builder.constructors.local.values) {
+      if (constructor.isConstructor && !constructor.isSynthetic) {
+        cls.addProblem(
+            templateIllegalMixinDueToConstructors
+                .withArguments(builder.fullNameForErrors),
+            cls.charOffset,
+            noLength,
+            context: [
+              templateIllegalMixinDueToConstructorsCause
+                  .withArguments(builder.fullNameForErrors)
+                  .withLocation(
+                      constructor.fileUri, constructor.charOffset, noLength)
+            ]);
+      }
+    }
+  }
+
   void checkClassSupertypes(SourceClassBuilder cls,
       List<Builder> directSupertypes, Set<ClassBuilder> blackListedClasses) {
     // Check that the direct supertypes aren't black-listed or enums.
     for (int i = 0; i < directSupertypes.length; i++) {
       Builder supertype = directSupertypes[i];
+      if (supertype is TypeAliasBuilder) {
+        TypeAliasBuilder aliasBuilder = supertype;
+        supertype = aliasBuilder.unaliasDeclaration;
+      }
       if (supertype is EnumBuilder) {
         cls.addProblem(templateExtendingEnum.withArguments(supertype.name),
             cls.charOffset, noLength);
@@ -693,23 +737,13 @@ class SourceLoader extends Loader {
       bool isClassBuilder = false;
       if (mixedInType is NamedTypeBuilder) {
         TypeDeclarationBuilder builder = mixedInType.declaration;
+        if (builder is TypeAliasBuilder) {
+          TypeAliasBuilder aliasBuilder = builder;
+          builder = aliasBuilder.unaliasDeclaration;
+        }
         if (builder is ClassBuilder) {
           isClassBuilder = true;
-          for (Builder constructor in builder.constructors.local.values) {
-            if (constructor.isConstructor && !constructor.isSynthetic) {
-              cls.addProblem(
-                  templateIllegalMixinDueToConstructors
-                      .withArguments(builder.fullNameForErrors),
-                  cls.charOffset,
-                  noLength,
-                  context: [
-                    templateIllegalMixinDueToConstructorsCause
-                        .withArguments(builder.fullNameForErrors)
-                        .withLocation(constructor.fileUri,
-                            constructor.charOffset, noLength)
-                  ]);
-            }
-          }
+          _checkConstructorsForMixin(cls, builder);
         }
       }
       if (!isClassBuilder) {
@@ -866,8 +900,8 @@ class SourceLoader extends Loader {
 
   void handleAmbiguousSupertypes(Class cls, Supertype a, Supertype b) {
     addProblem(
-        templateAmbiguousSupertypes.withArguments(
-            cls.name, a.asInterfaceType, b.asInterfaceType),
+        templateAmbiguousSupertypes.withArguments(cls.name, a.asInterfaceType,
+            b.asInterfaceType, cls.enclosingLibrary.isNonNullableByDefault),
         cls.fileOffset,
         noLength,
         cls.fileUri);
@@ -876,14 +910,19 @@ class SourceLoader extends Loader {
   void ignoreAmbiguousSupertypes(Class cls, Supertype a, Supertype b) {}
 
   void computeCoreTypes(Component component) {
-    coreTypes = new CoreTypes(component);
+    assert(_coreTypes == null, "CoreTypes has already been computed");
+    _coreTypes = new CoreTypes(component);
 
-    futureOfBottom = new InterfaceType(
-        coreTypes.futureClass, <DartType>[const BottomType()]);
-    iterableOfBottom = new InterfaceType(
-        coreTypes.iterableClass, <DartType>[const BottomType()]);
-    streamOfBottom = new InterfaceType(
-        coreTypes.streamClass, <DartType>[const BottomType()]);
+    // These types are used on the left-hand side of the is-subtype-of relation
+    // to check if the return types of functions with async, sync*, and async*
+    // bodies are correct.  It's valid to use the non-nullable types on the
+    // left-hand side in both opt-in and opt-out code.
+    futureOfBottom = new InterfaceType(coreTypes.futureClass,
+        Nullability.nonNullable, <DartType>[const BottomType()]);
+    iterableOfBottom = new InterfaceType(coreTypes.iterableClass,
+        Nullability.nonNullable, <DartType>[const BottomType()]);
+    streamOfBottom = new InterfaceType(coreTypes.streamClass,
+        Nullability.nonNullable, <DartType>[const BottomType()]);
 
     ticker.logMs("Computed core types");
   }
@@ -971,14 +1010,14 @@ class SourceLoader extends Loader {
       if (builder.library.loader == this && !builder.isPatch) {
         Class mixedInClass = builder.cls.mixedInClass;
         if (mixedInClass != null && mixedInClass.isMixinDeclaration) {
-          builder.checkMixinApplication(hierarchy);
+          builder.checkMixinApplication(hierarchy, coreTypes);
         }
       }
     }
     ticker.logMs("Checked mixin declaration applications");
   }
 
-  void buildOutlineExpressions() {
+  void buildOutlineExpressions(CoreTypes coreTypes) {
     builders.forEach((Uri uri, LibraryBuilder library) {
       if (library.loader == this) {
         library.buildOutlineExpressions();
@@ -986,11 +1025,11 @@ class SourceLoader extends Loader {
         while (iterator.moveNext()) {
           Builder declaration = iterator.current;
           if (declaration is ClassBuilder) {
-            declaration.buildOutlineExpressions(library);
+            declaration.buildOutlineExpressions(library, coreTypes);
           } else if (declaration is ExtensionBuilder) {
-            declaration.buildOutlineExpressions(library);
+            declaration.buildOutlineExpressions(library, coreTypes);
           } else if (declaration is MemberBuilder) {
-            declaration.buildOutlineExpressions(library);
+            declaration.buildOutlineExpressions(library, coreTypes);
           }
         }
       }
@@ -1042,31 +1081,44 @@ class SourceLoader extends Loader {
     ticker.logMs("Performed top level inference");
   }
 
-  void transformPostInference(
-      TreeNode node, bool transformSetLiterals, bool transformCollections) {
+  void transformPostInference(TreeNode node, bool transformSetLiterals,
+      bool transformCollections, Library clientLibrary) {
     if (transformCollections) {
-      node.accept(collectionTransformer ??= new CollectionTransformer(this));
+      collectionTransformer ??= new CollectionTransformer(this);
+      collectionTransformer.enterLibrary(clientLibrary);
+      node.accept(collectionTransformer);
+      collectionTransformer.exitLibrary();
     }
     if (transformSetLiterals) {
-      node.accept(setLiteralTransformer ??= new SetLiteralTransformer(this));
+      setLiteralTransformer ??= new SetLiteralTransformer(this);
+      setLiteralTransformer.enterLibrary(clientLibrary);
+      node.accept(setLiteralTransformer);
+      setLiteralTransformer.exitLibrary();
     }
   }
 
-  void transformListPostInference(List<TreeNode> list,
-      bool transformSetLiterals, bool transformCollections) {
+  void transformListPostInference(
+      List<TreeNode> list,
+      bool transformSetLiterals,
+      bool transformCollections,
+      Library clientLibrary) {
     if (transformCollections) {
       CollectionTransformer transformer =
           collectionTransformer ??= new CollectionTransformer(this);
+      transformer.enterLibrary(clientLibrary);
       for (int i = 0; i < list.length; ++i) {
         list[i] = list[i].accept(transformer);
       }
+      transformer.exitLibrary();
     }
     if (transformSetLiterals) {
       SetLiteralTransformer transformer =
           setLiteralTransformer ??= new SetLiteralTransformer(this);
+      transformer.enterLibrary(clientLibrary);
       for (int i = 0; i < list.length; ++i) {
         list[i] = list[i].accept(transformer);
       }
+      transformer.exitLibrary();
     }
   }
 
@@ -1104,7 +1156,17 @@ class SourceLoader extends Loader {
 
   void releaseAncillaryResources() {
     hierarchy = null;
+    builderHierarchy = null;
     typeInferenceEngine = null;
+    builders?.clear();
+    libraries?.clear();
+    first = null;
+    sourceBytes?.clear();
+    target?.releaseAncillaryResources();
+    _coreTypes = null;
+    instrumentation = null;
+    collectionTransformer = null;
+    setLiteralTransformer = null;
   }
 
   @override

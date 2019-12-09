@@ -9,9 +9,11 @@ import 'package:kernel/ast.dart'
         DynamicType,
         FunctionType,
         InterfaceType,
+        Library,
         NamedType,
         Procedure,
-        TypeParameter;
+        TypeParameter,
+        Variance;
 
 import 'package:kernel/class_hierarchy.dart' show ClassHierarchy;
 
@@ -28,6 +30,8 @@ import 'standard_bounds.dart' show StandardBounds;
 
 import 'type_constraint_gatherer.dart' show TypeConstraintGatherer;
 
+import 'type_demotion.dart';
+
 import 'type_schema.dart' show UnknownType, typeSchemaToString, isKnown;
 
 import 'type_schema_elimination.dart' show greatestClosure, leastClosure;
@@ -41,6 +45,7 @@ FunctionType substituteTypeParams(
   return new FunctionType(
       type.positionalParameters.map(substitution.substituteType).toList(),
       substitution.substituteType(type.returnType),
+      type.nullability,
       namedParameters: type.namedParameters
           .map((named) => new NamedType(
               named.name, substitution.substituteType(named.type),
@@ -105,18 +110,23 @@ class TypeSchemaEnvironment extends HierarchyBasedTypeEnvironment
   Class get objectClass => coreTypes.objectClass;
 
   InterfaceType getLegacyLeastUpperBound(
-      InterfaceType type1, InterfaceType type2) {
-    return hierarchy.getLegacyLeastUpperBound(type1, type2, this.coreTypes);
+      InterfaceType type1, InterfaceType type2, Library clientLibrary) {
+    return hierarchy.getLegacyLeastUpperBound(
+        type1, type2, clientLibrary, this.coreTypes);
   }
 
   /// Modify the given [constraint]'s lower bound to include [lower].
-  void addLowerBound(TypeConstraint constraint, DartType lower) {
-    constraint.lower = getStandardUpperBound(constraint.lower, lower);
+  void addLowerBound(
+      TypeConstraint constraint, DartType lower, Library clientLibrary) {
+    constraint.lower =
+        getStandardUpperBound(constraint.lower, lower, clientLibrary);
   }
 
   /// Modify the given [constraint]'s upper bound to include [upper].
-  void addUpperBound(TypeConstraint constraint, DartType upper) {
-    constraint.upper = getStandardLowerBound(constraint.upper, upper);
+  void addUpperBound(
+      TypeConstraint constraint, DartType upper, Library clientLibrary) {
+    constraint.upper =
+        getStandardLowerBound(constraint.upper, upper, clientLibrary);
   }
 
   @override
@@ -165,6 +175,7 @@ class TypeSchemaEnvironment extends HierarchyBasedTypeEnvironment
       List<DartType> actualTypes,
       DartType returnContextType,
       List<DartType> inferredTypes,
+      Library clientLibrary,
       {bool isConst: false}) {
     if (typeParametersToInfer.isEmpty) {
       return;
@@ -175,7 +186,7 @@ class TypeSchemaEnvironment extends HierarchyBasedTypeEnvironment
     // be subtypes (or supertypes) as necessary, and track the constraints that
     // are implied by this.
     TypeConstraintGatherer gatherer =
-        new TypeConstraintGatherer(this, typeParametersToInfer);
+        new TypeConstraintGatherer(this, typeParametersToInfer, clientLibrary);
 
     if (!isEmptyContext(returnContextType)) {
       if (isConst) {
@@ -193,9 +204,13 @@ class TypeSchemaEnvironment extends HierarchyBasedTypeEnvironment
       }
     }
 
-    inferTypeFromConstraints(
-        gatherer.computeConstraints(), typeParametersToInfer, inferredTypes,
+    inferTypeFromConstraints(gatherer.computeConstraints(clientLibrary),
+        typeParametersToInfer, inferredTypes, clientLibrary,
         downwardsInferPhase: formalTypes == null);
+
+    for (int i = 0; i < inferredTypes.length; i++) {
+      inferredTypes[i] = demoteType(inferredTypes[i]);
+    }
   }
 
   bool hasOmittedBound(TypeParameter parameter) {
@@ -228,8 +243,11 @@ class TypeSchemaEnvironment extends HierarchyBasedTypeEnvironment
   /// inference, and must not conclude `?` for any type formal.  In this pass,
   /// [inferredTypes] should contain the values from the first pass.  They will
   /// be replaced with the final inferred types.
-  void inferTypeFromConstraints(Map<TypeParameter, TypeConstraint> constraints,
-      List<TypeParameter> typeParametersToInfer, List<DartType> inferredTypes,
+  void inferTypeFromConstraints(
+      Map<TypeParameter, TypeConstraint> constraints,
+      List<TypeParameter> typeParametersToInfer,
+      List<DartType> inferredTypes,
+      Library clientLibrary,
       {bool downwardsInferPhase: false}) {
     List<DartType> typesFromDownwardsInference =
         downwardsInferPhase ? null : inferredTypes.toList(growable: false);
@@ -246,12 +264,16 @@ class TypeSchemaEnvironment extends HierarchyBasedTypeEnvironment
       }
 
       TypeConstraint constraint = constraints[typeParam];
-      if (downwardsInferPhase) {
-        inferredTypes[i] =
-            _inferTypeParameterFromContext(constraint, extendsConstraint);
+      if (downwardsInferPhase || !typeParam.isLegacyCovariant) {
+        inferredTypes[i] = _inferTypeParameterFromContext(
+            constraint, extendsConstraint, clientLibrary,
+            isContravariant: typeParam.variance == Variance.contravariant);
       } else {
         inferredTypes[i] = _inferTypeParameterFromAll(
-            typesFromDownwardsInference[i], constraint, extendsConstraint);
+            typesFromDownwardsInference[i],
+            constraint,
+            extendsConstraint,
+            clientLibrary);
       }
     }
 
@@ -349,21 +371,44 @@ class TypeSchemaEnvironment extends HierarchyBasedTypeEnvironment
   ///
   /// If [grounded] is `true`, then the returned type is guaranteed to be a
   /// known type (i.e. it will not contain any instances of `?`).
+  ///
+  /// If [isContravariant] is `true`, then we are solving for a contravariant
+  /// type parameter which means we choose the upper bound rather than the
+  /// lower bound for normally covariant type parameters.
   DartType solveTypeConstraint(TypeConstraint constraint,
-      {bool grounded: false}) {
-    // Prefer the known bound, if any.
-    if (isKnown(constraint.lower)) return constraint.lower;
-    if (isKnown(constraint.upper)) return constraint.upper;
+      {bool grounded: false, bool isContravariant: false}) {
+    if (!isContravariant) {
+      // Prefer the known bound, if any.
+      if (isKnown(constraint.lower)) return constraint.lower;
+      if (isKnown(constraint.upper)) return constraint.upper;
 
-    // Otherwise take whatever bound has partial information, e.g. `Iterable<?>`
-    if (constraint.lower is! UnknownType) {
-      return grounded
-          ? leastClosure(coreTypes, constraint.lower)
-          : constraint.lower;
+      // Otherwise take whatever bound has partial information,
+      // e.g. `Iterable<?>`
+      if (constraint.lower is! UnknownType) {
+        return grounded
+            ? leastClosure(coreTypes, constraint.lower)
+            : constraint.lower;
+      } else {
+        return grounded
+            ? greatestClosure(coreTypes, constraint.upper)
+            : constraint.upper;
+      }
     } else {
-      return grounded
-          ? greatestClosure(coreTypes, constraint.upper)
-          : constraint.upper;
+      // Prefer the known bound, if any.
+      if (isKnown(constraint.upper)) return constraint.upper;
+      if (isKnown(constraint.lower)) return constraint.lower;
+
+      // Otherwise take whatever bound has partial information,
+      // e.g. `Iterable<?>`
+      if (constraint.upper is! UnknownType) {
+        return grounded
+            ? greatestClosure(coreTypes, constraint.upper)
+            : constraint.upper;
+      } else {
+        return grounded
+            ? leastClosure(coreTypes, constraint.lower)
+            : constraint.lower;
+      }
     }
   }
 
@@ -375,8 +420,11 @@ class TypeSchemaEnvironment extends HierarchyBasedTypeEnvironment
             type, constraint.upper, SubtypeCheckMode.ignoringNullabilities);
   }
 
-  DartType _inferTypeParameterFromAll(DartType typeFromContextInference,
-      TypeConstraint constraint, DartType extendsConstraint) {
+  DartType _inferTypeParameterFromAll(
+      DartType typeFromContextInference,
+      TypeConstraint constraint,
+      DartType extendsConstraint,
+      Library clientLibrary) {
     // See if we already fixed this type from downwards inference.
     // If so, then we aren't allowed to change it based on argument types.
     if (isKnown(typeFromContextInference)) {
@@ -385,15 +433,17 @@ class TypeSchemaEnvironment extends HierarchyBasedTypeEnvironment
 
     if (extendsConstraint != null) {
       constraint = constraint.clone();
-      addUpperBound(constraint, extendsConstraint);
+      addUpperBound(constraint, extendsConstraint, clientLibrary);
     }
 
     return solveTypeConstraint(constraint, grounded: true);
   }
 
-  DartType _inferTypeParameterFromContext(
-      TypeConstraint constraint, DartType extendsConstraint) {
-    DartType t = solveTypeConstraint(constraint);
+  DartType _inferTypeParameterFromContext(TypeConstraint constraint,
+      DartType extendsConstraint, Library clientLibrary,
+      {bool isContravariant: false}) {
+    DartType t =
+        solveTypeConstraint(constraint, isContravariant: isContravariant);
     if (!isKnown(t)) {
       return t;
     }
@@ -407,7 +457,7 @@ class TypeSchemaEnvironment extends HierarchyBasedTypeEnvironment
     // If we consider the `T extends num` we conclude `<num>`, which works.
     if (extendsConstraint != null) {
       constraint = constraint.clone();
-      addUpperBound(constraint, extendsConstraint);
+      addUpperBound(constraint, extendsConstraint, clientLibrary);
       return solveTypeConstraint(constraint);
     }
     return t;

@@ -13,6 +13,8 @@ const _knownFeatures = <String, ExperimentalFeature>{
       ExperimentalFeatures.control_flow_collections,
   EnableString.extension_methods: ExperimentalFeatures.extension_methods,
   EnableString.non_nullable: ExperimentalFeatures.non_nullable,
+  EnableString.nonfunction_type_aliases:
+      ExperimentalFeatures.nonfunction_type_aliases,
   EnableString.set_literals: ExperimentalFeatures.set_literals,
   EnableString.spread_collections: ExperimentalFeatures.spread_collections,
   EnableString.triple_shift: ExperimentalFeatures.triple_shift,
@@ -29,6 +31,7 @@ List<bool> _buildExperimentalFlagsArray() => <bool>[
       true, // control-flow-collections
       true, // extension-methods
       IsEnabledByDefault.non_nullable,
+      IsEnabledByDefault.nonfunction_type_aliases,
       true, // set-literals
       true, // spread-collections
       IsEnabledByDefault.triple_shift,
@@ -52,6 +55,9 @@ class EnableString {
   /// String to enable the experiment "non-nullable"
   static const String non_nullable = 'non-nullable';
 
+  /// String to enable the experiment "nonfunction-type-aliases"
+  static const String nonfunction_type_aliases = 'nonfunction-type-aliases';
+
   /// String to enable the experiment "set-literals"
   static const String set_literals = 'set-literals';
 
@@ -74,7 +80,7 @@ class EnableString {
 }
 
 class ExperimentalFeatures {
-  static const constant_update_2018 = const ExperimentalFeature(
+  static const constant_update_2018 = ExperimentalFeature(
       0,
       EnableString.constant_update_2018,
       IsEnabledByDefault.constant_update_2018,
@@ -82,7 +88,7 @@ class ExperimentalFeatures {
       'Enhanced constant expressions',
       firstSupportedVersion: '2.4.1');
 
-  static const control_flow_collections = const ExperimentalFeature(
+  static const control_flow_collections = ExperimentalFeature(
       1,
       EnableString.control_flow_collections,
       IsEnabledByDefault.control_flow_collections,
@@ -90,7 +96,7 @@ class ExperimentalFeatures {
       'Control Flow Collections',
       firstSupportedVersion: '2.2.2');
 
-  static const extension_methods = const ExperimentalFeature(
+  static const extension_methods = ExperimentalFeature(
       2,
       EnableString.extension_methods,
       IsEnabledByDefault.extension_methods,
@@ -98,42 +104,45 @@ class ExperimentalFeatures {
       'Extension Methods',
       firstSupportedVersion: '2.6.0');
 
-  static const non_nullable = const ExperimentalFeature(
+  static const non_nullable = ExperimentalFeature(
       3,
       EnableString.non_nullable,
       IsEnabledByDefault.non_nullable,
       IsExpired.non_nullable,
       'Non Nullable by default');
 
-  static const set_literals = const ExperimentalFeature(
+  static const nonfunction_type_aliases = ExperimentalFeature(
       4,
-      EnableString.set_literals,
-      IsEnabledByDefault.set_literals,
-      IsExpired.set_literals,
-      'Set Literals',
+      EnableString.nonfunction_type_aliases,
+      IsEnabledByDefault.nonfunction_type_aliases,
+      IsExpired.nonfunction_type_aliases,
+      'Type aliases define a <type>, not just a <functionType>.');
+
+  static const set_literals = ExperimentalFeature(5, EnableString.set_literals,
+      IsEnabledByDefault.set_literals, IsExpired.set_literals, 'Set Literals',
       firstSupportedVersion: '2.2.0');
 
-  static const spread_collections = const ExperimentalFeature(
-      5,
+  static const spread_collections = ExperimentalFeature(
+      6,
       EnableString.spread_collections,
       IsEnabledByDefault.spread_collections,
       IsExpired.spread_collections,
       'Spread Collections',
       firstSupportedVersion: '2.2.2');
 
-  static const triple_shift = const ExperimentalFeature(
-      6,
+  static const triple_shift = ExperimentalFeature(
+      7,
       EnableString.triple_shift,
       IsEnabledByDefault.triple_shift,
       IsExpired.triple_shift,
       'Triple-shift operator');
 
-  static const variance = const ExperimentalFeature(7, EnableString.variance,
+  static const variance = ExperimentalFeature(8, EnableString.variance,
       IsEnabledByDefault.variance, IsExpired.variance, 'Sound variance.');
 
   @deprecated
-  static const bogus_disabled = const ExperimentalFeature(
-      8,
+  static const bogus_disabled = ExperimentalFeature(
+      9,
       // ignore: deprecated_member_use_from_same_package
       EnableString.bogus_disabled,
       IsEnabledByDefault.bogus_disabled,
@@ -141,8 +150,8 @@ class ExperimentalFeatures {
       null);
 
   @deprecated
-  static const bogus_enabled = const ExperimentalFeature(
-      9,
+  static const bogus_enabled = ExperimentalFeature(
+      10,
       // ignore: deprecated_member_use_from_same_package
       EnableString.bogus_enabled,
       IsEnabledByDefault.bogus_enabled,
@@ -165,6 +174,9 @@ class IsEnabledByDefault {
 
   /// Default state of the experiment "non-nullable"
   static const bool non_nullable = false;
+
+  /// Default state of the experiment "nonfunction-type-aliases"
+  static const bool nonfunction_type_aliases = false;
 
   /// Default state of the experiment "set-literals"
   static const bool set_literals = true;
@@ -202,6 +214,9 @@ class IsExpired {
 
   /// Expiration status of the experiment "non-nullable"
   static const bool non_nullable = false;
+
+  /// Expiration status of the experiment "nonfunction-type-aliases"
+  static const bool nonfunction_type_aliases = false;
 
   /// Expiration status of the experiment "set-literals"
   static const bool set_literals = true;
@@ -245,6 +260,10 @@ mixin _CurrentState {
 
   /// Current state for the flag "non-nullable"
   bool get non_nullable => isEnabled(ExperimentalFeatures.non_nullable);
+
+  /// Current state for the flag "nonfunction-type-aliases"
+  bool get nonfunction_type_aliases =>
+      isEnabled(ExperimentalFeatures.nonfunction_type_aliases);
 
   /// Current state for the flag "set-literals"
   bool get set_literals => isEnabled(ExperimentalFeatures.set_literals);

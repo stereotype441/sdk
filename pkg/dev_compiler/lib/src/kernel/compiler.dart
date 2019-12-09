@@ -6,7 +6,6 @@ import 'dart:collection';
 import 'dart:convert';
 import 'dart:math' show max, min;
 
-import 'package:front_end/src/api_unstable/ddc.dart' show TypeSchemaEnvironment;
 import 'package:kernel/class_hierarchy.dart';
 import 'package:kernel/core_types.dart';
 import 'package:kernel/kernel.dart' hide MapEntry;
@@ -111,6 +110,8 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
   final CoreTypes _coreTypes;
 
   final TypeEnvironment _types;
+
+  final StatefulStaticTypeContext _staticTypeContext;
 
   final ClassHierarchy _hierarchy;
 
@@ -219,12 +220,22 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
       SharedCompilerOptions options,
       {CoreTypes coreTypes}) {
     coreTypes ??= CoreTypes(component);
-    var types = TypeSchemaEnvironment(coreTypes, hierarchy);
+    var types = TypeEnvironment(coreTypes, hierarchy);
     var constants = DevCompilerConstants();
     var nativeTypes = NativeTypeSet(coreTypes, constants);
     var jsTypeRep = JSTypeRep(types, hierarchy);
-    return ProgramCompiler._(coreTypes, coreTypes.index, nativeTypes, constants,
-        types, hierarchy, jsTypeRep, NullableInference(jsTypeRep), options);
+    var staticTypeContext = StatefulStaticTypeContext.stacked(types);
+    return ProgramCompiler._(
+        coreTypes,
+        coreTypes.index,
+        nativeTypes,
+        constants,
+        types,
+        hierarchy,
+        jsTypeRep,
+        NullableInference(jsTypeRep, staticTypeContext),
+        staticTypeContext,
+        options);
   }
 
   ProgramCompiler._(
@@ -236,6 +247,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
       this._hierarchy,
       this._typeRep,
       this._nullableInference,
+      this._staticTypeContext,
       this._options)
       : _jsArrayClass = sdk.getClass('dart:_interceptors', 'JSArray'),
         _asyncStreamIteratorClass =
@@ -288,8 +300,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
       }
     }
 
-    // ignore: DEPRECATED_MEMBER_USE
-    var libraries = component.libraries.where((l) => !l.isExternal);
+    var libraries = component.libraries;
 
     // Initialize our library variables.
     var items = startModule(libraries);
@@ -406,6 +417,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
     // See _emitClass.
     assert(_currentLibrary == null);
     _currentLibrary = library;
+    _staticTypeContext.enterLibrary(_currentLibrary);
 
     if (isSdkInternalRuntime(library)) {
       // `dart:_runtime` uses a different order for bootstrapping.
@@ -428,6 +440,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
       _emitTopLevelFields(library.fields);
     }
 
+    _staticTypeContext.leaveLibrary(_currentLibrary);
     _currentLibrary = null;
   }
 
@@ -473,7 +486,6 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
     var savedLibrary = _currentLibrary;
     var savedUri = _currentUri;
     _currentClass = c;
-    _types.thisType = c.thisType;
     _currentLibrary = c.enclosingLibrary;
     _currentUri = c.fileUri;
 
@@ -485,7 +497,6 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
     }
 
     _currentClass = savedClass;
-    _types.thisType = savedClass?.thisType;
     _currentLibrary = savedLibrary;
     _currentUri = savedUri;
   }
@@ -764,7 +775,8 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
     }
 
     getBaseClass(int count) {
-      var base = emitDeferredType(c.thisType);
+      var base = emitDeferredType(
+          c.getThisType(_coreTypes, c.enclosingLibrary.nonNullable));
       while (--count >= 0) {
         base = js.call('#.__proto__', [base]);
       }
@@ -802,7 +814,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
       for (var ctor in superclass.constructors) {
         var savedUri = _currentUri;
         _currentUri = ctor.enclosingClass.fileUri;
-        var jsParams = _emitParameters(ctor.function);
+        var jsParams = _emitParameters(ctor.function, isForwarding: true);
         _currentUri = savedUri;
         var name = ctor.name.name;
         var ctorBody = [
@@ -969,155 +981,74 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
       if (prop != null) markSubtypeOf(prop);
     }
 
-    // TODO(jmesserly): share these hand coded type checks with the old back
-    // end, perhaps by factoring them into a common file, or move them to be
-    // static methdos in the SDK. (Or wait until we delete the old back end.)
-    if (c.enclosingLibrary == _coreTypes.coreLibrary) {
-      if (c == _coreTypes.objectClass) {
-        // Everything is an Object.
-        body.add(js.statement(
-            '#.is = function is_Object(o) { return true; }', [className]));
-        body.add(js.statement(
-            '#.as = function as_Object(o) { return o; }', [className]));
-        body.add(js.statement(
-            '#._check = function check_Object(o) { return o; }', [className]));
-        return null;
-      }
-      if (c == _coreTypes.stringClass) {
-        body.add(js.statement(
-            '#.is = function is_String(o) { return typeof o == "string"; }',
-            className));
-        body.add(js.statement(
-            '#.as = function as_String(o) {'
-            '  if (typeof o == "string" || o == null) return o;'
-            '  return #.as(o, #, false);'
-            '}',
-            [className, runtimeModule, className]));
-        body.add(js.statement(
-            '#._check = function check_String(o) {'
-            '  if (typeof o == "string" || o == null) return o;'
-            '  return #.as(o, #, true);'
-            '}',
-            [className, runtimeModule, className]));
-        return null;
-      }
-      if (c == _coreTypes.functionClass) {
-        body.add(js.statement(
-            '#.is = function is_Function(o) { return typeof o == "function"; }',
-            className));
-        body.add(js.statement(
-            '#.as = function as_Function(o) {'
-            '  if (typeof o == "function" || o == null) return o;'
-            '  return #.as(o, #, false);'
-            '}',
-            [className, runtimeModule, className]));
-        body.add(js.statement(
-            '#._check = function check_String(o) {'
-            '  if (typeof o == "function" || o == null) return o;'
-            '  return #.as(o, #, true);'
-            '}',
-            [className, runtimeModule, className]));
-        return null;
-      }
-      if (c == _coreTypes.intClass) {
-        body.add(js.statement(
-            '#.is = function is_int(o) {'
-            '  return typeof o == "number" && Math.floor(o) == o;'
-            '}',
-            className));
-        body.add(js.statement(
-            '#.as = function as_int(o) {'
-            '  if ((typeof o == "number" && Math.floor(o) == o) || o == null)'
-            '    return o;'
-            '  return #.as(o, #, false);'
-            '}',
-            [className, runtimeModule, className]));
-        body.add(js.statement(
-            '#._check = function check_int(o) {'
-            '  if ((typeof o == "number" && Math.floor(o) == o) || o == null)'
-            '    return o;'
-            '  return #.as(o, #, true);'
-            '}',
-            [className, runtimeModule, className]));
-        return null;
-      }
-      if (c == _coreTypes.nullClass) {
-        body.add(js.statement(
-            '#.is = function is_Null(o) { return o == null; }', className));
-        body.add(js.statement(
-            '#.as = function as_Null(o) {'
-            '  if (o == null) return o;'
-            '  return #.as(o, #, false);'
-            '}',
-            [className, runtimeModule, className]));
-        body.add(js.statement(
-            '#._check = function check_Null(o) {'
-            '  if (o == null) return o;'
-            '  return #.as(o, #, true);'
-            '}',
-            [className, runtimeModule, className]));
-        return null;
-      }
-      if (c == _coreTypes.numClass || c == _coreTypes.doubleClass) {
-        body.add(js.statement(
-            '#.is = function is_num(o) { return typeof o == "number"; }',
-            className));
-        body.add(js.statement(
-            '#.as = function as_num(o) {'
-            '  if (typeof o == "number" || o == null) return o;'
-            '  return #.as(o, #, false);'
-            '}',
-            [className, runtimeModule, className]));
-        body.add(js.statement(
-            '#._check = function check_num(o) {'
-            '  if (typeof o == "number" || o == null) return o;'
-            '  return #.as(o, #, true);'
-            '}',
-            [className, runtimeModule, className]));
-        return null;
-      }
-      if (c == _coreTypes.boolClass) {
-        body.add(js.statement(
-            '#.is = function is_bool(o) { return o === true || o === false; }',
-            className));
-        body.add(js.statement(
-            '#.as = function as_bool(o) {'
-            '  if (o === true || o === false || o == null) return o;'
-            '  return #.as(o, #, false);'
-            '}',
-            [className, runtimeModule, className]));
-        body.add(js.statement(
-            '#._check = function check_bool(o) {'
-            '  if (o === true || o === false || o == null) return o;'
-            '  return #.as(o, #, true);'
-            '}',
-            [className, runtimeModule, className]));
-        return null;
-      }
+    if (c.enclosingLibrary == _coreTypes.coreLibrary &&
+        (c == _coreTypes.objectClass ||
+            c == _coreTypes.stringClass ||
+            c == _coreTypes.functionClass ||
+            c == _coreTypes.intClass ||
+            c == _coreTypes.nullClass ||
+            c == _coreTypes.numClass ||
+            c == _coreTypes.doubleClass ||
+            c == _coreTypes.boolClass)) {
+      // Custom type tests for these types are in the patch files.
+      return null;
     }
-    if (c.enclosingLibrary == _coreTypes.asyncLibrary) {
-      if (c == _coreTypes.futureOrClass) {
-        var typeParam = TypeParameterType(c.typeParameters[0]);
+
+    if (c.enclosingLibrary == _coreTypes.asyncLibrary &&
+        c == _coreTypes.futureOrClass) {
+      // These methods are difficult to place in the runtime or patch files.
+      // * They need to be callable from the class but they can't be static
+      //   methods on the FutureOr class in Dart because they reference the
+      //   generic type parameter.
+      // * There isn't an obvious place in dart:_runtime were we could place a
+      //   method that adds these type tests (similar to addTypeTests()) because
+      //   in the bootstrap ordering the Future class hasn't been defined yet.
+      if (_options.nonNullableEnabled) {
+        // TODO(nshahan) Update FutureOr type tests for NNBD
+        var typeParam =
+            TypeParameterType(c.typeParameters[0], Nullability.legacy);
         var typeT = visitTypeParameterType(typeParam);
-        var futureOfT = visitInterfaceType(
-            InterfaceType(_coreTypes.futureClass, [typeParam]));
+        var futureOfT = visitInterfaceType(InterfaceType(
+            _coreTypes.futureClass, Nullability.legacy, [typeParam]));
         body.add(js.statement('''
             #.is = function is_FutureOr(o) {
               return #.is(o) || #.is(o);
             }
             ''', [className, typeT, futureOfT]));
-        // TODO(jmesserly): remove the fallback to `dart.as`. It's only for the
-        // _ignoreTypeFailure logic.
         body.add(js.statement('''
             #.as = function as_FutureOr(o) {
               if (o == null || #.is(o) || #.is(o)) return o;
-              return #.as(o, this, false);
+              #.castError(o, this, false);
             }
             ''', [className, typeT, futureOfT, runtimeModule]));
         body.add(js.statement('''
             #._check = function check_FutureOr(o) {
               if (o == null || #.is(o) || #.is(o)) return o;
-              return #.as(o, this, true);
+              #.castError(o, this, true);
+            }
+            ''', [className, typeT, futureOfT, runtimeModule]));
+        return null;
+      } else {
+        var typeParam =
+            TypeParameterType(c.typeParameters[0], Nullability.legacy);
+        var typeT = visitTypeParameterType(typeParam);
+        var futureOfT = visitInterfaceType(InterfaceType(
+            _coreTypes.futureClass, Nullability.legacy, [typeParam]));
+        body.add(js.statement('''
+            #.is = function is_FutureOr(o) {
+              return #.is(o) || #.is(o);
+            }
+            ''', [className, typeT, futureOfT]));
+        body.add(js.statement('''
+            #.as = function as_FutureOr(o) {
+              if (o == null || #.is(o) || #.is(o)) return o;
+              #.castError(o, this, false);
+            }
+            ''', [className, typeT, futureOfT, runtimeModule]));
+        body.add(js.statement('''
+            #._check = function check_FutureOr(o) {
+              if (o == null || #.is(o) || #.is(o)) return o;
+              #.castError(o, this, true);
             }
             ''', [className, typeT, futureOfT, runtimeModule]));
         return null;
@@ -1305,7 +1236,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
       if (!_options.emitMetadata && member.isStatic) continue;
 
       var name = member.name.name;
-      var reifiedType = _getMemberRuntimeType(member, c) as FunctionType;
+      var reifiedType = _memberRuntimeType(member, c) as FunctionType;
 
       // Don't add redundant signatures for inherited methods whose signature
       // did not change.  If we are not overriding, or if the thing we are
@@ -1318,7 +1249,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
           : null;
 
       var needsSignature = memberOverride == null ||
-          reifiedType != _getMemberRuntimeType(memberOverride, c);
+          reifiedType != _memberRuntimeType(memberOverride, c);
 
       if (needsSignature) {
         js_ast.Expression type;
@@ -1397,7 +1328,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
   }
 
   js_ast.Expression _emitFieldSignature(Field field, Class fromClass) {
-    var type = _getTypeFromClass(field.type, field.enclosingClass, fromClass);
+    var type = _typeFromClass(field.type, field.enclosingClass, fromClass);
     var args = [_emitType(type)];
     var annotations = field.annotations;
     if (_options.emitMetadata &&
@@ -1413,7 +1344,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
         field.isFinal ? 'finalFieldType(#)' : 'fieldType(#)', [args]);
   }
 
-  DartType _getMemberRuntimeType(Member member, Class fromClass) {
+  DartType _memberRuntimeType(Member member, Class fromClass) {
     var f = member.function;
     if (f == null) {
       return (member as Field).type;
@@ -1423,25 +1354,27 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
         !f.namedParameters.any(isCovariantParameter)) {
       result = f.thisFunctionType;
     } else {
-      reifyParameter(VariableDeclaration p) =>
-          isCovariantParameter(p) ? _coreTypes.objectClass.thisType : p.type;
+      reifyParameter(VariableDeclaration p) => isCovariantParameter(p)
+          ? _coreTypes.objectClass.getThisType(
+              _coreTypes, _coreTypes.objectClass.enclosingLibrary.nonNullable)
+          : p.type;
       reifyNamedParameter(VariableDeclaration p) =>
           NamedType(p.name, reifyParameter(p));
 
       // TODO(jmesserly): do covariant type parameter bounds also need to be
       // reified as `Object`?
-      result = FunctionType(
-          f.positionalParameters.map(reifyParameter).toList(), f.returnType,
+      result = FunctionType(f.positionalParameters.map(reifyParameter).toList(),
+          f.returnType, Nullability.legacy,
           namedParameters: f.namedParameters.map(reifyNamedParameter).toList()
             ..sort(),
           typeParameters: f.thisFunctionType.typeParameters,
           requiredParameterCount: f.requiredParameterCount);
     }
-    return _getTypeFromClass(result, member.enclosingClass, fromClass)
+    return _typeFromClass(result, member.enclosingClass, fromClass)
         as FunctionType;
   }
 
-  DartType _getTypeFromClass(DartType type, Class superclass, Class subclass) {
+  DartType _typeFromClass(DartType type, Class superclass, Class subclass) {
     if (identical(superclass, subclass)) return type;
     return Substitution.fromSupertype(
             _hierarchy.getClassAsInstanceOf(subclass, superclass))
@@ -1452,6 +1385,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
       Constructor node, List<Field> fields, js_ast.Expression className) {
     var savedUri = _currentUri;
     _currentUri = node.fileUri ?? savedUri;
+    _staticTypeContext.enterMember(node);
     var params = _emitParameters(node.function);
     var body = _withCurrentFunction(
         node.function,
@@ -1460,6 +1394,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
 
     var end = _nodeEnd(node.fileEndOffset);
     _currentUri = savedUri;
+    _staticTypeContext.leaveMember(node);
     end ??= _nodeEnd(node.enclosingClass.fileEndOffset);
 
     return js_ast.Fun(params, js_ast.Block(body))..sourceInformation = end;
@@ -1608,7 +1543,9 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
           (init == null || _constants.isConstant(init))) {
         continue;
       }
+      _staticTypeContext.enterMember(f);
       emitFieldInit(f, init, f);
+      _staticTypeContext.leaveMember(f);
     }
 
     // Run constructor field initializers such as `: foo = bar.baz`
@@ -1728,6 +1665,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
 
     var savedUri = _currentUri;
     for (var m in c.procedures) {
+      _staticTypeContext.enterMember(m);
       // For the Dart SDK, we use the member URI because it may be different
       // from the class (because of patch files). User code does not need this.
       //
@@ -1740,9 +1678,11 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
         // TODO(jmesserly): is there any other kind of forwarding stub?
         jsMethods.addAll(_emitCovarianceCheckStub(m));
       } else if (m.isFactory) {
-        // Skip redirecting factories (they've already been resolved).
-        if (redirectingFactories?.contains(m) ?? false) continue;
-        jsMethods.add(_emitFactoryConstructor(m));
+        if (redirectingFactories?.contains(m) ?? false) {
+          // Skip redirecting factories (they've already been resolved).
+        } else {
+          jsMethods.add(_emitFactoryConstructor(m));
+        }
       } else if (m.isAccessor) {
         jsMethods.add(_emitMethodDeclaration(m));
         jsMethods.add(_emitSuperAccessorWrapper(m, getters, setters));
@@ -1753,6 +1693,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
       } else {
         jsMethods.add(_emitMethodDeclaration(m));
       }
+      _staticTypeContext.leaveMember(m);
     }
     _currentUri = savedUri;
 
@@ -1849,7 +1790,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
     if (superMember == null) return const [];
 
     substituteType(DartType t) {
-      return _getTypeFromClass(t, superMember.enclosingClass, enclosingClass);
+      return _typeFromClass(t, superMember.enclosingClass, enclosingClass);
     }
 
     var name = _declareMemberName(member);
@@ -2105,11 +2046,12 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
       // Helper functions to test if a constructor invocation is internal and
       // should be eagerly evaluated.
       var isInternalConstructor = (ConstructorInvocation node) {
-        var type = node.getStaticType(_types) as InterfaceType;
+        var type = node.getStaticType(_staticTypeContext) as InterfaceType;
         var library = type.classNode.enclosingLibrary;
         return isSdkInternalRuntime(library);
       };
       for (var field in fields) {
+        _staticTypeContext.enterMember(field);
         var init = field.initializer;
         if (init == null ||
             init is BasicLiteral ||
@@ -2118,7 +2060,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
           if (init is ConstructorInvocation) {
             // This is an eagerly executed constructor invocation.  We need to
             // ensure the class is emitted before this statement.
-            var type = init.getStaticType(_types) as InterfaceType;
+            var type = init.getStaticType(_staticTypeContext) as InterfaceType;
             _emitClass(type.classNode);
           }
           _currentUri = field.fileUri;
@@ -2129,6 +2071,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
         } else {
           lazyFields.add(field);
         }
+        _staticTypeContext.leaveMember(field);
       }
 
       _currentUri = savedUri;
@@ -2149,6 +2092,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
 
     for (var field in fields) {
       _currentUri = field.fileUri;
+      _staticTypeContext.enterMember(field);
       var access = emitFieldName(field);
       accessors.add(js_ast.Method(access, _emitStaticFieldInitializer(field),
           isGetter: true)
@@ -2163,6 +2107,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
             access, js.call('function(_) {}') as js_ast.Fun,
             isSetter: true));
       }
+      _staticTypeContext.leaveMember(field);
     }
     _currentUri = _currentLibrary.fileUri;
 
@@ -2353,8 +2298,12 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
     if (member != null) {
       var jsName = _emitJSInteropStaticMemberName(member);
       if (jsName != null) return jsName;
-    }
 
+      // Allow the Dart SDK to assign names to statics with the @JSExportName
+      // annotation.
+      var exportName = _jsExportName(member);
+      if (exportName != null) return propertyName(exportName);
+    }
     switch (name) {
       // Reserved for the compiler to do `x as T`.
       case 'as':
@@ -2451,7 +2400,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
     return false;
   }
 
-  String _getJSNameWithoutGlobal(NamedNode n) {
+  String _jsNameWithoutGlobal(NamedNode n) {
     if (!usesJSInterop(n)) return null;
     var libraryJSName = _annotationName(getLibrary(n), isPublicJSAnnotation);
     var jsName = _annotationName(n, isPublicJSAnnotation) ?? getTopLevelName(n);
@@ -2459,7 +2408,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
   }
 
   js_ast.PropertyAccess _emitJSInterop(NamedNode n) {
-    var jsName = _getJSNameWithoutGlobal(n);
+    var jsName = _jsNameWithoutGlobal(n);
     if (jsName == null) return null;
     return _emitJSInteropForGlobal(jsName);
   }
@@ -2496,6 +2445,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
 
   js_ast.Method _emitLibraryAccessor(Procedure node) {
     var savedUri = _currentUri;
+    _staticTypeContext.enterMember(node);
     _currentUri = node.fileUri;
 
     var name = node.name.name;
@@ -2505,11 +2455,13 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
       ..sourceInformation = _nodeEnd(node.fileEndOffset);
 
     _currentUri = savedUri;
+    _staticTypeContext.leaveMember(node);
     return result;
   }
 
   js_ast.Statement _emitLibraryFunction(Procedure p) {
     var savedUri = _currentUri;
+    _staticTypeContext.enterMember(p);
     _currentUri = p.fileUri;
 
     var body = <js_ast.Statement>[];
@@ -2535,6 +2487,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
     }
 
     _currentUri = savedUri;
+    _staticTypeContext.leaveMember(p);
     return js_ast.Statement.from(body);
   }
 
@@ -2626,7 +2579,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
       return runtimeCall(
           'anonymousJSType(#)', [js.escapedString(getLocalClassName(c))]);
     }
-    var jsName = _getJSNameWithoutGlobal(c);
+    var jsName = _jsNameWithoutGlobal(c);
     if (jsName != null) {
       return runtimeCall('lazyJSType(() => #, #)',
           [_emitJSInteropForGlobal(jsName), js.escapedString(jsName)]);
@@ -2864,9 +2817,28 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
     return js_ast.Fun(formals, block);
   }
 
-  List<js_ast.Parameter> _emitParameters(FunctionNode f) {
+  js_ast.Parameter _emitParameter(VariableDeclaration node,
+      {bool withoutInitializer = false}) {
+    var initializer = node.initializer;
+    var id = _emitVariableDef(node);
+    if (initializer == null || withoutInitializer) return id;
+    return js_ast.DestructuredVariable(
+        name: id, defaultValue: _visitExpression(initializer));
+  }
+
+  List<js_ast.Parameter> _emitParameters(FunctionNode f,
+      {bool isForwarding = false}) {
+    // Destructure optional positional parameters in place.
+    // Given:
+    //  - (arg1, arg2, [opt1, opt2 = def2])
+    // Emit:
+    //  - (arg1, arg2, opt1 = null, opt2 = def2)
+    // Note, if [isForwarding] is set, omit initializers as this actually a
+    // forwarded call not a parameter list. E.g., the second in:
+    //  - foo(arg1, opt1 = def1) => super(arg1, opt1).
     var positional = f.positionalParameters;
-    var result = List<js_ast.Parameter>.of(positional.map(_emitVariableDef));
+    var result = List<js_ast.Parameter>.of(positional
+        .map((p) => _emitParameter(p, withoutInitializer: isForwarding)));
     if (positional.isNotEmpty &&
         f.requiredParameterCount == positional.length &&
         positional.last.annotations.any(isJsRestAnnotation)) {
@@ -2957,7 +2929,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
       //
       // In the future, we might be able to simplify this, see:
       // https://github.com/dart-lang/sdk/issues/28320
-      var jsParams = _emitParameters(function);
+      var jsParams = _emitParameters(function, isForwarding: true);
       var mutatedParams = jsParams;
       var gen = emitGeneratorFn((fnBody) {
         var mutatedVars = js_ast.findMutatedVariables(fnBody);
@@ -2970,10 +2942,9 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
         gen = js.call('() => #(#)', [gen, mutatedParams]);
       }
 
-      var returnType =
-          _getExpectedReturnType(function, _coreTypes.iterableClass);
-      var syncIterable =
-          _emitType(InterfaceType(_syncIterableClass, [returnType]));
+      var returnType = _expectedReturnType(function, _coreTypes.iterableClass);
+      var syncIterable = _emitType(
+          InterfaceType(_syncIterableClass, Nullability.legacy, [returnType]));
       return js.call('new #.new(#)', [syncIterable, gen]);
     }
 
@@ -2987,8 +2958,9 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
       // _AsyncStarImpl has an example of the generated code.
       var gen = emitGeneratorFn((_) => [_asyncStarController]);
 
-      var returnType = _getExpectedReturnType(function, _coreTypes.streamClass);
-      var asyncStarImpl = InterfaceType(_asyncStarImplClass, [returnType]);
+      var returnType = _expectedReturnType(function, _coreTypes.streamClass);
+      var asyncStarImpl =
+          InterfaceType(_asyncStarImplClass, Nullability.legacy, [returnType]);
       return js.call('new #.new(#).stream', [_emitType(asyncStarImpl), gen]);
     }
 
@@ -3012,11 +2984,12 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
   }
 
   /// Gets the expected return type of a `sync*` or `async*` body.
-  DartType _getExpectedReturnType(FunctionNode f, Class expected) {
+  DartType _expectedReturnType(FunctionNode f, Class expected) {
     var type = f.thisFunctionType.returnType;
     if (type is InterfaceType) {
-      var match = _hierarchy.getTypeAsInstanceOf(type, expected);
-      if (match != null) return match.typeArguments[0];
+      var matchArguments =
+          _hierarchy.getTypeArgumentsAsInstanceOf(type, expected);
+      if (matchArguments != null) return matchArguments[0];
     }
     return const DynamicType();
   }
@@ -3098,17 +3071,8 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
       }
     }
 
-    for (var p in f.positionalParameters.take(f.requiredParameterCount)) {
+    for (var p in f.positionalParameters) {
       var jsParam = _emitIdentifier(p.name);
-      initParameter(p, jsParam);
-    }
-    for (var p in f.positionalParameters.skip(f.requiredParameterCount)) {
-      var jsParam = _emitIdentifier(p.name);
-      var defaultValue = _defaultParamValue(p);
-      if (defaultValue != null) {
-        body.add(js.statement(
-            'if (# === void 0) # = #;', [jsParam, jsParam, defaultValue]));
-      }
       initParameter(p, jsParam);
     }
     for (var p in f.namedParameters) {
@@ -3170,7 +3134,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
     for (var t in typeFormals) {
       if (t.isGenericCovariantImpl && !_types.isTop(t.bound)) {
         body.add(runtimeStatement('checkTypeBound(#, #, #)', [
-          _emitType(TypeParameterType(t)),
+          _emitType(TypeParameterType(t, Nullability.legacy)),
           _emitType(t.bound),
           propertyName(t.name)
         ]));
@@ -3237,7 +3201,8 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
     }
 
     if (node is AsExpression && node.isTypeError) {
-      assert(node.getStaticType(_types) == _types.coreTypes.boolLegacyRawType);
+      assert(node.getStaticType(_staticTypeContext) ==
+          _types.coreTypes.boolLegacyRawType);
       return runtimeCall('dtest(#)', [_visitExpression(node.operand)]);
     }
 
@@ -3260,7 +3225,8 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
   ///
   /// This is the most common kind of marking, and is used for most expressions
   /// and statements.
-  SourceLocation _nodeStart(TreeNode node) => _getLocation(node.fileOffset);
+  SourceLocation _nodeStart(TreeNode node) =>
+      _toSourceLocation(node.fileOffset);
 
   /// Gets the end position of [node] for use in source mapping.
   ///
@@ -3271,7 +3237,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
   /// has already been emitted. For example, `foo.bar` we only need to mark the
   /// end of `.bar` to ensure `foo.bar` has a hover tooltip.
   NodeEnd _nodeEnd(int endOffset) {
-    var loc = _getLocation(endOffset);
+    var loc = _toSourceLocation(endOffset);
     return loc != null ? NodeEnd(loc) : null;
   }
 
@@ -3280,12 +3246,12 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
   //
   // TODO(jmesserly): we need a lot more nodes to support hover.
   NodeSpan _variableSpan(int offset, int nameLength) {
-    var start = _getLocation(offset);
-    var end = _getLocation(offset + nameLength);
+    var start = _toSourceLocation(offset);
+    var end = _toSourceLocation(offset + nameLength);
     return start != null && end != null ? NodeSpan(start, end) : null;
   }
 
-  SourceLocation _getLocation(int offset) {
+  SourceLocation _toSourceLocation(int offset) {
     if (offset == -1) return null;
     var fileUri = _currentUri;
     if (fileUri == null) return null;
@@ -3311,8 +3277,8 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
   /// source code.
   HoverComment _hoverComment(
       js_ast.Expression expr, int offset, int nameLength) {
-    var start = _getLocation(offset);
-    var end = _getLocation(offset + nameLength);
+    var start = _toSourceLocation(offset);
+    var end = _toSourceLocation(offset + nameLength);
     return start != null && end != null ? HoverComment(expr, start, end) : null;
   }
 
@@ -3363,7 +3329,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
   js_ast.Statement visitAssertStatement(AssertStatement node) {
     if (!_options.enableAsserts) return js_ast.EmptyStatement();
     var condition = node.condition;
-    var conditionType = condition.getStaticType(_types);
+    var conditionType = condition.getStaticType(_staticTypeContext);
     var jsCondition = _visitExpression(condition);
 
     var boolType = _coreTypes.boolLegacyRawType;
@@ -3377,11 +3343,12 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
       jsCondition = runtimeCall('test(#)', [jsCondition]);
     }
 
-    var encodedConditionSource = node
-        .enclosingComponent.uriToSource[node.location.file].source
-        .sublist(node.conditionStartOffset, node.conditionEndOffset);
-    var conditionSource = utf8.decode(encodedConditionSource);
-    var location = _getLocation(node.conditionStartOffset);
+    var encodedSource =
+        node.enclosingComponent.uriToSource[node.location.file].source;
+    var source = utf8.decode(encodedSource, allowMalformed: true);
+    var conditionSource =
+        source.substring(node.conditionStartOffset, node.conditionEndOffset);
+    var location = _toSourceLocation(node.conditionStartOffset);
     return js.statement(' if (!#) #.assertFailed(#, #, #, #, #);', [
       jsCondition,
       runtimeModule,
@@ -4015,7 +3982,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
     // encoded as a different node, or possibly eliminated?
     // (Regardless, we'll still need to handle the callable JS interop classes.)
     if (memberName == 'call' &&
-        _isDirectCallable(receiver.getStaticType(_types))) {
+        _isDirectCallable(receiver.getStaticType(_staticTypeContext))) {
       // Tearoff of `call` on a function type is a no-op;
       return _visitExpression(receiver);
     }
@@ -4090,8 +4057,6 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
       _emitStaticGet(node.target);
 
   js_ast.Expression _emitStaticGet(Member target) {
-    // TODO(vsm): Re-inline constants.  See:
-    // https://github.com/dart-lang/sdk/issues/36285
     var result = _emitStaticTarget(target);
     if (_reifyTearoff(target)) {
       // TODO(jmesserly): we could tag static/top-level function types once
@@ -4140,7 +4105,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
         target.hasGetter &&
         _isDynamicOrFunction(target.getterType);
     if (name == 'call') {
-      var receiverType = receiver.getStaticType(_types);
+      var receiverType = receiver.getStaticType(_staticTypeContext);
       if (isCallingDynamicField || _isDynamicOrFunction(receiverType)) {
         return _emitDynamicInvoke(jsReceiver, null, args, arguments);
       } else if (_isDirectCallable(receiverType)) {
@@ -4167,7 +4132,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
     if (target is Field || target is Procedure && target.isAccessor) {
       var fromType = target.getterType;
       if (fromType is InterfaceType) {
-        var callName = _getImplicitCallTarget(fromType);
+        var callName = _implicitCallTarget(fromType);
         if (callName != null) {
           return js.call('#.#.#(#)', [jsReceiver, jsName, callName, args]);
         }
@@ -4215,9 +4180,9 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
   }
 
   bool _isDirectCallable(DartType t) =>
-      t is FunctionType || t is InterfaceType && usesJSInterop(t.classNode);
+      t is FunctionType || (t is InterfaceType && usesJSInterop(t.classNode));
 
-  js_ast.Expression _getImplicitCallTarget(InterfaceType from) {
+  js_ast.Expression _implicitCallTarget(InterfaceType from) {
     var c = from.classNode;
     var member = _hierarchy.getInterfaceMember(c, Name("call"));
     if (member is Procedure && !member.isAccessor && !usesJSInterop(c)) {
@@ -4404,7 +4369,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
     if (target != null) {
       var targetClass = target.enclosingClass;
       var leftType = _coreTypes.legacyRawType(targetClass);
-      var rightType = right.getStaticType(_types);
+      var rightType = right.getStaticType(_staticTypeContext);
 
       if (_typeRep.binaryOperationIsPrimitive(leftType, rightType) ||
           leftType == _types.coreTypes.stringLegacyRawType && op == '+') {
@@ -4504,7 +4469,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
     var targetClass = target?.enclosingClass;
     var leftType = targetClass != null
         ? _coreTypes.legacyRawType(targetClass)
-        : left.getStaticType(_types);
+        : left.getStaticType(_staticTypeContext);
 
     // Conceptually `x == y` in Dart is defined as:
     //
@@ -4803,15 +4768,16 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
   }
 
   bool _isNull(Expression expr) =>
-      expr is NullLiteral || expr.getStaticType(_types) == _coreTypes.nullType;
+      expr is NullLiteral ||
+      expr.getStaticType(_staticTypeContext) == _coreTypes.nullType;
 
   bool _doubleEqIsIdentity(Expression left, Expression right) {
     // If we statically know LHS or RHS is null we can use ==.
     if (_isNull(left) || _isNull(right)) return true;
     // If the representation of the  two types will not induce conversion in
     // JS then we can use == .
-    return !_typeRep.equalityMayConvert(
-        left.getStaticType(_types), right.getStaticType(_types));
+    return !_typeRep.equalityMayConvert(left.getStaticType(_staticTypeContext),
+        right.getStaticType(_staticTypeContext));
   }
 
   bool _tripleEqIsIdentity(Expression left, Expression right) {
@@ -4882,7 +4848,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
 
     var type = ctorClass.typeParameters.isEmpty
         ? _coreTypes.legacyRawType(ctorClass)
-        : InterfaceType(ctorClass, args.types);
+        : InterfaceType(ctorClass, Nullability.legacy, args.types);
 
     if (isFromEnvironmentInvocation(_coreTypes, node)) {
       var value = _constants.evaluate(node);
@@ -4943,7 +4909,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
     if (typeArgs.isEmpty) return _emitType(type);
     identity ??= _typeRep.isPrimitive(typeArgs[0]);
     var c = identity ? _identityHashMapImplClass : _linkedHashMapImplClass;
-    return _emitType(InterfaceType(c, typeArgs));
+    return _emitType(InterfaceType(c, Nullability.legacy, typeArgs));
   }
 
   js_ast.Expression _emitSetImplType(InterfaceType type, {bool identity}) {
@@ -4951,7 +4917,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
     if (typeArgs.isEmpty) return _emitType(type);
     identity ??= _typeRep.isPrimitive(typeArgs[0]);
     var c = identity ? _identityHashSetImplClass : _linkedHashSetImplClass;
-    return _emitType(InterfaceType(c, typeArgs));
+    return _emitType(InterfaceType(c, Nullability.legacy, typeArgs));
   }
 
   js_ast.Expression _emitObjectLiteral(Arguments node) {
@@ -5015,11 +4981,11 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
       if (jsExpr is js_ast.LiteralString && jsExpr.valueWithoutQuotes.isEmpty) {
         continue;
       }
-      parts.add(
-          e.getStaticType(_types) == _types.coreTypes.stringLegacyRawType &&
-                  !isNullable(e)
-              ? jsExpr
-              : runtimeCall('str(#)', [jsExpr]));
+      parts.add(e.getStaticType(_staticTypeContext) ==
+                  _types.coreTypes.stringLegacyRawType &&
+              !isNullable(e)
+          ? jsExpr
+          : runtimeCall('str(#)', [jsExpr]));
     }
     if (parts.isEmpty) return js.string('');
     return js_ast.Expression.binary(parts, '+');
@@ -5077,7 +5043,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
     Expression fromExpr = node.operand;
     var to = node.type;
     var jsFrom = _visitExpression(fromExpr);
-    var from = fromExpr.getStaticType(_types);
+    var from = fromExpr.getStaticType(_staticTypeContext);
 
     // If the check was put here by static analysis to ensure soundness, we
     // can't skip it. For example, one could implement covariant generic caller
@@ -5172,7 +5138,8 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
     if (itemType == const DynamicType()) return list;
 
     // Call `new JSArray<E>.of(list)`
-    var arrayType = InterfaceType(_jsArrayClass, [itemType]);
+    var arrayType =
+        InterfaceType(_jsArrayClass, Nullability.legacy, [itemType]);
     return js.call('#.of(#)', [_emitType(arrayType), list]);
   }
 
@@ -5188,8 +5155,8 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
   js_ast.Expression visitSetLiteral(SetLiteral node) {
     // TODO(markzipan): remove const check when we use front-end const eval
     if (!node.isConst) {
-      var setType = visitInterfaceType(
-          InterfaceType(_linkedHashSetClass, [node.typeArgument]));
+      var setType = visitInterfaceType(InterfaceType(
+          _linkedHashSetClass, Nullability.legacy, [node.typeArgument]));
       if (node.expressions.isEmpty) {
         return js.call('#.new()', [setType]);
       }
@@ -5217,8 +5184,8 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
 
     // TODO(markzipan): remove const check when we use front-end const eval
     if (!node.isConst) {
-      var mapType =
-          _emitMapImplType(node.getStaticType(_types) as InterfaceType);
+      var mapType = _emitMapImplType(
+          node.getStaticType(_staticTypeContext) as InterfaceType);
       if (node.entries.isEmpty) {
         return js.call('new #.new()', [mapType]);
       }
@@ -5241,7 +5208,8 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
   js_ast.Expression visitFunctionExpression(FunctionExpression node) {
     var fn = _emitArrowFunction(node);
     if (!_reifyFunctionType(node.function)) return fn;
-    return _emitFunctionTagged(fn, node.getStaticType(_types) as FunctionType);
+    return _emitFunctionTagged(
+        fn, node.getStaticType(_staticTypeContext) as FunctionType);
   }
 
   js_ast.ArrowFun _emitArrowFunction(FunctionExpression node) {
@@ -5322,7 +5290,7 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
       js_ast.Expression genFn = js_ast.Fun([], jsBlock, isGenerator: true);
       if (usesThisOrSuper(genFn)) genFn = js.call('#.bind(this)', genFn);
       var asyncLibrary = emitLibraryName(_coreTypes.asyncLibrary);
-      var returnType = _emitType(node.getStaticType(_types));
+      var returnType = _emitType(node.getStaticType(_staticTypeContext));
       var asyncCall =
           js.call('#.async(#, #)', [asyncLibrary, returnType, genFn]);
       return js_ast.Yield(asyncCall);
@@ -5521,7 +5489,8 @@ class ProgramCompiler extends ComputeOnceConstantVisitor<js_ast.Expression>
       return js_ast.Property(symbol, constant);
     }
 
-    var type = visitInterfaceType(node.getType(_types) as InterfaceType);
+    var type =
+        visitInterfaceType(node.getType(_staticTypeContext) as InterfaceType);
     var prototype = js.call("#.prototype", [type]);
     var properties = [
       js_ast.Property(propertyName("__proto__"), prototype),

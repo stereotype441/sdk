@@ -11,6 +11,7 @@
 #include "vm/native_symbol.h"
 #include "vm/object.h"
 #include "vm/object_store.h"
+#include "vm/profiler.h"
 #include "vm/raw_object.h"
 #include "vm/raw_object_fields.h"
 #include "vm/reusable_handles.h"
@@ -1007,8 +1008,82 @@ void HeapSnapshotWriter::Write() {
     isolate()->VisitWeakPersistentHandles(&visitor);
   }
 
+  {
+    WriteUtf8("RSS");
+    WriteUnsigned(Service::CurrentRSS());
+
+    WriteUtf8("Dart Profiler Samples");
+    WriteUnsigned(Profiler::Size());
+
+    WriteUtf8("Dart Timeline Events");
+    WriteUnsigned(Timeline::recorder()->Size());
+
+    class WriteIsolateHeaps : public IsolateVisitor {
+     public:
+      explicit WriteIsolateHeaps(HeapSnapshotWriter* writer)
+          : writer_(writer) {}
+
+      virtual void VisitIsolate(Isolate* isolate) {
+        writer_->WriteUtf8(isolate->name());
+        writer_->WriteUnsigned((isolate->heap()->TotalCapacityInWords() +
+                                isolate->heap()->TotalExternalInWords()) *
+                               kWordSize);
+      }
+
+     private:
+      HeapSnapshotWriter* const writer_;
+    };
+    WriteIsolateHeaps visitor(this);
+    Isolate::VisitIsolates(&visitor);
+  }
+
   ClearObjectIds();
   Flush(true);
+}
+
+CountObjectsVisitor::CountObjectsVisitor(Thread* thread, intptr_t class_count)
+    : ObjectVisitor(),
+      HandleVisitor(thread),
+      new_count_(new intptr_t[class_count]),
+      new_size_(new intptr_t[class_count]),
+      new_external_size_(new intptr_t[class_count]),
+      old_count_(new intptr_t[class_count]),
+      old_size_(new intptr_t[class_count]),
+      old_external_size_(new intptr_t[class_count]) {
+  memset(new_count_.get(), 0, class_count * sizeof(intptr_t));
+  memset(new_size_.get(), 0, class_count * sizeof(intptr_t));
+  memset(new_external_size_.get(), 0, class_count * sizeof(intptr_t));
+  memset(old_count_.get(), 0, class_count * sizeof(intptr_t));
+  memset(old_size_.get(), 0, class_count * sizeof(intptr_t));
+  memset(old_external_size_.get(), 0, class_count * sizeof(intptr_t));
+}
+
+void CountObjectsVisitor::VisitObject(RawObject* obj) {
+  intptr_t cid = obj->GetClassId();
+  intptr_t size = obj->HeapSize();
+  if (obj->IsNewObject()) {
+    new_count_[cid] += 1;
+    new_size_[cid] += size;
+  } else {
+    old_count_[cid] += 1;
+    old_size_[cid] += size;
+  }
+}
+
+void CountObjectsVisitor::VisitHandle(uword addr) {
+  FinalizablePersistentHandle* handle =
+      reinterpret_cast<FinalizablePersistentHandle*>(addr);
+  RawObject* obj = handle->raw();
+  if (!obj->IsHeapObject()) {
+    return;
+  }
+  intptr_t cid = obj->GetClassId();
+  intptr_t size = handle->external_size();
+  if (obj->IsNewObject()) {
+    new_external_size_[cid] += size;
+  } else {
+    old_external_size_[cid] += size;
+  }
 }
 
 #endif  // !defined(PRODUCT)

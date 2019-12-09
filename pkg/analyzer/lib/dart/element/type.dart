@@ -20,6 +20,7 @@
 /// type parameters. But if we declare a variable as `Pair<String, int> pair;`
 /// the references to `String` and `int` are type arguments.
 import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/src/dart/element/type.dart' show InterfaceTypeImpl;
 
 /// The type associated with elements in the element model.
@@ -31,6 +32,7 @@ abstract class DartType {
   ///
   /// Clients should not depend on the content of the returned value as it will
   /// be changed if doing so would improve the UX.
+  @deprecated
   String get displayName;
 
   /// Return the element representing the declaration of this type, or `null` if
@@ -110,6 +112,23 @@ abstract class DartType {
   /// Return the name of this type, or `null` if the type does not have a name,
   /// such as when the type represents the type of an unnamed function.
   String get name;
+
+  /// Return the nullability suffix of this type.
+  NullabilitySuffix get nullabilitySuffix;
+
+  /// Return the presentation of this type as it should appear when presented
+  /// to users in contexts such as error messages.
+  ///
+  /// If [withNullability] is `true`, then [NullabilitySuffix.question] and
+  /// [NullabilitySuffix.star] will be be represented as `?` and `*`.
+  /// [NullabilitySuffix.none] does not have any explicit presentation.
+  ///
+  /// If [withNullability] is `false`, nullability suffixes will not be
+  /// included into the presentation.
+  ///
+  /// Clients should not depend on the content of the returned value as it will
+  /// be changed if doing so would improve the UX.
+  String getDisplayString({bool withNullability = false});
 
   /// If this type is a [TypeParameterType], returns its bound if it has one, or
   /// [objectType] otherwise.
@@ -356,7 +375,7 @@ abstract class InterfaceType implements ParameterizedType {
   /// need to be supplied for public names.
   @deprecated
   PropertyAccessorElement lookUpInheritedGetter(String name,
-      {LibraryElement library, bool thisType: true});
+      {LibraryElement library, bool thisType = true});
 
   /// Look up the member with the given [name] in this type and all extended
   /// and mixed in classes, starting from this type. If the search fails,
@@ -382,7 +401,7 @@ abstract class InterfaceType implements ParameterizedType {
   /// need to be supplied for public names.
   @deprecated
   MethodElement lookUpInheritedMethod(String name,
-      {LibraryElement library, bool thisType: true});
+      {LibraryElement library, bool thisType = true});
 
   /// Look up the member with the given [name] in this type and all extended
   /// and mixed in classes, and by default including [thisType]. If the search
@@ -395,7 +414,7 @@ abstract class InterfaceType implements ParameterizedType {
   /// need to be supplied for public names.
   @deprecated
   PropertyAccessorElement lookUpInheritedSetter(String name,
-      {LibraryElement library, bool thisType: true});
+      {LibraryElement library, bool thisType = true});
 
   /// Return the element representing the method that results from looking up
   /// the method with the given [name] in this class with respect to the given

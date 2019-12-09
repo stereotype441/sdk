@@ -61,7 +61,8 @@ ScopeBuilder::ScopeBuilder(ParsedFunction* parsed_function)
           ExternalTypedData::Handle(Z,
                                     parsed_function->function().KernelData()),
           parsed_function->function().KernelDataProgramOffset()),
-      inferred_type_metadata_helper_(&helper_),
+      constant_reader_(&helper_, &active_class_),
+      inferred_type_metadata_helper_(&helper_, &constant_reader_),
       procedure_attributes_metadata_helper_(&helper_),
       type_translator_(&helper_,
                        &active_class_,
@@ -652,14 +653,14 @@ void ScopeBuilder::VisitExpression() {
           helper_.ReadUInt();          // read kernel position.
       helper_.ReadUInt();              // read relative variable index.
       helper_.SkipOptionalDartType();  // read promoted type.
-      LookupVariable(variable_kernel_offset);
+      VisitVariableGet(variable_kernel_offset);
       return;
     }
     case kSpecializedVariableGet: {
       helper_.ReadPosition();  // read position.
       intptr_t variable_kernel_offset =
           helper_.ReadUInt();  // read kernel position.
-      LookupVariable(variable_kernel_offset);
+      VisitVariableGet(variable_kernel_offset);
       return;
     }
     case kVariableSet: {
@@ -750,13 +751,11 @@ void ScopeBuilder::VisitExpression() {
       helper_.SkipCanonicalNameReference();
       return;
     case kStaticInvocation:
-    case kConstStaticInvocation:
       helper_.ReadPosition();                // read position.
       helper_.SkipCanonicalNameReference();  // read procedure_reference.
       VisitArguments();                      // read arguments.
       return;
     case kConstructorInvocation:
-    case kConstConstructorInvocation:
       helper_.ReadPosition();                // read position.
       helper_.SkipCanonicalNameReference();  // read target_reference.
       VisitArguments();                      // read arguments.
@@ -790,15 +789,6 @@ void ScopeBuilder::VisitExpression() {
       }
       return;
     }
-    case kListConcatenation:
-    case kSetConcatenation:
-    case kMapConcatenation:
-    case kInstanceCreation:
-    case kFileUriExpression:
-      // Collection concatenation, instance creation operations and
-      // in-expression URI changes are removed by the constant evaluator.
-      UNREACHABLE();
-      break;
     case kIsExpression:
       helper_.ReadPosition();  // read position.
       VisitExpression();       // read operand.
@@ -809,9 +799,6 @@ void ScopeBuilder::VisitExpression() {
       helper_.ReadFlags();     // read flags.
       VisitExpression();       // read operand.
       VisitDartType();         // read type.
-      return;
-    case kSymbolLiteral:
-      helper_.SkipStringReference();  // read index into string table.
       return;
     case kTypeLiteral:
       VisitDartType();  // read type.
@@ -826,8 +813,7 @@ void ScopeBuilder::VisitExpression() {
       helper_.ReadPosition();  // read position.
       VisitExpression();       // read expression.
       return;
-    case kListLiteral:
-    case kConstListLiteral: {
+    case kListLiteral: {
       helper_.ReadPosition();                           // read position.
       VisitDartType();                                  // read type.
       intptr_t list_length = helper_.ReadListLength();  // read list length.
@@ -836,15 +822,13 @@ void ScopeBuilder::VisitExpression() {
       }
       return;
     }
-    case kSetLiteral:
-    case kConstSetLiteral: {
+    case kSetLiteral: {
       // Set literals are currently desugared in the frontend and will not
       // reach the VM. See http://dartbug.com/35124 for discussion.
       UNREACHABLE();
       return;
     }
-    case kMapLiteral:
-    case kConstMapLiteral: {
+    case kMapLiteral: {
       helper_.ReadPosition();                           // read position.
       VisitDartType();                                  // read key type.
       VisitDartType();                                  // read value type.
@@ -917,10 +901,6 @@ void ScopeBuilder::VisitExpression() {
       helper_.SkipDartType();
       helper_.SkipConstantReference();
       return;
-    case kDeprecated_ConstantExpression: {
-      helper_.SkipConstantReference();
-      return;
-    }
     case kInstantiation: {
       VisitExpression();
       const intptr_t list_length =
@@ -934,6 +914,22 @@ void ScopeBuilder::VisitExpression() {
     case kCheckLibraryIsLoaded:
       helper_.ReadUInt();  // library index
       break;
+    case kConstStaticInvocation:
+    case kConstConstructorInvocation:
+    case kConstListLiteral:
+    case kConstSetLiteral:
+    case kConstMapLiteral:
+    case kSymbolLiteral:
+      // Const invocations and const literals are removed by the
+      // constant evaluator.
+    case kListConcatenation:
+    case kSetConcatenation:
+    case kMapConcatenation:
+    case kInstanceCreation:
+    case kFileUriExpression:
+      // Collection concatenation, instance creation operations and
+      // in-expression URI changes are internal to the front end and
+      // removed by the constant evaluator.
     default:
       ReportUnexpectedTag("expression", tag);
       UNREACHABLE();
@@ -1264,6 +1260,7 @@ void ScopeBuilder::VisitVariableDeclaration() {
                            ? GenerateName(":var", name_index_++)
                            : H.DartSymbolObfuscate(helper.name_index_);
 
+  intptr_t initializer_offset = helper_.ReaderOffset();
   Tag tag = helper_.ReadTag();  // read (first part of) initializer.
   if (tag == kSomething) {
     VisitExpression();  // read (actual) initializer.
@@ -1280,7 +1277,21 @@ void ScopeBuilder::VisitVariableDeclaration() {
   if (helper.IsFinal()) {
     variable->set_is_final();
   }
-  scope_->AddVariable(variable);
+  if (helper.IsLate()) {
+    variable->set_is_late();
+    variable->set_late_init_offset(initializer_offset);
+  }
+  // Lift the two special async vars out of the function body scope, into the
+  // outer function declaration scope.
+  // This way we can allocate them in the outermost context at fixed indices,
+  // allowing support for --lazy-async-stacks implementation to find awaiters.
+  if (name.Equals(Symbols::AwaitJumpVar()) ||
+      name.Equals(Symbols::AsyncCompleter()) ||
+      name.Equals(Symbols::Controller())) {
+    scope_->parent()->AddVariable(variable);
+  } else {
+    scope_->AddVariable(variable);
+  }
   result_->locals.Insert(helper_.data_program_offset_ + kernel_offset_no_tag,
                          variable);
 }
@@ -1300,8 +1311,10 @@ void ScopeBuilder::VisitDartType() {
     case kDynamicType:
     case kVoidType:
     case kBottomType:
-    case kNeverType:
       // those contain nothing.
+      return;
+    case kNeverType:
+      helper_.ReadNullability();
       return;
     case kInterfaceType:
       VisitInterfaceType(false);
@@ -1369,9 +1382,7 @@ void ScopeBuilder::VisitFunctionType(bool simple) {
       // read string reference (i.e. named_parameters[i].name).
       helper_.SkipStringReference();
       VisitDartType();  // read named_parameters[i].type.
-      if (helper_.translation_helper_.info().kernel_binary_version() >= 29) {
-        helper_.ReadByte();  // read flags
-      }
+      helper_.ReadByte();  // read flags
     }
   }
 
@@ -1577,12 +1588,16 @@ LocalVariable* ScopeBuilder::MakeVariable(
     const String& name,
     const AbstractType& type,
     const InferredTypeMetadata* param_type_md /* = NULL */) {
-  CompileType* param_type = NULL;
-  if ((param_type_md != NULL) && !param_type_md->IsTrivial()) {
+  CompileType* param_type = nullptr;
+  const Object* param_value = nullptr;
+  if (param_type_md != nullptr && !param_type_md->IsTrivial()) {
     param_type = new (Z) CompileType(param_type_md->ToCompileType(Z));
+    if (param_type_md->IsConstant()) {
+      param_value = &param_type_md->constant_value;
+    }
   }
-  return new (Z)
-      LocalVariable(declaration_pos, token_pos, name, type, param_type);
+  return new (Z) LocalVariable(declaration_pos, token_pos, name, type,
+                               param_type, param_value);
 }
 
 void ScopeBuilder::AddExceptionVariable(
@@ -1700,7 +1715,20 @@ void ScopeBuilder::AddSwitchVariable() {
   }
 }
 
-void ScopeBuilder::LookupVariable(intptr_t declaration_binary_offset) {
+void ScopeBuilder::VisitVariableGet(intptr_t declaration_binary_offset) {
+  LocalVariable* variable = LookupVariable(declaration_binary_offset);
+  if (variable->is_late()) {
+    // Late variable initializer expressions may also contain local variables
+    // that need to be captured.
+    AlternativeReadingScope alt(&helper_.reader_, variable->late_init_offset());
+    if (helper_.ReadTag() != kNothing) {
+      VisitExpression();
+    }
+  }
+}
+
+LocalVariable* ScopeBuilder::LookupVariable(
+    intptr_t declaration_binary_offset) {
   LocalVariable* variable = result_->locals.Lookup(declaration_binary_offset);
   if (variable == NULL) {
     // We have not seen a declaration of the variable, so it must be the
@@ -1735,6 +1763,7 @@ void ScopeBuilder::LookupVariable(intptr_t declaration_binary_offset) {
   } else {
     ASSERT(variable->owner()->function_level() == scope_->function_level());
   }
+  return variable;
 }
 
 StringIndex ScopeBuilder::GetNameFromVariableDeclaration(

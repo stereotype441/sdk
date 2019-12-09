@@ -8,7 +8,7 @@
 #if !defined(DART_PRECOMPILED_RUNTIME)
 
 #include "vm/compiler/frontend/bytecode_reader.h"
-#include "vm/compiler/frontend/constant_evaluator.h"
+#include "vm/compiler/frontend/constant_reader.h"
 #include "vm/compiler/frontend/kernel_to_il.h"
 #include "vm/compiler/frontend/kernel_translation_helper.h"
 #include "vm/compiler/frontend/scope_builder.h"
@@ -21,11 +21,9 @@ namespace kernel {
 
 class StreamingFlowGraphBuilder : public KernelReaderHelper {
  public:
-  StreamingFlowGraphBuilder(
-      FlowGraphBuilder* flow_graph_builder,
-      const ExternalTypedData& data,
-      intptr_t data_program_offset,
-      GrowableObjectArray* record_yield_positions = nullptr)
+  StreamingFlowGraphBuilder(FlowGraphBuilder* flow_graph_builder,
+                            const ExternalTypedData& data,
+                            intptr_t data_program_offset)
       : KernelReaderHelper(
             flow_graph_builder->zone_,
             &flow_graph_builder->translation_helper_,
@@ -37,17 +35,13 @@ class StreamingFlowGraphBuilder : public KernelReaderHelper {
         flow_graph_builder_(flow_graph_builder),
         active_class_(&flow_graph_builder->active_class_),
         type_translator_(this, active_class_, /* finalize= */ true),
-        constant_evaluator_(this,
-                            &type_translator_,
-                            active_class_,
-                            flow_graph_builder),
+        constant_reader_(this, active_class_),
         bytecode_metadata_helper_(this, active_class_),
         direct_call_metadata_helper_(this),
-        inferred_type_metadata_helper_(this),
+        inferred_type_metadata_helper_(this, &constant_reader_),
         procedure_attributes_metadata_helper_(this),
         call_site_attributes_metadata_helper_(this, &type_translator_),
-        closure_owner_(Object::Handle(flow_graph_builder->zone_)),
-        record_yield_positions_(record_yield_positions) {}
+        closure_owner_(Object::Handle(flow_graph_builder->zone_)) {}
 
   virtual ~StreamingFlowGraphBuilder() {}
 
@@ -69,6 +63,7 @@ class StreamingFlowGraphBuilder : public KernelReaderHelper {
   FlowGraph* BuildGraphOfFieldInitializer();
   Fragment BuildFieldInitializer(const Field& field,
                                  bool only_for_side_effects);
+  Fragment BuildLateFieldInitializer(const Field& field, bool has_initializer);
   Fragment BuildInitializers(const Class& parent_class);
   FlowGraph* BuildGraphOfFunction(bool constructor);
 
@@ -88,6 +83,7 @@ class StreamingFlowGraphBuilder : public KernelReaderHelper {
   Fragment BuildFirstTimePrologue(const Function& dart_function,
                                   LocalVariable* first_parameter,
                                   intptr_t type_parameters_offset);
+  Fragment ClearRawParameters(const Function& dart_function);
   Fragment DebugStepCheckInPrologue(const Function& dart_function,
                                     TokenPosition position);
   Fragment SetAsyncStackTrace(const Function& dart_function);
@@ -160,7 +156,8 @@ class StreamingFlowGraphBuilder : public KernelReaderHelper {
   void InlineBailout(const char* reason);
   Fragment DebugStepCheck(TokenPosition position);
   Fragment LoadLocal(LocalVariable* variable);
-  Fragment Return(TokenPosition position);
+  Fragment Return(TokenPosition position,
+                  intptr_t yield_index = RawPcDescriptors::kInvalidYieldIndex);
   Fragment PushArgument();
   Fragment EvaluateAssertion();
   Fragment RethrowException(TokenPosition position, int catch_try_index);
@@ -221,6 +218,8 @@ class StreamingFlowGraphBuilder : public KernelReaderHelper {
   Fragment StringInterpolate(TokenPosition position);
   Fragment StringInterpolateSingle(TokenPosition position);
   Fragment ThrowTypeError();
+  Fragment ThrowLateInitializationError(TokenPosition position,
+                                        const String& name);
   Fragment LoadInstantiatorTypeArguments();
   Fragment LoadFunctionTypeArguments();
   Fragment InstantiateType(const AbstractType& type);
@@ -279,6 +278,8 @@ class StreamingFlowGraphBuilder : public KernelReaderHelper {
   Fragment BuildInvalidExpression(TokenPosition* position);
   Fragment BuildVariableGet(TokenPosition* position);
   Fragment BuildVariableGet(uint8_t payload, TokenPosition* position);
+  Fragment BuildVariableGetImpl(intptr_t variable_kernel_position,
+                                TokenPosition position);
   Fragment BuildVariableSet(TokenPosition* position);
   Fragment BuildVariableSet(uint8_t payload, TokenPosition* position);
   Fragment BuildPropertyGet(TokenPosition* position);
@@ -299,8 +300,8 @@ class StreamingFlowGraphBuilder : public KernelReaderHelper {
   Fragment BuildMethodInvocation(TokenPosition* position);
   Fragment BuildDirectMethodInvocation(TokenPosition* position);
   Fragment BuildSuperMethodInvocation(TokenPosition* position);
-  Fragment BuildStaticInvocation(bool is_const, TokenPosition* position);
-  Fragment BuildConstructorInvocation(bool is_const, TokenPosition* position);
+  Fragment BuildStaticInvocation(TokenPosition* position);
+  Fragment BuildConstructorInvocation(TokenPosition* position);
   Fragment BuildNot(TokenPosition* position);
   Fragment BuildNullCheck(TokenPosition* position);
   Fragment BuildLogicalExpression(TokenPosition* position);
@@ -310,13 +311,12 @@ class StreamingFlowGraphBuilder : public KernelReaderHelper {
   Fragment BuildStringConcatenation(TokenPosition* position);
   Fragment BuildIsExpression(TokenPosition* position);
   Fragment BuildAsExpression(TokenPosition* position);
-  Fragment BuildSymbolLiteral(TokenPosition* position);
   Fragment BuildTypeLiteral(TokenPosition* position);
   Fragment BuildThisExpression(TokenPosition* position);
   Fragment BuildRethrow(TokenPosition* position);
   Fragment BuildThrow(TokenPosition* position);
-  Fragment BuildListLiteral(bool is_const, TokenPosition* position);
-  Fragment BuildMapLiteral(bool is_const, TokenPosition* position);
+  Fragment BuildListLiteral(TokenPosition* position);
+  Fragment BuildMapLiteral(TokenPosition* position);
   Fragment BuildFunctionExpression();
   Fragment BuildLet(TokenPosition* position);
   Fragment BuildBlockExpression();
@@ -365,14 +365,13 @@ class StreamingFlowGraphBuilder : public KernelReaderHelper {
   FlowGraphBuilder* flow_graph_builder_;
   ActiveClass* const active_class_;
   TypeTranslator type_translator_;
-  ConstantEvaluator constant_evaluator_;
+  ConstantReader constant_reader_;
   BytecodeMetadataHelper bytecode_metadata_helper_;
   DirectCallMetadataHelper direct_call_metadata_helper_;
   InferredTypeMetadataHelper inferred_type_metadata_helper_;
   ProcedureAttributesMetadataHelper procedure_attributes_metadata_helper_;
   CallSiteAttributesMetadataHelper call_site_attributes_metadata_helper_;
   Object& closure_owner_;
-  GrowableObjectArray* record_yield_positions_;
 
   friend class KernelLoader;
 

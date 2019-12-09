@@ -22,7 +22,7 @@ import 'collections.dart'
         IfMapEntry,
         SpreadElement;
 
-import 'kernel_shadow_ast.dart';
+import 'internal_ast.dart';
 
 /// A shadow tree factory.
 class Forest {
@@ -323,7 +323,7 @@ class Forest {
   Statement createBreakStatement(int fileOffset, Object label) {
     assert(fileOffset != null);
     // TODO(johnniwinther): Use [label]?
-    return new BreakStatement(null)..fileOffset = fileOffset;
+    return new BreakStatementImpl(isContinue: false)..fileOffset = fileOffset;
   }
 
   /// Return a representation of a catch clause.
@@ -355,7 +355,7 @@ class Forest {
   Statement createContinueStatement(int fileOffset, Object label) {
     assert(fileOffset != null);
     // TODO(johnniwinther): Use [label]?
-    return new BreakStatement(null)..fileOffset = fileOffset;
+    return new BreakStatementImpl(isContinue: true)..fileOffset = fileOffset;
   }
 
   /// Return a representation of a do statement.
@@ -607,8 +607,15 @@ class Forest {
     return new TypeParameter(name);
   }
 
-  TypeParameterType createTypeParameterType(TypeParameter typeParameter) {
-    return new TypeParameterType(typeParameter);
+  TypeParameterType createTypeParameterType(
+      TypeParameter typeParameter, Nullability nullability) {
+    return new TypeParameterType(typeParameter, nullability);
+  }
+
+  TypeParameterType createTypeParameterTypeWithDefaultNullabilityForLibrary(
+      TypeParameter typeParameter, Library library) {
+    return new TypeParameterType.withDefaultNullabilityForLibrary(
+        typeParameter, library);
   }
 
   FunctionExpression createFunctionExpression(
@@ -673,6 +680,23 @@ class Forest {
         interfaceTarget: interfaceTarget,
         forEffect: forEffect,
         readOnlyReceiver: readOnlyReceiver)
+      ..fileOffset = fileOffset;
+  }
+
+  IndexGet createIndexGet(
+      int fileOffset, Expression receiver, Expression index) {
+    assert(fileOffset != null);
+    return new IndexGet(receiver, index)..fileOffset = fileOffset;
+  }
+
+  IndexSet createIndexSet(
+      int fileOffset, Expression receiver, Expression index, Expression value,
+      {bool forEffect, bool readOnlyReceiver}) {
+    assert(fileOffset != null);
+    assert(forEffect != null);
+    assert(readOnlyReceiver != null);
+    return new IndexSet(receiver, index, value,
+        forEffect: forEffect, readOnlyReceiver: readOnlyReceiver)
       ..fileOffset = fileOffset;
   }
 

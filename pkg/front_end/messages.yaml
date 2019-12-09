@@ -420,12 +420,23 @@ MultipleOnClauses:
   analyzerCode: ParserErrorCode.MULTIPLE_ON_CLAUSES
   script: "mixin A on B on C, D {}"
 
+ExtendsFutureOr:
+  template: "The type 'FutureOr' can't be used in an 'extends' clause."
+
 ImplementsFutureOr:
-  template: "'FutureOr' can't be used in an 'implements' clause."
-  script:
-    - >-
-      import 'dart:async';
-      class A implements FutureOr<int> {}
+  template: "The type 'FutureOr' can't be used in an 'implements' clause."
+
+ExtendsNever:
+  template: "The type 'Never' can't be used in an 'extends' clause."
+
+ImplementsNever:
+  template: "The type 'Never' can't be used in an 'implements' clause."
+
+ExtendsVoid:
+  template: "The type 'void' can't be used in an 'extends' clause."
+
+ImplementsVoid:
+  template: "The type 'void' can't be used in an 'implements' clause."
 
 ExpectedClassOrMixinBody:
   index: 8
@@ -780,6 +791,7 @@ ExtraneousModifierInExtension:
   template: "Can't have modifier '#lexeme' in an extension."
   tip: "Try removing '#lexeme'."
   analyzerCode: ParserErrorCode.INVALID_USE_OF_COVARIANT_IN_EXTENSION
+  hasPublishedDocs: true
   script:
     - "extension on String { foo(covariant String child) {} }"
 
@@ -1298,8 +1310,10 @@ ConstructorWithReturnType:
     - "class C { int C() {} }"
 
 ConstructorWithTypeParameters:
+  index: 99
   template: "Constructors can't have type parameters."
-  analyzerCode: TYPE_PARAMETER_ON_CONSTRUCTOR
+  analyzerCode: ParserErrorCode.TYPE_PARAMETER_ON_CONSTRUCTOR
+  tip: "Try removing the type parameters."
   script:
     - "class C { C<T>() {} }"
     - "class C { C.foo<T>() {} }"
@@ -2059,6 +2073,11 @@ TypeVariableSameNameAsEnclosing:
   template: "A type variable can't have the same name as its enclosing declaration."
   analyzerCode: CONFLICTING_TYPE_VARIABLE_AND_CLASS
 
+AnnotationOnFunctionTypeTypeVariable:
+  template: "A type variable on a function type can't have annotations."
+  script:
+    - "main() { Function<@Object() T>() x; }"
+
 ExpectedEnumBody:
   template: "Expected a enum body, but got '#lexeme'."
   tip: "An enum definition must have a body with at least one constant name."
@@ -2116,6 +2135,10 @@ PlatformPrivateLibraryAccess:
 TypedefNotFunction:
   template: "Can't create typedef from non-function type."
   analyzerCode: INVALID_GENERIC_FUNCTION_TYPE
+
+TypedefNotType:
+  template: "Can't create typedef from non-type."
+  analyzerCode: INVALID_TYPE_IN_TYPEDEF
 
 LibraryDirectiveNotFirst:
   index: 37
@@ -3371,15 +3394,6 @@ IncorrectTypeArgumentVariable:
   template: "This is the type variable whose bound isn't conformed to."
   severity: CONTEXT
 
-IntersectionTypeAsTypeArgument:
-  template: "Can't infer a type for '#name', it can be either '#type' or '#type2'."
-  tip: "Try adding a type argument selecting one of the options."
-  script: |
-    class A {}
-    class B extends A {}
-    f<T>(T t) => null;
-    g<S>(S t) => t is B ? f(t) : null;
-
 InferredPackageUri:
   template: "Interpreting this as package URI, '#uri'."
   severity: WARNING
@@ -3707,6 +3721,13 @@ ExplicitExtensionAsExpression:
 
 ExplicitExtensionAsLvalue:
   template: "Explicit extension application cannot be a target for assignment."
+
+DeferredExtensionImport:
+  template: "Extension '#name' cannot be imported through a deferred import."
+  tip: "Try adding the `hide #name` to the import."
+  script:
+    main.dart: "import 'lib.dart' deferred as prefix;"
+    lib.dart: "extension Extension on void {}"
 
 MultipleVarianceModifiers:
   index: 97

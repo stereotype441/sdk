@@ -31,10 +31,11 @@ class BazelFileUriResolverTest with ResourceProviderMixin {
     newFolder('/workspace/bazel-genfiles');
     workspace =
         BazelWorkspace.find(resourceProvider, convertPath('/workspace'));
-    resolver = new BazelFileUriResolver(workspace);
+    resolver = BazelFileUriResolver(workspace);
     newFile('/workspace/test.dart');
     newFile('/workspace/bazel-bin/gen1.dart');
     newFile('/workspace/bazel-genfiles/gen2.dart');
+    expect(workspace.isBazel, isTrue);
   }
 
   void test_resolveAbsolute_doesNotExist() {
@@ -71,13 +72,13 @@ class BazelFileUriResolverTest with ResourceProviderMixin {
   }
 
   void test_resolveAbsolute_notFile_dartUri() {
-    Uri uri = new Uri(scheme: 'dart', path: 'core');
+    Uri uri = Uri(scheme: 'dart', path: 'core');
     Source source = resolver.resolveAbsolute(uri);
     expect(source, isNull);
   }
 
   void test_resolveAbsolute_notFile_httpsUri() {
-    Uri uri = new Uri(scheme: 'https', path: '127.0.0.1/test.dart');
+    Uri uri = Uri(scheme: 'https', path: '127.0.0.1/test.dart');
     Source source = resolver.resolveAbsolute(uri);
     expect(source, isNull);
   }
@@ -89,8 +90,8 @@ class BazelFileUriResolverTest with ResourceProviderMixin {
     expect(source, isNotNull);
     expect(resolver.restoreAbsolute(source), uri);
     expect(
-        resolver.restoreAbsolute(
-            new NonExistingSource(source.fullName, null, null)),
+        resolver
+            .restoreAbsolute(NonExistingSource(source.fullName, null, null)),
         uri);
   }
 
@@ -450,7 +451,8 @@ class BazelPackageUriResolverTest with ResourceProviderMixin {
         'package:third_party.something/foo.dart');
   }
 
-  void _addResources(List<String> paths, {String workspacePath: '/workspace'}) {
+  void _addResources(List<String> paths,
+      {String workspacePath = '/workspace'}) {
     for (String path in paths) {
       if (path.endsWith('/')) {
         newFolder(path.substring(0, path.length - 1));
@@ -460,11 +462,11 @@ class BazelPackageUriResolverTest with ResourceProviderMixin {
     }
     workspace =
         BazelWorkspace.find(resourceProvider, convertPath(workspacePath));
-    resolver = new BazelPackageUriResolver(workspace);
+    resolver = BazelPackageUriResolver(workspace);
   }
 
   void _assertResolve(String uriStr, String posixPath,
-      {bool exists: true, bool restore: true}) {
+      {bool exists = true, bool restore = true}) {
     Uri uri = Uri.parse(uriStr);
     Source source = resolver.resolveAbsolute(uri);
     expect(source, isNotNull);
@@ -480,7 +482,7 @@ class BazelPackageUriResolverTest with ResourceProviderMixin {
 
   void _assertRestore(String posixPath, String expectedUri) {
     String path = convertPath(posixPath);
-    _MockSource source = new _MockSource(path);
+    _MockSource source = _MockSource(path);
     Uri uri = resolver.restoreAbsolute(source);
     expect(uri?.toString(), expectedUri);
   }
@@ -573,7 +575,22 @@ class BazelWorkspacePackageTest with ResourceProviderMixin {
     expect(package, isNull);
   }
 
-  void test_findPackageFor_packagesFileInBinExists() {
+  void test_findPackageFor_packagesFileExistsInOneOfSeveralBinPaths() {
+    _addResources([
+      '/ws/blaze-out/host/bin/some/code/code.packages',
+      '/ws/blaze-out/k8-opt/bin/some/code/',
+      '/ws/some/code/lib/code.dart',
+    ]);
+    workspace =
+        BazelWorkspace.find(resourceProvider, convertPath('/ws/some/code'));
+
+    package = workspace.findPackageFor('/ws/some/code/lib/code.dart');
+    expect(package, isNotNull);
+    expect(package.root, convertPath('/ws/some/code'));
+    expect(package.workspace, equals(workspace));
+  }
+
+  void test_findPackageFor_packagesFileExistsInOnlyBinPath() {
     _addResources([
       '/ws/blaze-out/host/bin/some/code/code.packages',
       '/ws/some/code/lib/code.dart',
@@ -650,7 +667,8 @@ class BazelWorkspaceTest with ResourceProviderMixin {
         resourceProvider, convertPath('/workspace/my/module'));
     expect(workspace.root, convertPath('/workspace'));
     expect(workspace.readonly, isNull);
-    expect(workspace.bin, convertPath('/workspace/blaze-out/host/bin'));
+    expect(workspace.binPaths.single,
+        convertPath('/workspace/blaze-out/host/bin'));
     expect(workspace.genfiles, convertPath('/workspace/blaze-genfiles'));
   }
 
@@ -664,7 +682,25 @@ class BazelWorkspaceTest with ResourceProviderMixin {
         resourceProvider, convertPath('/workspace/my/module'));
     expect(workspace.root, convertPath('/workspace'));
     expect(workspace.readonly, isNull);
-    expect(workspace.bin, convertPath('/workspace/blaze-bin'));
+    expect(workspace.binPaths.single, convertPath('/workspace/blaze-bin'));
+    expect(workspace.genfiles, convertPath('/workspace/blaze-genfiles'));
+  }
+
+  void test_find_hasMultipleBlazeBinFolderInOutFolder() {
+    _addResources([
+      '/workspace/blaze-out/host/bin/',
+      '/workspace/blaze-out/k8-fastbuild/bin/',
+      '/workspace/my/module/',
+    ]);
+    BazelWorkspace workspace = BazelWorkspace.find(
+        resourceProvider, convertPath('/workspace/my/module'));
+    expect(workspace.root, convertPath('/workspace'));
+    expect(workspace.readonly, isNull);
+    expect(workspace.binPaths, hasLength(2));
+    expect(workspace.binPaths,
+        contains(convertPath('/workspace/blaze-out/host/bin')));
+    expect(workspace.binPaths,
+        contains(convertPath('/workspace/blaze-out/k8-fastbuild/bin')));
     expect(workspace.genfiles, convertPath('/workspace/blaze-genfiles'));
   }
 
@@ -678,7 +714,8 @@ class BazelWorkspaceTest with ResourceProviderMixin {
         resourceProvider, convertPath('/Users/user/test/prime/my/module'));
     expect(workspace.root, convertPath('/Users/user/test/prime'));
     expect(workspace.readonly, convertPath('/Users/user/test/READONLY/prime'));
-    expect(workspace.bin, convertPath('/Users/user/test/prime/bazel-bin'));
+    expect(workspace.binPaths.single,
+        convertPath('/Users/user/test/prime/bazel-bin'));
     expect(workspace.genfiles,
         convertPath('/Users/user/test/prime/bazel-genfiles'));
   }
@@ -693,7 +730,8 @@ class BazelWorkspaceTest with ResourceProviderMixin {
         resourceProvider, convertPath('/Users/user/test/prime/my/module'));
     expect(workspace.root, convertPath('/Users/user/test/prime'));
     expect(workspace.readonly, isNull);
-    expect(workspace.bin, convertPath('/Users/user/test/prime/bazel-bin'));
+    expect(workspace.binPaths.single,
+        convertPath('/Users/user/test/prime/bazel-bin'));
     expect(workspace.genfiles,
         convertPath('/Users/user/test/prime/bazel-genfiles'));
   }
@@ -708,7 +746,8 @@ class BazelWorkspaceTest with ResourceProviderMixin {
         resourceProvider, convertPath('/Users/user/test/prime/my/module'));
     expect(workspace.root, convertPath('/Users/user/test/prime'));
     expect(workspace.readonly, convertPath('/Users/user/test/READONLY/prime'));
-    expect(workspace.bin, convertPath('/Users/user/test/prime/blaze-bin'));
+    expect(workspace.binPaths.single,
+        convertPath('/Users/user/test/prime/blaze-bin'));
     expect(workspace.genfiles,
         convertPath('/Users/user/test/prime/blaze-genfiles'));
   }
@@ -722,7 +761,7 @@ class BazelWorkspaceTest with ResourceProviderMixin {
         resourceProvider, convertPath('/workspace/my/module'));
     expect(workspace.root, convertPath('/workspace'));
     expect(workspace.readonly, isNull);
-    expect(workspace.bin, convertPath('/workspace/bazel-bin'));
+    expect(workspace.binPaths.single, convertPath('/workspace/bazel-bin'));
     expect(workspace.genfiles, convertPath('/workspace/bazel-genfiles'));
   }
 
@@ -735,7 +774,7 @@ class BazelWorkspaceTest with ResourceProviderMixin {
         resourceProvider, convertPath('/workspace/my/module'));
     expect(workspace.root, convertPath('/workspace'));
     expect(workspace.readonly, isNull);
-    expect(workspace.bin, convertPath('/workspace/bazel-bin'));
+    expect(workspace.binPaths.single, convertPath('/workspace/bazel-bin'));
     expect(workspace.genfiles, convertPath('/workspace/bazel-genfiles'));
   }
 
@@ -748,7 +787,7 @@ class BazelWorkspaceTest with ResourceProviderMixin {
         BazelWorkspace.find(resourceProvider, convertPath('/workspace'));
     expect(workspace.root, convertPath('/workspace'));
     expect(workspace.readonly, isNull);
-    expect(workspace.bin, convertPath('/workspace/bazel-bin'));
+    expect(workspace.binPaths.single, convertPath('/workspace/bazel-bin'));
     expect(workspace.genfiles, convertPath('/workspace/bazel-genfiles'));
   }
 
@@ -761,7 +800,7 @@ class BazelWorkspaceTest with ResourceProviderMixin {
         BazelWorkspace.find(resourceProvider, convertPath('/workspace'));
     expect(workspace.root, convertPath('/workspace'));
     expect(workspace.readonly, isNull);
-    expect(workspace.bin, convertPath('/workspace/blaze-bin'));
+    expect(workspace.binPaths.single, convertPath('/workspace/blaze-bin'));
     expect(workspace.genfiles, convertPath('/workspace/blaze-genfiles'));
   }
 
@@ -784,7 +823,7 @@ class BazelWorkspaceTest with ResourceProviderMixin {
         resourceProvider, convertPath('/workspace/my/module'));
     expect(workspace.root, convertPath('/workspace'));
     expect(workspace.readonly, isNull);
-    expect(workspace.bin, convertPath('/workspace/$prefix-bin'));
+    expect(workspace.binPaths.single, convertPath('/workspace/$prefix-bin'));
     expect(workspace.genfiles, convertPath('/workspace/$prefix-genfiles'));
   }
 
@@ -868,6 +907,6 @@ class _MockSource implements Source {
 
   @override
   noSuchMethod(Invocation invocation) {
-    throw new StateError('Unexpected invocation of ${invocation.memberName}');
+    throw StateError('Unexpected invocation of ${invocation.memberName}');
   }
 }

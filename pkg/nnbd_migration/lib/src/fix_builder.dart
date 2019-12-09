@@ -9,7 +9,6 @@ import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
-import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type_algebra.dart';
 import 'package:analyzer/src/dart/element/type_provider.dart';
@@ -76,7 +75,7 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   final TypeProvider typeProvider;
 
   /// The type system.
-  final Dart2TypeSystem _typeSystem;
+  final TypeSystemImpl _typeSystem;
 
   /// Variables for this migration run.
   final Variables _variables;
@@ -99,8 +98,8 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
 
   FixBuilder(this.source, this._decoratedClassHierarchy,
       TypeProvider typeProvider, this._typeSystem, this._variables)
-      : typeProvider = (typeProvider as TypeProviderImpl)
-            .withNullability(NullabilitySuffix.none);
+      : typeProvider =
+            (typeProvider as TypeProviderImpl).asNonNullableByDefault;
 
   /// Called whenever an AST node is found that needs to be changed.
   void addChange(AstNode node, NodeChange change);
@@ -629,34 +628,27 @@ abstract class FixBuilder extends GeneralizingAstVisitor<DartType>
   /// type of the class within which [element] is being accessed; this is used
   /// to perform the correct substitutions.
   DartType _computeMigratedType(Element element, {DartType targetType}) {
-    Element baseElement;
-    if (element is Member) {
-      baseElement = element.baseElement;
-    } else {
-      baseElement = element;
-    }
+    element = element.declaration;
     DartType type;
-    if (baseElement is ClassElement || baseElement is TypeParameterElement) {
+    if (element is ClassElement || element is TypeParameterElement) {
       return typeProvider.typeType;
-    } else if (baseElement is PropertyAccessorElement) {
-      if (baseElement.isSynthetic) {
+    } else if (element is PropertyAccessorElement) {
+      if (element.isSynthetic) {
         type = _variables
-            .decoratedElementType(baseElement.variable)
+            .decoratedElementType(element.variable)
             .toFinalType(typeProvider);
       } else {
-        var functionType = _variables.decoratedElementType(baseElement);
-        var decoratedType = baseElement.isGetter
+        var functionType = _variables.decoratedElementType(element);
+        var decoratedType = element.isGetter
             ? functionType.returnType
             : functionType.positionalParameters[0];
         type = decoratedType.toFinalType(typeProvider);
       }
     } else {
-      type = _variables
-          .decoratedElementType(baseElement)
-          .toFinalType(typeProvider);
+      type = _variables.decoratedElementType(element).toFinalType(typeProvider);
     }
     if (targetType is InterfaceType && targetType.typeArguments.isNotEmpty) {
-      var superclass = baseElement.enclosingElement as ClassElement;
+      var superclass = element.enclosingElement as ClassElement;
       var class_ = targetType.element;
       if (class_ != superclass) {
         var supertype = _decoratedClassHierarchy

@@ -132,9 +132,16 @@ claim
 clarification
 clashes
 class's
+class3a
+class3b
+class4a
+class4b
+class4c
+class4d
 clazz
 cls
 cn
+cnt
 co
 codebase
 codec
@@ -150,6 +157,7 @@ compares
 completes
 complicating
 component's
+comprehensive
 compressed
 compression
 concat
@@ -168,6 +176,8 @@ containers
 continuations
 contra
 convention
+coordinated
+coordinating
 core
 core's
 corrected
@@ -186,6 +196,7 @@ cyclically
 d
 d11e
 dag
+dangerous
 dangling
 danrubel
 daringfireball
@@ -261,6 +272,7 @@ ecma
 ecosystem
 ed
 eek
+eernst
 ef
 effects
 efficient
@@ -314,6 +326,8 @@ ffff
 fffff
 ffffffff
 ffi
+field1
+field2
 file's
 filenames
 finv
@@ -340,6 +354,7 @@ frontend
 frontends
 fs
 fsource
+fuller
 function's
 fuse
 futured
@@ -417,6 +432,7 @@ initializer's
 insertion
 inspector
 inspired
+inst
 instanceof
 instantiator
 intentionally
@@ -448,7 +464,6 @@ json
 juxtaposition
 juxtapositions
 k
-k’s
 kallentu
 kernel's
 kernel2kernel
@@ -456,6 +471,7 @@ klass
 kmillikin
 kustermann
 kv
+k’s
 l
 lacks
 lang
@@ -476,6 +492,7 @@ lifted
 lifter
 linearized
 lives
+llub
 lm
 locationd
 lots
@@ -633,13 +650,14 @@ queries
 quick
 quoted
 r
+r'$creation
 r'\f
 r'\r
 r'\s
 r'\t
 r'\u
 r'\v
-r'$creation
+ra
 radix
 raises
 ran
@@ -656,6 +674,7 @@ realign
 reassigned
 rebind
 rebuild
+rebuilds
 recalculating
 recalculation
 recall
@@ -683,6 +702,7 @@ relatively
 relativize
 relax
 relaxes
+relink
 remapped
 remedy
 removal
@@ -698,8 +718,10 @@ residue
 respond
 restriction
 resumed
+ret
 rewrites
 rewrote
+rf
 rhs
 ri
 rightmost
@@ -711,8 +733,10 @@ rooted
 roughly
 rounding
 rparen
+rs
 runnable
 s
+say
 sb
 scheglov
 scoped
@@ -810,6 +834,7 @@ sum
 summarizing
 superclasses
 superinitializer
+superinterface
 superinterfaces
 supernode
 supers
@@ -826,6 +851,7 @@ tagged
 tagger
 tags
 taking
+talks
 team
 tear
 tearing
@@ -842,6 +868,7 @@ terminator
 tester
 tex
 th
+therein
 thought
 ti
 tick
@@ -890,6 +917,7 @@ uint
 uint16
 uint32
 uint8
+ultimately
 umbrella
 un
 unaffected
@@ -970,6 +998,7 @@ widget
 widgets
 wiki
 wikipedia
+wind
 with1
 worthwhile
 writeln
@@ -1012,6 +1041,8 @@ xi
 xm
 xn
 xor
+xs
+xss
 xterm
 xx
 xxxx
@@ -1023,6 +1054,8 @@ yaml
 yet
 yielding
 yields
+ys
+yss
 z
 zi
 zip

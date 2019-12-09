@@ -61,7 +61,6 @@ namespace dart {
   F(Script, compile_time_constants_)                                           \
   F(Script, line_starts_)                                                      \
   F(Script, debug_positions_)                                                  \
-  F(Script, yield_positions_)                                                  \
   F(Script, kernel_program_info_)                                              \
   F(Script, source_)                                                           \
   F(Library, name_)                                                            \
@@ -94,11 +93,13 @@ namespace dart {
   F(KernelProgramInfo, constants_table_)                                       \
   F(KernelProgramInfo, libraries_cache_)                                       \
   F(KernelProgramInfo, classes_cache_)                                         \
+  F(KernelProgramInfo, retained_kernel_blob_)                                  \
   F(Code, object_pool_)                                                        \
   F(Code, instructions_)                                                       \
   F(Code, owner_)                                                              \
   F(Code, exception_handlers_)                                                 \
   F(Code, pc_descriptors_)                                                     \
+  F(Code, catch_entry_)                                                        \
   F(Code, compressed_stackmaps_)                                               \
   F(Code, inlined_id_to_function_)                                             \
   F(Code, code_source_map_)                                                    \

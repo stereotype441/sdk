@@ -267,7 +267,8 @@ class BaseFlowGraphBuilder {
                          bool negate = false);
   Fragment BranchIfStrictEqual(TargetEntryInstr** then_entry,
                                TargetEntryInstr** otherwise_entry);
-  Fragment Return(TokenPosition position);
+  Fragment Return(TokenPosition position,
+                  intptr_t yield_index = RawPcDescriptors::kInvalidYieldIndex);
   Fragment CheckStackOverflow(TokenPosition position,
                               intptr_t stack_depth,
                               intptr_t loop_depth);
@@ -408,6 +409,9 @@ class BaseFlowGraphBuilder {
 
   // Reset context level for the given deopt id (which was allocated earlier).
   void reset_context_depth_for_deopt_id(intptr_t deopt_id);
+
+  // Sets raw parameter variables to inferred constant values.
+  Fragment InitConstantParameters();
 
  protected:
   intptr_t AllocateBlockId() { return ++last_used_block_id_; }

@@ -2,6 +2,8 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+// @dart = 2.6
+
 part of dart.async;
 
 /** Abstract and private interface for a place to put events. */
@@ -87,6 +89,7 @@ class _BufferingStreamSubscription<T>
   static const int _STATE_PAUSE_COUNT = 128;
 
   /* Event handlers provided in constructor. */
+  @pragma("vm:entry-point")
   _DataHandler<T> _onData;
   Function _onError;
   _DoneHandler _onDone;

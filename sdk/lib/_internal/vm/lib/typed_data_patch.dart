@@ -2,6 +2,8 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+// @dart = 2.6
+
 /// Note: the VM concatenates all patch files into a single patch file. This
 /// file is the first patch in "dart:typed_data" which contains all the imports
 /// used by patches of that library. We plan to change this when we have a
@@ -3475,13 +3477,28 @@ class _ExternalFloat64x2Array extends _TypedList
 @patch
 class Float32x4 {
   @patch
+  @pragma("vm:prefer-inline")
+  factory Float32x4(double x, double y, double z, double w) {
+    _throwIfNull(x, 'x');
+    _throwIfNull(y, 'y');
+    _throwIfNull(z, 'z');
+    _throwIfNull(w, 'w');
+    return _Float32x4FromDoubles(x, y, z, w);
+  }
+
   @pragma("vm:exact-result-type", _Float32x4)
-  factory Float32x4(double x, double y, double z, double w)
-      native "Float32x4_fromDoubles";
+  static _Float32x4 _Float32x4FromDoubles(
+      double x, double y, double z, double w) native "Float32x4_fromDoubles";
 
   @patch
+  @pragma("vm:prefer-inline")
+  factory Float32x4.splat(double v) {
+    _throwIfNull(v, 'v');
+    return _Float32x4Splat(v);
+  }
+
   @pragma("vm:exact-result-type", _Float32x4)
-  factory Float32x4.splat(double v) native "Float32x4_splat";
+  static _Float32x4 _Float32x4Splat(double v) native "Float32x4_splat";
 
   @patch
   @pragma("vm:exact-result-type", _Float32x4)
@@ -3565,12 +3582,31 @@ class _Float32x4 implements Float32x4 {
 @patch
 class Int32x4 {
   @patch
+  @pragma("vm:prefer-inline")
+  factory Int32x4(int x, int y, int z, int w) {
+    _throwIfNull(x, 'x');
+    _throwIfNull(y, 'y');
+    _throwIfNull(z, 'z');
+    _throwIfNull(w, 'w');
+    return _Int32x4FromInts(x, y, z, w);
+  }
+
   @pragma("vm:exact-result-type", _Int32x4)
-  factory Int32x4(int x, int y, int z, int w) native "Int32x4_fromInts";
+  static _Int32x4 _Int32x4FromInts(int x, int y, int z, int w)
+      native "Int32x4_fromInts";
 
   @patch
+  @pragma("vm:prefer-inline")
+  factory Int32x4.bool(bool x, bool y, bool z, bool w) {
+    _throwIfNull(x, 'x');
+    _throwIfNull(y, 'y');
+    _throwIfNull(z, 'z');
+    _throwIfNull(w, 'w');
+    return _Int32x4FromBools(x, y, z, w);
+  }
+
   @pragma("vm:exact-result-type", _Int32x4)
-  factory Int32x4.bool(bool x, bool y, bool z, bool w)
+  static _Int32x4 _Int32x4FromBools(bool x, bool y, bool z, bool w)
       native "Int32x4_fromBools";
 
   @patch
@@ -3623,12 +3659,26 @@ class _Int32x4 implements Int32x4 {
 @patch
 class Float64x2 {
   @patch
+  @pragma("vm:prefer-inline")
+  factory Float64x2(double x, double y) {
+    _throwIfNull(x, 'x');
+    _throwIfNull(y, 'y');
+    return _Float64x2FromDoubles(x, y);
+  }
+
   @pragma("vm:exact-result-type", _Float64x2)
-  factory Float64x2(double x, double y) native "Float64x2_fromDoubles";
+  static _Float64x2 _Float64x2FromDoubles(double x, double y)
+      native "Float64x2_fromDoubles";
 
   @patch
+  @pragma("vm:prefer-inline")
+  factory Float64x2.splat(double v) {
+    _throwIfNull(v, 'v');
+    return _Float64x2Splat(v);
+  }
+
   @pragma("vm:exact-result-type", _Float64x2)
-  factory Float64x2.splat(double v) native "Float64x2_splat";
+  static _Float64x2 _Float64x2Splat(double v) native "Float64x2_splat";
 
   @patch
   @pragma("vm:exact-result-type", _Float64x2)
@@ -4613,6 +4663,13 @@ int _toInt32(int value) {
 @pragma("vm:prefer-inline")
 int _toUint32(int value) {
   return value & 0xFFFFFFFF;
+}
+
+@pragma("vm:prefer-inline")
+void _throwIfNull(val, String name) {
+  if (val == null) {
+    throw ArgumentError.notNull(name);
+  }
 }
 
 // In addition to explicitly checking the range, this method implicitly ensures

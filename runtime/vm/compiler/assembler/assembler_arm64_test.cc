@@ -512,6 +512,76 @@ ASSEMBLER_TEST_RUN(LoadStorePairOffset, test) {
   EXPECT_EQ(1, EXECUTE_TEST_CODE_INT64(Int64Return, test->entry()));
 }
 
+ASSEMBLER_TEST_GENERATE(PushRegisterPair, assembler) {
+  __ SetupDartSP();
+  __ LoadImmediate(R2, 12);
+  __ LoadImmediate(R3, 21);
+  __ PushRegisterPair(R2, R3);
+  __ Pop(R0);
+  __ Pop(R1);
+  __ RestoreCSP();
+  __ ret();
+}
+
+ASSEMBLER_TEST_RUN(PushRegisterPair, test) {
+  EXPECT(test != NULL);
+  typedef int (*PushRegisterPair)() DART_UNUSED;
+  EXPECT_EQ(12, EXECUTE_TEST_CODE_INT64(PushRegisterPair, test->entry()));
+}
+
+ASSEMBLER_TEST_GENERATE(PushRegisterPairReversed, assembler) {
+  __ SetupDartSP();
+  __ LoadImmediate(R3, 12);
+  __ LoadImmediate(R2, 21);
+  __ PushRegisterPair(R3, R2);
+  __ Pop(R0);
+  __ Pop(R1);
+  __ RestoreCSP();
+  __ ret();
+}
+
+ASSEMBLER_TEST_RUN(PushRegisterPairReversed, test) {
+  EXPECT(test != NULL);
+  typedef int (*PushRegisterPairReversed)() DART_UNUSED;
+  EXPECT_EQ(12,
+            EXECUTE_TEST_CODE_INT64(PushRegisterPairReversed, test->entry()));
+}
+
+ASSEMBLER_TEST_GENERATE(PopRegisterPair, assembler) {
+  __ SetupDartSP();
+  __ LoadImmediate(R2, 12);
+  __ LoadImmediate(R3, 21);
+  __ Push(R3);
+  __ Push(R2);
+  __ PopRegisterPair(R0, R1);
+  __ RestoreCSP();
+  __ ret();
+}
+
+ASSEMBLER_TEST_RUN(PopRegisterPair, test) {
+  EXPECT(test != NULL);
+  typedef int (*PopRegisterPair)() DART_UNUSED;
+  EXPECT_EQ(12, EXECUTE_TEST_CODE_INT64(PopRegisterPair, test->entry()));
+}
+
+ASSEMBLER_TEST_GENERATE(PopRegisterPairReversed, assembler) {
+  __ SetupDartSP();
+  __ LoadImmediate(R3, 12);
+  __ LoadImmediate(R2, 21);
+  __ Push(R3);
+  __ Push(R2);
+  __ PopRegisterPair(R1, R0);
+  __ RestoreCSP();
+  __ ret();
+}
+
+ASSEMBLER_TEST_RUN(PopRegisterPairReversed, test) {
+  EXPECT(test != NULL);
+  typedef int (*PopRegisterPairReversed)() DART_UNUSED;
+  EXPECT_EQ(12,
+            EXECUTE_TEST_CODE_INT64(PopRegisterPairReversed, test->entry()));
+}
+
 ASSEMBLER_TEST_GENERATE(Semaphore, assembler) {
   __ SetupDartSP();
   __ movz(R0, Immediate(40), 0);
@@ -2398,15 +2468,18 @@ static void EnterTestFrame(Assembler* assembler) {
   __ Push(CODE_REG);
   __ Push(THR);
   __ Push(BARRIER_MASK);
+  __ Push(NULL_REG);
   __ TagAndPushPP();
   __ ldr(CODE_REG, Address(R0, VMHandles::kOffsetOfRawPtrInHandle));
   __ mov(THR, R1);
   __ ldr(BARRIER_MASK, Address(THR, Thread::write_barrier_mask_offset()));
+  __ ldr(NULL_REG, Address(THR, Thread::object_null_offset()));
   __ LoadPoolPointer(PP);
 }
 
 static void LeaveTestFrame(Assembler* assembler) {
   __ PopAndUntagPP();
+  __ Pop(NULL_REG);
   __ Pop(BARRIER_MASK);
   __ Pop(THR);
   __ Pop(CODE_REG);
@@ -2479,6 +2552,39 @@ ASSEMBLER_TEST_GENERATE(LoadObjectNull, assembler) {
 
 ASSEMBLER_TEST_RUN(LoadObjectNull, test) {
   EXPECT_EQ(Object::null(), test->InvokeWithCodeAndThread<RawObject*>());
+}
+
+// PushObject null.
+ASSEMBLER_TEST_GENERATE(PushObjectNull, assembler) {
+  __ SetupDartSP();
+  EnterTestFrame(assembler);
+  __ PushObject(Object::null_object());
+  __ Pop(R0);
+  LeaveTestFrame(assembler);
+  __ RestoreCSP();
+  __ ret();
+}
+
+ASSEMBLER_TEST_RUN(PushObjectNull, test) {
+  EXPECT_EQ(Object::null(), test->InvokeWithCodeAndThread<RawObject*>());
+}
+
+// CompareObject null.
+ASSEMBLER_TEST_GENERATE(CompareObjectNull, assembler) {
+  __ SetupDartSP();
+  EnterTestFrame(assembler);
+  __ LoadObject(R0, Object::bool_true());
+  __ LoadObject(R1, Object::bool_false());
+  __ ldr(R2, Address(THR, Thread::object_null_offset()));
+  __ CompareObject(R2, Object::null_object());
+  __ csel(R0, R0, R1, EQ);
+  LeaveTestFrame(assembler);
+  __ RestoreCSP();
+  __ ret();
+}
+
+ASSEMBLER_TEST_RUN(CompareObjectNull, test) {
+  EXPECT_EQ(Bool::True().raw(), test->InvokeWithCodeAndThread<RawObject*>());
 }
 
 ASSEMBLER_TEST_GENERATE(LoadObjectTrue, assembler) {

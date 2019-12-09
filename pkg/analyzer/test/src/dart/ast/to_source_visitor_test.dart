@@ -2706,6 +2706,18 @@ class ToSourceVisitor2Test {
     _assertSource("E", AstTestFactory.typeParameter("E"));
   }
 
+  void test_visitTypeParameter_variance_covariant() {
+    _assertSource("out E", AstTestFactory.typeParameter3("E", "out"));
+  }
+
+  void test_visitTypeParameter_variance_contravariant() {
+    _assertSource("in E", AstTestFactory.typeParameter3("E", "in"));
+  }
+
+  void test_visitTypeParameter_variance_invariant() {
+    _assertSource("inout E", AstTestFactory.typeParameter3("E", "inout"));
+  }
+
   void test_visitTypeParameterList_multiple() {
     _assertSource("<E, F>", AstTestFactory.typeParameterList(["E", "F"]));
   }
@@ -2827,8 +2839,8 @@ class ToSourceVisitor2Test {
    * visiting the given [node].
    */
   void _assertSource(String expectedSource, AstNode node) {
-    StringBuffer buffer = new StringBuffer();
-    node.accept(new ToSourceVisitor(buffer));
+    StringBuffer buffer = StringBuffer();
+    node.accept(ToSourceVisitor(buffer));
     expect(buffer.toString(), expectedSource);
   }
 }

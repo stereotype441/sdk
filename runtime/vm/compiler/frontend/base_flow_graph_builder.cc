@@ -186,14 +186,15 @@ Fragment BaseFlowGraphBuilder::BranchIfStrictEqual(
   return Fragment(branch).closed();
 }
 
-Fragment BaseFlowGraphBuilder::Return(TokenPosition position) {
+Fragment BaseFlowGraphBuilder::Return(TokenPosition position,
+                                      intptr_t yield_index) {
   Fragment instructions;
 
   Value* value = Pop();
   ASSERT(stack_ == nullptr);
 
   ReturnInstr* return_instr =
-      new (Z) ReturnInstr(position, value, GetNextDeoptId());
+      new (Z) ReturnInstr(position, value, GetNextDeoptId(), yield_index);
   if (exit_collector_ != nullptr) exit_collector_->AddExit(return_instr);
 
   instructions <<= return_instr;
@@ -1118,6 +1119,21 @@ Fragment BaseFlowGraphBuilder::AssertAssignable(
   Push(instr);
 
   return Fragment(instr);
+}
+
+Fragment BaseFlowGraphBuilder::InitConstantParameters() {
+  Fragment instructions;
+  const intptr_t parameter_count = parsed_function_->function().NumParameters();
+  for (intptr_t i = 0; i < parameter_count; ++i) {
+    LocalVariable* raw_parameter = parsed_function_->RawParameterVariable(i);
+    const Object* param_value = raw_parameter->parameter_value();
+    if (param_value != nullptr) {
+      instructions += Constant(*param_value);
+      instructions += StoreLocalRaw(TokenPosition::kNoSource, raw_parameter);
+      instructions += Drop();
+    }
+  }
+  return instructions;
 }
 
 }  // namespace kernel

@@ -7,7 +7,6 @@ import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
-import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/summary/format.dart';
 import 'package:analyzer/src/summary/idl.dart';
 
@@ -24,14 +23,14 @@ CompilationUnitElement getUnitElement(Element element) {
       return e.definingCompilationUnit;
     }
   }
-  throw new StateError('Element not contained in compilation unit: $element');
+  throw StateError('Element not contained in compilation unit: $element');
 }
 
 /**
  * Index the [unit] into a new [AnalysisDriverUnitIndexBuilder].
  */
 AnalysisDriverUnitIndexBuilder indexUnit(CompilationUnit unit) {
-  return new _IndexAssembler().assemble(unit);
+  return _IndexAssembler().assemble(unit);
 }
 
 /**
@@ -90,11 +89,11 @@ class IndexElementInfo {
         kind = IndexSyntheticElementKind.topLevelVariable;
         element = property.getter ?? property.setter;
       } else {
-        throw new ArgumentError(
+        throw ArgumentError(
             'Unsupported synthetic element ${element.runtimeType}');
       }
     }
-    return new IndexElementInfo._(element, kind);
+    return IndexElementInfo._(element, kind);
   }
 
   IndexElementInfo._(this.element, this.kind);
@@ -232,20 +231,20 @@ class _IndexAssembler {
   void addElementRelation(Element element, IndexRelationKind kind, int offset,
       int length, bool isQualified) {
     _ElementInfo elementInfo = _getElementInfo(element);
-    elementRelations.add(new _ElementRelationInfo(
-        elementInfo, kind, offset, length, isQualified));
+    elementRelations.add(
+        _ElementRelationInfo(elementInfo, kind, offset, length, isQualified));
   }
 
   void addNameRelation(
       String name, IndexRelationKind kind, int offset, bool isQualified) {
     _StringInfo nameId = _getStringInfo(name);
-    nameRelations.add(new _NameRelationInfo(nameId, kind, offset, isQualified));
+    nameRelations.add(_NameRelationInfo(nameId, kind, offset, isQualified));
   }
 
   void addSubtype(String name, List<String> members, List<String> supertypes) {
     for (var supertype in supertypes) {
       subtypes.add(
-        new _SubtypeInfo(
+        _SubtypeInfo(
           _getStringInfo(supertype),
           _getStringInfo(name),
           members.map(_getStringInfo).toList(),
@@ -258,7 +257,7 @@ class _IndexAssembler {
    * Index the [unit] and assemble a new [AnalysisDriverUnitIndexBuilder].
    */
   AnalysisDriverUnitIndexBuilder assemble(CompilationUnit unit) {
-    unit.accept(new _IndexContributor(this));
+    unit.accept(_IndexContributor(this));
 
     // Sort strings and set IDs.
     List<_StringInfo> stringInfoList = stringMap.values.toList();
@@ -300,7 +299,7 @@ class _IndexAssembler {
       return a.supertype.id - b.supertype.id;
     });
 
-    return new AnalysisDriverUnitIndexBuilder(
+    return AnalysisDriverUnitIndexBuilder(
         strings: stringInfoList.map((s) => s.value).toList(),
         nullStringId: nullString.id,
         unitLibraryUris: unitLibraryUris.map((s) => s.id).toList(),
@@ -326,7 +325,7 @@ class _IndexAssembler {
             nameRelations.map((r) => r.isQualified).toList(),
         supertypes: subtypes.map((subtype) => subtype.supertype.id).toList(),
         subtypes: subtypes.map((subtype) {
-          return new AnalysisDriverSubtypeBuilder(
+          return AnalysisDriverSubtypeBuilder(
             name: subtype.name.id,
             members: subtype.members.map((member) => member.id).toList(),
           );
@@ -338,9 +337,7 @@ class _IndexAssembler {
    * [_ElementInfo.id] is filled by [assemble] during final sorting.
    */
   _ElementInfo _getElementInfo(Element element) {
-    if (element is Member) {
-      element = (element as Member).baseElement;
-    }
+    element = element.declaration;
     return elementMap.putIfAbsent(element, () {
       CompilationUnitElement unitElement = getUnitElement(element);
       int unitId = _getUnitId(unitElement);
@@ -354,7 +351,7 @@ class _IndexAssembler {
    */
   _StringInfo _getStringInfo(String string) {
     return stringMap.putIfAbsent(string, () {
-      return new _StringInfo(string);
+      return _StringInfo(string);
     });
   }
 
@@ -387,7 +384,7 @@ class _IndexAssembler {
    * This method is static, so it cannot add any information to the index.
    */
   _ElementInfo _newElementInfo(int unitId, Element element) {
-    IndexElementInfo info = new IndexElementInfo(element);
+    IndexElementInfo info = IndexElementInfo(element);
     element = info.element;
     // Prepare name identifiers.
     _StringInfo nameIdParameter = nullString;
@@ -405,7 +402,7 @@ class _IndexAssembler {
     if (element?.enclosingElement is CompilationUnitElement) {
       nameIdUnitMember = _getStringInfo(element.name);
     }
-    return new _ElementInfo(unitId, nameIdUnitMember, nameIdClassMember,
+    return _ElementInfo(unitId, nameIdUnitMember, nameIdClassMember,
         nameIdParameter, info.kind);
   }
 }
@@ -887,7 +884,7 @@ class _IndexContributor extends GeneralizingAstVisitor {
    */
   ConstructorElement _getActualConstructorElement(
       ConstructorElement constructor) {
-    Set<ConstructorElement> seenConstructors = new Set<ConstructorElement>();
+    Set<ConstructorElement> seenConstructors = Set<ConstructorElement>();
     while (constructor != null &&
         constructor.isSynthetic &&
         constructor.redirectedConstructor != null) {

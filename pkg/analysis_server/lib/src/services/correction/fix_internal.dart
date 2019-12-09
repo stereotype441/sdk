@@ -26,6 +26,7 @@ import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
+import 'package:analyzer/dart/element/type_system.dart';
 import 'package:analyzer/error/error.dart';
 import 'package:analyzer/file_system/file_system.dart';
 import 'package:analyzer/src/dart/analysis/session_helper.dart';
@@ -39,7 +40,7 @@ import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/generated/error_verifier.dart';
 import 'package:analyzer/src/generated/java_core.dart';
 import 'package:analyzer/src/generated/parser.dart';
-import 'package:analyzer/src/generated/resolver.dart';
+import 'package:analyzer/src/generated/resolver.dart' show TypeProvider;
 import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/hint/sdk_constraint_extractor.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart'
@@ -1324,8 +1325,13 @@ class FixProcessor extends BaseProcessor {
               });
             });
             _addFixFromBuilder(
-                changeBuilder, DartFixKind.CHANGE_TYPE_ANNOTATION,
-                args: [typeNode.type, newType.displayName]);
+              changeBuilder,
+              DartFixKind.CHANGE_TYPE_ANNOTATION,
+              args: [
+                typeNode.type,
+                newType.getDisplayString(withNullability: false),
+              ],
+            );
           }
         }
       }
@@ -2092,10 +2098,10 @@ class FixProcessor extends BaseProcessor {
       // should be parameter of function type
       DartType parameterType = parameterElement.type;
       if (parameterType is InterfaceType && parameterType.isDartCoreFunction) {
-        parameterType = FunctionTypeImpl.synthetic(
-          typeProvider.dynamicType,
-          [],
-          [],
+        parameterType = FunctionTypeImpl(
+          typeFormals: const [],
+          parameters: const [],
+          returnType: typeProvider.dynamicType,
           nullabilitySuffix: NullabilitySuffix.none,
         );
       }
@@ -2167,6 +2173,9 @@ class FixProcessor extends BaseProcessor {
     // prepare target declaration
     var targetDeclarationResult =
         await sessionHelper.getElementDeclaration(targetElement);
+    if (targetDeclarationResult == null) {
+      return;
+    }
     if (targetDeclarationResult.node is! ClassOrMixinDeclaration &&
         targetDeclarationResult.node is! ExtensionDeclaration) {
       return;
@@ -2794,6 +2803,10 @@ class FixProcessor extends BaseProcessor {
         }
         // Check the source.
         if (alreadyImportedWithPrefix.contains(declaration.path)) {
+          continue;
+        }
+        // Check that the import doesn't end with '.template.dart'
+        if (declaration.uri.path.endsWith('.template.dart')) {
           continue;
         }
         // Compute the fix kind.
@@ -4376,10 +4389,10 @@ class FixProcessor extends BaseProcessor {
     SdkConstraintExtractor extractor = new SdkConstraintExtractor(pubspecFile);
     String text = extractor.constraintText();
     int offset = extractor.constraintOffset();
-    int length = text.length;
     if (text == null || offset < 0) {
       return;
     }
+    int length = text.length;
     String newText;
     int spaceOffset = text.indexOf(' ');
     if (spaceOffset >= 0) {

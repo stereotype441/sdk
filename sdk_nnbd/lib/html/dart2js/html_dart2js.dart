@@ -1,5 +1,4 @@
 // @dart = 2.5
-
 /**
  * HTML elements and other resources for web-based applications that need to
  * interact with the browser and the DOM (Document Object Model).
@@ -25216,8 +25215,7 @@ class ResizeObserver extends Interceptor {
 
 // WARNING: Do not edit - generated code.
 
-typedef void ResizeObserverCallback(
-    List<ResizeObserverEntry> entries, ResizeObserver observer);
+typedef void ResizeObserverCallback(List entries, ResizeObserver observer);
 // Copyright (c) 2012, the Dart project authors.  Please see the AUTHORS file
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.

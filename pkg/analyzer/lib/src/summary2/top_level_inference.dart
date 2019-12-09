@@ -7,7 +7,6 @@ import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/element.dart';
-import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/resolver/scope.dart';
 import 'package:analyzer/src/generated/resolver.dart';
@@ -119,10 +118,7 @@ class TopLevelInference {
   }
 
   void _performOverrideInference() {
-    var inferrer = new InstanceMemberInferrer(
-      linker.typeProvider,
-      linker.inheritance,
-    );
+    var inferrer = InstanceMemberInferrer(linker.inheritance);
     for (var builder in linker.builders.values) {
       for (var unit in builder.element.units) {
         inferrer.inferCompilationUnit(unit);
@@ -227,12 +223,8 @@ class _InferenceDependenciesCollector extends RecursiveAstVisitor<void> {
 
   @override
   void visitInstanceCreationExpression(InstanceCreationExpression node) {
-    var element = node.staticElement;
+    var element = node.staticElement?.declaration;
     if (element == null) return;
-
-    if (element is ConstructorMember) {
-      element = (element as ConstructorMember).baseElement;
-    }
 
     _set.add(element);
 
@@ -461,6 +453,7 @@ class _VariableInferenceNode extends _InferenceNode {
 
   void _resolveInitializer() {
     var astResolver = AstResolver(_walker._linker, _unitElement, _scope);
+    astResolver.flowAnalysis?.topLevelDeclaration_enter(_node, null, null);
     astResolver.resolve(_node.initializer, () => _node.initializer);
   }
 }

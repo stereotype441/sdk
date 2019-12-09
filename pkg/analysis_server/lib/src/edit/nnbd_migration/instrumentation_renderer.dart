@@ -4,6 +4,7 @@
 
 import 'dart:convert' show htmlEscape, LineSplitter;
 
+import 'package:analysis_server/src/edit/nnbd_migration/dart_page_style.dart';
 import 'package:analysis_server/src/edit/nnbd_migration/migration_info.dart';
 import 'package:analysis_server/src/edit/nnbd_migration/offset_mapper.dart';
 import 'package:analysis_server/src/edit/nnbd_migration/path_mapper.dart';
@@ -51,150 +52,20 @@ mustache.Template _template = mustache.Template(r'''
     document.addEventListener("DOMContentLoaded", highlightTarget);
     window.addEventListener("hashchange", highlightTarget);
     </script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:400,600&display=swap">
     <link rel="stylesheet" href="{{ highlightStylePath }}">
-    <style>
-a:link {
-  color: inherit;
-  text-decoration-line: none;
-}
-
-a:visited {
-  color: inherit;
-  text-decoration-line: none;
-}
-
-a:hover {
-  text-decoration-line: underline;
-}
-
-body {
-  font-family: sans-serif;
-  padding: 1em;
-}
-
-h2 {
-  font-size: 1em;
-  font-weight: bold;
-}
-
-.code {
-  left: 0.5em;
-  /* Increase line height to make room for borders in non-nullable type
-   * regions.
-   */
-  line-height: 1.3;
-  padding-left: 60px;
-  position: absolute;
-  top: 0.5em;
-}
-
-.content {
-  font-family: monospace;
-  position: relative;
-  white-space: pre;
-}
-
-.regions {
-  padding: 0.5em;
-  position: absolute;
-  left: 0.5em;
-  top: 0.5em;
-  /* The content of the regions is not visible; the user instead will see the
-   * highlighted copy of the content. */
-  visibility: hidden;
-}
-
-.regions table {
-  border-spacing: 0;
-}
-
-.regions td {
-  border: none;
-  line-height: 1.3;
-  padding: 0;
-  white-space: pre;
-}
-
-.regions td:empty:after {
-  content: "\00a0";
-}
-
-.regions td.line-no {
-  color: #999999;
-  display: inline-block;
-  padding-right: 4px;
-  text-align: right;
-  visibility: visible;
-  width: 50px;
-}
-
-.region {
-  cursor: default;
-  display: inline-block;
-  position: relative;
-  visibility: visible;
-}
-
-.region.fix-region {
-  /* Green means this region was added. */
-  background-color: #ccffcc;
-  color: #003300;
-}
-
-.region.non-nullable-type-region {
-  background-color: rgba(0, 0, 0, 0.3);
-  border-bottom: solid 2px #cccccc;
-  /* Invisible text; use underlying highlighting. */
-  color: rgba(0, 0, 0, 0);
-  /* Reduce line height to make room for border. */
-  line-height: 1;
-}
-
-.region .tooltip {
-  background-color: #EEE;
-  border: solid 2px #999;
-  color: #333;
-  cursor: auto;
-  font-family: sans-serif;
-  font-size: 0.8em;
-  left: 0;
-  margin-left: 0;
-  padding: 1px;
-  position: absolute;
-  top: 100%;
-  visibility: hidden;
-  white-space: normal;
-  width: 400px;
-  z-index: 1;
-}
-
-.region .tooltip > * {
-  margin: 1em;
-}
-
-.region:hover .tooltip {
-  visibility: visible;
-}
-
-.target {
-  background-color: #FFFF99;
-  position: relative;
-  visibility: visible;
-}
-    </style>
+    <style>{{{ dartPageStyle }}}</style>
   </head>
   <body>
-    <h1>Non-nullable fix instrumentation report</h1>
-    <p><em>Well-written introduction to this report.</em></p>
-    <div class="navigation">
-      {{# links }}
-        {{# isLink }}<a href="{{ href }}">{{ name }}</a>{{/ isLink }}
-        {{^ isLink }}{{ name }}{{/ isLink }}
-        <br />
-      {{/ links }}
-    </div>
-    {{# units }}'''
-    '<h2>{{{ path }}}</h2>'
+    <h1>Preview of NNBD migration</h1>
+    {{# units }}
+    <p><b>
+    Hover over modified regions to see why the migration tool chose to make the
+    modification.
+    </b></p>
+    <h2>{{ thisUnit }}</h2>
+    <div class="panels">
+    <div class="horizontal">'''
     '<div class="content">'
     '<div class="code">'
     '{{! Write the file content, modified to include navigation information, }}'
@@ -206,7 +77,20 @@ h2 {
     '{{! the content, to provide tooltips for modified regions. }}'
     '{{{ regionContent }}}'
     '</div></div>'
-    r'''
+    '''
+    <div class="nav" style="">
+      <p>Select a source file below to preview the modifications.</p>
+      <p class="root">{{ root }}</p>
+      {{# links }}
+        {{# isLink }}<a class="file-name" href="{{ href }}">{{ name }}</a>{{/ isLink }}
+        {{^ isLink }}<span class="file-name selected-file">{{ name }}</span>{{/ isLink }}
+        {{ modificationCount }}
+        <br/>
+      {{/ links }}
+    </div><!-- /nav -->
+    </div><!-- /horizontal -->
+    <div><em>Generated on {{ generationDate }}</em></div>
+    </div><!-- /panels -->
     {{/ units }}
     <script lang="javascript">
 document.addEventListener("DOMContentLoaded", (event) => {
@@ -221,6 +105,9 @@ document.addEventListener("DOMContentLoaded", (event) => {
 /// Instrumentation display output for a library that was migrated to use
 /// non-nullable types.
 class InstrumentationRenderer {
+  /// A flag indicating whether the incremental workflow is currently supported.
+  static const bool supportsIncrementalWorkflow = false;
+
   /// Display information for a compilation unit.
   final UnitInfo unitInfo;
 
@@ -241,11 +128,15 @@ class InstrumentationRenderer {
   /// Builds an HTML view of the instrumentation information in [unitInfo].
   String render() {
     Map<String, dynamic> mustacheContext = {
+      'root': migrationInfo.includedRoot,
       'units': <Map<String, dynamic>>[],
+      'dartPageStyle': dartPageStyle,
+      'thisUnit': migrationInfo._computeName(unitInfo),
       'links': migrationInfo.unitLinks(unitInfo),
       'highlightJsPath': migrationInfo.highlightJsPath(unitInfo),
       'highlightStylePath': migrationInfo.highlightStylePath(unitInfo),
       'navContent': _computeNavigationContent(unitInfo),
+      'generationDate': migrationInfo.migrationDate,
     };
     mustacheContext['units'].add({
       'path': unitInfo.path,
@@ -265,34 +156,42 @@ class InstrumentationRenderer {
     // Compute insertions for navigation targets.
     //
     for (NavigationTarget region in unitInfo.targets) {
-      int openOffset = mapper.map(region.offset);
-      String openInsertion = openInsertions[openOffset] ?? '';
-      openInsertion = '<a id="o${region.offset}">$openInsertion';
-      openInsertions[openOffset] = openInsertion;
+      int regionLength = region.length;
+      if (regionLength > 0) {
+        int openOffset = mapper.map(region.offset);
+        String openInsertion = openInsertions[openOffset] ?? '';
+        openInsertion = '<span id="o${region.offset}">$openInsertion';
+        openInsertions[openOffset] = openInsertion;
 
-      int closeOffset = openOffset + region.length;
-      String closeInsertion = closeInsertions[closeOffset] ?? '';
-      closeInsertion = '$closeInsertion</a>';
-      closeInsertions[closeOffset] = closeInsertion;
+        int closeOffset = openOffset + regionLength;
+        String closeInsertion = closeInsertions[closeOffset] ?? '';
+        closeInsertion = '$closeInsertion</span>';
+        closeInsertions[closeOffset] = closeInsertion;
+      }
     }
     //
     // Compute insertions for navigation sources, but skip the sources that
     // point at themselves.
     //
     for (NavigationSource region in unitInfo.sources ?? <NavigationSource>[]) {
-      int openOffset = mapper.map(region.offset);
-      NavigationTarget target = region.target;
-      if (target.filePath != unitInfo.path || region.offset != target.offset) {
-        String openInsertion = openInsertions[openOffset] ?? '';
-        String htmlPath = pathContext.relative(pathMapper.map(target.filePath),
-            from: unitDir);
-        openInsertion = '<a href="$htmlPath#o${target.offset}">$openInsertion';
-        openInsertions[openOffset] = openInsertion;
+      int regionLength = region.length;
+      if (regionLength > 0) {
+        int openOffset = mapper.map(region.offset);
+        NavigationTarget target = region.target;
+        if (target.filePath != unitInfo.path ||
+            region.offset != target.offset) {
+          String openInsertion = openInsertions[openOffset] ?? '';
+          String htmlPath = pathContext
+              .relative(pathMapper.map(target.filePath), from: unitDir);
+          openInsertion =
+              '<a href="$htmlPath#o${target.offset}">$openInsertion';
+          openInsertions[openOffset] = openInsertion;
 
-        int closeOffset = openOffset + region.length;
-        String closeInsertion = closeInsertions[closeOffset] ?? '';
-        closeInsertion = '$closeInsertion</a>';
-        closeInsertions[closeOffset] = closeInsertion;
+          int closeOffset = openOffset + regionLength;
+          String closeInsertion = closeInsertions[closeOffset] ?? '';
+          closeInsertion = '$closeInsertion</a>';
+          closeInsertions[closeOffset] = closeInsertion;
+        }
       }
     }
     //
@@ -359,23 +258,49 @@ class InstrumentationRenderer {
           '${content.substring(offset, offset + length)}'
           '<span class="tooltip">'
           '<p>${region.explanation}</p>');
+      //
+      // Write out any details.
+      //
       if (region.details.isNotEmpty) {
         regions.write('<ul>');
-      }
-      for (var detail in region.details) {
-        regions.write('<li>');
-
-        if (detail.target != null) {
-          regions.write('<a href="${_uriForTarget(detail.target, unitDir)}">');
+        for (var detail in region.details) {
+          regions.write('<li>');
+          writeSplitLines(detail.description);
+          NavigationTarget target = detail.target;
+          if (target != null) {
+            String relativePath = _relativePathToTarget(target, unitDir);
+            String targetUri = _uriForRelativePath(relativePath, target);
+            regions.write(' <a href="$targetUri">(');
+            regions.write(relativePath);
+            // TODO(brianwilkerson) Add the line number to the link text. This
+            //  will require that either the contents of all navigation targets
+            //  have been set or that line information has been saved.
+            regions.write(')</a>');
+          }
+          regions.write('</li>');
         }
-        writeSplitLines(detail.description);
-        if (detail.target != null) {
-          regions.write('</a>');
-        }
-        regions.write('</li>');
-      }
-      if (region.details.isNotEmpty) {
         regions.write('</ul>');
+      }
+      //
+      // Write out any edits.
+      //
+      if (supportsIncrementalWorkflow && region.edits.isNotEmpty) {
+        for (EditDetail edit in region.edits) {
+          int offset = edit.offset;
+          String targetUri = Uri(
+              scheme: 'http',
+              path: pathContext.basename(unitInfo.path),
+              queryParameters: {
+                'offset': offset.toString(),
+                'end': (offset + edit.length).toString(),
+                'replacement': edit.replacement
+              }).toString();
+          regions.write('<p>');
+          regions.write('<a href="$targetUri">');
+          regions.write(edit.description);
+          regions.write('</a>');
+          regions.write('</p>');
+        }
       }
       regions.write('</span></span>');
     }
@@ -394,14 +319,18 @@ class InstrumentationRenderer {
   }
 
   /// Return the URL that will navigate to the given [target].
-  String _uriForTarget(NavigationTarget target, String unitDir) {
+  String _relativePathToTarget(NavigationTarget target, String unitDir) {
     if (target == null) {
       // TODO(brianwilkerson) This is temporary support until we can get targets
       //  for all nodes.
       return '';
     }
-    String relativePath =
-        pathContext.relative(pathMapper.map(target.filePath), from: unitDir);
+    return pathContext.relative(pathMapper.map(target.filePath), from: unitDir);
+  }
+
+  /// Return the URL that will navigate to the given [target] in the file at the
+  /// given [relativePath].
+  String _uriForRelativePath(String relativePath, NavigationTarget target) {
     return '$relativePath#o${target.offset.toString()}';
   }
 }
@@ -415,13 +344,20 @@ class MigrationInfo {
   /// The information about the compilation units that are are migrated.
   final Set<UnitInfo> units;
 
+  /// A map from file paths to the unit infos created for those files. The units
+  /// in this map is a strict superset of the [units] that were migrated.
+  final Map<String, UnitInfo> unitMap;
+
   /// The resource provider's path context.
   final path.Context pathContext;
 
   /// The filesystem root used to create relative paths for each unit.
   final String includedRoot;
 
-  MigrationInfo(this.units, this.pathContext, this.includedRoot);
+  final String migrationDate;
+
+  MigrationInfo(this.units, this.unitMap, this.pathContext, this.includedRoot)
+      : migrationDate = DateTime.now().toString();
 
   /// The path to the highlight.js script, relative to [unitInfo].
   String highlightJsPath(UnitInfo unitInfo) {
@@ -432,7 +368,7 @@ class MigrationInfo {
     }
     // Files that aren't within the [includedRoot] are written to the top-level
     // of the output directory, next to the Javascript file.
-    return 'highlight.pack.js';
+    return pathContext.join('..', 'highlight.pack.js');
   }
 
   /// The path to the highlight.js stylesheet, relative to [unitInfo].
@@ -444,20 +380,26 @@ class MigrationInfo {
     }
     // Files that aren't within the [includedRoot] are written to the top-level
     // of the output directory, next to the CSS file.
-    return 'androidstudio.css';
+    return pathContext.join('..', 'androidstudio.css');
   }
 
   /// Generate mustache context for unit links, for navigation in the
-  /// instrumentation document for [thisUnit].
-  List<Map<String, Object>> unitLinks(UnitInfo thisUnit) {
-    return [
-      for (var unit in units)
-        {
-          'name': _computeName(unit),
-          'isLink': unit != thisUnit,
-          if (unit != thisUnit) 'href': _pathTo(target: unit, source: thisUnit)
-        }
-    ];
+  /// instrumentation document for [currentUnit].
+  List<Map<String, Object>> unitLinks(UnitInfo currentUnit) {
+    List<Map<String, Object>> links = [];
+    for (UnitInfo unit in units) {
+      int count = unit.fixRegions.length;
+      String modificationCount =
+          count == 1 ? '(1 modification)' : '($count modifications)';
+      bool isNotCurrent = unit != currentUnit;
+      links.add({
+        'name': _computeName(unit),
+        'modificationCount': modificationCount,
+        'isLink': isNotCurrent,
+        if (isNotCurrent) 'href': _pathTo(target: unit, source: currentUnit)
+      });
+    }
+    return links;
   }
 
   /// Return the path to [unit] from [includedRoot], to be used as a display

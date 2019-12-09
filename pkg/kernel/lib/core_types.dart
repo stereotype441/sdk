@@ -28,6 +28,7 @@ class CoreTypes {
       'FallThroughError',
     ],
     'dart:_internal': [
+      'LateInitializationErrorImpl',
       'Symbol',
     ],
     'dart:async': [
@@ -64,6 +65,9 @@ class CoreTypes {
   Constructor _fallThroughErrorUrlAndLineConstructor;
   Procedure _objectEquals;
   Procedure _mapUnmodifiable;
+  Procedure _iterableGetIterator;
+  Procedure _iteratorMoveNext;
+  Procedure _iteratorGetCurrent;
 
   Class _internalSymbolClass;
 
@@ -86,6 +90,7 @@ class CoreTypes {
   Procedure _asyncErrorWrapperHelperProcedure;
   Procedure _awaitHelperProcedure;
   Procedure _boolFromEnvironment;
+  Constructor _lateInitializationErrorConstructor;
 
   /// The `dart:mirrors` library, or `null` if the component does not use it.
   Library _mirrorsLibrary;
@@ -153,9 +158,6 @@ class CoreTypes {
   InterfaceType _streamLegacyRawType;
   InterfaceType _streamNullableRawType;
   InterfaceType _streamNonNullableRawType;
-  InterfaceType _asyncAwaitCompleterLegacyRawType;
-  InterfaceType _asyncAwaitCompleterNullableRawType;
-  InterfaceType _asyncAwaitCompleterNonNullableRawType;
   InterfaceType _futureOrLegacyRawType;
   InterfaceType _futureOrNullableRawType;
   InterfaceType _futureOrNonNullableRawType;
@@ -167,6 +169,12 @@ class CoreTypes {
   final Map<Class, InterfaceType> _nullableRawTypes =
       new Map<Class, InterfaceType>.identity();
   final Map<Class, InterfaceType> _nonNullableRawTypes =
+      new Map<Class, InterfaceType>.identity();
+  final Map<Class, InterfaceType> _thisInterfaceTypes =
+      new Map<Class, InterfaceType>.identity();
+  final Map<Typedef, TypedefType> _thisTypedefTypes =
+      new Map<Typedef, TypedefType>.identity();
+  final Map<Class, InterfaceType> _bottomInterfaceTypes =
       new Map<Class, InterfaceType>.identity();
 
   CoreTypes(Component component)
@@ -318,8 +326,23 @@ class CoreTypes {
     return _iterableClass ??= index.getClass('dart:core', 'Iterable');
   }
 
+  Procedure get iterableGetIterator {
+    return _iterableGetIterator ??=
+        index.getMember('dart:core', 'Iterable', 'get:iterator');
+  }
+
   Class get iteratorClass {
     return _iteratorClass ??= index.getClass('dart:core', 'Iterator');
+  }
+
+  Procedure get iteratorMoveNext {
+    return _iteratorMoveNext ??=
+        index.getMember('dart:core', 'Iterator', 'moveNext');
+  }
+
+  Procedure get iteratorGetCurrent {
+    return _iteratorGetCurrent ??=
+        index.getMember('dart:core', 'Iterator', 'get:current');
   }
 
   Class get listClass {
@@ -465,19 +488,19 @@ class CoreTypes {
 
   InterfaceType get objectLegacyRawType {
     return _objectLegacyRawType ??= _legacyRawTypes[objectClass] ??=
-        new InterfaceType(objectClass, const <DartType>[], Nullability.legacy);
+        new InterfaceType(objectClass, Nullability.legacy, const <DartType>[]);
   }
 
   InterfaceType get objectNullableRawType {
     return _objectNullableRawType ??= _nullableRawTypes[objectClass] ??=
         new InterfaceType(
-            objectClass, const <DartType>[], Nullability.nullable);
+            objectClass, Nullability.nullable, const <DartType>[]);
   }
 
   InterfaceType get objectNonNullableRawType {
     return _objectNonNullableRawType ??= _nonNullableRawTypes[objectClass] ??=
         new InterfaceType(
-            objectClass, const <DartType>[], Nullability.nonNullable);
+            objectClass, Nullability.nonNullable, const <DartType>[]);
   }
 
   InterfaceType objectRawType(Nullability nullability) {
@@ -498,23 +521,23 @@ class CoreTypes {
   /// Null is always nullable, so there's only one raw type for that class.
   InterfaceType get nullType {
     return _nullType ??= _nullableRawTypes[nullClass] ??=
-        new InterfaceType(nullClass, const <DartType>[], Nullability.nullable);
+        new InterfaceType(nullClass, Nullability.nullable, const <DartType>[]);
   }
 
   InterfaceType get boolLegacyRawType {
     return _boolLegacyRawType ??= _legacyRawTypes[boolClass] ??=
-        new InterfaceType(boolClass, const <DartType>[], Nullability.legacy);
+        new InterfaceType(boolClass, Nullability.legacy, const <DartType>[]);
   }
 
   InterfaceType get boolNullableRawType {
     return _boolNullableRawType ??= _nullableRawTypes[boolClass] ??=
-        new InterfaceType(boolClass, const <DartType>[], Nullability.nullable);
+        new InterfaceType(boolClass, Nullability.nullable, const <DartType>[]);
   }
 
   InterfaceType get boolNonNullableRawType {
     return _boolNonNullableRawType ??= _nonNullableRawTypes[boolClass] ??=
         new InterfaceType(
-            boolClass, const <DartType>[], Nullability.nonNullable);
+            boolClass, Nullability.nonNullable, const <DartType>[]);
   }
 
   InterfaceType boolRawType(Nullability nullability) {
@@ -534,18 +557,18 @@ class CoreTypes {
 
   InterfaceType get intLegacyRawType {
     return _intLegacyRawType ??= _legacyRawTypes[intClass] ??=
-        new InterfaceType(intClass, const <DartType>[], Nullability.legacy);
+        new InterfaceType(intClass, Nullability.legacy, const <DartType>[]);
   }
 
   InterfaceType get intNullableRawType {
     return _intNullableRawType ??= _nullableRawTypes[intClass] ??=
-        new InterfaceType(intClass, const <DartType>[], Nullability.nullable);
+        new InterfaceType(intClass, Nullability.nullable, const <DartType>[]);
   }
 
   InterfaceType get intNonNullableRawType {
     return _intNonNullableRawType ??= _nonNullableRawTypes[intClass] ??=
         new InterfaceType(
-            intClass, const <DartType>[], Nullability.nonNullable);
+            intClass, Nullability.nonNullable, const <DartType>[]);
   }
 
   InterfaceType intRawType(Nullability nullability) {
@@ -565,18 +588,18 @@ class CoreTypes {
 
   InterfaceType get numLegacyRawType {
     return _numLegacyRawType ??= _legacyRawTypes[numClass] ??=
-        new InterfaceType(numClass, const <DartType>[], Nullability.legacy);
+        new InterfaceType(numClass, Nullability.legacy, const <DartType>[]);
   }
 
   InterfaceType get numNullableRawType {
     return _numNullableRawType ??= _nullableRawTypes[numClass] ??=
-        new InterfaceType(numClass, const <DartType>[], Nullability.nullable);
+        new InterfaceType(numClass, Nullability.nullable, const <DartType>[]);
   }
 
   InterfaceType get numNonNullableRawType {
     return _numNonNullableRawType ??= _nonNullableRawTypes[numClass] ??=
         new InterfaceType(
-            numClass, const <DartType>[], Nullability.nonNullable);
+            numClass, Nullability.nonNullable, const <DartType>[]);
   }
 
   InterfaceType numRawType(Nullability nullability) {
@@ -596,19 +619,19 @@ class CoreTypes {
 
   InterfaceType get doubleLegacyRawType {
     return _doubleLegacyRawType ??= _legacyRawTypes[doubleClass] ??=
-        new InterfaceType(doubleClass, const <DartType>[], Nullability.legacy);
+        new InterfaceType(doubleClass, Nullability.legacy, const <DartType>[]);
   }
 
   InterfaceType get doubleNullableRawType {
     return _doubleNullableRawType ??= _nullableRawTypes[doubleClass] ??=
         new InterfaceType(
-            doubleClass, const <DartType>[], Nullability.nullable);
+            doubleClass, Nullability.nullable, const <DartType>[]);
   }
 
   InterfaceType get doubleNonNullableRawType {
     return _doubleNonNullableRawType ??= _nonNullableRawTypes[doubleClass] ??=
         new InterfaceType(
-            doubleClass, const <DartType>[], Nullability.nonNullable);
+            doubleClass, Nullability.nonNullable, const <DartType>[]);
   }
 
   InterfaceType doubleRawType(Nullability nullability) {
@@ -628,19 +651,19 @@ class CoreTypes {
 
   InterfaceType get stringLegacyRawType {
     return _stringLegacyRawType ??= _legacyRawTypes[stringClass] ??=
-        new InterfaceType(stringClass, const <DartType>[], Nullability.legacy);
+        new InterfaceType(stringClass, Nullability.legacy, const <DartType>[]);
   }
 
   InterfaceType get stringNullableRawType {
     return _stringNullableRawType ??= _nullableRawTypes[stringClass] ??=
         new InterfaceType(
-            stringClass, const <DartType>[], Nullability.nullable);
+            stringClass, Nullability.nullable, const <DartType>[]);
   }
 
   InterfaceType get stringNonNullableRawType {
     return _stringNonNullableRawType ??= _nonNullableRawTypes[stringClass] ??=
         new InterfaceType(
-            stringClass, const <DartType>[], Nullability.nonNullable);
+            stringClass, Nullability.nonNullable, const <DartType>[]);
   }
 
   InterfaceType stringRawType(Nullability nullability) {
@@ -660,20 +683,20 @@ class CoreTypes {
 
   InterfaceType get listLegacyRawType {
     return _listLegacyRawType ??= _legacyRawTypes[listClass] ??=
-        new InterfaceType(listClass, const <DartType>[const DynamicType()],
-            Nullability.legacy);
+        new InterfaceType(listClass, Nullability.legacy,
+            const <DartType>[const DynamicType()]);
   }
 
   InterfaceType get listNullableRawType {
     return _listNullableRawType ??= _nullableRawTypes[listClass] ??=
-        new InterfaceType(listClass, const <DartType>[const DynamicType()],
-            Nullability.nullable);
+        new InterfaceType(listClass, Nullability.nullable,
+            const <DartType>[const DynamicType()]);
   }
 
   InterfaceType get listNonNullableRawType {
     return _listNonNullableRawType ??= _nonNullableRawTypes[listClass] ??=
-        new InterfaceType(listClass, const <DartType>[const DynamicType()],
-            Nullability.nonNullable);
+        new InterfaceType(listClass, Nullability.nonNullable,
+            const <DartType>[const DynamicType()]);
   }
 
   InterfaceType listRawType(Nullability nullability) {
@@ -693,20 +716,20 @@ class CoreTypes {
 
   InterfaceType get setLegacyRawType {
     return _setLegacyRawType ??= _legacyRawTypes[setClass] ??=
-        new InterfaceType(setClass, const <DartType>[const DynamicType()],
-            Nullability.legacy);
+        new InterfaceType(setClass, Nullability.legacy,
+            const <DartType>[const DynamicType()]);
   }
 
   InterfaceType get setNullableRawType {
     return _setNullableRawType ??= _nullableRawTypes[setClass] ??=
-        new InterfaceType(setClass, const <DartType>[const DynamicType()],
-            Nullability.nullable);
+        new InterfaceType(setClass, Nullability.nullable,
+            const <DartType>[const DynamicType()]);
   }
 
   InterfaceType get setNonNullableRawType {
     return _setNonNullableRawType ??= _nonNullableRawTypes[setClass] ??=
-        new InterfaceType(setClass, const <DartType>[const DynamicType()],
-            Nullability.nonNullable);
+        new InterfaceType(setClass, Nullability.nonNullable,
+            const <DartType>[const DynamicType()]);
   }
 
   InterfaceType setRawType(Nullability nullability) {
@@ -726,26 +749,20 @@ class CoreTypes {
 
   InterfaceType get mapLegacyRawType {
     return _mapLegacyRawType ??= _legacyRawTypes[mapClass] ??=
-        new InterfaceType(
-            mapClass,
-            const <DartType>[const DynamicType(), const DynamicType()],
-            Nullability.legacy);
+        new InterfaceType(mapClass, Nullability.legacy,
+            const <DartType>[const DynamicType(), const DynamicType()]);
   }
 
   InterfaceType get mapNullableRawType {
     return _mapNullableRawType ??= _nullableRawTypes[mapClass] ??=
-        new InterfaceType(
-            mapClass,
-            const <DartType>[const DynamicType(), const DynamicType()],
-            Nullability.nullable);
+        new InterfaceType(mapClass, Nullability.nullable,
+            const <DartType>[const DynamicType(), const DynamicType()]);
   }
 
   InterfaceType get mapNonNullableRawType {
     return _mapNonNullableRawType ??= _nonNullableRawTypes[mapClass] ??=
-        new InterfaceType(
-            mapClass,
-            const <DartType>[const DynamicType(), const DynamicType()],
-            Nullability.nonNullable);
+        new InterfaceType(mapClass, Nullability.nonNullable,
+            const <DartType>[const DynamicType(), const DynamicType()]);
   }
 
   InterfaceType mapRawType(Nullability nullability) {
@@ -765,20 +782,20 @@ class CoreTypes {
 
   InterfaceType get iterableLegacyRawType {
     return _iterableLegacyRawType ??= _legacyRawTypes[iterableClass] ??=
-        new InterfaceType(iterableClass, const <DartType>[const DynamicType()],
-            Nullability.legacy);
+        new InterfaceType(iterableClass, Nullability.legacy,
+            const <DartType>[const DynamicType()]);
   }
 
   InterfaceType get iterableNullableRawType {
     return _iterableNullableRawType ??= _nullableRawTypes[iterableClass] ??=
-        new InterfaceType(iterableClass, const <DartType>[const DynamicType()],
-            Nullability.nullable);
+        new InterfaceType(iterableClass, Nullability.nullable,
+            const <DartType>[const DynamicType()]);
   }
 
   InterfaceType get iterableNonNullableRawType {
     return _iterableNonNullableRawType ??=
         _nonNullableRawTypes[iterableClass] ??= new InterfaceType(iterableClass,
-            const <DartType>[const DynamicType()], Nullability.nonNullable);
+            Nullability.nonNullable, const <DartType>[const DynamicType()]);
   }
 
   InterfaceType iterableRawType(Nullability nullability) {
@@ -798,20 +815,20 @@ class CoreTypes {
 
   InterfaceType get iteratorLegacyRawType {
     return _iteratorLegacyRawType ??= _legacyRawTypes[iteratorClass] ??=
-        new InterfaceType(iteratorClass, const <DartType>[const DynamicType()],
-            Nullability.legacy);
+        new InterfaceType(iteratorClass, Nullability.legacy,
+            const <DartType>[const DynamicType()]);
   }
 
   InterfaceType get iteratorNullableRawType {
     return _iteratorNullableRawType ??= _nullableRawTypes[iteratorClass] ??=
-        new InterfaceType(iteratorClass, const <DartType>[const DynamicType()],
-            Nullability.nullable);
+        new InterfaceType(iteratorClass, Nullability.nullable,
+            const <DartType>[const DynamicType()]);
   }
 
   InterfaceType get iteratorNonNullableRawType {
     return _iteratorNonNullableRawType ??=
         _nonNullableRawTypes[iteratorClass] ??= new InterfaceType(iteratorClass,
-            const <DartType>[const DynamicType()], Nullability.nonNullable);
+            Nullability.nonNullable, const <DartType>[const DynamicType()]);
   }
 
   InterfaceType iteratorRawType(Nullability nullability) {
@@ -831,19 +848,19 @@ class CoreTypes {
 
   InterfaceType get symbolLegacyRawType {
     return _symbolLegacyRawType ??= _legacyRawTypes[symbolClass] ??=
-        new InterfaceType(symbolClass, const <DartType>[], Nullability.legacy);
+        new InterfaceType(symbolClass, Nullability.legacy, const <DartType>[]);
   }
 
   InterfaceType get symbolNullableRawType {
     return _symbolNullableRawType ??= _nullableRawTypes[symbolClass] ??=
         new InterfaceType(
-            symbolClass, const <DartType>[], Nullability.nullable);
+            symbolClass, Nullability.nullable, const <DartType>[]);
   }
 
   InterfaceType get symbolNonNullableRawType {
     return _symbolNonNullableRawType ??= _nonNullableRawTypes[symbolClass] ??=
         new InterfaceType(
-            symbolClass, const <DartType>[], Nullability.nonNullable);
+            symbolClass, Nullability.nonNullable, const <DartType>[]);
   }
 
   InterfaceType symbolRawType(Nullability nullability) {
@@ -863,18 +880,18 @@ class CoreTypes {
 
   InterfaceType get typeLegacyRawType {
     return _typeLegacyRawType ??= _legacyRawTypes[typeClass] ??=
-        new InterfaceType(typeClass, const <DartType>[], Nullability.legacy);
+        new InterfaceType(typeClass, Nullability.legacy, const <DartType>[]);
   }
 
   InterfaceType get typeNullableRawType {
     return _typeNullableRawType ??= _nullableRawTypes[typeClass] ??=
-        new InterfaceType(typeClass, const <DartType>[], Nullability.nullable);
+        new InterfaceType(typeClass, Nullability.nullable, const <DartType>[]);
   }
 
   InterfaceType get typeNonNullableRawType {
     return _typeNonNullableRawType ??= _nonNullableRawTypes[typeClass] ??=
         new InterfaceType(
-            typeClass, const <DartType>[], Nullability.nonNullable);
+            typeClass, Nullability.nonNullable, const <DartType>[]);
   }
 
   InterfaceType typeRawType(Nullability nullability) {
@@ -895,19 +912,19 @@ class CoreTypes {
   InterfaceType get functionLegacyRawType {
     return _functionLegacyRawType ??= _legacyRawTypes[functionClass] ??=
         new InterfaceType(
-            functionClass, const <DartType>[], Nullability.legacy);
+            functionClass, Nullability.legacy, const <DartType>[]);
   }
 
   InterfaceType get functionNullableRawType {
     return _functionNullableRawType ??= _nullableRawTypes[functionClass] ??=
         new InterfaceType(
-            functionClass, const <DartType>[], Nullability.nullable);
+            functionClass, Nullability.nullable, const <DartType>[]);
   }
 
   InterfaceType get functionNonNullableRawType {
     return _functionNonNullableRawType ??=
         _nonNullableRawTypes[functionClass] ??= new InterfaceType(
-            functionClass, const <DartType>[], Nullability.nonNullable);
+            functionClass, Nullability.nonNullable, const <DartType>[]);
   }
 
   InterfaceType functionRawType(Nullability nullability) {
@@ -928,19 +945,19 @@ class CoreTypes {
   InterfaceType get invocationLegacyRawType {
     return _invocationLegacyRawType ??= _legacyRawTypes[invocationClass] ??=
         new InterfaceType(
-            invocationClass, const <DartType>[], Nullability.legacy);
+            invocationClass, Nullability.legacy, const <DartType>[]);
   }
 
   InterfaceType get invocationNullableRawType {
     return _invocationNullableRawType ??= _nullableRawTypes[invocationClass] ??=
         new InterfaceType(
-            invocationClass, const <DartType>[], Nullability.nullable);
+            invocationClass, Nullability.nullable, const <DartType>[]);
   }
 
   InterfaceType get invocationNonNullableRawType {
     return _invocationNonNullableRawType ??=
         _nonNullableRawTypes[invocationClass] ??= new InterfaceType(
-            invocationClass, const <DartType>[], Nullability.nonNullable);
+            invocationClass, Nullability.nonNullable, const <DartType>[]);
   }
 
   InterfaceType invocationRawType(Nullability nullability) {
@@ -961,19 +978,19 @@ class CoreTypes {
   InterfaceType get invocationMirrorLegacyRawType {
     return _invocationMirrorLegacyRawType ??=
         _legacyRawTypes[invocationMirrorClass] ??= new InterfaceType(
-            invocationMirrorClass, const <DartType>[], Nullability.legacy);
+            invocationMirrorClass, Nullability.legacy, const <DartType>[]);
   }
 
   InterfaceType get invocationMirrorNullableRawType {
     return _invocationMirrorNullableRawType ??=
         _nullableRawTypes[invocationMirrorClass] ??= new InterfaceType(
-            invocationMirrorClass, const <DartType>[], Nullability.nullable);
+            invocationMirrorClass, Nullability.nullable, const <DartType>[]);
   }
 
   InterfaceType get invocationMirrorNonNullableRawType {
     return _invocationMirrorNonNullableRawType ??=
         _nonNullableRawTypes[invocationMirrorClass] ??= new InterfaceType(
-            invocationMirrorClass, const <DartType>[], Nullability.nonNullable);
+            invocationMirrorClass, Nullability.nonNullable, const <DartType>[]);
   }
 
   InterfaceType invocationMirrorRawType(Nullability nullability) {
@@ -993,20 +1010,20 @@ class CoreTypes {
 
   InterfaceType get futureLegacyRawType {
     return _futureLegacyRawType ??= _legacyRawTypes[futureClass] ??=
-        new InterfaceType(futureClass, const <DartType>[const DynamicType()],
-            Nullability.legacy);
+        new InterfaceType(futureClass, Nullability.legacy,
+            const <DartType>[const DynamicType()]);
   }
 
   InterfaceType get futureNullableRawType {
     return _futureNullableRawType ??= _nullableRawTypes[futureClass] ??=
-        new InterfaceType(futureClass, const <DartType>[const DynamicType()],
-            Nullability.nullable);
+        new InterfaceType(futureClass, Nullability.nullable,
+            const <DartType>[const DynamicType()]);
   }
 
   InterfaceType get futureNonNullableRawType {
     return _futureNonNullableRawType ??= _nonNullableRawTypes[futureClass] ??=
-        new InterfaceType(futureClass, const <DartType>[const DynamicType()],
-            Nullability.nonNullable);
+        new InterfaceType(futureClass, Nullability.nonNullable,
+            const <DartType>[const DynamicType()]);
   }
 
   InterfaceType futureRawType(Nullability nullability) {
@@ -1027,19 +1044,19 @@ class CoreTypes {
   InterfaceType get stackTraceLegacyRawType {
     return _stackTraceLegacyRawType ??= _legacyRawTypes[stackTraceClass] ??=
         new InterfaceType(
-            stackTraceClass, const <DartType>[], Nullability.legacy);
+            stackTraceClass, Nullability.legacy, const <DartType>[]);
   }
 
   InterfaceType get stackTraceNullableRawType {
     return _stackTraceNullableRawType ??= _nullableRawTypes[stackTraceClass] ??=
         new InterfaceType(
-            stackTraceClass, const <DartType>[], Nullability.nullable);
+            stackTraceClass, Nullability.nullable, const <DartType>[]);
   }
 
   InterfaceType get stackTraceNonNullableRawType {
     return _stackTraceNonNullableRawType ??=
         _nonNullableRawTypes[stackTraceClass] ??= new InterfaceType(
-            stackTraceClass, const <DartType>[], Nullability.nonNullable);
+            stackTraceClass, Nullability.nonNullable, const <DartType>[]);
   }
 
   InterfaceType stackTraceRawType(Nullability nullability) {
@@ -1059,20 +1076,20 @@ class CoreTypes {
 
   InterfaceType get streamLegacyRawType {
     return _streamLegacyRawType ??= _legacyRawTypes[streamClass] ??=
-        new InterfaceType(streamClass, const <DartType>[const DynamicType()],
-            Nullability.legacy);
+        new InterfaceType(streamClass, Nullability.legacy,
+            const <DartType>[const DynamicType()]);
   }
 
   InterfaceType get streamNullableRawType {
     return _streamNullableRawType ??= _nullableRawTypes[streamClass] ??=
-        new InterfaceType(streamClass, const <DartType>[const DynamicType()],
-            Nullability.nullable);
+        new InterfaceType(streamClass, Nullability.nullable,
+            const <DartType>[const DynamicType()]);
   }
 
   InterfaceType get streamNonNullableRawType {
     return _streamNonNullableRawType ??= _nonNullableRawTypes[streamClass] ??=
-        new InterfaceType(streamClass, const <DartType>[const DynamicType()],
-            Nullability.nonNullable);
+        new InterfaceType(streamClass, Nullability.nonNullable,
+            const <DartType>[const DynamicType()]);
   }
 
   InterfaceType streamRawType(Nullability nullability) {
@@ -1090,61 +1107,22 @@ class CoreTypes {
     }
   }
 
-  InterfaceType get asyncAwaitCompleterLegacyRawType {
-    return _asyncAwaitCompleterLegacyRawType ??=
-        _legacyRawTypes[asyncAwaitCompleterClass] ??= new InterfaceType(
-            asyncAwaitCompleterClass,
-            const <DartType>[const DynamicType()],
-            Nullability.legacy);
-  }
-
-  InterfaceType get asyncAwaitCompleterNullableRawType {
-    return _asyncAwaitCompleterNullableRawType ??=
-        _nullableRawTypes[asyncAwaitCompleterClass] ??= new InterfaceType(
-            asyncAwaitCompleterClass,
-            const <DartType>[const DynamicType()],
-            Nullability.nullable);
-  }
-
-  InterfaceType get asyncAwaitCompleterNonNullableRawType {
-    return _asyncAwaitCompleterNonNullableRawType ??=
-        _nonNullableRawTypes[asyncAwaitCompleterClass] ??= new InterfaceType(
-            asyncAwaitCompleterClass,
-            const <DartType>[const DynamicType()],
-            Nullability.nonNullable);
-  }
-
-  InterfaceType asyncAwaitCompleterRawType(Nullability nullability) {
-    switch (nullability) {
-      case Nullability.legacy:
-        return asyncAwaitCompleterLegacyRawType;
-      case Nullability.nullable:
-        return asyncAwaitCompleterNullableRawType;
-      case Nullability.nonNullable:
-        return asyncAwaitCompleterNonNullableRawType;
-      case Nullability.undetermined:
-      default:
-        throw new StateError(
-            "Unsupported nullability $nullability on an InterfaceType.");
-    }
-  }
-
   InterfaceType get futureOrLegacyRawType {
     return _futureOrLegacyRawType ??= _legacyRawTypes[futureOrClass] ??=
-        new InterfaceType(futureOrClass, const <DartType>[const DynamicType()],
-            Nullability.legacy);
+        new InterfaceType(futureOrClass, Nullability.legacy,
+            const <DartType>[const DynamicType()]);
   }
 
   InterfaceType get futureOrNullableRawType {
     return _futureOrNullableRawType ??= _nullableRawTypes[futureOrClass] ??=
-        new InterfaceType(futureOrClass, const <DartType>[const DynamicType()],
-            Nullability.nullable);
+        new InterfaceType(futureOrClass, Nullability.nullable,
+            const <DartType>[const DynamicType()]);
   }
 
   InterfaceType get futureOrNonNullableRawType {
     return _futureOrNonNullableRawType ??=
         _nonNullableRawTypes[futureOrClass] ??= new InterfaceType(futureOrClass,
-            const <DartType>[const DynamicType()], Nullability.nonNullable);
+            Nullability.nonNullable, const <DartType>[const DynamicType()]);
   }
 
   InterfaceType futureOrRawType(Nullability nullability) {
@@ -1164,19 +1142,19 @@ class CoreTypes {
 
   InterfaceType get pragmaLegacyRawType {
     return _pragmaLegacyRawType ??= _legacyRawTypes[pragmaClass] ??=
-        new InterfaceType(pragmaClass, const <DartType>[], Nullability.legacy);
+        new InterfaceType(pragmaClass, Nullability.legacy, const <DartType>[]);
   }
 
   InterfaceType get pragmaNullableRawType {
     return _pragmaNullableRawType ??= _nullableRawTypes[pragmaClass] ??=
         new InterfaceType(
-            pragmaClass, const <DartType>[], Nullability.nullable);
+            pragmaClass, Nullability.nullable, const <DartType>[]);
   }
 
   InterfaceType get pragmaNonNullableRawType {
     return _pragmaNonNullableRawType ??= _nonNullableRawTypes[pragmaClass] ??=
         new InterfaceType(
-            pragmaClass, const <DartType>[], Nullability.nonNullable);
+            pragmaClass, Nullability.nonNullable, const <DartType>[]);
   }
 
   InterfaceType pragmaRawType(Nullability nullability) {
@@ -1198,27 +1176,27 @@ class CoreTypes {
     // TODO(dmitryas): Consider using computeBounds instead of DynamicType here.
     return _legacyRawTypes[klass] ??= new InterfaceType(
         klass,
+        Nullability.legacy,
         new List<DartType>.filled(
-            klass.typeParameters.length, const DynamicType()),
-        Nullability.legacy);
+            klass.typeParameters.length, const DynamicType()));
   }
 
   InterfaceType nullableRawType(Class klass) {
     // TODO(dmitryas): Consider using computeBounds instead of DynamicType here.
     return _nullableRawTypes[klass] ??= new InterfaceType(
         klass,
+        Nullability.nullable,
         new List<DartType>.filled(
-            klass.typeParameters.length, const DynamicType()),
-        Nullability.nullable);
+            klass.typeParameters.length, const DynamicType()));
   }
 
   InterfaceType nonNullableRawType(Class klass) {
     // TODO(dmitryas): Consider using computeBounds instead of DynamicType here.
     return _nonNullableRawTypes[klass] ??= new InterfaceType(
         klass,
+        Nullability.nonNullable,
         new List<DartType>.filled(
-            klass.typeParameters.length, const DynamicType()),
-        Nullability.nonNullable);
+            klass.typeParameters.length, const DynamicType()));
   }
 
   InterfaceType rawType(Class klass, Nullability nullability) {
@@ -1234,5 +1212,49 @@ class CoreTypes {
         throw new StateError(
             "Unsupported nullability $nullability on an InterfaceType.");
     }
+  }
+
+  InterfaceType thisInterfaceType(Class klass, Nullability nullability) {
+    InterfaceType result = _thisInterfaceTypes[klass];
+    if (result == null) {
+      return _thisInterfaceTypes[klass] = new InterfaceType(klass, nullability,
+          getAsTypeArguments(klass.typeParameters, klass.enclosingLibrary));
+    }
+    if (result.nullability != nullability) {
+      return _thisInterfaceTypes[klass] = result.withNullability(nullability);
+    }
+    return result;
+  }
+
+  TypedefType thisTypedefType(Typedef typedef, Nullability nullability) {
+    TypedefType result = _thisTypedefTypes[typedef];
+    if (result == null) {
+      return _thisTypedefTypes[typedef] = new TypedefType(typedef, nullability,
+          getAsTypeArguments(typedef.typeParameters, typedef.enclosingLibrary));
+    }
+    if (result.nullability != nullability) {
+      return _thisTypedefTypes[typedef] = result.withNullability(nullability);
+    }
+    return result;
+  }
+
+  Constructor get lateInitializationErrorConstructor {
+    return _lateInitializationErrorConstructor ??=
+        index.getMember('dart:_internal', 'LateInitializationErrorImpl', '');
+  }
+
+  InterfaceType bottomInterfaceType(Class klass, Nullability nullability) {
+    InterfaceType result = _bottomInterfaceTypes[klass];
+    if (result == null) {
+      return _bottomInterfaceTypes[klass] = new InterfaceType(
+          klass,
+          nullability,
+          new List<DartType>.filled(
+              klass.typeParameters.length, const BottomType()));
+    }
+    if (result.nullability != nullability) {
+      return _bottomInterfaceTypes[klass] = result.withNullability(nullability);
+    }
+    return result;
   }
 }

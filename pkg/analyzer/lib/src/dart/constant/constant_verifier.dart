@@ -10,6 +10,7 @@ import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
+import 'package:analyzer/dart/element/type_system.dart';
 import 'package:analyzer/error/error.dart';
 import 'package:analyzer/error/listener.dart';
 import 'package:analyzer/src/dart/ast/utilities.dart';
@@ -20,7 +21,7 @@ import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/diagnostic/diagnostic_factory.dart';
 import 'package:analyzer/src/error/codes.dart';
 import 'package:analyzer/src/generated/engine.dart';
-import 'package:analyzer/src/generated/resolver.dart';
+import 'package:analyzer/src/generated/resolver.dart' show TypeProvider;
 
 /// Instances of the class `ConstantVerifier` traverse an AST structure looking
 /// for additional errors and warnings not covered by the parser and resolver.
@@ -60,7 +61,7 @@ class ConstantVerifier extends RecursiveAstVisitor<void> {
             currentLibrary,
             typeProvider,
             declaredVariables,
-            currentLibrary.context.typeSystem,
+            currentLibrary.typeSystem,
             featureSet ??
                 (currentLibrary.context.analysisOptions as AnalysisOptionsImpl)
                     .contextFeatures);
@@ -75,7 +76,7 @@ class ConstantVerifier extends RecursiveAstVisitor<void> {
       : _constantUpdate2018Enabled =
             featureSet.isEnabled(Feature.constant_update_2018),
         _intType = _typeProvider.intType,
-        _evaluationEngine = new ConstantEvaluationEngine(
+        _evaluationEngine = ConstantEvaluationEngine(
             _typeProvider, declaredVariables,
             typeSystem: typeSystem, experimentStatus: featureSet);
 
@@ -130,7 +131,7 @@ class ConstantVerifier extends RecursiveAstVisitor<void> {
       ConstructorElement constructor = node.staticElement;
       if (constructor != null) {
         ConstantVisitor constantVisitor =
-            new ConstantVisitor(_evaluationEngine, _errorReporter);
+            ConstantVisitor(_evaluationEngine, _errorReporter);
         _evaluationEngine.evaluateConstructorCall(
             node,
             node.argumentList.arguments,
@@ -251,7 +252,7 @@ class ConstantVerifier extends RecursiveAstVisitor<void> {
               _errorReporter.reportErrorForNode(
                   CompileTimeErrorCode.INCONSISTENT_CASE_EXPRESSION_TYPES,
                   expression,
-                  [expression.toSource(), firstType.displayName]);
+                  [expression.toSource(), firstType]);
               foundError = true;
             }
           }
@@ -309,7 +310,7 @@ class ConstantVerifier extends RecursiveAstVisitor<void> {
     _errorReporter.reportErrorForToken(
         CompileTimeErrorCode.CASE_EXPRESSION_TYPE_IMPLEMENTS_EQUALS,
         node.switchKeyword,
-        [type.displayName]);
+        [type]);
     return true;
   }
 
@@ -376,7 +377,7 @@ class ConstantVerifier extends RecursiveAstVisitor<void> {
   void _reportErrorIfFromDeferredLibrary(
       Expression expression, ErrorCode errorCode) {
     DeferredLibraryReferenceDetector referenceDetector =
-        new DeferredLibraryReferenceDetector();
+        DeferredLibraryReferenceDetector();
     expression.accept(referenceDetector);
     if (referenceDetector.result) {
       _errorReporter.reportErrorForNode(errorCode, expression);
@@ -418,8 +419,8 @@ class ConstantVerifier extends RecursiveAstVisitor<void> {
               CheckedModeCompileTimeErrorCode.VARIABLE_TYPE_MISMATCH)) {
         _errorReporter.reportError(data);
       } else if (errorCode != null) {
-        _errorReporter.reportError(new AnalysisError(
-            data.source, data.offset, data.length, errorCode));
+        _errorReporter.reportError(
+            AnalysisError(data.source, data.offset, data.length, errorCode));
       }
     }
   }
@@ -456,11 +457,11 @@ class ConstantVerifier extends RecursiveAstVisitor<void> {
   ///        compile time constant
   /// @return the value of the compile time constant
   DartObjectImpl _validate(Expression expression, ErrorCode errorCode) {
-    RecordingErrorListener errorListener = new RecordingErrorListener();
+    RecordingErrorListener errorListener = RecordingErrorListener();
     ErrorReporter subErrorReporter =
-        new ErrorReporter(errorListener, _errorReporter.source);
-    DartObjectImpl result = expression
-        .accept(new ConstantVisitor(_evaluationEngine, subErrorReporter));
+        ErrorReporter(errorListener, _errorReporter.source);
+    DartObjectImpl result =
+        expression.accept(ConstantVisitor(_evaluationEngine, subErrorReporter));
     _reportErrors(errorListener.errors, errorCode);
     return result;
   }
@@ -511,8 +512,7 @@ class ConstantVerifier extends RecursiveAstVisitor<void> {
         Expression defaultValue = parameter.defaultValue;
         DartObjectImpl result;
         if (defaultValue == null) {
-          result =
-              new DartObjectImpl(_typeProvider.nullType, NullState.NULL_STATE);
+          result = DartObjectImpl(_typeProvider.nullType, NullState.NULL_STATE);
         } else {
           result = _validate(
               defaultValue, CompileTimeErrorCode.NON_CONSTANT_DEFAULT_VALUE);
@@ -525,7 +525,7 @@ class ConstantVerifier extends RecursiveAstVisitor<void> {
         }
         VariableElementImpl element =
             parameter.declaredElement as VariableElementImpl;
-        element.evaluationResult = new EvaluationResultImpl(result);
+        element.evaluationResult = EvaluationResultImpl(result);
       }
     }
   }
@@ -551,9 +551,9 @@ class ConstantVerifier extends RecursiveAstVisitor<void> {
             AnalysisErrorListener errorListener =
                 AnalysisErrorListener.NULL_LISTENER;
             ErrorReporter subErrorReporter =
-                new ErrorReporter(errorListener, _errorReporter.source);
-            DartObjectImpl result = initializer.accept(
-                new ConstantVisitor(_evaluationEngine, subErrorReporter));
+                ErrorReporter(errorListener, _errorReporter.source);
+            DartObjectImpl result = initializer
+                .accept(ConstantVisitor(_evaluationEngine, subErrorReporter));
             if (result == null) {
               _errorReporter.reportErrorForNode(
                   CompileTimeErrorCode
@@ -684,7 +684,7 @@ class _ConstLiteralVerifier {
 
       return true;
     }
-    throw new UnsupportedError(
+    throw UnsupportedError(
       'Unhandled type of collection element: ${element.runtimeType}',
     );
   }

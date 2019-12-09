@@ -218,7 +218,8 @@ void HierarchyInfo::BuildRangesFor(ClassTable* table,
       test_succeeded = false;
     } else if (use_subtype_test) {
       cls_type = cls.RareType();
-      test_succeeded = cls_type.IsSubtypeOf(dst_type, Heap::kNew);
+      test_succeeded =
+          cls_type.IsSubtypeOf(NNBDMode::kLegacy, dst_type, Heap::kNew);
     } else {
       while (!cls.IsObjectClass()) {
         if (cls.raw() == klass.raw()) {
@@ -540,6 +541,16 @@ Definition* Definition::OriginalDefinitionIgnoreBoxingAndConstraints() {
     if (orig == def) return def;
     def = orig;
   }
+}
+
+bool Definition::IsArrayLength(Definition* def) {
+  if (def != nullptr) {
+    if (auto load = def->OriginalDefinitionIgnoreBoxingAndConstraints()
+                        ->AsLoadField()) {
+      return load->IsImmutableLengthLoad();
+    }
+  }
+  return false;
 }
 
 const ICData* Instruction::GetICData(
@@ -1004,9 +1015,9 @@ Instruction* AssertSubtypeInstr::Canonicalize(FlowGraph* flow_graph) {
 
     AbstractType& sub_type = AbstractType::Handle(Z, sub_type_.raw());
     AbstractType& super_type = AbstractType::Handle(Z, super_type_.raw());
-    if (AbstractType::InstantiateAndTestSubtype(&sub_type, &super_type,
-                                                instantiator_type_args,
-                                                function_type_args)) {
+    if (AbstractType::InstantiateAndTestSubtype(
+            NNBDMode::kLegacy, &sub_type, &super_type, instantiator_type_args,
+            function_type_args)) {
       return NULL;
     }
   }
@@ -1091,10 +1102,11 @@ ConstantInstr::ConstantInstr(const Object& value, TokenPosition token_pos)
   // Check that all non-Smi objects are heap allocated and in old space.
   ASSERT(value.IsSmi() || value.IsOld());
 #if defined(DEBUG)
-  // Generally, instances in the flow graph should be canonical. Smis and
-  // null values are canonical by construction and so we skip them here.
+  // Generally, instances in the flow graph should be canonical. Smis, null
+  // values, and sentinel values are canonical by construction and so we skip
+  // them here.
   if (!value.IsNull() && !value.IsSmi() && value.IsInstance() &&
-      !value.IsCanonical()) {
+      !value.IsCanonical() && (value.raw() != Object::sentinel().raw())) {
     // The only allowed type for which IsCanonical() never answers true is
     // TypeParameter. (They are treated as canonical due to how they are
     // created, but there is no way to canonicalize a new TypeParameter
@@ -2644,7 +2656,7 @@ bool LoadFieldInstr::IsFixedLengthArrayCid(intptr_t cid) {
 }
 
 bool LoadFieldInstr::IsTypedDataViewFactory(const Function& function) {
-  auto kind = MethodRecognizer::RecognizeKind(function);
+  auto kind = function.recognized_kind();
   switch (kind) {
     case MethodRecognizer::kTypedData_ByteDataView_factory:
     case MethodRecognizer::kTypedData_Int8ArrayView_factory:
@@ -2929,9 +2941,9 @@ Definition* AssertAssignableInstr::Canonicalize(FlowGraph* flow_graph) {
 
   if ((instantiator_type_args != nullptr) && (function_type_args != nullptr)) {
     AbstractType& new_dst_type = AbstractType::Handle(
-        Z,
-        dst_type().InstantiateFrom(*instantiator_type_args, *function_type_args,
-                                   kAllFree, nullptr, Heap::kOld));
+        Z, dst_type().InstantiateFrom(
+               NNBDMode::kLegacy, *instantiator_type_args, *function_type_args,
+               kAllFree, nullptr, Heap::kOld));
     if (new_dst_type.IsNull()) {
       // Failed instantiation in dead code.
       return this;
@@ -3241,7 +3253,8 @@ static bool MayBeNumber(CompileType* type) {
   }
   // Note that type 'Number' is a subtype of itself.
   return compile_type.IsTopType() || compile_type.IsTypeParameter() ||
-         compile_type.IsSubtypeOf(Type::Handle(Type::Number()), Heap::kOld);
+         compile_type.IsSubtypeOf(NNBDMode::kLegacy,
+                                  Type::Handle(Type::Number()), Heap::kOld);
 }
 
 // Returns a replacement for a strict comparison and signals if the result has
@@ -3733,7 +3746,7 @@ const CallTargets* CallTargets::CreateAndExpand(Zone* zone,
     int lower_limit_cid = (idx == 0) ? -1 : targets[idx - 1].cid_end;
     auto target_info = targets.TargetAt(idx);
     const Function& target = *target_info->target;
-    if (MethodRecognizer::PolymorphicTarget(target)) continue;
+    if (target.is_polymorphic_target()) continue;
     for (int i = target_info->cid_start - 1; i > lower_limit_cid; i--) {
       bool class_is_abstract = false;
       if (FlowGraphCompiler::LookupMethodFor(i, name, args_desc, &fn,
@@ -3757,7 +3770,7 @@ const CallTargets* CallTargets::CreateAndExpand(Zone* zone,
         (idx == length - 1) ? max_cid : targets[idx + 1].cid_start;
     auto target_info = targets.TargetAt(idx);
     const Function& target = *target_info->target;
-    if (MethodRecognizer::PolymorphicTarget(target)) continue;
+    if (target.is_polymorphic_target()) continue;
     // The code below makes attempt to avoid spreading class-id range
     // into a suffix that consists purely of abstract classes to
     // shorten the range.
@@ -3808,7 +3821,7 @@ void CallTargets::MergeIntoRanges() {
     const Function& target = *TargetAt(dest)->target;
     if (TargetAt(dest)->cid_end + 1 >= TargetAt(src)->cid_start &&
         target.raw() == TargetAt(src)->target->raw() &&
-        !MethodRecognizer::PolymorphicTarget(target)) {
+        !target.is_polymorphic_target()) {
       TargetAt(dest)->cid_end = TargetAt(src)->cid_end;
       TargetAt(dest)->count += TargetAt(src)->count;
       TargetAt(dest)->exactness = StaticTypeExactnessState::NotTracking();
@@ -3909,6 +3922,10 @@ void FunctionEntryInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
 #endif
   if (tag() == Instruction::kFunctionEntry) {
     __ Bind(compiler->GetJumpLabel(this));
+  }
+
+  if (this == compiler->flow_graph().graph_entry()->unchecked_entry()) {
+    __ BindUncheckedEntryPoint();
   }
 
   // In the AOT compiler we want to reduce code size, so generate no
@@ -4313,7 +4330,7 @@ void InstanceCallInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
                                     token_pos(), locs(), entry_kind());
     } else {
       compiler->GenerateInstanceCall(deopt_id(), token_pos(), locs(),
-                                     *call_ic_data);
+                                     *call_ic_data, entry_kind());
     }
   }
 }
@@ -4383,8 +4400,7 @@ const BinaryFeedback& StaticCallInstr::BinaryFeedback() {
 
 bool CallTargets::HasSingleRecognizedTarget() const {
   if (!HasSingleTarget()) return false;
-  return MethodRecognizer::RecognizeKind(FirstTarget()) !=
-         MethodRecognizer::kUnknown;
+  return FirstTarget().recognized_kind() != MethodRecognizer::kUnknown;
 }
 
 bool CallTargets::HasSingleTarget() const {
@@ -5449,9 +5465,10 @@ SimdOpInstr* SimdOpInstr::CreateFromCall(Zone* zone,
                                          intptr_t mask /* = 0 */) {
   SimdOpInstr* op =
       new (zone) SimdOpInstr(KindForMethod(kind), call->deopt_id());
-  op->SetInputAt(0, new (zone) Value(receiver));
-  // Note: we are skipping receiver.
-  for (intptr_t i = 1; i < op->InputCount(); i++) {
+  if (receiver != nullptr) {
+    op->SetInputAt(0, new (zone) Value(receiver));
+  }
+  for (intptr_t i = (receiver != nullptr ? 1 : 0); i < op->InputCount(); i++) {
     op->SetInputAt(i, call->PushArgumentAt(i)->value()->CopyWithType(zone));
   }
   if (op->HasMask()) {

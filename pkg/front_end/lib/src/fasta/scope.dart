@@ -5,6 +5,7 @@
 library fasta.scope;
 
 import 'package:kernel/ast.dart' hide MapEntry;
+import 'package:kernel/core_types.dart';
 
 import 'builder/builder.dart';
 import 'builder/class_builder.dart';
@@ -14,6 +15,7 @@ import 'builder/member_builder.dart';
 import 'builder/name_iterator.dart';
 import 'builder/type_variable_builder.dart';
 import 'kernel/body_builder.dart' show JumpTarget;
+import 'kernel/class_hierarchy_builder.dart' show ClassMember;
 
 import 'fasta_codes.dart'
     show
@@ -257,7 +259,7 @@ class Scope extends MutableScope {
     _local.forEach(f);
   }
 
-  void forEachLocalSetter(void Function(String name, Builder member) f) {
+  void forEachLocalSetter(void Function(String name, MemberBuilder member) f) {
     _setters.forEach(f);
   }
 
@@ -467,6 +469,12 @@ abstract class LazyScope extends Scope {
     ensureScope();
     return super._setters;
   }
+
+  @override
+  Set<ExtensionBuilder> get _extensions {
+    ensureScope();
+    return super._extensions;
+  }
 }
 
 class ScopeBuilder {
@@ -597,44 +605,51 @@ class AmbiguousMemberBuilder extends AmbiguousBuilder implements MemberBuilder {
       String name, Builder builder, int charOffset, Uri fileUri)
       : super(name, builder, charOffset, fileUri);
 
+  @override
   Member get member => null;
+
+  @override
+  Member get readTarget => null;
+
+  @override
+  Member get writeTarget => null;
+
+  @override
+  Member get invokeTarget => null;
 
   bool get isNative => false;
 
   @override
   bool get isAssignable => false;
 
+  @override
   ClassBuilder get classBuilder => parent is ClassBuilder ? parent : null;
 
+  @override
   void set parent(Builder value) {
     throw new UnsupportedError('AmbiguousMemberBuilder.parent=');
   }
 
+  @override
   LibraryBuilder get library {
     throw new UnsupportedError('AmbiguousMemberBuilder.parent=');
   }
 
   // TODO(johnniwinther): Remove this and create a [ProcedureBuilder] interface.
-  Member get extensionTearOff => null;
-
-  // TODO(johnniwinther): Remove this and create a [ProcedureBuilder] interface.
-  Procedure get procedure => null;
-
-  // TODO(johnniwinther): Remove this and create a [ProcedureBuilder] interface.
+  @override
   ProcedureKind get kind => null;
 
-  void buildOutlineExpressions(LibraryBuilder library) {
+  @override
+  void buildOutlineExpressions(LibraryBuilder library, CoreTypes coreTypes) {
     throw new UnsupportedError(
         'AmbiguousMemberBuilder.buildOutlineExpressions');
   }
 
-  void inferType() {
-    throw new UnsupportedError('AmbiguousMemberBuilder.inferType');
-  }
+  @override
+  List<ClassMember> get localMembers => const <ClassMember>[];
 
-  void inferCopiedType(covariant Object other) {
-    throw new UnsupportedError('AmbiguousMemberBuilder.inferCopiedType');
-  }
+  @override
+  List<ClassMember> get localSetters => const <ClassMember>[];
 }
 
 class ScopeLocalDeclarationIterator implements Iterator<Builder> {

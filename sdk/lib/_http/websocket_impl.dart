@@ -2,6 +2,8 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+// @dart = 2.6
+
 part of dart._http;
 
 const String _webSocketGUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
@@ -217,7 +219,8 @@ class _WebSocketProtocolTransformer extends StreamTransformerBase<List<int>,
             _unmask(index, payloadLength, buffer);
           }
           // Control frame and data frame share _payloads.
-          _payload.add(new Uint8List.view(buffer.buffer, index, payloadLength));
+          _payload.add(new Uint8List.view(
+              buffer.buffer, buffer.offsetInBytes + index, payloadLength));
           index += payloadLength;
           if (_isControlFrame()) {
             if (_remainingPayloadBytes == 0) _controlFrameEnd();
@@ -259,8 +262,8 @@ class _WebSocketProtocolTransformer extends StreamTransformerBase<List<int>,
           mask = (mask << 8) | _maskingBytes[(_unmaskingIndex + i) & 3];
         }
         Int32x4 blockMask = new Int32x4(mask, mask, mask, mask);
-        Int32x4List blockBuffer =
-            new Int32x4List.view(buffer.buffer, index, blockCount);
+        Int32x4List blockBuffer = new Int32x4List.view(
+            buffer.buffer, buffer.offsetInBytes + index, blockCount);
         for (int i = 0; i < blockBuffer.length; i++) {
           blockBuffer[i] ^= blockMask;
         }
@@ -820,7 +823,7 @@ class _WebSocketOutgoingTransformer
           }
           Int32x4 blockMask = new Int32x4(mask, mask, mask, mask);
           Int32x4List blockBuffer =
-              new Int32x4List.view(list.buffer, 0, blockCount);
+              new Int32x4List.view(list.buffer, list.offsetInBytes, blockCount);
           for (int i = 0; i < blockBuffer.length; i++) {
             blockBuffer[i] ^= blockMask;
           }

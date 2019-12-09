@@ -3,7 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'dart:io' show Directory, Platform;
-import 'package:_fe_analyzer_shared/src/testing/id.dart' show ActualData, Id;
+import 'package:_fe_analyzer_shared/src/testing/id.dart';
 import 'package:_fe_analyzer_shared/src/testing/id_testing.dart'
     show DataInterpreter, runTests;
 import 'package:_fe_analyzer_shared/src/testing/id_testing.dart';
@@ -11,6 +11,7 @@ import 'package:front_end/src/fasta/kernel/kernel_api.dart';
 import 'package:front_end/src/testing/id_testing_helper.dart';
 import 'package:front_end/src/testing/id_testing_utils.dart';
 import 'package:kernel/ast.dart';
+import 'package:kernel/type_environment.dart';
 
 main(List<String> args) async {
   Directory dataDir = new Directory.fromUri(Platform.script.resolve('data'));
@@ -49,6 +50,7 @@ class StaticTypeDataComputer extends DataComputer<String> {
 
 class StaticTypeDataExtractor extends CfeDataExtractor<String> {
   final TypeEnvironment _environment;
+  StaticTypeContext _staticTypeContext;
 
   StaticTypeDataExtractor(InternalCompilerResult compilerResult,
       Map<Id, ActualData<String>> actualMap)
@@ -58,6 +60,27 @@ class StaticTypeDataExtractor extends CfeDataExtractor<String> {
         super(compilerResult, actualMap);
 
   @override
+  visitField(Field node) {
+    _staticTypeContext = new StaticTypeContext(node, _environment);
+    super.visitField(node);
+    _staticTypeContext = null;
+  }
+
+  @override
+  visitConstructor(Constructor node) {
+    _staticTypeContext = new StaticTypeContext(node, _environment);
+    super.visitConstructor(node);
+    _staticTypeContext = null;
+  }
+
+  @override
+  visitProcedure(Procedure node) {
+    _staticTypeContext = new StaticTypeContext(node, _environment);
+    super.visitProcedure(node);
+    _staticTypeContext = null;
+  }
+
+  @override
   String computeLibraryValue(Id id, Library node) {
     return 'nnbd=${node.isNonNullableByDefault}';
   }
@@ -65,11 +88,17 @@ class StaticTypeDataExtractor extends CfeDataExtractor<String> {
   @override
   String computeNodeValue(Id id, TreeNode node) {
     if (node is Expression) {
-      DartType type = node.getStaticType(_environment);
+      DartType type = node.getStaticType(_staticTypeContext);
       return typeToText(type);
     } else if (node is Arguments) {
       if (node.types.isNotEmpty) {
         return '<${node.types.map(typeToText).join(',')}>';
+      }
+    } else if (node is ForInStatement) {
+      if (id.kind == IdKind.current) {
+        DartType type = _staticTypeContext.typeEnvironment.forInElementType(
+            node, node.iterable.getStaticType(_staticTypeContext));
+        return typeToText(type);
       }
     }
     return null;
@@ -84,6 +113,7 @@ class StaticTypeDataExtractor extends CfeDataExtractor<String> {
       // Skip `null` literals from null-aware operations.
       return value1;
     }
-    return null;
+    return new ActualData<String>(value1.id, '${value1.value}|${value2.value}',
+        value1.uri, value1.offset, value1.object);
   }
 }

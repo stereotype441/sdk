@@ -60,7 +60,6 @@ DEFINE_FLAG(int,
             "The scale of invocation count, by size of the function.");
 DEFINE_FLAG(bool, source_lines, false, "Emit source line as assembly comment.");
 
-DECLARE_FLAG(bool, code_comments);
 DECLARE_FLAG(charp, deoptimize_filter);
 DECLARE_FLAG(bool, intrinsify);
 DECLARE_FLAG(int, regexp_optimization_counter_threshold);
@@ -328,30 +327,6 @@ void FlowGraphCompiler::CompactBlocks() {
   block_info->set_next_nonempty_label(nonempty_label);
 }
 
-intptr_t FlowGraphCompiler::UncheckedEntryOffset() const {
-  BlockEntryInstr* entry = flow_graph().graph_entry()->unchecked_entry();
-  if (entry == nullptr) {
-    entry = flow_graph().graph_entry()->normal_entry();
-  }
-  if (entry == nullptr) {
-    entry = flow_graph().graph_entry()->osr_entry();
-  }
-  ASSERT(entry != nullptr);
-  compiler::Label* target = GetJumpLabel(entry);
-
-  if (target->IsBound()) {
-    return target->Position();
-  }
-
-  // Intrinsification happened.
-  if (parsed_function().function().IsDynamicFunction()) {
-    return FLAG_precompiled_mode ? Instructions::kPolymorphicEntryOffsetAOT
-                                 : Instructions::kPolymorphicEntryOffsetJIT;
-  }
-
-  return 0;
-}
-
 #if defined(DART_PRECOMPILER)
 static intptr_t LocationToStackIndex(const Location& src) {
   ASSERT(src.HasStackIndex());
@@ -490,6 +465,12 @@ void FlowGraphCompiler::EmitCallsiteMetadata(TokenPosition token_pos,
       AddCurrentDescriptor(RawPcDescriptors::kDeopt, deopt_id_after, token_pos);
     }
   }
+}
+
+void FlowGraphCompiler::EmitYieldPositionMetadata(TokenPosition token_pos,
+                                                  intptr_t yield_index) {
+  AddDescriptor(RawPcDescriptors::kOther, assembler()->CodeSize(),
+                DeoptId::kNone, token_pos, CurrentTryIndex(), yield_index);
 }
 
 void FlowGraphCompiler::EmitInstructionPrologue(Instruction* instr) {
@@ -732,12 +713,13 @@ void FlowGraphCompiler::AddDescriptor(RawPcDescriptors::Kind kind,
                                       intptr_t pc_offset,
                                       intptr_t deopt_id,
                                       TokenPosition token_pos,
-                                      intptr_t try_index) {
+                                      intptr_t try_index,
+                                      intptr_t yield_index) {
   code_source_map_builder_->NoteDescriptor(kind, pc_offset, token_pos);
   // Don't emit deopt-descriptors in AOT mode.
   if (FLAG_precompiled_mode && (kind == RawPcDescriptors::kDeopt)) return;
   pc_descriptors_list_->AddDescriptor(kind, pc_offset, deopt_id, token_pos,
-                                      try_index);
+                                      try_index, yield_index);
 }
 
 // Uses current pc position and try-index.
@@ -1117,12 +1099,14 @@ void FlowGraphCompiler::FinalizeVarDescriptors(const Code& code) {
 
 void FlowGraphCompiler::FinalizeCatchEntryMovesMap(const Code& code) {
 #if defined(DART_PRECOMPILER)
-  TypedData& maps = TypedData::Handle(
-      catch_entry_moves_maps_builder_->FinalizeCatchEntryMovesMap());
-  code.set_catch_entry_moves_maps(maps);
-#else
-  code.set_variables(Smi::Handle(Smi::New(flow_graph().variable_count())));
+  if (FLAG_precompiled_mode) {
+    TypedData& maps = TypedData::Handle(
+        catch_entry_moves_maps_builder_->FinalizeCatchEntryMovesMap());
+    code.set_catch_entry_moves_maps(maps);
+    return;
+  }
 #endif
+  code.set_num_variables(flow_graph().variable_count());
 }
 
 void FlowGraphCompiler::FinalizeStaticCallTargetsTable(const Code& code) {
@@ -1209,6 +1193,7 @@ bool FlowGraphCompiler::TryIntrinsifyHelper() {
         // Only intrinsify getter if the field cannot contain a mutable double.
         // Reading from a mutable double box requires allocating a fresh double.
         if (field.is_instance() && !field.needs_load_guard() &&
+            !field.is_late() &&
             (FLAG_precompiled_mode || !IsPotentialUnboxedField(field))) {
           SpecialStatsBegin(CombinedCodeStatistics::kTagIntrinsics);
           GenerateGetterIntrinsic(compiler::target::Field::OffsetOf(field));
@@ -1390,7 +1375,7 @@ void FlowGraphCompiler::GenerateStaticCall(intptr_t deopt_id,
     }
     AddCurrentDescriptor(RawPcDescriptors::kRewind, deopt_id, token_pos);
     EmitUnoptimizedStaticCall(args_info.count_with_type_args, deopt_id,
-                              token_pos, locs, call_ic_data);
+                              token_pos, locs, call_ic_data, entry_kind);
   }
 }
 
@@ -2050,9 +2035,8 @@ void FlowGraphCompiler::EmitPolymorphicInstanceCall(
     } else {
       const ICData& unary_checks = ICData::ZoneHandle(
           zone(), original_call.ic_data()->AsUnaryClassChecks());
-      // TODO(sjindel/entrypoints): Support skiping type checks on switchable
-      // calls.
-      EmitInstanceCallAOT(unary_checks, deopt_id, token_pos, locs);
+      EmitInstanceCallAOT(unary_checks, deopt_id, token_pos, locs,
+                          original_call.entry_kind());
     }
   }
 }
@@ -2261,7 +2245,7 @@ void FlowGraphCompiler::GenerateAssertAssignableViaTypeTestingStub(
   // caller side!
   const Type& int_type = Type::Handle(zone(), Type::IntType());
   bool is_non_smi = false;
-  if (int_type.IsSubtypeOf(dst_type, Heap::kOld)) {
+  if (int_type.IsSubtypeOf(NNBDMode::kLegacy, dst_type, Heap::kOld)) {
     __ BranchIfSmi(instance_reg, done);
     is_non_smi = true;
   }
@@ -2420,8 +2404,13 @@ void ThrowErrorSlowPathCode::EmitNativeCode(FlowGraphCompiler* compiler) {
   if (!use_shared_stub) {
     compiler->SaveLiveRegisters(locs);
   }
-  for (intptr_t i = 0; i < num_args_; ++i) {
+  intptr_t i = 0;
+  if (num_args_ % 2 != 0) {
     __ PushRegister(locs->in(i).reg());
+    ++i;
+  }
+  for (; i < num_args_; i += 2) {
+    __ PushRegisterPair(locs->in(i + 1).reg(), locs->in(i).reg());
   }
   if (use_shared_stub) {
     EmitSharedStubCall(compiler, live_fpu_registers);

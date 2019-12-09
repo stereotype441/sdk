@@ -69,6 +69,7 @@ Dart_FileReadCallback Dart::file_read_callback_ = NULL;
 Dart_FileWriteCallback Dart::file_write_callback_ = NULL;
 Dart_FileCloseCallback Dart::file_close_callback_ = NULL;
 Dart_EntropySource Dart::entropy_source_callback_ = NULL;
+bool Dart::non_nullable_flag_ = false;
 
 // Structure for managing read-only global handles allocation used for
 // creating global read-only handles that are pre created and initialized
@@ -157,6 +158,11 @@ char* Dart::Init(const uint8_t* vm_isolate_snapshot,
     return strdup("VM already initialized or flags not initialized.");
   }
 
+  if (FLAG_causal_async_stacks && FLAG_lazy_async_stacks) {
+    return strdup(
+        "To use --lazy-async-stacks, please disable --causal-async-stacks!");
+  }
+
   const Snapshot* snapshot = nullptr;
   if (vm_isolate_snapshot != nullptr) {
     snapshot = Snapshot::SetupFromBuffer(vm_isolate_snapshot);
@@ -221,6 +227,9 @@ char* Dart::Init(const uint8_t* vm_isolate_snapshot,
     ASSERT(vm_isolate_ == NULL);
     ASSERT(Flags::Initialized());
     const bool is_vm_isolate = true;
+
+    // Cache value of "non-nullable" experimental flag.
+    set_non_nullable_flag(KernelIsolate::GetExperimentalFlag("non-nullable"));
 
     // Setup default flags for the VM isolate.
     Dart_IsolateFlags api_flags;
@@ -603,7 +612,7 @@ char* Dart::Cleanup() {
   MallocHooks::Cleanup();
   Flags::Cleanup();
 #if !defined(PRODUCT) && !defined(DART_PRECOMPILED_RUNTIME)
-  IsolateReloadContext::SetFileModifiedCallback(NULL);
+  IsolateGroupReloadContext::SetFileModifiedCallback(NULL);
   Service::SetEmbedderStreamCallbacks(NULL, NULL);
 #endif  // !defined(PRODUCT) && !defined(DART_PRECOMPILED_RUNTIME)
   return NULL;
@@ -847,6 +856,10 @@ const char* Dart::FeaturesString(Isolate* isolate,
     buffer.AddString(FLAG_causal_async_stacks ? " causal_async_stacks"
                                               : " no-causal_async_stacks");
 
+#if !defined(PRODUCT)
+    buffer.AddString(FLAG_code_comments ? " code-comments"
+                                        : " no-code-comments");
+#endif
 
 // Generated code must match the host architecture and ABI.
 #if defined(TARGET_ARCH_ARM)

@@ -6,6 +6,7 @@
 
 #include "vm/class_finalizer.h"
 #include "vm/compiler/aot/precompiler.h"
+#include "vm/compiler/frontend/constant_reader.h"
 #include "vm/log.h"
 #include "vm/object_store.h"
 #include "vm/parser.h"  // for ParsedFunction
@@ -675,13 +676,13 @@ RawFunction* TranslationHelper::LookupMethodByMember(
 
   Function& function =
       Function::Handle(Z, klass.LookupFunctionAllowPrivate(method_name));
-  CheckStaticLookup(function);
 #ifdef DEBUG
   if (function.IsNull()) {
     THR_Print("Unable to find \'%s\' in %s\n", method_name.ToCString(),
               klass.ToCString());
   }
 #endif
+  CheckStaticLookup(function);
   ASSERT(!function.IsNull());
   return function.raw();
 }
@@ -1009,11 +1010,7 @@ void FieldHelper::ReadUntilExcluding(Field field) {
       if (++next_read_ == field) return;
       FALL_THROUGH;
     case kFlags:
-      if (helper_->translation_helper_.info().kernel_binary_version() >= 29) {
-        flags_ = helper_->ReadUInt();
-      } else {
-        flags_ = helper_->ReadFlags();
-      }
+      flags_ = helper_->ReadUInt();
       if (++next_read_ == field) return;
       FALL_THROUGH;
     case kName:
@@ -1081,11 +1078,7 @@ void ProcedureHelper::ReadUntilExcluding(Field field) {
       if (++next_read_ == field) return;
       FALL_THROUGH;
     case kFlags:
-      if (helper_->translation_helper_.info().kernel_binary_version() >= 29) {
-        flags_ = helper_->ReadUInt();
-      } else {
-        flags_ = helper_->ReadFlags();
-      }
+      flags_ = helper_->ReadUInt();
       if (++next_read_ == field) return;
       FALL_THROUGH;
     case kName:
@@ -1317,10 +1310,8 @@ void LibraryHelper::ReadUntilExcluding(Field field) {
       FALL_THROUGH;
     }
     case kLanguageVersion: {
-      if (binary_version_ >= 27) {
-        helper_->ReadUInt();  // Read major language version.
-        helper_->ReadUInt();  // Read minor language version.
-      }
+      helper_->ReadUInt();  // Read major language version.
+      helper_->ReadUInt();  // Read minor language version.
       if (++next_read_ == field) return;
       FALL_THROUGH;
     }
@@ -1694,8 +1685,10 @@ DirectCallMetadata DirectCallMetadataHelper::GetDirectTargetForMethodInvocation(
 }
 
 InferredTypeMetadataHelper::InferredTypeMetadataHelper(
-    KernelReaderHelper* helper)
-    : MetadataHelper(helper, tag(), /* precompiler_only = */ true) {}
+    KernelReaderHelper* helper,
+    ConstantReader* constant_reader)
+    : MetadataHelper(helper, tag(), /* precompiler_only = */ true),
+      constant_reader_(constant_reader) {}
 
 InferredTypeMetadata InferredTypeMetadataHelper::GetInferredType(
     intptr_t node_offset) {
@@ -1711,7 +1704,15 @@ InferredTypeMetadata InferredTypeMetadataHelper::GetInferredType(
   const NameIndex kernel_name = helper_->ReadCanonicalNameReference();
   const uint8_t flags = helper_->ReadByte();
 
+  const Object* constant_value = &Object::null_object();
+  if ((flags & InferredTypeMetadata::kFlagConstant) != 0) {
+    const intptr_t constant_offset = helper_->ReadUInt();
+    constant_value = &Object::ZoneHandle(
+        H.zone(), constant_reader_->ReadConstant(constant_offset));
+  }
+
   if (H.IsRoot(kernel_name)) {
+    ASSERT((flags & InferredTypeMetadata::kFlagConstant) == 0);
     return InferredTypeMetadata(kDynamicCid, flags);
   }
 
@@ -1726,7 +1727,7 @@ InferredTypeMetadata InferredTypeMetadataHelper::GetInferredType(
     cid = kDynamicCid;
   }
 
-  return InferredTypeMetadata(cid, flags);
+  return InferredTypeMetadata(cid, flags, *constant_value);
 }
 
 void ProcedureAttributesMetadata::InitializeFromFlags(uint8_t flags) {
@@ -1976,8 +1977,10 @@ void KernelReaderHelper::SkipDartType() {
     case kDynamicType:
     case kVoidType:
     case kBottomType:
-    case kNeverType:
       // those contain nothing.
+      return;
+    case kNeverType:
+      ReadNullability();
       return;
     case kInterfaceType:
       SkipInterfaceType(false);
@@ -2043,9 +2046,7 @@ void KernelReaderHelper::SkipFunctionType(bool simple) {
       // read string reference (i.e. named_parameters[i].name).
       SkipStringReference();
       SkipDartType();  // read named_parameters[i].type.
-      if (translation_helper_.info().kernel_binary_version() >= 29) {
-        SkipBytes(1);  // read flags
-      }
+      SkipBytes(1);    // read flags
     }
   }
 
@@ -2224,13 +2225,11 @@ void KernelReaderHelper::SkipExpression() {
       SkipArguments();               // read arguments.
       return;
     case kStaticInvocation:
-    case kConstStaticInvocation:
       ReadPosition();                // read position.
       SkipCanonicalNameReference();  // read procedure_reference.
       SkipArguments();               // read arguments.
       return;
     case kConstructorInvocation:
-    case kConstConstructorInvocation:
       ReadPosition();                // read position.
       SkipCanonicalNameReference();  // read target_reference.
       SkipArguments();               // read arguments.
@@ -2257,15 +2256,6 @@ void KernelReaderHelper::SkipExpression() {
       ReadPosition();           // read position.
       SkipListOfExpressions();  // read list of expressions.
       return;
-    case kListConcatenation:
-    case kSetConcatenation:
-    case kMapConcatenation:
-    case kInstanceCreation:
-    case kFileUriExpression:
-      // Collection concatenation, instance creation operations and
-      // in-expression URI changes are removed by the constant evaluator.
-      UNREACHABLE();
-      break;
     case kIsExpression:
       ReadPosition();    // read position.
       SkipExpression();  // read operand.
@@ -2276,9 +2266,6 @@ void KernelReaderHelper::SkipExpression() {
       SkipFlags();       // read flags.
       SkipExpression();  // read operand.
       SkipDartType();    // read type.
-      return;
-    case kSymbolLiteral:
-      SkipStringReference();  // read index into string table.
       return;
     case kTypeLiteral:
       SkipDartType();  // read type.
@@ -2293,19 +2280,16 @@ void KernelReaderHelper::SkipExpression() {
       SkipExpression();  // read expression.
       return;
     case kListLiteral:
-    case kConstListLiteral:
       ReadPosition();           // read position.
       SkipDartType();           // read type.
       SkipListOfExpressions();  // read list of expressions.
       return;
     case kSetLiteral:
-    case kConstSetLiteral:
       // Set literals are currently desugared in the frontend and will not
       // reach the VM. See http://dartbug.com/35124 for discussion.
       UNREACHABLE();
       return;
-    case kMapLiteral:
-    case kConstMapLiteral: {
+    case kMapLiteral: {
       ReadPosition();                           // read position.
       SkipDartType();                           // read key type.
       SkipDartType();                           // read value type.
@@ -2360,13 +2344,26 @@ void KernelReaderHelper::SkipExpression() {
       SkipDartType();  // read type.
       SkipConstantReference();
       return;
-    case kDeprecated_ConstantExpression:
-      SkipConstantReference();
-      return;
     case kLoadLibrary:
     case kCheckLibraryIsLoaded:
       ReadUInt();  // skip library index
       return;
+    case kConstStaticInvocation:
+    case kConstConstructorInvocation:
+    case kConstListLiteral:
+    case kConstSetLiteral:
+    case kConstMapLiteral:
+    case kSymbolLiteral:
+      // Const invocations and const literals are removed by the
+      // constant evaluator.
+    case kListConcatenation:
+    case kSetConcatenation:
+    case kMapConcatenation:
+    case kInstanceCreation:
+    case kFileUriExpression:
+      // Collection concatenation, instance creation operations and
+      // in-expression URI changes are internal to the front end and
+      // removed by the constant evaluator.
     default:
       ReportUnexpectedTag("expression", tag);
       UNREACHABLE();
@@ -2783,12 +2780,12 @@ void TypeTranslator::BuildTypeInternal() {
       result_ = Object::void_type().raw();
       break;
     case kBottomType:
-      result_ =
-          Class::Handle(Z, I->object_store()->null_class()).DeclarationType();
-      // We set the nullability of Null to kNullable, even in legacy mode.
+      result_ = I->object_store()->null_type();
       ASSERT(result_.IsNullable());
       break;
     case kNeverType:
+      helper_->ReadNullability();
+      // Ignore nullability, as Never type is non-nullable.
       result_ = Object::never_type().raw();
       break;
     case kInterfaceType:
@@ -2830,18 +2827,13 @@ void TypeTranslator::BuildInterfaceType(bool simple) {
   if (simple) {
     if (finalize_ || klass.is_type_finalized()) {
       // Fast path for non-generic types: retrieve or populate the class's only
-      // canonical type, which is its declaration type.
-      result_ = klass.DeclarationType();
-      // TODO(regis): Remove this workaround once nullability of Null provided
-      // by CFE is always kNullable.
-      if (!result_.IsNullType()) {
-        result_ = Type::Cast(result_).ToNullability(nullability, Heap::kOld);
-      }
+      // canonical type (as long as only one nullability variant is used), which
+      // is its declaration type.
+      result_ = klass.DeclarationType(nullability);
     } else {
       // Note that the type argument vector is not yet extended.
-      result_ =
-          Type::New(klass, Object::null_type_arguments(), klass.token_pos());
-      Type::Cast(result_).set_nullability(nullability);
+      result_ = Type::New(klass, Object::null_type_arguments(),
+                          klass.token_pos(), nullability);
     }
     return;
   }
@@ -2929,10 +2921,8 @@ void TypeTranslator::BuildFunctionType(bool simple) {
       // read string reference (i.e. named_parameters[i].name).
       String& name = H.DartSymbolObfuscate(helper_->ReadStringReference());
       BuildTypeInternal();  // read named_parameters[i].type.
-      if (translation_helper_.info().kernel_binary_version() >= 29) {
-        // TODO(markov): Store 'required' bit.
-        helper_->ReadFlags();  // read flags
-      }
+      // TODO(markov): Store 'required' bit.
+      helper_->ReadFlags();  // read flags
       parameter_types.SetAt(pos, result_);
       parameter_names.SetAt(pos, name);
     }
@@ -2948,8 +2938,7 @@ void TypeTranslator::BuildFunctionType(bool simple) {
   finalize_ = finalize;
 
   Type& signature_type =
-      Type::ZoneHandle(Z, signature_function.SignatureType());
-  signature_type.set_nullability(nullability);
+      Type::ZoneHandle(Z, signature_function.SignatureType(nullability));
 
   if (finalize_) {
     signature_type ^=

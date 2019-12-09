@@ -6,9 +6,12 @@ import 'dart:core' hide MapEntry;
 
 import 'package:_fe_analyzer_shared/src/flow_analysis/flow_analysis.dart';
 
-import 'package:front_end/src/fasta/kernel/kernel_shadow_ast.dart';
+import 'package:_fe_analyzer_shared/src/util/link.dart';
 
-import 'package:kernel/ast.dart' hide Variance;
+import 'package:front_end/src/fasta/kernel/internal_ast.dart';
+import 'package:front_end/src/fasta/type_inference/type_demotion.dart';
+
+import 'package:kernel/ast.dart';
 
 import 'package:kernel/class_hierarchy.dart' show ClassHierarchy;
 
@@ -27,18 +30,19 @@ import '../../base/instrumentation.dart'
         InstrumentationValueForType,
         InstrumentationValueForTypeArgs;
 
+import '../builder/constructor_builder.dart';
 import '../builder/extension_builder.dart';
 import '../builder/member_builder.dart';
 
 import '../fasta_codes.dart';
 
-import '../kernel/expression_generator.dart' show buildIsNull;
-
-import '../kernel/kernel_shadow_ast.dart'
+import '../kernel/internal_ast.dart'
     show
         VariableDeclarationImpl,
         getExplicitTypeArguments,
         getExtensionTypeParameterCount;
+
+import '../kernel/inference_visitor.dart';
 
 import '../kernel/type_algorithms.dart' show hasAnyTypeVariables;
 
@@ -277,8 +281,8 @@ class ClosureContext {
         _inferredUnwrappedReturnOrYieldType = unwrappedType;
       } else {
         _inferredUnwrappedReturnOrYieldType = inferrer.typeSchemaEnvironment
-            .getStandardUpperBound(
-                _inferredUnwrappedReturnOrYieldType, unwrappedType);
+            .getStandardUpperBound(_inferredUnwrappedReturnOrYieldType,
+                unwrappedType, inferrer.library.library);
       }
       return;
     }
@@ -303,7 +307,8 @@ class ClosureContext {
       return;
     }
     DartType expectedType = node.isYieldStar
-        ? _wrapAsyncOrGenerator(inferrer, returnOrYieldContext)
+        ? _wrapAsyncOrGenerator(
+            inferrer, returnOrYieldContext, inferrer.library.nonNullable)
         : returnOrYieldContext;
     Expression expression = inferrer.ensureAssignableResult(
         expectedType, expressionResult,
@@ -327,8 +332,8 @@ class ClosureContext {
         _inferredUnwrappedReturnOrYieldType = unwrappedType;
       } else {
         _inferredUnwrappedReturnOrYieldType = inferrer.typeSchemaEnvironment
-            .getStandardUpperBound(
-                _inferredUnwrappedReturnOrYieldType, unwrappedType);
+            .getStandardUpperBound(_inferredUnwrappedReturnOrYieldType,
+                unwrappedType, inferrer.library.library);
       }
     }
   }
@@ -344,7 +349,8 @@ class ClosureContext {
       inferredType = greatestClosure(inferrer.coreTypes, returnOrYieldContext);
     }
 
-    inferredType = _wrapAsyncOrGenerator(inferrer, inferredType);
+    inferredType = _wrapAsyncOrGenerator(
+        inferrer, inferredType, inferrer.library.nonNullable);
     for (int i = 0; i < returnStatements.length; ++i) {
       checkValidReturn(inferrer, inferredType, returnStatements[i],
           returnExpressionTypes[i]);
@@ -353,15 +359,18 @@ class ClosureContext {
     return inferredType;
   }
 
-  DartType _wrapAsyncOrGenerator(TypeInferrerImpl inferrer, DartType type) {
+  DartType _wrapAsyncOrGenerator(
+      TypeInferrerImpl inferrer, DartType type, Nullability nullability) {
     if (isGenerator) {
       if (isAsync) {
-        return inferrer.wrapType(type, inferrer.coreTypes.streamClass);
+        return inferrer.wrapType(
+            type, inferrer.coreTypes.streamClass, nullability);
       } else {
-        return inferrer.wrapType(type, inferrer.coreTypes.iterableClass);
+        return inferrer.wrapType(
+            type, inferrer.coreTypes.iterableClass, nullability);
       }
     } else if (isAsync) {
-      return inferrer.wrapFutureType(type);
+      return inferrer.wrapFutureType(type, nullability);
     } else {
       return type;
     }
@@ -397,6 +406,10 @@ abstract class TypeInferrer {
   /// Gets the [TypeSchemaEnvironment] being used for type inference.
   TypeSchemaEnvironment get typeSchemaEnvironment;
 
+  /// Returns the [FlowAnalysis] used during inference.
+  FlowAnalysis<TreeNode, Statement, Expression, VariableDeclaration, DartType>
+      get flowAnalysis;
+
   /// The URI of the code for which type inference is currently being
   /// performed--this is used for testing.
   Uri get uriForInstrumentation;
@@ -408,7 +421,7 @@ abstract class TypeInferrer {
       InferenceHelper helper, DartType declaredType, Expression initializer);
 
   /// Performs type inference on the given function body.
-  void inferFunctionBody(InferenceHelper helper, DartType returnType,
+  Statement inferFunctionBody(InferenceHelper helper, DartType returnType,
       AsyncMarker asyncMarker, Statement body);
 
   /// Performs type inference on the given constructor initializer.
@@ -427,6 +440,11 @@ abstract class TypeInferrer {
   /// expression.
   Expression inferParameterInitializer(
       InferenceHelper helper, Expression initializer, DartType declaredType);
+
+  /// Ensures that all parameter types of [constructor] have been inferred.
+  // TODO(johnniwinther): We are still parameters on synthesized mixin
+  //  application constructors.
+  void inferConstructorParameterTypes(Constructor constructor);
 }
 
 /// Concrete implementation of [TypeInferrer] specialized to work with kernel
@@ -434,8 +452,7 @@ abstract class TypeInferrer {
 class TypeInferrerImpl implements TypeInferrer {
   /// Marker object to indicate that a function takes an unknown number
   /// of arguments.
-  static final FunctionType unknownFunction =
-      new FunctionType(const [], const DynamicType());
+  final FunctionType unknownFunction;
 
   final TypeInferenceEngine engine;
 
@@ -485,12 +502,13 @@ class TypeInferrerImpl implements TypeInferrer {
   TypeInferrerImpl(this.engine, this.uriForInstrumentation, bool topLevel,
       this.thisType, this.library, this.assignedVariables, this.dataForTesting)
       : assert(library != null),
+        unknownFunction = new FunctionType(
+            const [], const DynamicType(), library.nonNullable),
         classHierarchy = engine.classHierarchy,
         instrumentation = topLevel ? null : engine.instrumentation,
         typeSchemaEnvironment = engine.typeSchemaEnvironment,
         isTopLevel = topLevel,
         typePromoter = new TypePromoter(engine.typeSchemaEnvironment),
-        // TODO(dmitryas): Pass in the actual assigned variables.
         flowAnalysis = new FlowAnalysis(
             new TypeOperationsCfe(engine.typeSchemaEnvironment),
             assignedVariables);
@@ -504,6 +522,40 @@ class TypeInferrerImpl implements TypeInferrer {
     isReachable ??= flowAnalysis.isReachable;
     if (!isReachable) {
       dataForTesting.flowAnalysisResult.unreachableNodes.add(node);
+    }
+  }
+
+  @override
+  void inferConstructorParameterTypes(Constructor target) {
+    ConstructorBuilder constructor = engine.beingInferred[target];
+    if (constructor != null) {
+      // There is a cyclic dependency where inferring the types of the
+      // initializing formals of a constructor required us to infer the
+      // corresponding field type which required us to know the type of the
+      // constructor.
+      String name = target.enclosingClass.name;
+      if (target.name.name.isNotEmpty) {
+        // TODO(ahe): Use `inferrer.helper.constructorNameForDiagnostics`
+        // instead. However, `inferrer.helper` may be null.
+        name += ".${target.name.name}";
+      }
+      constructor.library.addProblem(
+          templateCantInferTypeDueToCircularity.withArguments(name),
+          target.fileOffset,
+          name.length,
+          target.fileUri);
+      for (VariableDeclaration declaration
+          in target.function.positionalParameters) {
+        declaration.type ??= const InvalidType();
+      }
+      for (VariableDeclaration declaration in target.function.namedParameters) {
+        declaration.type ??= const InvalidType();
+      }
+    } else if ((constructor = engine.toBeInferred[target]) != null) {
+      engine.toBeInferred.remove(target);
+      engine.beingInferred[target] = constructor;
+      constructor.inferFormalTypes();
+      engine.beingInferred.remove(target);
     }
   }
 
@@ -566,7 +618,7 @@ class TypeInferrerImpl implements TypeInferrer {
       {int fileOffset,
       bool isReturnFromAsync: false,
       bool isVoidAllowed: false,
-      Template<Message Function(DartType, DartType)> template}) {
+      Template<Message Function(DartType, DartType, bool)> template}) {
     assert(expectedType != null);
     fileOffset ??= expression.fileOffset;
     expectedType = greatestClosure(coreTypes, expectedType);
@@ -578,7 +630,8 @@ class TypeInferrerImpl implements TypeInferrer {
       // and Future<T>.
       DartType unfuturedExpectedType =
           typeSchemaEnvironment.unfutureType(expectedType);
-      DartType futuredExpectedType = wrapFutureType(unfuturedExpectedType);
+      DartType futuredExpectedType =
+          wrapFutureType(unfuturedExpectedType, library.nonNullable);
       if (isAssignable(unfuturedExpectedType, actualType)) {
         expectedType = unfuturedExpectedType;
       } else if (isAssignable(futuredExpectedType, actualType)) {
@@ -607,8 +660,12 @@ class TypeInferrerImpl implements TypeInferrer {
           VariableDeclaration t =
               new VariableDeclaration.forValue(expression, type: actualType)
                 ..fileOffset = fileOffset;
-          Expression nullCheck =
-              buildIsNull(new VariableGet(t), fileOffset, helper);
+          Expression nullCheck = new MethodInvocation(
+              new VariableGet(t),
+              equalsName,
+              new Arguments(
+                  <Expression>[new NullLiteral()..fileOffset = fileOffset]))
+            ..fileOffset = fileOffset;
           PropertyGet tearOff =
               new PropertyGet(new VariableGet(t), callName, callMember)
                 ..fileOffset = fileOffset;
@@ -651,19 +708,22 @@ class TypeInferrerImpl implements TypeInferrer {
       if (expectedType is! InvalidType && actualType is! InvalidType) {
         errorNode = helper.wrapInProblem(
             errorNode,
-            (template ?? templateInvalidAssignment)
-                .withArguments(actualType, expectedType),
+            (template ?? templateInvalidAssignment).withArguments(
+                actualType, expectedType, isNonNullableByDefault),
             noLength);
       }
       return errorNode;
     } else {
-      Template<Message Function(DartType, DartType)> template =
+      Template<Message Function(DartType, DartType, bool)> template =
           _getPreciseTypeErrorTemplate(expression);
       if (template != null) {
         // The type of the expression is known precisely, so an implicit
         // downcast is guaranteed to fail.  Insert a compile-time error.
-        return helper.wrapInProblem(expression,
-            template.withArguments(actualType, expectedType), noLength);
+        return helper.wrapInProblem(
+            expression,
+            template.withArguments(
+                actualType, expectedType, isNonNullableByDefault),
+            noLength);
       } else {
         // Insert an implicit downcast.
         return new AsExpression(expression, initialExpectedType)
@@ -702,8 +762,8 @@ class TypeInferrerImpl implements TypeInferrer {
     DartType onType = extension.onType;
     List<DartType> inferredTypes =
         new List<DartType>.filled(typeParameters.length, const UnknownType());
-    typeSchemaEnvironment.inferGenericFunctionOrType(
-        null, typeParameters, [onType], [receiverType], null, inferredTypes);
+    typeSchemaEnvironment.inferGenericFunctionOrType(null, typeParameters,
+        [onType], [receiverType], null, inferredTypes, library.library);
     return inferredTypes;
   }
 
@@ -727,7 +787,7 @@ class TypeInferrerImpl implements TypeInferrer {
 
     receiverType = resolveTypeParameter(receiverType);
 
-    if (receiverType is FunctionType && name.name == 'call') {
+    if (receiverType is FunctionType && name == callName) {
       return const ObjectAccessTarget.callFunction();
     }
 
@@ -745,7 +805,7 @@ class TypeInferrerImpl implements TypeInferrer {
       target = const ObjectAccessTarget.invalid();
     } else if (receiverType is InterfaceType &&
         receiverType.classNode == coreTypes.functionClass &&
-        name.name == 'call') {
+        name == callName) {
       target = const ObjectAccessTarget.callFunction();
     } else {
       target = const ObjectAccessTarget.missing();
@@ -785,7 +845,7 @@ class TypeInferrerImpl implements TypeInferrer {
 
       ExtensionAccessCandidate bestSoFar;
       List<ExtensionAccessCandidate> noneMoreSpecific = [];
-      library.scope.forEachExtension((ExtensionBuilder extensionBuilder) {
+      library.forEachExtensionInScope((ExtensionBuilder extensionBuilder) {
         MemberBuilder thisBuilder =
             extensionBuilder.lookupLocalMemberByName(name, setter: setter);
         MemberBuilder otherBuilder = extensionBuilder
@@ -837,8 +897,10 @@ class TypeInferrerImpl implements TypeInferrer {
                         !thisBuilder.isField &&
                         !thisBuilder.isStatic
                     ? new ObjectAccessTarget.extensionMember(
-                        thisBuilder.procedure,
-                        thisBuilder.extensionTearOff,
+                        setter
+                            ? thisBuilder.writeTarget
+                            : thisBuilder.invokeTarget,
+                        thisBuilder.readTarget,
                         thisBuilder.kind,
                         inferredTypeArguments)
                     : const ObjectAccessTarget.missing(),
@@ -892,7 +954,7 @@ class TypeInferrerImpl implements TypeInferrer {
       DartType receiverType,
       Name name,
       int fileOffset,
-      Template<Message Function(String, DartType)> errorTemplate) {
+      Template<Message Function(String, DartType, bool)> errorTemplate) {
     assert(receiverType != null && isKnown(receiverType));
     if (!isTopLevel && target.isMissing && errorTemplate != null) {
       int length = name.name.length;
@@ -901,8 +963,8 @@ class TypeInferrerImpl implements TypeInferrer {
         length = 1;
       }
       return helper.buildProblem(
-          errorTemplate.withArguments(
-              name.name, resolveTypeParameter(receiverType)),
+          errorTemplate.withArguments(name.name,
+              resolveTypeParameter(receiverType), isNonNullableByDefault),
           fileOffset,
           length);
     }
@@ -947,6 +1009,7 @@ class TypeInferrerImpl implements TypeInferrer {
             return substitution.substituteType(new FunctionType(
                 functionType.positionalParameters.skip(1).toList(),
                 functionType.returnType,
+                library.nonNullable,
                 namedParameters: functionType.namedParameters,
                 typeParameters: functionType.typeParameters
                     .skip(target.inferredExtensionTypeArguments.length)
@@ -993,9 +1056,10 @@ class TypeInferrerImpl implements TypeInferrer {
     if (memberClass.typeParameters.isNotEmpty) {
       receiverType = resolveTypeParameter(receiverType);
       if (receiverType is InterfaceType) {
-        InterfaceType castedType =
-            classHierarchy.getTypeAsInstanceOf(receiverType, memberClass);
-        calleeType = Substitution.fromInterfaceType(castedType)
+        List<DartType> castedTypeArguments = classHierarchy
+            .getTypeArgumentsAsInstanceOf(receiverType, memberClass);
+        calleeType = Substitution.fromPairs(
+                memberClass.typeParameters, castedTypeArguments)
             .substituteType(calleeType);
       }
     }
@@ -1261,10 +1325,10 @@ class TypeInferrerImpl implements TypeInferrer {
 
   DartType getDerivedTypeArgumentOf(DartType type, Class class_) {
     if (type is InterfaceType) {
-      InterfaceType typeAsInstanceOfClass =
-          classHierarchy.getTypeAsInstanceOf(type, class_);
-      if (typeAsInstanceOfClass != null) {
-        return typeAsInstanceOfClass.typeArguments[0];
+      List<DartType> typeArgumentsAsInstanceOfClass =
+          classHierarchy.getTypeArgumentsAsInstanceOf(type, class_);
+      if (typeArgumentsAsInstanceOfClass != null) {
+        return typeArgumentsAsInstanceOfClass[0];
       }
     }
     return null;
@@ -1306,9 +1370,10 @@ class TypeInferrerImpl implements TypeInferrer {
         if (memberClass.typeParameters.isNotEmpty) {
           receiverType = resolveTypeParameter(receiverType);
           if (receiverType is InterfaceType) {
-            InterfaceType castedType =
-                classHierarchy.getTypeAsInstanceOf(receiverType, memberClass);
-            setterType = Substitution.fromInterfaceType(castedType)
+            setterType = Substitution.fromPairs(
+                    memberClass.typeParameters,
+                    classHierarchy.getTypeArgumentsAsInstanceOf(
+                        receiverType, memberClass))
                 .substituteType(setterType);
           }
         }
@@ -1412,6 +1477,49 @@ class TypeInferrerImpl implements TypeInferrer {
     return initializerType;
   }
 
+  void inferSyntheticVariable(VariableDeclarationImpl variable) {
+    assert(variable.isImplicitlyTyped);
+    assert(variable.initializer != null);
+    ExpressionInferenceResult result = inferExpression(
+        variable.initializer, const UnknownType(), true,
+        isVoidAllowed: true);
+    variable.initializer = result.expression..parent = variable;
+    DartType inferredType = inferDeclarationType(result.inferredType);
+    instrumentation?.record(uriForInstrumentation, variable.fileOffset, 'type',
+        new InstrumentationValueForType(inferredType));
+    variable.type = inferredType;
+  }
+
+  Link<NullAwareGuard> inferSyntheticVariableNullAware(
+      VariableDeclarationImpl variable) {
+    assert(variable.isImplicitlyTyped);
+    assert(variable.initializer != null);
+    ExpressionInferenceResult result = inferExpression(
+        variable.initializer, const UnknownType(), true,
+        isVoidAllowed: true);
+    Link<NullAwareGuard> nullAwareGuards;
+    if (isNonNullableByDefault) {
+      variable.initializer = result.nullAwareAction..parent = variable;
+      nullAwareGuards = result.nullAwareGuards;
+    } else {
+      variable.initializer = result.expression..parent = variable;
+      nullAwareGuards = const Link<NullAwareGuard>();
+    }
+    DartType inferredType = inferDeclarationType(result.inferredType);
+    instrumentation?.record(uriForInstrumentation, variable.fileOffset, 'type',
+        new InstrumentationValueForType(inferredType));
+    variable.type = inferredType;
+    return nullAwareGuards;
+  }
+
+  NullAwareGuard createNullAwareGuard(VariableDeclaration variable) {
+    Member equalsMember =
+        findInterfaceMember(variable.type, equalsName, variable.fileOffset)
+            .member;
+    return new NullAwareGuard(
+        variable, variable.fileOffset, equalsMember, this);
+  }
+
   /// Performs type inference on the given [expression].
   ///
   /// [typeContext] is the expected type of the expression, based on surrounding
@@ -1443,6 +1551,8 @@ class TypeInferrerImpl implements TypeInferrer {
     InferenceVisitor visitor = new InferenceVisitor(this);
     ExpressionInferenceResult result;
     if (expression is ExpressionJudgment) {
+      result = expression.acceptInference(visitor, typeContext);
+    } else if (expression is InternalExpression) {
       result = expression.acceptInference(visitor, typeContext);
     } else {
       result = expression.accept1(visitor, typeContext);
@@ -1479,12 +1589,13 @@ class TypeInferrerImpl implements TypeInferrer {
   }
 
   @override
-  void inferFunctionBody(InferenceHelper helper, DartType returnType,
+  Statement inferFunctionBody(InferenceHelper helper, DartType returnType,
       AsyncMarker asyncMarker, Statement body) {
+    assert(body != null);
     assert(closureContext == null);
     this.helper = helper;
     closureContext = new ClosureContext(this, asyncMarker, returnType, false);
-    inferStatement(body);
+    StatementInferenceResult result = inferStatement(body);
     closureContext = null;
     this.helper = null;
     if (dataForTesting != null) {
@@ -1494,6 +1605,7 @@ class TypeInferrerImpl implements TypeInferrer {
       }
     }
     flowAnalysis.finish();
+    return result.hasChanged ? result.statement : body;
   }
 
   DartType inferInvocation(DartType typeContext, int offset,
@@ -1541,7 +1653,9 @@ class TypeInferrerImpl implements TypeInferrer {
       bool isConst: false,
       bool isImplicitExtensionMember: false}) {
     FunctionType extensionFunctionType = new FunctionType(
-        [calleeType.positionalParameters.first], const DynamicType(),
+        [calleeType.positionalParameters.first],
+        const DynamicType(),
+        library.nonNullable,
         requiredParameterCount: 1,
         typeParameters: calleeType.typeParameters
             .take(extensionTypeParameterCount)
@@ -1563,7 +1677,9 @@ class TypeInferrerImpl implements TypeInferrer {
           calleeType.typeParameters.skip(extensionTypeParameterCount).toList();
     }
     FunctionType targetFunctionType = new FunctionType(
-        calleeType.positionalParameters.skip(1).toList(), calleeType.returnType,
+        calleeType.positionalParameters.skip(1).toList(),
+        calleeType.returnType,
+        library.nonNullable,
         requiredParameterCount: calleeType.requiredParameterCount - 1,
         namedParameters: calleeType.namedParameters,
         typeParameters: targetTypeParameters);
@@ -1651,7 +1767,8 @@ class TypeInferrerImpl implements TypeInferrer {
           null,
           null,
           typeContext,
-          inferredTypes);
+          inferredTypes,
+          library.library);
       substitution =
           Substitution.fromPairs(calleeTypeParameters, inferredTypes);
     } else if (explicitTypeArguments != null &&
@@ -1765,9 +1882,12 @@ class TypeInferrerImpl implements TypeInferrer {
           formalTypes,
           actualTypes,
           typeContext,
-          inferredTypes);
+          inferredTypes,
+          library.library);
       assert(inferredTypes.every((type) => isKnown(type)),
           "Unknown type(s) in inferred types: $inferredTypes.");
+      assert(inferredTypes.every((type) => !hasPromotedTypeVariable(type)),
+          "Promoted type variable(s) in inferred types: $inferredTypes.");
       substitution =
           Substitution.fromPairs(calleeTypeParameters, inferredTypes);
       instrumentation?.record(uriForInstrumentation, offset, 'typeArgs',
@@ -1844,6 +1964,7 @@ class TypeInferrerImpl implements TypeInferrer {
           function.positionalParameters;
       for (int i = 0; i < positionalParameters.length; i++) {
         VariableDeclaration parameter = positionalParameters[i];
+        flowAnalysis.initialize(parameter);
         inferMetadataKeepingHelper(parameter, parameter.annotations);
         if (parameter.initializer != null) {
           ExpressionInferenceResult initializerResult = inferExpression(
@@ -1853,6 +1974,7 @@ class TypeInferrerImpl implements TypeInferrer {
         }
       }
       for (VariableDeclaration parameter in function.namedParameters) {
+        flowAnalysis.initialize(parameter);
         inferMetadataKeepingHelper(parameter, parameter.annotations);
         ExpressionInferenceResult initializerResult =
             inferExpression(parameter.initializer, parameter.type, !isTopLevel);
@@ -1902,7 +2024,8 @@ class TypeInferrerImpl implements TypeInferrer {
       for (int i = 0; i < typeContext.typeParameters.length; i++) {
         substitutionMap[typeContext.typeParameters[i]] =
             i < typeParameters.length
-                ? new TypeParameterType(typeParameters[i])
+                ? new TypeParameterType.forAlphaRenaming(
+                    typeContext.typeParameters[i], typeParameters[i])
                 : const DynamicType();
       }
       substitution = Substitution.fromMap(substitutionMap);
@@ -1921,7 +2044,7 @@ class TypeInferrerImpl implements TypeInferrer {
     // `Qi[T/S]` with respect to `?`.  Otherwise, let `Ri` be `dynamic`.
     for (int i = 0; i < formals.length; i++) {
       VariableDeclarationImpl formal = formals[i];
-      if (VariableDeclarationImpl.isImplicitlyTyped(formal)) {
+      if (formal.isImplicitlyTyped) {
         DartType inferredType;
         if (formalTypesFromContext[i] == coreTypes.nullType) {
           inferredType = coreTypes.objectRawType(library.nullable);
@@ -2016,6 +2139,371 @@ class TypeInferrerImpl implements TypeInferrer {
             typeArguments: arguments.types));
   }
 
+  ExpressionInferenceResult _inferDynamicInvocation(
+      int fileOffset,
+      Link<NullAwareGuard> nullAwareGuards,
+      Expression receiver,
+      Name name,
+      Arguments arguments,
+      DartType typeContext) {
+    DartType inferredType = inferInvocation(
+        typeContext, fileOffset, unknownFunction, arguments,
+        receiverType: const DynamicType());
+    assert(name != equalsName);
+    return new ExpressionInferenceResult.nullAware(
+        inferredType,
+        new MethodInvocationImpl(receiver, name, arguments)
+          ..fileOffset = fileOffset,
+        nullAwareGuards);
+  }
+
+  ExpressionInferenceResult _inferMissingInvocation(
+      int fileOffset,
+      Link<NullAwareGuard> nullAwareGuards,
+      Expression receiver,
+      DartType receiverType,
+      ObjectAccessTarget target,
+      Name name,
+      Arguments arguments,
+      DartType typeContext,
+      {bool isImplicitCall}) {
+    assert(isImplicitCall != null);
+    Expression error = createMissingMethodInvocation(
+        fileOffset, receiver, receiverType, name, arguments,
+        isImplicitCall: isImplicitCall);
+    inferInvocation(typeContext, fileOffset, unknownFunction, arguments,
+        receiverType: receiverType);
+    assert(name != equalsName);
+    // TODO(johnniwinther): Use InvalidType instead.
+    return new ExpressionInferenceResult.nullAware(
+        const DynamicType(), error, nullAwareGuards);
+  }
+
+  ExpressionInferenceResult _inferExtensionInvocation(
+      int fileOffset,
+      Link<NullAwareGuard> nullAwareGuards,
+      Expression receiver,
+      DartType receiverType,
+      ObjectAccessTarget target,
+      Name name,
+      Arguments arguments,
+      DartType typeContext) {
+    assert(target.isExtensionMember);
+    DartType calleeType = getGetterType(target, receiverType);
+    FunctionType functionType = getFunctionType(target, receiverType, false);
+
+    // TODO(johnniwinther): Disallow all implicit non-function calls?
+    if (calleeType is! DynamicType &&
+        !(calleeType is InterfaceType &&
+            calleeType.classNode == coreTypes.functionClass) &&
+        identical(functionType, unknownFunction)) {
+      Expression error = helper.buildProblem(
+          // TODO(johnniwinther): Use a different message for implicit .call.
+          templateInvokeNonFunction.withArguments(name.name),
+          fileOffset,
+          noLength);
+      return new ExpressionInferenceResult(const DynamicType(), error);
+    }
+    StaticInvocation staticInvocation = transformExtensionMethodInvocation(
+        fileOffset, target, receiver, arguments);
+    DartType inferredType = inferInvocation(
+        typeContext, fileOffset, functionType, staticInvocation.arguments,
+        receiverType: receiverType, isImplicitExtensionMember: true);
+    if (!isTopLevel) {
+      library.checkBoundsInStaticInvocation(staticInvocation,
+          typeSchemaEnvironment, helper.uri, getTypeArgumentsInfo(arguments));
+    }
+    return new ExpressionInferenceResult.nullAware(
+        inferredType, staticInvocation, nullAwareGuards);
+  }
+
+  ExpressionInferenceResult _inferFunctionInvocation(
+      int fileOffset,
+      Link<NullAwareGuard> nullAwareGuards,
+      Expression receiver,
+      DartType receiverType,
+      ObjectAccessTarget target,
+      Arguments arguments,
+      DartType typeContext) {
+    assert(target.isCallFunction);
+    FunctionType functionType = getFunctionType(target, receiverType, false);
+    DartType inferredType = inferInvocation(
+        typeContext, fileOffset, functionType, arguments,
+        receiverType: receiverType);
+    // TODO(johnniwinther): Check that type arguments against the bounds.
+    return new ExpressionInferenceResult.nullAware(
+        inferredType,
+        new MethodInvocation(receiver, callName, arguments)
+          ..fileOffset = fileOffset,
+        nullAwareGuards);
+  }
+
+  ExpressionInferenceResult _inferInstanceMethodInvocation(
+      int fileOffset,
+      Link<NullAwareGuard> nullAwareGuards,
+      Expression receiver,
+      DartType receiverType,
+      ObjectAccessTarget target,
+      Arguments arguments,
+      DartType typeContext,
+      {bool isImplicitCall}) {
+    assert(isImplicitCall != null);
+    assert(target.isInstanceMember);
+    Procedure method = target.member;
+    assert(method.kind == ProcedureKind.Method,
+        "Unexpected instance method $method");
+    Name methodName = method.name;
+
+    if (receiverType == const DynamicType()) {
+      FunctionNode signature = method.function;
+      if (arguments.positional.length < signature.requiredParameterCount ||
+          arguments.positional.length > signature.positionalParameters.length) {
+        target = const ObjectAccessTarget.unresolved();
+        method = null;
+      }
+      for (NamedExpression argument in arguments.named) {
+        if (!signature.namedParameters
+            .any((declaration) => declaration.name == argument.name)) {
+          target = const ObjectAccessTarget.unresolved();
+          method = null;
+        }
+      }
+      if (instrumentation != null && method != null) {
+        instrumentation.record(uriForInstrumentation, fileOffset, 'target',
+            new InstrumentationValueForMember(method));
+      }
+    }
+
+    DartType calleeType = getGetterType(target, receiverType);
+    FunctionType functionType =
+        getFunctionType(target, receiverType, !isImplicitCall);
+
+    // TODO(johnniwinther): Refactor to avoid this test in multiple places,
+    // either by providing a shared helper method or avoiding the calleeType/
+    // functionType distinction altogether.
+    if (!target.isUnresolved &&
+        calleeType is! DynamicType &&
+        !(calleeType is InterfaceType &&
+            calleeType.classNode == coreTypes.functionClass) &&
+        identical(functionType, unknownFunction)) {
+      Expression error = helper.buildProblem(
+          templateInvokeNonFunction.withArguments(methodName.name),
+          fileOffset,
+          noLength);
+      return new ExpressionInferenceResult(const DynamicType(), error);
+    }
+    bool contravariantCheck = false;
+    if (receiver is! ThisExpression &&
+        method != null &&
+        returnedTypeParametersOccurNonCovariantly(
+            method.enclosingClass, method.function.returnType)) {
+      contravariantCheck = true;
+    }
+    DartType inferredType = inferInvocation(
+        typeContext, fileOffset, functionType, arguments,
+        receiverType: receiverType);
+
+    Expression replacement;
+    if (contravariantCheck) {
+      // TODO(johnniwinther): Merge with the replacement computation below.
+      replacement = new AsExpression(
+          new MethodInvocation(receiver, methodName, arguments, method)
+            ..fileOffset = fileOffset,
+          inferredType)
+        ..isTypeError = true
+        ..fileOffset = fileOffset;
+      if (instrumentation != null) {
+        int offset =
+            arguments.fileOffset == -1 ? fileOffset : arguments.fileOffset;
+        instrumentation.record(uriForInstrumentation, offset, 'checkReturn',
+            new InstrumentationValueForType(inferredType));
+      }
+    }
+
+    _checkBoundsInMethodInvocation(
+        target, receiverType, calleeType, methodName, arguments, fileOffset);
+
+    replacement ??=
+        new MethodInvocation(receiver, methodName, arguments, method)
+          ..fileOffset = fileOffset;
+
+    return new ExpressionInferenceResult.nullAware(
+        inferredType, replacement, nullAwareGuards);
+  }
+
+  ExpressionInferenceResult _inferInstanceGetterInvocation(
+      int fileOffset,
+      Link<NullAwareGuard> nullAwareGuards,
+      Expression receiver,
+      DartType receiverType,
+      ObjectAccessTarget target,
+      Arguments arguments,
+      DartType typeContext,
+      {bool isImplicitCall}) {
+    assert(isImplicitCall != null);
+    assert(target.isInstanceMember);
+    Procedure getter = target.member;
+    assert(getter.kind == ProcedureKind.Getter);
+
+    if (receiverType == const DynamicType() && getter is Procedure) {
+      FunctionNode signature = getter.function;
+      if (arguments.positional.length < signature.requiredParameterCount ||
+          arguments.positional.length > signature.positionalParameters.length) {
+        target = const ObjectAccessTarget.unresolved();
+        getter = null;
+      }
+      for (NamedExpression argument in arguments.named) {
+        if (!signature.namedParameters
+            .any((declaration) => declaration.name == argument.name)) {
+          target = const ObjectAccessTarget.unresolved();
+          getter = null;
+        }
+      }
+      if (instrumentation != null && getter != null) {
+        instrumentation.record(uriForInstrumentation, fileOffset, 'target',
+            new InstrumentationValueForMember(getter));
+      }
+    }
+
+    DartType calleeType = getGetterType(target, receiverType);
+    FunctionType functionType =
+        getFunctionType(target, receiverType, !isImplicitCall);
+
+    if (!target.isUnresolved &&
+        calleeType is! DynamicType &&
+        !(calleeType is InterfaceType &&
+            calleeType.classNode == coreTypes.functionClass) &&
+        identical(functionType, unknownFunction)) {
+      Expression error = helper.buildProblem(
+          templateInvokeNonFunction.withArguments(getter.name.name),
+          fileOffset,
+          noLength);
+      return new ExpressionInferenceResult(const DynamicType(), error);
+    }
+    bool contravariantCheck = false;
+    if (calleeType is! DynamicType &&
+        receiver is! ThisExpression &&
+        returnedTypeParametersOccurNonCovariantly(
+            getter.enclosingClass, getter.function.returnType)) {
+      contravariantCheck = true;
+    }
+
+    DartType inferredType = inferInvocation(
+        typeContext, fileOffset, functionType, arguments,
+        receiverType: receiverType);
+
+    if (isImplicitCall) {
+      Expression error = helper.buildProblem(
+          templateImplicitCallOfNonMethod.withArguments(
+              receiverType, isNonNullableByDefault),
+          fileOffset,
+          noLength);
+      return new ExpressionInferenceResult(const DynamicType(), error);
+    }
+
+    Expression replacement;
+    if (contravariantCheck) {
+      PropertyGet propertyGet = new PropertyGet(receiver, getter.name, getter);
+      AsExpression asExpression = new AsExpression(propertyGet, functionType)
+        ..isTypeError = true
+        ..fileOffset = fileOffset;
+      replacement = new MethodInvocation(asExpression, callName, arguments);
+      if (instrumentation != null) {
+        int offset =
+            arguments.fileOffset == -1 ? fileOffset : arguments.fileOffset;
+        instrumentation.record(uriForInstrumentation, offset,
+            'checkGetterReturn', new InstrumentationValueForType(functionType));
+      }
+    }
+
+    _checkBoundsInMethodInvocation(
+        target, receiverType, calleeType, getter.name, arguments, fileOffset);
+
+    // TODO(johnniwinther): Always encode the call as an explicit .call and
+    // set the correct member on the invocation.
+    replacement ??=
+        new MethodInvocation(receiver, getter.name, arguments, getter)
+          ..fileOffset = fileOffset;
+
+    return new ExpressionInferenceResult.nullAware(
+        inferredType, replacement, nullAwareGuards);
+  }
+
+  ExpressionInferenceResult _inferInstanceFieldInvocation(
+      int fileOffset,
+      Link<NullAwareGuard> nullAwareGuards,
+      Expression receiver,
+      DartType receiverType,
+      ObjectAccessTarget target,
+      Arguments arguments,
+      DartType typeContext,
+      {bool isImplicitCall}) {
+    assert(isImplicitCall != null);
+    assert(target.isInstanceMember);
+    Field field = target.member;
+
+    DartType calleeType = getGetterType(target, receiverType);
+    FunctionType functionType =
+        getFunctionType(target, receiverType, !isImplicitCall);
+
+    if (calleeType is! DynamicType &&
+        !(calleeType is InterfaceType &&
+            calleeType.classNode == coreTypes.functionClass) &&
+        identical(functionType, unknownFunction)) {
+      Expression error = helper.buildProblem(
+          templateInvokeNonFunction.withArguments(target.member.name.name),
+          fileOffset,
+          noLength);
+      return new ExpressionInferenceResult(const DynamicType(), error);
+    }
+    bool contravariantCheck = false;
+    if (receiver is! ThisExpression &&
+        calleeType is! DynamicType &&
+        returnedTypeParametersOccurNonCovariantly(
+            field.enclosingClass, field.type)) {
+      contravariantCheck = true;
+    }
+
+    DartType inferredType = inferInvocation(
+        typeContext, fileOffset, functionType, arguments,
+        receiverType: receiverType);
+
+    if (isImplicitCall) {
+      Expression error = helper.buildProblem(
+          templateImplicitCallOfNonMethod.withArguments(
+              receiverType, isNonNullableByDefault),
+          fileOffset,
+          noLength);
+      return new ExpressionInferenceResult(const DynamicType(), error);
+    }
+
+    Expression replacement;
+    if (contravariantCheck) {
+      PropertyGet propertyGet = new PropertyGet(receiver, field.name, field);
+      AsExpression asExpression = new AsExpression(propertyGet, functionType)
+        ..isTypeError = true
+        ..fileOffset = fileOffset;
+      replacement = new MethodInvocation(asExpression, callName, arguments);
+      if (instrumentation != null) {
+        int offset =
+            arguments.fileOffset == -1 ? fileOffset : arguments.fileOffset;
+        instrumentation.record(uriForInstrumentation, offset,
+            'checkGetterReturn', new InstrumentationValueForType(functionType));
+      }
+    }
+
+    _checkBoundsInMethodInvocation(
+        target, receiverType, calleeType, field.name, arguments, fileOffset);
+
+    // TODO(johnniwinther): Always encode the call as an explicit .call and
+    // set the correct member on the invocation.
+    replacement ??= new MethodInvocation(receiver, field.name, arguments, field)
+      ..fileOffset = fileOffset;
+
+    return new ExpressionInferenceResult.nullAware(
+        inferredType, replacement, nullAwareGuards);
+  }
+
   /// Performs the core type inference algorithm for method invocations (this
   /// handles both null-aware and non-null-aware method invocations).
   ExpressionInferenceResult inferMethodInvocation(
@@ -2024,9 +2512,9 @@ class TypeInferrerImpl implements TypeInferrer {
     ExpressionInferenceResult result =
         inferExpression(node.receiver, const UnknownType(), true);
     Expression receiver;
-    NullAwareGuard nullAwareGuard;
+    Link<NullAwareGuard> nullAwareGuards;
     if (isNonNullableByDefault) {
-      nullAwareGuard = result.nullAwareGuard;
+      nullAwareGuards = result.nullAwareGuards;
       receiver = result.nullAwareAction;
     } else {
       receiver = result.expression;
@@ -2035,101 +2523,69 @@ class TypeInferrerImpl implements TypeInferrer {
     ObjectAccessTarget target = findInterfaceMember(
         receiverType, node.name, node.fileOffset,
         instrumented: true, includeExtensionMethods: true);
-    Expression error = reportMissingInterfaceMember(target, receiverType,
-        node.name, node.fileOffset, templateUndefinedMethod);
-    if (target.isInstanceMember) {
-      Member interfaceMember = target.member;
-      if (receiverType == const DynamicType() && interfaceMember is Procedure) {
-        Arguments arguments = node.arguments;
-        FunctionNode signature = interfaceMember.function;
-        if (arguments.positional.length < signature.requiredParameterCount ||
-            arguments.positional.length >
-                signature.positionalParameters.length) {
-          target = const ObjectAccessTarget.unresolved();
-          interfaceMember = null;
-        }
-        for (NamedExpression argument in arguments.named) {
-          if (!signature.namedParameters
-              .any((declaration) => declaration.name == argument.name)) {
-            target = const ObjectAccessTarget.unresolved();
-            interfaceMember = null;
+    switch (target.kind) {
+      case ObjectAccessTargetKind.instanceMember:
+        Member member = target.member;
+        if (member is Procedure) {
+          if (member.kind == ProcedureKind.Getter) {
+            return _inferInstanceGetterInvocation(
+                node.fileOffset,
+                nullAwareGuards,
+                receiver,
+                receiverType,
+                target,
+                node.arguments,
+                typeContext,
+                isImplicitCall: node.isImplicitCall);
+          } else {
+            return _inferInstanceMethodInvocation(
+                node.fileOffset,
+                nullAwareGuards,
+                receiver,
+                receiverType,
+                target,
+                node.arguments,
+                typeContext,
+                isImplicitCall: node.isImplicitCall);
           }
+        } else {
+          return _inferInstanceFieldInvocation(node.fileOffset, nullAwareGuards,
+              receiver, receiverType, target, node.arguments, typeContext,
+              isImplicitCall: node.isImplicitCall);
         }
-        if (instrumentation != null && interfaceMember != null) {
-          instrumentation.record(uriForInstrumentation, node.fileOffset,
-              'target', new InstrumentationValueForMember(interfaceMember));
-        }
-      }
-      node.interfaceTarget = interfaceMember;
+        break;
+      case ObjectAccessTargetKind.callFunction:
+        return _inferFunctionInvocation(node.fileOffset, nullAwareGuards,
+            receiver, receiverType, target, node.arguments, typeContext);
+      case ObjectAccessTargetKind.extensionMember:
+        return _inferExtensionInvocation(
+            node.fileOffset,
+            nullAwareGuards,
+            receiver,
+            receiverType,
+            target,
+            node.name,
+            node.arguments,
+            typeContext);
+      case ObjectAccessTargetKind.missing:
+        return _inferMissingInvocation(
+            node.fileOffset,
+            nullAwareGuards,
+            receiver,
+            receiverType,
+            target,
+            node.name,
+            node.arguments,
+            typeContext,
+            isImplicitCall: node.isImplicitCall);
+      case ObjectAccessTargetKind.dynamic:
+      case ObjectAccessTargetKind.invalid:
+      case ObjectAccessTargetKind.unresolved:
+        return _inferDynamicInvocation(node.fileOffset, nullAwareGuards,
+            receiver, node.name, node.arguments, typeContext);
     }
-
-    Name methodName = node.name;
-    assert(target != null, "No target for ${node}.");
-    bool isOverloadedArithmeticOperator =
-        isOverloadedArithmeticOperatorAndType(target, receiverType);
-    DartType calleeType = getGetterType(target, receiverType);
-    FunctionType functionType =
-        getFunctionType(target, receiverType, !node.isImplicitCall);
-
-    if (!target.isUnresolved &&
-        calleeType is! DynamicType &&
-        !(calleeType is InterfaceType &&
-            calleeType.classNode == coreTypes.functionClass) &&
-        identical(functionType, unknownFunction)) {
-      Expression error = helper.wrapInProblem(node,
-          templateInvokeNonFunction.withArguments(methodName.name), noLength);
-      return new ExpressionInferenceResult(const DynamicType(), error);
-    }
-    MethodContravarianceCheckKind checkKind = preCheckInvocationContravariance(
-        receiverType, target,
-        isThisReceiver: receiver is ThisExpression);
-    Expression replacement;
-    Arguments arguments = node.arguments;
-    if (target.isExtensionMember) {
-      StaticInvocation staticInvocation = transformExtensionMethodInvocation(
-          node.fileOffset, target, receiver, node.arguments);
-      arguments = staticInvocation.arguments;
-      replacement = staticInvocation;
-    } else {
-      node.receiver = receiver..parent = node;
-      arguments = node.arguments;
-      replacement = node;
-    }
-    DartType inferredType = inferInvocation(
-        typeContext, node.fileOffset, functionType, arguments,
-        isOverloadedArithmeticOperator: isOverloadedArithmeticOperator,
-        receiverType: receiverType,
-        isImplicitExtensionMember: target.isExtensionMember);
-    if (methodName.name == '==') {
-      inferredType = coreTypes.boolRawType(library.nonNullable);
-    }
-    replacement = handleInvocationContravariance(checkKind, node, arguments,
-        replacement, inferredType, functionType, node.fileOffset);
-
-    if (node.isImplicitCall && target.isInstanceMember) {
-      Member member = target.member;
-      if (!(member is Procedure && member.kind == ProcedureKind.Method)) {
-        Expression error = helper.wrapInProblem(
-            node,
-            templateImplicitCallOfNonMethod.withArguments(receiverType),
-            noLength);
-        return new ExpressionInferenceResult(const DynamicType(), error);
-      }
-    }
-    if (!isTopLevel && target.isExtensionMember) {
-      library.checkBoundsInStaticInvocation(replacement, typeSchemaEnvironment,
-          helper.uri, getTypeArgumentsInfo(arguments));
-    } else {
-      _checkBoundsInMethodInvocation(target, receiverType, calleeType,
-          methodName, arguments, node.fileOffset);
-    }
-    if (error != null) {
-      // TODO(johnniwinther): Use InvalidType instead.
-      return new ExpressionInferenceResult(const DynamicType(), error);
-    }
-
-    return new ExpressionInferenceResult.nullAware(
-        inferredType, replacement, nullAwareGuard);
+    return unhandled('$target', 'inferMethodInvocation', node.fileOffset,
+        uriForInstrumentation);
   }
 
   void _checkBoundsInMethodInvocation(
@@ -2257,15 +2713,13 @@ class TypeInferrerImpl implements TypeInferrer {
   ///
   /// Derived classes should override this method with logic that dispatches on
   /// the statement type and calls the appropriate specialized "infer" method.
-  void inferStatement(Statement statement) {
+  StatementInferenceResult inferStatement(Statement statement) {
     registerIfUnreachableForTesting(statement);
 
     // For full (non-top level) inference, we need access to the
     // ExpressionGeneratorHelper so that we can perform error recovery.
     if (!isTopLevel) assert(helper != null);
-    if (statement != null) {
-      statement.accept(new InferenceVisitor(this));
-    }
+    return statement.accept(new InferenceVisitor(this));
   }
 
   /// Performs the type inference steps necessary to instantiate a tear-off
@@ -2281,8 +2735,8 @@ class TypeInferrerImpl implements TypeInferrer {
         List<DartType> inferredTypes = new List<DartType>.filled(
             typeParameters.length, const UnknownType());
         FunctionType instantiatedType = functionType.withoutTypeParameters;
-        typeSchemaEnvironment.inferGenericFunctionOrType(
-            instantiatedType, typeParameters, [], [], context, inferredTypes);
+        typeSchemaEnvironment.inferGenericFunctionOrType(instantiatedType,
+            typeParameters, [], [], context, inferredTypes, library.library);
         if (!isTopLevel) {
           expression = new Instantiation(expression, inferredTypes)
             ..fileOffset = expression.fileOffset;
@@ -2399,18 +2853,22 @@ class TypeInferrerImpl implements TypeInferrer {
     }
     // TODO(paulberry): If [type] is a subtype of `Future`, should we just
     // return it unmodified?
+    if (type == null) {
+      return coreTypes.futureRawType(library.nullable);
+    }
     return new InterfaceType(
-        coreTypes.futureOrClass, <DartType>[type ?? const DynamicType()]);
+        coreTypes.futureOrClass, library.nonNullable, <DartType>[type]);
   }
 
-  DartType wrapFutureType(DartType type) {
+  DartType wrapFutureType(DartType type, Nullability nullability) {
     DartType typeWithoutFutureOr = type ?? const DynamicType();
     return new InterfaceType(
-        coreTypes.futureClass, <DartType>[typeWithoutFutureOr]);
+        coreTypes.futureClass, nullability, <DartType>[typeWithoutFutureOr]);
   }
 
-  DartType wrapType(DartType type, Class class_) {
-    return new InterfaceType(class_, <DartType>[type ?? const DynamicType()]);
+  DartType wrapType(DartType type, Class class_, Nullability nullability) {
+    return new InterfaceType(
+        class_, nullability, <DartType>[type ?? const DynamicType()]);
   }
 
   Member _getInterfaceMember(
@@ -2430,8 +2888,8 @@ class TypeInferrerImpl implements TypeInferrer {
   ///
   /// If it is, an error message template is returned, which can be used by the
   /// caller to report an invalid cast.  Otherwise, `null` is returned.
-  Template<Message Function(DartType, DartType)> _getPreciseTypeErrorTemplate(
-      Expression expression) {
+  Template<Message Function(DartType, DartType, bool)>
+      _getPreciseTypeErrorTemplate(Expression expression) {
     if (expression is ListLiteral) {
       return templateInvalidCastLiteralList;
     }
@@ -2460,8 +2918,7 @@ class TypeInferrerImpl implements TypeInferrer {
     }
     if (expression is VariableGet) {
       VariableDeclaration variable = expression.variable;
-      if (variable is VariableDeclarationImpl &&
-          VariableDeclarationImpl.isLocalFunction(variable)) {
+      if (variable is VariableDeclarationImpl && variable.isLocalFunction) {
         return templateInvalidCastLocalFunction;
       }
     }
@@ -2512,6 +2969,22 @@ class TypeInferrerImpl implements TypeInferrer {
     }
   }
 
+  Expression createMissingMethodInvocation(int fileOffset, Expression receiver,
+      DartType receiverType, Name name, Arguments arguments,
+      {bool isImplicitCall}) {
+    assert(isImplicitCall != null);
+    if (isTopLevel) {
+      return engine.forest
+          .createMethodInvocation(fileOffset, receiver, name, arguments);
+    } else {
+      return helper.buildProblem(
+          templateUndefinedMethod.withArguments(name.name,
+              resolveTypeParameter(receiverType), isNonNullableByDefault),
+          fileOffset,
+          isImplicitCall ? noLength : name.name.length);
+    }
+  }
+
   Expression createMissingPropertyGet(int fileOffset, Expression receiver,
       DartType receiverType, Name propertyName) {
     if (isTopLevel) {
@@ -2519,8 +2992,8 @@ class TypeInferrerImpl implements TypeInferrer {
           .createPropertyGet(fileOffset, receiver, propertyName);
     } else {
       return helper.buildProblem(
-          templateUndefinedGetter.withArguments(
-              propertyName.name, resolveTypeParameter(receiverType)),
+          templateUndefinedGetter.withArguments(propertyName.name,
+              resolveTypeParameter(receiverType), isNonNullableByDefault),
           fileOffset,
           propertyName.name.length);
     }
@@ -2536,8 +3009,8 @@ class TypeInferrerImpl implements TypeInferrer {
           forEffect: forEffect);
     } else {
       return helper.buildProblem(
-          templateUndefinedSetter.withArguments(
-              propertyName.name, resolveTypeParameter(receiverType)),
+          templateUndefinedSetter.withArguments(propertyName.name,
+              resolveTypeParameter(receiverType), isNonNullableByDefault),
           fileOffset,
           propertyName.name.length);
     }
@@ -2546,33 +3019,28 @@ class TypeInferrerImpl implements TypeInferrer {
   Expression createMissingIndexGet(int fileOffset, Expression receiver,
       DartType receiverType, Expression index) {
     if (isTopLevel) {
-      return engine.forest.createMethodInvocation(
-          fileOffset,
-          receiver,
-          indexGetName,
-          engine.forest.createArguments(fileOffset, <Expression>[index]));
+      return engine.forest.createIndexGet(fileOffset, receiver, index);
     } else {
       return helper.buildProblem(
-          templateUndefinedMethod.withArguments(
-              indexGetName.name, resolveTypeParameter(receiverType)),
+          templateUndefinedMethod.withArguments(indexGetName.name,
+              resolveTypeParameter(receiverType), isNonNullableByDefault),
           fileOffset,
           noLength);
     }
   }
 
   Expression createMissingIndexSet(int fileOffset, Expression receiver,
-      DartType receiverType, Expression index, Expression value) {
+      DartType receiverType, Expression index, Expression value,
+      {bool forEffect, bool readOnlyReceiver}) {
+    assert(forEffect != null);
+    assert(readOnlyReceiver != null);
     if (isTopLevel) {
-      return engine.forest.createMethodInvocation(
-          fileOffset,
-          receiver,
-          indexSetName,
-          engine.forest
-              .createArguments(fileOffset, <Expression>[index, value]));
+      return engine.forest.createIndexSet(fileOffset, receiver, index, value,
+          forEffect: forEffect, readOnlyReceiver: readOnlyReceiver);
     } else {
       return helper.buildProblem(
-          templateUndefinedMethod.withArguments(
-              indexSetName.name, resolveTypeParameter(receiverType)),
+          templateUndefinedMethod.withArguments(indexSetName.name,
+              resolveTypeParameter(receiverType), isNonNullableByDefault),
           fileOffset,
           noLength);
     }
@@ -2580,13 +3048,14 @@ class TypeInferrerImpl implements TypeInferrer {
 
   Expression createMissingBinary(int fileOffset, Expression left,
       DartType leftType, Name binaryName, Expression right) {
+    assert(binaryName != equalsName);
     if (isTopLevel) {
       return engine.forest.createMethodInvocation(fileOffset, left, binaryName,
           engine.forest.createArguments(fileOffset, <Expression>[right]));
     } else {
       return helper.buildProblem(
-          templateUndefinedMethod.withArguments(
-              binaryName.name, resolveTypeParameter(leftType)),
+          templateUndefinedMethod.withArguments(binaryName.name,
+              resolveTypeParameter(leftType), isNonNullableByDefault),
           fileOffset,
           binaryName.name.length);
     }
@@ -2599,8 +3068,8 @@ class TypeInferrerImpl implements TypeInferrer {
         ..fileOffset = fileOffset;
     } else {
       return helper.buildProblem(
-          templateUndefinedMethod.withArguments(
-              unaryName.name, resolveTypeParameter(expressionType)),
+          templateUndefinedMethod.withArguments(unaryName.name,
+              resolveTypeParameter(expressionType), isNonNullableByDefault),
           fileOffset,
           unaryName.name == unaryMinusName.name ? 1 : unaryName.name.length);
     }
@@ -2685,8 +3154,11 @@ abstract class MixinInferrer {
           asInstantiationOf(baseType, mixinSupertype.classNode);
       if (supertype == null) {
         reportProblem(
-            templateMixinInferenceNoMatchingClass.withArguments(mixinClass.name,
-                baseType.classNode.name, mixinSupertype.asInterfaceType),
+            templateMixinInferenceNoMatchingClass.withArguments(
+                mixinClass.name,
+                baseType.classNode.name,
+                mixinSupertype.asInterfaceType,
+                mixinClass.enclosingLibrary.isNonNullableByDefault),
             mixinClass);
         return;
       }
@@ -2715,7 +3187,8 @@ abstract class MixinInferrer {
     generateConstraints(mixinClass, baseType, mixinSupertype);
     // Solve them to get a map from type parameters to upper and lower
     // bounds.
-    Map<TypeParameter, TypeConstraint> result = gatherer.computeConstraints();
+    Map<TypeParameter, TypeConstraint> result =
+        gatherer.computeConstraints(classNode.enclosingLibrary);
     // Generate new type parameters with the solution as bounds.
     List<TypeParameter> parameters = mixinClass.typeParameters.map((p) {
       TypeConstraint constraint = result[p];
@@ -2723,8 +3196,11 @@ abstract class MixinInferrer {
       // either unconstrained or else with identical upper and lower bounds.
       if (constraint != null && constraint.upper != constraint.lower) {
         reportProblem(
-            templateMixinInferenceNoMatchingClass.withArguments(mixinClass.name,
-                baseType.classNode.name, mixinSupertype.asInterfaceType),
+            templateMixinInferenceNoMatchingClass.withArguments(
+                mixinClass.name,
+                baseType.classNode.name,
+                mixinSupertype.asInterfaceType,
+                mixinClass.enclosingLibrary.isNonNullableByDefault),
             mixinClass);
         return p;
       }
@@ -2738,7 +3214,10 @@ abstract class MixinInferrer {
     // substitute them before calling instantiate to bounds.
     Substitution substitution = Substitution.fromPairs(
         mixinClass.typeParameters,
-        parameters.map((p) => new TypeParameterType(p)).toList());
+        new List<DartType>.generate(
+            parameters.length,
+            (i) => new TypeParameterType.forAlphaRenaming(
+                mixinClass.typeParameters[i], parameters[i])));
     for (TypeParameter p in parameters) {
       p.bound = substitution.substituteType(p.bound);
     }
@@ -2748,6 +3227,55 @@ abstract class MixinInferrer {
       mixedInType.typeArguments[i] = bounds[i];
     }
   }
+}
+
+/// The result of a statement inference.
+class StatementInferenceResult {
+  const StatementInferenceResult();
+
+  factory StatementInferenceResult.single(Statement statement) =
+      SingleStatementInferenceResult;
+
+  factory StatementInferenceResult.multiple(
+          int fileOffset, List<Statement> statements) =
+      MultipleStatementInferenceResult;
+
+  bool get hasChanged => false;
+
+  Statement get statement =>
+      throw new UnsupportedError('StatementInferenceResult.statement');
+
+  int get statementCount =>
+      throw new UnsupportedError('StatementInferenceResult.statementCount');
+
+  List<Statement> get statements =>
+      throw new UnsupportedError('StatementInferenceResult.statements');
+}
+
+class SingleStatementInferenceResult implements StatementInferenceResult {
+  final Statement statement;
+
+  SingleStatementInferenceResult(this.statement);
+
+  bool get hasChanged => true;
+
+  int get statementCount => 1;
+
+  List<Statement> get statements =>
+      throw new UnsupportedError('SingleStatementInferenceResult.statements');
+}
+
+class MultipleStatementInferenceResult implements StatementInferenceResult {
+  final int fileOffset;
+  final List<Statement> statements;
+
+  MultipleStatementInferenceResult(this.fileOffset, this.statements);
+
+  bool get hasChanged => true;
+
+  Statement get statement => new Block(statements)..fileOffset = fileOffset;
+
+  int get statementCount => statements.length;
 }
 
 /// The result of an expression inference.
@@ -2760,10 +3288,10 @@ class ExpressionInferenceResult {
 
   factory ExpressionInferenceResult.nullAware(
       DartType inferredType, Expression expression,
-      [NullAwareGuard nullAwareGuard]) {
-    if (nullAwareGuard != null) {
+      [Link<NullAwareGuard> nullAwareGuards = const Link<NullAwareGuard>()]) {
+    if (nullAwareGuards != null && nullAwareGuards.isNotEmpty) {
       return new NullAwareExpressionInferenceResult(
-          inferredType, nullAwareGuard, expression);
+          inferredType, nullAwareGuards, expression);
     } else {
       return new ExpressionInferenceResult(inferredType, expression);
     }
@@ -2772,13 +3300,13 @@ class ExpressionInferenceResult {
   ExpressionInferenceResult(this.inferredType, this.expression)
       : assert(expression != null);
 
-  /// The guard used for null-aware access if the expression is part of a
-  /// null-shorting, and `null` otherwise.
-  NullAwareGuard get nullAwareGuard => null;
+  /// The guards used for null-aware access if the expression is part of a
+  /// null-shorting.
+  Link<NullAwareGuard> get nullAwareGuards => const Link<NullAwareGuard>();
 
-  /// If the expression is part of a null-shorting, the action performed on
-  /// the variable in [nullAwareGuard]. Otherwise, this is the same as
-  /// [expression].
+  /// If the expression is part of a null-shorting, this is the action performed
+  /// on the guarded variable, found as the first guard in [nullAwareGuards].
+  /// Otherwise, this is the same as [expression].
   Expression get nullAwareAction => expression;
 
   String toString() => 'ExpressionInferenceResult($inferredType,$expression)';
@@ -2795,11 +3323,25 @@ class NullAwareGuard {
   /// The [Member] used for the == call.
   final Member _nullAwareEquals;
 
-  NullAwareGuard(
-      this._nullAwareVariable, this._nullAwareFileOffset, this._nullAwareEquals)
+  final TypeInferrerImpl _inferrer;
+
+  NullAwareGuard(this._nullAwareVariable, this._nullAwareFileOffset,
+      this._nullAwareEquals, this._inferrer)
       : assert(_nullAwareVariable != null),
         assert(_nullAwareFileOffset != null),
-        assert(_nullAwareEquals != null);
+        assert(_nullAwareEquals != null),
+        assert(_inferrer != null) {
+    // Ensure the initializer of [_nullAwareVariable] is promoted to
+    // non-nullable.
+    _inferrer.flowAnalysis
+        .nullAwareAccess_rightBegin(_nullAwareVariable.initializer);
+    // Ensure [_nullAwareVariable] is promoted to non-nullable.
+    // TODO(johnniwinther): Avoid creating a [VariableGet] to promote the
+    // variable.
+    VariableGet read = new VariableGet(_nullAwareVariable);
+    _inferrer.flowAnalysis.variableRead(read, _nullAwareVariable);
+    _inferrer.flowAnalysis.nullAwareAccess_rightBegin(read);
+  }
 
   /// Creates the null-guarded application of [nullAwareAction] with the
   /// [inferredType].
@@ -2811,6 +3353,10 @@ class NullAwareGuard {
   ///
   Expression createExpression(
       DartType inferredType, Expression nullAwareAction) {
+    // End non-nullable promotion of [_nullAwareVariable].
+    _inferrer.flowAnalysis.nullAwareAccess_end();
+    // End non-nullable promotion of the initializer of [_nullAwareVariable].
+    _inferrer.flowAnalysis.nullAwareAccess_end();
     MethodInvocation equalsNull = createEqualsNull(_nullAwareFileOffset,
         createVariableGet(_nullAwareVariable), _nullAwareEquals);
     ConditionalExpression condition = new ConditionalExpression(
@@ -2834,7 +3380,7 @@ class NullAwareExpressionInferenceResult implements ExpressionInferenceResult {
   final DartType inferredType;
 
   @override
-  final NullAwareGuard nullAwareGuard;
+  final Link<NullAwareGuard> nullAwareGuards;
 
   @override
   final Expression nullAwareAction;
@@ -2842,20 +3388,25 @@ class NullAwareExpressionInferenceResult implements ExpressionInferenceResult {
   Expression _expression;
 
   NullAwareExpressionInferenceResult(
-      this.inferredType, this.nullAwareGuard, this.nullAwareAction)
-      : assert(nullAwareGuard != null),
+      this.inferredType, this.nullAwareGuards, this.nullAwareAction)
+      : assert(nullAwareGuards.isNotEmpty),
         assert(nullAwareAction != null);
 
   Expression get expression {
     if (_expression == null) {
-      _expression ??=
-          nullAwareGuard.createExpression(inferredType, nullAwareAction);
+      _expression = nullAwareAction;
+      Link<NullAwareGuard> nullAwareGuard = nullAwareGuards;
+      while (nullAwareGuard.isNotEmpty) {
+        _expression =
+            nullAwareGuard.head.createExpression(inferredType, _expression);
+        nullAwareGuard = nullAwareGuard.tail;
+      }
     }
     return _expression;
   }
 
   String toString() =>
-      'NullAwareExpressionInferenceResult($inferredType,$nullAwareGuard,'
+      'NullAwareExpressionInferenceResult($inferredType,$nullAwareGuards,'
       '$nullAwareAction)';
 }
 
@@ -2992,7 +3543,8 @@ class ExtensionAccessCandidate {
 
   ExtensionAccessCandidate(
       this.onType, this.onTypeInstantiateToBounds, this.target,
-      {this.isPlatform});
+      {this.isPlatform})
+      : assert(isPlatform != null);
 
   bool isMoreSpecificThan(TypeSchemaEnvironment typeSchemaEnvironment,
       ExtensionAccessCandidate other) {

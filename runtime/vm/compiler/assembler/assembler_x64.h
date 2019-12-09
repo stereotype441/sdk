@@ -678,6 +678,15 @@ class Assembler : public AssemblerBase {
   void PushRegister(Register r);
   void PopRegister(Register r);
 
+  void PushRegisterPair(Register r0, Register r1) {
+    PushRegister(r1);
+    PushRegister(r0);
+  }
+  void PopRegisterPair(Register r0, Register r1) {
+    PopRegister(r0);
+    PopRegister(r1);
+  }
+
   // Methods for adding/subtracting an immediate value that may be loaded from
   // the constant pool.
   // TODO(koda): Assert that these are not used for heap objects.
@@ -893,11 +902,6 @@ class Assembler : public AssemblerBase {
   void MonomorphicCheckedEntryJIT();
   void MonomorphicCheckedEntryAOT();
   void BranchOnMonomorphicCheckedEntryJIT(Label* label);
-
-  void UpdateAllocationStats(intptr_t cid);
-
-  void UpdateAllocationStatsWithSize(intptr_t cid, Register size_reg);
-  void UpdateAllocationStatsWithSize(intptr_t cid, intptr_t instance_size);
 
   // If allocation tracing for |cid| is enabled, will jump to |trace| label,
   // which will allocate in the runtime where tracing occurs.

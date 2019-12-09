@@ -118,11 +118,8 @@ main() {
         " assignmentOperator: +=)",
         new DelayedAssignment(
             helper, token, generator, expression, assignmentOperator));
-    check(
-        "DelayedPostfixIncrement(offset: 4, binaryOperator: +,"
-        " interfaceTarget: $uri::#class1::myInterfaceTarget)",
-        new DelayedPostfixIncrement(
-            helper, token, generator, binaryOperator, interfaceTarget));
+    check("DelayedPostfixIncrement(offset: 4, binaryOperator: +)",
+        new DelayedPostfixIncrement(helper, token, generator, binaryOperator));
     check(
         "VariableUseGenerator(offset: 4, variable: dynamic #t1;\n,"
         " promotedType: void)",
@@ -144,13 +141,11 @@ main() {
         new SuperPropertyAccessGenerator(helper, token, name, getter, setter));
     check(
         "IndexedAccessGenerator(offset: 4, receiver: expression, index: index,"
-        " getter: $uri::myGetter, setter: $uri::mySetter)",
-        new IndexedAccessGenerator(
-            helper, token, expression, index, getter, setter));
-    check(
-        "ThisIndexedAccessGenerator(offset: 4, index: index,"
-        " getter: $uri::myGetter, setter: $uri::mySetter)",
-        new ThisIndexedAccessGenerator(helper, token, index, getter, setter));
+        " isNullAware: false)",
+        new IndexedAccessGenerator(helper, token, expression, index,
+            isNullAware: false));
+    check("ThisIndexedAccessGenerator(offset: 4, index: index)",
+        new ThisIndexedAccessGenerator(helper, token, index));
     check(
         "SuperIndexedAccessGenerator(offset: 4, index: index,"
         " getter: $uri::myGetter, setter: $uri::mySetter)",

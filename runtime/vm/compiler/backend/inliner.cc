@@ -1673,7 +1673,7 @@ intptr_t PolymorphicInliner::AllocateBlockId() const {
 bool PolymorphicInliner::CheckInlinedDuplicate(const Function& target) {
   for (intptr_t i = 0; i < inlined_variants_.length(); ++i) {
     if ((target.raw() == inlined_variants_.TargetAt(i)->target->raw()) &&
-        !MethodRecognizer::PolymorphicTarget(target)) {
+        !target.is_polymorphic_target()) {
       // The call target is shared with a previous inlined variant.  Share
       // the graph.  This requires a join block at the entry, and edge-split
       // form requires a target for each branch.
@@ -1805,8 +1805,7 @@ bool PolymorphicInliner::TryInlineRecognizedMethod(intptr_t receiver_cid,
     // The empty Object constructor is the only case where the inlined body is
     // empty and there is no result.
     ASSERT((last != nullptr && result != nullptr) ||
-           MethodRecognizer::RecognizeKind(target) ==
-               MethodRecognizer::kObjectConstructor);
+           (target.recognized_kind() == MethodRecognizer::kObjectConstructor));
     graph_entry->set_normal_entry(entry);
     // Create a graph fragment.
     redefinition->InsertAfter(entry);
@@ -3321,11 +3320,10 @@ bool FlowGraphInliner::TryReplaceInstanceCallWithInline(
     // The empty Object constructor is the only case where the inlined body is
     // empty and there is no result.
     ASSERT((last != nullptr && result != nullptr) ||
-           MethodRecognizer::RecognizeKind(target) ==
-               MethodRecognizer::kObjectConstructor);
+           (target.recognized_kind() == MethodRecognizer::kObjectConstructor));
     // Determine if inlining instance methods needs a check.
     FlowGraph::ToCheck check = FlowGraph::ToCheck::kNoCheck;
-    if (MethodRecognizer::PolymorphicTarget(target)) {
+    if (target.is_polymorphic_target()) {
       check = FlowGraph::ToCheck::kCheckCid;
     } else {
       check = flow_graph->CheckForInstanceCall(call, target.kind());
@@ -3409,8 +3407,8 @@ bool FlowGraphInliner::TryReplaceStaticCallWithInline(
     // The empty Object constructor is the only case where the inlined body is
     // empty and there is no result.
     ASSERT((last != nullptr && result != nullptr) ||
-           MethodRecognizer::RecognizeKind(call->function()) ==
-               MethodRecognizer::kObjectConstructor);
+           (call->function().recognized_kind() ==
+            MethodRecognizer::kObjectConstructor));
     // Remove the original push arguments.
     for (intptr_t i = 0; i < call->ArgumentCount(); ++i) {
       PushArgumentInstr* push = call->PushArgumentAt(i);
@@ -3529,20 +3527,13 @@ static bool InlineSimdOp(FlowGraph* flow_graph,
     }
 
     case MethodRecognizer::kFloat32x4Zero:
-    case MethodRecognizer::kFloat32x4Splat:
-    case MethodRecognizer::kFloat32x4Constructor:
     case MethodRecognizer::kFloat32x4ToFloat64x2:
     case MethodRecognizer::kFloat64x2ToFloat32x4:
     case MethodRecognizer::kFloat32x4ToInt32x4:
     case MethodRecognizer::kInt32x4ToFloat32x4:
-    case MethodRecognizer::kFloat64x2Constructor:
     case MethodRecognizer::kFloat64x2Zero:
-    case MethodRecognizer::kFloat64x2Splat:
-    case MethodRecognizer::kInt32x4BoolConstructor:
-    case MethodRecognizer::kInt32x4Constructor:
       *last = SimdOpInstr::CreateFromFactoryCall(Z, kind, call);
       break;
-
     default:
       *last = SimdOpInstr::CreateFromCall(Z, kind, receiver, call);
       break;
@@ -3687,7 +3678,7 @@ bool FlowGraphInliner::TryInlineRecognizedMethod(
     FlowGraphInliner::ExactnessInfo* exactness) {
   const bool can_speculate = policy->IsAllowedForInlining(call->deopt_id());
 
-  const MethodRecognizer::Kind kind = MethodRecognizer::RecognizeKind(target);
+  const MethodRecognizer::Kind kind = target.recognized_kind();
   switch (kind) {
     // Recognized [] operators.
     case MethodRecognizer::kImmutableArrayGetIndexed:
@@ -3993,7 +3984,7 @@ bool FlowGraphInliner::TryInlineRecognizedMethod(
 
     case MethodRecognizer::kFloat32x4Abs:
     case MethodRecognizer::kFloat32x4Clamp:
-    case MethodRecognizer::kFloat32x4Constructor:
+    case MethodRecognizer::kFloat32x4FromDoubles:
     case MethodRecognizer::kFloat32x4Equal:
     case MethodRecognizer::kFloat32x4GetSignMask:
     case MethodRecognizer::kFloat32x4GreaterThan:
@@ -4021,7 +4012,7 @@ bool FlowGraphInliner::TryInlineRecognizedMethod(
     case MethodRecognizer::kFloat32x4WithZ:
     case MethodRecognizer::kFloat32x4Zero:
     case MethodRecognizer::kFloat64x2Abs:
-    case MethodRecognizer::kFloat64x2Constructor:
+    case MethodRecognizer::kFloat64x2FromDoubles:
     case MethodRecognizer::kFloat64x2GetSignMask:
     case MethodRecognizer::kFloat64x2GetX:
     case MethodRecognizer::kFloat64x2GetY:
@@ -4035,8 +4026,8 @@ bool FlowGraphInliner::TryInlineRecognizedMethod(
     case MethodRecognizer::kFloat64x2WithX:
     case MethodRecognizer::kFloat64x2WithY:
     case MethodRecognizer::kFloat64x2Zero:
-    case MethodRecognizer::kInt32x4BoolConstructor:
-    case MethodRecognizer::kInt32x4Constructor:
+    case MethodRecognizer::kInt32x4FromBools:
+    case MethodRecognizer::kInt32x4FromInts:
     case MethodRecognizer::kInt32x4GetFlagW:
     case MethodRecognizer::kInt32x4GetFlagX:
     case MethodRecognizer::kInt32x4GetFlagY:

@@ -8,6 +8,7 @@ import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/constant/value.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/generated/resolver.dart';
+import 'package:meta/meta.dart';
 
 /// Provide common functionality shared by the various TypeProvider
 /// implementations.
@@ -41,9 +42,12 @@ abstract class TypeProviderBase implements TypeProvider {
 }
 
 class TypeProviderImpl extends TypeProviderBase {
-  final NullabilitySuffix _nullabilitySuffix;
   final LibraryElement _coreLibrary;
   final LibraryElement _asyncLibrary;
+
+  /// If `true`, then NNBD types are returned.
+  /// If `false`, then legacy types are returned.
+  final bool _isNonNullableByDefault;
 
   ClassElement _boolElement;
   ClassElement _doubleElement;
@@ -55,6 +59,7 @@ class TypeProviderImpl extends TypeProviderBase {
   ClassElement _mapElement;
   ClassElement _nullElement;
   ClassElement _numElement;
+  ClassElement _objectElement;
   ClassElement _setElement;
   ClassElement _streamElement;
   ClassElement _stringElement;
@@ -88,17 +93,46 @@ class TypeProviderImpl extends TypeProviderBase {
   InterfaceType _symbolType;
   InterfaceType _typeType;
 
+  InterfaceTypeImpl _nullStar;
+
+  InterfaceType _iterableForSetMapDisambiguation;
+  InterfaceType _mapForSetMapDisambiguation;
+
   Set<ClassElement> _nonSubtypableClasses;
 
   /// Initialize a newly created type provider to provide the types defined in
   /// the given [coreLibrary] and [asyncLibrary].
-  TypeProviderImpl(
-    LibraryElement coreLibrary,
-    LibraryElement asyncLibrary, {
-    NullabilitySuffix nullabilitySuffix = NullabilitySuffix.star,
-  })  : _nullabilitySuffix = nullabilitySuffix,
-        _coreLibrary = coreLibrary,
-        _asyncLibrary = asyncLibrary;
+  TypeProviderImpl({
+    @required LibraryElement coreLibrary,
+    @required LibraryElement asyncLibrary,
+    @required bool isNonNullableByDefault,
+  })  : _coreLibrary = coreLibrary,
+        _asyncLibrary = asyncLibrary,
+        _isNonNullableByDefault = isNonNullableByDefault;
+
+  TypeProviderImpl get asLegacy {
+    if (_isNonNullableByDefault) {
+      return TypeProviderImpl(
+        coreLibrary: _coreLibrary,
+        asyncLibrary: _asyncLibrary,
+        isNonNullableByDefault: false,
+      );
+    } else {
+      return this;
+    }
+  }
+
+  TypeProviderImpl get asNonNullableByDefault {
+    if (_isNonNullableByDefault) {
+      return this;
+    } else {
+      return TypeProviderImpl(
+        coreLibrary: _coreLibrary,
+        asyncLibrary: _asyncLibrary,
+        isNonNullableByDefault: true,
+      );
+    }
+  }
 
   @override
   ClassElement get boolElement {
@@ -113,7 +147,7 @@ class TypeProviderImpl extends TypeProviderBase {
 
   @override
   DartType get bottomType {
-    if (_nullabilitySuffix == NullabilitySuffix.none) {
+    if (_isNonNullableByDefault) {
       return NeverTypeImpl.instance;
     }
     return NeverTypeImpl.instanceLegacy;
@@ -221,6 +255,25 @@ class TypeProviderImpl extends TypeProviderBase {
     return _iterableElement ??= _getClassElement(_coreLibrary, 'Iterable');
   }
 
+  /// Return the type that should be used during disambiguation between `Set`
+  /// and `Map` literals. If NNBD enabled, use `Iterable<Object?, Object?>`,
+  /// otherwise use `Iterable<Object*, Object*>*`.
+  InterfaceType get iterableForSetMapDisambiguation {
+    if (_iterableForSetMapDisambiguation == null) {
+      var objectType = objectElement.instantiate(
+        typeArguments: const [],
+        nullabilitySuffix: _questionOrStarSuffix,
+      );
+      _iterableForSetMapDisambiguation = iterableElement.instantiate(
+        typeArguments: [
+          objectType,
+        ],
+        nullabilitySuffix: _questionOrStarSuffix,
+      );
+    }
+    return _iterableForSetMapDisambiguation;
+  }
+
   @override
   InterfaceType get iterableObjectType {
     _iterableObjectType ??= InterfaceTypeImpl.explicit(
@@ -251,6 +304,26 @@ class TypeProviderImpl extends TypeProviderBase {
   @override
   ClassElement get mapElement {
     return _mapElement ??= _getClassElement(_coreLibrary, 'Map');
+  }
+
+  /// Return the type that should be used during disambiguation between `Set`
+  /// and `Map` literals. If NNBD enabled, use `Map<Object?, Object?>`,
+  /// otherwise use `Map<Object*, Object*>*`.
+  InterfaceType get mapForSetMapDisambiguation {
+    if (_mapForSetMapDisambiguation == null) {
+      var objectType = objectElement.instantiate(
+        typeArguments: const [],
+        nullabilitySuffix: _questionOrStarSuffix,
+      );
+      _mapForSetMapDisambiguation = mapElement.instantiate(
+        typeArguments: [
+          objectType,
+          objectType,
+        ],
+        nullabilitySuffix: _questionOrStarSuffix,
+      );
+    }
+    return _mapForSetMapDisambiguation;
   }
 
   @override
@@ -288,10 +361,17 @@ class TypeProviderImpl extends TypeProviderBase {
     return _nullElement ??= _getClassElement(_coreLibrary, 'Null');
   }
 
+  InterfaceTypeImpl get nullStar {
+    return _nullStar ??= nullElement.instantiate(
+      typeArguments: const [],
+      nullabilitySuffix: NullabilitySuffix.star,
+    );
+  }
+
   @override
   DartObjectImpl get nullObject {
     if (_nullObject == null) {
-      _nullObject = new DartObjectImpl(nullType, NullState.NULL_STATE);
+      _nullObject = DartObjectImpl(nullType, NullState.NULL_STATE);
     }
     return _nullObject;
   }
@@ -311,6 +391,10 @@ class TypeProviderImpl extends TypeProviderBase {
   InterfaceType get numType {
     _numType ??= _getType(_coreLibrary, "num");
     return _numType;
+  }
+
+  ClassElement get objectElement {
+    return _objectElement ??= _getClassElement(_coreLibrary, 'Object');
   }
 
   @override
@@ -387,6 +471,20 @@ class TypeProviderImpl extends TypeProviderBase {
   @override
   VoidType get voidType => VoidTypeImpl.instance;
 
+  NullabilitySuffix get _nullabilitySuffix {
+    if (_isNonNullableByDefault) {
+      return NullabilitySuffix.none;
+    } else {
+      return NullabilitySuffix.star;
+    }
+  }
+
+  NullabilitySuffix get _questionOrStarSuffix {
+    return _isNonNullableByDefault
+        ? NullabilitySuffix.question
+        : NullabilitySuffix.star;
+  }
+
   @override
   InterfaceType futureOrType2(DartType valueType) {
     return futureOrElement.instantiate(
@@ -441,14 +539,6 @@ class TypeProviderImpl extends TypeProviderBase {
       typeArguments: [elementType],
       nullabilitySuffix: _nullabilitySuffix,
     );
-  }
-
-  TypeProviderImpl withNullability(NullabilitySuffix nullabilitySuffix) {
-    if (_nullabilitySuffix == nullabilitySuffix) {
-      return this;
-    }
-    return TypeProviderImpl(_coreLibrary, _asyncLibrary,
-        nullabilitySuffix: nullabilitySuffix);
   }
 
   /// Return the class with the given [name] from the given [library], or

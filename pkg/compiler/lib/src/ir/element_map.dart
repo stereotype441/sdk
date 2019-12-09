@@ -59,6 +59,7 @@ abstract class IrToElementMap {
 
   CommonElements get commonElements;
   DiagnosticReporter get reporter;
+  ir.CoreTypes get coreTypes;
   InterfaceType getThisType(IndexedClass cls);
   InterfaceType getSuperType(IndexedClass cls);
   OrderedTypeSet getOrderedTypeSet(IndexedClass cls);
@@ -68,4 +69,5 @@ abstract class IrToElementMap {
   DartType getCallType(InterfaceType type);
   int getHierarchyDepth(IndexedClass cls);
   DartType getTypeVariableBound(IndexedTypeVariable typeVariable);
+  List<Variance> getTypeVariableVariances(IndexedClass cls);
 }

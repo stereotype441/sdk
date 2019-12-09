@@ -4,6 +4,7 @@
 
 import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
+import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/type_provider.dart';
 import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/generated/resolver.dart';
@@ -14,9 +15,13 @@ class TestAnalysisContext implements AnalysisContext {
   @override
   final SourceFactory sourceFactory = _MockSourceFactory();
 
-  AnalysisOptions _analysisOptions;
-  TypeProviderImpl _typeProvider;
-  TypeSystem _typeSystem;
+  AnalysisOptionsImpl _analysisOptions;
+
+  TypeProvider _typeProviderLegacy;
+  TypeProvider _typeProviderNonNullableByDefault;
+
+  TypeSystemImpl _typeSystemLegacy;
+  TypeSystemImpl _typeSystemNonNullableByDefault;
 
   TestAnalysisContext({FeatureSet featureSet}) {
     _analysisOptions = AnalysisOptionsImpl()
@@ -29,28 +34,69 @@ class TestAnalysisContext implements AnalysisContext {
           : NullabilitySuffix.star,
     );
 
-    _typeProvider = TypeProviderImpl(
-      sdkElements.coreLibrary,
-      sdkElements.asyncLibrary,
+    _typeProviderLegacy = TypeProviderImpl(
+      coreLibrary: sdkElements.coreLibrary,
+      asyncLibrary: sdkElements.asyncLibrary,
+      isNonNullableByDefault: false,
     );
 
-    if (_analysisOptions.contextFeatures.isEnabled(Feature.non_nullable)) {
-      _typeProvider = _typeProvider.withNullability(NullabilitySuffix.none);
-    }
+    _typeProviderNonNullableByDefault = TypeProviderImpl(
+      coreLibrary: sdkElements.coreLibrary,
+      asyncLibrary: sdkElements.asyncLibrary,
+      isNonNullableByDefault: true,
+    );
 
-    _typeSystem = Dart2TypeSystem(typeProvider);
+    _typeSystemLegacy = TypeSystemImpl(
+      implicitCasts: _analysisOptions.implicitCasts,
+      isNonNullableByDefault: false,
+      strictInference: _analysisOptions.strictInference,
+      typeProvider: _typeProviderLegacy,
+    );
+
+    _typeSystemNonNullableByDefault = TypeSystemImpl(
+      implicitCasts: _analysisOptions.implicitCasts,
+      isNonNullableByDefault: true,
+      strictInference: _analysisOptions.strictInference,
+      typeProvider: _typeProviderNonNullableByDefault,
+    );
+
+    _setLibraryTypeSystem(sdkElements.coreLibrary);
+    _setLibraryTypeSystem(sdkElements.asyncLibrary);
   }
 
   @override
   AnalysisOptions get analysisOptions => _analysisOptions;
 
+  @Deprecated('Use LibraryElement.typeProvider')
   @override
-  TypeProvider get typeProvider => _typeProvider;
+  TypeProvider get typeProvider => typeProviderLegacy;
 
+  TypeProvider get typeProviderLegacy {
+    return _typeProviderLegacy;
+  }
+
+  TypeProvider get typeProviderNonNullableByDefault {
+    return _typeProviderNonNullableByDefault;
+  }
+
+  @Deprecated('Use LibraryElement.typeSystem')
   @override
-  TypeSystem get typeSystem => _typeSystem;
+  TypeSystemImpl get typeSystem => typeSystemLegacy;
+
+  TypeSystemImpl get typeSystemLegacy {
+    return _typeSystemLegacy;
+  }
+
+  TypeSystemImpl get typeSystemNonNullableByDefault {
+    return _typeSystemNonNullableByDefault;
+  }
 
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+
+  void _setLibraryTypeSystem(LibraryElementImpl libraryElement) {
+    libraryElement.typeProvider = _typeProviderLegacy;
+    libraryElement.typeSystem = _typeSystemLegacy;
+  }
 }
 
 class _MockSource implements Source {

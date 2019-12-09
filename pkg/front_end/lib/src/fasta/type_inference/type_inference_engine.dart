@@ -9,18 +9,19 @@ import 'package:kernel/ast.dart'
         Constructor,
         DartType,
         DartTypeVisitor,
-        DynamicType,
         Field,
         FunctionType,
         InterfaceType,
         Member,
         NamedType,
+        NeverType,
         Nullability,
         TreeNode,
         TypeParameter,
         TypeParameterType,
         TypedefType,
-        VariableDeclaration;
+        VariableDeclaration,
+        Variance;
 
 import 'package:kernel/class_hierarchy.dart' show ClassHierarchy;
 
@@ -30,7 +31,7 @@ import 'package:kernel/type_environment.dart';
 
 import '../../base/instrumentation.dart' show Instrumentation;
 
-import '../builder/library_builder.dart';
+import '../builder/constructor_builder.dart';
 
 import '../kernel/forest.dart';
 
@@ -43,32 +44,15 @@ import 'type_inferrer.dart';
 
 import 'type_schema_environment.dart' show TypeSchemaEnvironment;
 
-enum Variance {
-  covariant,
-  contravariant,
-  invariant,
-}
-
-Variance invertVariance(Variance variance) {
-  switch (variance) {
-    case Variance.covariant:
-      return Variance.contravariant;
-    case Variance.contravariant:
-      return Variance.covariant;
-    case Variance.invariant:
-  }
-  return variance;
-}
-
 /// Visitor to check whether a given type mentions any of a class's type
 /// parameters in a non-covariant fashion.
 class IncludesTypeParametersNonCovariantly extends DartTypeVisitor<bool> {
-  Variance _variance;
+  int _variance;
 
   final List<TypeParameter> _typeParametersToSearchFor;
 
   IncludesTypeParametersNonCovariantly(this._typeParametersToSearchFor,
-      {Variance initialVariance})
+      {int initialVariance})
       : _variance = initialVariance;
 
   @override
@@ -77,12 +61,12 @@ class IncludesTypeParametersNonCovariantly extends DartTypeVisitor<bool> {
   @override
   bool visitFunctionType(FunctionType node) {
     if (node.returnType.accept(this)) return true;
-    Variance oldVariance = _variance;
+    int oldVariance = _variance;
     _variance = Variance.invariant;
     for (TypeParameter parameter in node.typeParameters) {
       if (parameter.bound.accept(this)) return true;
     }
-    _variance = invertVariance(oldVariance);
+    _variance = Variance.combine(Variance.contravariant, oldVariance);
     for (DartType parameter in node.positionalParameters) {
       if (parameter.accept(this)) return true;
     }
@@ -95,9 +79,13 @@ class IncludesTypeParametersNonCovariantly extends DartTypeVisitor<bool> {
 
   @override
   bool visitInterfaceType(InterfaceType node) {
-    for (DartType argument in node.typeArguments) {
-      if (argument.accept(this)) return true;
+    int oldVariance = _variance;
+    for (int i = 0; i < node.typeArguments.length; i++) {
+      _variance = Variance.combine(
+          node.classNode.typeParameters[i].variance, oldVariance);
+      if (node.typeArguments[i].accept(this)) return true;
     }
+    _variance = oldVariance;
     return false;
   }
 
@@ -108,7 +96,7 @@ class IncludesTypeParametersNonCovariantly extends DartTypeVisitor<bool> {
 
   @override
   bool visitTypeParameterType(TypeParameterType node) {
-    return _variance != Variance.covariant &&
+    return !Variance.greaterThanOrEqual(_variance, node.parameter.variance) &&
         _typeParametersToSearchFor.contains(node.parameter);
   }
 }
@@ -140,14 +128,14 @@ abstract class TypeInferenceEngine {
   /// This is represented as a map from a constructor to its library
   /// builder because the builder is used to report errors due to cyclic
   /// inference dependencies.
-  final Map<Constructor, LibraryBuilder> toBeInferred = {};
+  final Map<Constructor, ConstructorBuilder> toBeInferred = {};
 
   /// A map containing constructors in the process of being inferred.
   ///
   /// This is used to detect cyclic inference dependencies.  It is represented
   /// as a map from a constructor to its library builder because the builder
   /// is used to report errors.
-  final Map<Constructor, LibraryBuilder> beingInferred = {};
+  final Map<Constructor, ConstructorBuilder> beingInferred = {};
 
   final Instrumentation instrumentation;
 
@@ -167,35 +155,12 @@ abstract class TypeInferenceEngine {
   /// constructors still needing inference and infer the types of their
   /// initializing formals from the corresponding fields.
   void finishTopLevelInitializingFormals() {
-    // Field types have all been inferred so there cannot be a cyclic
-    // dependency.
-    for (Constructor constructor in toBeInferred.keys) {
-      for (VariableDeclaration declaration
-          in constructor.function.positionalParameters) {
-        inferInitializingFormal(declaration, constructor);
-      }
-      for (VariableDeclaration declaration
-          in constructor.function.namedParameters) {
-        inferInitializingFormal(declaration, constructor);
-      }
-    }
+    // Field types have all been inferred so we don't need to guard against
+    // cyclic dependency.
+    toBeInferred.values.forEach((ConstructorBuilder builder) {
+      builder.inferFormalTypes();
+    });
     toBeInferred.clear();
-  }
-
-  void inferInitializingFormal(VariableDeclaration formal, Constructor parent) {
-    if (formal.type == null) {
-      for (Field field in parent.enclosingClass.fields) {
-        if (field.name.name == formal.name) {
-          TypeInferenceEngine.resolveInferenceNode(field);
-          formal.type = field.type;
-          return;
-        }
-      }
-      // We did not find the corresponding field, so the program is erroneous.
-      // The error should have been reported elsewhere and type inference
-      // should continue by inferring dynamic.
-      formal.type = const DynamicType();
-    }
   }
 
   /// Gets ready to do top level type inference for the component having the
@@ -211,11 +176,7 @@ abstract class TypeInferenceEngine {
     if (member is Field) {
       DartType type = member.type;
       if (type is ImplicitFieldType) {
-        if (type.memberBuilder.member != member) {
-          type.memberBuilder.inferCopiedType(member);
-        } else {
-          type.memberBuilder.inferType();
-        }
+        type.inferType();
       }
     }
     return member;
@@ -300,6 +261,16 @@ class TypeOperationsCfe
 
   @override
   DartType promoteToNonNull(DartType type) {
+    if (type is TypeParameterType) {
+      DartType bound = type.bound.withNullability(Nullability.nonNullable);
+      if (bound != type.bound) {
+        return new TypeParameterType(
+            type.parameter, type.typeParameterTypeNullability, bound);
+      }
+      return type;
+    } else if (type == typeEnvironment.nullType) {
+      return const NeverType(Nullability.nonNullable);
+    }
     return type.withNullability(Nullability.nonNullable);
   }
 
@@ -307,10 +278,16 @@ class TypeOperationsCfe
   DartType variableType(VariableDeclaration variable) => variable.type;
 
   @override
-  DartType tryPromoteToType(DartType from, DartType to) {
-    if (from is TypeParameterType) {
-      return new TypeParameterType(from.parameter, to, from.nullability);
+  DartType tryPromoteToType(DartType to, DartType from) {
+    if (isSubtypeOf(to, from)) {
+      return to;
     }
-    return to;
+    if (from is TypeParameterType) {
+      if (isSubtypeOf(to, from.promotedBound ?? from.bound)) {
+        return new TypeParameterType.intersection(
+            from.parameter, from.nullability, to);
+      }
+    }
+    return from;
   }
 }

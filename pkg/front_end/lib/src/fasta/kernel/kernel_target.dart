@@ -30,10 +30,13 @@ import 'package:kernel/ast.dart'
         RedirectingInitializer,
         Source,
         SuperInitializer,
+        Supertype,
         TypeParameter,
         TypeParameterType,
         VariableDeclaration,
         VariableGet;
+
+import 'package:kernel/class_hierarchy.dart' show ClassHierarchy;
 
 import 'package:kernel/clone.dart' show CloneVisitor;
 
@@ -42,6 +45,8 @@ import 'package:kernel/type_algebra.dart' show substitute;
 import 'package:kernel/target/targets.dart' show DiagnosticReporter;
 
 import 'package:kernel/type_environment.dart' show TypeEnvironment;
+
+import 'package:kernel/verifier.dart' show verifyGetStaticType;
 
 import '../../api_prototype/file_system.dart' show FileSystem;
 
@@ -53,6 +58,7 @@ import '../builder/library_builder.dart';
 import '../builder/named_type_builder.dart';
 import '../builder/nullability_builder.dart';
 import '../builder/procedure_builder.dart';
+import '../builder/type_alias_builder.dart';
 import '../builder/type_builder.dart';
 import '../builder/type_declaration_builder.dart';
 
@@ -278,7 +284,7 @@ class KernelTarget extends TargetImplementation {
       loader.checkRedirectingFactories(myClasses);
       loader.addNoSuchMethodForwarders(myClasses);
       loader.checkMixins(myClasses);
-      loader.buildOutlineExpressions();
+      loader.buildOutlineExpressions(loader.coreTypes);
       installAllComponentProblems(loader.allComponentProblems);
       loader.allComponentProblems.clear();
       return component;
@@ -461,6 +467,10 @@ class KernelTarget extends TargetImplementation {
       unhandled("${type.runtimeType}", "installForwardingConstructors",
           builder.charOffset, builder.fileUri);
     }
+    if (supertype is TypeAliasBuilder) {
+      TypeAliasBuilder aliasBuilder = supertype;
+      supertype = aliasBuilder.unaliasDeclaration;
+    }
     if (supertype is SourceClassBuilder && supertype.isMixinApplication) {
       installForwardingConstructors(supertype);
     }
@@ -558,9 +568,12 @@ class KernelTarget extends TargetImplementation {
     List<DartType> typeParameterTypes = new List<DartType>();
     for (int i = 0; i < enclosingClass.typeParameters.length; i++) {
       TypeParameter typeParameter = enclosingClass.typeParameters[i];
-      typeParameterTypes.add(new TypeParameterType(typeParameter));
+      typeParameterTypes.add(
+          new TypeParameterType.withDefaultNullabilityForLibrary(
+              typeParameter, enclosingClass.enclosingLibrary));
     }
-    return new InterfaceType(enclosingClass, typeParameterTypes);
+    return new InterfaceType(enclosingClass,
+        enclosingClass.enclosingLibrary.nonNullable, typeParameterTypes);
   }
 
   void setupTopAndBottomTypes() {
@@ -832,6 +845,12 @@ class KernelTarget extends TargetImplementation {
   void verify() {
     // TODO(ahe): How to handle errors.
     verifyComponent(component);
+    ClassHierarchy hierarchy = new ClassHierarchy(component,
+        onAmbiguousSupertypes: (Class cls, Supertype a, Supertype b) {
+      // An error has already been reported.
+    });
+    verifyGetStaticType(
+        new TypeEnvironment(loader.coreTypes, hierarchy), component);
     ticker.logMs("Verified component");
   }
 
@@ -862,6 +881,10 @@ class KernelTarget extends TargetImplementation {
         }
       }
     }
+  }
+
+  void releaseAncillaryResources() {
+    component = null;
   }
 }
 

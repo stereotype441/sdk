@@ -38,11 +38,13 @@ import 'package:analyzer/dart/analysis/session.dart';
 import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
+import 'package:analyzer/dart/element/type_system.dart';
 import 'package:analyzer/error/error.dart';
 import 'package:analyzer/src/dart/constant/evaluation.dart';
 import 'package:analyzer/src/generated/engine.dart' show AnalysisContext;
 import 'package:analyzer/src/generated/java_engine.dart';
-import 'package:analyzer/src/generated/resolver.dart';
+import 'package:analyzer/src/generated/resolver.dart'
+    show Namespace, TypeProvider;
 import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/generated/utilities_dart.dart';
 import 'package:analyzer/src/task/api/model.dart' show AnalysisTarget;
@@ -442,6 +444,9 @@ abstract class CompilationUnitElement implements Element, UriReferencedElement {
 abstract class ConstructorElement
     implements ClassMemberElement, ExecutableElement, ConstantEvaluationTarget {
   @override
+  ConstructorElement get declaration;
+
+  @override
   ClassElement get enclosingElement;
 
   /// Return `true` if this constructor is a const constructor.
@@ -500,6 +505,13 @@ abstract class Element implements AnalysisTarget {
 
   /// Return the analysis context in which this element is defined.
   AnalysisContext get context;
+
+  /// Return the declaration of this element. If the element is a view on an
+  /// element, e.g. a method from an interface type, with substituted type
+  /// parameters, return the corresponding element from the class, without any
+  /// substitutions. If this element is already a declaration (or a synthetic
+  /// element, e.g. a synthetic property accessor), return itself.
+  Element get declaration;
 
   /// Return the display name of this element, or `null` if this element does
   /// not have a name.
@@ -634,6 +646,7 @@ abstract class Element implements AnalysisTarget {
   /// Return the most immediate ancestor of this element for which the
   /// [predicate] returns `true`, or `null` if there is no such ancestor. Note
   /// that this element will never be returned.
+  @Deprecated('Use either thisOrAncestorMatching or thisOrAncestorOfType')
   E getAncestor<E extends Element>(Predicate<Element> predicate);
 
   /// Return a display name for the given element that includes the path to the
@@ -651,6 +664,15 @@ abstract class Element implements AnalysisTarget {
   /// declared in <i>L</i> or if <i>m</i> is public.
   /// </blockquote>
   bool isAccessibleIn(LibraryElement library);
+
+  /// Return either this element or the most immediate ancestor of this element
+  /// for which the [predicate] returns `true`, or `null` if there is no such
+  /// element.
+  E thisOrAncestorMatching<E extends Element>(Predicate<Element> predicate);
+
+  /// Return either this element or the most immediate ancestor of this element
+  /// that has the given type, or `null` if there is no such element.
+  E thisOrAncestorOfType<E extends Element>();
 
   /// Use the given [visitor] to visit all of the children of this element.
   /// There is no guarantee of the order in which the children will be visited.
@@ -761,73 +783,68 @@ abstract class ElementAnnotation implements ConstantEvaluationTarget {
 ///
 /// Clients may not extend, implement or mix-in this class.
 class ElementKind implements Comparable<ElementKind> {
-  static const ElementKind CLASS = const ElementKind('CLASS', 0, "class");
+  static const ElementKind CLASS = ElementKind('CLASS', 0, "class");
 
   static const ElementKind COMPILATION_UNIT =
-      const ElementKind('COMPILATION_UNIT', 1, "compilation unit");
+      ElementKind('COMPILATION_UNIT', 1, "compilation unit");
 
   static const ElementKind CONSTRUCTOR =
-      const ElementKind('CONSTRUCTOR', 2, "constructor");
+      ElementKind('CONSTRUCTOR', 2, "constructor");
 
-  static const ElementKind DYNAMIC =
-      const ElementKind('DYNAMIC', 3, "<dynamic>");
+  static const ElementKind DYNAMIC = ElementKind('DYNAMIC', 3, "<dynamic>");
 
-  static const ElementKind ERROR = const ElementKind('ERROR', 4, "<error>");
+  static const ElementKind ERROR = ElementKind('ERROR', 4, "<error>");
 
   static const ElementKind EXPORT =
-      const ElementKind('EXPORT', 5, "export directive");
+      ElementKind('EXPORT', 5, "export directive");
 
   static const ElementKind EXTENSION =
-      const ElementKind('EXTENSION', 24, "extension");
+      ElementKind('EXTENSION', 24, "extension");
 
-  static const ElementKind FIELD = const ElementKind('FIELD', 6, "field");
+  static const ElementKind FIELD = ElementKind('FIELD', 6, "field");
 
-  static const ElementKind FUNCTION =
-      const ElementKind('FUNCTION', 7, "function");
+  static const ElementKind FUNCTION = ElementKind('FUNCTION', 7, "function");
 
   static const ElementKind GENERIC_FUNCTION_TYPE =
-      const ElementKind('GENERIC_FUNCTION_TYPE', 8, 'generic function type');
+      ElementKind('GENERIC_FUNCTION_TYPE', 8, 'generic function type');
 
-  static const ElementKind GETTER = const ElementKind('GETTER', 9, "getter");
+  static const ElementKind GETTER = ElementKind('GETTER', 9, "getter");
 
   static const ElementKind IMPORT =
-      const ElementKind('IMPORT', 10, "import directive");
+      ElementKind('IMPORT', 10, "import directive");
 
-  static const ElementKind LABEL = const ElementKind('LABEL', 11, "label");
+  static const ElementKind LABEL = ElementKind('LABEL', 11, "label");
 
-  static const ElementKind LIBRARY =
-      const ElementKind('LIBRARY', 12, "library");
+  static const ElementKind LIBRARY = ElementKind('LIBRARY', 12, "library");
 
   static const ElementKind LOCAL_VARIABLE =
-      const ElementKind('LOCAL_VARIABLE', 13, "local variable");
+      ElementKind('LOCAL_VARIABLE', 13, "local variable");
 
-  static const ElementKind METHOD = const ElementKind('METHOD', 14, "method");
+  static const ElementKind METHOD = ElementKind('METHOD', 14, "method");
 
-  static const ElementKind NAME = const ElementKind('NAME', 15, "<name>");
+  static const ElementKind NAME = ElementKind('NAME', 15, "<name>");
 
-  static const ElementKind NEVER = const ElementKind('NEVER', 16, "<never>");
+  static const ElementKind NEVER = ElementKind('NEVER', 16, "<never>");
 
   static const ElementKind PARAMETER =
-      const ElementKind('PARAMETER', 17, "parameter");
+      ElementKind('PARAMETER', 17, "parameter");
 
-  static const ElementKind PREFIX =
-      const ElementKind('PREFIX', 18, "import prefix");
+  static const ElementKind PREFIX = ElementKind('PREFIX', 18, "import prefix");
 
-  static const ElementKind SETTER = const ElementKind('SETTER', 19, "setter");
+  static const ElementKind SETTER = ElementKind('SETTER', 19, "setter");
 
   static const ElementKind TOP_LEVEL_VARIABLE =
-      const ElementKind('TOP_LEVEL_VARIABLE', 20, "top level variable");
+      ElementKind('TOP_LEVEL_VARIABLE', 20, "top level variable");
 
   static const ElementKind FUNCTION_TYPE_ALIAS =
-      const ElementKind('FUNCTION_TYPE_ALIAS', 21, "function type alias");
+      ElementKind('FUNCTION_TYPE_ALIAS', 21, "function type alias");
 
   static const ElementKind TYPE_PARAMETER =
-      const ElementKind('TYPE_PARAMETER', 22, "type parameter");
+      ElementKind('TYPE_PARAMETER', 22, "type parameter");
 
-  static const ElementKind UNIVERSE =
-      const ElementKind('UNIVERSE', 23, "<universe>");
+  static const ElementKind UNIVERSE = ElementKind('UNIVERSE', 23, "<universe>");
 
-  static const List<ElementKind> values = const [
+  static const List<ElementKind> values = [
     CLASS,
     COMPILATION_UNIT,
     CONSTRUCTOR,
@@ -959,6 +976,9 @@ abstract class ElementVisitor<R> {
 ///
 /// Clients may not extend, implement or mix-in this class.
 abstract class ExecutableElement implements FunctionTypedElement {
+  @override
+  ExecutableElement get declaration;
+
   /// Return `true` if this executable element did not have an explicit return
   /// type specified for it in the original source. Note that if there was no
   /// explicit return type, and if the element model is fully populated, then
@@ -1051,6 +1071,9 @@ abstract class ExtensionElement implements TypeParameterizedElement {
 /// Clients may not extend, implement or mix-in this class.
 abstract class FieldElement
     implements ClassMemberElement, PropertyInducingElement {
+  @override
+  FieldElement get declaration;
+
   /// Return `true` if this field was explicitly marked as being covariant.
   bool get isCovariant;
 
@@ -1296,6 +1319,12 @@ abstract class LibraryElement implements Element {
   /// elements, but does not include imports, exports, or synthetic elements.
   Iterable<Element> get topLevelElements;
 
+  /// Return the [TypeProvider] that is used in this library.
+  TypeProvider get typeProvider;
+
+  /// Return the [TypeSystem] that is used in this library.
+  TypeSystem get typeSystem;
+
   /// Return a list containing all of the compilation units this library
   /// consists of. This includes the defining compilation unit and units
   /// included using the `part` directive.
@@ -1327,7 +1356,10 @@ abstract class LocalVariableElement implements PromotableElement {}
 /// be contained within an extension element.
 ///
 /// Clients may not extend, implement or mix-in this class.
-abstract class MethodElement implements ClassMemberElement, ExecutableElement {}
+abstract class MethodElement implements ClassMemberElement, ExecutableElement {
+  @override
+  MethodElement get declaration;
+}
 
 /// A pseudo-element that represents multiple elements defined within a single
 /// scope that have the same name. This situation is not allowed by the
@@ -1366,6 +1398,9 @@ abstract class NamespaceCombinator {}
 /// Clients may not extend, implement or mix-in this class.
 abstract class ParameterElement
     implements PromotableElement, ConstantEvaluationTarget {
+  @override
+  ParameterElement get declaration;
+
   /// Return the Dart code of the default value, or `null` if no default value.
   String get defaultValueCode;
 
@@ -1481,6 +1516,9 @@ abstract class PropertyAccessorElement implements ExecutableElement {
   /// if there is no corresponding setter.
   PropertyAccessorElement get correspondingSetter;
 
+  @override
+  PropertyAccessorElement get declaration;
+
   /// Return `true` if this accessor represents a getter.
   bool get isGetter;
 
@@ -1546,7 +1584,10 @@ abstract class ShowElementCombinator implements NamespaceCombinator {
 /// A top-level variable.
 ///
 /// Clients may not extend, implement or mix-in this class.
-abstract class TopLevelVariableElement implements PropertyInducingElement {}
+abstract class TopLevelVariableElement implements PropertyInducingElement {
+  @override
+  TopLevelVariableElement get declaration;
+}
 
 /// An element that defines a type.
 ///
@@ -1566,6 +1607,9 @@ abstract class TypeParameterElement implements TypeDefiningElement {
   /// distinguish between an implicit and explicit bound is needed by the
   /// instantiate to bounds algorithm.
   DartType get bound;
+
+  @override
+  TypeParameterElement get declaration;
 
   @override
   @deprecated
@@ -1632,6 +1676,9 @@ abstract class VariableElement implements Element, ConstantEvaluationTarget {
   /// modifier or if the value of this variable could not be computed because of
   /// errors.
   DartObject get constantValue;
+
+  @override
+  VariableElement get declaration;
 
   /// Return `true` if this variable element did not have an explicit type
   /// specified for it.

@@ -390,10 +390,10 @@ class SsaCodeGenerator implements HVisitor, HBlockInformationVisitor {
         new SsaInstructionSelection(_options, _closedWorld, _interceptorData));
     runPhase(new SsaTypeKnownRemover());
     runPhase(new SsaTrustedCheckRemover(_options));
-    runPhase(new SsaAssignmentChaining(_options, _closedWorld));
+    runPhase(new SsaAssignmentChaining(_closedWorld));
     runPhase(new SsaInstructionMerger(_abstractValueDomain, generateAtUseSite));
     runPhase(new SsaConditionMerger(generateAtUseSite, controlFlowOperators));
-    runPhase(new SsaShareRegionConstants(_options));
+    runPhase(new SsaShareRegionConstants());
 
     SsaLiveIntervalBuilder intervalBuilder =
         new SsaLiveIntervalBuilder(generateAtUseSite, controlFlowOperators);
@@ -2891,7 +2891,7 @@ class SsaCodeGenerator implements HVisitor, HBlockInformationVisitor {
   void checkType(HInstruction input, HInstruction interceptor, DartType type,
       SourceInformation sourceInformation,
       {bool negative: false}) {
-    if (type.isInterfaceType) {
+    if (type is InterfaceType) {
       InterfaceType interfaceType = type;
       ClassEntity element = interfaceType.element;
       if (element == _commonElements.jsArrayClass) {
@@ -3065,8 +3065,7 @@ class SsaCodeGenerator implements HVisitor, HBlockInformationVisitor {
         } else {
           checkNull(input);
         }
-      } else if (element ==
-          _commonElements.objectClass /* || type.treatAsDynamic*/) {
+      } else if (element == _commonElements.objectClass /* || type.isTop*/) {
         // The constant folder also does this optimization, but we make
         // it safe by assuming it may have not run.
         push(newLiteralBool(!negative, sourceInformation));
@@ -3102,7 +3101,7 @@ class SsaCodeGenerator implements HVisitor, HBlockInformationVisitor {
           _commonElements.isListSupertype(element)) {
         handleListOrSupertypeCheck(input, interceptor, type, sourceInformation,
             negative: negative);
-      } else if (type.isFunctionType) {
+      } else if (type is FunctionType) {
         checkType(input, interceptor, type, sourceInformation,
             negative: negative);
       } else if ((input.isPrimitive(_abstractValueDomain).isPotentiallyTrue &&
@@ -3133,10 +3132,10 @@ class SsaCodeGenerator implements HVisitor, HBlockInformationVisitor {
   void visitTypeConversion(HTypeConversion node) {
     assert(node.isTypeCheck || node.isCastCheck);
     DartType type = node.typeExpression;
-    assert(!type.isTypedef);
-    assert(!type.isDynamic);
-    assert(!type.isVoid);
-    if (type.isFunctionType) {
+    assert(type is! TypedefType);
+    assert(type is! DynamicType);
+    assert(type is! VoidType);
+    if (type is FunctionType) {
       // TODO(5022): We currently generate $isFunction checks for
       // function types.
       _registry
@@ -3379,6 +3378,9 @@ class SsaCodeGenerator implements HVisitor, HBlockInformationVisitor {
     js.Expression value = pop();
     String relation = negative ? '!=' : '==';
 
+    js.Expression handleNegative(js.Expression test) =>
+        negative ? js.Prefix('!', test) : test;
+
     js.Expression typeof(String type) =>
         js.Binary(relation, js.Prefix('typeof', value), js.string(type));
 
@@ -3387,14 +3389,16 @@ class SsaCodeGenerator implements HVisitor, HBlockInformationVisitor {
           StaticUse.staticInvoke(helper, CallStructure.ONE_ARG));
       js.Expression test =
           js.Call(_emitter.staticFunctionAccess(helper), [value]);
-      if (negative) {
-        test = js.Prefix('!', test);
-      }
-      return test;
+      return handleNegative(test);
     }
 
     js.Expression test;
     switch (node.specialization) {
+      case IsTestSpecialization.null_:
+        // This case should be lowered to [HIdentity] during optimization.
+        test = js.Binary(relation, value, js.LiteralNull());
+        break;
+
       case IsTestSpecialization.string:
         test = typeof("string");
         break;
@@ -3410,6 +3414,16 @@ class SsaCodeGenerator implements HVisitor, HBlockInformationVisitor {
       case IsTestSpecialization.int:
         test = isTest(_commonElements.specializedIsInt);
         break;
+
+      case IsTestSpecialization.arrayTop:
+        test = handleNegative(js.js('Array.isArray(#)', [value]));
+        break;
+
+      case IsTestSpecialization.instanceof:
+        InterfaceType type = node.dartType;
+        _registry.registerTypeUse(TypeUse.instanceConstructor(type));
+        test = handleNegative(js.js('# instanceof #',
+            [value, _emitter.constructorAccess(type.element)]));
     }
     push(test.withSourceInformation(node.sourceInformation));
   }
@@ -3477,7 +3491,7 @@ class SsaCodeGenerator implements HVisitor, HBlockInformationVisitor {
     }
 
     // Try to use the 'rti' field, or a specialization of 'instanceType'.
-    AbstractValue receiverMask = input.instructionType;
+    AbstractValue receiverMask = node.codegenInputType;
 
     AbstractBool isArray = _abstractValueDomain.isInstanceOf(
         receiverMask, _commonElements.jsArrayClass);
@@ -3531,7 +3545,7 @@ class SsaCodeGenerator implements HVisitor, HBlockInformationVisitor {
     TypeRecipe typeExpression = node.typeExpression;
     if (envStructure is FullTypeEnvironmentStructure &&
         typeExpression is TypeExpressionRecipe) {
-      if (typeExpression.type.isTypeVariable) {
+      if (typeExpression.type is TypeVariableType) {
         TypeVariableType type = typeExpression.type;
         int index = indexTypeVariable(
             _closedWorld, _rtiSubstitutions, envStructure, type);

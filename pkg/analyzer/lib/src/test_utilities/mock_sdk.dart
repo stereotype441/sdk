@@ -5,6 +5,7 @@
 import 'package:analyzer/file_system/file_system.dart';
 import 'package:analyzer/file_system/memory_file_system.dart';
 import 'package:analyzer/src/context/context.dart';
+import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/generated/sdk.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/summary/idl.dart' show PackageBundle;
@@ -411,7 +412,7 @@ class Object {
   int get hashCode => 0;
   Type get runtimeType => null;
 
-  bool operator ==(other) => identical(this, other);
+  bool operator ==(Object other) => identical(this, other);
 
   String toString() => 'a string';
   dynamic noSuchMethod(Invocation invocation) => null;
@@ -869,6 +870,8 @@ class MockSdk implements DartSdk {
 
   final Map<String, String> uriMap = {};
 
+  final AnalysisOptionsImpl _analysisOptions;
+
   /**
    * The [AnalysisContextImpl] which is used for all of the sources.
    */
@@ -885,10 +888,11 @@ class MockSdk implements DartSdk {
   /// Optional [additionalLibraries] should have unique URIs, and paths in
   /// their units are relative (will be put into `sdkRoot/lib`).
   MockSdk({
-    bool generateSummaryFiles: false,
+    bool generateSummaryFiles = false,
     @required this.resourceProvider,
+    AnalysisOptionsImpl analysisOptions,
     List<MockSdkLibrary> additionalLibraries = const [],
-  }) {
+  }) : _analysisOptions = analysisOptions ?? AnalysisOptionsImpl() {
     for (MockSdkLibrary library in _LIBRARIES) {
       var convertedLibrary = library._toProvider(resourceProvider);
       sdkLibraries.add(convertedLibrary);
@@ -943,15 +947,14 @@ class MockSdk implements DartSdk {
   @override
   AnalysisContextImpl get context {
     if (_analysisContext == null) {
-      _analysisContext = new _SdkAnalysisContext(this);
-      SourceFactory factory = new SourceFactory([new DartUriResolver(this)]);
-      _analysisContext.sourceFactory = factory;
+      var factory = SourceFactory([DartUriResolver(this)]);
+      _analysisContext = SdkAnalysisContext(_analysisOptions, factory);
     }
     return _analysisContext;
   }
 
   @override
-  String get sdkVersion => throw new UnimplementedError();
+  String get sdkVersion => throw UnimplementedError();
 
   @override
   List<String> get uris =>
@@ -1003,7 +1006,7 @@ class MockSdk implements DartSdk {
       } else {
         bytes = _computeLinkedBundleBytes();
       }
-      _bundle = new PackageBundle.fromBuffer(bytes);
+      _bundle = PackageBundle.fromBuffer(bytes);
     }
     return _bundle;
   }
@@ -1023,7 +1026,7 @@ class MockSdk implements DartSdk {
     String path = uriMap[dartUri];
     if (path != null) {
       File file = resourceProvider.getResource(path);
-      Uri uri = new Uri(scheme: 'dart', path: dartUri.substring(5));
+      Uri uri = Uri(scheme: 'dart', path: dartUri.substring(5));
       return file.createSource(uri);
     }
     // If we reach here then we tried to use a dartUri that's not in the
@@ -1038,7 +1041,7 @@ class MockSdk implements DartSdk {
     List<Source> librarySources = sdkLibraries
         .map((SdkLibrary library) => mapDartUri(library.shortName))
         .toList();
-    return new SummaryBuilder(librarySources, context).build();
+    return SummaryBuilder(librarySources, context).build();
   }
 }
 
@@ -1048,25 +1051,25 @@ class MockSdkLibrary implements SdkLibrary {
   MockSdkLibrary(this.units);
 
   @override
-  String get category => throw new UnimplementedError();
+  String get category => throw UnimplementedError();
 
   @override
-  bool get isDart2JsLibrary => throw new UnimplementedError();
+  bool get isDart2JsLibrary => throw UnimplementedError();
 
   @override
-  bool get isDocumented => throw new UnimplementedError();
+  bool get isDocumented => throw UnimplementedError();
 
   @override
-  bool get isImplementation => throw new UnimplementedError();
+  bool get isImplementation => throw UnimplementedError();
 
   @override
   bool get isInternal => shortName.startsWith('dart:_');
 
   @override
-  bool get isShared => throw new UnimplementedError();
+  bool get isShared => throw UnimplementedError();
 
   @override
-  bool get isVmLibrary => throw new UnimplementedError();
+  bool get isVmLibrary => throw UnimplementedError();
 
   @override
   String get path => units[0].path;
@@ -1095,13 +1098,4 @@ class MockSdkLibraryUnit {
       content,
     );
   }
-}
-
-/**
- * An [AnalysisContextImpl] that only contains sources for a Dart SDK.
- */
-class _SdkAnalysisContext extends AnalysisContextImpl {
-  final DartSdk sdk;
-
-  _SdkAnalysisContext(this.sdk);
 }

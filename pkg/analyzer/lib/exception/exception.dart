@@ -24,7 +24,7 @@ class AnalysisException implements Exception {
   AnalysisException([this.message = 'Exception', this.cause]);
 
   String toString() {
-    StringBuffer buffer = new StringBuffer();
+    StringBuffer buffer = StringBuffer();
     buffer.write('$runtimeType: ');
     buffer.writeln(message);
     if (cause != null) {
@@ -69,14 +69,21 @@ class CaughtException implements Exception {
       : this.stackTrace = stackTrace ?? StackTrace.current;
 
   /**
-   * Create a [CaughtException] to wrap a prior one, adding a [message].
+   * Recursively unwrap this [CaughtException] if it itself contains a
+   * [CaughtException].
+   *
+   * If it does not contain a [CaughtException], simply return this instance.
    */
-  CaughtException.wrapInMessage(String message, CaughtException exception)
-      : this.withMessage(message, exception, null);
+  CaughtException get rootCaughtException {
+    if (exception is CaughtException) {
+      return (exception as CaughtException).rootCaughtException;
+    }
+    return this;
+  }
 
   @override
   String toString() {
-    StringBuffer buffer = new StringBuffer();
+    StringBuffer buffer = StringBuffer();
     _writeOn(buffer);
     return buffer.toString();
   }
@@ -107,4 +114,21 @@ class CaughtException implements Exception {
       }
     }
   }
+}
+
+/**
+ * A form of [CaughtException] that should be silent to users.
+ *
+ * This is still considered an exceptional situation and will be sent to crash
+ * reporting.
+ */
+class SilentException extends CaughtException {
+  SilentException(String message, exception, stackTrace)
+      : super.withMessage(message, exception, stackTrace);
+
+  /**
+   * Create a [SilentException] to wrap a [CaughtException], adding a [message].
+   */
+  SilentException.wrapInMessage(String message, CaughtException exception)
+      : this(message, exception, null);
 }

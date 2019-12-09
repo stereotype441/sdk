@@ -159,16 +159,12 @@ const Slot& Slot::GetTypeArgumentsSlotFor(Thread* thread, const Class& cls) {
 const Slot& Slot::GetContextVariableSlotFor(Thread* thread,
                                             const LocalVariable& variable) {
   ASSERT(variable.is_captured());
-  // TODO(vegorov) Can't assign static type to local variables because
-  // for captured parameters we generate the code that first stores a
-  // variable into the context and then loads it from the context to perform
-  // the type check.
   return SlotCache::Instance(thread).Canonicalize(Slot(
       Kind::kCapturedVariable,
       IsImmutableBit::encode(variable.is_final()) | IsNullableBit::encode(true),
       kDynamicCid,
       compiler::target::Context::variable_offset(variable.index().value()),
-      &variable.name(), /*static_type=*/nullptr));
+      &variable.name(), &variable.type()));
 }
 
 const Slot& Slot::GetTypeArgumentsIndexSlot(Thread* thread, intptr_t index) {
@@ -212,13 +208,22 @@ const Slot& Slot::Get(const Field& field,
     }
   }
 
-  const Slot& slot = SlotCache::Instance(thread).Canonicalize(
-      Slot(Kind::kDartField,
-           IsImmutableBit::encode(field.is_final() || field.is_const()) |
-               IsNullableBit::encode(is_nullable) |
-               IsGuardedBit::encode(used_guarded_state),
-           nullable_cid, compiler::target::Field::OffsetOf(field), &field,
-           &AbstractType::ZoneHandle(zone, field.type())));
+  AbstractType& type = AbstractType::ZoneHandle(zone, field.type());
+
+  if (field.needs_load_guard()) {
+    // Should be kept in sync with LoadStaticFieldInstr::ComputeType.
+    type = Type::DynamicType();
+    nullable_cid = kDynamicCid;
+    is_nullable = true;
+    used_guarded_state = false;
+  }
+
+  const Slot& slot = SlotCache::Instance(thread).Canonicalize(Slot(
+      Kind::kDartField,
+      IsImmutableBit::encode(field.is_final() || field.is_const()) |
+          IsNullableBit::encode(is_nullable) |
+          IsGuardedBit::encode(used_guarded_state),
+      nullable_cid, compiler::target::Field::OffsetOf(field), &field, &type));
 
   // If properties of this slot were based on the guarded state make sure
   // to add the field to the list of guarded fields. Note that during background

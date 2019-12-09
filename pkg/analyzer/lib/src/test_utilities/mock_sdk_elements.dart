@@ -822,7 +822,7 @@ class _MockSdkElementsBuilder {
       nullabilitySuffix == NullabilitySuffix.none,
     );
 
-    var asyncUnit = new CompilationUnitElementImpl();
+    var asyncUnit = CompilationUnitElementImpl();
     var asyncSource = analysisContext.sourceFactory.forUri('dart:async');
     asyncUnit.librarySource = asyncUnit.source = asyncSource;
     asyncLibrary.definingCompilationUnit = asyncUnit;
@@ -972,10 +972,10 @@ class _MockSdkElementsBuilder {
     List<TypeParameterElement> typeFormals = const [],
     List<ParameterElement> parameters = const [],
   }) {
-    return FunctionTypeImpl.synthetic(
-      returnType,
-      typeFormals,
-      parameters,
+    return FunctionTypeImpl(
+      typeFormals: typeFormals,
+      parameters: parameters,
+      returnType: returnType,
       nullabilitySuffix: nullabilitySuffix,
     );
   }

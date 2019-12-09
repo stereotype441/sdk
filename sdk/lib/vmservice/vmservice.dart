@@ -2,6 +2,8 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+// @dart = 2.6
+
 library dart._vmservice;
 
 import 'dart:async';
@@ -648,7 +650,8 @@ class VMService extends MessageRouter {
   }
 }
 
-@pragma("vm:entry-point", "call")
+@pragma("vm:entry-point",
+    const bool.fromEnvironment("dart.vm.product") ? false : "call")
 RawReceivePort boot() {
   // Return the port we expect isolate control messages on.
   return isolateControlPort;

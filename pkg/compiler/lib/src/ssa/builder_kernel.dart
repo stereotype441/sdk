@@ -381,6 +381,8 @@ class KernelSsaGraphBuilder extends ir.Visitor {
         return options.useContentSecurityPolicy;
       case 'USE_NEW_RTI':
         return options.experimentNewRti;
+      case 'VARIANCE':
+        return options.enableVariance;
       default:
         return null;
     }
@@ -1484,11 +1486,12 @@ class KernelSsaGraphBuilder extends ir.Visitor {
       ir.FunctionNode function = getFunctionNode(_elementMap, method);
       for (ir.TypeParameter typeParameter in function.typeParameters) {
         Local local = _localsMap.getLocalTypeVariable(
-            new ir.TypeParameterType(typeParameter), _elementMap);
+            new ir.TypeParameterType(typeParameter, ir.Nullability.legacy),
+            _elementMap);
         HInstruction newParameter = localsHandler.directLocals[local];
         DartType bound = _getDartTypeIfValid(typeParameter.bound);
-        if (!bound.isDynamic &&
-            !bound.isVoid &&
+        if (bound is! DynamicType &&
+            bound is! VoidType &&
             bound != _commonElements.objectType) {
           if (options.experimentNewRti) {
             _checkTypeBound(newParameter, bound, local.name);
@@ -5415,7 +5418,7 @@ class KernelSsaGraphBuilder extends ir.Visitor {
     DartType typeValue =
         localsHandler.substInContext(_elementMap.getDartType(type));
 
-    if (typeValue.treatAsDynamic) {
+    if (typeValue.isTop) {
       stack.add(graph.addConstantBool(true, closedWorld));
       return;
     }
@@ -5524,7 +5527,7 @@ class KernelSsaGraphBuilder extends ir.Visitor {
   /// Returns `true` if the checking of [type] is performed directly on the
   /// object and not on an interceptor.
   bool _hasDirectCheckFor(DartType type) {
-    if (!type.isInterfaceType) return false;
+    if (type is! InterfaceType) return false;
     InterfaceType interfaceType = type;
     ClassEntity element = interfaceType.element;
     return element == _commonElements.stringClass ||
@@ -5547,7 +5550,7 @@ class KernelSsaGraphBuilder extends ir.Visitor {
     List<DartType> bounds = thisType.typeArguments;
     for (int i = 0; i < bounds.length; i++) {
       DartType arg = type.typeArguments[i];
-      if (arg.treatAsDynamic) continue;
+      if (arg.isTop) continue;
       TypeVariableType typeVariable = bounds[i];
       DartType bound =
           _elementEnvironment.getTypeVariableBound(typeVariable.element);

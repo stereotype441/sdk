@@ -4,7 +4,6 @@
 
 import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/dart/ast/ast.dart';
-import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/error/listener.dart';
 import 'package:analyzer/src/dart/element/type.dart';
@@ -14,7 +13,7 @@ import 'package:analyzer/src/generated/resolver.dart';
 /// Verifier for [CollectionElement]s in list, set, or map literals.
 class LiteralElementVerifier {
   final TypeProvider typeProvider;
-  final TypeSystem typeSystem;
+  final TypeSystemImpl typeSystem;
   final ErrorReporter errorReporter;
   final FeatureSet featureSet;
   final bool Function(Expression) checkForUseOfVoidResult;
@@ -48,7 +47,7 @@ class LiteralElementVerifier {
   /// Check that the given [type] is assignable to the [elementType], otherwise
   /// report the list or set error on the [errorNode].
   void _checkAssignableToElementType(DartType type, AstNode errorNode) {
-    if (!typeSystem.isAssignableTo(type, elementType, featureSet: featureSet)) {
+    if (!typeSystem.isAssignableTo(type, elementType)) {
       var errorCode = forList
           ? StaticWarningCode.LIST_ELEMENT_TYPE_NOT_ASSIGNABLE
           : StaticWarningCode.SET_ELEMENT_TYPE_NOT_ASSIGNABLE;
@@ -108,8 +107,7 @@ class LiteralElementVerifier {
     }
 
     var keyType = entry.key.staticType;
-    if (!typeSystem.isAssignableTo(keyType, mapKeyType,
-        featureSet: featureSet)) {
+    if (!typeSystem.isAssignableTo(keyType, mapKeyType)) {
       errorReporter.reportTypeErrorForNode(
         StaticWarningCode.MAP_KEY_TYPE_NOT_ASSIGNABLE,
         entry.key,
@@ -118,8 +116,7 @@ class LiteralElementVerifier {
     }
 
     var valueType = entry.value.staticType;
-    if (!typeSystem.isAssignableTo(valueType, mapValueType,
-        featureSet: featureSet)) {
+    if (!typeSystem.isAssignableTo(valueType, mapValueType)) {
       errorReporter.reportTypeErrorForNode(
         StaticWarningCode.MAP_VALUE_TYPE_NOT_ASSIGNABLE,
         entry.value,
@@ -145,13 +142,8 @@ class LiteralElementVerifier {
     }
 
     InterfaceType iterableType;
-    var iterableDynamicType = (typeProvider.iterableDynamicType as TypeImpl)
-        .withNullability(NullabilitySuffix.question);
-    if (expressionType is InterfaceTypeImpl &&
-        typeSystem.isSubtypeOf(expressionType, iterableDynamicType)) {
-      iterableType = expressionType.asInstanceOf(
-        iterableDynamicType.element,
-      );
+    if (expressionType is InterfaceTypeImpl) {
+      iterableType = expressionType.asInstanceOf(typeProvider.iterableElement);
     }
 
     if (iterableType == null) {
@@ -162,8 +154,7 @@ class LiteralElementVerifier {
     }
 
     var iterableElementType = iterableType.typeArguments[0];
-    if (!typeSystem.isAssignableTo(iterableElementType, elementType,
-        featureSet: featureSet)) {
+    if (!typeSystem.isAssignableTo(iterableElementType, elementType)) {
       var errorCode = forList
           ? StaticWarningCode.LIST_ELEMENT_TYPE_NOT_ASSIGNABLE
           : StaticWarningCode.SET_ELEMENT_TYPE_NOT_ASSIGNABLE;
@@ -192,10 +183,8 @@ class LiteralElementVerifier {
     }
 
     InterfaceType mapType;
-    var mapObjectObjectType = typeProvider.mapObjectObjectType;
-    if (expressionType is InterfaceTypeImpl &&
-        typeSystem.isSubtypeOf(expressionType, mapObjectObjectType)) {
-      mapType = expressionType.asInstanceOf(mapObjectObjectType.element);
+    if (expressionType is InterfaceTypeImpl) {
+      mapType = expressionType.asInstanceOf(typeProvider.mapElement);
     }
 
     if (mapType == null) {
@@ -206,8 +195,7 @@ class LiteralElementVerifier {
     }
 
     var keyType = mapType.typeArguments[0];
-    if (!typeSystem.isAssignableTo(keyType, mapKeyType,
-        featureSet: featureSet)) {
+    if (!typeSystem.isAssignableTo(keyType, mapKeyType)) {
       errorReporter.reportTypeErrorForNode(
         StaticWarningCode.MAP_KEY_TYPE_NOT_ASSIGNABLE,
         expression,
@@ -216,8 +204,7 @@ class LiteralElementVerifier {
     }
 
     var valueType = mapType.typeArguments[1];
-    if (!typeSystem.isAssignableTo(valueType, mapValueType,
-        featureSet: featureSet)) {
+    if (!typeSystem.isAssignableTo(valueType, mapValueType)) {
       errorReporter.reportTypeErrorForNode(
         StaticWarningCode.MAP_VALUE_TYPE_NOT_ASSIGNABLE,
         expression,

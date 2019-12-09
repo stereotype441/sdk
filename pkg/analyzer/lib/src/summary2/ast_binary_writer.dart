@@ -945,6 +945,8 @@ class AstBinaryWriter extends ThrowingAstVisitor<LinkedNodeBuilder> {
       methodDeclaration_returnType: node.returnType?.accept(this),
       methodDeclaration_typeParameters: node.typeParameters?.accept(this),
       methodDeclaration_formalParameters: node.parameters?.accept(this),
+      methodDeclaration_hasOperatorEqualWithParameterTypeFromObject:
+          LazyAst.hasOperatorEqualParameterTypeFromObject(node),
     );
     builder.name = node.name.name;
     builder.flags = AstBinaryFlags.encode(
@@ -1352,6 +1354,7 @@ class AstBinaryWriter extends ThrowingAstVisitor<LinkedNodeBuilder> {
     var builder = LinkedNodeBuilder.typeParameter(
       typeParameter_bound: node.bound?.accept(this),
       typeParameter_defaultType: _writeType(LazyAst.getDefaultType(node)),
+      typeParameter_variance: _getVarianceToken(node),
       informativeId: getInformativeId(node),
     );
     builder.name = node.name.name;
@@ -1463,12 +1466,12 @@ class AstBinaryWriter extends ThrowingAstVisitor<LinkedNodeBuilder> {
   }
 
   _ElementComponents _componentsOfElement(Element element) {
-    while (element is ParameterMember) {
-      element = (element as ParameterMember).baseElement;
+    if (element is ParameterMember) {
+      element = element.declaration;
     }
 
     if (element is Member) {
-      var elementIndex = _indexOfElement(element.baseElement);
+      var elementIndex = _indexOfElement(element.declaration);
       var substitution = element.substitution.map;
       var substitutionBuilder = LinkedNodeTypeSubstitutionBuilder(
         typeParameters: substitution.keys.map(_indexOfElement).toList(),
@@ -1621,7 +1624,7 @@ class AstBinaryWriter extends ThrowingAstVisitor<LinkedNodeBuilder> {
   }
 
   void _storeTypedLiteral(LinkedNodeBuilder builder, TypedLiteral node,
-      {bool isMap: false, bool isSet: false}) {
+      {bool isMap = false, bool isSet = false}) {
     _storeExpression(builder, node);
     builder
       ..flags = AstBinaryFlags.encode(
@@ -1676,6 +1679,15 @@ class AstBinaryWriter extends ThrowingAstVisitor<LinkedNodeBuilder> {
     return _linkingContext.writeType(type);
   }
 
+  UnlinkedTokenType _getVarianceToken(TypeParameter parameter) {
+    // TODO (kallentu) : Clean up TypeParameterImpl casting once variance is
+    // added to the interface.
+    var parameterImpl = parameter as TypeParameterImpl;
+    return parameterImpl.varianceKeyword != null
+        ? TokensWriter.astToBinaryTokenType(parameterImpl.varianceKeyword.type)
+        : null;
+  }
+
   /// Return `true` if the expression might be successfully serialized.
   ///
   /// This does not mean that the expression is constant, it just means that
@@ -1700,7 +1712,7 @@ class AstBinaryWriter extends ThrowingAstVisitor<LinkedNodeBuilder> {
     } else if (node.isOptionalNamed) {
       return LinkedNodeFormalParameterKind.optionalNamed;
     } else {
-      throw new StateError('Unknown kind of parameter');
+      throw StateError('Unknown kind of parameter');
     }
   }
 }

@@ -2225,6 +2225,9 @@ class Definition : public Instruction {
   // boxing/unboxing and constraint instructions.
   Definition* OriginalDefinitionIgnoreBoxingAndConstraints();
 
+  // Helper method to determine if definition denotes an array length.
+  static bool IsArrayLength(Definition* def);
+
   virtual Definition* AsDefinition() { return this; }
   virtual const Definition* AsDefinition() const { return this; }
 
@@ -2677,8 +2680,15 @@ inline Definition* Instruction::ArgumentAt(intptr_t index) const {
 
 class ReturnInstr : public TemplateInstruction<1, NoThrow> {
  public:
-  ReturnInstr(TokenPosition token_pos, Value* value, intptr_t deopt_id)
-      : TemplateInstruction(deopt_id), token_pos_(token_pos) {
+  // The [yield_index], if provided, will cause the instruction to emit extra
+  // yield_index -> pc offset into the [PcDescriptors].
+  ReturnInstr(TokenPosition token_pos,
+              Value* value,
+              intptr_t deopt_id,
+              intptr_t yield_index = RawPcDescriptors::kInvalidYieldIndex)
+      : TemplateInstruction(deopt_id),
+        token_pos_(token_pos),
+        yield_index_(yield_index) {
     SetInputAt(0, value);
   }
 
@@ -2686,6 +2696,7 @@ class ReturnInstr : public TemplateInstruction<1, NoThrow> {
 
   virtual TokenPosition token_pos() const { return token_pos_; }
   Value* value() const { return inputs_[0]; }
+  intptr_t yield_index() const { return yield_index_; }
 
   virtual bool CanBecomeDeoptimizationTarget() const {
     // Return instruction might turn into a Goto instruction after inlining.
@@ -2697,8 +2708,17 @@ class ReturnInstr : public TemplateInstruction<1, NoThrow> {
 
   virtual bool HasUnknownSideEffects() const { return false; }
 
+  virtual bool AttributesEqual(Instruction* other) const {
+    auto other_return = other->AsReturn();
+    return token_pos() == other_return->token_pos() &&
+           yield_index() == other_return->yield_index();
+  }
+
+  PRINT_OPERANDS_TO_SUPPORT
+
  private:
   const TokenPosition token_pos_;
+  const intptr_t yield_index_;
 
   DISALLOW_COPY_AND_ASSIGN(ReturnInstr);
 };
@@ -4542,15 +4562,13 @@ class FfiCallInstr : public Definition {
                intptr_t deopt_id,
                const Function& signature,
                const ZoneGrowableArray<Representation>& arg_reps,
-               const ZoneGrowableArray<Location>& arg_locs,
-               const ZoneGrowableArray<HostLocation>* arg_host_locs = nullptr)
+               const ZoneGrowableArray<Location>& arg_locs)
       : Definition(deopt_id),
         zone_(zone),
         signature_(signature),
         inputs_(arg_reps.length() + 1),
         arg_representations_(arg_reps),
-        arg_locations_(arg_locs),
-        arg_host_locations_(arg_host_locs) {
+        arg_locations_(arg_locs) {
     inputs_.FillWith(nullptr, 0, arg_reps.length() + 1);
     ASSERT(signature.IsZoneHandle());
   }
@@ -4599,7 +4617,6 @@ class FfiCallInstr : public Definition {
   GrowableArray<Value*> inputs_;
   const ZoneGrowableArray<Representation>& arg_representations_;
   const ZoneGrowableArray<Location>& arg_locations_;
-  const ZoneGrowableArray<HostLocation>* arg_host_locations_;
 
   DISALLOW_COPY_AND_ASSIGN(FfiCallInstr);
 };
@@ -7899,7 +7916,7 @@ class CheckBoundBase : public TemplateDefinition<2, NoThrow, Pure> {
 
   // Returns true if the bounds check can be eliminated without
   // changing the semantics (viz. 0 <= index < length).
-  bool IsRedundant();
+  bool IsRedundant(bool use_loops = false);
 
   // Give a name to the location/input indices.
   enum { kLengthPos = 0, kIndexPos = 1 };
@@ -8288,10 +8305,10 @@ class UnboxedWidthExtenderInstr : public TemplateDefinition<1, NoThrow, Pure> {
   M(2, _, Float32x4LessThan, (Float32x4, Float32x4), Int32x4)                  \
   M(2, _, Float32x4LessThanOrEqual, (Float32x4, Float32x4), Int32x4)           \
   M(2, _, Float32x4NotEqual, (Float32x4, Float32x4), Int32x4)                  \
-  M(4, _, Int32x4Constructor, (Int32, Int32, Int32, Int32), Int32x4)           \
-  M(4, _, Int32x4BoolConstructor, (Bool, Bool, Bool, Bool), Int32x4)           \
-  M(4, _, Float32x4Constructor, (Double, Double, Double, Double), Float32x4)   \
-  M(2, _, Float64x2Constructor, (Double, Double), Float64x2)                   \
+  M(4, _, Int32x4FromInts, (Int32, Int32, Int32, Int32), Int32x4)              \
+  M(4, _, Int32x4FromBools, (Bool, Bool, Bool, Bool), Int32x4)                 \
+  M(4, _, Float32x4FromDoubles, (Double, Double, Double, Double), Float32x4)   \
+  M(2, _, Float64x2FromDoubles, (Double, Double), Float64x2)                   \
   M(0, _, Float32x4Zero, (), Float32x4)                                        \
   M(0, _, Float64x2Zero, (), Float64x2)                                        \
   M(1, _, Float32x4Splat, (Double), Float32x4)                                 \

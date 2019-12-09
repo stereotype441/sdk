@@ -34,7 +34,32 @@ class _VisibleForTemplate {
 ''');
   }
 
-  test_constructor() async {
+  test_unnamedConstructor() async {
+    addAngularMetaPackage();
+    newFile('/lib1.dart', content: r'''
+import 'package:angular_meta/angular_meta.dart';
+class A {
+  int _x;
+
+  @visibleForTemplate
+  A(this._x);
+}
+''');
+    newFile('/lib2.dart', content: r'''
+import 'lib1.dart';
+
+void main() {
+  new A(0);
+}
+''');
+
+    await _resolveTestFile('/lib1.dart');
+    await _resolveTestFile('/lib2.dart');
+    assertTestErrorsWithCodes(
+        [HintCode.INVALID_USE_OF_VISIBLE_FOR_TEMPLATE_MEMBER]);
+  }
+
+  test_namedConstructor() async {
     addAngularMetaPackage();
     newFile('/lib1.dart', content: r'''
 import 'package:angular_meta/angular_meta.dart';
@@ -236,7 +261,7 @@ class InvalidUseOfVisibleForTemplateMember_InExtensionTest
     extends InvalidUseOfVisibleForTemplateMemberTest {
   @override
   AnalysisOptionsImpl get analysisOptions => AnalysisOptionsImpl()
-    ..contextFeatures = new FeatureSet.forTesting(
+    ..contextFeatures = FeatureSet.forTesting(
         sdkVersion: '2.3.0', additionalFeatures: [Feature.extension_methods]);
 
   test_functionInExtension() async {

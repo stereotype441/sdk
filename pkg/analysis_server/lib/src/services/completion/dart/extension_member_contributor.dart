@@ -9,10 +9,12 @@ import 'package:analysis_server/src/services/completion/dart/suggestion_builder.
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
+import 'package:analyzer/dart/element/type_system.dart';
 import 'package:analyzer/src/dart/element/type_algebra.dart';
 import 'package:analyzer/src/dart/resolver/scope.dart';
-import 'package:analyzer/src/generated/resolver.dart';
-import 'package:analyzer/src/generated/type_system.dart';
+import 'package:analyzer/src/generated/resolver.dart'
+    show GenericInferrer, LibraryScope, TypeProvider;
+import 'package:analyzer/src/generated/type_system.dart' show GenericInferrer;
 
 import '../../../protocol_server.dart' show CompletionSuggestion;
 
@@ -63,8 +65,8 @@ class ExtensionMemberContributor extends DartCompletionContributor {
       }
       LibraryScope nameScope = new LibraryScope(containingLibrary);
       for (var extension in nameScope.extensions) {
-        var typeSystem = containingLibrary.context.typeSystem;
-        var typeProvider = containingLibrary.context.typeProvider;
+        var typeSystem = containingLibrary.typeSystem;
+        var typeProvider = containingLibrary.typeProvider;
         var extendedType =
             _resolveExtendedType(typeSystem, typeProvider, extension, type);
         if (extendedType != null &&

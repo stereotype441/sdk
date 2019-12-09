@@ -504,6 +504,7 @@ abstract class CommonElements {
   FunctionEntity get rtiBindMethod;
   FunctionEntity get rtiAddRulesMethod;
   FunctionEntity get rtiAddErasedTypesMethod;
+  FunctionEntity get rtiAddTypeParameterVariancesMethod;
 
   FunctionEntity get generalIsTestImplementation;
   FunctionEntity get generalAsCheckImplementation;
@@ -1943,6 +1944,12 @@ class CommonElementsImpl
   FunctionEntity get rtiAddErasedTypesMethod => _rtiAddErasedTypesMethod ??=
       _findClassMember(_rtiUniverseClass, 'addErasedTypes');
 
+  FunctionEntity _rtiAddTypeParameterVariancesMethod;
+  @override
+  FunctionEntity get rtiAddTypeParameterVariancesMethod =>
+      _rtiAddTypeParameterVariancesMethod ??=
+          _findClassMember(_rtiUniverseClass, 'addTypeParameterVariances');
+
   FunctionEntity _generalIsTestImplementation;
   @override
   FunctionEntity get generalIsTestImplementation =>
@@ -2289,6 +2296,9 @@ abstract class ElementEnvironment {
   /// where the type arguments are the type variables of [cls].
   InterfaceType getThisType(ClassEntity cls);
 
+  /// Returns the instantiation of [cls] to bounds.
+  InterfaceType getClassInstantiationToBounds(ClassEntity cls);
+
   /// Returns `true` if [cls] is generic.
   bool isGenericClass(ClassEntity cls);
 
@@ -2301,6 +2311,9 @@ abstract class ElementEnvironment {
   /// The upper bound on the [typeVariable]. If not explicitly declared, this is
   /// `Object`.
   DartType getTypeVariableBound(TypeVariableEntity typeVariable);
+
+  /// Returns the variances for each type parameter in [cls].
+  List<Variance> getTypeVariableVariances(ClassEntity cls);
 
   /// Returns the type of [function].
   FunctionType getFunctionType(FunctionEntity function);

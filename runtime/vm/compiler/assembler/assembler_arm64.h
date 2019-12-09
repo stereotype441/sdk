@@ -446,6 +446,9 @@ class Assembler : public AssemblerBase {
   void PushRegister(Register r) { Push(r); }
   void PopRegister(Register r) { Pop(r); }
 
+  void PushRegisterPair(Register r0, Register r1) { PushPair(r0, r1); }
+  void PopRegisterPair(Register r0, Register r1) { PopPair(r0, r1); }
+
   void PushRegisters(const RegisterSet& registers);
   void PopRegisters(const RegisterSet& registers);
 
@@ -1502,21 +1505,33 @@ class Assembler : public AssemblerBase {
                        const ExternalLabel* label,
                        ObjectPoolBuilderEntry::Patchability patchable);
   void LoadIsolate(Register dst);
+
+  // Note: the function never clobbers TMP, TMP2 scratch registers.
   void LoadObject(Register dst, const Object& obj);
+  // Note: the function never clobbers TMP, TMP2 scratch registers.
   void LoadUniqueObject(Register dst, const Object& obj);
+  // Note: the function never clobbers TMP, TMP2 scratch registers.
   void LoadImmediate(Register reg, int64_t imm);
+
   void LoadDImmediate(VRegister reg, double immd);
 
   // Load word from pool from the given offset using encoding that
   // InstructionPattern::DecodeLoadWordFromPool can decode.
+  //
+  // Note: the function never clobbers TMP, TMP2 scratch registers.
   void LoadWordFromPoolOffset(Register dst, uint32_t offset, Register pp = PP);
+
   void LoadDoubleWordFromPoolOffset(Register lower,
                                     Register upper,
                                     uint32_t offset);
 
   void PushObject(const Object& object) {
-    LoadObject(TMP, object);
-    Push(TMP);
+    if (IsSameObject(compiler::NullObject(), object)) {
+      Push(NULL_REG);
+    } else {
+      LoadObject(TMP, object);
+      Push(TMP);
+    }
   }
   void PushImmediate(int64_t immediate) {
     LoadImmediate(TMP, immediate);
@@ -1556,6 +1571,10 @@ class Assembler : public AssemblerBase {
   void CheckCodePointer();
   void RestoreCodePointer();
 
+  // Restores the values of the registers that are blocked to cache some values
+  // e.g. BARRIER_MASK and NULL_REG.
+  void RestorePinnedRegisters();
+
   void EnterDartFrame(intptr_t frame_size, Register new_pp = kNoRegister);
   void EnterOsrFrame(intptr_t extra_size, Register new_pp = kNoRegister);
   void LeaveDartFrame(RestorePP restore_pp = kRestoreCallerPP);
@@ -1572,10 +1591,6 @@ class Assembler : public AssemblerBase {
   void MonomorphicCheckedEntryJIT();
   void MonomorphicCheckedEntryAOT();
   void BranchOnMonomorphicCheckedEntryJIT(Label* label);
-
-  void UpdateAllocationStats(intptr_t cid);
-
-  void UpdateAllocationStatsWithSize(intptr_t cid, Register size_reg);
 
   // If allocation tracing for |cid| is enabled, will jump to |trace| label,
   // which will allocate in the runtime where tracing occurs.
@@ -1681,6 +1696,7 @@ class Assembler : public AssemblerBase {
 
   void LoadWordFromPoolOffsetFixed(Register dst, uint32_t offset);
 
+  // Note: the function never clobbers TMP, TMP2 scratch registers.
   void LoadObjectHelper(Register dst, const Object& obj, bool is_unique);
 
   void AddSubHelper(OperandSize os,

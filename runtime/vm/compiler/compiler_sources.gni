@@ -107,8 +107,8 @@ compiler_sources = [
   "frontend/bytecode_reader.h",
   "frontend/bytecode_scope_builder.cc",
   "frontend/bytecode_scope_builder.h",
-  "frontend/constant_evaluator.cc",
-  "frontend/constant_evaluator.h",
+  "frontend/constant_reader.cc",
+  "frontend/constant_reader.h",
   "frontend/flow_graph_builder.cc",
   "frontend/flow_graph_builder.h",
   "frontend/kernel_binary_flowgraph.cc",
@@ -169,5 +169,6 @@ compiler_sources_tests = [
   "backend/slot_test.cc",
   "backend/type_propagator_test.cc",
   "backend/typed_data_aot_test.cc",
+  "backend/yield_position_test.cc",
   "cha_test.cc",
 ]
