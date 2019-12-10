@@ -818,7 +818,7 @@ _f(int i, int j) => i + j;
     visitSubexpression(findNode.binary('+'), 'int');
   }
 
-  solo_test_binaryExpression_userDefinable_simple() async {
+  test_binaryExpression_userDefinable_simple() async {
     await analyze('''
 class _C {
   int operator+(String s) => 1;
