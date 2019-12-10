@@ -589,9 +589,7 @@ class ResolverVisitor extends ScopedVisitor {
             propagateTypes,
             reportConstEvaluationErrors,
             flowAnalysisHelper,
-            const ElementTypeProvider(),
-            (self, featureSet, flowAnalysis) =>
-                StaticTypeAnalyzer(self, featureSet, flowAnalysis));
+            const ElementTypeProvider());
 
   ResolverVisitor._(
       this.inheritance,
@@ -605,10 +603,7 @@ class ResolverVisitor extends ScopedVisitor {
       bool propagateTypes,
       reportConstEvaluationErrors,
       this._flowAnalysis,
-      this._elementTypeProvider,
-      StaticTypeAnalyzer Function(
-              ResolverVisitor, FeatureSet, FlowAnalysisHelper)
-          makeStaticTypeAnalyzer)
+      this._elementTypeProvider)
       : _analysisOptions = definingLibrary.context.analysisOptions,
         _featureSet = featureSet,
         _uiAsCodeEnabled =
@@ -619,14 +614,15 @@ class ResolverVisitor extends ScopedVisitor {
     this._promoteManager = TypePromotionManager(typeSystem);
     this.extensionResolver = ExtensionMemberResolver(this);
     this.elementResolver = ElementResolver(this,
-        reportConstEvaluationErrors: reportConstEvaluationErrors);
+        reportConstEvaluationErrors: reportConstEvaluationErrors,
+        elementTypeProvider: _elementTypeProvider);
     bool strongModeHints = false;
     AnalysisOptions options = _analysisOptions;
     if (options is AnalysisOptionsImpl) {
       strongModeHints = options.strongModeHints;
     }
     this.inferenceContext = InferenceContext._(this, strongModeHints);
-    this.typeAnalyzer = makeStaticTypeAnalyzer(this, featureSet, _flowAnalysis);
+    this.typeAnalyzer = _makeStaticTypeAnalyzer(featureSet, _flowAnalysis);
   }
 
   /// Return the element representing the function containing the current node,
@@ -2548,6 +2544,10 @@ class ResolverVisitor extends ScopedVisitor {
     }
   }
 
+  StaticTypeAnalyzer _makeStaticTypeAnalyzer(
+          FeatureSet featureSet, FlowAnalysisHelper flowAnalysis) =>
+      StaticTypeAnalyzer(this, featureSet, flowAnalysis);
+
   void _pushCollectionTypesDown(CollectionElement element,
       {DartType elementType,
       @required DartType iterableType,
@@ -2728,9 +2728,13 @@ class ResolverVisitorForMigration extends ResolverVisitor {
             true,
             FlowAnalysisHelperForMigration(
                 typeSystem, migrationResolutionHooks),
-            migrationResolutionHooks,
-            (self, featureSet, flowAnalysis) => StaticTypeAnalyzerForMigration(
-                self, featureSet, flowAnalysis, migrationResolutionHooks));
+            migrationResolutionHooks);
+
+  @override
+  StaticTypeAnalyzer _makeStaticTypeAnalyzer(
+          FeatureSet featureSet, FlowAnalysisHelper flowAnalysis) =>
+      StaticTypeAnalyzerForMigration(
+          this, featureSet, flowAnalysis, _elementTypeProvider);
 }
 
 /// The abstract class `ScopedVisitor` maintains name and label scopes as an AST
