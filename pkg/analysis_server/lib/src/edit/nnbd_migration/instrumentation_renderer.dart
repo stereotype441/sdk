@@ -4,6 +4,7 @@
 
 import 'dart:convert' show htmlEscape, LineSplitter;
 
+import 'package:analysis_server/src/edit/nnbd_migration/dart_page_style.dart';
 import 'package:analysis_server/src/edit/nnbd_migration/migration_info.dart';
 import 'package:analysis_server/src/edit/nnbd_migration/offset_mapper.dart';
 import 'package:analysis_server/src/edit/nnbd_migration/path_mapper.dart';
@@ -51,185 +52,20 @@ mustache.Template _template = mustache.Template(r'''
     document.addEventListener("DOMContentLoaded", highlightTarget);
     window.addEventListener("hashchange", highlightTarget);
     </script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:400,600&display=swap">
     <link rel="stylesheet" href="{{ highlightStylePath }}">
-    <style>
-.code a:link {
-  color: inherit;
-  text-decoration-line: none;
-}
-
-.code a:visited {
-  color: inherit;
-  text-decoration-line: none;
-}
-
-.code a:hover {
-  text-decoration-line: underline;
-  font-weight: bold;
-}
-
-body {
-  font-family: sans-serif;
-  padding: 1em;
-}
-
-h2 {
-  font-size: 1em;
-  font-weight: bold;
-}
-
-.content {
-  font-family: monospace;
-  /* Vertical margin around content. */
-  margin: 1em 0;
-  /* Offset the margin introduced by the absolutely positioned child div. */
-  margin-left: -0.5em;
-  position: relative;
-  white-space: pre;
-}
-
-.code {
-  left: 0.5em;
-  /* Increase line height to make room for borders in non-nullable type
-   * regions.
-   */
-  line-height: 1.3;
-  padding-left: 60px;
-  position: inherit;
-  top: 0.5em;
-}
-
-.navigationHeader {
-  padding-left: 1em;
-}
-
-.navigationLinks {
-  padding-left: 2em;
-}
-
-.regions {
-  padding: 0.5em;
-  position: absolute;
-  left: 0.5em;
-  top: 0.5em;
-  /* The content of the regions is not visible; the user instead will see the
-   * highlighted copy of the content. */
-  visibility: hidden;
-}
-
-.regions table {
-  border-spacing: 0;
-}
-
-.regions td {
-  border: none;
-  line-height: 1.3;
-  padding: 0;
-  white-space: pre;
-}
-
-.regions td:empty:after {
-  content: "\00a0";
-}
-
-.regions td.line-no {
-  color: #999999;
-  display: inline-block;
-  padding-right: 4px;
-  text-align: right;
-  visibility: visible;
-  width: 50px;
-}
-
-.region {
-  cursor: default;
-  display: inline-block;
-  position: relative;
-  visibility: visible;
-}
-
-.region.fix-region {
-  /* Green means this region was added. */
-  background-color: #ccffcc;
-  color: #003300;
-}
-
-.region.non-nullable-type-region {
-  background-color: rgba(0, 0, 0, 0.3);
-  border-bottom: solid 2px #cccccc;
-  /* Invisible text; use underlying highlighting. */
-  color: rgba(0, 0, 0, 0);
-  /* Reduce line height to make room for border. */
-  line-height: 1;
-}
-
-.region .tooltip {
-  background-color: #EEE;
-  border: solid 2px #999;
-  color: #333;
-  cursor: auto;
-  font-family: sans-serif;
-  font-size: 0.8em;
-  left: 0;
-  margin-left: 0;
-  padding: 1px;
-  position: absolute;
-  top: 100%;
-  visibility: hidden;
-  white-space: normal;
-  width: 400px;
-  z-index: 1;
-}
-
-.region .tooltip > * {
-  margin: 1em;
-}
-
-.region:hover .tooltip {
-  visibility: visible;
-}
-
-.region .tooltip::after {
-  /* Make a larger hover target once the tooltip appears. */
-  content: '';
-  position: absolute;
-  top: -1em;
-  height: 2em;
-  left: -1ch;
-  width: 3ch;
-}
-
-.selectedFile {
-  font-weight: bold;
-}
-
-.target {
-  background-color: #FFFF99;
-  position: relative;
-  visibility: visible;
-}
-    </style>
+    <style>{{{ dartPageStyle }}}</style>
   </head>
   <body>
     <h1>Preview of NNBD migration</h1>
-    <p><b>
-    Select a migrated file to see the suggested modifications below.
-    </b></p>
-    <div class="navigationHeader">
-    {{ root }}
-    </div>
-    <div class="navigationLinks">
-      {{# links }}
-        {{# isLink }}<a href="{{ href }}">{{ name }}</a>{{/ isLink }}
-        {{^ isLink }}<span class="selectedFile">{{ name }}</span>{{/ isLink }}
-        {{ modificationCount }}
-        <br/>
-      {{/ links }}
-    </div>
     {{# units }}
     <p><b>
-    Hover over modified regions to see why the modification is suggested.
-    </b></p>'''
+    Hover over modified regions to see why the migration tool chose to make the
+    modification.
+    </b></p>
+    <h2>{{ thisUnit }}</h2>
+    <div class="panels">
+    <div class="horizontal">'''
     '<div class="content">'
     '<div class="code">'
     '{{! Write the file content, modified to include navigation information, }}'
@@ -241,10 +77,20 @@ h2 {
     '{{! the content, to provide tooltips for modified regions. }}'
     '{{{ regionContent }}}'
     '</div></div>'
-    '<div>'
-    '<i>Generated on {{ generationDate }}</i>'
-    '</div>'
-    r'''
+    '''
+    <div class="nav" style="">
+      <p>Select a source file below to preview the modifications.</p>
+      <p class="root">{{ root }}</p>
+      {{# links }}
+        {{# isLink }}<a class="file-name" href="{{ href }}">{{ name }}</a>{{/ isLink }}
+        {{^ isLink }}<span class="file-name selected-file">{{ name }}</span>{{/ isLink }}
+        {{ modificationCount }}
+        <br/>
+      {{/ links }}
+    </div><!-- /nav -->
+    </div><!-- /horizontal -->
+    <div><em>Generated on {{ generationDate }}</em></div>
+    </div><!-- /panels -->
     {{/ units }}
     <script lang="javascript">
 document.addEventListener("DOMContentLoaded", (event) => {
@@ -284,6 +130,8 @@ class InstrumentationRenderer {
     Map<String, dynamic> mustacheContext = {
       'root': migrationInfo.includedRoot,
       'units': <Map<String, dynamic>>[],
+      'dartPageStyle': dartPageStyle,
+      'thisUnit': migrationInfo._computeName(unitInfo),
       'links': migrationInfo.unitLinks(unitInfo),
       'highlightJsPath': migrationInfo.highlightJsPath(unitInfo),
       'highlightStylePath': migrationInfo.highlightStylePath(unitInfo),
@@ -417,13 +265,17 @@ class InstrumentationRenderer {
         regions.write('<ul>');
         for (var detail in region.details) {
           regions.write('<li>');
-          if (detail.target != null) {
-            String targetUri = _uriForTarget(detail.target, unitDir);
-            regions.write('<a href="$targetUri">');
-          }
           writeSplitLines(detail.description);
-          if (detail.target != null) {
-            regions.write('</a>');
+          NavigationTarget target = detail.target;
+          if (target != null) {
+            String relativePath = _relativePathToTarget(target, unitDir);
+            String targetUri = _uriForRelativePath(relativePath, target);
+            regions.write(' <a href="$targetUri">(');
+            regions.write(relativePath);
+            // TODO(brianwilkerson) Add the line number to the link text. This
+            //  will require that either the contents of all navigation targets
+            //  have been set or that line information has been saved.
+            regions.write(')</a>');
           }
           regions.write('</li>');
         }
@@ -467,14 +319,18 @@ class InstrumentationRenderer {
   }
 
   /// Return the URL that will navigate to the given [target].
-  String _uriForTarget(NavigationTarget target, String unitDir) {
+  String _relativePathToTarget(NavigationTarget target, String unitDir) {
     if (target == null) {
       // TODO(brianwilkerson) This is temporary support until we can get targets
       //  for all nodes.
       return '';
     }
-    String relativePath =
-        pathContext.relative(pathMapper.map(target.filePath), from: unitDir);
+    return pathContext.relative(pathMapper.map(target.filePath), from: unitDir);
+  }
+
+  /// Return the URL that will navigate to the given [target] in the file at the
+  /// given [relativePath].
+  String _uriForRelativePath(String relativePath, NavigationTarget target) {
     return '$relativePath#o${target.offset.toString()}';
   }
 }

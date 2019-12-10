@@ -15,6 +15,7 @@
 namespace dart {
 namespace kernel {
 
+class ConstantReader;
 class KernelReaderHelper;
 class TypeTranslator;
 
@@ -389,6 +390,8 @@ class VariableDeclarationHelper {
     kConst = 1 << 1,
     kCovariant = 1 << 3,
     kIsGenericCovariantImpl = 1 << 5,
+    kLate = 1 << 6,
+    kRequired = 1 << 7,
   };
 
   explicit VariableDeclarationHelper(KernelReaderHelper* helper)
@@ -403,11 +406,13 @@ class VariableDeclarationHelper {
   void SetNext(Field field) { next_read_ = field; }
   void SetJustRead(Field field) { next_read_ = field + 1; }
 
-  bool IsConst() { return (flags_ & kConst) != 0; }
-  bool IsFinal() { return (flags_ & kFinal) != 0; }
-  bool IsCovariant() { return (flags_ & kCovariant) != 0; }
+  bool IsConst() const { return (flags_ & kConst) != 0; }
+  bool IsFinal() const { return (flags_ & kFinal) != 0; }
+  bool IsCovariant() const { return (flags_ & kCovariant) != 0; }
+  bool IsLate() const { return (flags_ & kLate) != 0; }
+  bool IsRequired() const { return (flags_ & kRequired) != 0; }
 
-  bool IsGenericCovariantImpl() {
+  bool IsGenericCovariantImpl() const {
     return (flags_ & kIsGenericCovariantImpl) != 0;
   }
 
@@ -906,13 +911,17 @@ struct InferredTypeMetadata {
     kFlagNullable = 1 << 0,
     kFlagInt = 1 << 1,
     kFlagSkipCheck = 1 << 2,
+    kFlagConstant = 1 << 3,
   };
 
-  InferredTypeMetadata(intptr_t cid_, uint8_t flags_)
-      : cid(cid_), flags(flags_) {}
+  InferredTypeMetadata(intptr_t cid_,
+                       uint8_t flags_,
+                       const Object& constant_value_ = Object::null_object())
+      : cid(cid_), flags(flags_), constant_value(constant_value_) {}
 
   const intptr_t cid;
   const uint8_t flags;
+  const Object& constant_value;
 
   bool IsTrivial() const {
     return (cid == kDynamicCid) && (flags == kFlagNullable);
@@ -920,6 +929,7 @@ struct InferredTypeMetadata {
   bool IsNullable() const { return (flags & kFlagNullable) != 0; }
   bool IsInt() const { return (flags & kFlagInt) != 0; }
   bool IsSkipCheck() const { return (flags & kFlagSkipCheck) != 0; }
+  bool IsConstant() const { return (flags & kFlagConstant) != 0; }
 
   CompileType ToCompileType(Zone* zone) const {
     if (IsInt()) {
@@ -936,11 +946,14 @@ class InferredTypeMetadataHelper : public MetadataHelper {
  public:
   static const char* tag() { return "vm.inferred-type.metadata"; }
 
-  explicit InferredTypeMetadataHelper(KernelReaderHelper* helper);
+  explicit InferredTypeMetadataHelper(KernelReaderHelper* helper,
+                                      ConstantReader* constant_reader);
 
   InferredTypeMetadata GetInferredType(intptr_t node_offset);
 
  private:
+  ConstantReader* constant_reader_;
+
   DISALLOW_COPY_AND_ASSIGN(InferredTypeMetadataHelper);
 };
 

@@ -387,7 +387,7 @@ bool HierarchyInfo::CanUseSubtypeRangeCheckFor(const AbstractType& type) {
     // arguments are not "dynamic" but instantiated-to-bounds.
     const Type& rare_type =
         Type::Handle(zone, Type::RawCast(type_class.RareType()));
-    if (!rare_type.Equals(type)) {
+    if (!rare_type.IsEquivalent(type, /* syntactically = */ true)) {
       return false;
     }
   }
@@ -5465,9 +5465,10 @@ SimdOpInstr* SimdOpInstr::CreateFromCall(Zone* zone,
                                          intptr_t mask /* = 0 */) {
   SimdOpInstr* op =
       new (zone) SimdOpInstr(KindForMethod(kind), call->deopt_id());
-  op->SetInputAt(0, new (zone) Value(receiver));
-  // Note: we are skipping receiver.
-  for (intptr_t i = 1; i < op->InputCount(); i++) {
+  if (receiver != nullptr) {
+    op->SetInputAt(0, new (zone) Value(receiver));
+  }
+  for (intptr_t i = (receiver != nullptr ? 1 : 0); i < op->InputCount(); i++) {
     op->SetInputAt(i, call->PushArgumentAt(i)->value()->CopyWithType(zone));
   }
   if (op->HasMask()) {

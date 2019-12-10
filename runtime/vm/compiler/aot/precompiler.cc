@@ -322,6 +322,20 @@ void Precompiler::DoCompileAll() {
       AddRoots();
       AddAnnotatedRoots();
 
+      // With the nnbd experiment enabled, these non-nullable type arguments may
+      // not be retained, although they will be used and expected to be
+      // canonical.
+      AddTypeArguments(
+          TypeArguments::Handle(Z, I->object_store()->type_argument_int()));
+      AddTypeArguments(
+          TypeArguments::Handle(Z, I->object_store()->type_argument_double()));
+      AddTypeArguments(
+          TypeArguments::Handle(Z, I->object_store()->type_argument_string()));
+      AddTypeArguments(TypeArguments::Handle(
+          Z, I->object_store()->type_argument_string_dynamic()));
+      AddTypeArguments(TypeArguments::Handle(
+          Z, I->object_store()->type_argument_string_string()));
+
       // Compile newly found targets and add their callees until we reach a
       // fixed point.
       Iterate();
@@ -2202,6 +2216,13 @@ void Precompiler::Obfuscate() {
 }
 
 void Precompiler::FinalizeAllClasses() {
+  // Create a fresh Zone because kernel reading during class finalization
+  // may create zone handles. Those handles may prevent garbage collection of
+  // otherwise unreachable constants of dropped classes, which would
+  // cause assertion failures during GC after classes are dropped.
+  StackZone stack_zone(thread());
+  HANDLESCOPE(thread());
+
   error_ = Library::FinalizeAllClasses();
   if (!error_.IsNull()) {
     Jump(error_);

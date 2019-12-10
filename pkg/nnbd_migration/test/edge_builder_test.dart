@@ -1665,6 +1665,66 @@ class C {
     // exception to be thrown.
   }
 
+  test_constructor_withRedirectingSuperInitializer() async {
+    await analyze('''
+class C {
+  C.named(int i);
+}
+class D extends C {
+  D(int j) : super.named(j);
+}
+''');
+
+    var namedConstructor = findElement.constructor('named', of: 'C');
+    var constructorType = variables.decoratedElementType(namedConstructor);
+    var constructorParameterType = constructorType.positionalParameters[0];
+    assertEdge(
+        decoratedTypeAnnotation('int j').node, constructorParameterType.node,
+        hard: true);
+  }
+
+  @FailingTest(
+      reason: 'Need to pass type arguments along in '
+          'EdgeBuilder.visitSuperConstructorInvocation')
+  test_constructor_withRedirectingSuperInitializer_withTypeArgument() async {
+    await analyze('''
+class C<T> {
+  C.named(T i);
+}
+class D extends C<int> {
+  D(int j) : super.named(j);
+}
+''');
+
+    var namedConstructor = findElement.constructor('named', of: 'C');
+    var constructorType = variables.decoratedElementType(namedConstructor);
+    var constructorParameterType = constructorType.positionalParameters[0];
+    assertEdge(
+        decoratedTypeAnnotation('int j').node, constructorParameterType.node,
+        hard: true);
+  }
+
+  @FailingTest(
+      reason: 'Need to pass type arguments along in '
+          'EdgeBuilder.visitSuperConstructorInvocation')
+  test_constructor_withRedirectingSuperInitializer_withTypeVariable() async {
+    await analyze('''
+class C<T> {
+  C.named(T i);
+}
+class D<T> extends C<T> {
+  D(T j) : super.named(j);
+}
+''');
+
+    var namedConstructor = findElement.constructor('named', of: 'C');
+    var constructorType = variables.decoratedElementType(namedConstructor);
+    var constructorParameterType = constructorType.positionalParameters[0];
+    assertEdge(
+        decoratedTypeAnnotation('int j').node, constructorParameterType.node,
+        hard: true);
+  }
+
   test_constructorDeclaration_returnType_generic() async {
     await analyze('''
 class C<T, U> {
@@ -2075,6 +2135,15 @@ bar() {
 ''');
     var type = decoratedTypeAnnotation('Function(String message)');
     expect(type.returnType, isNotNull);
+  }
+
+  test_function_metadata() async {
+    await analyze('''
+@deprecated
+void f() {}
+''');
+    // No assertions needed; the AnnotationTracker mixin verifies that the
+    // metadata was visited.
   }
 
   test_functionDeclaration_expression_body() async {

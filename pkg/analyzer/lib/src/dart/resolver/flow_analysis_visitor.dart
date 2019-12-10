@@ -518,7 +518,7 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
       } else if (forLoopParts is ForPartsWithDeclarations) {
         forLoopParts.variables?.accept(this);
       } else {
-        throw new StateError('Unrecognized for loop parts');
+        throw StateError('Unrecognized for loop parts');
       }
 
       assignedVariables.beginNode();
@@ -541,13 +541,13 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
         assignedVariables.declare(variable);
         assignedVariables.write(variable);
       } else {
-        throw new StateError('Unrecognized for loop parts');
+        throw StateError('Unrecognized for loop parts');
       }
       assignedVariables.beginNode();
       body.accept(this);
       assignedVariables.endNode(node);
     } else {
-      throw new StateError('Unrecognized for loop parts');
+      throw StateError('Unrecognized for loop parts');
     }
   }
 }

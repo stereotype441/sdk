@@ -58,14 +58,14 @@ class ContentCache {
    * A table mapping the full path of sources to the contents of those sources.
    * This is used to override the default contents of a source.
    */
-  Map<String, String> _contentMap = new HashMap<String, String>();
+  Map<String, String> _contentMap = HashMap<String, String>();
 
   /**
    * A table mapping the full path of sources to the modification stamps of
    * those sources. This is used when the default contents of a source has been
    * overridden.
    */
-  Map<String, int> _stampMap = new HashMap<String, int>();
+  Map<String, int> _stampMap = HashMap<String, int>();
 
   int _nextStamp = 0;
 
@@ -147,11 +147,11 @@ class CustomUriResolver extends UriResolver {
     String mapping = _urlMappings[uri.toString()];
     if (mapping == null) return null;
 
-    Uri fileUri = new Uri.file(mapping);
+    Uri fileUri = Uri.file(mapping);
     if (!fileUri.isAbsolute) return null;
 
-    JavaFile javaFile = new JavaFile.fromUri(fileUri);
-    return new FileBasedSource(javaFile, actualUri ?? uri);
+    JavaFile javaFile = JavaFile.fromUri(fileUri);
+    return FileBasedSource(javaFile, actualUri ?? uri);
   }
 }
 
@@ -251,7 +251,7 @@ class LineInfo_Location {
  * An implementation of an non-existing [Source].
  */
 class NonExistingSource extends Source {
-  static final unknown = new NonExistingSource(
+  static final unknown = NonExistingSource(
       '/unknown.dart', pathos.toUri('/unknown.dart'), UriKind.FILE_URI);
 
   @override
@@ -267,7 +267,7 @@ class NonExistingSource extends Source {
 
   @override
   TimestampedData<String> get contents {
-    throw new UnsupportedError('$fullName does not exist.');
+    throw UnsupportedError('$fullName does not exist.');
   }
 
   @override
@@ -522,19 +522,19 @@ class SourceKind implements Comparable<SourceKind> {
   /**
    * A source containing HTML. The HTML might or might not contain Dart scripts.
    */
-  static const SourceKind HTML = const SourceKind('HTML', 0);
+  static const SourceKind HTML = SourceKind('HTML', 0);
 
   /**
    * A Dart compilation unit that is not a part of another library. Libraries
    * might or might not contain any directives, including a library directive.
    */
-  static const SourceKind LIBRARY = const SourceKind('LIBRARY', 1);
+  static const SourceKind LIBRARY = SourceKind('LIBRARY', 1);
 
   /**
    * A Dart compilation unit that is part of another library. Parts contain a
    * part-of directive.
    */
-  static const SourceKind PART = const SourceKind('PART', 2);
+  static const SourceKind PART = SourceKind('PART', 2);
 
   /**
    * An unknown kind of source. Used both when it is not possible to identify
@@ -542,9 +542,9 @@ class SourceKind implements Comparable<SourceKind> {
    * without performing a computation and the client does not want to spend the
    * time to identify the kind.
    */
-  static const SourceKind UNKNOWN = const SourceKind('UNKNOWN', 3);
+  static const SourceKind UNKNOWN = SourceKind('UNKNOWN', 3);
 
-  static const List<SourceKind> values = const [HTML, LIBRARY, PART, UNKNOWN];
+  static const List<SourceKind> values = [HTML, LIBRARY, PART, UNKNOWN];
 
   /**
    * The name of this source kind.
@@ -577,19 +577,19 @@ class UriKind implements Comparable<UriKind> {
   /**
    * A 'dart:' URI.
    */
-  static const UriKind DART_URI = const UriKind('DART_URI', 0, 0x64);
+  static const UriKind DART_URI = UriKind('DART_URI', 0, 0x64);
 
   /**
    * A 'file:' URI.
    */
-  static const UriKind FILE_URI = const UriKind('FILE_URI', 1, 0x66);
+  static const UriKind FILE_URI = UriKind('FILE_URI', 1, 0x66);
 
   /**
    * A 'package:' URI.
    */
-  static const UriKind PACKAGE_URI = const UriKind('PACKAGE_URI', 2, 0x70);
+  static const UriKind PACKAGE_URI = UriKind('PACKAGE_URI', 2, 0x70);
 
-  static const List<UriKind> values = const [DART_URI, FILE_URI, PACKAGE_URI];
+  static const List<UriKind> values = [DART_URI, FILE_URI, PACKAGE_URI];
 
   /**
    * The name of this URI kind.

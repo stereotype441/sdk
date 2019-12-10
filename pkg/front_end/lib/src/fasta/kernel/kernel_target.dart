@@ -25,7 +25,6 @@ import 'package:kernel/ast.dart'
         Library,
         Name,
         NamedExpression,
-        Nullability,
         NullLiteral,
         Procedure,
         RedirectingInitializer,
@@ -59,6 +58,7 @@ import '../builder/library_builder.dart';
 import '../builder/named_type_builder.dart';
 import '../builder/nullability_builder.dart';
 import '../builder/procedure_builder.dart';
+import '../builder/type_alias_builder.dart';
 import '../builder/type_builder.dart';
 import '../builder/type_declaration_builder.dart';
 
@@ -467,6 +467,10 @@ class KernelTarget extends TargetImplementation {
       unhandled("${type.runtimeType}", "installForwardingConstructors",
           builder.charOffset, builder.fileUri);
     }
+    if (supertype is TypeAliasBuilder) {
+      TypeAliasBuilder aliasBuilder = supertype;
+      supertype = aliasBuilder.unaliasDeclaration;
+    }
     if (supertype is SourceClassBuilder && supertype.isMixinApplication) {
       installForwardingConstructors(supertype);
     }
@@ -568,8 +572,8 @@ class KernelTarget extends TargetImplementation {
           new TypeParameterType.withDefaultNullabilityForLibrary(
               typeParameter, enclosingClass.enclosingLibrary));
     }
-    return new InterfaceType(
-        enclosingClass, Nullability.legacy, typeParameterTypes);
+    return new InterfaceType(enclosingClass,
+        enclosingClass.enclosingLibrary.nonNullable, typeParameterTypes);
   }
 
   void setupTopAndBottomTypes() {
