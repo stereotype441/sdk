@@ -116,6 +116,16 @@ Future<CompilerResult> _compile(List<String> args,
   try {
     argResults = argParser.parse(filterUnknownArguments(args, argParser));
   } on FormatException catch (error) {
+    if (args.any((arg) => arg.contains('ddc_sdk.sum'))) {
+      print('Compiling with analyzer based DDC is no longer supported.\n');
+      print('The most likely reason you are seeing this message is due to an '
+          'old version of build_web_compilers.');
+      print('Update your package pubspec.yaml to depend on a newer version of '
+          'build_web_compilers:\n\n'
+          'dev_dependency:\n'
+          '  build_web_compilers: ^2.0.0\n');
+      return CompilerResult(64);
+    }
     print(error);
     print(_usageMessage(argParser));
     return CompilerResult(64);
@@ -256,8 +266,9 @@ Future<CompilerResult> _compile(List<String> args,
         sourcePathToUri(packageFile),
         sourcePathToUri(librarySpecPath),
         inputSummaries,
-        DevCompilerTarget(
-            TargetFlags(trackWidgetCreation: trackWidgetCreation)),
+        DevCompilerTarget(TargetFlags(
+            trackWidgetCreation: trackWidgetCreation,
+            enableNullSafety: options.enableNullSafety)),
         fileSystem: fileSystem,
         experiments: experiments,
         environmentDefines: declaredVariables);
@@ -292,8 +303,9 @@ Future<CompilerResult> _compile(List<String> args,
         sourcePathToUri(librarySpecPath),
         inputSummaries,
         inputDigests,
-        DevCompilerTarget(
-            TargetFlags(trackWidgetCreation: trackWidgetCreation)),
+        DevCompilerTarget(TargetFlags(
+            trackWidgetCreation: trackWidgetCreation,
+            enableNullSafety: options.enableNullSafety)),
         fileSystem: fileSystem,
         experiments: experiments,
         environmentDefines: declaredVariables,

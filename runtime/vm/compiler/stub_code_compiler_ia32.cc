@@ -1920,6 +1920,16 @@ void StubCodeCompiler::GenerateOneArgCheckInlineCacheWithExactnessCheckStub(
   __ Stop("Unimplemented");
 }
 
+void StubCodeCompiler::GenerateAllocateMintWithFPURegsStub(
+    Assembler* assembler) {
+  __ Stop("Unimplemented");
+}
+
+void StubCodeCompiler::GenerateAllocateMintWithoutFPURegsStub(
+    Assembler* assembler) {
+  __ Stop("Unimplemented");
+}
+
 // EBX: receiver
 // ECX: ICData
 // ESP[0]: return address
@@ -2428,11 +2438,6 @@ void StubCodeCompiler::GenerateDefaultTypeTestStub(Assembler* assembler) {
 }
 
 void StubCodeCompiler::GenerateTopTypeTypeTestStub(Assembler* assembler) {
-  // Not implemented on ia32.
-  __ Breakpoint();
-}
-
-void StubCodeCompiler::GenerateTypeRefTypeTestStub(Assembler* assembler) {
   // Not implemented on ia32.
   __ Breakpoint();
 }

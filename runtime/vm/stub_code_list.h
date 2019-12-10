@@ -19,6 +19,8 @@ namespace dart {
   V(ArrayWriteBarrier)                                                         \
   V(PrintStopMessage)                                                          \
   V(AllocateArray)                                                             \
+  V(AllocateMintWithFPURegs)                                                   \
+  V(AllocateMintWithoutFPURegs)                                                \
   V(AllocateContext)                                                           \
   V(CallToRuntime)                                                             \
   V(LazyCompile)                                                               \
@@ -62,7 +64,6 @@ namespace dart {
   V(Subtype6TestCache)                                                         \
   V(DefaultTypeTest)                                                           \
   V(TopTypeTypeTest)                                                           \
-  V(TypeRefTypeTest)                                                           \
   V(UnreachableTypeTest)                                                       \
   V(SlowTypeTest)                                                              \
   V(LazySpecializeTypeTest)                                                    \
