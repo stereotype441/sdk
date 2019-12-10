@@ -404,7 +404,7 @@ class ElementResolverTest with ResourceProviderMixin, ElementsTypesMixin {
     //
     ClassElementImpl classD =
         ElementFactory.classElement("D", interfaceTypeStar(classC));
-    _encloseElement(classA);
+    _encloseElement(classD);
     //
     // D a;
     // a[i];
