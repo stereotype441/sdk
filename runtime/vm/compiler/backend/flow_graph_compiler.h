@@ -501,6 +501,7 @@ class FlowGraphCompiler : public ValueObject {
       const Register function_type_args_reg,
       const Register subtype_cache_reg,
       const Register dst_type_reg,
+      const Register dst_type_reg_to_call,
       const Register scratch_reg,
       compiler::Label* done);
 
@@ -769,6 +770,13 @@ class FlowGraphCompiler : public ValueObject {
   // locations of values in the slow path call.
   Environment* SlowPathEnvironmentFor(Instruction* inst,
                                       intptr_t num_slow_path_args) {
+    if (inst->env() == nullptr && is_optimizing()) {
+      if (pending_deoptimization_env_ == nullptr) {
+        return nullptr;
+      }
+      return SlowPathEnvironmentFor(pending_deoptimization_env_, inst->locs(),
+                                    num_slow_path_args);
+    }
     return SlowPathEnvironmentFor(inst->env(), inst->locs(),
                                   num_slow_path_args);
   }

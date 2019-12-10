@@ -154,12 +154,11 @@ void StubCodeCompiler::GenerateCallToRuntimeStub(Assembler* assembler) {
   __ ret();
 }
 
-void StubCodeCompiler::GenerateSharedStub(
-    Assembler* assembler,
-    bool save_fpu_registers,
-    const RuntimeEntry* target,
-    intptr_t self_code_stub_offset_from_thread,
-    bool allow_return) {
+void GenerateSharedStub(Assembler* assembler,
+                        bool save_fpu_registers,
+                        const RuntimeEntry* target,
+                        intptr_t self_code_stub_offset_from_thread,
+                        bool allow_return) {
   // We want the saved registers to appear like part of the caller's frame, so
   // we push them before calling EnterStubFrame.
   __ PushRegisters(kDartAvailableCpuRegs,
@@ -1136,6 +1135,16 @@ void StubCodeCompiler::GenerateAllocateArrayStub(Assembler* assembler) {
 
   __ LeaveStubFrame();
   __ ret();
+}
+
+void StubCodeCompiler::GenerateAllocateMintWithFPURegsStub(
+    Assembler* assembler) {
+  __ Stop("Unimplemented");
+}
+
+void StubCodeCompiler::GenerateAllocateMintWithoutFPURegsStub(
+    Assembler* assembler) {
+  __ Stop("Unimplemented");
 }
 
 // Called when invoking Dart code from C++ (VM code).
@@ -2925,16 +2934,6 @@ void StubCodeCompiler::GenerateDefaultTypeTestStub(Assembler* assembler) {
 
 void StubCodeCompiler::GenerateTopTypeTypeTestStub(Assembler* assembler) {
   __ Ret();
-}
-
-void StubCodeCompiler::GenerateTypeRefTypeTestStub(Assembler* assembler) {
-  const Register kTypeRefReg = RBX;
-
-  // We dereference the TypeRef and tail-call to it's type testing stub.
-  __ movq(kTypeRefReg,
-          FieldAddress(kTypeRefReg, target::TypeRef::type_offset()));
-  __ jmp(FieldAddress(
-      kTypeRefReg, target::AbstractType::type_test_stub_entry_point_offset()));
 }
 
 void StubCodeCompiler::GenerateUnreachableTypeTestStub(Assembler* assembler) {
