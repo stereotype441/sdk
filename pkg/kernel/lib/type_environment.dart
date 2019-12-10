@@ -38,32 +38,43 @@ abstract class TypeEnvironment extends SubtypeTester {
   InterfaceType get nullType => coreTypes.nullType;
   InterfaceType get functionLegacyRawType => coreTypes.functionLegacyRawType;
 
-  InterfaceType literalListType(DartType elementType, Nullability nullability) {
+  /// Returns the type `List<E>` with the given [nullability] and [elementType]
+  /// as `E`.
+  InterfaceType listType(DartType elementType, Nullability nullability) {
     return new InterfaceType(
         coreTypes.listClass, nullability, <DartType>[elementType]);
   }
 
-  InterfaceType literalSetType(DartType elementType, Nullability nullability) {
+  /// Returns the type `Set<E>` with the given [nullability] and [elementType]
+  /// as `E`.
+  InterfaceType setType(DartType elementType, Nullability nullability) {
     return new InterfaceType(
         coreTypes.setClass, nullability, <DartType>[elementType]);
   }
 
-  InterfaceType literalMapType(
-      DartType key, DartType value, Nullability nullability) {
+  /// Returns the type `Map<K,V>` with the given [nullability], [key] as `K`
+  /// and [value] is `V`.
+  InterfaceType mapType(DartType key, DartType value, Nullability nullability) {
     return new InterfaceType(
         coreTypes.mapClass, nullability, <DartType>[key, value]);
   }
 
+  /// Returns the type `Iterable<E>` with the given [nullability] and [type]
+  /// as `E`.
   InterfaceType iterableType(DartType type, Nullability nullability) {
     return new InterfaceType(
         coreTypes.iterableClass, nullability, <DartType>[type]);
   }
 
+  /// Returns the type `Stream<E>` with the given [nullability] and [type]
+  /// as `E`.
   InterfaceType streamType(DartType type, Nullability nullability) {
     return new InterfaceType(
         coreTypes.streamClass, nullability, <DartType>[type]);
   }
 
+  /// Returns the type `Future<E>` with the given [nullability] and [type]
+  /// as `E`.
   InterfaceType futureType(DartType type, Nullability nullability) {
     return new InterfaceType(
         coreTypes.futureClass, nullability, <DartType>[type]);
@@ -83,9 +94,10 @@ abstract class TypeEnvironment extends SubtypeTester {
       // we aren't concerned with it.  If a class implements multiple
       // instantiations of Future, getTypeAsInstanceOf is responsible for
       // picking the least one in the sense required by the spec.
-      InterfaceType future = getTypeAsInstanceOf(type, coreTypes.futureClass);
-      if (future != null) {
-        return future.typeArguments[0];
+      List<DartType> futureArguments =
+          getTypeArgumentsAsInstanceOf(type, coreTypes.futureClass);
+      if (futureArguments != null) {
+        return futureArguments[0];
       }
     }
     return type;
@@ -99,14 +111,19 @@ abstract class TypeEnvironment extends SubtypeTester {
   DartType forInElementType(ForInStatement node, DartType iterableType) {
     // TODO(johnniwinther): Update this to use the type of
     //  `iterable.iterator.current` if inference is updated accordingly.
+    while (iterableType is TypeParameterType) {
+      TypeParameterType typeParameterType = iterableType;
+      iterableType =
+          typeParameterType.promotedBound ?? typeParameterType.parameter.bound;
+    }
     if (node.isAsync) {
-      InterfaceType type =
-          getTypeAsInstanceOf(iterableType, coreTypes.streamClass);
-      return type.typeArguments.single;
+      List<DartType> typeArguments =
+          getTypeArgumentsAsInstanceOf(iterableType, coreTypes.streamClass);
+      return typeArguments.single;
     } else {
-      InterfaceType type =
-          getTypeAsInstanceOf(iterableType, coreTypes.iterableClass);
-      return type.typeArguments.single;
+      List<DartType> typeArguments =
+          getTypeArgumentsAsInstanceOf(iterableType, coreTypes.iterableClass);
+      return typeArguments.single;
     }
   }
 
@@ -370,7 +387,11 @@ abstract class SubtypeTester {
 
   static List<Object> typeChecks;
 
-  InterfaceType getTypeAsInstanceOf(InterfaceType type, Class superclass);
+  InterfaceType getTypeAsInstanceOf(InterfaceType type, Class superclass,
+      Library clientLibrary, CoreTypes coreTypes);
+
+  List<DartType> getTypeArgumentsAsInstanceOf(
+      InterfaceType type, Class superclass);
 
   /// Determines if the given type is at the top of the type hierarchy.  May be
   /// overridden in subclasses.
@@ -482,13 +503,15 @@ abstract class SubtypeTester {
     }
 
     if (subtype is InterfaceType && supertype is InterfaceType) {
-      var upcastType = getTypeAsInstanceOf(subtype, supertype.classNode);
-      if (upcastType == null) return const IsSubtypeOf.never();
+      Class supertypeClass = supertype.classNode;
+      List<DartType> upcastTypeArguments =
+          getTypeArgumentsAsInstanceOf(subtype, supertypeClass);
+      if (upcastTypeArguments == null) return const IsSubtypeOf.never();
       IsSubtypeOf result = const IsSubtypeOf.always();
-      for (int i = 0; i < upcastType.typeArguments.length; ++i) {
+      for (int i = 0; i < upcastTypeArguments.length; ++i) {
         // Termination: the 'supertype' parameter decreases in size.
-        int variance = upcastType.classNode.typeParameters[i].variance;
-        DartType leftType = upcastType.typeArguments[i];
+        int variance = supertypeClass.typeParameters[i].variance;
+        DartType leftType = upcastTypeArguments[i];
         DartType rightType = supertype.typeArguments[i];
         if (variance == Variance.contravariant) {
           result = result

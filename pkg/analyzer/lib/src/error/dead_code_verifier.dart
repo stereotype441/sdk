@@ -17,6 +17,7 @@ import 'package:analyzer/src/error/codes.dart';
 import 'package:analyzer/src/generated/constant.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/type_system.dart';
+import 'package:analyzer/src/task/strong/checker.dart';
 
 /// A visitor that finds dead code and unused labels.
 class DeadCodeVerifier extends RecursiveAstVisitor<void> {
@@ -51,7 +52,7 @@ class DeadCodeVerifier extends RecursiveAstVisitor<void> {
     TokenType operatorType = node.operator.type;
     if (operatorType == TokenType.QUESTION_QUESTION_EQ) {
       _checkForDeadNullCoalesce(
-          node.leftHandSide.staticType, node.rightHandSide);
+          getReadType(node.leftHandSide), node.rightHandSide);
     }
     super.visitAssignmentExpression(node);
   }
@@ -104,8 +105,9 @@ class DeadCodeVerifier extends RecursiveAstVisitor<void> {
 //                return null;
 //              }
 //            }
-    } else if (isQuestionQuestion && _isNonNullableUnit) {
-      _checkForDeadNullCoalesce(node.leftOperand.staticType, node.rightOperand);
+    } else if (isQuestionQuestion) {
+      _checkForDeadNullCoalesce(
+          getReadType(node.leftOperand), node.rightOperand);
     }
     super.visitBinaryExpression(node);
   }
@@ -285,7 +287,7 @@ class DeadCodeVerifier extends RecursiveAstVisitor<void> {
     node.finallyBlock?.accept(this);
     NodeList<CatchClause> catchClauses = node.catchClauses;
     int numOfCatchClauses = catchClauses.length;
-    List<DartType> visitedTypes = new List<DartType>();
+    List<DartType> visitedTypes = List<DartType>();
     for (int i = 0; i < numOfCatchClauses; i++) {
       CatchClause catchClause = catchClauses[i];
       if (catchClause.onKeyword != null) {
@@ -321,7 +323,7 @@ class DeadCodeVerifier extends RecursiveAstVisitor<void> {
                   HintCode.DEAD_CODE_ON_CATCH_SUBTYPE,
                   offset,
                   length,
-                  [currentType.displayName, type.displayName]);
+                  [currentType, type]);
               return;
             }
           }
@@ -369,7 +371,7 @@ class DeadCodeVerifier extends RecursiveAstVisitor<void> {
   /// [library].
   void _checkCombinator(LibraryElement library, Combinator combinator) {
     Namespace namespace =
-        new NamespaceBuilder().createExportNamespaceForLibrary(library);
+        NamespaceBuilder().createExportNamespaceForLibrary(library);
     NodeList<SimpleIdentifier> names;
     ErrorCode hintCode;
     if (combinator is HideCombinator) {
@@ -404,7 +406,7 @@ class DeadCodeVerifier extends RecursiveAstVisitor<void> {
   /// continue, return, or throw statement at the end of a switch case, that are
   /// mandated by the language spec.
   void _checkForDeadStatementsInNodeList(NodeList<Statement> statements,
-      {bool allowMandated: false}) {
+      {bool allowMandated = false}) {
     bool statementExits(Statement statement) {
       if (statement is BreakStatement) {
         return statement.label == null;
@@ -442,11 +444,10 @@ class DeadCodeVerifier extends RecursiveAstVisitor<void> {
   EvaluationResultImpl _getConstantBooleanValue(Expression expression) {
     if (expression is BooleanLiteral) {
       if (expression.value) {
-        return new EvaluationResultImpl(
-            new DartObjectImpl(null, BoolState.from(true)));
+        return EvaluationResultImpl(DartObjectImpl(null, BoolState.from(true)));
       } else {
-        return new EvaluationResultImpl(
-            new DartObjectImpl(null, BoolState.from(false)));
+        return EvaluationResultImpl(
+            DartObjectImpl(null, BoolState.from(false)));
       }
     }
 
@@ -492,7 +493,7 @@ class DeadCodeVerifier extends RecursiveAstVisitor<void> {
 
   /// Enter a new label scope in which the given [labels] are defined.
   void _pushLabels(List<Label> labels) {
-    labelTracker = new _LabelTracker(labelTracker, labels);
+    labelTracker = _LabelTracker(labelTracker, labels);
   }
 }
 
@@ -513,7 +514,7 @@ class _LabelTracker {
 
   /// Initialize a newly created label tracker.
   _LabelTracker(this.outerTracker, this.labels) {
-    used = new List.filled(labels.length, false);
+    used = List.filled(labels.length, false);
     for (int i = 0; i < labels.length; i++) {
       labelMap[labels[i].label.name] = i;
     }

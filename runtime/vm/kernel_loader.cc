@@ -204,7 +204,8 @@ KernelLoader::KernelLoader(Program* program,
               program_->kernel_data_size(),
               0),
       type_translator_(&helper_, &active_class_, /* finalize= */ false),
-      inferred_type_metadata_helper_(&helper_),
+      constant_reader_(&helper_, &active_class_),
+      inferred_type_metadata_helper_(&helper_, &constant_reader_),
       bytecode_metadata_helper_(&helper_, &active_class_),
       external_name_class_(Class::Handle(Z)),
       external_name_field_(Field::Handle(Z)),
@@ -452,7 +453,8 @@ KernelLoader::KernelLoader(const Script& script,
       translation_helper_(this, thread_, Heap::kOld),
       helper_(zone_, &translation_helper_, script, kernel_data, 0),
       type_translator_(&helper_, &active_class_, /* finalize= */ false),
-      inferred_type_metadata_helper_(&helper_),
+      constant_reader_(&helper_, &active_class_),
+      inferred_type_metadata_helper_(&helper_, &constant_reader_),
       bytecode_metadata_helper_(&helper_, &active_class_),
       external_name_class_(Class::Handle(Z)),
       external_name_field_(Field::Handle(Z)),
@@ -1185,12 +1187,11 @@ void KernelLoader::FinishTopLevelClassLoading(
     const bool is_late = field_helper.IsLate();
     const bool is_extension_member = field_helper.IsExtensionMember();
     const Field& field = Field::Handle(
-        Z,
-        Field::NewTopLevel(name, is_final, field_helper.IsConst(), script_class,
-                           field_helper.position_, field_helper.end_position_));
+        Z, Field::NewTopLevel(name, is_final, field_helper.IsConst(), is_late,
+                              script_class, field_helper.position_,
+                              field_helper.end_position_));
     field.set_kernel_offset(field_offset);
     field.set_has_pragma(has_pragma_annotation);
-    field.set_is_late(is_late);
     field.set_is_extension_member(is_extension_member);
     const AbstractType& type = T.BuildType();  // read type.
     field.SetFieldType(type);
@@ -1539,16 +1540,15 @@ void KernelLoader::FinishClassLoading(const Class& klass,
       const bool is_late = field_helper.IsLate();
       const bool is_extension_member = field_helper.IsExtensionMember();
       Field& field = Field::Handle(
-          Z,
-          Field::New(name, field_helper.IsStatic(), is_final,
-                     field_helper.IsConst(), is_reflectable, script_class, type,
-                     field_helper.position_, field_helper.end_position_));
+          Z, Field::New(name, field_helper.IsStatic(), is_final,
+                        field_helper.IsConst(), is_reflectable, is_late,
+                        script_class, type, field_helper.position_,
+                        field_helper.end_position_));
       field.set_kernel_offset(field_offset);
       field.set_has_pragma(has_pragma_annotation);
       field.set_is_covariant(field_helper.IsCovariant());
       field.set_is_generic_covariant_impl(
           field_helper.IsGenericCovariantImpl());
-      field.set_is_late(is_late);
       field.set_is_extension_member(is_extension_member);
       ReadInferredType(field, field_offset + library_kernel_offset_);
       CheckForInitializer(field);
@@ -1573,13 +1573,14 @@ void KernelLoader::FinishClassLoading(const Class& klass,
       // Add static field 'const _deleted_enum_sentinel'.
       // This field does not need to be of type E.
       Field& deleted_enum_sentinel = Field::ZoneHandle(Z);
-      deleted_enum_sentinel = Field::New(
-          Symbols::_DeletedEnumSentinel(),
-          /* is_static = */ true,
-          /* is_final = */ true,
-          /* is_const = */ true,
-          /* is_reflectable = */ false, klass, Object::dynamic_type(),
-          TokenPosition::kNoSource, TokenPosition::kNoSource);
+      deleted_enum_sentinel =
+          Field::New(Symbols::_DeletedEnumSentinel(),
+                     /* is_static = */ true,
+                     /* is_final = */ true,
+                     /* is_const = */ true,
+                     /* is_reflectable = */ false,
+                     /* is_late = */ false, klass, Object::dynamic_type(),
+                     TokenPosition::kNoSource, TokenPosition::kNoSource);
       fields_.Add(&deleted_enum_sentinel);
     }
 

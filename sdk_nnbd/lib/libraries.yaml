@@ -366,7 +366,7 @@ dart2js_server:
 dartdevc:
     libraries:
       _runtime:
-        uri: "_internal/js_dev_runtime/private/ddc_runtime/runtime.dart"
+        uri: "../../sdk/lib/_internal/js_dev_runtime/private/ddc_runtime/runtime.dart"
 
       _debugger:
         uri: "../../sdk/lib/_internal/js_dev_runtime/private/debugger.dart"

@@ -24,11 +24,11 @@ import 'package:test/test.dart';
 
 import '../../../generated/test_support.dart';
 
-final isDynamicType = new TypeMatcher<DynamicTypeImpl>();
+final isDynamicType = TypeMatcher<DynamicTypeImpl>();
 
-final isNeverType = new TypeMatcher<NeverTypeImpl>();
+final isNeverType = TypeMatcher<NeverTypeImpl>();
 
-final isVoidType = new TypeMatcher<VoidTypeImpl>();
+final isVoidType = TypeMatcher<VoidTypeImpl>();
 
 /// Base for resolution tests.
 mixin ResolutionTest implements ResourceProviderMixin {
@@ -161,7 +161,7 @@ mixin ResolutionTest implements ResourceProviderMixin {
   }
 
   void assertElementTypeStrings(List<DartType> types, List<String> expected) {
-    expect(types.map((t) => t.displayName).toList(), expected);
+    expect(types.map(typeString).toList(), expected);
   }
 
   void assertEnclosingElement(Element element, Element expectedEnclosing) {
@@ -192,7 +192,7 @@ mixin ResolutionTest implements ResourceProviderMixin {
     ResolvedUnitResult result,
     List<ExpectedError> expectedErrors,
   ) {
-    GatheringErrorListener errorListener = new GatheringErrorListener();
+    GatheringErrorListener errorListener = GatheringErrorListener();
     errorListener.addAll(result.errors);
     errorListener.assertErrors(expectedErrors);
   }
@@ -203,7 +203,7 @@ mixin ResolutionTest implements ResourceProviderMixin {
    */
   void assertErrorsWithCodes(List<AnalysisError> errors,
       [List<ErrorCode> expected = const <ErrorCode>[]]) {
-    var errorListener = new GatheringErrorListener();
+    var errorListener = GatheringErrorListener();
     for (AnalysisError error in result.errors) {
       ErrorCode errorCode = error.errorCode;
       if (!enableUnusedElement &&
@@ -250,7 +250,7 @@ mixin ResolutionTest implements ResourceProviderMixin {
   void assertInstanceCreation(InstanceCreationExpression creation,
       ClassElement expectedClassElement, String expectedType,
       {String constructorName,
-      bool expectedConstructorMember: false,
+      bool expectedConstructorMember = false,
       Map<String, String> expectedSubstitution,
       PrefixElement expectedPrefix}) {
     String expectedClassName = expectedClassElement.name;
@@ -344,7 +344,7 @@ mixin ResolutionTest implements ResourceProviderMixin {
     String expectedMethodNameType,
     String expectedNameType,
     String expectedType,
-    List<String> expectedTypeArguments: const <String>[],
+    List<String> expectedTypeArguments = const <String>[],
   }) {
     MethodInvocationImpl invocationImpl = invocation;
 
@@ -567,14 +567,14 @@ mixin ResolutionTest implements ResourceProviderMixin {
   Future<void> resolveTestFile() async {
     var path = convertPath('/test/lib/test.dart');
     result = await resolveFile(path);
-    findNode = new FindNode(result.content, result.unit);
-    findElement = new FindElement(result.unit);
+    findNode = FindNode(result.content, result.unit);
+    findElement = FindElement(result.unit);
   }
 
   /// Return a textual representation of the [type] that is appropriate for
   /// tests.
-  String typeString(DartType type) => (type as TypeImpl)
-      ?.toString(withNullability: typeToStringWithNullability);
+  String typeString(DartType type) =>
+      type.getDisplayString(withNullability: typeToStringWithNullability);
 
   static String _extractReturnType(String invokeType) {
     int functionIndex = invokeType.indexOf(' Function');

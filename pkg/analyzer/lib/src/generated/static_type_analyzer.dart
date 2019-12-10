@@ -205,7 +205,7 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
     return inferred;
   }
 
-  DartType inferListType(ListLiteral node, {bool downwards: false}) {
+  DartType inferListType(ListLiteral node, {bool downwards = false}) {
     DartType contextType = InferenceContext.getContext(node);
 
     var element = _typeProvider.listElement;
@@ -1252,7 +1252,7 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
    */
   void _analyzeLeastUpperBound(
       Expression node, Expression expr1, Expression expr2,
-      {bool read: false}) {
+      {bool read = false}) {
     DartType staticType1 = _getExpressionType(expr1, read: read);
     DartType staticType2 = _getExpressionType(expr2, read: read);
 
@@ -1468,7 +1468,7 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
    * See [getExpressionType] for more information. Without strong mode, this is
    * equivalent to [_getStaticType].
    */
-  DartType _getExpressionType(Expression expr, {bool read: false}) =>
+  DartType _getExpressionType(Expression expr, {bool read = false}) =>
       getExpressionType(expr, _typeSystem, _typeProvider, read: read);
 
   /**
@@ -1492,7 +1492,7 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
   /**
    * Return the static type of the given [expression].
    */
-  DartType _getStaticType(Expression expression, {bool read: false}) {
+  DartType _getStaticType(Expression expression, {bool read = false}) {
     DartType type;
     if (read) {
       type = getReadType(expression);
@@ -1661,7 +1661,7 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
       TypeArgumentList typeArguments,
       ArgumentList argumentList,
       AstNode errorNode,
-      {bool isConst: false}) {
+      {bool isConst = false}) {
     if (typeArguments == null &&
         fnType is FunctionType &&
         fnType.typeFormals.isNotEmpty) {
