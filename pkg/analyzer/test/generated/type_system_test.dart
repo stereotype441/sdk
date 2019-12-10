@@ -12,6 +12,7 @@ import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/error/listener.dart';
 import 'package:analyzer/src/dart/ast/token.dart' show KeywordToken;
+import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/resolver/variance.dart';
@@ -19,7 +20,7 @@ import 'package:analyzer/src/error/codes.dart';
 import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/source.dart'
-    show NonExistingSource, UriKind;
+    show NonExistingSource, Source, UriKind;
 import 'package:meta/meta.dart';
 import 'package:path/path.dart' show toUri;
 import 'package:test/test.dart';
@@ -41,6 +42,8 @@ main() {
 }
 
 abstract class AbstractTypeSystemTest with ElementsTypesMixin {
+  TestAnalysisContext analysisContext;
+
   @override
   TypeProvider typeProvider;
 
@@ -51,7 +54,7 @@ abstract class AbstractTypeSystemTest with ElementsTypesMixin {
   }
 
   void setUp() {
-    var analysisContext = TestAnalysisContext(
+    analysisContext = TestAnalysisContext(
       featureSet: testFeatureSet,
     );
     typeProvider = analysisContext.typeProviderLegacy;
@@ -90,6 +93,9 @@ class AssignabilityTest extends AbstractTypeSystemTest {
         ]),
       ],
     );
+
+    var testLibrary = _testLibrary();
+    B.enclosingElement = testLibrary.definingCompilationUnit;
 
     _checkIsStrictAssignableTo(
       interfaceTypeStar(B),
@@ -406,6 +412,19 @@ class AssignabilityTest extends AbstractTypeSystemTest {
   void _checkUnrelated(DartType type1, DartType type2) {
     _checkIsNotAssignableTo(type1, type2);
     _checkIsNotAssignableTo(type2, type1);
+  }
+
+  /// Return a test library, in `/test.dart` file.
+  LibraryElementImpl _testLibrary() {
+    var source = _MockSource(toUri('/test.dart'));
+
+    var definingUnit = CompilationUnitElementImpl();
+    definingUnit.source = definingUnit.librarySource = source;
+
+    var testLibrary =
+        LibraryElementImpl(analysisContext, null, '', -1, 0, false);
+    testLibrary.definingCompilationUnit = definingUnit;
+    return testLibrary;
   }
 }
 
@@ -4024,4 +4043,16 @@ class TypeSystemTest extends AbstractTypeSystemTest {
     var element = typeParameter('T', bound: bound);
     return typeParameterTypeStar(element);
   }
+}
+
+class _MockSource implements Source {
+  @override
+  final Uri uri;
+
+  _MockSource(this.uri);
+
+  @override
+  String get encoding => '$uri';
+
+  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
