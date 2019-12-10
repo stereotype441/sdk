@@ -13,6 +13,7 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/file_system/file_system.dart';
 import 'package:analyzer/src/dart/analysis/driver.dart' as driver;
 import 'package:analyzer/src/dart/analysis/uri_converter.dart';
+import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
 import 'package:analyzer/src/dart/element/type_provider.dart';
 import 'package:analyzer/src/generated/engine.dart' show AnalysisOptionsImpl;
 import 'package:analyzer/src/generated/resolver.dart';
@@ -35,6 +36,8 @@ class AnalysisSessionImpl implements AnalysisSession {
 
   /// The cache of libraries for URIs.
   final Map<String, LibraryElement> _uriToLibraryCache = {};
+
+  final InheritanceManager3 inheritanceManager = InheritanceManager3(false);
 
   /// Initialize a newly created analysis session.
   AnalysisSessionImpl(this._driver);

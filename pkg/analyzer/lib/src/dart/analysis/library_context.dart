@@ -54,7 +54,6 @@ class LibraryContext {
 
   AnalysisContextImpl analysisContext;
   LinkedElementFactory elementFactory;
-  InheritanceManager3 inheritanceManager;
 
   var loadedBundles = Set<LibraryCycle>.identity();
 
@@ -77,8 +76,6 @@ class LibraryContext {
 
     _createElementFactory();
     load2(targetLibrary);
-
-    inheritanceManager = InheritanceManager3();
   }
 
   /**

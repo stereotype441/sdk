@@ -43,9 +43,9 @@ class Linker {
   /// Libraries that are being linked.
   final Map<Uri, LibraryBuilder> builders = {};
 
-  InheritanceManager3 inheritance; // TODO(scheglov) cache it
+  final InheritanceManager3 inheritance; // TODO(scheglov) cache it
 
-  Linker(this.elementFactory) {
+  Linker(this.elementFactory, this.inheritance) {
     linkingBundleContext = LinkingBundleContext(
       elementFactory.dynamicRef,
     );

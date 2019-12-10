@@ -1270,7 +1270,7 @@ class AnalysisDriver implements AnalysisDriverGeneric {
             libraryContext.isLibraryUri,
             libraryContext.analysisContext,
             libraryContext.elementFactory,
-            libraryContext.inheritanceManager,
+            (currentSession as AnalysisSessionImpl).inheritanceManager,
             library,
             _resourceProvider,
             testingData: testingData);
@@ -1353,7 +1353,7 @@ class AnalysisDriver implements AnalysisDriverGeneric {
           libraryContext.isLibraryUri,
           libraryContext.analysisContext,
           libraryContext.elementFactory,
-          libraryContext.inheritanceManager,
+          (currentSession as AnalysisSessionImpl).inheritanceManager,
           library,
           _resourceProvider,
           testingData: testingData);

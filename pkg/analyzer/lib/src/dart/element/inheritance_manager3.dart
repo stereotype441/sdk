@@ -40,7 +40,7 @@ class InheritanceManager3 {
   /// self-referencing cycles.
   final Set<ClassElement> _processingClasses = Set<ClassElement>();
 
-  InheritanceManager3([@deprecated TypeSystem typeSystem]);
+  InheritanceManager3(bool hack, [@deprecated TypeSystem typeSystem]);
 
   /// Return the most specific signature of the member with the given [name]
   /// that the [type] inherits from the mixins, superclasses, or interfaces;

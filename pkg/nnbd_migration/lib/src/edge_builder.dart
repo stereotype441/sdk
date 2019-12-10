@@ -97,8 +97,6 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
         ResolutionUtils {
   final TypeSystem _typeSystem;
 
-  final InheritanceManager3 _inheritanceManager;
-
   /// The repository of constraint variables and decorated types (from a
   /// previous pass over the source code).
   final VariableRepository _variables;
@@ -197,8 +195,7 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
 
   EdgeBuilder(this.typeProvider, this._typeSystem, this._variables, this._graph,
       this.source, this.listener, this._decoratedClassHierarchy,
-      {this.instrumentation})
-      : _inheritanceManager = InheritanceManager3();
+      {this.instrumentation});
 
   /// Gets the decorated type of [element] from [_variables], performing any
   /// necessary substitutions.

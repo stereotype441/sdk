@@ -5,6 +5,7 @@
 import 'dart:convert';
 
 import 'package:analyzer/dart/analysis/features.dart';
+import 'package:analyzer/dart/analysis/session.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/syntactic_entity.dart';
 import 'package:analyzer/dart/ast/token.dart';
@@ -14,6 +15,7 @@ import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/dart/element/visitor.dart';
 import 'package:analyzer/file_system/file_system.dart';
+import 'package:analyzer/src/dart/analysis/session.dart';
 import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
 import 'package:analyzer/src/workspace/bazel.dart';
 import 'package:analyzer/src/workspace/gn.dart';
@@ -108,7 +110,9 @@ class KytheDartVisitor extends GeneralizingAstVisitor with OutputUtils {
   KytheVName _enclosingClassVName;
 
   KytheDartVisitor(this.resourceProvider, this.entries, this.corpus,
-      this._inheritanceManager, this._contents);
+      AnalysisSession session, this._contents)
+      : _inheritanceManager =
+            (session as AnalysisSessionImpl).inheritanceManager;
 
   @override
   String get enclosingFilePath => _enclosingFilePath;
