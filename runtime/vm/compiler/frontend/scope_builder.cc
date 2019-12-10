@@ -61,7 +61,8 @@ ScopeBuilder::ScopeBuilder(ParsedFunction* parsed_function)
           ExternalTypedData::Handle(Z,
                                     parsed_function->function().KernelData()),
           parsed_function->function().KernelDataProgramOffset()),
-      inferred_type_metadata_helper_(&helper_),
+      constant_reader_(&helper_, &active_class_),
+      inferred_type_metadata_helper_(&helper_, &constant_reader_),
       procedure_attributes_metadata_helper_(&helper_),
       type_translator_(&helper_,
                        &active_class_,
@@ -652,14 +653,14 @@ void ScopeBuilder::VisitExpression() {
           helper_.ReadUInt();          // read kernel position.
       helper_.ReadUInt();              // read relative variable index.
       helper_.SkipOptionalDartType();  // read promoted type.
-      LookupVariable(variable_kernel_offset);
+      VisitVariableGet(variable_kernel_offset);
       return;
     }
     case kSpecializedVariableGet: {
       helper_.ReadPosition();  // read position.
       intptr_t variable_kernel_offset =
           helper_.ReadUInt();  // read kernel position.
-      LookupVariable(variable_kernel_offset);
+      VisitVariableGet(variable_kernel_offset);
       return;
     }
     case kVariableSet: {
@@ -1259,6 +1260,7 @@ void ScopeBuilder::VisitVariableDeclaration() {
                            ? GenerateName(":var", name_index_++)
                            : H.DartSymbolObfuscate(helper.name_index_);
 
+  intptr_t initializer_offset = helper_.ReaderOffset();
   Tag tag = helper_.ReadTag();  // read (first part of) initializer.
   if (tag == kSomething) {
     VisitExpression();  // read (actual) initializer.
@@ -1274,6 +1276,10 @@ void ScopeBuilder::VisitVariableDeclaration() {
       MakeVariable(helper.position_, end_position, name, type);
   if (helper.IsFinal()) {
     variable->set_is_final();
+  }
+  if (helper.IsLate()) {
+    variable->set_is_late();
+    variable->set_late_init_offset(initializer_offset);
   }
   // Lift the two special async vars out of the function body scope, into the
   // outer function declaration scope.
@@ -1582,12 +1588,16 @@ LocalVariable* ScopeBuilder::MakeVariable(
     const String& name,
     const AbstractType& type,
     const InferredTypeMetadata* param_type_md /* = NULL */) {
-  CompileType* param_type = NULL;
-  if ((param_type_md != NULL) && !param_type_md->IsTrivial()) {
+  CompileType* param_type = nullptr;
+  const Object* param_value = nullptr;
+  if (param_type_md != nullptr && !param_type_md->IsTrivial()) {
     param_type = new (Z) CompileType(param_type_md->ToCompileType(Z));
+    if (param_type_md->IsConstant()) {
+      param_value = &param_type_md->constant_value;
+    }
   }
-  return new (Z)
-      LocalVariable(declaration_pos, token_pos, name, type, param_type);
+  return new (Z) LocalVariable(declaration_pos, token_pos, name, type,
+                               param_type, param_value);
 }
 
 void ScopeBuilder::AddExceptionVariable(
@@ -1705,7 +1715,20 @@ void ScopeBuilder::AddSwitchVariable() {
   }
 }
 
-void ScopeBuilder::LookupVariable(intptr_t declaration_binary_offset) {
+void ScopeBuilder::VisitVariableGet(intptr_t declaration_binary_offset) {
+  LocalVariable* variable = LookupVariable(declaration_binary_offset);
+  if (variable->is_late()) {
+    // Late variable initializer expressions may also contain local variables
+    // that need to be captured.
+    AlternativeReadingScope alt(&helper_.reader_, variable->late_init_offset());
+    if (helper_.ReadTag() != kNothing) {
+      VisitExpression();
+    }
+  }
+}
+
+LocalVariable* ScopeBuilder::LookupVariable(
+    intptr_t declaration_binary_offset) {
   LocalVariable* variable = result_->locals.Lookup(declaration_binary_offset);
   if (variable == NULL) {
     // We have not seen a declaration of the variable, so it must be the
@@ -1740,6 +1763,7 @@ void ScopeBuilder::LookupVariable(intptr_t declaration_binary_offset) {
   } else {
     ASSERT(variable->owner()->function_level() == scope_->function_level());
   }
+  return variable;
 }
 
 StringIndex ScopeBuilder::GetNameFromVariableDeclaration(

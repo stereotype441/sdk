@@ -1281,12 +1281,6 @@ class Class extends NamedNode implements Annotatable, FileUriNode {
     return coreTypes.thisInterfaceType(this, nullability);
   }
 
-  InterfaceType _bottomType;
-  InterfaceType get bottomType {
-    return _bottomType ??= new InterfaceType(this, Nullability.legacy,
-        new List<DartType>.filled(typeParameters.length, const BottomType()));
-  }
-
   /// Returns a possibly synthesized name for this class, consistent with
   /// the names used across all [toString] calls.
   String toString() => debugQualifiedClassName(this);
@@ -2647,14 +2641,19 @@ abstract class Expression extends TreeNode {
           typeParameterType.promotedBound ?? typeParameterType.parameter.bound;
     }
     if (type == context.typeEnvironment.nullType) {
-      return superclass.bottomType;
+      return context.typeEnvironment.coreTypes
+          .bottomInterfaceType(superclass, context.nullable);
     }
     if (type is InterfaceType) {
-      var upcastType =
-          context.typeEnvironment.getTypeAsInstanceOf(type, superclass);
-      if (upcastType != null) return upcastType;
+      List<DartType> upcastTypeArguments = context.typeEnvironment
+          .getTypeArgumentsAsInstanceOf(type, superclass);
+      if (upcastTypeArguments != null) {
+        return new InterfaceType(
+            superclass, type.nullability, upcastTypeArguments);
+      }
     } else if (type is BottomType) {
-      return superclass.bottomType;
+      return context.typeEnvironment.coreTypes
+          .bottomInterfaceType(superclass, context.nonNullable);
     }
     context.typeEnvironment
         .typeError(this, '$type is not a subtype of $superclass');
@@ -3038,9 +3037,10 @@ class SuperPropertyGet extends Expression {
     if (declaringClass.typeParameters.isEmpty) {
       return interfaceTarget.getterType;
     }
-    var receiver = context.typeEnvironment
-        .getTypeAsInstanceOf(context.thisType, declaringClass);
-    return Substitution.fromInterfaceType(receiver)
+    List<DartType> receiverArguments = context.typeEnvironment
+        .getTypeArgumentsAsInstanceOf(context.thisType, declaringClass);
+    return Substitution.fromPairs(
+            declaringClass.typeParameters, receiverArguments)
         .substituteType(interfaceTarget.getterType);
   }
 
@@ -3397,10 +3397,11 @@ class SuperMethodInvocation extends InvocationExpression {
   DartType getStaticType(StaticTypeContext context) {
     if (interfaceTarget == null) return const DynamicType();
     Class superclass = interfaceTarget.enclosingClass;
-    var receiverType = context.typeEnvironment
-        .getTypeAsInstanceOf(context.thisType, superclass);
-    var returnType = Substitution.fromInterfaceType(receiverType)
-        .substituteType(interfaceTarget.function.returnType);
+    List<DartType> receiverTypeArguments = context.typeEnvironment
+        .getTypeArgumentsAsInstanceOf(context.thisType, superclass);
+    DartType returnType =
+        Substitution.fromPairs(superclass.typeParameters, receiverTypeArguments)
+            .substituteType(interfaceTarget.function.returnType);
     return Substitution.fromPairs(
             interfaceTarget.function.typeParameters, arguments.types)
         .substituteType(returnType);
@@ -3733,8 +3734,7 @@ class ListConcatenation extends Expression {
   }
 
   DartType getStaticType(StaticTypeContext context) {
-    return context.typeEnvironment
-        .literalListType(typeArgument, context.nonNullable);
+    return context.typeEnvironment.listType(typeArgument, context.nonNullable);
   }
 
   R accept<R>(ExpressionVisitor<R> v) => v.visitListConcatenation(this);
@@ -3771,8 +3771,7 @@ class SetConcatenation extends Expression {
   }
 
   DartType getStaticType(StaticTypeContext context) {
-    return context.typeEnvironment
-        .literalSetType(typeArgument, context.nonNullable);
+    return context.typeEnvironment.setType(typeArgument, context.nonNullable);
   }
 
   R accept<R>(ExpressionVisitor<R> v) => v.visitSetConcatenation(this);
@@ -3813,7 +3812,7 @@ class MapConcatenation extends Expression {
 
   DartType getStaticType(StaticTypeContext context) {
     return context.typeEnvironment
-        .literalMapType(keyType, valueType, context.nonNullable);
+        .mapType(keyType, valueType, context.nonNullable);
   }
 
   R accept<R>(ExpressionVisitor<R> v) => v.visitMapConcatenation(this);
@@ -4203,8 +4202,7 @@ class ListLiteral extends Expression {
   }
 
   DartType getStaticType(StaticTypeContext context) {
-    return context.typeEnvironment
-        .literalListType(typeArgument, context.nonNullable);
+    return context.typeEnvironment.listType(typeArgument, context.nonNullable);
   }
 
   R accept<R>(ExpressionVisitor<R> v) => v.visitListLiteral(this);
@@ -4234,8 +4232,7 @@ class SetLiteral extends Expression {
   }
 
   DartType getStaticType(StaticTypeContext context) {
-    return context.typeEnvironment
-        .literalSetType(typeArgument, context.nonNullable);
+    return context.typeEnvironment.setType(typeArgument, context.nonNullable);
   }
 
   R accept<R>(ExpressionVisitor<R> v) => v.visitSetLiteral(this);
@@ -4270,7 +4267,7 @@ class MapLiteral extends Expression {
 
   DartType getStaticType(StaticTypeContext context) {
     return context.typeEnvironment
-        .literalMapType(keyType, valueType, context.nonNullable);
+        .mapType(keyType, valueType, context.nonNullable);
   }
 
   R accept<R>(ExpressionVisitor<R> v) => v.visitMapLiteral(this);
@@ -6632,8 +6629,8 @@ class MapConstant extends Constant {
           other.valueType == valueType &&
           listEquals(other.entries, entries));
 
-  DartType getType(StaticTypeContext context) => context.typeEnvironment
-      .literalMapType(keyType, valueType, context.nonNullable);
+  DartType getType(StaticTypeContext context) =>
+      context.typeEnvironment.mapType(keyType, valueType, context.nonNullable);
 }
 
 class ConstantMapEntry {
@@ -6679,8 +6676,8 @@ class ListConstant extends Constant {
           other.typeArgument == typeArgument &&
           listEquals(other.entries, entries));
 
-  DartType getType(StaticTypeContext context) => context.typeEnvironment
-      .literalListType(typeArgument, context.nonNullable);
+  DartType getType(StaticTypeContext context) =>
+      context.typeEnvironment.listType(typeArgument, context.nonNullable);
 }
 
 class SetConstant extends Constant {
@@ -6714,7 +6711,7 @@ class SetConstant extends Constant {
           listEquals(other.entries, entries));
 
   DartType getType(StaticTypeContext context) =>
-      context.typeEnvironment.literalSetType(typeArgument, context.nonNullable);
+      context.typeEnvironment.setType(typeArgument, context.nonNullable);
 }
 
 class InstanceConstant extends Constant {
@@ -7104,6 +7101,7 @@ abstract class BinarySink {
   void writeStringReference(String str);
   void writeName(Name node);
   void writeDartType(DartType type);
+  void writeConstantReference(Constant constant);
   void writeNode(Node node);
 
   void enterScope(
@@ -7132,6 +7130,7 @@ abstract class BinarySource {
   String readStringReference();
   Name readName();
   DartType readDartType();
+  Constant readConstantReference();
   FunctionNode readFunctionNode();
 
   void enterScope({List<TypeParameter> typeParameters});

@@ -38,7 +38,7 @@ class StreamingFlowGraphBuilder : public KernelReaderHelper {
         constant_reader_(this, active_class_),
         bytecode_metadata_helper_(this, active_class_),
         direct_call_metadata_helper_(this),
-        inferred_type_metadata_helper_(this),
+        inferred_type_metadata_helper_(this, &constant_reader_),
         procedure_attributes_metadata_helper_(this),
         call_site_attributes_metadata_helper_(this, &type_translator_),
         closure_owner_(Object::Handle(flow_graph_builder->zone_)) {}
@@ -218,6 +218,8 @@ class StreamingFlowGraphBuilder : public KernelReaderHelper {
   Fragment StringInterpolate(TokenPosition position);
   Fragment StringInterpolateSingle(TokenPosition position);
   Fragment ThrowTypeError();
+  Fragment ThrowLateInitializationError(TokenPosition position,
+                                        const String& name);
   Fragment LoadInstantiatorTypeArguments();
   Fragment LoadFunctionTypeArguments();
   Fragment InstantiateType(const AbstractType& type);
@@ -276,6 +278,8 @@ class StreamingFlowGraphBuilder : public KernelReaderHelper {
   Fragment BuildInvalidExpression(TokenPosition* position);
   Fragment BuildVariableGet(TokenPosition* position);
   Fragment BuildVariableGet(uint8_t payload, TokenPosition* position);
+  Fragment BuildVariableGetImpl(intptr_t variable_kernel_position,
+                                TokenPosition position);
   Fragment BuildVariableSet(TokenPosition* position);
   Fragment BuildVariableSet(uint8_t payload, TokenPosition* position);
   Fragment BuildPropertyGet(TokenPosition* position);

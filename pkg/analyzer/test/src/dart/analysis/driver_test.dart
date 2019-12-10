@@ -46,21 +46,21 @@ main() {
  * any code to run, as long as it's not waiting on some external event.
  */
 Future pumpEventQueue([int times = 5000]) {
-  if (times == 0) return new Future.value();
+  if (times == 0) return Future.value();
   // We use a delayed future to allow microtask events to finish. The
   // Future.value or Future() constructors use scheduleMicrotask themselves and
   // would therefore not wait for microtask callbacks that are scheduled after
   // invoking this method.
-  return new Future.delayed(Duration.zero, () => pumpEventQueue(times - 1));
+  return Future.delayed(Duration.zero, () => pumpEventQueue(times - 1));
 }
 
 @reflectiveTest
 class AnalysisDriverSchedulerTest with ResourceProviderMixin {
   DartSdk sdk;
-  final ByteStore byteStore = new MemoryByteStore();
-  final FileContentOverlay contentOverlay = new FileContentOverlay();
+  final ByteStore byteStore = MemoryByteStore();
+  final FileContentOverlay contentOverlay = FileContentOverlay();
 
-  final StringBuffer logBuffer = new StringBuffer();
+  final StringBuffer logBuffer = StringBuffer();
   PerformanceLog logger;
 
   AnalysisDriverScheduler scheduler;
@@ -68,27 +68,27 @@ class AnalysisDriverSchedulerTest with ResourceProviderMixin {
   List<ResolvedUnitResult> allResults = [];
 
   AnalysisDriver newDriver() {
-    sdk = new MockSdk(resourceProvider: resourceProvider);
-    AnalysisDriver driver = new AnalysisDriver(
+    sdk = MockSdk(resourceProvider: resourceProvider);
+    AnalysisDriver driver = AnalysisDriver(
         scheduler,
         logger,
         resourceProvider,
         byteStore,
         contentOverlay,
         null,
-        new SourceFactory([
-          new DartUriResolver(sdk),
-          new ResourceUriResolver(resourceProvider)
-        ], null, resourceProvider),
-        new AnalysisOptionsImpl());
+        SourceFactory(
+            [DartUriResolver(sdk), ResourceUriResolver(resourceProvider)],
+            null,
+            resourceProvider),
+        AnalysisOptionsImpl());
     driver.results.forEach(allResults.add);
     return driver;
   }
 
   void setUp() {
-    sdk = new MockSdk(resourceProvider: resourceProvider);
-    logger = new PerformanceLog(logBuffer);
-    scheduler = new AnalysisDriverScheduler(logger);
+    sdk = MockSdk(resourceProvider: resourceProvider);
+    logger = PerformanceLog(logBuffer);
+    scheduler = AnalysisDriverScheduler(logger);
     scheduler.start();
   }
 
@@ -287,7 +287,7 @@ class AnalysisDriverSchedulerTest with ResourceProviderMixin {
     driver2.addFile(b);
     driver2.addFile(c);
 
-    Monitor idleStatusMonitor = new Monitor();
+    Monitor idleStatusMonitor = Monitor();
     List<AnalysisStatus> allStatuses = [];
     // awaiting times out.
     // ignore: unawaited_futures
@@ -318,7 +318,7 @@ class AnalysisDriverSchedulerTest with ResourceProviderMixin {
     driver1.addFile(a);
     driver2.addFile(b);
 
-    Monitor idleStatusMonitor = new Monitor();
+    Monitor idleStatusMonitor = Monitor();
     List<AnalysisStatus> allStatuses = [];
     // awaiting times out.
     // ignore: unawaited_futures
@@ -358,10 +358,9 @@ class AnalysisDriverTest extends BaseAnalysisDriverTest {
   }
 
   test_addFile_notAbsolutePath() async {
-    try {
+    expect(() {
       driver.addFile('not_absolute.dart');
-      fail('ArgumentError expected.');
-    } on ArgumentError {}
+    }, throwsArgumentError);
   }
 
   test_addFile_shouldRefresh() async {
@@ -696,10 +695,9 @@ var A = B;
   }
 
   test_changeFile_notAbsolutePath() async {
-    try {
+    expect(() {
       driver.changeFile('not_absolute.dart');
-      fail('ArgumentError expected.');
-    } on ArgumentError {}
+    }, throwsArgumentError);
   }
 
   test_changeFile_notUsed() async {
@@ -1106,7 +1104,7 @@ aaa() {}
 bbb() {}
 ''');
 
-    Source generatedSource = new _SourceMock(generatedPath, uri);
+    Source generatedSource = _SourceMock(generatedPath, uri);
 
     generatedUriResolver.resolveAbsoluteFunction =
         (uri, actualUri) => generatedSource;
@@ -1167,10 +1165,9 @@ bbb() {}
   }
 
   test_getErrors_notAbsolutePath() async {
-    try {
+    expect(() async {
       await driver.getErrors('not_absolute.dart');
-      fail('ArgumentError expected.');
-    } on ArgumentError {}
+    }, throwsArgumentError);
   }
 
   test_getFilesDefiningClassMemberName_class() async {
@@ -1286,10 +1283,9 @@ bbb() {}
   }
 
   test_getFileSync_notAbsolutePath() async {
-    try {
+    expect(() {
       driver.getFileSync('not_absolute.dart');
-      fail('ArgumentError expected.');
-    } on ArgumentError {}
+    }, throwsArgumentError);
   }
 
   test_getFileSync_part() async {
@@ -1319,10 +1315,9 @@ main() {
   }
 
   test_getIndex_notAbsolutePath() async {
-    try {
+    expect(() async {
       await driver.getIndex('not_absolute.dart');
-      fail('ArgumentError expected.');
-    } on ArgumentError {}
+    }, throwsArgumentError);
   }
 
   test_getLibraryByUri() async {
@@ -1685,10 +1680,9 @@ main() {
   }
 
   test_getResult_notAbsolutePath() async {
-    try {
+    expect(() async {
       await driver.getResult('not_absolute.dart');
-      fail('ArgumentError expected.');
-    } on ArgumentError {}
+    }, throwsArgumentError);
   }
 
   test_getResult_notDartFile() async {
@@ -1823,10 +1817,9 @@ var A2 = B1;
   }
 
   test_getSourceKind_notAbsolutePath() async {
-    try {
+    expect(() async {
       await driver.getSourceKind('not_absolute.dart');
-      fail('ArgumentError expected.');
-    } on ArgumentError {}
+    }, throwsArgumentError);
   }
 
   test_getSourceKind_notDartFile() async {
@@ -1871,10 +1864,9 @@ import 'package:test/b.dart';
   }
 
   test_getUnitElement_notAbsolutePath() async {
-    try {
+    expect(() async {
       await driver.getUnitElement('not_absolute.dart');
-      fail('ArgumentError expected.');
-    } on ArgumentError {}
+    }, throwsArgumentError);
   }
 
   test_getUnitElement_notDart() async {
@@ -2140,10 +2132,9 @@ import 'b.dart';
   }
 
   test_parseFile_notAbsolutePath() async {
-    try {
+    expect(() async {
       await driver.parseFile('not_absolute.dart');
-      fail('ArgumentError expected.');
-    } on ArgumentError {}
+    }, throwsArgumentError);
   }
 
   test_parseFile_notDart() async {
@@ -2173,10 +2164,9 @@ import 'b.dart';
   }
 
   test_parseFileSync_notAbsolutePath() async {
-    try {
+    expect(() {
       driver.parseFileSync('not_absolute.dart');
-      fail('ArgumentError expected.');
-    } on ArgumentError {}
+    }, throwsArgumentError);
   }
 
   test_parseFileSync_notDart() {
@@ -2742,10 +2732,9 @@ var A = B;
   }
 
   test_removeFile_notAbsolutePath() async {
-    try {
+    expect(() {
       driver.removeFile('not_absolute.dart');
-      fail('ArgumentError expected.');
-    } on ArgumentError {}
+    }, throwsArgumentError);
   }
 
   test_resetUriResolution() async {
@@ -3021,7 +3010,7 @@ var v = 0
     await scheduler.waitForIdle();
 
     if (allExceptions.isNotEmpty) {
-      var buffer = new StringBuffer();
+      var buffer = StringBuffer();
       for (var exception in allExceptions) {
         buffer.writeln('Path: ${exception.path}');
         buffer.writeln('Exception: ${exception.exception}');
@@ -3222,6 +3211,6 @@ class _SourceMock implements Source {
 
   @override
   noSuchMethod(Invocation invocation) {
-    throw new StateError('Unexpected invocation of ${invocation.memberName}');
+    throw StateError('Unexpected invocation of ${invocation.memberName}');
   }
 }

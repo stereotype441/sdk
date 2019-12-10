@@ -551,6 +551,7 @@ abstract class Member implements Element {
    */
   MapSubstitution get substitution => _substitution;
 
+  @Deprecated('Use either thisOrAncestorMatching or thisOrAncestorOfType')
   @override
   E getAncestor<E extends Element>(Predicate<Element> predicate) =>
       declaration.getAncestor(predicate);
@@ -576,6 +577,14 @@ abstract class Member implements Element {
   }
 
   @override
+  E thisOrAncestorMatching<E extends Element>(Predicate<Element> predicate) =>
+      declaration.thisOrAncestorMatching(predicate);
+
+  @override
+  E thisOrAncestorOfType<E extends Element>() =>
+      declaration.thisOrAncestorOfType<E>();
+
+  @override
   void visitChildren(ElementVisitor visitor) {
     // There are no children to visit
   }
@@ -584,7 +593,8 @@ abstract class Member implements Element {
   /// Otherwise, return the type unchanged.
   DartType _toLegacyType(DartType type) {
     if (isLegacy) {
-      return NullabilityEliminator.perform(type);
+      var typeProvider = declaration.library.typeProvider;
+      return NullabilityEliminator.perform(typeProvider, type);
     } else {
       return type;
     }
@@ -706,8 +716,9 @@ class MethodMember extends ExecutableMember implements MethodElement {
         var typeParameter = typeParameters[i];
         if (typeParameter is TypeParameterElementImpl) {
           typeParameter.appendTo(buffer);
-        } else
+        } else {
           (typeParameter as TypeParameterMember).appendTo(buffer);
+        }
       }
       buffer.write('>');
     }
@@ -839,6 +850,7 @@ class ParameterMember extends VariableMember
   @override
   T accept<T>(ElementVisitor<T> visitor) => visitor.visitParameterElement(this);
 
+  @Deprecated('Use either thisOrAncestorMatching or thisOrAncestorOfType')
   @override
   E getAncestor<E extends Element>(Predicate<Element> predicate) {
     Element element = declaration.getAncestor(predicate);

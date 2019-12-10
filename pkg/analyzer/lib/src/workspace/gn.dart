@@ -75,21 +75,21 @@ class GnWorkspace extends Workspace {
 
   @override
   UriResolver get packageUriResolver =>
-      new PackageMapUriResolver(provider, packageMap);
+      PackageMapUriResolver(provider, packageMap);
 
   @override
   SourceFactory createSourceFactory(DartSdk sdk, SummaryDataStore summaryData) {
     if (summaryData != null) {
-      throw new UnsupportedError(
+      throw UnsupportedError(
           'Summary files are not supported in a GN workspace.');
     }
     List<UriResolver> resolvers = <UriResolver>[];
     if (sdk != null) {
-      resolvers.add(new DartUriResolver(sdk));
+      resolvers.add(DartUriResolver(sdk));
     }
     resolvers.add(packageUriResolver);
-    resolvers.add(new ResourceUriResolver(provider));
-    return new SourceFactory(resolvers, packages, provider);
+    resolvers.add(ResourceUriResolver(provider));
+    return SourceFactory(resolvers, packages, provider);
   }
 
   /**
@@ -135,7 +135,7 @@ class GnWorkspace extends Workspace {
    * Creates an alternate representation for available packages.
    */
   Map<String, List<Folder>> _convertPackagesToMap(Packages packages) {
-    Map<String, List<Folder>> folderMap = new HashMap<String, List<Folder>>();
+    Map<String, List<Folder>> folderMap = HashMap<String, List<Folder>>();
     if (packages != null && packages != Packages.noPackages) {
       var pathContext = provider.pathContext;
       packages.asMap().forEach((String packageName, Uri uri) {
@@ -159,7 +159,7 @@ class GnWorkspace extends Workspace {
       return mapOne;
     });
     _resolveSymbolicLinks(map);
-    return new MapPackages(map);
+    return MapPackages(map);
   }
 
   /**
@@ -217,7 +217,7 @@ class GnWorkspace extends Workspace {
         if (packagesFiles.isEmpty) {
           return null;
         }
-        return new GnWorkspace._(provider, root, packagesFiles);
+        return GnWorkspace._(provider, root, packagesFiles);
       }
 
       // Go up a folder.
@@ -252,8 +252,7 @@ class GnWorkspace extends Workspace {
     }
     return genDir
         .getChildren()
-        .where((resource) => resource is File)
-        .map((resource) => resource as File)
+        .whereType<File>()
         .where((File file) => pathContext.extension(file.path) == '.packages')
         .map((File file) => file.path)
         .toList();
@@ -285,11 +284,7 @@ class GnWorkspace extends Workspace {
     if (!outDirectory.exists) {
       return null;
     }
-    return outDirectory
-        .getChildren()
-        .where((resource) => resource is Folder)
-        .map((resource) => resource as Folder)
-        .firstWhere((Folder folder) {
+    return outDirectory.getChildren().whereType<Folder>().firstWhere((folder) {
       String baseName = pathContext.basename(folder.path);
       // Taking a best guess to identify a build dir. This is clearly a fallback
       // to the config-based method.

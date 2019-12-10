@@ -101,14 +101,14 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
             (analysisOptions as AnalysisOptionsImpl).strictInference,
         _inheritanceManager = inheritanceManager,
         _invalidAccessVerifier =
-            new _InvalidAccessVerifier(_errorReporter, _currentLibrary) {
+            _InvalidAccessVerifier(_errorReporter, _currentLibrary) {
     _inDeprecatedMember = _currentLibrary.hasDeprecated;
     String libraryPath = _currentLibrary.source.fullName;
     _workspacePackage = _getPackage(libraryPath, resourceProvider);
 
     _linterContext = LinterContextImpl(
       null /* allUnits */,
-      new LinterContextUnit(content, unit),
+      LinterContextUnit(content, unit),
       declaredVariables,
       typeProvider,
       _typeSystem,
@@ -300,7 +300,7 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
         ExecutableElement getOverriddenPropertyAccessor() {
           final element = field.declaredElement;
           if (element is PropertyAccessorElement || element is FieldElement) {
-            Name name = new Name(_currentLibrary.source.uri, element.name);
+            Name name = Name(_currentLibrary.source.uri, element.name);
             Element enclosingElement = element.enclosingElement;
             if (enclosingElement is ClassElement) {
               InterfaceType classType = enclosingElement.thisType;
@@ -309,7 +309,7 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
               // Check for a setter.
               if (overridden == null) {
                 Name setterName =
-                    new Name(_currentLibrary.source.uri, '${element.name}=');
+                    Name(_currentLibrary.source.uri, '${element.name}=');
                 overridden = _inheritanceManager
                     .getMember(classType, setterName, forSuper: true);
               }
@@ -725,11 +725,13 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
         }
       } else if (element is LibraryElement) {
         displayName = element.definingCompilationUnit.source.uri.toString();
-      } else if (displayName == FunctionElement.CALL_METHOD_NAME &&
-          node is MethodInvocation &&
-          node.staticInvokeType is InterfaceType) {
-        DartType staticInvokeType = node.staticInvokeType;
-        displayName = "${staticInvokeType.displayName}.${element.displayName}";
+      } else if (node is MethodInvocation &&
+          displayName == FunctionElement.CALL_METHOD_NAME) {
+        var invokeType = node.staticInvokeType as InterfaceType;
+        if (invokeType is InterfaceType) {
+          var invokeClass = invokeType.element;
+          displayName = "${invokeClass.name}.${element.displayName}";
+        }
       }
       LibraryElement library =
           element is LibraryElement ? element : element.library;
@@ -887,10 +889,10 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
     }
 
     ClassElement element = node.declaredElement;
-    if (isOrInheritsImmutable(element, new HashSet<ClassElement>())) {
+    if (isOrInheritsImmutable(element, HashSet<ClassElement>())) {
       Iterable<String> nonFinalFields =
           definedOrInheritedNonFinalInstanceFields(
-              element, new HashSet<ClassElement>());
+              element, HashSet<ClassElement>());
       if (nonFinalFields.isNotEmpty) {
         _errorReporter.reportErrorForNode(
             HintCode.MUST_BE_IMMUTABLE, node.name, [nonFinalFields.join(', ')]);
@@ -1076,7 +1078,7 @@ class BestPracticesVerifier extends RecursiveAstVisitor<void> {
                 ? functionNode.name
                 : functionNode;
         _errorReporter.reportErrorForNode(
-            HintCode.MISSING_RETURN, errorNode, [returnType.displayName]);
+            HintCode.MISSING_RETURN, errorNode, [returnType]);
       }
     }
   }

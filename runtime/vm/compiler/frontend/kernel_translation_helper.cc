@@ -6,6 +6,7 @@
 
 #include "vm/class_finalizer.h"
 #include "vm/compiler/aot/precompiler.h"
+#include "vm/compiler/frontend/constant_reader.h"
 #include "vm/log.h"
 #include "vm/object_store.h"
 #include "vm/parser.h"  // for ParsedFunction
@@ -733,7 +734,6 @@ void TranslationHelper::SetupFieldAccessorFunction(
 
   intptr_t pos = 0;
   if (is_method) {
-    // TODO(regis): Set nullability to kNonNullable instead of kLegacy.
     function.SetParameterTypeAt(pos, GetDeclarationType(klass));
     function.SetParameterNameAt(pos, Symbols::This());
     pos++;
@@ -1684,8 +1684,10 @@ DirectCallMetadata DirectCallMetadataHelper::GetDirectTargetForMethodInvocation(
 }
 
 InferredTypeMetadataHelper::InferredTypeMetadataHelper(
-    KernelReaderHelper* helper)
-    : MetadataHelper(helper, tag(), /* precompiler_only = */ true) {}
+    KernelReaderHelper* helper,
+    ConstantReader* constant_reader)
+    : MetadataHelper(helper, tag(), /* precompiler_only = */ true),
+      constant_reader_(constant_reader) {}
 
 InferredTypeMetadata InferredTypeMetadataHelper::GetInferredType(
     intptr_t node_offset) {
@@ -1701,7 +1703,15 @@ InferredTypeMetadata InferredTypeMetadataHelper::GetInferredType(
   const NameIndex kernel_name = helper_->ReadCanonicalNameReference();
   const uint8_t flags = helper_->ReadByte();
 
+  const Object* constant_value = &Object::null_object();
+  if ((flags & InferredTypeMetadata::kFlagConstant) != 0) {
+    const intptr_t constant_offset = helper_->ReadUInt();
+    constant_value = &Object::ZoneHandle(
+        H.zone(), constant_reader_->ReadConstant(constant_offset));
+  }
+
   if (H.IsRoot(kernel_name)) {
+    ASSERT((flags & InferredTypeMetadata::kFlagConstant) == 0);
     return InferredTypeMetadata(kDynamicCid, flags);
   }
 
@@ -1716,7 +1726,7 @@ InferredTypeMetadata InferredTypeMetadataHelper::GetInferredType(
     cid = kDynamicCid;
   }
 
-  return InferredTypeMetadata(cid, flags);
+  return InferredTypeMetadata(cid, flags, *constant_value);
 }
 
 void ProcedureAttributesMetadata::InitializeFromFlags(uint8_t flags) {
@@ -2818,7 +2828,8 @@ void TypeTranslator::BuildInterfaceType(bool simple) {
       // Fast path for non-generic types: retrieve or populate the class's only
       // canonical type (as long as only one nullability variant is used), which
       // is its declaration type.
-      result_ = klass.DeclarationType(nullability);
+      result_ = klass.DeclarationType();
+      result_ = Type::Cast(result_).ToNullability(nullability, Heap::kOld);
     } else {
       // Note that the type argument vector is not yet extended.
       result_ = Type::New(klass, Object::null_type_arguments(),
@@ -3165,9 +3176,10 @@ const Type& TypeTranslator::ReceiverType(const Class& klass) {
     type = klass.DeclarationType();
   } else {
     type = Type::New(klass, TypeArguments::Handle(Z, klass.type_parameters()),
-                     klass.token_pos());
+                     klass.token_pos(),
+                     Dart::non_nullable_flag() ? Nullability::kNonNullable
+                                               : Nullability::kLegacy);
   }
-  // TODO(regis): Set nullability to kNonNullable instead of kLegacy.
   return type;
 }
 
@@ -3218,7 +3230,6 @@ void TypeTranslator::SetupFunctionParameters(
   intptr_t pos = 0;
   if (is_method) {
     ASSERT(!klass.IsNull());
-    // TODO(regis): Set nullability to kNonNullable instead of kLegacy.
     function.SetParameterTypeAt(pos, H.GetDeclarationType(klass));
     function.SetParameterNameAt(pos, Symbols::This());
     pos++;

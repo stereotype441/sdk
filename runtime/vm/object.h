@@ -951,12 +951,9 @@ class Class : public Object {
   // class B<T, S>
   // class C<R> extends B<R, int>
   // C.DeclarationType() --> C [R, int, R]
-  // The declaration type is legacy by default, but another nullability
-  // variant may be requested. The first requested type gets cached in the class
-  // and subsequent nullability variants get cached in the object store.
-  // TODO(regis): Is this caching still useful or should we eliminate it?
-  RawType* DeclarationType(
-      Nullability nullability = Nullability::kLegacy) const;
+  // The declaration type's nullability is either legacy or non-nullable when
+  // the non-nullable experiment is enabled.
+  RawType* DeclarationType() const;
 
   static intptr_t declaration_type_offset() {
     return OFFSET_OF(RawClass, declaration_type_);
@@ -3603,6 +3600,7 @@ class Field : public Object {
                        bool is_final,
                        bool is_const,
                        bool is_reflectable,
+                       bool is_late,
                        const Object& owner,
                        const AbstractType& type,
                        TokenPosition token_pos,
@@ -3611,6 +3609,7 @@ class Field : public Object {
   static RawField* NewTopLevel(const String& name,
                                bool is_final,
                                bool is_const,
+                               bool is_late,
                                const Object& owner,
                                TokenPosition token_pos,
                                TokenPosition end_token_pos);
@@ -3854,6 +3853,7 @@ class Field : public Object {
                             bool is_final,
                             bool is_const,
                             bool is_reflectable,
+                            bool is_late,
                             const Object& owner,
                             TokenPosition token_pos,
                             TokenPosition end_token_pos);
@@ -6099,8 +6099,17 @@ class ContextScope : public Object {
   RawString* NameAt(intptr_t scope_index) const;
   void SetNameAt(intptr_t scope_index, const String& name) const;
 
+  void ClearFlagsAt(intptr_t scope_index) const;
+
   bool IsFinalAt(intptr_t scope_index) const;
   void SetIsFinalAt(intptr_t scope_index, bool is_final) const;
+
+  bool IsLateAt(intptr_t scope_index) const;
+  void SetIsLateAt(intptr_t scope_index, bool is_late) const;
+
+  intptr_t LateInitOffsetAt(intptr_t scope_index) const;
+  void SetLateInitOffsetAt(intptr_t scope_index,
+                           intptr_t late_init_offset) const;
 
   bool IsConstAt(intptr_t scope_index) const;
   void SetIsConstAt(intptr_t scope_index, bool is_const) const;
@@ -6148,6 +6157,9 @@ class ContextScope : public Object {
     ASSERT((index >= 0) && (index < num_variables()));
     return raw_ptr()->VariableDescAddr(index);
   }
+
+  bool GetFlagAt(intptr_t scope_index, intptr_t mask) const;
+  void SetFlagAt(intptr_t scope_index, intptr_t mask, bool value) const;
 
   FINAL_HEAP_OBJECT_IMPLEMENTATION(ContextScope, Object);
   friend class Class;
@@ -6748,15 +6760,20 @@ class TypeArguments : public Instance {
 
   // Check if the vectors are equal (they may be null).
   bool Equals(const TypeArguments& other) const {
-    return IsSubvectorEquivalent(other, 0, IsNull() ? 0 : Length());
+    return IsSubvectorEquivalent(other, 0, IsNull() ? 0 : Length(),
+                                 /* syntactically = */ false);
   }
 
-  bool IsEquivalent(const TypeArguments& other, TrailPtr trail = NULL) const {
-    return IsSubvectorEquivalent(other, 0, IsNull() ? 0 : Length(), trail);
+  bool IsEquivalent(const TypeArguments& other,
+                    bool syntactically,
+                    TrailPtr trail = NULL) const {
+    return IsSubvectorEquivalent(other, 0, IsNull() ? 0 : Length(),
+                                 syntactically, trail);
   }
   bool IsSubvectorEquivalent(const TypeArguments& other,
                              intptr_t from_index,
                              intptr_t len,
+                             bool syntactically,
                              TrailPtr trail = NULL) const;
 
   // Check if the vector is instantiated (it must not be null).
@@ -6928,9 +6945,11 @@ class AbstractType : public Instance {
   }
   virtual uint32_t CanonicalizeHash() const { return Hash(); }
   virtual bool Equals(const Instance& other) const {
-    return IsEquivalent(other);
+    return IsEquivalent(other, /* syntactically = */ false);
   }
-  virtual bool IsEquivalent(const Instance& other, TrailPtr trail = NULL) const;
+  virtual bool IsEquivalent(const Instance& other,
+                            bool syntactically,
+                            TrailPtr trail = NULL) const;
   virtual bool IsRecursive() const;
 
   // Check if this type represents a function type.
@@ -7164,8 +7183,15 @@ class Type : public AbstractType {
   virtual bool IsInstantiated(Genericity genericity = kAny,
                               intptr_t num_free_fun_type_params = kAllFree,
                               TrailPtr trail = NULL) const;
-  virtual bool IsEquivalent(const Instance& other, TrailPtr trail = NULL) const;
+  virtual bool IsEquivalent(const Instance& other,
+                            bool syntactically,
+                            TrailPtr trail = NULL) const;
   virtual bool IsRecursive() const;
+
+  // Return true if this type can be used as the declaration type of cls after
+  // canonicalization (passed-in cls must match type_class()).
+  bool IsDeclarationTypeOf(const Class& cls) const;
+
   // If signature is not null, this type represents a function type. Note that
   // the signature fully represents the type and type arguments can be ignored.
   // However, in case of a generic typedef, they document how the typedef class
@@ -7253,9 +7279,7 @@ class Type : public AbstractType {
   static RawType* DartTypeType();
 
   // The finalized type of the given non-parameterized class.
-  static RawType* NewNonParameterizedType(
-      const Class& type_class,
-      Nullability nullability = Nullability::kLegacy);
+  static RawType* NewNonParameterizedType(const Class& type_class);
 
   static RawType* New(const Class& clazz,
                       const TypeArguments& arguments,
@@ -7319,7 +7343,9 @@ class TypeRef : public AbstractType {
   virtual bool IsInstantiated(Genericity genericity = kAny,
                               intptr_t num_free_fun_type_params = kAllFree,
                               TrailPtr trail = NULL) const;
-  virtual bool IsEquivalent(const Instance& other, TrailPtr trail = NULL) const;
+  virtual bool IsEquivalent(const Instance& other,
+                            bool syntactically,
+                            TrailPtr trail = NULL) const;
   virtual bool IsRecursive() const { return true; }
   virtual bool IsFunctionType() const {
     const AbstractType& ref_type = AbstractType::Handle(type());
@@ -7402,7 +7428,9 @@ class TypeParameter : public AbstractType {
   virtual bool IsInstantiated(Genericity genericity = kAny,
                               intptr_t num_free_fun_type_params = kAllFree,
                               TrailPtr trail = NULL) const;
-  virtual bool IsEquivalent(const Instance& other, TrailPtr trail = NULL) const;
+  virtual bool IsEquivalent(const Instance& other,
+                            bool syntactically,
+                            TrailPtr trail = NULL) const;
   virtual bool IsRecursive() const { return false; }
   virtual RawAbstractType* InstantiateFrom(
       NNBDMode mode,

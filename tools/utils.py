@@ -804,7 +804,8 @@ class PosixCoreDumpEnabler(object):
         resource.setrlimit(resource.RLIMIT_CORE, (-1, -1))
 
     def __exit__(self, *_):
-        resource.setrlimit(resource.RLIMIT_CORE, self._old_limits)
+        if self._old_limits != None:
+            resource.setrlimit(resource.RLIMIT_CORE, self._old_limits)
 
 
 class LinuxCoreDumpEnabler(PosixCoreDumpEnabler):

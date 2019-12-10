@@ -16,7 +16,7 @@ import 'package:analyzer/src/error/codes.dart';
 
 /// An [AstVisitor] that fills [UsedLocalElements].
 class GatherUsedLocalElementsVisitor extends RecursiveAstVisitor {
-  final UsedLocalElements usedElements = new UsedLocalElements();
+  final UsedLocalElements usedElements = UsedLocalElements();
 
   final LibraryElement _enclosingLibrary;
   ClassElement _enclosingClass;
@@ -88,6 +88,9 @@ class GatherUsedLocalElementsVisitor extends RecursiveAstVisitor {
     if (node.inDeclarationContext()) {
       return;
     }
+    if (_inCommentReference(node)) {
+      return;
+    }
     Element element = node.staticElement;
     // Store un-parameterized members.
     if (element is ExecutableMember) {
@@ -131,18 +134,18 @@ class GatherUsedLocalElementsVisitor extends RecursiveAstVisitor {
     if (element == null) {
       return;
     }
-    // check if a local element
+    // Check if [element] is a local element.
     if (!identical(element.library, _enclosingLibrary)) {
       return;
     }
-    // ignore references to an element from itself
+    // Ignore references to an element from itself.
     if (identical(element, _enclosingClass)) {
       return;
     }
     if (identical(element, _enclosingExec)) {
       return;
     }
-    // ignore places where the element is not actually used
+    // Ignore places where the element is not actually used.
     if (node.parent is TypeName) {
       if (element is ClassElement) {
         AstNode parent2 = node.parent.parent;
@@ -161,13 +164,24 @@ class GatherUsedLocalElementsVisitor extends RecursiveAstVisitor {
     usedElements.addElement(element);
   }
 
+  /// Returns whether [identifier] is found in a [CommentReference].
+  static bool _inCommentReference(SimpleIdentifier identifier) {
+    var parent = identifier.parent;
+    return parent is CommentReference || parent?.parent is CommentReference;
+  }
+
+  /// Returns whether the value of [node] is _only_ being read at this position.
+  ///
+  /// Returns `false` if [node] is not a read access, or if [node] is a combined
+  /// read/write access.
   static bool _isReadIdentifier(SimpleIdentifier node) {
-    // not reading at all
+    // Not reading at all.
     if (!node.inGetterContext()) {
       return false;
     }
-    // check if useless reading
+    // Check if useless reading.
     AstNode parent = node.parent;
+
     if (parent.parent is ExpressionStatement) {
       if (parent is PrefixExpression || parent is PostfixExpression) {
         // v++;
@@ -304,7 +318,7 @@ class UnusedLocalElementsVerifier extends RecursiveAstVisitor {
   bool _overridesUsedElement(Element element) {
     Element enclosingElement = element.enclosingElement;
     if (enclosingElement is ClassElement) {
-      Name name = new Name(_libraryUri, element.name);
+      Name name = Name(_libraryUri, element.name);
       Iterable<ExecutableElement> overriddenElements = _inheritanceManager
           .getOverridden(enclosingElement.thisType, name)
           ?.map((ExecutableElement e) =>
@@ -320,8 +334,8 @@ class UnusedLocalElementsVerifier extends RecursiveAstVisitor {
   void _reportErrorForElement(
       ErrorCode errorCode, Element element, List<Object> arguments) {
     if (element != null) {
-      _errorListener.onError(new AnalysisError(element.source,
-          element.nameOffset, element.nameLength, errorCode, arguments));
+      _errorListener.onError(AnalysisError(element.source, element.nameOffset,
+          element.nameLength, errorCode, arguments));
     }
   }
 
@@ -394,29 +408,29 @@ class UnusedLocalElementsVerifier extends RecursiveAstVisitor {
 class UsedLocalElements {
   /// Resolved, locally defined elements that are used or potentially can be
   /// used.
-  final HashSet<Element> elements = new HashSet<Element>();
+  final HashSet<Element> elements = HashSet<Element>();
 
   /// [LocalVariableElement]s that represent exceptions in [CatchClause]s.
   final HashSet<LocalVariableElement> catchExceptionElements =
-      new HashSet<LocalVariableElement>();
+      HashSet<LocalVariableElement>();
 
   /// [LocalVariableElement]s that represent stack traces in [CatchClause]s.
   final HashSet<LocalVariableElement> catchStackTraceElements =
-      new HashSet<LocalVariableElement>();
+      HashSet<LocalVariableElement>();
 
   /// Resolved class members that are referenced in the library.
-  final HashSet<Element> members = new HashSet<Element>();
+  final HashSet<Element> members = HashSet<Element>();
 
   /// Resolved class members that are read in the library.
-  final HashSet<Element> readMembers = new HashSet<Element>();
+  final HashSet<Element> readMembers = HashSet<Element>();
 
   /// Unresolved class members that are read in the library.
-  final HashSet<String> unresolvedReadMembers = new HashSet<String>();
+  final HashSet<String> unresolvedReadMembers = HashSet<String>();
 
   UsedLocalElements();
 
   factory UsedLocalElements.merge(List<UsedLocalElements> parts) {
-    UsedLocalElements result = new UsedLocalElements();
+    UsedLocalElements result = UsedLocalElements();
     int length = parts.length;
     for (int i = 0; i < length; i++) {
       UsedLocalElements part = parts[i];

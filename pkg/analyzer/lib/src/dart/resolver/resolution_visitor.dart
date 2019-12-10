@@ -621,7 +621,7 @@ class ResolutionVisitor extends RecursiveAstVisitor<void> {
       if (_elementWalker != null) {
         element = _elementWalker.getParameter();
       } else {
-        element = new ParameterElementImpl(nameNode.name, nameNode.offset);
+        element = ParameterElementImpl(nameNode.name, nameNode.offset);
         _elementHolder.addParameter(element);
         element.isConst = node.isConst;
         element.isExplicitlyCovariant = node.covariantKeyword != null;
@@ -1170,7 +1170,7 @@ class ResolutionVisitor extends RecursiveAstVisitor<void> {
   /// declarations are not valid (they declare interfaces and mixins, but not
   /// classes).
   void _resolveType(TypeName typeName, ErrorCode errorCode,
-      {bool asClass: false}) {
+      {bool asClass = false}) {
     visitTypeName(typeName);
 
     DartType type = typeName.type;
