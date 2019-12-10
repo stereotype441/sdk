@@ -1201,8 +1201,8 @@ class ResolverVisitor extends ScopedVisitor {
 
   @override
   void visitDefaultFormalParameter(DefaultFormalParameter node) {
-    InferenceContext.setType(
-        node.defaultValue, _safeVariableType(node.declaredElement));
+    InferenceContext.setType(node.defaultValue,
+        _elementTypeProvider.safeVariableType(node.declaredElement));
     super.visitDefaultFormalParameter(node);
     ParameterElement element = node.declaredElement;
 
@@ -1919,8 +1919,8 @@ class ResolverVisitor extends ScopedVisitor {
     // invocation.
     //
     node.accept(elementResolver);
-    InferenceContext.setType(
-        node.argumentList, _safeExecutableType(node.staticElement));
+    InferenceContext.setType(node.argumentList,
+        _elementTypeProvider.safeExecutableType(node.staticElement));
     node.argumentList?.accept(this);
     node.accept(typeAnalyzer);
   }
@@ -2030,8 +2030,8 @@ class ResolverVisitor extends ScopedVisitor {
     // invocation.
     //
     node.accept(elementResolver);
-    InferenceContext.setType(
-        node.argumentList, _safeExecutableType(node.staticElement));
+    InferenceContext.setType(node.argumentList,
+        _elementTypeProvider.safeExecutableType(node.staticElement));
     node.argumentList?.accept(this);
     node.accept(typeAnalyzer);
   }
@@ -2167,7 +2167,8 @@ class ResolverVisitor extends ScopedVisitor {
     _flowAnalysis?.variableDeclarationList(node);
     for (VariableDeclaration decl in node.variables) {
       VariableElement variableElement = decl.declaredElement;
-      InferenceContext.setType(decl, _safeVariableType(variableElement));
+      InferenceContext.setType(
+          decl, _elementTypeProvider.safeVariableType(variableElement));
     }
     super.visitVariableDeclarationList(node);
   }
@@ -2503,8 +2504,8 @@ class ResolverVisitor extends ScopedVisitor {
     }
 
     if (inferred == null) {
-      InferenceContext.setType(
-          node.argumentList, _safeExecutableType(originalElement));
+      InferenceContext.setType(node.argumentList,
+          _elementTypeProvider.safeExecutableType(originalElement));
     }
   }
 
@@ -2583,12 +2584,6 @@ class ResolverVisitor extends ScopedVisitor {
           valueType: valueType);
     }
   }
-
-  FunctionType _safeExecutableType(ExecutableElement element) =>
-      element == null ? null : _elementTypeProvider.getExecutableType(element);
-
-  DartType _safeVariableType(VariableElement variable) =>
-      variable == null ? null : _elementTypeProvider.getVariableType(variable);
 
   /// Continues resolution of the [FunctionExpressionInvocation] node after
   /// resolving its function.
