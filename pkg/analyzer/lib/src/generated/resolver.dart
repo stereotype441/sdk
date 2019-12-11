@@ -2732,6 +2732,7 @@ class ResolverVisitorForMigration extends ResolverVisitor {
 
   @override
   void visitTypeName(TypeName node) {
+    // TODO(paulberry): Need to handle generic function types too
     node.type = (_elementTypeProvider as MigrationResolutionHooks)
         .getMigratedTypeAnnotationType(source, node);
   }
