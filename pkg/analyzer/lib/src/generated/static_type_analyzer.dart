@@ -80,7 +80,7 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
 
   final FlowAnalysisHelper _flowAnalysis;
 
-  final ElementTypeProvider _elementTypeProvider = const ElementTypeProvider();
+  final ElementTypeProvider _elementTypeProvider;
 
   /**
    * Initialize a newly created static type analyzer to analyze types for the
@@ -88,7 +88,9 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
    *
    * @param resolver the resolver driving this participant
    */
-  StaticTypeAnalyzer(this._resolver, this._featureSet, this._flowAnalysis) {
+  StaticTypeAnalyzer(this._resolver, this._featureSet, this._flowAnalysis,
+      {ElementTypeProvider elementTypeProvider = const ElementTypeProvider()})
+      : _elementTypeProvider = elementTypeProvider {
     _typeProvider = _resolver.typeProvider;
     _typeSystem = _resolver.typeSystem;
     _dynamicType = _typeProvider.dynamicType;
@@ -1490,14 +1492,6 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
     return null;
   }
 
-  List<ParameterElement> _getExecutableParameters(ExecutableElement element) =>
-      element?.parameters;
-
-  DartType _getExecutableReturnType(FunctionTypedElement element) =>
-      element?.returnType ?? _dynamicType;
-
-  FunctionType _getExecutableType(ExecutableElement element) => element.type;
-
   /**
    * Gets the definite type of expression, which can be used in cases where
    * the most precise type is desired, for example computing the least upper
@@ -2230,37 +2224,20 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
 }
 
 class StaticTypeAnalyzerForMigration extends StaticTypeAnalyzer {
-  final MigrationResolutionHooks migrationResolutionHooks;
-
   StaticTypeAnalyzerForMigration(
       ResolverVisitor resolver,
       FeatureSet featureSet,
       FlowAnalysisHelper flowAnalysis,
-      this.migrationResolutionHooks)
-      : super(resolver, featureSet, flowAnalysis);
-
-  @override
-  List<ParameterElement> _getExecutableParameters(ExecutableElement element) =>
-      element == null
-          ? super._getExecutableParameters(element)
-          : migrationResolutionHooks.getExecutableParameters(element);
-
-  @override
-  DartType _getExecutableReturnType(FunctionTypedElement element) =>
-      element == null
-          ? super._getExecutableReturnType(element)
-          : migrationResolutionHooks.getExecutableReturnType(element);
-
-  @override
-  FunctionType _getExecutableType(ExecutableElement element) =>
-      migrationResolutionHooks.getExecutableType(element);
+      MigrationResolutionHooks migrationResolutionHooks)
+      : super(resolver, featureSet, flowAnalysis,
+            elementTypeProvider: migrationResolutionHooks);
 
   @override
   void _recordStaticType(Expression expression, DartType type) {
     super._recordStaticType(
         expression,
-        migrationResolutionHooks.modifyExpressionType(
-            expression, type ?? _dynamicType));
+        (_elementTypeProvider as MigrationResolutionHooks)
+            .modifyExpressionType(expression, type ?? _dynamicType));
   }
 }
 
