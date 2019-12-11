@@ -299,6 +299,8 @@ class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
       // TODO(paulberry): for prefix increment/decrement, inserting a null check
       // isn't sufficient.
       return true;
+    } else if (parent is ThrowExpression) {
+      return true;
     }
     return false;
   }

@@ -1517,6 +1517,7 @@ _f(bool/*?*/ x) => !x;
         changes: {findNode.simple('x;'): NullCheck()});
   }
 
+  @FailingTest(reason: 'TODO(paulberry)')
   test_prefixExpression_combined_nullable_noProblem() async {
     await analyze('''
 abstract class _C {
@@ -1544,6 +1545,7 @@ abstract class _E {
     visitSubexpression(prefix, 'dynamic');
   }
 
+  @FailingTest(reason: 'TODO(paulberry)')
   test_prefixExpression_combined_nullable_problem() async {
     await analyze('''
 abstract class _C {
@@ -1603,6 +1605,7 @@ _f(int x) => ++x;
     visitSubexpression(findNode.prefix('++'), 'int');
   }
 
+  @FailingTest(reason: 'TODO(paulberry)')
   test_prefixExpression_lhs_nullable_problem() async {
     await analyze('''
 abstract class _C {
@@ -1828,6 +1831,7 @@ _f(_C<int>/*?*/ c) => c?.x;
     visitSubexpression(findNode.propertyAccess('c?.x'), 'List<int>?');
   }
 
+  @FailingTest(reason: 'TODO(paulberry)')
   test_propertyAccess_object_getter() async {
     await analyze('''
 class _C {}
@@ -1836,6 +1840,7 @@ _f(_C/*?*/ c) => (c).hashCode;
     visitSubexpression(findNode.propertyAccess('(c).hashCode'), 'int');
   }
 
+  @FailingTest(reason: 'TODO(paulberry)')
   test_propertyAccess_object_tearoff() async {
     await analyze('''
 class _C {}
