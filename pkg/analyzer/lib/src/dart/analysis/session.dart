@@ -37,6 +37,8 @@ class AnalysisSessionImpl implements AnalysisSession {
   /// The cache of libraries for URIs.
   final Map<String, LibraryElement> _uriToLibraryCache = {};
 
+  final InheritanceManager3 inheritanceManager = InheritanceManager3();
+
   /// Initialize a newly created analysis session.
   AnalysisSessionImpl(this._driver);
 

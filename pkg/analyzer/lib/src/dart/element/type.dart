@@ -8,6 +8,7 @@ import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
+import 'package:analyzer/src/dart/analysis/session.dart';
 import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
 import 'package:analyzer/src/dart/element/member.dart';
@@ -1128,9 +1129,8 @@ class InterfaceTypeImpl extends TypeImpl implements InterfaceType {
   @override
   List<TypeParameterElement> get typeParameters => element.typeParameters;
 
-  InheritanceManager3 get _inheritanceManager {
-    return InheritanceManager3();
-  }
+  InheritanceManager3 get _inheritanceManager =>
+      (element.library.session as AnalysisSessionImpl).inheritanceManager;
 
   @override
   bool operator ==(Object object) {
