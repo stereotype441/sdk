@@ -1246,6 +1246,7 @@ int _g() => 1;
     visitSubexpression(findNode.methodInvocation('_g();'), 'int');
   }
 
+  @FailingTest(reason: 'TODO(paulberry)')
   test_methodInvocation_toString() async {
     await analyze('''
 abstract class _C {}
