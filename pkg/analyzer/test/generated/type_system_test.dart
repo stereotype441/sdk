@@ -11,6 +11,7 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/error/listener.dart';
+import 'package:analyzer/src/dart/analysis/session.dart';
 import 'package:analyzer/src/dart/ast/token.dart' show KeywordToken;
 import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/member.dart';
@@ -421,8 +422,8 @@ class AssignabilityTest extends AbstractTypeSystemTest {
     var definingUnit = CompilationUnitElementImpl();
     definingUnit.source = definingUnit.librarySource = source;
 
-    var testLibrary =
-        LibraryElementImpl(analysisContext, null, '', -1, 0, false);
+    var testLibrary = LibraryElementImpl(
+        analysisContext, AnalysisSessionImpl(null), '', -1, 0, false);
     testLibrary.definingCompilationUnit = definingUnit;
     return testLibrary;
   }
