@@ -1286,7 +1286,7 @@ _f(bool/*?*/ x) => ((x) != (null)) && x;
     visitSubexpression(findNode.binary('&&'), 'bool');
   }
 
-  test_postfixExpression_combined_nullable_noProblem() async {
+  solo_test_postfixExpression_combined_nullable_noProblem() async {
     await analyze('''
 abstract class _C {
   _D/*?*/ operator+(int/*!*/ value);
