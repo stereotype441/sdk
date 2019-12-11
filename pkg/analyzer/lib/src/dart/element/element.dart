@@ -5311,9 +5311,7 @@ class LibraryElementImpl extends ElementImpl implements LibraryElement {
   LibraryElementImpl(this.context, this.session, String name, int offset,
       this.nameLength, this.isNonNullableByDefault)
       : linkedContext = null,
-        super(name, offset) {
-    if (session == null) throw 'WTF';
-  }
+        super(name, offset);
 
   LibraryElementImpl.forLinkedNode(
       this.context,
@@ -5326,7 +5324,6 @@ class LibraryElementImpl extends ElementImpl implements LibraryElement {
       CompilationUnit linkedNode)
       : isNonNullableByDefault = linkedContext.isNNBD,
         super.forLinkedNode(null, reference, linkedNode) {
-    if (session == null) throw 'WTF';
     _name = name;
     _nameOffset = offset;
     setResolutionCapability(

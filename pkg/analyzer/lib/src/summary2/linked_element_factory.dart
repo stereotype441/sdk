@@ -29,7 +29,6 @@ class LinkedElementFactory {
     this.analysisSession,
     this.rootReference,
   ) {
-    if (analysisSession == null) throw 'WTF';
     var dartCoreRef = rootReference.getChild('dart:core');
     dartCoreRef.getChild('dynamic').element = DynamicElementImpl.instance;
     dartCoreRef.getChild('Never').element = NeverElementImpl.instance;
