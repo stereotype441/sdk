@@ -277,6 +277,11 @@ class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
       // TODO(paulberry): ok for toString etc. if the shape is correct
       return parent.operator.type == TokenType.PERIOD &&
           identical(node, parent.target);
+    } else if (parent is MethodInvocation) {
+      // TODO(paulberry): what about cascaded?
+      // TODO(paulberry): ok for toString etc. if the shape is correct
+      return parent.operator.type == TokenType.PERIOD &&
+          identical(node, parent.target);
     } else if (parent is IndexExpression) {
       return identical(node, parent.target);
     } else if (parent is ConditionalExpression) {
