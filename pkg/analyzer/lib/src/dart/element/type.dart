@@ -1324,28 +1324,6 @@ class InterfaceTypeImpl extends TypeImpl implements InterfaceType {
     return null;
   }
 
-  ExecutableElement lookUpGetterOrMethod(
-    String name,
-    LibraryElement library, {
-    bool forSuper = false,
-    bool forSuperRecovery = false,
-    bool withStaticLookup = false,
-  }) {
-    var inheritance = _inheritanceManager;
-    var nameObj = Name(library.source.uri, name);
-
-    var result = inheritance.getMember(this, nameObj, forSuper: forSuper);
-    if (result != null) {
-      return result;
-    }
-
-    if (forSuper && forSuperRecovery) {
-      return inheritance.getInherited(this, nameObj);
-    }
-
-    return null;
-  }
-
   @deprecated
   @override
   PropertyAccessorElement lookUpInheritedGetter(String name,
