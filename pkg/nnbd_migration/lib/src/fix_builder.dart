@@ -211,8 +211,15 @@ class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
   }
 
   @override
-  DartType getVariableType(VariableElement variable) =>
-      _fixBuilder._computeMigratedType(variable);
+  DartType getVariableType(VariableElement variable) {
+    if (variable.library == null) {
+      // This is a synthetic variable created during resolution (e.g. a
+      // parameter of a function type), so the type it currently has is the
+      // correct post-migration type.
+      return variable.type;
+    }
+    return _fixBuilder._computeMigratedType(variable);
+  }
 
   @override
   DartType modifyExpressionType(Expression node, DartType type) {
