@@ -11,7 +11,7 @@ import 'package:analyzer/src/generated/source.dart';
 
 /// Hooks used by resolution to communicate with the migration engine.
 abstract class MigrationResolutionHooks implements ElementTypeProvider {
-  DartType getMigratedTypeAnnotationType(Source source, TypeName node);
+  DartType getMigratedTypeAnnotationType(Source source, TypeAnnotation node);
 
   DartType modifyExpressionType(Expression expression, DartType dartType);
 

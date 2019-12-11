@@ -24,6 +24,7 @@ import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/generated/utilities_dart.dart';
 import 'package:meta/meta.dart';
 import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
+import 'package:nnbd_migration/src/decorated_type.dart';
 import 'package:nnbd_migration/src/utilities/resolution_utils.dart';
 import 'package:nnbd_migration/src/variables.dart';
 
@@ -204,14 +205,9 @@ class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
   }
 
   @override
-  DartType getMigratedTypeAnnotationType(Source source, TypeName node) {
-    var decoratedType =
-        _fixBuilder._variables.decoratedTypeAnnotation(source, node);
-    var type = decoratedType.toFinalType(_fixBuilder.typeProvider);
-    if (!type.isDynamic && decoratedType.node.isNullable) {
-      _fixBuilder.addChange(node, MakeNullable());
-    }
-    return type;
+  DartType getMigratedTypeAnnotationType(Source source, TypeAnnotation node) {
+    return _fixTypeAnnotation(source, node)
+        .toFinalType(_fixBuilder.typeProvider);
   }
 
   @override
@@ -265,6 +261,25 @@ class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
       }
       return node;
     }
+  }
+
+  DecoratedType _fixTypeAnnotation(Source source, TypeAnnotation node) {
+    var decoratedType =
+        _fixBuilder._variables.decoratedTypeAnnotation(source, node);
+    if (!decoratedType.type.isDynamic && decoratedType.node.isNullable) {
+      _fixBuilder.addChange(node, MakeNullable());
+    }
+    if (node is TypeName) {
+      var typeArguments = node.typeArguments;
+      if (typeArguments != null) {
+        for (var arg in typeArguments.arguments) {
+          _fixTypeAnnotation(source, arg);
+        }
+      }
+    } else {
+      throw UnimplementedError('TODO(paulberry)');
+    }
+    return decoratedType;
   }
 
   bool _needsNullCheckDueToStructure(Expression node) {
