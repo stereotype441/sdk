@@ -295,6 +295,10 @@ class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
       return identical(node, parent.condition);
     } else if (parent is FunctionExpressionInvocation) {
       return identical(node, parent.function);
+    } else if (parent is PrefixExpression) {
+      // TODO(paulberry): for prefix increment/decrement, inserting a null check
+      // isn't sufficient.
+      return true;
     }
     return false;
   }

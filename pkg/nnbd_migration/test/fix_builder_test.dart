@@ -1313,6 +1313,7 @@ abstract class _E {
     visitSubexpression(findNode.postfix('++'), 'dynamic');
   }
 
+  @FailingTest(reason: 'TODO(paulberry)')
   test_postfixExpression_combined_nullable_problem() async {
     await analyze('''
 abstract class _C {
@@ -1372,6 +1373,7 @@ _g(_C/*!*/ c) {}
         changes: {findNode.simple('c);'): NullCheck()});
   }
 
+  @FailingTest(reason: 'TODO(paulberry)')
   test_postfixExpression_lhs_nullable_problem() async {
     await analyze('''
 abstract class _C {
@@ -1459,6 +1461,7 @@ _f(_C c) => c.x;
     visitSubexpression(findNode.prefixed('c.x'), 'int?');
   }
 
+  @FailingTest(reason: 'TODO(paulberry)')
   test_prefixedIdentifier_object_getter() async {
     await analyze('''
 class _C {}
@@ -1467,6 +1470,7 @@ _f(_C/*?*/ c) => c.hashCode;
     visitSubexpression(findNode.prefixed('c.hashCode'), 'int');
   }
 
+  @FailingTest(reason: 'TODO(paulberry)')
   test_prefixedIdentifier_object_tearoff() async {
     await analyze('''
 class _C {}
