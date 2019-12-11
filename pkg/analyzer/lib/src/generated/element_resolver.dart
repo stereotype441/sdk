@@ -1109,7 +1109,9 @@ class ElementResolver extends SimpleAstVisitor<void> {
     if (expression is NullLiteral) {
       return _resolver.typeProvider.nullType;
     }
-    DartType type = read ? getReadType(expression) : expression.staticType;
+    DartType type = read
+        ? getReadType(expression, elementTypeProvider: _elementTypeProvider)
+        : expression.staticType;
     return _resolveTypeParameter(type);
   }
 
