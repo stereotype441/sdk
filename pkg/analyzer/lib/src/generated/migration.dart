@@ -7,9 +7,12 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/generated/element_type_provider.dart';
+import 'package:analyzer/src/generated/source.dart';
 
 /// Hooks used by resolution to communicate with the migration engine.
 abstract class MigrationResolutionHooks implements ElementTypeProvider {
+  DartType getMigratedTypeAnnotationType(Source source, TypeName node);
+
   DartType modifyExpressionType(Expression expression, DartType dartType);
 
   void setFlowAnalysis(

@@ -204,6 +204,13 @@ class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
   }
 
   @override
+  DartType getMigratedTypeAnnotationType(Source source, TypeName node) {
+    return _fixBuilder._variables
+        .decoratedTypeAnnotation(source, node)
+        .toFinalType(_fixBuilder.typeProvider);
+  }
+
+  @override
   DartType getVariableType(VariableElement variable) =>
       _fixBuilder._computeMigratedType(variable);
 
