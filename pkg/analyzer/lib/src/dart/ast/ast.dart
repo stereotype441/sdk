@@ -6273,15 +6273,8 @@ abstract class InvocationExpressionImpl extends ExpressionImpl
   @override
   List<DartType> typeArgumentTypes;
 
-  DartType _staticInvokeType;
-
   @override
-  DartType get staticInvokeType => _staticInvokeType;
-
-  @override
-  void set staticInvokeType(DartType value) {
-    _staticInvokeType = value;
-  }
+  DartType staticInvokeType;
 
   /// Initialize a newly created invocation.
   InvocationExpressionImpl(

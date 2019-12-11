@@ -1165,7 +1165,7 @@ Object/*!*/ _f(dynamic d) => d.f();
     visitSubexpression(findNode.methodInvocation('d.f'), 'dynamic');
   }
 
-  solo_test_methodInvocation_namedParameter() async {
+  test_methodInvocation_namedParameter() async {
     await analyze('''
 abstract class _C {
   int f({int/*!*/ x});
