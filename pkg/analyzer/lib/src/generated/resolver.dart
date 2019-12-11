@@ -2731,6 +2731,12 @@ class ResolverVisitorForMigration extends ResolverVisitor {
             migrationResolutionHooks);
 
   @override
+  void visitTypeName(TypeName node) {
+    node.type = (_elementTypeProvider as MigrationResolutionHooks)
+        .getMigratedTypeAnnotationType(source, node);
+  }
+
+  @override
   StaticTypeAnalyzer _makeStaticTypeAnalyzer(
           FeatureSet featureSet, FlowAnalysisHelper flowAnalysis) =>
       StaticTypeAnalyzerForMigration(
