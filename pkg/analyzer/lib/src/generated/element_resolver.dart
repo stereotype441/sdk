@@ -129,7 +129,8 @@ class ElementResolver extends SimpleAstVisitor<void> {
       ElementTypeProvider elementTypeProvider = const ElementTypeProvider()})
       : _definingLibrary = _resolver.definingLibrary,
         _extensionResolver = _resolver.extensionResolver,
-        _methodInvocationResolver = MethodInvocationResolver(_resolver),
+        _methodInvocationResolver =
+            MethodInvocationResolver(_resolver, elementTypeProvider),
         _elementTypeProvider = elementTypeProvider {
     _dynamicType = _resolver.typeProvider.dynamicType;
     _typeType = _resolver.typeProvider.typeType;
