@@ -263,22 +263,17 @@ class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
         }
       }
     } else if (parent is PrefixedIdentifier) {
-      if (identical(node, parent.prefix)) {
-        // TODO(paulberry): ok for toString etc. if the shape is correct
-        return true;
-      }
+      // TODO(paulberry): ok for toString etc. if the shape is correct
+      return identical(node, parent.prefix);
     } else if (parent is PropertyAccess) {
       // TODO(paulberry): what about cascaded?
-      if (parent.operator.type == TokenType.PERIOD &&
-          identical(node, parent.target)) {
-        // TODO(paulberry): ok for toString etc. if the shape is correct
-        return true;
-      }
+      // TODO(paulberry): ok for toString etc. if the shape is correct
+      return parent.operator.type == TokenType.PERIOD &&
+          identical(node, parent.target);
     } else if (parent is IndexExpression) {
-      if (identical(node, parent.target)) {
-        // TODO(paulberry): what about cascaded?
-        return true;
-      }
+      return identical(node, parent.target);
+    } else if (parent is ConditionalExpression) {
+      return identical(node, parent.condition);
     }
     return false;
   }
