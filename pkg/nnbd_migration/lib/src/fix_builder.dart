@@ -274,6 +274,8 @@ class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
       return identical(node, parent.target);
     } else if (parent is ConditionalExpression) {
       return identical(node, parent.condition);
+    } else if (parent is FunctionExpressionInvocation) {
+      return identical(node, parent.function);
     }
     return false;
   }
