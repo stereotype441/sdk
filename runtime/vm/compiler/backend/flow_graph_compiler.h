@@ -501,7 +501,6 @@ class FlowGraphCompiler : public ValueObject {
       const Register function_type_args_reg,
       const Register subtype_cache_reg,
       const Register dst_type_reg,
-      const Register dst_type_reg_to_call,
       const Register scratch_reg,
       compiler::Label* done);
 
@@ -848,6 +847,7 @@ class FlowGraphCompiler : public ValueObject {
   bool IsEmptyBlock(BlockEntryInstr* block) const;
 
  private:
+  friend class BoxInt64Instr;            // For AddPcRelativeCallStubTarget().
   friend class CheckNullInstr;           // For AddPcRelativeCallStubTarget().
   friend class NullErrorSlowPath;        // For AddPcRelativeCallStubTarget().
   friend class CheckStackOverflowInstr;  // For AddPcRelativeCallStubTarget().

@@ -49,8 +49,6 @@ abstract class AbstractResynthesizeTest with ResourceProviderMixin {
         DartUriResolver(sdk),
         ResourceUriResolver(resourceProvider),
       ],
-      null,
-      resourceProvider,
     );
 
     testFile = convertPath('/test.dart');
@@ -6801,7 +6799,7 @@ Future<dynamic> f;
     allowMissingFiles = true;
     var library = await checkLibrary('''
 @foo
-import '';
+import 'ht:';
 ''');
     checkElementText(library, r'''
 @
@@ -7878,19 +7876,18 @@ class C {
 ''');
   }
 
-  test_invalidUri_part_emptyUri() async {
+  test_part_emptyUri() async {
     allowMissingFiles = true;
     var library = await checkLibrary(r'''
 part '';
 class B extends A {}
 ''');
     checkElementText(library, r'''
-part '<unresolved>';
+part 'test.dart';
 class B {
 }
---------------------
-unit: null
-
+class B {
+}
 ''');
   }
 
