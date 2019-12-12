@@ -110,8 +110,8 @@ static bool IsControlFlow(Instruction* instruction) {
 static void AssertPushArgsInEnv(FlowGraph* flow_graph, Definition* call) {
   Environment* env = call->env();
   if (env == nullptr) {
-    // An empty environment should only happen pre-SSA.
-    ASSERT(flow_graph->current_ssa_temp_index() == 0);
+    // Environments can be removed by EliminateEnvironments pass and
+    // are not present before SSA.
   } else if (flow_graph->function().IsIrregexpFunction()) {
     // TODO(dartbug.com/38577): cleanup regexp pipeline too....
   } else {
@@ -364,6 +364,8 @@ void FlowGraphChecker::VisitDefUse(Definition* def,
     // BlockEntry instructions have environments attached to them but
     // have no reliable way to verify if they are still in the graph.
     ASSERT(is_env);
+    ASSERT(instruction->next() != nullptr);
+    ASSERT(DefDominatesUse(def, instruction));
   } else {
     // Others are fully linked into graph.
     ASSERT(IsControlFlow(instruction) || instruction->next() != nullptr);

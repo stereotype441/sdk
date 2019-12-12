@@ -2238,7 +2238,7 @@
           preview pages.
         </p>
       </field>
-      <field name="outputDir" optional="true">
+      <field name="outputDir" optional="true" deprecated="true">
         <ref>FilePath</ref>
         <p>
           The absolute and normalized path to a directory to which
@@ -2292,6 +2292,16 @@
           details that users might want to explore before committing the changes
           or (b) describe exceptions that were thrown but that did not stop the
           fixes from being produced. The list will be omitted if it is empty.
+        </p>
+      </field>
+      <field name="urls" optional="true">
+        <list>
+          <ref>String</ref>
+        </list>
+        <p>
+          The URLs that users can visit in a browser to see a preview of the
+          proposed changes. There is one URL for each of the included file
+          paths. The field is omitted if no port was provided.
         </p>
       </field>
     </result>

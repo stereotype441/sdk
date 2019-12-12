@@ -226,15 +226,16 @@ uint32_t ImageWriter::GetDataOffsetFor(RawObject* raw_object) {
 
 #if defined(DART_PRECOMPILER)
 void ImageWriter::DumpInstructionStats() {
-  CombinedCodeStatistics instruction_stats;
+  std::unique_ptr<CombinedCodeStatistics> instruction_stats(
+      new CombinedCodeStatistics());
   for (intptr_t i = 0; i < instructions_.length(); i++) {
     auto& data = instructions_[i];
     CodeStatistics* stats = data.insns_->stats();
     if (stats != nullptr) {
-      stats->AppendTo(&instruction_stats);
+      stats->AppendTo(instruction_stats.get());
     }
   }
-  instruction_stats.DumpStatistics();
+  instruction_stats->DumpStatistics();
 }
 
 void ImageWriter::DumpInstructionsSizes() {
@@ -477,6 +478,11 @@ static const char* NameOfStubIsolateSpecificStub(ObjectStore* object_store,
   } else if (code.raw() ==
              object_store->null_error_stub_without_fpu_regs_stub()) {
     return "_iso_stub_NullErrorSharedWithoutFPURegsStub";
+  } else if (code.raw() == object_store->allocate_mint_with_fpu_regs_stub()) {
+    return "_iso_stub_AllocateMintWithFPURegsStub";
+  } else if (code.raw() ==
+             object_store->allocate_mint_without_fpu_regs_stub()) {
+    return "_iso_stub_AllocateMintWithoutFPURegsStub";
   } else if (code.raw() ==
              object_store->stack_overflow_stub_with_fpu_regs_stub()) {
     return "_iso_stub_StackOverflowStubWithFPURegsStub";
@@ -633,8 +639,6 @@ void AssemblyImageWriter::WriteText(WriteStream* clustered_stream, bool vm) {
       WriteWordLiteralText(marked_tags);
       text_offset += sizeof(compiler::target::uword);
       WriteWordLiteralText(insns.raw_ptr()->size_and_flags_);
-      text_offset += sizeof(compiler::target::uword);
-      WriteWordLiteralText(insns.raw_ptr()->unchecked_entrypoint_pc_offset_);
       text_offset += sizeof(compiler::target::uword);
 #else   // defined(IS_SIMARM_X64)
       uword object_start = reinterpret_cast<uword>(insns.raw_ptr());
@@ -920,7 +924,7 @@ void BlobImageWriter::WriteText(WriteStream* clustered_stream, bool vm) {
     const Code& code = *instructions_[i].code_;
     if ((elf_ != nullptr) && (dwarf_ != nullptr) && !code.IsNull()) {
       intptr_t segment_offset = instructions_blob_stream_.bytes_written() +
-                                Instructions::HeaderSize();
+                                compiler::target::Instructions::HeaderSize();
       dwarf_->AddCode(code, segment_base + segment_offset);
     }
 #endif
@@ -946,8 +950,6 @@ void BlobImageWriter::WriteText(WriteStream* clustered_stream, bool vm) {
     instructions_blob_stream_.WriteTargetWord(marked_tags);
     instructions_blob_stream_.WriteFixed<uint32_t>(
         insns.raw_ptr()->size_and_flags_);
-    instructions_blob_stream_.WriteFixed<uint32_t>(
-        insns.raw_ptr()->unchecked_entrypoint_pc_offset_);
     payload_stream_start = instructions_blob_stream_.Position();
     instructions_blob_stream_.WriteBytes(
         reinterpret_cast<const void*>(insns.PayloadStart()), insns.Size());

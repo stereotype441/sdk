@@ -220,7 +220,8 @@ class Symbols;
  protected: /* NOLINT */                                                       \
   object() : super() {}                                                        \
   BASE_OBJECT_IMPLEMENTATION(object, super)                                    \
-  OBJECT_SERVICE_SUPPORT(object)
+  OBJECT_SERVICE_SUPPORT(object)                                               \
+  friend class Object;
 
 #define HEAP_OBJECT_IMPLEMENTATION(object, super)                              \
   OBJECT_IMPLEMENTATION(object, super);                                        \
@@ -254,6 +255,7 @@ class Symbols;
   }                                                                            \
   static intptr_t NextFieldOffset() { return -kWordSize; }                     \
   SNAPSHOT_READER_SUPPORT(rettype)                                             \
+  friend class Object;                                                         \
   friend class StackFrame;                                                     \
   friend class Thread;
 
@@ -503,6 +505,7 @@ class Object {
   // Initialize the VM isolate.
   static void InitNull(Isolate* isolate);
   static void Init(Isolate* isolate);
+  static void InitVtables();
   static void FinishInit(Isolate* isolate);
   static void FinalizeVMIsolate(Isolate* isolate);
   static void FinalizeReadOnlyObject(RawObject* object);
@@ -523,6 +526,14 @@ class Object {
     return RoundedAllocationSize(sizeof(RawObject));
   }
 
+  template <class FakeObject>
+  static void VerifyBuiltinVtable(intptr_t cid) {
+    FakeObject fake;
+    if (cid >= kNumPredefinedCids) {
+      cid = kInstanceCid;
+    }
+    ASSERT(builtin_vtables_[cid] == fake.vtable());
+  }
   static void VerifyBuiltinVtables();
 
   static const ClassId kClassId = kObjectCid;
@@ -712,8 +723,7 @@ class Object {
     return reinterpret_cast<cpp_vtable*>(vtable_addr);
   }
 
-  static cpp_vtable handle_vtable_;
-  static RelaxedAtomic<cpp_vtable> builtin_vtables_[kNumPredefinedCids];
+  static cpp_vtable builtin_vtables_[kNumPredefinedCids];
 
   // The static values below are singletons shared between the different
   // isolates. They are all allocated in the non-GC'd Dart::vm_isolate_.
@@ -892,11 +902,6 @@ class Class : public Object {
            (!Utils::IsAligned((value * kWordSize), kObjectAlignment) &&
             ((value + 1) == raw_ptr()->instance_size_in_words_)));
     StoreNonPointer(&raw_ptr()->next_field_offset_in_words_, value);
-  }
-
-  cpp_vtable handle_vtable() const { return raw_ptr()->handle_vtable_; }
-  void set_handle_vtable(cpp_vtable value) const {
-    StoreNonPointer(&raw_ptr()->handle_vtable_, value);
   }
 
   static bool is_valid_id(intptr_t value) {
@@ -4826,11 +4831,7 @@ class Instructions : public Object {
 
   uword PayloadStart() const { return PayloadStart(raw()); }
   uword MonomorphicEntryPoint() const { return MonomorphicEntryPoint(raw()); }
-  uword MonomorphicUncheckedEntryPoint() const {
-    return MonomorphicUncheckedEntryPoint(raw());
-  }
   uword EntryPoint() const { return EntryPoint(raw()); }
-  uword UncheckedEntryPoint() const { return UncheckedEntryPoint(raw()); }
   static uword PayloadStart(const RawInstructions* instr) {
     return reinterpret_cast<uword>(instr->ptr()) + HeaderSize();
   }
@@ -4879,26 +4880,6 @@ class Instructions : public Object {
     return entry;
   }
 
-  static uword UncheckedEntryPoint(const RawInstructions* instr) {
-    uword entry =
-        PayloadStart(instr) + instr->ptr()->unchecked_entrypoint_pc_offset_;
-    if (!HasSingleEntryPoint(instr)) {
-      entry += !FLAG_precompiled_mode ? kPolymorphicEntryOffsetJIT
-                                      : kPolymorphicEntryOffsetAOT;
-    }
-    return entry;
-  }
-
-  static uword MonomorphicUncheckedEntryPoint(const RawInstructions* instr) {
-    uword entry =
-        PayloadStart(instr) + instr->ptr()->unchecked_entrypoint_pc_offset_;
-    if (!HasSingleEntryPoint(instr)) {
-      entry += !FLAG_precompiled_mode ? kMonomorphicEntryOffsetJIT
-                                      : kMonomorphicEntryOffsetAOT;
-    }
-    return entry;
-  }
-
   static const intptr_t kMaxElements =
       (kMaxInt32 - (sizeof(RawInstructions) + sizeof(RawObject) +
                     (2 * kMaxObjectAlignment)));
@@ -4935,10 +4916,6 @@ class Instructions : public Object {
   CodeStatistics* stats() const;
   void set_stats(CodeStatistics* stats) const;
 
-  uword unchecked_entrypoint_pc_offset() const {
-    return raw_ptr()->unchecked_entrypoint_pc_offset_;
-  }
-
  private:
   void SetSize(intptr_t value) const {
     ASSERT(value >= 0);
@@ -4951,17 +4928,11 @@ class Instructions : public Object {
                     FlagsBits::update(value, raw_ptr()->size_and_flags_));
   }
 
-  void set_unchecked_entrypoint_pc_offset(uword value) const {
-    StoreNonPointer(&raw_ptr()->unchecked_entrypoint_pc_offset_, value);
-  }
-
   // New is a private method as RawInstruction and RawCode objects should
   // only be created using the Code::FinalizeCode method. This method creates
   // the RawInstruction and RawCode objects, sets up the pointer offsets
   // and links the two in a GC safe manner.
-  static RawInstructions* New(intptr_t size,
-                              bool has_single_entry_point,
-                              uword unchecked_entrypoint_pc_offset);
+  static RawInstructions* New(intptr_t size, bool has_single_entry_point);
 
   FINAL_HEAP_OBJECT_IMPLEMENTATION(Instructions, Object);
   friend class Class;
@@ -5346,7 +5317,8 @@ class Code : public Object {
     return code->ptr()->instructions_;
   }
 
-  static uword EntryPoint(const RawCode* code) {
+  // Returns the entry point of [InstructionsOf(code)].
+  static uword EntryPointOf(const RawCode* code) {
     return Instructions::EntryPoint(InstructionsOf(code));
   }
 
@@ -5411,27 +5383,44 @@ class Code : public Object {
   bool is_alive() const { return AliveBit::decode(raw_ptr()->state_bits_); }
   void set_is_alive(bool value) const;
 
+  // Returns the payload start of [instructions()].
   uword PayloadStart() const {
     return Instructions::PayloadStart(instructions());
   }
+  // Returns the entry point of [instructions()].
   uword EntryPoint() const { return Instructions::EntryPoint(instructions()); }
+  // Returns the unchecked entry point of [instructions()].
   uword UncheckedEntryPoint() const {
-    return Instructions::UncheckedEntryPoint(instructions());
+#if defined(DART_PRECOMPILED_RUNTIME)
+    return raw_ptr()->unchecked_entry_point_;
+#else
+    return EntryPoint() + raw_ptr()->unchecked_offset_;
+#endif
   }
+  // Returns the monomorphic entry point of [instructions()].
   uword MonomorphicEntryPoint() const {
     return Instructions::MonomorphicEntryPoint(instructions());
   }
+  // Returns the unchecked monomorphic entry point of [instructions()].
   uword MonomorphicUncheckedEntryPoint() const {
-    return Instructions::MonomorphicUncheckedEntryPoint(instructions());
+#if defined(DART_PRECOMPILED_RUNTIME)
+    return raw_ptr()->monomorphic_unchecked_entry_point_;
+#else
+    return MonomorphicEntryPoint() + raw_ptr()->unchecked_offset_;
+#endif
   }
+  // Returns the size of [instructions()].
   intptr_t Size() const { return Instructions::Size(instructions()); }
+
   RawObjectPool* GetObjectPool() const;
+  // Returns whether the given PC address is in [instructions()].
   bool ContainsInstructionAt(uword addr) const {
     return ContainsInstructionAt(raw(), addr);
   }
 
+  // Returns whether the given PC address is in [InstructionsOf(code)].
   static bool ContainsInstructionAt(const RawCode* code, uword addr) {
-    return Instructions::ContainsPc(code->ptr()->instructions_, addr);
+    return Instructions::ContainsPc(InstructionsOf(code), addr);
   }
 
   // Returns true if there is a debugger breakpoint set in this code object.
@@ -5746,11 +5735,18 @@ class Code : public Object {
   void Enable() const {
     if (!IsDisabled()) return;
     ASSERT(Thread::Current()->IsMutatorThread());
-    ASSERT(instructions() != active_instructions());
-    SetActiveInstructions(Instructions::Handle(instructions()));
+    ResetActiveInstructions();
   }
 
-  bool IsDisabled() const { return instructions() != active_instructions(); }
+  bool IsDisabled() const { return IsDisabled(raw()); }
+  static bool IsDisabled(RawCode* code) {
+#if defined(DART_PRECOMPILED_RUNTIME)
+    UNREACHABLE();
+    return false;
+#else
+    return code->ptr()->instructions_ != code->ptr()->active_instructions_;
+#endif
+  }
 
  private:
   void set_state_bits(intptr_t bits) const;
@@ -5804,15 +5800,39 @@ class Code : public Object {
 #endif
   }
 
-  // Initializes 4 cached entrypoint addresses in 'code' from 'instructions'.
+  // Initializes the cached entrypoint addresses in [code] as calculated
+  // from [instructions] and [unchecked_offset].
   static void InitializeCachedEntryPointsFrom(RawCode* code,
-                                              RawInstructions* instructions);
+                                              RawInstructions* instructions,
+                                              uint32_t unchecked_offset);
 
-  void SetActiveInstructions(const Instructions& instructions) const;
+  // Sets [active_instructions_] to [instructions] and updates the cached
+  // entry point addresses.
+  void SetActiveInstructions(const Instructions& instructions,
+                             uint32_t unchecked_offset) const;
+
+  // Resets [active_instructions_] to its original value of [instructions_] and
+  // updates the cached entry point addresses to match.
+  void ResetActiveInstructions() const;
 
   void set_instructions(const Instructions& instructions) const {
     ASSERT(Thread::Current()->IsMutatorThread() || !is_alive());
     StorePointer(&raw_ptr()->instructions_, instructions.raw());
+  }
+#if !defined(DART_PRECOMPILED_RUNTIME)
+  void set_unchecked_offset(uword offset) const {
+    StoreNonPointer(&raw_ptr()->unchecked_offset_, offset);
+  }
+#endif
+
+  // Returns the unchecked entry point offset for [instructions_].
+  uint32_t UncheckedEntryPointOffset() const {
+#if defined(DART_PRECOMPILED_RUNTIME)
+    UNREACHABLE();
+    return raw_ptr()->unchecked_entry_point_ - raw_ptr()->entry_point_;
+#else
+    return raw_ptr()->unchecked_offset_;
+#endif
   }
 
   void set_pointer_offsets_length(intptr_t value) {
@@ -5857,6 +5877,7 @@ class Code : public Object {
   // function points to is optimized.
   friend class RawFunction;
   friend class CallSiteResetter;
+  friend class CodeKeyValueTrait;  // for UncheckedEntryPointOffset
 };
 
 class Bytecode : public Object {
@@ -7637,8 +7658,6 @@ class Smi : public Integer {
     return -kWordSize;
   }
 
-  static cpp_vtable handle_vtable_;
-
   Smi() : Integer() {}
   BASE_OBJECT_IMPLEMENTATION(Smi, Integer);
   OBJECT_SERVICE_SUPPORT(Smi);
@@ -9358,6 +9377,7 @@ class TypedDataView : public TypedDataBase {
 
   FINAL_HEAP_OBJECT_IMPLEMENTATION(TypedDataView, TypedDataBase);
   friend class Class;
+  friend class Object;
   friend class TypedDataViewDeserializationCluster;
 };
 
@@ -10141,11 +10161,7 @@ DART_FORCE_INLINE
 void Object::SetRaw(RawObject* value) {
   NoSafepointScope no_safepoint_scope;
   raw_ = value;
-  if ((reinterpret_cast<uword>(value) & kSmiTagMask) == kSmiTag) {
-    set_vtable(Smi::handle_vtable_);
-    return;
-  }
-  intptr_t cid = value->GetClassId();
+  intptr_t cid = value->GetClassIdMayBeSmi();
   // Free-list elements cannot be wrapped in a handle.
   ASSERT(cid != kFreeListElement);
   ASSERT(cid != kForwardingCorpse);
@@ -10154,7 +10170,7 @@ void Object::SetRaw(RawObject* value) {
   }
   set_vtable(builtin_vtables_[cid]);
 #if defined(DEBUG)
-  if (FLAG_verify_handles) {
+  if (FLAG_verify_handles && raw_->IsHeapObject()) {
     Isolate* isolate = Isolate::Current();
     Heap* isolate_heap = isolate->heap();
     Heap* vm_isolate_heap = Dart::vm_isolate()->heap();
@@ -10280,7 +10296,7 @@ void MegamorphicCache::SetEntry(const Array& array,
     if (target.IsFunction()) {
       const auto& function = Function::Cast(target);
       const auto& entry_point = Smi::Handle(
-          Smi::FromAlignedAddress(Code::EntryPoint(function.CurrentCode())));
+          Smi::FromAlignedAddress(Code::EntryPointOf(function.CurrentCode())));
       array.SetAt((index * kEntryLength) + kTargetFunctionIndex, entry_point);
       return;
     }
