@@ -1060,6 +1060,17 @@ C<int, num?> f(List<int> a) => a;
     await _checkSingleFileChanges(content, expected);
   }
 
+  @FailingTest(issue: 'https://github.com/dart-lang/sdk/issues/39609')
+  test_dynamic_dispatch_to_object_method() async {
+    var content = '''
+String f(dynamic x) => x.toString();
+''';
+    var expected = '''
+String f(dynamic x) => x.toString();
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_dynamic_method_call() async {
     var content = '''
 class C {
@@ -1749,6 +1760,68 @@ void g(C<int?> c) {                   // (3)
     await _checkSingleFileChanges(content, expected);
   }
 
+  test_getter_implicit_returnType_overrides_implicit_getter() async {
+    var content = '''
+class A {
+  final String s = "x";
+}
+class C implements A {
+  get s => false ? "y" : null;
+}
+''';
+    var expected = '''
+class A {
+  final String? s = "x";
+}
+class C implements A {
+  get s => false ? "y" : null;
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_getter_overrides_implicit_getter() async {
+    var content = '''
+class A {
+  final String s = "x";
+}
+class C implements A {
+  String get s => false ? "y" : null;
+}
+''';
+    var expected = '''
+class A {
+  final String? s = "x";
+}
+class C implements A {
+  String? get s => false ? "y" : null;
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_getter_overrides_implicit_getter_with_generics() async {
+    var content = '''
+class A<T> {
+  final T value;
+  A(this.value);
+}
+class C implements A<String/*!*/> {
+  String get value => false ? "y" : null;
+}
+''';
+    var expected = '''
+class A<T> {
+  final T? value;
+  A(this.value);
+}
+class C implements A<String/*!*/> {
+  String? get value => false ? "y" : null;
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
   test_getter_topLevel() async {
     var content = '''
 int get g => 0;
@@ -1918,6 +1991,30 @@ class C extends B {
   f() => 1;
 }
 int? g(C c) => c.f();
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  @FailingTest(issue: 'https://github.com/dart-lang/sdk/issues/38469')
+  test_inserted_nodes_properly_wrapped() async {
+    addMetaPackage();
+    var content = '''
+class C {
+  C operator+(C other) => null;
+}
+void f(C x, C y) {
+  C z = x + y;
+  assert(z != null);
+}
+''';
+    var expected = '''
+class C {
+  C operator+(C other) => null;
+}
+void f(C x, C y) {
+  C z = (x + y)!;
+  assert(z != null);
+}
 ''';
     await _checkSingleFileChanges(content, expected);
   }
@@ -2479,7 +2576,7 @@ main() {
   test_null_aware_setter_invocation_null_target() async {
     var content = '''
 class C {
-  void set x(int value);
+  void set x(int value) {}
 }
 int f(C c) => c?.x = 1;
 main() {
@@ -2488,7 +2585,7 @@ main() {
 ''';
     var expected = '''
 class C {
-  void set x(int value);
+  void set x(int value) {}
 }
 int? f(C? c) => c?.x = 1;
 main() {
@@ -2501,7 +2598,7 @@ main() {
   test_null_aware_setter_invocation_null_value() async {
     var content = '''
 class C {
-  void set x(int value);
+  void set x(int value) {}
 }
 int f(C c) => c?.x = 1;
 main() {
@@ -2510,7 +2607,7 @@ main() {
 ''';
     var expected = '''
 class C {
-  void set x(int value);
+  void set x(int value) {}
 }
 int? f(C? c) => c?.x = 1;
 main() {
@@ -2537,6 +2634,21 @@ class _C {
 _C g(int/*!*/ i) => _C();
 test(int?/*?*/ j) {
   g(j!)..f();
+}
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  @FailingTest(issue: 'https://github.com/dart-lang/sdk/issues/39269')
+  test_null_in_conditional_expression() async {
+    var content = '''
+void f() {
+  List<int> x = false ? [] : null;
+}
+''';
+    var expected = '''
+void f() {
+  List<int>? x = false ? [] : null;
 }
 ''';
     await _checkSingleFileChanges(content, expected);
@@ -2941,6 +3053,30 @@ int? recover() {
   assert(false);
   return null;
 }
+''';
+    await _checkSingleFileChanges(content, expected);
+  }
+
+  test_setter_overrides_implicit_setter() async {
+    var content = '''
+class A {
+  String s = "x";
+}
+class C implements A {
+  String get s => "x";
+  void set s(String value) {}
+}
+f() => A().s = null;
+''';
+    var expected = '''
+class A {
+  String? s = "x";
+}
+class C implements A {
+  String get s => "x";
+  void set s(String? value) {}
+}
+f() => A().s = null;
 ''';
     await _checkSingleFileChanges(content, expected);
   }

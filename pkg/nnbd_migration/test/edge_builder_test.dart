@@ -1665,7 +1665,7 @@ class C {
     // exception to be thrown.
   }
 
-  test_constructor_withRedirectingSuperInitializer() async {
+  test_constructor_superInitializer() async {
     await analyze('''
 class C {
   C.named(int i);
@@ -1683,45 +1683,37 @@ class D extends C {
         hard: true);
   }
 
-  @FailingTest(
-      reason: 'Need to pass type arguments along in '
-          'EdgeBuilder.visitSuperConstructorInvocation')
-  test_constructor_withRedirectingSuperInitializer_withTypeArgument() async {
+  test_constructor_superInitializer_withTypeArgument() async {
     await analyze('''
 class C<T> {
-  C.named(T i);
+  C.named(T/*1*/ i);
 }
-class D extends C<int> {
-  D(int j) : super.named(j);
+class D extends C<int/*2*/> {
+  D(int/*3*/ j) : super.named(j);
 }
 ''');
 
-    var namedConstructor = findElement.constructor('named', of: 'C');
-    var constructorType = variables.decoratedElementType(namedConstructor);
-    var constructorParameterType = constructorType.positionalParameters[0];
-    assertEdge(
-        decoratedTypeAnnotation('int j').node, constructorParameterType.node,
+    var nullable_t1 = decoratedTypeAnnotation('T/*1*/').node;
+    var nullable_int2 = decoratedTypeAnnotation('int/*2*/').node;
+    var nullable_int3 = decoratedTypeAnnotation('int/*3*/').node;
+    assertEdge(nullable_int3, substitutionNode(nullable_int2, nullable_t1),
         hard: true);
   }
 
-  @FailingTest(
-      reason: 'Need to pass type arguments along in '
-          'EdgeBuilder.visitSuperConstructorInvocation')
-  test_constructor_withRedirectingSuperInitializer_withTypeVariable() async {
+  test_constructor_superInitializer_withTypeVariable() async {
     await analyze('''
 class C<T> {
-  C.named(T i);
+  C.named(T/*1*/ i);
 }
-class D<T> extends C<T> {
-  D(T j) : super.named(j);
+class D<U> extends C<U/*2*/> {
+  D(U/*3*/ j) : super.named(j);
 }
 ''');
 
-    var namedConstructor = findElement.constructor('named', of: 'C');
-    var constructorType = variables.decoratedElementType(namedConstructor);
-    var constructorParameterType = constructorType.positionalParameters[0];
-    assertEdge(
-        decoratedTypeAnnotation('int j').node, constructorParameterType.node,
+    var nullable_t1 = decoratedTypeAnnotation('T/*1*/').node;
+    var nullable_u2 = decoratedTypeAnnotation('U/*2*/').node;
+    var nullable_u3 = decoratedTypeAnnotation('U/*3*/').node;
+    assertEdge(nullable_u3, substitutionNode(nullable_u2, nullable_t1),
         hard: true);
   }
 
@@ -2340,6 +2332,15 @@ int/*2*/ g() {
             hard: false));
   }
 
+  test_functionTypeAlias_inExpression() async {
+    await analyze('''
+typedef bool _P<T>(T value);
+bool f(Object x) => x is _P<Object>;
+''');
+    // No assertions here; just don't crash. This test can be repurposed for
+    // a more specific test with assertions.
+  }
+
   test_genericMethodInvocation() async {
     await analyze('''
 class Base {
@@ -2406,6 +2407,29 @@ int bar(Derived<String> d, int i, List<String> j) => d.foo(i, j);
             decoratedTypeAnnotation('U foo').node),
         decoratedTypeAnnotation('int bar').node,
         hard: false);
+  }
+
+  test_genericTypeAlias_inExpression() async {
+    await analyze('''
+typedef _P<T> = bool Function(T value);
+bool f(Object x) => x is _P<Object>;
+''');
+    // No assertions here; just don't crash. This test can be repurposed for
+    // a more specific test with assertions.
+  }
+
+  test_getter_overrides_implicit_getter() async {
+    await analyze('''
+class A {
+  final String/*1*/ s = "x";
+}
+class C implements A {
+  String/*2*/ get s => false ? "y" : null;
+}
+''');
+    var string1 = decoratedTypeAnnotation('String/*1*/');
+    var string2 = decoratedTypeAnnotation('String/*2*/');
+    assertEdge(string2.node, string1.node, hard: true);
   }
 
   test_if_condition() async {
@@ -5112,6 +5136,22 @@ Set<String> f() {
     assertNoUpstreamNullability(decoratedTypeAnnotation('Set').node);
     assertEdge(inSet(alwaysPlus), decoratedTypeAnnotation('String>{').node,
         hard: false);
+  }
+
+  test_setter_overrides_implicit_setter() async {
+    await analyze('''
+class A {
+  String/*1*/ s = "x";
+}
+class C implements A {
+  String get s => "x";
+  void set s(String/*2*/ value) {}
+}
+f() => A().s = null;
+''');
+    var string1 = decoratedTypeAnnotation('String/*1*/');
+    var string2 = decoratedTypeAnnotation('String/*2*/');
+    assertEdge(string1.node, string2.node, hard: true);
   }
 
   test_simpleIdentifier_function() async {

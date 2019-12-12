@@ -769,6 +769,13 @@ class FlowGraphCompiler : public ValueObject {
   // locations of values in the slow path call.
   Environment* SlowPathEnvironmentFor(Instruction* inst,
                                       intptr_t num_slow_path_args) {
+    if (inst->env() == nullptr && is_optimizing()) {
+      if (pending_deoptimization_env_ == nullptr) {
+        return nullptr;
+      }
+      return SlowPathEnvironmentFor(pending_deoptimization_env_, inst->locs(),
+                                    num_slow_path_args);
+    }
     return SlowPathEnvironmentFor(inst->env(), inst->locs(),
                                   num_slow_path_args);
   }
@@ -840,6 +847,7 @@ class FlowGraphCompiler : public ValueObject {
   bool IsEmptyBlock(BlockEntryInstr* block) const;
 
  private:
+  friend class BoxInt64Instr;            // For AddPcRelativeCallStubTarget().
   friend class CheckNullInstr;           // For AddPcRelativeCallStubTarget().
   friend class NullErrorSlowPath;        // For AddPcRelativeCallStubTarget().
   friend class CheckStackOverflowInstr;  // For AddPcRelativeCallStubTarget().

@@ -530,7 +530,7 @@
         ],
         "vm-options": ["--enable_interpreter"]
     }},
-    "(dartdevc|dartdevk)-checked-(linux|mac|win)-(debug|product|release)-(chrome|firefox)": {
+    "dartdevk-checked-(linux|mac|win)-(debug|product|release)-(chrome|firefox)": {
       "options": {
         "checked": true,
         "use-sdk": true
@@ -995,13 +995,16 @@
           "arguments": [
             "--mode=${mode}",
             "--arch=${arch}",
-            "--asan"
+            "--sanitizer=asan"
           ]
         },
         {
           "name": "build dart",
           "script": "tools/build.py",
-          "arguments": ["runtime"],
+          "arguments": [
+            "--sanitizer=asan",
+            "runtime"
+          ],
           "environment": {
             "ASAN_OPTIONS": "handle_segv=0:detect_leaks=1:detect_stack_use_after_return=0:disable_coredump=0:abort_on_error=1",
             "ASAN_SYMBOLIZER_PATH": "buildtools/linux-x64/clang/bin/llvm-symbolizer"
@@ -1032,13 +1035,16 @@
           "arguments": [
             "--mode=${mode}",
             "--arch=${arch}",
-            "--lsan"
+            "--sanitizer=lsan"
           ]
         },
         {
           "name": "build dart",
           "script": "tools/build.py",
-          "arguments": ["runtime"],
+          "arguments": [
+            "--sanitizer=lsan",
+            "runtime"
+          ],
           "environment": {
             "ASAN_OPTIONS": "handle_segv=0:detect_leaks=1:detect_stack_use_after_return=0:disable_coredump=0:abort_on_error=1",
             "ASAN_SYMBOLIZER_PATH": "buildtools/linux-x64/clang/bin/llvm-symbolizer"
@@ -1069,13 +1075,16 @@
           "arguments": [
             "--mode=${mode}",
             "--arch=${arch}",
-            "--msan"
+            "--sanitizer=msan"
           ]
         },
         {
           "name": "build dart",
           "script": "tools/build.py",
-          "arguments": ["runtime"],
+          "arguments": [
+            "--sanitizer=msan",
+            "runtime"
+          ],
           "environment": {
             "MSAN_OPTIONS": "handle_segv=0:detect_leaks=1:detect_stack_use_after_return=0:disable_coredump=0:abort_on_error=1",
             "MSAN_SYMBOLIZER_PATH": "buildtools/linux-x64/clang/bin/llvm-symbolizer"
@@ -1106,13 +1115,16 @@
           "arguments": [
             "--mode=${mode}",
             "--arch=${arch}",
-            "--tsan"
+            "--sanitizer=tsan"
           ]
         },
         {
           "name": "build dart",
           "script": "tools/build.py",
-          "arguments": ["runtime"],
+          "arguments": [
+            "--sanitizer=tsan",
+            "runtime"
+          ],
           "environment": {
             "TSAN_OPTIONS": "handle_segv=0:disable_coredump=0:abort_on_error=1",
             "TSAN_SYMBOLIZER_PATH": "buildtools/linux-x64/clang/bin/llvm-symbolizer"
@@ -1143,13 +1155,16 @@
           "arguments": [
             "--mode=${mode}",
             "--arch=${arch}",
-            "--ubsan"
+            "--sanitizer=ubsan"
           ]
         },
         {
           "name": "build dart",
           "script": "tools/build.py",
-          "arguments": ["runtime"],
+          "arguments": [
+            "--sanitizer=ubsan",
+            "runtime"
+          ],
           "environment": {
             "UBSAN_OPTIONS": "handle_segv=0:disable_coredump=0:abort_on_error=1"
           }
@@ -1313,33 +1328,12 @@
           "arguments": ["dart2js_bot", "dartdevc_test"]
         },
         {
-          "name": "ddc co19_2 tests",
-          "arguments": [
-            "-ndartdevc-checked-${system}-release-chrome",
-            "co19_2"
-          ],
-          "shards": 6,
-          "fileset": "dart2js"
-        },
-        {
           "name": "ddk co19_2 tests",
           "arguments": [
             "-ndartdevk-checked-${system}-release-chrome",
             "co19_2"
           ],
           "shards": 6,
-          "fileset": "dart2js"
-        },
-        {
-          "name": "ddc tests",
-          "arguments": [
-            "-ndartdevc-checked-${system}-release-chrome",
-            "language_2",
-            "corelib_2",
-            "lib_2",
-            "dartdevc_native"
-          ],
-          "shards": 1,
           "fileset": "dart2js"
         },
         {
@@ -1350,17 +1344,6 @@
             "corelib_2",
             "lib_2",
             "dartdevc_native"
-          ]
-        },
-        {
-          "name": "ddc analyzer modular tests",
-          "script": "out/ReleaseX64/dart-sdk/bin/dart",
-          "testRunner": true,
-          "arguments": [
-            "pkg/dev_compiler/test/modular_ddc_suite.dart",
-            "-ndartdevc-${system}-release",
-            "--verbose",
-            "--use-sdk"
           ]
         },
         {
@@ -1386,26 +1369,10 @@
           ]
         },
         {
-          "name": "ddc sourcemap tests",
-          "script": "out/ReleaseX64/dart",
-          "arguments": [
-            "pkg/dev_compiler/test/sourcemap/sourcemaps_ddc_suite.dart",
-            "-rnone"
-          ]
-        },
-        {
           "name": "ddk sourcemap tests",
           "script": "out/ReleaseX64/dart",
           "arguments": [
             "pkg/dev_compiler/test/sourcemap/sourcemaps_ddk_suite.dart",
-            "-rnone"
-          ]
-        },
-        {
-          "name": "ddc sourcemap stacktrace tests",
-          "script": "out/ReleaseX64/dart",
-          "arguments": [
-            "pkg/dev_compiler/test/sourcemap/stacktrace_ddc_suite.dart",
             "-rnone"
           ]
         },
@@ -1423,16 +1390,6 @@
           "arguments": [
             "pkg/dev_compiler/test/worker/worker_test.dart",
             "-rnone"
-          ]
-        },
-        {
-          "name": "ddc self host test",
-          "script": "out/ReleaseX64/dart-sdk/bin/dart",
-          "arguments": [
-            "--enable-asserts",
-            "pkg/dev_compiler/bin/dartdevc.dart",
-            "-o=out/ReleaseX64/dartdevc.js",
-            "pkg/dev_compiler/bin/dartdevc.dart"
           ]
         },
         {
@@ -2232,6 +2189,13 @@
           "arguments": [
             "-nanalyzer-asserts-weak-${system}",
             "language"]
+        },
+        {
+          "name": "analyze nnbd strong co19 tests",
+          "arguments": [
+            "-nanalyzer-asserts-strong-${system}",
+            "co19/LanguageFeatures/nnbd"
+          ]
         }
       ]
     },

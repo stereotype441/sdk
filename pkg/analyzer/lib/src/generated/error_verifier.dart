@@ -341,7 +341,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
     _enclosingClass = classElement;
   }
 
-  bool get _isNonNullable =>
+  bool get _isNonNullableByDefault =>
       _featureSet?.isEnabled(Feature.non_nullable) ?? false;
 
   @override
@@ -879,7 +879,6 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
   void visitFunctionTypeAlias(FunctionTypeAlias node) {
     _checkForBuiltInIdentifierAsName(
         node.name, CompileTimeErrorCode.BUILT_IN_IDENTIFIER_AS_TYPEDEF_NAME);
-    _checkForDefaultValueInFunctionTypeAlias(node);
     _checkForTypeAliasCannotReferenceItself(node, node.declaredElement);
     super.visitFunctionTypeAlias(node);
   }
@@ -1608,7 +1607,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
 
       if (field.isFinal) {
         notInitFinalFields.add(field);
-      } else if (_isNonNullable &&
+      } else if (_isNonNullableByDefault &&
           _typeSystem.isPotentiallyNonNullable(field.type)) {
         notInitNonNullableFields.add(field);
       }
@@ -1999,7 +1998,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
       DartType expectedStaticType,
       ErrorCode errorCode) {
     if (!_typeSystem.isAssignableTo(actualStaticType, expectedStaticType)) {
-      _errorReporter.reportTypeErrorForNode(
+      _errorReporter.reportErrorForNode(
           errorCode, expression, [actualStaticType, expectedStaticType]);
       return false;
     }
@@ -2585,25 +2584,6 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
   }
 
   /**
-   * Verify that there are no default parameters in the given function type
-   * [alias].
-   *
-   * See [CompileTimeErrorCode.DEFAULT_VALUE_IN_FUNCTION_TYPE_ALIAS].
-   */
-  void _checkForDefaultValueInFunctionTypeAlias(FunctionTypeAlias alias) {
-    FormalParameterList formalParameterList = alias.parameters;
-    NodeList<FormalParameter> parameters = formalParameterList.parameters;
-    for (FormalParameter parameter in parameters) {
-      if (parameter is DefaultFormalParameter) {
-        if (parameter.defaultValue != null) {
-          _errorReporter.reportErrorForNode(
-              CompileTimeErrorCode.DEFAULT_VALUE_IN_FUNCTION_TYPE_ALIAS, alias);
-        }
-      }
-    }
-  }
-
-  /**
    * Verify that the given default formal [parameter] is not part of a function
    * typed parameter.
    *
@@ -2741,12 +2721,12 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
     }
 
     if (bestIterableType == null) {
-      _errorReporter.reportTypeErrorForNode(
+      _errorReporter.reportErrorForNode(
           StaticTypeWarningCode.FOR_IN_OF_INVALID_TYPE,
           node.iterable,
           [iterableType, loopTypeName]);
     } else if (!_typeSystem.isAssignableTo(bestIterableType, variableType)) {
-      _errorReporter.reportTypeErrorForNode(
+      _errorReporter.reportErrorForNode(
           StaticTypeWarningCode.FOR_IN_OF_INVALID_ELEMENT_TYPE,
           node.iterable,
           [iterableType, loopTypeName, variableType]);
@@ -2943,13 +2923,13 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
     if (_isEnclosingConstructorConst) {
       // TODO(paulberry): this error should be based on the actual type of the
       // constant, not the static type.  See dartbug.com/21119.
-      _errorReporter.reportTypeErrorForNode(
+      _errorReporter.reportErrorForNode(
           CheckedModeCompileTimeErrorCode
               .CONST_FIELD_INITIALIZER_NOT_ASSIGNABLE,
           expression,
           [staticType, fieldType]);
     }
-    _errorReporter.reportTypeErrorForNode(
+    _errorReporter.reportErrorForNode(
         StaticWarningCode.FIELD_INITIALIZER_NOT_ASSIGNABLE,
         expression,
         [staticType, fieldType]);
@@ -3039,7 +3019,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
               CompileTimeErrorCode.CONST_NOT_INITIALIZED,
               variable.name,
               [variable.name.name]);
-        } else if (!_isNonNullable || !variable.isLate) {
+        } else if (!_isNonNullableByDefault || !variable.isLate) {
           _errorReporter.reportErrorForNode(
               StaticWarningCode.FINAL_NOT_INITIALIZED,
               variable.name,
@@ -3541,7 +3521,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
 
   void _checkForListConstructor(
       InstanceCreationExpression node, InterfaceType type) {
-    if (!_isNonNullable) return;
+    if (!_isNonNullableByDefault) return;
 
     if (node.constructorName.name == null &&
         node.argumentList.arguments.length == 1 &&
@@ -3693,7 +3673,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
       if (setterType != null &&
           getterType != null &&
           !_typeSystem.isAssignableTo(getterType, setterType)) {
-        _errorReporter.reportTypeErrorForNode(
+        _errorReporter.reportErrorForNode(
             StaticWarningCode.MISMATCHED_GETTER_AND_SETTER_TYPES,
             accessorDeclaration,
             [accessorTextName, getterType, setterType, accessorTextName]);
@@ -3720,7 +3700,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
               !_typeSystem.isAssignableTo(getterType, setterType)) {
             SimpleIdentifier nameNode = member.name;
             String name = nameNode.name;
-            _errorReporter.reportTypeErrorForNode(
+            _errorReporter.reportErrorForNode(
                 StaticWarningCode.MISMATCHED_GETTER_AND_SETTER_TYPES,
                 nameNode,
                 [name, getterType, setterType, name]);
@@ -4246,7 +4226,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
   void _checkForNotInitializedNonNullableInstanceFields(
     FieldDeclaration fieldDeclaration,
   ) {
-    if (!_isNonNullable) return;
+    if (!_isNonNullableByDefault) return;
 
     if (fieldDeclaration.isStatic) return;
     var fields = fieldDeclaration.fields;
@@ -4278,7 +4258,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
   void _checkForNotInitializedNonNullableVariable(
     VariableDeclarationList node,
   ) {
-    if (!_isNonNullable) {
+    if (!_isNonNullableByDefault) {
       return;
     }
 
@@ -4318,7 +4298,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
    */
   bool _checkForNullableDereference(Expression expression) {
     if (expression == null ||
-        !_isNonNullable ||
+        !_isNonNullableByDefault ||
         expression.staticType == null ||
         expression.staticType.isDynamic ||
         !_typeSystem.isPotentiallyNullable(expression.staticType)) {
@@ -4735,17 +4715,17 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
       String displayName = _enclosingFunction.displayName;
 
       if (displayName.isEmpty) {
-        _errorReporter.reportTypeErrorForNode(
+        _errorReporter.reportErrorForNode(
             StaticTypeWarningCode.RETURN_OF_INVALID_TYPE_FROM_CLOSURE,
             returnExpression,
             [fromType, toType]);
       } else if (_enclosingFunction is MethodElement) {
-        _errorReporter.reportTypeErrorForNode(
+        _errorReporter.reportErrorForNode(
             StaticTypeWarningCode.RETURN_OF_INVALID_TYPE_FROM_METHOD,
             returnExpression,
             [fromType, toType, displayName]);
       } else {
-        _errorReporter.reportTypeErrorForNode(
+        _errorReporter.reportErrorForNode(
             StaticTypeWarningCode.RETURN_OF_INVALID_TYPE_FROM_FUNCTION,
             returnExpression,
             [fromType, toType, displayName]);
@@ -5033,7 +5013,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
   }
 
   void _checkForUnnecessaryNullAware(Expression target, Token operator) {
-    if (!_isNonNullable) {
+    if (!_isNonNullableByDefault) {
       return;
     }
 
@@ -5177,7 +5157,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
           } else if (declaredType != null &&
               fieldType != null &&
               !_typeSystem.isAssignableTo(declaredType, fieldType)) {
-            _errorReporter.reportTypeErrorForNode(
+            _errorReporter.reportErrorForNode(
                 StaticWarningCode.FIELD_INITIALIZING_FORMAL_NOT_ASSIGNABLE,
                 parameter,
                 [declaredType, fieldType]);
@@ -5473,7 +5453,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
         requiredReturnType = _typeProvider.iterableDynamicType;
       }
       if (!_typeSystem.isAssignableTo(impliedReturnType, requiredReturnType)) {
-        _errorReporter.reportTypeErrorForNode(
+        _errorReporter.reportErrorForNode(
             StaticTypeWarningCode.YIELD_OF_INVALID_TYPE,
             yieldExpression,
             [impliedReturnType, requiredReturnType]);
@@ -5613,7 +5593,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
   }
 
   void _checkUseOfDefaultValuesInParameters(FormalParameterList node) {
-    if (!_isNonNullable) return;
+    if (!_isNonNullableByDefault) return;
 
     AstNode parent = node.parent;
     var defaultValuesAreAllowed = parent is ConstructorDeclaration ||
@@ -5983,7 +5963,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
   /// If in a legacy library, return the legacy version of the [type].
   /// Otherwise, return the original type.
   DartType _toLegacyType(DartType type) {
-    if (_isNonNullable) return type;
+    if (_isNonNullableByDefault) return type;
     return NullabilityEliminator.perform(_typeProvider, type);
   }
 

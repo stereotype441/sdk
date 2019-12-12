@@ -10,7 +10,6 @@ import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/error/error.dart';
-import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:source_span/source_span.dart';
 
@@ -68,6 +67,11 @@ class ErrorReporter {
   final Source _defaultSource;
 
   /**
+   * Is `true` if the library being analyzed is non-nullable by default.
+   */
+  final bool isNonNullableByDefault;
+
+  /**
    * The source to be used when reporting errors.
    */
   Source _source;
@@ -77,7 +81,8 @@ class ErrorReporter {
    * given [_errorListener]. Errors will be reported against the
    * [_defaultSource] unless another source is provided later.
    */
-  ErrorReporter(this._errorListener, this._defaultSource) {
+  ErrorReporter(this._errorListener, this._defaultSource,
+      {this.isNonNullableByDefault = false}) {
     if (_errorListener == null) {
       throw ArgumentError("An error listener must be provided");
     } else if (_defaultSource == null) {
@@ -109,24 +114,13 @@ class ErrorReporter {
    */
   void reportErrorForElement(ErrorCode errorCode, Element element,
       [List<Object> arguments]) {
-    int length = 0;
-    if (element is ImportElement) {
-      length = 6; // 'import'.length
-    } else if (element is ExportElement) {
-      length = 6; // 'export'.length
-    } else {
-      length = element.nameLength;
-    }
-    reportErrorForOffset(errorCode, element.nameOffset, length, arguments);
+    reportErrorForOffset(
+        errorCode, element.nameOffset, element.nameLength, arguments);
   }
 
   /**
    * Report an error with the given [errorCode] and [arguments].
    * The [node] is used to compute the location of the error.
-   *
-   * If the arguments contain the names of two or more types, the method
-   * [reportTypeErrorForNode] should be used and the types
-   * themselves (rather than their names) should be passed as arguments.
    */
   void reportErrorForNode(ErrorCode errorCode, AstNode node,
       [List<Object> arguments]) {
@@ -139,6 +133,7 @@ class ErrorReporter {
    */
   void reportErrorForOffset(ErrorCode errorCode, int offset, int length,
       [List<Object> arguments]) {
+    _convertTypeNames(arguments);
     _errorListener
         .onError(AnalysisError(_source, offset, length, errorCode, arguments));
   }
@@ -182,9 +177,9 @@ class ErrorReporter {
    * If there are not two or more types in the argument list, the method
    * [reportErrorForNode] should be used instead.
    */
+  @Deprecated('Use reportErrorForNode(), it will convert types as well')
   void reportTypeErrorForNode(
       ErrorCode errorCode, AstNode node, List<Object> arguments) {
-    _convertTypeNames(arguments);
     reportErrorForOffset(errorCode, node.offset, node.length, arguments);
   }
 
@@ -196,28 +191,17 @@ class ErrorReporter {
    * clarify the message.
    */
   void _convertTypeNames(List<Object> arguments) {
-    String computeDisplayName(DartType type) {
-      if (type is FunctionType) {
-        String name = type.name;
-        if (name != null && name.isNotEmpty) {
-          StringBuffer buffer = StringBuffer();
-          buffer.write(name);
-          (type as TypeImpl).appendTo(
-            buffer,
-            withNullability: false,
-            skipAllDynamicArguments: false,
-          );
-          return buffer.toString();
-        }
-      }
-      return type.getDisplayString(withNullability: false);
+    if (arguments == null) {
+      return;
     }
 
     Map<String, List<_TypeToConvert>> typeGroups = {};
     for (int i = 0; i < arguments.length; i++) {
       Object argument = arguments[i];
       if (argument is DartType) {
-        String displayName = computeDisplayName(argument);
+        String displayName = argument.getDisplayString(
+          withNullability: isNonNullableByDefault,
+        );
         List<_TypeToConvert> types =
             typeGroups.putIfAbsent(displayName, () => <_TypeToConvert>[]);
         types.add(_TypeToConvert(i, argument, displayName));

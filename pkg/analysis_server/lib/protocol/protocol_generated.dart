@@ -8252,6 +8252,7 @@ class EditDartfixParams implements RequestParams {
  *   "hasErrors": bool
  *   "edits": List<SourceFileEdit>
  *   "details": optional List<String>
+ *   "urls": optional List<String>
  * }
  *
  * Clients may not extend, implement or mix-in this class.
@@ -8266,6 +8267,8 @@ class EditDartfixResult implements ResponseResult {
   List<SourceFileEdit> _edits;
 
   List<String> _details;
+
+  List<String> _urls;
 
   /**
    * A list of recommended changes that can be automatically made by applying
@@ -8343,17 +8346,35 @@ class EditDartfixResult implements ResponseResult {
     this._details = value;
   }
 
+  /**
+   * The URLs that users can visit in a browser to see a preview of the
+   * proposed changes. There is one URL for each of the included file paths.
+   * The field is omitted if no port was provided.
+   */
+  List<String> get urls => _urls;
+
+  /**
+   * The URLs that users can visit in a browser to see a preview of the
+   * proposed changes. There is one URL for each of the included file paths.
+   * The field is omitted if no port was provided.
+   */
+  void set urls(List<String> value) {
+    this._urls = value;
+  }
+
   EditDartfixResult(
       List<DartFixSuggestion> suggestions,
       List<DartFixSuggestion> otherSuggestions,
       bool hasErrors,
       List<SourceFileEdit> edits,
-      {List<String> details}) {
+      {List<String> details,
+      List<String> urls}) {
     this.suggestions = suggestions;
     this.otherSuggestions = otherSuggestions;
     this.hasErrors = hasErrors;
     this.edits = edits;
     this.details = details;
+    this.urls = urls;
   }
 
   factory EditDartfixResult.fromJson(
@@ -8404,9 +8425,14 @@ class EditDartfixResult implements ResponseResult {
         details = jsonDecoder.decodeList(
             jsonPath + ".details", json["details"], jsonDecoder.decodeString);
       }
+      List<String> urls;
+      if (json.containsKey("urls")) {
+        urls = jsonDecoder.decodeList(
+            jsonPath + ".urls", json["urls"], jsonDecoder.decodeString);
+      }
       return new EditDartfixResult(
           suggestions, otherSuggestions, hasErrors, edits,
-          details: details);
+          details: details, urls: urls);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "edit.dartfix result", json);
     }
@@ -8433,6 +8459,9 @@ class EditDartfixResult implements ResponseResult {
     if (details != null) {
       result["details"] = details;
     }
+    if (urls != null) {
+      result["urls"] = urls;
+    }
     return result;
   }
 
@@ -8454,7 +8483,8 @@ class EditDartfixResult implements ResponseResult {
           hasErrors == other.hasErrors &&
           listEqual(edits, other.edits,
               (SourceFileEdit a, SourceFileEdit b) => a == b) &&
-          listEqual(details, other.details, (String a, String b) => a == b);
+          listEqual(details, other.details, (String a, String b) => a == b) &&
+          listEqual(urls, other.urls, (String a, String b) => a == b);
     }
     return false;
   }
@@ -8467,6 +8497,7 @@ class EditDartfixResult implements ResponseResult {
     hash = JenkinsSmiHash.combine(hash, hasErrors.hashCode);
     hash = JenkinsSmiHash.combine(hash, edits.hashCode);
     hash = JenkinsSmiHash.combine(hash, details.hashCode);
+    hash = JenkinsSmiHash.combine(hash, urls.hashCode);
     return JenkinsSmiHash.finish(hash);
   }
 }

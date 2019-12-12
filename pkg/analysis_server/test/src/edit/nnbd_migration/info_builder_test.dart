@@ -9,6 +9,7 @@ import 'package:analysis_server/src/edit/nnbd_migration/instrumentation_informat
 import 'package:analysis_server/src/edit/nnbd_migration/instrumentation_listener.dart';
 import 'package:analysis_server/src/edit/nnbd_migration/migration_info.dart';
 import 'package:analyzer/dart/analysis/results.dart';
+import 'package:analyzer/dart/ast/ast.dart';
 import 'package:meta/meta.dart';
 import 'package:nnbd_migration/nnbd_migration.dart';
 import 'package:test/test.dart';
@@ -18,8 +19,168 @@ import '../../../analysis_abstract.dart';
 
 main() {
   defineReflectiveSuite(() {
+    defineReflectiveTests(BuildEnclosingMemberDescriptionTest);
     defineReflectiveTests(InfoBuilderTest);
   });
+}
+
+@reflectiveTest
+class BuildEnclosingMemberDescriptionTest extends AbstractAnalysisTest {
+  Future<ResolvedUnitResult> resolveTestFile() async {
+    String includedRoot = resourceProvider.pathContext.dirname(testFile);
+    server.setAnalysisRoots('0', [includedRoot], [], {});
+    return await server
+        .getAnalysisDriver(testFile)
+        .currentSession
+        .getResolvedUnit(testFile);
+  }
+
+  test_classConstructor_named() async {
+    addTestFile(r'''
+class C {
+  C.aaa();
+}
+''');
+    var result = await resolveTestFile();
+    ClassDeclaration class_ = result.unit.declarations.single;
+    ClassMember constructor = class_.members.single;
+    expect(InfoBuilder.buildEnclosingMemberDescription(constructor),
+        equals("the constructor 'C.aaa'"));
+  }
+
+  test_classConstructor_unnamed() async {
+    addTestFile(r'''
+class C {
+  C();
+}
+''');
+    var result = await resolveTestFile();
+    ClassDeclaration class_ = result.unit.declarations.single;
+    ClassMember constructor = class_.members.single;
+    expect(InfoBuilder.buildEnclosingMemberDescription(constructor),
+        equals("the default constructor of 'C'"));
+  }
+
+  test_classGetter() async {
+    addTestFile(r'''
+class C {
+  int get aaa => 7;
+}
+''');
+    var result = await resolveTestFile();
+    ClassDeclaration class_ = result.unit.declarations.single;
+    ClassMember getter = class_.members.single;
+    expect(InfoBuilder.buildEnclosingMemberDescription(getter),
+        equals("the getter 'C.aaa'"));
+  }
+
+  test_classMethod() async {
+    addTestFile(r'''
+class C {
+  int aaa() => 7;
+}
+''');
+    var result = await resolveTestFile();
+    ClassDeclaration class_ = result.unit.declarations.single;
+    ClassMember method = class_.members.single;
+    expect(InfoBuilder.buildEnclosingMemberDescription(method),
+        equals("the method 'C.aaa'"));
+  }
+
+  test_classOperator() async {
+    addTestFile(r'''
+class C {
+  bool operator ==(Object other) => false;
+}
+''');
+    var result = await resolveTestFile();
+    ClassDeclaration class_ = result.unit.declarations.single;
+    ClassMember operator = class_.members.single;
+    expect(InfoBuilder.buildEnclosingMemberDescription(operator),
+        equals("the operator 'C.=='"));
+  }
+
+  test_classSetter() async {
+    addTestFile(r'''
+class C {
+  void set aaa(value) {}
+}
+''');
+    var result = await resolveTestFile();
+    ClassDeclaration class_ = result.unit.declarations.single;
+    ClassMember setter = class_.members.single;
+    expect(InfoBuilder.buildEnclosingMemberDescription(setter),
+        equals("the setter 'C.aaa='"));
+  }
+
+  test_extensionMethod() async {
+    addTestFile(r'''
+extension E on List {
+  int aaa() => 7;
+}
+''');
+    var result = await resolveTestFile();
+    ExtensionDeclaration extension_ = result.unit.declarations.single;
+    ClassMember method = extension_.members.single;
+    expect(InfoBuilder.buildEnclosingMemberDescription(method),
+        equals("the method 'E.aaa'"));
+  }
+
+  test_extensionMethod_unnamed() async {
+    addTestFile(r'''
+extension on List {
+  int aaa() => 7;
+}
+''');
+    var result = await resolveTestFile();
+    ExtensionDeclaration extension_ = result.unit.declarations.single;
+    ClassMember method = extension_.members.single;
+    expect(InfoBuilder.buildEnclosingMemberDescription(method),
+        equals("the method 'aaa' in unnamed extension on List"));
+  }
+
+  test_mixinMethod() async {
+    addTestFile(r'''
+mixin C {
+  int aaa() => 7;
+}
+''');
+    var result = await resolveTestFile();
+    MixinDeclaration mixin_ = result.unit.declarations.single;
+    ClassMember method = mixin_.members.single;
+    expect(InfoBuilder.buildEnclosingMemberDescription(method),
+        equals("the method 'C.aaa'"));
+  }
+
+  test_topLevelFunction() async {
+    addTestFile(r'''
+void aaa(value) {}
+''');
+    var result = await resolveTestFile();
+    var function = result.unit.declarations.single;
+    expect(InfoBuilder.buildEnclosingMemberDescription(function),
+        equals("the function 'aaa'"));
+  }
+
+  test_topLevelGetter() async {
+    addTestFile(r'''
+int get aaa => 7;
+''');
+    var result = await resolveTestFile();
+    var getter = result.unit.declarations.single;
+    expect(InfoBuilder.buildEnclosingMemberDescription(getter),
+        equals("the getter 'aaa'"));
+  }
+
+  test_topLevelSetter() async {
+    addTestFile(r'''
+void set aaa(value) {}
+''');
+    var result = await resolveTestFile();
+    var setter = result.unit.declarations.single;
+    expect(InfoBuilder.buildEnclosingMemberDescription(setter),
+        equals("the setter 'aaa='"));
+  }
 }
 
 @reflectiveTest
@@ -75,7 +236,7 @@ class InfoBuilderTest extends AbstractAnalysisTest {
     // Compute the analysis results.
     String includedRoot = resourceProvider.pathContext.dirname(testFile);
     server.setAnalysisRoots('0', [includedRoot], [], {});
-    ResolvedUnitResult result = await server
+    var result = await server
         .getAnalysisDriver(testFile)
         .currentSession
         .getResolvedUnit(testFile);
@@ -227,33 +388,6 @@ void g() {
     assertDetail(detail: regions[0].details[0], offset: 104, length: 1);
   }
 
-  test_exactNullable_exactNullable() async {
-    UnitInfo unit = await buildInfoForSingleTestFile('''
-void g(List<int> list1, List<int> list2) {
-  list1[0] = null;
-  list2[0] = list1[0];
-}
-''', migratedContent: '''
-void g(List<int?> list1, List<int?> list2) {
-  list1[0] = null;
-  list2[0] = list1[0];
-}
-''');
-    List<RegionInfo> regions = unit.regions;
-    expect(regions, hasLength(4));
-    // regions[0] is the hard edge that list1 is unconditionally indexed
-    assertRegion(region: regions[1], offset: 15, details: [
-      "An explicit 'null' is assigned",
-      // TODO(mfairhurst): Fix this bug.
-      'exact nullable node with no info (Substituted(type(32), migrated))'
-    ]);
-    // regions[2] is the hard edge that list2 is unconditionally indexed
-    assertRegion(
-        region: regions[3],
-        offset: 33,
-        details: ["A nullable value is assigned"]);
-  }
-
   test_exactNullable() async {
     UnitInfo unit = await buildInfoForSingleTestFile('''
 void f(List<int> list) {
@@ -276,12 +410,39 @@ void g() {
     expect(regions, hasLength(3));
     // regions[0] is the hard edge that f's parameter is non-nullable.
     assertRegion(region: regions[1], offset: 15, details: [
-      "An explicit 'null' is assigned",
+      "An explicit 'null' is assigned in the function 'f'",
     ]);
     assertRegion(
         region: regions[2],
         offset: 66,
         details: ["This is later required to accept null."]);
+  }
+
+  test_exactNullable_exactNullable() async {
+    UnitInfo unit = await buildInfoForSingleTestFile('''
+void g(List<int> list1, List<int> list2) {
+  list1[0] = null;
+  list2[0] = list1[0];
+}
+''', migratedContent: '''
+void g(List<int?> list1, List<int?> list2) {
+  list1[0] = null;
+  list2[0] = list1[0];
+}
+''');
+    List<RegionInfo> regions = unit.regions;
+    expect(regions, hasLength(4));
+    // regions[0] is the hard edge that list1 is unconditionally indexed
+    assertRegion(region: regions[1], offset: 15, details: [
+      "An explicit 'null' is assigned in the function 'g'",
+      // TODO(mfairhurst): Fix this bug.
+      'exact nullable node with no info (Substituted(type(32), migrated))'
+    ]);
+    // regions[2] is the hard edge that list2 is unconditionally indexed
+    assertRegion(
+        region: regions[3],
+        offset: 33,
+        details: ["A nullable value is assigned in the function 'g'"]);
   }
 
   test_expressionFunctionReturnTarget() async {
@@ -318,6 +479,26 @@ class A {
     assertRegion(region: regions[0], offset: 15, details: [
       "This field is initialized by an optional field formal parameter that "
           "has an implicit default value of 'null'"
+    ]);
+  }
+
+  test_field_fieldFormalInitializer_optional_defaultNull() async {
+    UnitInfo unit = await buildInfoForSingleTestFile('''
+class A {
+  int _f;
+  A([this._f = null]);
+}
+''', migratedContent: '''
+class A {
+  int? _f;
+  A([this._f = null]);
+}
+''');
+    List<RegionInfo> regions = unit.regions;
+    expect(regions, hasLength(1));
+    assertRegion(region: regions[0], offset: 15, details: [
+      "This field is initialized by an optional field formal parameter that "
+          "has an explicit default value of 'null'"
     ]);
   }
 
@@ -371,6 +552,32 @@ class A {
         region: regions[1],
         offset: 33,
         details: ["This field is initialized to a nullable value"]);
+  }
+
+  test_fieldLaterAssignedNullable() async {
+    UnitInfo unit = await buildInfoForSingleTestFile('''
+class Foo {
+  int value = 7;
+  void bar() {
+    value = null;
+  }
+}
+''', migratedContent: '''
+class Foo {
+  int? value = 7;
+  void bar() {
+    value = null;
+  }
+}
+''');
+    List<RegionInfo> regions = unit.regions;
+    expect(regions, hasLength(1));
+    RegionInfo region = regions.single;
+    assertRegion(region: region, offset: 17, details: [
+      "An explicit 'null' is assigned in the method 'Foo.bar'",
+    ]);
+
+    assertDetail(detail: region.details[0], offset: 56, length: 4);
   }
 
   test_insertedRequired_fieldFormal() async {
@@ -679,28 +886,25 @@ void g() {
         details: ["An explicit 'null' is passed as an argument"]);
   }
 
-  @failingTest
   test_parameter_fromInvocation_implicit() async {
-    // Failing because the upstream edge ("always -(hard)-> type(13)")
-    // associated with the reason (a _NullabilityNodeSimple) had a `null` origin
-    // when the listener's `graphEdge` method was called.
     UnitInfo unit = await buildInfoForSingleTestFile('''
 void f(String s) {}
 void g(p) {
   f(p);
 }
+void h() => g(null);
 ''', migratedContent: '''
 void f(String? s) {}
 void g(p) {
   f(p);
 }
+void h() => g(null);
 ''');
     List<RegionInfo> regions = unit.regions;
     expect(regions, hasLength(1));
-    assertRegion(
-        region: regions[0],
-        offset: 13,
-        details: ["A nullable value is explicitly passed as an argument"]);
+    assertRegion(region: regions[0], offset: 13, details: [
+      "A dynamic value, which is nullable is passed as an argument"
+    ]);
   }
 
   test_parameter_fromMultipleOverridden_explicit() async {
@@ -807,21 +1011,15 @@ class B extends A {
         details: ["A nullable value is assigned"]);
   }
 
-  @FailingTest(
-      reason: "Currently crashes with: Bad state: A decorated type for void "
-          "set m(int _m) should have been stored by the NodeBuilder via "
-          "recordDecoratedElementType")
   test_parameter_fromOverriddenField_explicit() async {
-    await buildInfoForSingleTestFile('''
+    UnitInfo unit = await buildInfoForSingleTestFile('''
 class A {
   int m;
 }
 class B extends A {
   void set m(Object p) {}
 }
-void f(A a) {
-  a.m = null;
-}
+void f(A a) => a.m = null;
 ''', migratedContent: '''
 class A {
   int? m;
@@ -829,13 +1027,21 @@ class A {
 class B extends A {
   void set m(Object? p) {}
 }
-void f(A a) {
-  a.m = null;
-}
+void f(A a) => a.m = null;
 ''');
-    // TODO(srawlins): Write expectations similar to
-    //  test_parameter_fromMultipleOverridden_explicit above, once the test stops
-    //  crashing.
+    List<RegionInfo> regions = unit.fixRegions;
+    expect(regions, hasLength(2));
+    assertRegion(region: regions[0], offset: 15, details: [
+      // TODO(srawlins): I suspect this should be removed...
+      "A nullable value is assigned",
+      "An explicit 'null' is assigned in the function 'f'",
+    ]);
+    assertRegion(region: regions[1], offset: 61, details: [
+      // TODO(srawlins): Improve this message to include "B.m".
+      "The corresponding parameter in the overridden method is nullable"
+    ]);
+    assertDetail(detail: regions[0].details[1], offset: 90, length: 4);
+    assertDetail(detail: regions[1].details[0], offset: 12, length: 3);
   }
 
   test_parameter_named_omittedInCall() async {
@@ -857,10 +1063,7 @@ void g({int? i}) {}
     assertDetail(detail: regions[0].details[0], offset: 11, length: 3);
   }
 
-  @failingTest
   test_parameter_optional_explicitDefault_null() async {
-    // Failing because we appear to never get an origin when the upstream node
-    // for an edge is 'always'.
     UnitInfo unit = await buildInfoForSingleTestFile('''
 void f({String s = null}) {}
 ''', migratedContent: '''
@@ -874,23 +1077,20 @@ void f({String? s = null}) {}
         details: ["This parameter has an explicit default value of 'null'"]);
   }
 
-  @failingTest
   test_parameter_optional_explicitDefault_nullable() async {
-    // Failing because we appear to never get an origin when the upstream node
-    // for an edge is 'always'.
     UnitInfo unit = await buildInfoForSingleTestFile('''
-const sd = null;
+String sd = null;
 void f({String s = sd}) {}
 ''', migratedContent: '''
-const sd = null;
+String? sd = null;
 void f({String? s = sd}) {}
 ''');
     List<RegionInfo> regions = unit.fixRegions;
-    expect(regions, hasLength(1));
+    expect(regions, hasLength(2));
     assertRegion(
-        region: regions[0],
-        offset: 31,
-        details: ["This parameter has an explicit default value of 'null'"]);
+        region: regions[1],
+        offset: 33,
+        details: ["This parameter has a nullable default value"]);
   }
 
   test_parameter_optional_implicitDefault_named() async {

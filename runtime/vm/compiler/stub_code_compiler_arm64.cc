@@ -176,12 +176,11 @@ void StubCodeCompiler::GenerateCallToRuntimeStub(Assembler* assembler) {
   __ ret();
 }
 
-void StubCodeCompiler::GenerateSharedStub(
-    Assembler* assembler,
-    bool save_fpu_registers,
-    const RuntimeEntry* target,
-    intptr_t self_code_stub_offset_from_thread,
-    bool allow_return) {
+void GenerateSharedStub(Assembler* assembler,
+                        bool save_fpu_registers,
+                        const RuntimeEntry* target,
+                        intptr_t self_code_stub_offset_from_thread,
+                        bool allow_return) {
   // We want the saved registers to appear like part of the caller's frame, so
   // we push them before calling EnterStubFrame.
   RegisterSet all_registers;
@@ -786,15 +785,15 @@ static void PushArrayOfArguments(Assembler* assembler) {
   // R3: address of first argument in array.
 
   Label loop, loop_exit;
+  __ Bind(&loop);
   __ CompareRegisters(R2, ZR);
   __ b(&loop_exit, LE);
-  __ Bind(&loop);
   __ ldr(R7, Address(R1));
   __ AddImmediate(R1, -target::kWordSize);
   __ AddImmediate(R3, target::kWordSize);
-  __ AddImmediateSetFlags(R2, R2, -target::ToRawSmi(1));
+  __ AddImmediate(R2, R2, -target::ToRawSmi(1));
   __ StoreIntoObject(R0, Address(R3, -target::kWordSize), R7);
-  __ b(&loop, GE);
+  __ b(&loop);
   __ Bind(&loop_exit);
 }
 
@@ -1216,6 +1215,16 @@ void StubCodeCompiler::GenerateAllocateArrayStub(Assembler* assembler) {
 
   __ LeaveStubFrame();
   __ ret();
+}
+
+void StubCodeCompiler::GenerateAllocateMintWithFPURegsStub(
+    Assembler* assembler) {
+  __ Stop("Unimplemented");
+}
+
+void StubCodeCompiler::GenerateAllocateMintWithoutFPURegsStub(
+    Assembler* assembler) {
+  __ Stop("Unimplemented");
 }
 
 // Called when invoking Dart code from C++ (VM code).
