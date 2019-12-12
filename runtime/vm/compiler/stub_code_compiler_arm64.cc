@@ -785,15 +785,15 @@ static void PushArrayOfArguments(Assembler* assembler) {
   // R3: address of first argument in array.
 
   Label loop, loop_exit;
+  __ Bind(&loop);
   __ CompareRegisters(R2, ZR);
   __ b(&loop_exit, LE);
-  __ Bind(&loop);
   __ ldr(R7, Address(R1));
   __ AddImmediate(R1, -target::kWordSize);
   __ AddImmediate(R3, target::kWordSize);
-  __ AddImmediateSetFlags(R2, R2, -target::ToRawSmi(1));
+  __ AddImmediate(R2, R2, -target::ToRawSmi(1));
   __ StoreIntoObject(R0, Address(R3, -target::kWordSize), R7);
-  __ b(&loop, GE);
+  __ b(&loop);
   __ Bind(&loop_exit);
 }
 
@@ -2897,6 +2897,18 @@ void StubCodeCompiler::GenerateDefaultTypeTestStub(Assembler* assembler) {
 
 void StubCodeCompiler::GenerateTopTypeTypeTestStub(Assembler* assembler) {
   __ Ret();
+}
+
+void StubCodeCompiler::GenerateTypeRefTypeTestStub(Assembler* assembler) {
+  const Register kTypeRefReg = R8;
+
+  // We dereference the TypeRef and tail-call to it's type testing stub.
+  __ ldr(kTypeRefReg,
+         FieldAddress(kTypeRefReg, target::TypeRef::type_offset()));
+  __ ldr(R9, FieldAddress(
+                 kTypeRefReg,
+                 target::AbstractType::type_test_stub_entry_point_offset()));
+  __ br(R9);
 }
 
 void StubCodeCompiler::GenerateUnreachableTypeTestStub(Assembler* assembler) {

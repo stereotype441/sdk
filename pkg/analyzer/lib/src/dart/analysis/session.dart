@@ -43,7 +43,7 @@ class AnalysisSessionImpl implements AnalysisSession {
   AnalysisSessionImpl(this._driver);
 
   @override
-  AnalysisContext get analysisContext => _driver.analysisContext;
+  AnalysisContext get analysisContext => _driver?.analysisContext;
 
   @override
   DeclaredVariables get declaredVariables => _driver.declaredVariables;

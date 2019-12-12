@@ -1183,15 +1183,6 @@ class CompileTimeErrorCode extends AnalyzerErrorCode {
           correction: "Try removing the argument or using 'List.filled'.");
 
   /**
-   * 15.3.1 Typedef: It is a compile-time error if any default values are
-   * specified in the signature of a function type alias.
-   */
-  static const CompileTimeErrorCode DEFAULT_VALUE_IN_FUNCTION_TYPE_ALIAS =
-      CompileTimeErrorCode('DEFAULT_VALUE_IN_FUNCTION_TYPE_ALIAS',
-          "Default parameter values aren't allowed in typedefs.",
-          correction: "Try removing the default value.");
-
-  /**
    * 6.2.1 Required Formals: By means of a function signature that names the
    * parameter and describes its type as a function type. It is a compile-time
    * error if any default values are specified in the signature of such a
@@ -7654,7 +7645,8 @@ class StaticWarningCode extends AnalyzerErrorCode {
           'UNNECESSARY_NON_NULL_ASSERTION',
           "The '!' will have no effect because the target expression cannot be"
               " null.",
-          correction: "Try removing the '!' operator here.");
+          correction: "Try removing the '!' operator here.",
+          errorSeverity: ErrorSeverity.WARNING);
 
   /**
    * When the '...?' operator is used on a value that we know to be non-null,
@@ -7665,7 +7657,8 @@ class StaticWarningCode extends AnalyzerErrorCode {
           'UNNECESSARY_NULL_AWARE_SPREAD',
           "The target expression can't be null, so it isn't necessary to use "
               "the null-aware spread operator '...?'.",
-          correction: "Try replacing the '...?' with a '...' in the spread.");
+          correction: "Try replacing the '...?' with a '...' in the spread.",
+          errorSeverity: ErrorSeverity.WARNING);
 
   /**
    * For the purposes of experimenting with potential non-null type semantics.
@@ -7710,7 +7703,8 @@ class StaticWarningCode extends AnalyzerErrorCode {
   static const StaticWarningCode UNNECESSARY_NULL_AWARE_CALL =
       StaticWarningCode('UNNECESSARY_NULL_AWARE_CALL',
           "The target expression can't be null, and so '?.' isn't necessary.",
-          correction: "Try replacing the '?.' with a '.' in the invocation.");
+          correction: "Try replacing the '?.' with a '.' in the invocation.",
+          errorSeverity: ErrorSeverity.WARNING);
 
   /**
    * It is a static warning to assign void to any non-void type in dart.

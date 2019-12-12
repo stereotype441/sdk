@@ -3279,14 +3279,16 @@ void CatchBlockEntryInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
   compiler->AddExceptionHandler(
       catch_try_index(), try_index(), compiler->assembler()->CodeSize(),
       is_generated(), catch_handler_types_, needs_stacktrace());
-  // On lazy deoptimization we patch the optimized code here to enter the
-  // deoptimization stub.
-  const intptr_t deopt_id = DeoptId::ToDeoptAfter(GetDeoptId());
-  if (compiler->is_optimizing()) {
-    compiler->AddDeoptIndexAtCall(deopt_id);
-  } else {
-    compiler->AddCurrentDescriptor(RawPcDescriptors::kDeopt, deopt_id,
-                                   TokenPosition::kNoSource);
+  if (!FLAG_precompiled_mode) {
+    // On lazy deoptimization we patch the optimized code here to enter the
+    // deoptimization stub.
+    const intptr_t deopt_id = DeoptId::ToDeoptAfter(GetDeoptId());
+    if (compiler->is_optimizing()) {
+      compiler->AddDeoptIndexAtCall(deopt_id);
+    } else {
+      compiler->AddCurrentDescriptor(RawPcDescriptors::kDeopt, deopt_id,
+                                     TokenPosition::kNoSource);
+    }
   }
   if (HasParallelMove()) {
     compiler->parallel_move_resolver()->EmitNativeCode(parallel_move());
@@ -4633,21 +4635,19 @@ void BoxInt64Instr::EmitNativeCode(FlowGraphCompiler* compiler) {
     __ TryAllocate(compiler->mint_class(),
                    compiler->intrinsic_slow_path_label(), out_reg, tmp);
   } else {
-    if (locs()->call_on_shared_slow_path()) {
-      const bool live_fpu_regs =
-          locs()->live_registers()->FpuRegisterCount() > 0;
-      __ ldr(
-          TMP,
-          compiler::Address(
-              THR,
-              live_fpu_regs
-                  ? compiler::target::Thread::
-                        allocate_mint_with_fpu_regs_entry_point_offset()
-                  : compiler::target::Thread::
-                        allocate_mint_without_fpu_regs_entry_point_offset()));
-      __ blx(TMP);
+    auto object_store = compiler->isolate()->object_store();
+    const bool live_fpu_regs = locs()->live_registers()->FpuRegisterCount() > 0;
+    const auto& stub = Code::ZoneHandle(
+        compiler->zone(),
+        live_fpu_regs ? object_store->allocate_mint_with_fpu_regs_stub()
+                      : object_store->allocate_mint_without_fpu_regs_stub());
+
+    if (locs()->call_on_shared_slow_path() && !stub.InVMIsolateHeap()) {
+      compiler->AddPcRelativeCallStubTarget(stub);
+      __ GenerateUnRelocatedPcRelativeCall();
 
       ASSERT(!locs()->live_registers()->ContainsRegister(R0));
+
       auto extended_env = compiler->SlowPathEnvironmentFor(this, 0);
       compiler->EmitCallsiteMetadata(token_pos(), DeoptId::kNone,
                                      RawPcDescriptors::kOther, locs(),

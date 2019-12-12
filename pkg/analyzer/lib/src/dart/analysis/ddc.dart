@@ -163,7 +163,7 @@ class DevCompilerResynthesizerBuilder {
 
     var elementFactory = summary2.LinkedElementFactory(
       analysisContext,
-      null,
+      AnalysisSessionImpl(null),
       summary2.Reference.root(),
     );
 
@@ -180,7 +180,7 @@ class DevCompilerResynthesizerBuilder {
   void _createElementFactory(PackageBundle newBundle) {
     elementFactory = summary2.LinkedElementFactory(
       context,
-      null,
+      AnalysisSessionImpl(null),
       summary2.Reference.root(),
     );
     for (var bundle in _summaryData.bundles) {

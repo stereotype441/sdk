@@ -72,10 +72,10 @@ static constexpr dart::compiler::target::word Array_type_arguments_offset = 4;
 static constexpr dart::compiler::target::word Class_declaration_type_offset =
     56;
 static constexpr dart::compiler::target::word Class_num_type_arguments_offset =
-    106;
+    102;
 static constexpr dart::compiler::target::word Class_super_type_offset = 44;
 static constexpr dart::compiler::target::word
-    Class_type_arguments_field_offset_in_words_offset = 96;
+    Class_type_arguments_field_offset_in_words_offset = 92;
 static constexpr dart::compiler::target::word
     ClassTable_shared_class_table_offset = 16;
 static constexpr dart::compiler::target::word ClassTable_table_offset = 8;
@@ -362,7 +362,7 @@ static constexpr dart::compiler::target::word Double_InstanceSize = 16;
 static constexpr dart::compiler::target::word Float32x4_InstanceSize = 24;
 static constexpr dart::compiler::target::word Float64x2_InstanceSize = 24;
 static constexpr dart::compiler::target::word Instructions_UnalignedHeaderSize =
-    12;
+    8;
 static constexpr dart::compiler::target::word Int32x4_InstanceSize = 24;
 static constexpr dart::compiler::target::word Mint_InstanceSize = 16;
 static constexpr dart::compiler::target::word NativeArguments_StructSize = 16;
@@ -436,10 +436,10 @@ static constexpr dart::compiler::target::word Array_type_arguments_offset = 8;
 static constexpr dart::compiler::target::word Class_declaration_type_offset =
     112;
 static constexpr dart::compiler::target::word Class_num_type_arguments_offset =
-    190;
+    182;
 static constexpr dart::compiler::target::word Class_super_type_offset = 88;
 static constexpr dart::compiler::target::word
-    Class_type_arguments_field_offset_in_words_offset = 180;
+    Class_type_arguments_field_offset_in_words_offset = 172;
 static constexpr dart::compiler::target::word
     ClassTable_shared_class_table_offset = 32;
 static constexpr dart::compiler::target::word ClassTable_table_offset = 16;
@@ -728,7 +728,7 @@ static constexpr dart::compiler::target::word Double_InstanceSize = 16;
 static constexpr dart::compiler::target::word Float32x4_InstanceSize = 24;
 static constexpr dart::compiler::target::word Float64x2_InstanceSize = 24;
 static constexpr dart::compiler::target::word Instructions_UnalignedHeaderSize =
-    16;
+    12;
 static constexpr dart::compiler::target::word Int32x4_InstanceSize = 24;
 static constexpr dart::compiler::target::word Mint_InstanceSize = 16;
 static constexpr dart::compiler::target::word NativeArguments_StructSize = 32;
@@ -800,10 +800,10 @@ static constexpr dart::compiler::target::word Array_type_arguments_offset = 4;
 static constexpr dart::compiler::target::word Class_declaration_type_offset =
     56;
 static constexpr dart::compiler::target::word Class_num_type_arguments_offset =
-    106;
+    102;
 static constexpr dart::compiler::target::word Class_super_type_offset = 44;
 static constexpr dart::compiler::target::word
-    Class_type_arguments_field_offset_in_words_offset = 96;
+    Class_type_arguments_field_offset_in_words_offset = 92;
 static constexpr dart::compiler::target::word
     ClassTable_shared_class_table_offset = 16;
 static constexpr dart::compiler::target::word ClassTable_table_offset = 8;
@@ -1086,7 +1086,7 @@ static constexpr dart::compiler::target::word Double_InstanceSize = 16;
 static constexpr dart::compiler::target::word Float32x4_InstanceSize = 24;
 static constexpr dart::compiler::target::word Float64x2_InstanceSize = 24;
 static constexpr dart::compiler::target::word Instructions_UnalignedHeaderSize =
-    12;
+    8;
 static constexpr dart::compiler::target::word Int32x4_InstanceSize = 24;
 static constexpr dart::compiler::target::word Mint_InstanceSize = 16;
 static constexpr dart::compiler::target::word NativeArguments_StructSize = 16;
@@ -1160,10 +1160,10 @@ static constexpr dart::compiler::target::word Array_type_arguments_offset = 8;
 static constexpr dart::compiler::target::word Class_declaration_type_offset =
     112;
 static constexpr dart::compiler::target::word Class_num_type_arguments_offset =
-    190;
+    182;
 static constexpr dart::compiler::target::word Class_super_type_offset = 88;
 static constexpr dart::compiler::target::word
-    Class_type_arguments_field_offset_in_words_offset = 180;
+    Class_type_arguments_field_offset_in_words_offset = 172;
 static constexpr dart::compiler::target::word
     ClassTable_shared_class_table_offset = 32;
 static constexpr dart::compiler::target::word ClassTable_table_offset = 16;
@@ -1453,7 +1453,7 @@ static constexpr dart::compiler::target::word Double_InstanceSize = 16;
 static constexpr dart::compiler::target::word Float32x4_InstanceSize = 24;
 static constexpr dart::compiler::target::word Float64x2_InstanceSize = 24;
 static constexpr dart::compiler::target::word Instructions_UnalignedHeaderSize =
-    16;
+    12;
 static constexpr dart::compiler::target::word Int32x4_InstanceSize = 24;
 static constexpr dart::compiler::target::word Mint_InstanceSize = 16;
 static constexpr dart::compiler::target::word NativeArguments_StructSize = 32;

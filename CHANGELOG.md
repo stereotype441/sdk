@@ -1,10 +1,6 @@
-## 2.7.0
-
-**Extension methods** -- which we shipped in preview in 2.6.0 -- are no longer
-in preview, and are now officially supported as of 2.7.0. Learn more about them
-here:
-
-https://medium.com/dartlang/extension-methods-2d466cd8b308
+## Next release
+(Add new changes here, and they will be copied to the change section for the
+ next release)
 
 ### Language
 
@@ -18,15 +14,22 @@ https://medium.com/dartlang/extension-methods-2d466cd8b308
 
 #### Linter
 
-The Linter was updated to `0.1.105+1`, which includes:
+The Linter was updated to `0.1.106`, which includes:
 
-* hardened checks for lib dir location (fixing crashes in `avoid_renaming_method_parameters`,
-  `prefer_relative_imports` and `public_member_api_docs`)
-* improved performance for `always_require_non_null_named_parameters`
+* improved docs for `comment_references`
+* fixes to `null_closures` to properly handle `Iterable.singleWhere`
+* (internal) migration to latest analyzer APIs
+* new lint: `no_logic_in_create_state`
 
 #### Pub
 
 ## 2.7.0 - 2019-12-11
+
+**Extension methods** -- which we shipped in preview in 2.6.0 -- are no longer
+in preview, and are now officially supported as of 2.7.0. Learn more about them
+here:
+
+https://medium.com/dartlang/extension-methods-2d466cd8b308
 
 ### Language
 
