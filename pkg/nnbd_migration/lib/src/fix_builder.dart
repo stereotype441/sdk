@@ -205,6 +205,12 @@ class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
   }
 
   @override
+  DartType getFieldType(FieldElement element) {
+    assert(!element.isSynthetic);
+    return _fixBuilder._computeMigratedType(element);
+  }
+
+  @override
   DartType getMigratedTypeAnnotationType(Source source, TypeAnnotation node) {
     return _fixTypeAnnotation(source, node)
         .toFinalType(_fixBuilder.typeProvider);
