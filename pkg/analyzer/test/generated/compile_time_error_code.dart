@@ -1037,7 +1037,6 @@ typedef F = int Function([Map<String, String> m = const {}]);
     await assertErrorsInCode('''
 typedef F([x = 0]);
 ''', [
-      error(CompileTimeErrorCode.DEFAULT_VALUE_IN_FUNCTION_TYPE_ALIAS, 0, 19),
       error(ParserErrorCode.DEFAULT_VALUE_IN_FUNCTION_TYPE, 13, 1),
     ]);
   }
@@ -1046,7 +1045,6 @@ typedef F([x = 0]);
     await assertErrorsInCode('''
 typedef F([x = 0]);
 ''', [
-      error(CompileTimeErrorCode.DEFAULT_VALUE_IN_FUNCTION_TYPE_ALIAS, 0, 19),
       error(ParserErrorCode.DEFAULT_VALUE_IN_FUNCTION_TYPE, 13, 1),
     ]);
   }
@@ -2351,31 +2349,6 @@ class A<E> {
 }
 ''', [
       error(CompileTimeErrorCode.INVALID_TYPE_ARGUMENT_IN_CONST_MAP, 47, 1),
-    ]);
-  }
-
-  test_invalidUri_export() async {
-    await assertErrorsInCode('''
-export 'ht:';
-''', [
-      error(CompileTimeErrorCode.INVALID_URI, 7, 5),
-    ]);
-  }
-
-  test_invalidUri_import() async {
-    await assertErrorsInCode('''
-import 'ht:';
-''', [
-      error(CompileTimeErrorCode.INVALID_URI, 7, 5),
-    ]);
-  }
-
-  test_invalidUri_part() async {
-    await assertErrorsInCode(r'''
-library lib;
-part 'ht:';
-''', [
-      error(CompileTimeErrorCode.INVALID_URI, 18, 5),
     ]);
   }
 

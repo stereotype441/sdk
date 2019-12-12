@@ -25,7 +25,6 @@ import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/generated/utilities_general.dart'
     show PerformanceTag;
 import 'package:analyzer/src/manifest/manifest_validator.dart';
-import 'package:analyzer/src/plugin/resolver_provider.dart';
 import 'package:analyzer/src/pubspec/pubspec_validator.dart';
 import 'package:analyzer/src/source/package_map_resolver.dart';
 import 'package:analyzer/src/source/path_filter.dart';
@@ -89,9 +88,6 @@ class Driver with HasContextMixin implements CommandLineStarter {
   /// If [analysisDriver] is not `null`, the [CommandLineOptions] that guided
   /// its creation.
   CommandLineOptions _previousOptions;
-
-  @override
-  ResolverProvider packageResolverProvider;
 
   /// SDK instance.
   DartSdk sdk;
@@ -434,33 +430,13 @@ class Driver with HasContextMixin implements CommandLineStarter {
       SummaryDataStore summaryDataStore,
       bool includeSdkResolver,
       AnalysisOptions analysisOptions) {
-    // Create a custom package resolver if one has been specified.
-    if (packageResolverProvider != null) {
-      Folder folder = resourceProvider.getFolder('.');
-      UriResolver resolver = packageResolverProvider(folder);
-      if (resolver != null) {
-        // TODO(brianwilkerson) This doesn't handle sdk extensions.
-        List<UriResolver> resolvers = <UriResolver>[];
-        if (includeSdkResolver) {
-          resolvers.add(new DartUriResolver(sdk));
-        }
-        resolvers
-            .add(new InSummaryUriResolver(resourceProvider, summaryDataStore));
-        resolvers.add(resolver);
-        resolvers.add(new ResourceUriResolver(resourceProvider));
-        return new SourceFactory(resolvers);
-      }
-    }
-
     UriResolver packageUriResolver;
 
-    if (options.packageRootPath != null) {
-      ContextBuilderOptions builderOptions = new ContextBuilderOptions();
-      builderOptions.defaultPackagesDirectoryPath = options.packageRootPath;
-      ContextBuilder builder = new ContextBuilder(resourceProvider, null, null,
-          options: builderOptions);
-      packageUriResolver = new PackageMapUriResolver(resourceProvider,
-          builder.convertPackagesToMap(builder.createPackageMap('')));
+    if (packageInfo.packageMap != null) {
+      packageUriResolver = new PackageMapUriResolver(
+        resourceProvider,
+        packageInfo.packageMap,
+      );
     }
 
     // Now, build our resolver list.
@@ -499,7 +475,7 @@ class Driver with HasContextMixin implements CommandLineStarter {
     // Finally files.
     resolvers.add(new ResourceUriResolver(resourceProvider));
 
-    return new SourceFactory(resolvers, packageInfo.packages);
+    return new SourceFactory(resolvers);
   }
 
   /// Collect all analyzable files at [filePath], recursively if it's a
@@ -631,11 +607,6 @@ class Driver with HasContextMixin implements CommandLineStarter {
   }
 
   _PackageInfo _findPackages(CommandLineOptions options) {
-    if (packageResolverProvider != null) {
-      // The resolver provider will do all the work later.
-      return new _PackageInfo(null, null);
-    }
-
     Packages packages;
     Map<String, List<Folder>> packageMap;
 

@@ -4156,7 +4156,10 @@ class ThisExpression extends Expression {
 }
 
 class Rethrow extends Expression {
-  DartType getStaticType(StaticTypeContext context) => const BottomType();
+  DartType getStaticType(StaticTypeContext context) =>
+      context.isNonNullableByDefault
+          ? const NeverType(Nullability.nonNullable)
+          : const BottomType();
 
   R accept<R>(ExpressionVisitor<R> v) => v.visitRethrow(this);
   R accept1<R, A>(ExpressionVisitor1<R, A> v, A arg) =>
@@ -4173,7 +4176,10 @@ class Throw extends Expression {
     expression?.parent = this;
   }
 
-  DartType getStaticType(StaticTypeContext context) => const BottomType();
+  DartType getStaticType(StaticTypeContext context) =>
+      context.isNonNullableByDefault
+          ? const NeverType(Nullability.nonNullable)
+          : const BottomType();
 
   R accept<R>(ExpressionVisitor<R> v) => v.visitThrow(this);
   R accept1<R, A>(ExpressionVisitor1<R, A> v, A arg) => v.visitThrow(this, arg);
@@ -6097,6 +6103,8 @@ class TypeParameterType extends DartType {
   /// left-hand side of the intersection type.  In case [promotedBound] is null,
   /// it is an equivalent of setting the overall nullability.
   TypeParameterType withNullability(Nullability typeParameterTypeNullability) {
+    assert(promotedBound == null,
+        "Can't change the nullability attribute of an intersection type.");
     return typeParameterTypeNullability == this.typeParameterTypeNullability
         ? this
         : new TypeParameterType(
