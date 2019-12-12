@@ -3271,3 +3271,15 @@ class LeastUpperBoundTest extends BoundTestBase {
     }
   }
 }
+
+class _MockSource implements Source {
+  @override
+  final Uri uri;
+
+  _MockSource(this.uri);
+
+  @override
+  String get encoding => '$uri';
+
+  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
