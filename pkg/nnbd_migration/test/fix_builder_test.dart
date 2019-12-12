@@ -952,6 +952,31 @@ _f(int/*?*/ x) =>
     visitSubexpression(findNode.listLiteral('['), 'List<dynamic>');
   }
 
+  test_constructor_initializer_non_nullable_context() async {
+    await analyze('''
+class C {
+  int/*!*/ i;
+  C(int/*?*/ j) : i = j;
+}
+''');
+    // A check needs to be added because nullable int is not assignable to
+    // non-nullable int.
+    var jReference = findNode.simple('j;');
+    visitSubexpression(jReference, 'int', changes: {jReference: NullCheck()});
+  }
+
+  test_constructor_initializer_nullable_context() async {
+    await analyze('''
+class C {
+  int/*?*/ i;
+  C(int/*?*/ j) : i = j;
+}
+''');
+    // No check needs to be added because nullable int is assignable to nullable
+    // int.
+    visitSubexpression(findNode.simple('j;'), 'int?');
+  }
+
   test_doubleLiteral() async {
     await analyze('''
 f() => 1.0;
