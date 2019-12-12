@@ -105,9 +105,7 @@ RawArray* ICData::cached_icdata_arrays_[kCachedICDataArrayCount];
 // A VM heap allocated preinitialized empty subtype entry array.
 RawArray* SubtypeTestCache::cached_array_;
 
-cpp_vtable Object::handle_vtable_ = 0;
-RelaxedAtomic<cpp_vtable> Object::builtin_vtables_[kNumPredefinedCids] = {};
-cpp_vtable Smi::handle_vtable_ = 0;
+cpp_vtable Object::builtin_vtables_[kNumPredefinedCids] = {};
 
 // These are initialized to a value that will force a illegal memory access if
 // they are being used.
@@ -571,17 +569,105 @@ void Object::InitNull(Isolate* isolate) {
   }
 }
 
+void Object::InitVtables() {
+  {
+    Object fake_handle;
+    builtin_vtables_[kObjectCid] = fake_handle.vtable();
+  }
+
+#define INIT_VTABLE(clazz)                                                     \
+  {                                                                            \
+    clazz fake_handle;                                                         \
+    builtin_vtables_[k##clazz##Cid] = fake_handle.vtable();                    \
+  }
+  CLASS_LIST_NO_OBJECT_NOR_STRING_NOR_ARRAY(INIT_VTABLE)
+#undef INIT_VTABLE
+
+#define INIT_VTABLE(clazz)                                                     \
+  {                                                                            \
+    Array fake_handle;                                                         \
+    builtin_vtables_[k##clazz##Cid] = fake_handle.vtable();                    \
+  }
+  CLASS_LIST_ARRAYS(INIT_VTABLE)
+#undef INIT_VTABLE
+
+#define INIT_VTABLE(clazz)                                                     \
+  {                                                                            \
+    String fake_handle;                                                        \
+    builtin_vtables_[k##clazz##Cid] = fake_handle.vtable();                    \
+  }
+  CLASS_LIST_STRINGS(INIT_VTABLE)
+#undef INIT_VTABLE
+
+  {
+    Instance fake_handle;
+    builtin_vtables_[kFfiNativeTypeCid] = fake_handle.vtable();
+  }
+
+#define INIT_VTABLE(clazz)                                                     \
+  {                                                                            \
+    Instance fake_handle;                                                      \
+    builtin_vtables_[kFfi##clazz##Cid] = fake_handle.vtable();                 \
+  }
+  CLASS_LIST_FFI_TYPE_MARKER(INIT_VTABLE)
+#undef INIT_VTABLE
+
+  {
+    Instance fake_handle;
+    builtin_vtables_[kFfiNativeFunctionCid] = fake_handle.vtable();
+  }
+
+  {
+    Pointer fake_handle;
+    builtin_vtables_[kFfiPointerCid] = fake_handle.vtable();
+  }
+
+  {
+    DynamicLibrary fake_handle;
+    builtin_vtables_[kFfiDynamicLibraryCid] = fake_handle.vtable();
+  }
+
+#define INIT_VTABLE(clazz)                                                     \
+  {                                                                            \
+    Instance fake_handle;                                                      \
+    builtin_vtables_[k##clazz##Cid] = fake_handle.vtable();                    \
+  }
+  CLASS_LIST_WASM(INIT_VTABLE)
+#undef INIT_VTABLE
+
+#define INIT_VTABLE(clazz)                                                     \
+  {                                                                            \
+    TypedData fake_internal_handle;                                            \
+    builtin_vtables_[kTypedData##clazz##Cid] = fake_internal_handle.vtable();  \
+    TypedDataView fake_view_handle;                                            \
+    builtin_vtables_[kTypedData##clazz##ViewCid] = fake_view_handle.vtable();  \
+    ExternalTypedData fake_external_handle;                                    \
+    builtin_vtables_[kExternalTypedData##clazz##Cid] =                         \
+        fake_external_handle.vtable();                                         \
+  }
+  CLASS_LIST_TYPED_DATA(INIT_VTABLE)
+#undef INIT_VTABLE
+
+  {
+    TypedDataView fake_handle;
+    builtin_vtables_[kByteDataViewCid] = fake_handle.vtable();
+  }
+
+  {
+    Instance fake_handle;
+    builtin_vtables_[kByteBufferCid] = fake_handle.vtable();
+    builtin_vtables_[kNullCid] = fake_handle.vtable();
+    builtin_vtables_[kDynamicCid] = fake_handle.vtable();
+    builtin_vtables_[kVoidCid] = fake_handle.vtable();
+    builtin_vtables_[kNeverCid] = fake_handle.vtable();
+  }
+}
+
 void Object::Init(Isolate* isolate) {
   // Should only be run by the vm isolate.
   ASSERT(isolate == Dart::vm_isolate());
 
-  // Initialize the static vtable values.
-  {
-    Object fake_object;
-    Smi fake_smi;
-    Object::handle_vtable_ = fake_object.vtable();
-    Smi::handle_vtable_ = fake_smi.vtable();
-  }
+  InitVtables();
 
   Heap* heap = isolate->heap();
 
@@ -620,7 +706,7 @@ void Object::Init(Isolate* isolate) {
     // Directly set raw_ to break a circular dependency: SetRaw will attempt
     // to lookup class class in the class table where it is not registered yet.
     cls.raw_ = class_class_;
-    cls.set_handle_vtable(fake.vtable());
+    ASSERT(builtin_vtables_[kClassCid] == fake.vtable());
     cls.set_instance_size(Class::InstanceSize());
     cls.set_next_field_offset(Class::NextFieldOffset());
     cls.set_id(Class::kClassId);
@@ -1426,17 +1512,15 @@ void Object::MakeUnusedSpaceTraversable(const Object& obj,
 
 void Object::VerifyBuiltinVtables() {
 #if defined(DEBUG)
-  Thread* thread = Thread::Current();
-  Isolate* isolate = thread->isolate();
-  Class& cls = Class::Handle(thread->zone(), Class::null());
-  for (intptr_t cid = (kIllegalCid + 1); cid < kNumPredefinedCids; cid++) {
-    if (isolate->class_table()->HasValidClassAt(cid)) {
-      cls ^= isolate->class_table()->At(cid);
-      ASSERT(builtin_vtables_[cid] == cls.raw_ptr()->handle_vtable_);
-    }
-  }
+  ASSERT(builtin_vtables_[kIllegalCid] == 0);
   ASSERT(builtin_vtables_[kFreeListElement] == 0);
   ASSERT(builtin_vtables_[kForwardingCorpse] == 0);
+  ClassTable* table = Isolate::Current()->class_table();
+  for (intptr_t cid = kObjectCid; cid < kNumPredefinedCids; cid++) {
+    if (table->HasValidClassAt(cid)) {
+      ASSERT(builtin_vtables_[cid] != 0);
+    }
+  }
 #endif
 }
 
@@ -2277,16 +2361,12 @@ void Object::InitializeObject(uword address, intptr_t class_id, intptr_t size) {
 void Object::CheckHandle() const {
 #if defined(DEBUG)
   if (raw_ != Object::null()) {
-    if ((reinterpret_cast<uword>(raw_) & kSmiTagMask) == kSmiTag) {
-      ASSERT(vtable() == Smi::handle_vtable_);
-      return;
-    }
-    intptr_t cid = raw_->GetClassId();
+    intptr_t cid = raw_->GetClassIdMayBeSmi();
     if (cid >= kNumPredefinedCids) {
       cid = kInstanceCid;
     }
     ASSERT(vtable() == builtin_vtables_[cid]);
-    if (FLAG_verify_handles) {
+    if (FLAG_verify_handles && raw_->IsHeapObject()) {
       Isolate* isolate = Isolate::Current();
       Heap* isolate_heap = isolate->heap();
       Heap* vm_isolate_heap = Dart::vm_isolate()->heap();
@@ -2475,8 +2555,7 @@ RawClass* Class::New(Isolate* isolate, bool register_class) {
     NoSafepointScope no_safepoint;
     result ^= raw;
   }
-  FakeObject fake;
-  result.set_handle_vtable(fake.vtable());
+  Object::VerifyBuiltinVtable<FakeObject>(FakeObject::kClassId);
   result.set_token_pos(TokenPosition::kNoSource);
   result.set_end_token_pos(TokenPosition::kNoSource);
   result.set_instance_size(FakeObject::InstanceSize());
@@ -3862,9 +3941,9 @@ RawClass* Class::NewCommon(intptr_t index) {
     NoSafepointScope no_safepoint;
     result ^= raw;
   }
-  FakeInstance fake;
-  ASSERT(fake.IsInstance());
-  result.set_handle_vtable(fake.vtable());
+  // Here kIllegalCid means not-yet-assigned.
+  Object::VerifyBuiltinVtable<FakeInstance>(index == kIllegalCid ? kInstanceCid
+                                                                 : index);
   result.set_token_pos(TokenPosition::kNoSource);
   result.set_end_token_pos(TokenPosition::kNoSource);
   result.set_instance_size(FakeInstance::InstanceSize());
@@ -12591,9 +12670,7 @@ void Library::CheckFunctionFingerprints() {
 }
 #endif  // defined(DART_NO_SNAPSHOT) && !defined(PRODUCT).
 
-RawInstructions* Instructions::New(intptr_t size,
-                                   bool has_single_entry_point,
-                                   uword unchecked_entrypoint_pc_offset) {
+RawInstructions* Instructions::New(intptr_t size, bool has_single_entry_point) {
   ASSERT(size >= 0);
   ASSERT(Object::instructions_class() != Class::null());
   if (size < 0 || size > kMaxElements) {
@@ -12609,7 +12686,6 @@ RawInstructions* Instructions::New(intptr_t size,
     result ^= raw;
     result.SetSize(size);
     result.SetHasSingleEntryPoint(has_single_entry_point);
-    result.set_unchecked_entrypoint_pc_offset(unchecked_entrypoint_pc_offset);
     result.set_stats(nullptr);
   }
   return result.raw();
@@ -14937,8 +15013,7 @@ RawCode* Code::FinalizeCode(FlowGraphCompiler* compiler,
   assembler->GetSelfHandle() = code.raw();
 #endif
   Instructions& instrs = Instructions::ZoneHandle(Instructions::New(
-      assembler->CodeSize(), assembler->has_single_entry_point(),
-      assembler->UncheckedEntryOffset()));
+      assembler->CodeSize(), assembler->has_single_entry_point()));
 
   {
     // Important: if GC is triggerred at any point between Instructions::New
@@ -15000,8 +15075,10 @@ RawCode* Code::FinalizeCode(FlowGraphCompiler* compiler,
     }
 
     // Hook up Code and Instructions objects.
-    code.SetActiveInstructions(instrs);
+    const uword unchecked_offset = assembler->UncheckedEntryOffset();
+    code.SetActiveInstructions(instrs, unchecked_offset);
     code.set_instructions(instrs);
+    NOT_IN_PRECOMPILED(code.set_unchecked_offset(unchecked_offset));
     code.set_is_alive(true);
 
     // Set object pool in Instructions object.
@@ -15232,8 +15309,8 @@ void Code::DisableDartCode() const {
   ASSERT(IsFunctionCode());
   ASSERT(instructions() == active_instructions());
   const Code& new_code = StubCode::FixCallersTarget();
-  SetActiveInstructions(Instructions::Handle(new_code.instructions()));
-  StoreNonPointer(&raw_ptr()->unchecked_entry_point_, raw_ptr()->entry_point_);
+  SetActiveInstructions(Instructions::Handle(new_code.instructions()),
+                        new_code.UncheckedEntryPointOffset());
 }
 
 void Code::DisableStubCode() const {
@@ -15241,23 +15318,26 @@ void Code::DisableStubCode() const {
   ASSERT(IsAllocationStubCode());
   ASSERT(instructions() == active_instructions());
   const Code& new_code = StubCode::FixAllocationStubTarget();
-  SetActiveInstructions(Instructions::Handle(new_code.instructions()));
-  StoreNonPointer(&raw_ptr()->unchecked_entry_point_, raw_ptr()->entry_point_);
+  SetActiveInstructions(Instructions::Handle(new_code.instructions()),
+                        new_code.UncheckedEntryPointOffset());
 }
 
 void Code::InitializeCachedEntryPointsFrom(RawCode* code,
-                                           RawInstructions* instructions) {
+                                           RawInstructions* instructions,
+                                           uint32_t unchecked_offset) {
   NoSafepointScope _;
-  code->ptr()->entry_point_ = Instructions::EntryPoint(instructions);
-  code->ptr()->monomorphic_entry_point_ =
+  const uword entry_point = Instructions::EntryPoint(instructions);
+  const uword monomorphic_entry_point =
       Instructions::MonomorphicEntryPoint(instructions);
-  code->ptr()->unchecked_entry_point_ =
-      Instructions::UncheckedEntryPoint(instructions);
+  code->ptr()->entry_point_ = entry_point;
+  code->ptr()->monomorphic_entry_point_ = monomorphic_entry_point;
+  code->ptr()->unchecked_entry_point_ = entry_point + unchecked_offset;
   code->ptr()->monomorphic_unchecked_entry_point_ =
-      Instructions::MonomorphicUncheckedEntryPoint(instructions);
+      monomorphic_entry_point + unchecked_offset;
 }
 
-void Code::SetActiveInstructions(const Instructions& instructions) const {
+void Code::SetActiveInstructions(const Instructions& instructions,
+                                 uint32_t unchecked_offset) const {
 #if defined(DART_PRECOMPILED_RUNTIME)
   UNREACHABLE();
 #else
@@ -15265,7 +15345,17 @@ void Code::SetActiveInstructions(const Instructions& instructions) const {
   // RawInstructions are never allocated in New space and hence a
   // store buffer update is not needed here.
   StorePointer(&raw_ptr()->active_instructions_, instructions.raw());
-  Code::InitializeCachedEntryPointsFrom(raw(), instructions.raw());
+  Code::InitializeCachedEntryPointsFrom(raw(), instructions.raw(),
+                                        unchecked_offset);
+#endif
+}
+
+void Code::ResetActiveInstructions() const {
+#if defined(DART_PRECOMPILED_RUNTIME)
+  UNREACHABLE();
+#else
+  SetActiveInstructions(Instructions::Handle(instructions()),
+                        raw_ptr()->unchecked_offset_);
 #endif
 }
 
@@ -15960,7 +16050,7 @@ void MegamorphicCache::SwitchToBareInstructions() {
     const intptr_t cid = (*slot)->GetClassIdMayBeSmi();
     if (cid == kFunctionCid) {
       RawCode* code = Function::CurrentCodeOf(Function::RawCast(*slot));
-      *slot = Smi::FromAlignedAddress(Code::EntryPoint(code));
+      *slot = Smi::FromAlignedAddress(Code::EntryPointOf(code));
     } else {
       ASSERT(cid == kSmiCid);
     }
@@ -17839,9 +17929,24 @@ RawType* Type::ToNullability(Nullability value, Heap::Space space) const {
   if (nullability() == value) {
     return raw();
   }
+  // Type parameter instantiation may request a nullability change, which should
+  // be ignored for types dynamic and void. Type Null cannot be the result of
+  // instantiating a non-nullable type parameter (TypeError thrown).
+  const classid_t cid = type_class_id();
+  if (cid == kDynamicCid || cid == kVoidCid || cid == kNullCid) {
+    return raw();
+  }
+  if (cid == kNeverCid) {
+    if (value == Nullability::kNullable) {
+      // Map nullable Never type to Null type.
+      return Type::NullType();
+    }
+    return raw();
+  }
   // Clone type and set new nullability.
   Type& type = Type::Handle();
-  // TODO(regis): Should we always clone in old space and remove space param?
+  // Always cloning in old space and removing space parameter would not satisfy
+  // currently existing requests for type instantiation in new space.
   type ^= Object::Clone(*this, space);
   type.set_nullability(value);
   type.SetHash(0);
@@ -18666,7 +18771,6 @@ RawTypeParameter* TypeParameter::ToNullability(Nullability value,
   }
   // Clone type and set new nullability.
   TypeParameter& type_parameter = TypeParameter::Handle();
-  // TODO(regis): Should we always clone in old space and remove space param?
   type_parameter ^= Object::Clone(*this, space);
   type_parameter.set_nullability(value);
   type_parameter.SetHash(0);
@@ -22333,9 +22437,10 @@ const char* StackTrace::ToDartCString(const StackTrace& stack_trace_in) {
 
 const char* StackTrace::ToDwarfCString(const StackTrace& stack_trace_in) {
 #if defined(DART_PRECOMPILER) || defined(DART_PRECOMPILED_RUNTIME)
-  Zone* zone = Thread::Current()->zone();
-  StackTrace& stack_trace = StackTrace::Handle(zone, stack_trace_in.raw());
-  Object& code = Object::Handle(zone);
+  auto const T = Thread::Current();
+  auto const zone = T->zone();
+  auto& stack_trace = StackTrace::Handle(zone, stack_trace_in.raw());
+  auto& code = Object::Handle(zone);
   ZoneTextBuffer buffer(zone, 1024);
 
   // The Dart standard requires the output of StackTrace.toString to include
@@ -22351,6 +22456,17 @@ const char* StackTrace::ToDwarfCString(const StackTrace& stack_trace_in) {
   OSThread* thread = OSThread::Current();
   buffer.Printf("pid: %" Pd ", tid: %" Pd ", name %s\n", OS::ProcessId(),
                 OSThread::ThreadIdToIntPtr(thread->id()), thread->name());
+  if (auto const isolate_group = T->isolate_group()) {
+    buffer.Printf("isolate_instructions: %" Px "",
+                  reinterpret_cast<uintptr_t>(
+                      isolate_group->source()->snapshot_instructions));
+    if (auto const vm_group = Dart::vm_isolate()->group()) {
+      buffer.Printf(" vm_instructions: %" Px "",
+                    reinterpret_cast<uintptr_t>(
+                        vm_group->source()->snapshot_instructions));
+    }
+    buffer.Printf("\n");
+  }
   intptr_t frame_index = 0;
   uint32_t frame_skip = 0;
   do {
@@ -22385,11 +22501,11 @@ const char* StackTrace::ToDwarfCString(const StackTrace& stack_trace_in) {
         if (NativeSymbolResolver::LookupSharedObject(call_addr, &dso_base,
                                                      &dso_name)) {
           uword dso_offset = call_addr - dso_base;
-          buffer.Printf("    #%02" Pd " pc %" Pp "  %s\n", frame_index,
-                        dso_offset, dso_name);
+          buffer.Printf("    #%02" Pd " abs %" Pp " virt %" Pp " %s\n",
+                        frame_index, call_addr, dso_offset, dso_name);
           NativeSymbolResolver::FreeSymbolName(dso_name);
         } else {
-          buffer.Printf("    #%02" Pd " pc %" Pp "  <unknown>\n", frame_index,
+          buffer.Printf("    #%02" Pd " abs %" Pp " <unknown>\n", frame_index,
                         call_addr);
         }
         frame_index++;
