@@ -1172,7 +1172,8 @@ class ResolverVisitor extends ScopedVisitor {
     // to be visited in the context of the constructor field initializer node.
     //
     FieldElement fieldElement = enclosingClass.getField(node.fieldName.name);
-    InferenceContext.setType(node.expression, fieldElement?.type);
+    InferenceContext.setType(
+        node.expression, _elementTypeProvider.safeFieldType(fieldElement));
     node.expression?.accept(this);
     node.accept(elementResolver);
     node.accept(typeAnalyzer);
