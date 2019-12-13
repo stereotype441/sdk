@@ -33,11 +33,8 @@ class ElementTypeProvider {
   /// Guaranteed to be a function type.
   FunctionType getExecutableType(FunctionTypedElement element) => element.type;
 
-  /// Queries the type of a (non-synthetic) field.
-  DartType getFieldType(FieldElement element) {
-    assert(!element.isSynthetic);
-    return element.type;
-  }
+  /// Queries the type of a field.
+  DartType getFieldType(FieldElement element) => element.type;
 
   /// Queries the type of a variable element.
   DartType getVariableType(VariableElement variable) => variable.type;
