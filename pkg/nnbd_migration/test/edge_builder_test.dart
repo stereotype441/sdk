@@ -1592,6 +1592,63 @@ void f(bool b, Map<int, String> x, Map<int, String> y) {
         yType.typeArguments[1].node);
   }
 
+  test_conditionalExpression_generic_lub() async {
+    await analyze('''
+class A<T> {}
+class B<T> extends A<T/*b*/> {}
+class C<T> extends A<T/*c*/> {}
+A<num> f(bool b, B<num> x, C<num> y) {
+  return (b ? x : y);
+}
+''');
+    var bType = decoratedTypeAnnotation('B<num> x');
+    var cType = decoratedTypeAnnotation('C<num> y');
+    var bInA = decoratedTypeAnnotation('T/*b*/');
+    var cInA = decoratedTypeAnnotation('T/*c*/');
+    var resultType = decoratedExpressionType('(b ?');
+    assertLUB(resultType.node, bType.node, cType.node);
+    assertLUB(
+        resultType.typeArguments[0].node,
+        substitutionNode(bType.typeArguments[0].node, bInA.node),
+        substitutionNode(cType.typeArguments[0].node, cInA.node));
+  }
+
+  test_conditionalExpression_generic_lub_leftSubtype() async {
+    await analyze('''
+class A<T> {}
+class B<T> extends A<T/*b*/> {}
+A<num> f(bool b, B<num> x, A<num> y) {
+  return (b ? x : y);
+}
+''');
+    var aType = decoratedTypeAnnotation('A<num> y');
+    var bType = decoratedTypeAnnotation('B<num> x');
+    var bInA = decoratedTypeAnnotation('T/*b*/');
+    var resultType = decoratedExpressionType('(b ?');
+    assertLUB(resultType.node, bType.node, aType.node);
+    assertLUB(
+        resultType.typeArguments[0].node,
+        substitutionNode(bType.typeArguments[0].node, bInA.node),
+        aType.typeArguments[0].node);
+  }
+
+  test_conditionalExpression_generic_lub_rightSubtype() async {
+    await analyze('''
+class A<T> {}
+class B<T> extends A<T/*b*/> {}
+A<num> f(bool b, A<num> x, B<num> y) {
+  return (b ? x : y);
+}
+''');
+    var aType = decoratedTypeAnnotation('A<num> x');
+    var bType = decoratedTypeAnnotation('B<num> y');
+    var bInA = decoratedTypeAnnotation('T/*b*/');
+    var resultType = decoratedExpressionType('(b ?');
+    assertLUB(resultType.node, aType.node, bType.node);
+    assertLUB(resultType.typeArguments[0].node, aType.typeArguments[0].node,
+        substitutionNode(bType.typeArguments[0].node, bInA.node));
+  }
+
   test_conditionalExpression_left_non_null() async {
     await analyze('''
 int f(bool b, int i) {
@@ -1619,6 +1676,72 @@ int f(bool b, int i) {
     assertLUB(nullable_conditional, inSet(alwaysPlus), nullable_i);
   }
 
+  test_conditionalExpression_left_null_right_function() async {
+    await analyze('''
+bool Function<T>(int) g(bool b, bool Function<T>(int) f) {
+  return (b ? null : f);
+}
+''');
+
+    var nullable_i =
+        decoratedGenericFunctionTypeAnnotation('bool Function<T>(int) f').node;
+    var nullable_conditional = decoratedExpressionType('(b ?').node;
+    assertLUB(nullable_conditional, inSet(alwaysPlus), nullable_i);
+  }
+
+  test_conditionalExpression_left_null_right_parameterType() async {
+    await analyze('''
+T g<T>(bool b, T t) {
+  return (b ? null : t);
+}
+''');
+
+    var nullable_t = decoratedTypeAnnotation('T t').node;
+    var nullable_conditional = decoratedExpressionType('(b ?').node;
+    assertLUB(nullable_conditional, inSet(alwaysPlus), nullable_t);
+  }
+
+  test_conditionalExpression_left_null_right_typeArgs() async {
+    await analyze('''
+List<int> f(bool b, List<int> l) {
+  return (b ? null : l);
+}
+''');
+
+    var nullable_i = decoratedTypeAnnotation('List<int> l').node;
+    var nullable_conditional = decoratedExpressionType('(b ?').node;
+    assertLUB(nullable_conditional, inSet(alwaysPlus), nullable_i);
+  }
+
+  test_conditionalExpression_nullTyped_nullParameter() async {
+    await analyze('''
+void f(bool b, void Function(Null p) x, void Function(List<int> p) y) {
+  (b ? x : y);
+}
+''');
+    var xType =
+        decoratedGenericFunctionTypeAnnotation('void Function(Null p) x');
+    var yType =
+        decoratedGenericFunctionTypeAnnotation('void Function(List<int> p) y');
+    var resultType = decoratedExpressionType('(b ?');
+    assertLUB(resultType.node, xType.node, yType.node);
+    assertGLB(resultType.positionalParameters[0].node,
+        xType.positionalParameters[0].node, yType.positionalParameters[0].node);
+  }
+
+  test_conditionalExpression_parameterType() async {
+    await analyze('''
+T g<T>(bool b, T x, T y) {
+  return (b ? x : y);
+}
+''');
+
+    var nullable_x = decoratedTypeAnnotation('T x').node;
+    var nullable_y = decoratedTypeAnnotation('T y').node;
+    var nullable_conditional = decoratedExpressionType('(b ?').node;
+    assertLUB(nullable_conditional, nullable_x, nullable_y);
+  }
+
   test_conditionalExpression_right_non_null() async {
     await analyze('''
 int f(bool b, int i) {
@@ -1644,6 +1767,43 @@ int f(bool b, int i) {
     var nullable_i = decoratedTypeAnnotation('int i').node;
     var nullable_conditional = decoratedExpressionType('(b ?').node;
     assertLUB(nullable_conditional, nullable_i, inSet(alwaysPlus));
+  }
+
+  test_conditionalExpression_right_null_left_function() async {
+    await analyze('''
+bool Function<T>(int) g(bool b, bool Function<T>(int) f) {
+  return (b ? f : null);
+}
+''');
+
+    var nullable_i =
+        decoratedGenericFunctionTypeAnnotation('bool Function<T>(int) f').node;
+    var nullable_conditional = decoratedExpressionType('(b ?').node;
+    assertLUB(nullable_conditional, nullable_i, inSet(alwaysPlus));
+  }
+
+  test_conditionalExpression_right_null_left_typeArgs() async {
+    await analyze('''
+List<int> f(bool b, List<int> l) {
+  return (b ? l : null);
+}
+''');
+
+    var nullable_i = decoratedTypeAnnotation('List<int> l').node;
+    var nullable_conditional = decoratedExpressionType('(b ?').node;
+    assertLUB(nullable_conditional, nullable_i, inSet(alwaysPlus));
+  }
+
+  test_conditionalExpression_right_null_left_typeParameter() async {
+    await analyze('''
+T f<T>(bool b, T t) {
+  return (b ? t : null);
+}
+''');
+
+    var nullable_t = decoratedTypeAnnotation('T t').node;
+    var nullable_conditional = decoratedExpressionType('(b ?').node;
+    assertLUB(nullable_conditional, nullable_t, inSet(alwaysPlus));
   }
 
   test_constructor_default_parameter_value_bool() async {
