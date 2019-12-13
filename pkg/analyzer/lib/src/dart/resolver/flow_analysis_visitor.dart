@@ -291,8 +291,8 @@ class FlowAnalysisHelperForMigration extends FlowAnalysisHelper {
 
   @override
   LocalVariableTypeProvider get localVariableTypeProvider {
-    return _LocalVariableTypeProviderForMigration(
-        this, migrationResolutionHooks);
+    return _LocalVariableTypeProvider(this,
+        elementTypeProvider: migrationResolutionHooks);
   }
 
   @override
@@ -557,9 +557,11 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
 class _LocalVariableTypeProvider implements LocalVariableTypeProvider {
   final FlowAnalysisHelper _manager;
 
-  final ElementTypeProvider _elementTypeProvider = const ElementTypeProvider();
+  final ElementTypeProvider _elementTypeProvider;
 
-  _LocalVariableTypeProvider(this._manager);
+  _LocalVariableTypeProvider(this._manager,
+      {ElementTypeProvider elementTypeProvider = const ElementTypeProvider()})
+      : _elementTypeProvider = elementTypeProvider;
 
   @override
   DartType getType(SimpleIdentifier node) {
