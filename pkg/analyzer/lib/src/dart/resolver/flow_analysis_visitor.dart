@@ -10,6 +10,7 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/dart/element/type_system.dart';
 import 'package:analyzer/src/dart/element/type.dart';
+import 'package:analyzer/src/generated/element_type_provider.dart';
 import 'package:analyzer/src/generated/migration.dart';
 import 'package:analyzer/src/generated/type_system.dart' show TypeSystemImpl;
 import 'package:analyzer/src/generated/variable_type_provider.dart';
@@ -290,8 +291,8 @@ class FlowAnalysisHelperForMigration extends FlowAnalysisHelper {
 
   @override
   LocalVariableTypeProvider get localVariableTypeProvider {
-    return _LocalVariableTypeProviderForMigration(
-        this, migrationResolutionHooks);
+    return _LocalVariableTypeProvider(this,
+        elementTypeProvider: migrationResolutionHooks);
   }
 
   @override
@@ -556,7 +557,11 @@ class _AssignedVariablesVisitor extends RecursiveAstVisitor<void> {
 class _LocalVariableTypeProvider implements LocalVariableTypeProvider {
   final FlowAnalysisHelper _manager;
 
-  _LocalVariableTypeProvider(this._manager);
+  final ElementTypeProvider _elementTypeProvider;
+
+  _LocalVariableTypeProvider(this._manager,
+      {ElementTypeProvider elementTypeProvider = const ElementTypeProvider()})
+      : _elementTypeProvider = elementTypeProvider;
 
   @override
   DartType getType(SimpleIdentifier node) {
@@ -565,22 +570,6 @@ class _LocalVariableTypeProvider implements LocalVariableTypeProvider {
       var promotedType = _manager.flow?.variableRead(node, variable);
       if (promotedType != null) return promotedType;
     }
-    return _getDeclaredType(variable);
-  }
-
-  DartType _getDeclaredType(VariableElement variable) => variable.type;
-}
-
-class _LocalVariableTypeProviderForMigration
-    extends _LocalVariableTypeProvider {
-  final MigrationResolutionHooks _migrationResolutionHooks;
-
-  _LocalVariableTypeProviderForMigration(
-      FlowAnalysisHelper manager, this._migrationResolutionHooks)
-      : super(manager);
-
-  @override
-  DartType _getDeclaredType(VariableElement variable) {
-    return _migrationResolutionHooks.getVariableType(variable);
+    return _elementTypeProvider.getVariableType(variable);
   }
 }
