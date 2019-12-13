@@ -981,7 +981,8 @@ class ResolverVisitor extends ScopedVisitor {
           // If this is a user-defined operator, set the right operand context
           // using the operator method's parameter type.
           var rightParam = invokeType.parameters[0];
-          InferenceContext.setType(right, rightParam.type);
+          InferenceContext.setType(
+              right, _elementTypeProvider.getVariableType(rightParam));
         }
       }
 
@@ -1177,7 +1178,8 @@ class ResolverVisitor extends ScopedVisitor {
     // to be visited in the context of the constructor field initializer node.
     //
     FieldElement fieldElement = enclosingClass.getField(node.fieldName.name);
-    InferenceContext.setType(node.expression, fieldElement?.type);
+    InferenceContext.setType(
+        node.expression, _elementTypeProvider.safeFieldType(fieldElement));
     node.expression?.accept(this);
     node.accept(elementResolver);
     node.accept(typeAnalyzer);
@@ -1374,7 +1376,7 @@ class ResolverVisitor extends ScopedVisitor {
           var parameters =
               _elementTypeProvider.getExecutableParameters(identifierElement);
           if (parameters.isNotEmpty) {
-            valueType = parameters[0].type;
+            valueType = _elementTypeProvider.getVariableType(parameters[0]);
           }
         }
       }
@@ -1469,7 +1471,7 @@ class ResolverVisitor extends ScopedVisitor {
           var parameters =
               _elementTypeProvider.getExecutableParameters(identifierElement);
           if (parameters.isNotEmpty) {
-            valueType = parameters[0].type;
+            valueType = _elementTypeProvider.getVariableType(parameters[0]);
           }
         }
       }
@@ -1716,7 +1718,8 @@ class ResolverVisitor extends ScopedVisitor {
       var parameters = _elementTypeProvider.getExecutableParameters(method);
       if (parameters.isNotEmpty) {
         var indexParam = parameters[0];
-        InferenceContext.setType(node.index, indexParam.type);
+        InferenceContext.setType(
+            node.index, _elementTypeProvider.getVariableType(indexParam));
       }
     }
     node.index?.accept(this);
