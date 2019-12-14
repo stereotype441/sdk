@@ -1547,18 +1547,37 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
       } else {
         var leftType = left.type;
         var rightType = right.type;
-        if (leftType is InterfaceType && rightType is InterfaceType) {
-          if (leftType.element != type.element ||
-              rightType.element != type.element) {
-            _unimplemented(astNode, 'LUB/GLB with substitution');
+        if (leftType.isDartCoreNull) {
+          assert(isLUB, "shouldn't be possible to get C<T> from GLB(null, S)");
+          return DecoratedType(type, node, typeArguments: right.typeArguments);
+        } else if (rightType.isDartCoreNull) {
+          assert(isLUB, "shouldn't be possible to get C<T> from GLB(S, null)");
+          return DecoratedType(type, node, typeArguments: left.typeArguments);
+        } else if (leftType is InterfaceType && rightType is InterfaceType) {
+          List<DecoratedType> leftTypeArguments;
+          List<DecoratedType> rightTypeArguments;
+          if (isLUB) {
+            leftTypeArguments = _decoratedClassHierarchy
+                .asInstanceOf(left, type.element)
+                .typeArguments;
+            rightTypeArguments = _decoratedClassHierarchy
+                .asInstanceOf(right, type.element)
+                .typeArguments;
+          } else {
+            if (leftType.element != type.element ||
+                rightType.element != type.element) {
+              _unimplemented(astNode, 'GLB with substitution');
+            }
+            leftTypeArguments = left.typeArguments;
+            rightTypeArguments = right.typeArguments;
           }
           List<DecoratedType> newTypeArguments = [];
           for (int i = 0; i < type.typeArguments.length; i++) {
             newTypeArguments.add(_decorateUpperOrLowerBound(
                 astNode,
                 type.typeArguments[i],
-                left.typeArguments[i],
-                right.typeArguments[i],
+                leftTypeArguments[i],
+                rightTypeArguments[i],
                 isLUB));
           }
           return DecoratedType(type, node, typeArguments: newTypeArguments);
@@ -1572,6 +1591,23 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
     } else if (type is FunctionType) {
       var leftType = left.type;
       var rightType = right.type;
+      if (leftType.isDartCoreNull) {
+        assert(
+            isLUB, "shouldn't be possible to get a function from GLB(null, S)");
+        return DecoratedType(type, node,
+            returnType: right.returnType,
+            typeFormalBounds: right.typeFormalBounds,
+            positionalParameters: right.positionalParameters,
+            namedParameters: right.namedParameters);
+      } else if (rightType.isDartCoreNull) {
+        assert(
+            isLUB, "shouldn't be possible to get a function from GLB(S, null)");
+        return DecoratedType(type, node,
+            returnType: left.returnType,
+            typeFormalBounds: left.typeFormalBounds,
+            positionalParameters: left.positionalParameters,
+            namedParameters: left.namedParameters);
+      }
       if (leftType is FunctionType && rightType is FunctionType) {
         var returnType = _decorateUpperOrLowerBound(
             astNode, type.returnType, left.returnType, right.returnType, isLUB);
@@ -1610,7 +1646,19 @@ class EdgeBuilder extends GeneralizingAstVisitor<DecoratedType>
             '${rightType.runtimeType}');
       }
     } else if (type is TypeParameterType) {
-      _unimplemented(astNode, 'LUB/GLB with type parameter types');
+      var leftType = left.type;
+      var rightType = right.type;
+      if (leftType.isDartCoreNull || rightType.isDartCoreNull) {
+        assert(isLUB, "shouldn't be possible to get T from GLB(null, S)");
+        return DecoratedType(type, node);
+      }
+
+      if (leftType.element == type.element &&
+          rightType.element == type.element) {
+        return DecoratedType(type, node);
+      }
+
+      _unimplemented(astNode, 'LUB/GLB with unequal type parameter types');
     }
     _unimplemented(astNode, '_decorateUpperOrLowerBound');
   }
