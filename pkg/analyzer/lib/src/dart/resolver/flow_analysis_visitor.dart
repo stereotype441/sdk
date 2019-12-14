@@ -282,6 +282,8 @@ class FlowAnalysisHelper {
   }
 }
 
+/// Override of [FlowAnalysisHelper] that invokes methods of
+/// [MigrationResolutionHooks] when appropriate.
 class FlowAnalysisHelperForMigration extends FlowAnalysisHelper {
   final MigrationResolutionHooks migrationResolutionHooks;
 

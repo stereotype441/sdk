@@ -2223,6 +2223,8 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<void> {
   }
 }
 
+/// Override of [FlowAnalysisHelper] that invokes methods of
+/// [MigrationResolutionHooks] when appropriate.
 class StaticTypeAnalyzerForMigration extends StaticTypeAnalyzer {
   StaticTypeAnalyzerForMigration(
       ResolverVisitor resolver,
