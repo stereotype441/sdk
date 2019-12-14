@@ -6,7 +6,6 @@ import 'package:_fe_analyzer_shared/src/flow_analysis/flow_analysis.dart';
 import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/token.dart';
-import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
@@ -15,17 +14,13 @@ import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/inheritance_manager3.dart';
 import 'package:analyzer/src/dart/element/member.dart';
 import 'package:analyzer/src/dart/element/type.dart';
-import 'package:analyzer/src/dart/element/type_algebra.dart';
 import 'package:analyzer/src/dart/element/type_provider.dart';
-import 'package:analyzer/src/dart/resolver/flow_analysis_visitor.dart';
 import 'package:analyzer/src/generated/migration.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/generated/utilities_dart.dart';
-import 'package:meta/meta.dart';
 import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
 import 'package:nnbd_migration/src/decorated_type.dart';
-import 'package:nnbd_migration/src/utilities/resolution_utils.dart';
 import 'package:nnbd_migration/src/variables.dart';
 
 /// Problem reported by [FixBuilder] when encountering a compound assignment
@@ -58,9 +53,6 @@ class CompoundAssignmentReadNullable implements Problem {
 
 /// TODO(paulberry): document
 abstract class FixBuilder {
-  /// The decorated class hierarchy for this migration run.
-  final DecoratedClassHierarchy _decoratedClassHierarchy;
-
   /// The type provider providing non-nullable types.
   final TypeProvider typeProvider;
 
@@ -91,9 +83,14 @@ abstract class FixBuilder {
             source,
             definingLibrary);
 
-  FixBuilder._(this._decoratedClassHierarchy, this._typeSystem, this._variables,
-      this.source, LibraryElement definingLibrary)
+  FixBuilder._(
+      DecoratedClassHierarchy decoratedClassHierarchy,
+      this._typeSystem,
+      this._variables,
+      this.source,
+      LibraryElement definingLibrary)
       : typeProvider = _typeSystem.typeProvider {
+    // TODO(paulberry): make use of decoratedClassHierarchy
     assert(_typeSystem.isNonNullableByDefault);
     assert((typeProvider as TypeProviderImpl).isNonNullableByDefault);
     var inheritanceManager = InheritanceManager3();
@@ -101,6 +98,7 @@ abstract class FixBuilder {
     var errorListener = AnalysisErrorListener.NULL_LISTENER;
     // TODO(paulberry): once the feature is no longer experimental, change the
     // way we enable it in the resolver.
+    // ignore: invalid_use_of_visible_for_testing_member
     var featureSet = FeatureSet.forTesting(
         sdkVersion: '2.6.0', additionalFeatures: [Feature.non_nullable]);
     _resolver = ResolverVisitorForMigration(
