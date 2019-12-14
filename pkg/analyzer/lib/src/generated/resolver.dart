@@ -2708,6 +2708,8 @@ class ResolverVisitor extends ScopedVisitor {
   }
 }
 
+/// Override of [ResolverVisitorForMigration] that invokes methods of
+/// [MigrationResolutionHooks] when appropriate.
 class ResolverVisitorForMigration extends ResolverVisitor {
   ResolverVisitorForMigration(
       InheritanceManager3 inheritanceManager,
