@@ -240,8 +240,6 @@ class TypeProviderImpl extends TypeProviderBase {
     return _intType;
   }
 
-  bool get isNonNullableByDefault => _isNonNullableByDefault;
-
   @override
   InterfaceType get iterableDynamicType {
     _iterableDynamicType ??= InterfaceTypeImpl.explicit(
