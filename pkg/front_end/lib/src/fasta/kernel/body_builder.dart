@@ -38,6 +38,8 @@ import 'package:_fe_analyzer_shared/src/scanner/scanner.dart' show Token;
 import 'package:_fe_analyzer_shared/src/scanner/token_impl.dart'
     show isBinaryOperator, isMinusOperator, isUserDefinableOperator;
 
+import 'package:_fe_analyzer_shared/src/util/link.dart';
+
 import 'package:kernel/ast.dart';
 import 'package:kernel/type_environment.dart';
 
@@ -1524,9 +1526,16 @@ class BodyBuilder extends ScopeListener<JumpTarget>
       push(_createReadOnlyVariableAccess(
           expression.variable, token, expression.fileOffset, null));
     } else {
+      bool isNullAware = optional('?..', token);
+      if (isNullAware && !libraryBuilder.isNonNullableByDefault) {
+        addProblem(
+            fasta.templateExperimentNotEnabled.withArguments('non-nullable'),
+            offsetForToken(token),
+            token.charCount);
+      }
       VariableDeclaration variable =
           forest.createVariableDeclarationForValue(expression);
-      push(new Cascade(variable, isNullAware: optional('?..', token))
+      push(new Cascade(variable, isNullAware: isNullAware)
         ..fileOffset = expression.fileOffset);
       push(_createReadOnlyVariableAccess(
           variable, token, expression.fileOffset, null));
@@ -1931,6 +1940,10 @@ class BodyBuilder extends ScopeListener<JumpTarget>
         return new UnresolvedNameGenerator(this, token, n);
       }
     } else if (declaration.isTypeDeclaration) {
+      if (declaration is AccessErrorBuilder) {
+        AccessErrorBuilder accessError = declaration;
+        declaration = accessError.builder;
+      }
       return new TypeUseGenerator(this, token, declaration, name);
     } else if (declaration.isLocal) {
       VariableBuilder variableBuilder = declaration;
@@ -2392,12 +2405,26 @@ class BodyBuilder extends ScopeListener<JumpTarget>
     }
   }
 
+  /// Stack containing assigned variables info for try statements.
+  ///
+  /// These are created in [beginTryStatement] and ended in either [beginBlock]
+  /// when a finally block starts or in [endTryStatement] when the try statement
+  /// ends. Since these need to be associated with the try statement created in
+  /// in [endTryStatement] we store them the stack until the try statement is
+  /// created.
+  Link<AssignedVariablesNodeInfo<VariableDeclaration>> tryStatementInfoStack =
+      const Link<AssignedVariablesNodeInfo<VariableDeclaration>>();
+
   @override
   void beginBlock(Token token, BlockKind blockKind) {
     if (blockKind == BlockKind.tryStatement) {
       // This is matched by the call to [endNode] in [endBlock].
       typeInferrer?.assignedVariables?.beginNode();
     } else if (blockKind == BlockKind.finallyClause) {
+      // This is matched by the call to [beginNode] in [beginTryStatement].
+      tryStatementInfoStack = tryStatementInfoStack
+          .prepend(typeInferrer?.assignedVariables?.deferNode());
+
       // This is matched by the call to [endNode] in [endTryStatement].
       typeInferrer?.assignedVariables?.beginNode();
     }
@@ -2425,6 +2452,14 @@ class BodyBuilder extends ScopeListener<JumpTarget>
 
   @override
   void handleAssignmentExpression(Token token) {
+    assert(checkState(token, [
+      unionOfKinds(<ValueKind>[ValueKinds.Expression, ValueKinds.Generator]),
+      unionOfKinds(<ValueKind>[
+        ValueKinds.Expression, ValueKinds.Generator,
+        // TODO(johnniwinther): Avoid problem builders here.
+        ValueKinds.ProblemBuilder
+      ])
+    ]));
     debugEvent("AssignmentExpression");
     Expression value = popForValue();
     Object generator = pop();
@@ -3440,11 +3475,22 @@ class BodyBuilder extends ScopeListener<JumpTarget>
   }
 
   @override
+  void beginTryStatement(Token token) {
+    // This is matched by the call to [endNode] in [endTryStatement].
+    typeInferrer?.assignedVariables?.beginNode();
+  }
+
+  @override
   void endTryStatement(int catchCount, Token tryKeyword, Token finallyKeyword) {
     Statement finallyBlock;
     if (finallyKeyword != null) {
       finallyBlock = pop();
+      // This is matched by the call to [beginNode] in [beginBlock].
       typeInferrer?.assignedVariables?.endNode(finallyBlock);
+    } else {
+      // This is matched by the call to [beginNode] in [beginTryStatement].
+      tryStatementInfoStack = tryStatementInfoStack
+          .prepend(typeInferrer?.assignedVariables?.deferNode());
     }
     List<Catch> catchBlocks;
     List<Statement> compileTimeErrors;
@@ -3463,13 +3509,11 @@ class BodyBuilder extends ScopeListener<JumpTarget>
     }
     Statement tryBlock = popStatement();
     int fileOffset = offsetForToken(tryKeyword);
-    Statement result = tryBlock;
-    if (catchBlocks != null) {
-      result = forest.createTryCatch(fileOffset, result, catchBlocks);
-    }
-    if (finallyBlock != null) {
-      result = forest.createTryFinally(fileOffset, result, finallyBlock);
-    }
+    Statement result = forest.createTryStatement(
+        fileOffset, tryBlock, catchBlocks, finallyBlock);
+    typeInferrer?.assignedVariables
+        ?.storeInfo(result, tryStatementInfoStack.head);
+    tryStatementInfoStack = tryStatementInfoStack.tail;
 
     if (compileTimeErrors != null) {
       compileTimeErrors.add(result);
@@ -3491,6 +3535,12 @@ class BodyBuilder extends ScopeListener<JumpTarget>
     Expression index = popForValue();
     Object receiver = pop();
     bool isNullAware = optional('?.[', openSquareBracket);
+    if (isNullAware && !libraryBuilder.isNonNullableByDefault) {
+      addProblem(
+          fasta.templateExperimentNotEnabled.withArguments('non-nullable'),
+          offsetForToken(openSquareBracket),
+          openSquareBracket.charCount);
+    }
     if (receiver is Generator) {
       push(receiver.buildIndexedAccess(index, openSquareBracket,
           isNullAware: isNullAware));
@@ -4622,7 +4672,7 @@ class BodyBuilder extends ScopeListener<JumpTarget>
     Expression problem = elements.expressionProblem;
     Statement forInStatement;
     if (elements.explicitVariableDeclaration != null) {
-      forInStatement = new ForInStatementImpl(variable, expression, body,
+      forInStatement = new ForInStatement(variable, expression, body,
           isAsync: awaitToken != null)
         ..fileOffset = awaitToken?.charOffset ?? forToken.charOffset
         ..bodyOffset = body.fileOffset; // TODO(ahe): Isn't this redundant?

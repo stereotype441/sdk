@@ -1757,11 +1757,11 @@ abstract class IntegrationTestMixin {
    *
    * includePedanticFixes: bool (optional)
    *
-   *   A flag indicating that "pedantic" fixes should be applied.
+   *   A flag indicating whether "pedantic" fixes should be applied.
    *
    * includeRequiredFixes: bool (optional)
    *
-   *   A flag indicating that "required" fixes should be applied.
+   *   A flag indicating whether "required" fixes should be applied.
    *
    * excludedFixes: List<String> (optional)
    *
@@ -1772,15 +1772,11 @@ abstract class IntegrationTestMixin {
    *
    * port: int (optional)
    *
-   *   The port to be used to listen for and respond to http requests for
-   *   preview pages.
+   *   Deprecated: This field is now ignored by server.
    *
    * outputDir: FilePath (optional)
    *
-   *   The absolute and normalized path to a directory to which non-nullability
-   *   migration output will be written. The output is only produced if the
-   *   non-nullable fix is included. Files in the directory might be
-   *   overwritten, but no previously existing files will be deleted.
+   *   Deprecated: This field is now ignored by server.
    *
    * Returns
    *
@@ -1811,11 +1807,16 @@ abstract class IntegrationTestMixin {
    *   or (b) describe exceptions that were thrown but that did not stop the
    *   fixes from being produced. The list will be omitted if it is empty.
    *
+   * port: int (optional)
+   *
+   *   The port on which the preview tool will respond to GET requests. The
+   *   field is omitted if a preview was not requested.
+   *
    * urls: List<String> (optional)
    *
    *   The URLs that users can visit in a browser to see a preview of the
    *   proposed changes. There is one URL for each of the included file paths.
-   *   The field is omitted if no port was provided.
+   *   The field is omitted if a preview was not requested.
    */
   Future<EditDartfixResult> sendEditDartfix(List<String> included,
       {List<String> includedFixes,

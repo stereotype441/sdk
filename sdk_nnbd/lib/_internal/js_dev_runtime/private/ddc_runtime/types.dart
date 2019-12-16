@@ -990,12 +990,12 @@ _isFunctionSubtype(ft1, ft2, bool strictMode) => JS('', '''(() => {
 bool isSubtypeOf(Object t1, Object t2) {
   // TODO(jmesserly): we've optimized `is`/`as`/implicit type checks, so they're
   // dispatched on the type. Can we optimize the subtype relation too?
-  late Object map;
+  Object map;
   if (JS('!', '!#.hasOwnProperty(#)', t1, _subtypeCache)) {
-    JS('', '#[#] = # = new Map()', t1, _subtypeCache, map);
+    JS('', '#[#] = #', t1, _subtypeCache, map = JS<Object>('!', 'new Map()'));
     _cacheMaps.add(map);
   } else {
-    map = JS('', '#[#]', t1, _subtypeCache);
+    map = JS<Object>('!', '#[#]', t1, _subtypeCache);
     bool result = JS('', '#.get(#)', map, t2);
     if (JS('!', '# !== void 0', result)) return result;
   }
@@ -1322,7 +1322,7 @@ Object extractTypeArguments<T>(T instance, Function f) {
     throw ArgumentError('Cannot extract from non-class type ($type).');
   }
   var typeArguments = getGenericArgs(type);
-  if (typeArguments.isEmpty) {
+  if (typeArguments!.isEmpty) {
     throw ArgumentError('Cannot extract from non-generic type ($type).');
   }
   var supertype = _getMatchingSupertype(getReifiedType(instance), type);
@@ -1468,8 +1468,8 @@ class _TypeInferrer {
     var matchingSupertype = _getMatchingSupertype(subtype, supertype);
     if (matchingSupertype == null) return false;
 
-    var matchingTypeArgs = getGenericArgs(matchingSupertype);
-    var supertypeTypeArgs = getGenericArgs(supertype);
+    var matchingTypeArgs = getGenericArgs(matchingSupertype)!;
+    var supertypeTypeArgs = getGenericArgs(supertype)!;
     for (int i = 0; i < supertypeTypeArgs.length; i++) {
       if (!_isSubtypeMatch(matchingTypeArgs[i], supertypeTypeArgs[i])) {
         return false;
@@ -1514,13 +1514,13 @@ class _TypeInferrer {
 
     // Handle FutureOr<T> union type.
     if (_isFutureOr(subtype)) {
-      var subtypeArg = getGenericArgs(subtype)[0];
+      var subtypeArg = getGenericArgs(subtype)![0];
       if (_isFutureOr(supertype)) {
         // `FutureOr<P>` is a subtype match for `FutureOr<Q>` with respect to `L`
         // under constraints `C`:
         // - If `P` is a subtype match for `Q` with respect to `L` under constraints
         //   `C`.
-        var supertypeArg = getGenericArgs(supertype)[0];
+        var supertypeArg = getGenericArgs(supertype)![0];
         return _isSubtypeMatch(subtypeArg, supertypeArg);
       }
 
@@ -1530,8 +1530,9 @@ class _TypeInferrer {
       //   constraints `C0`.
       // - And `P` is a subtype match for `Q` with respect to `L` under
       //   constraints `C1`.
-      var subtypeFuture = JS('!', '#(#)', getGenericClass(Future), subtypeArg);
-      return _isSubtypeMatch(subtypeFuture!, supertype) &&
+      var subtypeFuture =
+          JS<Object>('!', '#(#)', getGenericClass(Future), subtypeArg);
+      return _isSubtypeMatch(subtypeFuture, supertype) &&
           _isSubtypeMatch(subtypeArg!, supertype);
     }
 
@@ -1544,11 +1545,11 @@ class _TypeInferrer {
       //   constraints `C`
       //   - And `P` is a subtype match for `Q` with respect to `L` under
       //     constraints `C`
-      var supertypeArg = getGenericArgs(supertype)[0];
+      var supertypeArg = getGenericArgs(supertype)![0];
       var supertypeFuture =
-          JS('!', '#(#)', getGenericClass(Future), supertypeArg);
-      return _isSubtypeMatch(subtype!, supertypeFuture) ||
-          _isSubtypeMatch(subtype!, supertypeArg);
+          JS<Object>('!', '#(#)', getGenericClass(Future), supertypeArg);
+      return _isSubtypeMatch(subtype, supertypeFuture) ||
+          _isSubtypeMatch(subtype, supertypeArg);
     }
 
     // A type variable `T` not in `L` with bound `P` is a subtype match for the

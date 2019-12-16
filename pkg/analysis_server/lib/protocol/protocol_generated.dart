@@ -8031,24 +8031,24 @@ class EditDartfixParams implements RequestParams {
   }
 
   /**
-   * A flag indicating that "pedantic" fixes should be applied.
+   * A flag indicating whether "pedantic" fixes should be applied.
    */
   bool get includePedanticFixes => _includePedanticFixes;
 
   /**
-   * A flag indicating that "pedantic" fixes should be applied.
+   * A flag indicating whether "pedantic" fixes should be applied.
    */
   void set includePedanticFixes(bool value) {
     this._includePedanticFixes = value;
   }
 
   /**
-   * A flag indicating that "required" fixes should be applied.
+   * A flag indicating whether "required" fixes should be applied.
    */
   bool get includeRequiredFixes => _includeRequiredFixes;
 
   /**
-   * A flag indicating that "required" fixes should be applied.
+   * A flag indicating whether "required" fixes should be applied.
    */
   void set includeRequiredFixes(bool value) {
     this._includeRequiredFixes = value;
@@ -8073,32 +8073,24 @@ class EditDartfixParams implements RequestParams {
   }
 
   /**
-   * The port to be used to listen for and respond to http requests for preview
-   * pages.
+   * Deprecated: This field is now ignored by server.
    */
   int get port => _port;
 
   /**
-   * The port to be used to listen for and respond to http requests for preview
-   * pages.
+   * Deprecated: This field is now ignored by server.
    */
   void set port(int value) {
     this._port = value;
   }
 
   /**
-   * The absolute and normalized path to a directory to which non-nullability
-   * migration output will be written. The output is only produced if the
-   * non-nullable fix is included. Files in the directory might be overwritten,
-   * but no previously existing files will be deleted.
+   * Deprecated: This field is now ignored by server.
    */
   String get outputDir => _outputDir;
 
   /**
-   * The absolute and normalized path to a directory to which non-nullability
-   * migration output will be written. The output is only produced if the
-   * non-nullable fix is included. Files in the directory might be overwritten,
-   * but no previously existing files will be deleted.
+   * Deprecated: This field is now ignored by server.
    */
   void set outputDir(String value) {
     this._outputDir = value;
@@ -8252,6 +8244,7 @@ class EditDartfixParams implements RequestParams {
  *   "hasErrors": bool
  *   "edits": List<SourceFileEdit>
  *   "details": optional List<String>
+ *   "port": optional int
  *   "urls": optional List<String>
  * }
  *
@@ -8267,6 +8260,8 @@ class EditDartfixResult implements ResponseResult {
   List<SourceFileEdit> _edits;
 
   List<String> _details;
+
+  int _port;
 
   List<String> _urls;
 
@@ -8347,16 +8342,30 @@ class EditDartfixResult implements ResponseResult {
   }
 
   /**
+   * The port on which the preview tool will respond to GET requests. The field
+   * is omitted if a preview was not requested.
+   */
+  int get port => _port;
+
+  /**
+   * The port on which the preview tool will respond to GET requests. The field
+   * is omitted if a preview was not requested.
+   */
+  void set port(int value) {
+    this._port = value;
+  }
+
+  /**
    * The URLs that users can visit in a browser to see a preview of the
    * proposed changes. There is one URL for each of the included file paths.
-   * The field is omitted if no port was provided.
+   * The field is omitted if a preview was not requested.
    */
   List<String> get urls => _urls;
 
   /**
    * The URLs that users can visit in a browser to see a preview of the
    * proposed changes. There is one URL for each of the included file paths.
-   * The field is omitted if no port was provided.
+   * The field is omitted if a preview was not requested.
    */
   void set urls(List<String> value) {
     this._urls = value;
@@ -8368,12 +8377,14 @@ class EditDartfixResult implements ResponseResult {
       bool hasErrors,
       List<SourceFileEdit> edits,
       {List<String> details,
+      int port,
       List<String> urls}) {
     this.suggestions = suggestions;
     this.otherSuggestions = otherSuggestions;
     this.hasErrors = hasErrors;
     this.edits = edits;
     this.details = details;
+    this.port = port;
     this.urls = urls;
   }
 
@@ -8425,6 +8436,10 @@ class EditDartfixResult implements ResponseResult {
         details = jsonDecoder.decodeList(
             jsonPath + ".details", json["details"], jsonDecoder.decodeString);
       }
+      int port;
+      if (json.containsKey("port")) {
+        port = jsonDecoder.decodeInt(jsonPath + ".port", json["port"]);
+      }
       List<String> urls;
       if (json.containsKey("urls")) {
         urls = jsonDecoder.decodeList(
@@ -8432,7 +8447,7 @@ class EditDartfixResult implements ResponseResult {
       }
       return new EditDartfixResult(
           suggestions, otherSuggestions, hasErrors, edits,
-          details: details, urls: urls);
+          details: details, port: port, urls: urls);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "edit.dartfix result", json);
     }
@@ -8459,6 +8474,9 @@ class EditDartfixResult implements ResponseResult {
     if (details != null) {
       result["details"] = details;
     }
+    if (port != null) {
+      result["port"] = port;
+    }
     if (urls != null) {
       result["urls"] = urls;
     }
@@ -8484,6 +8502,7 @@ class EditDartfixResult implements ResponseResult {
           listEqual(edits, other.edits,
               (SourceFileEdit a, SourceFileEdit b) => a == b) &&
           listEqual(details, other.details, (String a, String b) => a == b) &&
+          port == other.port &&
           listEqual(urls, other.urls, (String a, String b) => a == b);
     }
     return false;
@@ -8497,6 +8516,7 @@ class EditDartfixResult implements ResponseResult {
     hash = JenkinsSmiHash.combine(hash, hasErrors.hashCode);
     hash = JenkinsSmiHash.combine(hash, edits.hashCode);
     hash = JenkinsSmiHash.combine(hash, details.hashCode);
+    hash = JenkinsSmiHash.combine(hash, port.hashCode);
     hash = JenkinsSmiHash.combine(hash, urls.hashCode);
     return JenkinsSmiHash.finish(hash);
   }

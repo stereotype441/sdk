@@ -190,6 +190,16 @@ class InferenceVisitor
     return _unhandledStatement(node);
   }
 
+  @override
+  StatementInferenceResult visitTryCatch(TryCatch node) {
+    return _unhandledStatement(node);
+  }
+
+  @override
+  StatementInferenceResult visitTryFinally(TryFinally node) {
+    return _unhandledStatement(node);
+  }
+
   void _unhandledInitializer(Initializer node) {
     unhandled("${node.runtimeType}", "InferenceVisitor", node.fileOffset,
         node.location.file);
@@ -308,10 +318,13 @@ class InferenceVisitor
   StatementInferenceResult visitBlock(Block node) {
     inferrer.registerIfUnreachableForTesting(node);
     List<Statement> result = _visitStatements<Statement>(node.statements);
-    return result != null
-        ? new StatementInferenceResult.single(
-            new Block(result)..fileOffset = node.fileOffset)
-        : const StatementInferenceResult();
+    if (result != null) {
+      Block block = new Block(result)..fileOffset = node.fileOffset;
+      inferrer.library.loader.dataForTesting?.registerAlias(node, block);
+      return new StatementInferenceResult.single(block);
+    } else {
+      return const StatementInferenceResult();
+    }
   }
 
   @override
@@ -755,7 +768,7 @@ class InferenceVisitor
     Expression implicitDowncast = inferrer.ensureAssignable(
         variable.type, inferredType, variableGet,
         fileOffset: parent.fileOffset,
-        template: templateForInLoopElementTypeNotAssignable);
+        errorTemplate: templateForInLoopElementTypeNotAssignable);
     Statement expressionEffect;
     if (!identical(implicitDowncast, variableGet)) {
       variable.initializer = implicitDowncast..parent = variable;
@@ -798,7 +811,7 @@ class InferenceVisitor
             const DynamicType(), iterableClass, inferrer.library.nonNullable),
         inferredExpressionType,
         iterable,
-        template: templateForInLoopTypeNotIterable);
+        errorTemplate: templateForInLoopTypeNotIterable);
     DartType inferredType;
     if (typeNeeded) {
       inferredType = const DynamicType();
@@ -942,7 +955,7 @@ class InferenceVisitor
           greatestClosure(inferrer.coreTypes, syntheticWriteType),
           variable.type,
           rhs,
-          template: templateForInLoopElementTypeNotAssignable,
+          errorTemplate: templateForInLoopElementTypeNotAssignable,
           isVoidAllowed: true);
       if (syntheticVariableSet != null) {
         syntheticVariableSet.value = rhs..parent = syntheticVariableSet;
@@ -960,8 +973,7 @@ class InferenceVisitor
   }
 
   @override
-  StatementInferenceResult visitForInStatement(
-      covariant ForInStatementImpl node) {
+  StatementInferenceResult visitForInStatement(ForInStatement node) {
     assert(node.variable.name != null);
     ForInResult result = handleForInDeclaringVariable(
         node, node.variable, node.iterable, null,
@@ -1369,6 +1381,7 @@ class InferenceVisitor
       Expression condition =
           inferrer.ensureAssignableResult(boolType, conditionResult);
       element.condition = condition..parent = element;
+      inferrer.flowAnalysis.ifStatement_thenBegin(condition);
       ExpressionInferenceResult thenResult = inferElement(
           element.then,
           inferredTypeArgument,
@@ -1379,6 +1392,7 @@ class InferenceVisitor
       element.then = thenResult.expression..parent = element;
       ExpressionInferenceResult otherwiseResult;
       if (element.otherwise != null) {
+        inferrer.flowAnalysis.ifStatement_elseBegin();
         otherwiseResult = inferElement(
             element.otherwise,
             inferredTypeArgument,
@@ -1388,6 +1402,7 @@ class InferenceVisitor
             typeChecksNeeded);
         element.otherwise = otherwiseResult.expression..parent = element;
       }
+      inferrer.flowAnalysis.ifStatement_end(element.otherwise != null);
       return new ExpressionInferenceResult(
           otherwiseResult == null
               ? thenResult.inferredType
@@ -1834,6 +1849,7 @@ class InferenceVisitor
       Expression condition =
           inferrer.ensureAssignableResult(boolType, conditionResult);
       entry.condition = condition..parent = entry;
+      inferrer.flowAnalysis.ifStatement_thenBegin(condition);
       // Note that this recursive invocation of inferMapEntry will add two types
       // to actualTypes; they are the actual types of the current invocation if
       // the 'else' branch is empty.
@@ -1852,6 +1868,7 @@ class InferenceVisitor
       entry.then = then..parent = entry;
       MapEntry otherwise;
       if (entry.otherwise != null) {
+        inferrer.flowAnalysis.ifStatement_elseBegin();
         // We need to modify the actual types added in the recursive call to
         // inferMapEntry.
         DartType actualValueType = actualTypes.removeLast();
@@ -1882,6 +1899,7 @@ class InferenceVisitor
                 actualTypesForSet[lengthForSet - 1], inferrer.library.library);
         entry.otherwise = otherwise..parent = entry;
       }
+      inferrer.flowAnalysis.ifStatement_end(entry.otherwise != null);
       return entry;
     } else if (entry is ForMapEntry) {
       // TODO(johnniwinther): Use _visitStatements instead.
@@ -2346,14 +2364,16 @@ class InferenceVisitor
       NullCheck node, DartType typeContext) {
     // TODO(johnniwinther): Should the typeContext for the operand be
     //  `Nullable(typeContext)`?
-    ExpressionInferenceResult operandResult = inferrer.inferExpression(
-        node.operand, typeContext, !inferrer.isTopLevel);
+    ExpressionInferenceResult operandResult =
+        inferrer.inferExpression(node.operand, typeContext, true);
     node.operand = operandResult.expression..parent = node;
     // TODO(johnniwinther): Check that the inferred type is potentially
     //  nullable.
     inferrer.flowAnalysis.nonNullAssert_end(node.operand);
     // TODO(johnniwinther): Return `NonNull(inferredType)`.
-    return new ExpressionInferenceResult(operandResult.inferredType, node);
+    return new ExpressionInferenceResult(
+        operandResult.inferredType.withNullability(Nullability.nonNullable),
+        node);
   }
 
   ExpressionInferenceResult visitNullAwareMethodInvocation(
@@ -4931,58 +4951,61 @@ class InferenceVisitor
   }
 
   void visitCatch(Catch node) {
-    if (node.exception != null) {
-      inferrer.flowAnalysis.initialize(node.exception);
-    }
-    if (node.stackTrace != null) {
-      inferrer.flowAnalysis.initialize(node.stackTrace);
-    }
     StatementInferenceResult bodyResult = inferrer.inferStatement(node.body);
     if (bodyResult.hasChanged) {
       node.body = bodyResult.statement..parent = node;
     }
   }
 
-  @override
-  StatementInferenceResult visitTryCatch(TryCatch node) {
-    inferrer.flowAnalysis.tryCatchStatement_bodyBegin();
-    Statement bodyWithAssignedInfo = node.body;
-    StatementInferenceResult bodyResult = inferrer.inferStatement(node.body);
-    if (bodyResult.hasChanged) {
-      node.body = bodyResult.statement..parent = node;
+  StatementInferenceResult visitTryStatement(TryStatement node) {
+    if (node.finallyBlock != null) {
+      inferrer.flowAnalysis.tryFinallyStatement_bodyBegin();
     }
-    inferrer.flowAnalysis.tryCatchStatement_bodyEnd(bodyWithAssignedInfo);
-    for (Catch catch_ in node.catches) {
-      inferrer.flowAnalysis
-          .tryCatchStatement_catchBegin(catch_.exception, catch_.stackTrace);
-      inferrer.flowAnalysis.initialize(catch_.exception);
-      inferrer.flowAnalysis.initialize(catch_.stackTrace);
-      visitCatch(catch_);
-      inferrer.flowAnalysis.tryCatchStatement_catchEnd();
+    Statement tryBodyWithAssignedInfo = node.tryBlock;
+    if (node.catchBlocks.isNotEmpty) {
+      inferrer.flowAnalysis.tryCatchStatement_bodyBegin();
     }
-    inferrer.flowAnalysis.tryCatchStatement_end();
-    return const StatementInferenceResult();
-  }
 
-  @override
-  StatementInferenceResult visitTryFinally(TryFinally node) {
-    inferrer.flowAnalysis.tryFinallyStatement_bodyBegin();
-    // TODO(johnniwinther): Use one internal statement for try-catch-finally.
-    TreeNode body = node.body;
-    Statement bodyWithAssignedInfo = body is TryCatch ? body.body : body;
-    StatementInferenceResult bodyResult = inferrer.inferStatement(node.body);
-    if (bodyResult.hasChanged) {
-      node.body = bodyResult.statement..parent = node;
+    StatementInferenceResult tryBlockResult =
+        inferrer.inferStatement(node.tryBlock);
+
+    if (node.catchBlocks.isNotEmpty) {
+      inferrer.flowAnalysis.tryCatchStatement_bodyEnd(tryBodyWithAssignedInfo);
+      for (Catch catchBlock in node.catchBlocks) {
+        inferrer.flowAnalysis.tryCatchStatement_catchBegin(
+            catchBlock.exception, catchBlock.stackTrace);
+        visitCatch(catchBlock);
+        inferrer.flowAnalysis.tryCatchStatement_catchEnd();
+      }
+      inferrer.flowAnalysis.tryCatchStatement_end();
     }
-    inferrer.flowAnalysis
-        .tryFinallyStatement_finallyBegin(bodyWithAssignedInfo);
-    StatementInferenceResult finalizerResult =
-        inferrer.inferStatement(node.finalizer);
-    if (finalizerResult.hasChanged) {
-      node.finalizer = finalizerResult.statement..parent = node;
+
+    StatementInferenceResult finalizerResult;
+    if (node.finallyBlock != null) {
+      // If a try statement has no catch blocks, the finally block uses the
+      // assigned variables from the try block in [tryBodyWithAssignedInfo],
+      // otherwise it uses the assigned variables for the
+      inferrer.flowAnalysis.tryFinallyStatement_finallyBegin(
+          node.catchBlocks.isNotEmpty ? node : tryBodyWithAssignedInfo);
+      finalizerResult = inferrer.inferStatement(node.finallyBlock);
+      inferrer.flowAnalysis.tryFinallyStatement_end(node.finallyBlock);
     }
-    inferrer.flowAnalysis.tryFinallyStatement_end(node.finalizer);
-    return const StatementInferenceResult();
+    Statement result =
+        tryBlockResult.hasChanged ? tryBlockResult.statement : node.tryBlock;
+    if (node.catchBlocks.isNotEmpty) {
+      result = new TryCatch(result, node.catchBlocks)
+        ..fileOffset = node.fileOffset;
+    }
+    if (node.finallyBlock != null) {
+      result = new TryFinally(
+          result,
+          finalizerResult.hasChanged
+              ? finalizerResult.statement
+              : node.finallyBlock)
+        ..fileOffset = node.fileOffset;
+    }
+    inferrer.library.loader.dataForTesting?.registerAlias(node, result);
+    return new StatementInferenceResult.single(result);
   }
 
   @override

@@ -226,6 +226,7 @@ const String EDIT_RESPONSE_DARTFIX_DETAILS = 'details';
 const String EDIT_RESPONSE_DARTFIX_EDITS = 'edits';
 const String EDIT_RESPONSE_DARTFIX_HAS_ERRORS = 'hasErrors';
 const String EDIT_RESPONSE_DARTFIX_OTHER_SUGGESTIONS = 'otherSuggestions';
+const String EDIT_RESPONSE_DARTFIX_PORT = 'port';
 const String EDIT_RESPONSE_DARTFIX_SUGGESTIONS = 'suggestions';
 const String EDIT_RESPONSE_DARTFIX_URLS = 'urls';
 const String EDIT_RESPONSE_FORMAT_EDITS = 'edits';

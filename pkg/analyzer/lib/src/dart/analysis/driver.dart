@@ -3,7 +3,6 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'dart:async';
-import 'dart:collection';
 import 'dart:typed_data';
 
 import 'package:analyzer/dart/analysis/analysis_context.dart' as api;
@@ -18,6 +17,7 @@ import 'package:analyzer/exception/exception.dart';
 import 'package:analyzer/file_system/file_system.dart';
 import 'package:analyzer/src/context/context_root.dart';
 import 'package:analyzer/src/dart/analysis/byte_store.dart';
+import 'package:analyzer/src/dart/analysis/feature_set_provider.dart';
 import 'package:analyzer/src/dart/analysis/file_state.dart';
 import 'package:analyzer/src/dart/analysis/file_tracker.dart';
 import 'package:analyzer/src/dart/analysis/index.dart';
@@ -151,7 +151,7 @@ class AnalysisDriver implements AnalysisDriverGeneric {
       2 + AnalysisOptions.signatureLength + _declaredVariablesSignatureLength);
 
   /// The set of priority files, that should be analyzed sooner.
-  final _priorityFiles = LinkedHashSet<String>();
+  final _priorityFiles = <String>{};
 
   /// The mapping from the files for which analysis was requested using
   /// [getResult] to the [Completer]s to report the result.
@@ -204,7 +204,7 @@ class AnalysisDriver implements AnalysisDriverGeneric {
   final _requestedParts = <String, List<Completer<ResolvedUnitResult>>>{};
 
   /// The set of part files that are currently scheduled for analysis.
-  final _partsToAnalyze = LinkedHashSet<String>();
+  final _partsToAnalyze = <String>{};
 
   /// The controller for the [results] stream.
   final _resultController = StreamController<ResolvedUnitResult>();
@@ -1442,6 +1442,14 @@ class AnalysisDriver implements AnalysisDriverGeneric {
   /// changes.
   void _createFileTracker() {
     _fillSalt();
+
+    var featureSetProvider = FeatureSetProvider.build(
+      resourceProvider: resourceProvider,
+      contextRoot: contextRoot,
+      sourceFactory: _sourceFactory,
+      defaultFeatureSet: _analysisOptions.contextFeatures,
+    );
+
     _fsState = FileSystemState(
       _logger,
       _byteStore,
@@ -1453,6 +1461,7 @@ class AnalysisDriver implements AnalysisDriverGeneric {
       declaredVariables,
       _unlinkedSalt,
       _linkedSalt,
+      featureSetProvider,
       externalSummaries: _externalSummaries,
     );
     _fileTracker = FileTracker(_logger, _fsState, _changeHook);
@@ -1722,7 +1731,7 @@ class AnalysisDriver implements AnalysisDriverGeneric {
       String min = _twoDigits(time.minute);
       String sec = _twoDigits(time.second);
       String ms = _threeDigits(time.millisecond);
-      String key = 'exception_${time.year}$m$d' '_$h$min$sec' + '_$ms';
+      String key = 'exception_${time.year}$m${d}_$h$min${sec}_$ms';
 
       _byteStore.put(key, bytes);
       return key;
@@ -2202,7 +2211,7 @@ class _FilesDefiningClassMemberNameTask {
   final Completer<List<String>> completer = Completer<List<String>>();
 
   final List<String> definingFiles = <String>[];
-  final Set<String> checkedFiles = Set<String>();
+  final Set<String> checkedFiles = <String>{};
   final List<String> filesToCheck = <String>[];
 
   _FilesDefiningClassMemberNameTask(this.driver, this.name);

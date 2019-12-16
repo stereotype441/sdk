@@ -2588,6 +2588,7 @@ final Matcher isEditDartfixParams =
  *   "hasErrors": bool
  *   "edits": List<SourceFileEdit>
  *   "details": optional List<String>
+ *   "port": optional int
  *   "urls": optional List<String>
  * }
  */
@@ -2599,6 +2600,7 @@ final Matcher isEditDartfixResult =
           "edits": isListOf(isSourceFileEdit)
         }, optionalFields: {
           "details": isListOf(isString),
+          "port": isInt,
           "urls": isListOf(isString)
         }));
 

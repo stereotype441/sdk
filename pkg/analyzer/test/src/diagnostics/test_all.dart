@@ -61,13 +61,13 @@ import 'deprecated_function_class_declaration_test.dart'
 import 'deprecated_member_use_test.dart' as deprecated_member_use;
 import 'deprecated_mixin_function_test.dart' as deprecated_mixin_function;
 import 'division_optimization_test.dart' as division_optimization;
-import 'down_cast_composite_test.dart' as down_cast_composite;
 import 'duplicate_definition_test.dart' as duplicate_definition;
 import 'duplicate_hidden_name_test.dart' as duplicate_hidden_name;
 import 'duplicate_import_test.dart' as duplicate_import;
 import 'duplicate_shown_name_test.dart' as duplicate_shown_name;
 import 'equal_elements_in_const_set_test.dart' as equal_elements_in_const_set;
 import 'equal_keys_in_const_map_test.dart' as equal_keys_in_const_map;
+import 'export_legacy_symbol_test.dart' as export_legacy_symbol;
 import 'export_suplicated_library_named_test.dart'
     as export_suplicated_library_named;
 import 'expression_in_map_test.dart' as expression_in_map;
@@ -274,6 +274,8 @@ import 'override_on_non_overriding_method_test.dart'
 import 'override_on_non_overriding_setter_test.dart'
     as override_on_non_overriding_setter;
 import 'part_of_different_library_test.dart' as part_of_different_library;
+import 'private_collision_in_mixin_application_test.dart'
+    as private_collision_in_mixin_application;
 import 'redirect_generative_to_missing_constructor_test.dart'
     as redirect_generative_to_missing_constructor;
 import 'redirect_generative_to_non_generative_constructor_test.dart'
@@ -439,13 +441,13 @@ main() {
     deprecated_member_use.main();
     deprecated_mixin_function.main();
     division_optimization.main();
-    down_cast_composite.main();
     duplicate_definition.main();
     duplicate_hidden_name.main();
     duplicate_import.main();
     duplicate_shown_name.main();
     equal_elements_in_const_set.main();
     equal_keys_in_const_map.main();
+    export_legacy_symbol.main();
     export_suplicated_library_named.main();
     expression_in_map.main();
     extends_disallowed_class.main();
@@ -584,6 +586,7 @@ main() {
     override_on_non_overriding_method.main();
     override_on_non_overriding_setter.main();
     part_of_different_library.main();
+    private_collision_in_mixin_application.main();
     redirect_generative_to_missing_constructor.main();
     redirect_generative_to_non_generative_constructor.main();
     redirect_to_invalid_function_type.main();
