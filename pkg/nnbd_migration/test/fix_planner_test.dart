@@ -47,14 +47,26 @@ f(a, b) => a + b;
     });
   }
 
+  void test_introduceAs_no_parens() async {
+    await resolveTestUnit('''
+f(a, b) => a | b;
+''');
+    var expr = findNode.binary('a | b');
+    var previewInfo =
+        FixPlanner.run(testUnit, {expr: const IntroduceAs('int')});
+    expect(previewInfo, {
+      expr.end: [const AddAs('int')]
+    });
+  }
+
   void test_nullCheck_no_parens() async {
     await resolveTestUnit('''
 f(a) => a++;
 ''');
-    var postfix = findNode.postfix('a++');
-    var previewInfo = FixPlanner.run(testUnit, {postfix: const NullCheck()});
+    var expr = findNode.postfix('a++');
+    var previewInfo = FixPlanner.run(testUnit, {expr: const NullCheck()});
     expect(previewInfo, {
-      postfix.end: [const AddBang()]
+      expr.end: [const AddBang()]
     });
   }
 
@@ -62,11 +74,11 @@ f(a) => a++;
     await resolveTestUnit('''
 f(a) => -a;
 ''');
-    var prefix = findNode.prefix('-a');
-    var previewInfo = FixPlanner.run(testUnit, {prefix: const NullCheck()});
+    var expr = findNode.prefix('-a');
+    var previewInfo = FixPlanner.run(testUnit, {expr: const NullCheck()});
     expect(previewInfo, {
-      prefix.offset: [const AddOpenParen()],
-      prefix.end: [const AddCloseParen(), const AddBang()]
+      expr.offset: [const AddOpenParen()],
+      expr.end: [const AddCloseParen(), const AddBang()]
     });
   }
 }

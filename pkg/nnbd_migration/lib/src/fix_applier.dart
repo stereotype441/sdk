@@ -7,6 +7,14 @@ import 'package:analyzer/dart/ast/precedence.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:nnbd_migration/src/fix_builder.dart';
 
+class AddAs extends PreviewInfo {
+  final String type;
+
+  const AddAs(this.type);
+
+  operator ==(Object other) => other is AddAs && type == other.type;
+}
+
 class AddBang extends PreviewInfo {
   const AddBang();
 }
@@ -90,6 +98,25 @@ class FixPlanner extends GeneralizingAstVisitor<_Plan> {
   }
 }
 
+class IntroduceAs extends _NestableChange {
+  /// TODO(paulberry): shouldn't be a String
+  final String type;
+
+  const IntroduceAs(this.type, [Change inner = const NoChange()])
+      : super(inner);
+
+  @override
+  _Plan apply(AstNode node, FixPlanner planner) {
+    return _Plan.suffix(
+        _inner
+            .apply(node, planner)
+            .addParensIfLowerPrecedenceThan(Precedence.bitwiseOr),
+        AddAs(type),
+        Precedence.relational,
+        false);
+  }
+}
+
 class NoChange extends Change {
   const NoChange();
 
@@ -126,23 +153,6 @@ class _ExtractSubexpression extends Change {
   @override
   _Plan apply(AstNode node, FixPlanner planner) {
     return _inner.accept(planner);
-  }
-}
-
-class _IntroduceAs extends _NestableChange {
-  final String type;
-
-  _IntroduceAs(Change inner, this.type) : super(inner);
-
-  @override
-  _Plan apply(AstNode node, FixPlanner planner) {
-    return _Plan.suffix(
-        _inner
-            .apply(node, planner)
-            .addParensIfLowerPrecedenceThan(Precedence.bitwiseOr),
-        throw 'TODO(paulberry): as $type',
-        Precedence.relational,
-        false);
   }
 }
 
