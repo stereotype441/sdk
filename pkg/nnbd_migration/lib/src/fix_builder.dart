@@ -51,7 +51,10 @@ class CompoundAssignmentReadNullable implements Problem {
   const CompoundAssignmentReadNullable();
 }
 
-/// TODO(paulberry): document
+/// This class runs the analyzer's resolver over the code being migrated, after
+/// graph propagation, to figure out what changes need to be made.  It doesn't
+/// actually make the changes; it simply reports what changes are necessary
+/// through abstract methods.
 abstract class FixBuilder {
   /// The type provider providing non-nullable types.
   final TypeProvider typeProvider;
@@ -118,6 +121,8 @@ abstract class FixBuilder {
   /// Called whenever code is found that can't be automatically fixed.
   void addProblem(AstNode node, Problem problem);
 
+  /// Visits the entire compilation [unit] using the analyzer's resolver and
+  /// makes note of changes that need to be made.
   void visitAll(CompilationUnit unit) {
     unit.accept(_resolver);
   }
@@ -176,6 +181,8 @@ class MakeNullable implements NodeChange {
   const MakeNullable._();
 }
 
+/// Implementation of [MigrationResolutionHooks] that interfaces with
+/// [FixBuilder].
 class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
   final FixBuilder _fixBuilder;
 
