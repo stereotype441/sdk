@@ -59,6 +59,19 @@ f(a, b) => a | b;
     });
   }
 
+  void test_introduceAs_parens() async {
+    await resolveTestUnit('''
+f(a, b) => a < b;
+''');
+    var expr = findNode.binary('a < b');
+    var previewInfo =
+        FixPlanner.run(testUnit, {expr: const IntroduceAs('bool')});
+    expect(previewInfo, {
+      expr.offset: [const AddOpenParen()],
+      expr.end: [const AddCloseParen(), const AddAs('bool')]
+    });
+  }
+
   void test_nullCheck_no_parens() async {
     await resolveTestUnit('''
 f(a) => a++;
