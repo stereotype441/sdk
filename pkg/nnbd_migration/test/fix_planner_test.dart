@@ -60,7 +60,7 @@ f(a) => a++;
 
   void test_nullCheck_parens() async {
     await resolveTestUnit('''
-f(a) => ++a;
+f(a) => -a;
 ''');
     var prefix = findNode.prefix('-a');
     var previewInfo = FixPlanner.run(testUnit, {prefix: const NullCheck()});

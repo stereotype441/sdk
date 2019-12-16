@@ -33,12 +33,10 @@ class FixPlanner extends GeneralizingAstVisitor<_Plan> {
 
   _Plan visitBinaryExpression(BinaryExpression node) {
     // TODO(paulberry): test
-    var plan = _Plan.empty(node);
     // TODO(paulberry): fix context
-    _exploratory3(plan, node.leftOperand, context: node.precedence);
-    _exploratory3(plan, node.rightOperand,
-        context: node.precedence, atEnd: true);
-    return plan;
+    return _Plan.empty(node)
+      ..subsume(this, node.leftOperand, context: node.precedence)
+      ..subsume(this, node.rightOperand, context: node.precedence, atEnd: true);
   }
 
   _Plan visitExpression(Expression node) {
@@ -46,18 +44,17 @@ class FixPlanner extends GeneralizingAstVisitor<_Plan> {
   }
 
   _Plan visitFunctionExpression(FunctionExpression node) {
-    var plan = _Plan.empty(node);
-    _exploratory3(plan, node.typeParameters);
-    _exploratory3(plan, node.parameters);
-    _exploratory3(plan, node.body);
-    return plan;
+    return _Plan.empty(node)
+      ..subsume(this, node.typeParameters)
+      ..subsume(this, node.parameters)
+      ..subsume(this, node.body);
   }
 
   _Plan visitNode(AstNode node) {
     var plan = _Plan.empty(node);
     for (var entity in node.childEntities) {
       if (entity is AstNode) {
-        plan.subsume(_exploratory2(entity));
+        plan.subsume(this, entity);
       }
     }
     return plan;
@@ -65,9 +62,13 @@ class FixPlanner extends GeneralizingAstVisitor<_Plan> {
 
   _Plan visitPostfixExpression(PostfixExpression node) {
     // TODO(paulberry): test
-    var plan = _Plan.empty(node);
-    _exploratory3(plan, node.operand, context: Precedence.postfix);
-    return plan;
+    return _Plan.empty(node)
+      ..subsume(this, node.operand, context: Precedence.postfix, atEnd: true);
+  }
+
+  _Plan visitPrefixExpression(PrefixExpression node) {
+    // TODO(paulberry): test
+    return _Plan.empty(node)..subsume(this, node.operand);
   }
 
   _Plan visitSimpleIdentifier(Expression node) {
@@ -79,19 +80,6 @@ class FixPlanner extends GeneralizingAstVisitor<_Plan> {
   _Plan _exploratory2(AstNode node) {
     var change = _changes[node] ?? NoChange();
     return change.apply(node, this);
-  }
-
-  /// TODO(paulberry): combine with _exploratory2?
-  void _exploratory3(_Plan plan, AstNode node,
-      {Precedence context = Precedence.none, bool atEnd: false}) {
-    if (node == null) return;
-    // TODO(paulberry): test adding of parens
-    var subPlan = _exploratory2(node).addParensIfLowerPrecedenceThan(context);
-    // TODO(paulberry): test adding of parens for cascade reasons
-    if (atEnd && subPlan.endsInCascade) {
-      plan.endsInCascade = true;
-    }
-    plan.subsume(subPlan);
   }
 
   static Map<int, List<PreviewInfo>> run(
@@ -215,8 +203,17 @@ class _Plan {
     throw UnimplementedError('TODO(paulberry)');
   }
 
-  void subsume(_Plan subPlan) {
-    if (subPlan == null) return;
+  /// TODO(paulberry): subsume is no longer a good name.
+  void subsume(FixPlanner planner, AstNode node,
+      {Precedence context = Precedence.none, bool atEnd: false}) {
+    if (node == null) return;
+    // TODO(paulberry): test adding of parens
+    var subPlan =
+        planner._exploratory2(node).addParensIfLowerPrecedenceThan(context);
+    // TODO(paulberry): test adding of parens for cascade reasons
+    if (atEnd && subPlan.endsInCascade) {
+      endsInCascade = true;
+    }
     if (_previewInfo == null) {
       _previewInfo = subPlan._previewInfo;
     } else {
