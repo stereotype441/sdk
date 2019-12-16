@@ -22,7 +22,7 @@ extension _CorrectedPrecedence on Expression {
 }
 
 abstract class _Change {
-  _Plan apply(AstNode node, _Plan recurse(AstNode node));
+  _Plan apply(AstNode node, FixPlanner planner);
 }
 
 abstract class _NestableChange extends _Change {
@@ -33,8 +33,8 @@ abstract class _NestableChange extends _Change {
 
 class _NoChange extends _Change {
   @override
-  _Plan apply(AstNode node, _Plan recurse(AstNode node)) {
-    return recurse(node);
+  _Plan apply(AstNode node, FixPlanner planner) {
+    return node.accept(planner);
   }
 }
 
@@ -42,8 +42,8 @@ class _NullCheck extends _NestableChange {
   _NullCheck(_Change inner) : super(inner);
 
   @override
-  _Plan apply(AstNode node, _Plan recurse(AstNode node)) {
-    return _Plan.suffix(_inner.apply(node, recurse).addParensIfLowerPrecedenceThan(Precedence.postfix), '!', Precedence.postfix, false);
+  _Plan apply(AstNode node, FixPlanner planner) {
+    return _Plan.suffix(_inner.apply(node, planner).addParensIfLowerPrecedenceThan(Precedence.postfix), '!', Precedence.postfix, false);
   }
 }
 
@@ -51,8 +51,8 @@ class _MakeNullable extends _NestableChange {
   _MakeNullable(_Change inner) : super(inner);
 
   @override
-  _Plan apply(AstNode node, _Plan recurse(AstNode node)) {
-    return _Plan.suffix(_inner.apply(node, recurse), '?', Precedence.primary, false);
+  _Plan apply(AstNode node, FixPlanner planner) {
+    return _Plan.suffix(_inner.apply(node, planner), '?', Precedence.primary, false);
   }
 }
 
@@ -62,8 +62,8 @@ class _IntroduceAs extends _NestableChange {
   final String type;
 
   @override
-  _Plan apply(AstNode node, _Plan recurse(AstNode node)) {
-    return _Plan.suffix(_inner.apply(node, recurse).addParensIfLowerPrecedenceThan(Precedence.bitwiseOr), ' as $type', Precedence.relational, false);
+  _Plan apply(AstNode node, FixPlanner planner) {
+    return _Plan.suffix(_inner.apply(node, planner).addParensIfLowerPrecedenceThan(Precedence.bitwiseOr), ' as $type', Precedence.relational, false);
   }
 }
 
@@ -73,8 +73,8 @@ class _ExtractSubexpression extends _Change {
   _ExtractSubexpression(this._inner);
 
   @override
-  _Plan apply(AstNode node, _Plan recurse(AstNode node)) {
-    return recurse(_inner);
+  _Plan apply(AstNode node, FixPlanner planner) {
+    return _inner.accept(planner);
   }
 }
 
@@ -102,13 +102,14 @@ class _Plan {
   }
 }
 
-class FixApplier extends GeneralizingAstVisitor<void> {
+/// TODO(paulberry): rename file to fix_planner.dart?
+class FixPlanner extends GeneralizingAstVisitor<_Plan> {
   final Map<AstNode, _Change> _changes;
 
   /// This version passes around a plan
   _Plan _exploratory2(AstNode node) {
     var change = _changes[node] ?? _NoChange();
-    return change.apply(node, _exploratory2b);
+    return change.apply(node, this);
   }
 
   Precedence _getContextPrecedence(AstNode node){
@@ -123,7 +124,7 @@ class FixApplier extends GeneralizingAstVisitor<void> {
     throw UnimplementedError('TODO(paulberry)');
   }
 
-  _Plan _exploratory2b(AstNode node) {
+  _Plan visitNode(AstNode node) {
     bool endsInCascade = false;
     for (var entity in node.childEntities) {
       if (entity is AstNode) {
@@ -140,25 +141,5 @@ class FixApplier extends GeneralizingAstVisitor<void> {
     return plan;
   }
 
-  FixApplier(this._changes);
-
-  Precedence _contextPrecedence;
-
-  void dispatchSubexpression(Expression subexpression, Precedence precedence) {
-    // TODO(paulberry): I don't like that it's easy to forget to call
-    // dispatchSubexpression and just visit normally.
-    _contextPrecedence = precedence;
-    var change = _changes[subexpression];
-    if (change == null) {
-      subexpression.accept(this);
-    } else if (change is NullCheck) {
-
-    } else {
-    }
-    _contextPrecedence = null;
-  }
-
-  void visitExpression(Expression node) {
-    
-  }
+  FixPlanner(this._changes);
 }
