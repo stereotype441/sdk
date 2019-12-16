@@ -1198,7 +1198,7 @@ class InterfaceTypeImpl extends TypeImpl implements InterfaceType {
    * return the type `A<String>`.
    */
   InterfaceType asInstanceOf(ClassElement targetElement) {
-    return _asInstanceOf(targetElement, Set<ClassElement>());
+    return _asInstanceOf(targetElement, <ClassElement>{});
   }
 
   @override

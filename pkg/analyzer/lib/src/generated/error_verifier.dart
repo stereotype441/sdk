@@ -45,8 +45,12 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
    *
    * TODO(mfairhurst): Calculate these fields rather than hard-code them.
    */
-  static final _objectPropertyNames =
-      Set.from(['hashCode', 'runtimeType', 'noSuchMethod', 'toString']);
+  static final _objectPropertyNames = {
+    'hashCode',
+    'runtimeType',
+    'noSuchMethod',
+    'toString',
+  };
 
   /**
    * The error reporter by which errors will be reported.
@@ -217,13 +221,13 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
    * The return statements found in the method or function that we are currently
    * visiting that have a return value.
    */
-  List<ReturnStatement> _returnsWith = List<ReturnStatement>();
+  List<ReturnStatement> _returnsWith = <ReturnStatement>[];
 
   /**
    * The return statements found in the method or function that we are currently
    * visiting that do not have a return value.
    */
-  List<ReturnStatement> _returnsWithout = List<ReturnStatement>();
+  List<ReturnStatement> _returnsWithout = <ReturnStatement>[];
 
   /**
    * This map is initialized when visiting the contents of a class declaration.
@@ -451,8 +455,8 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
     try {
       _inAsync = node.isAsynchronous;
       _inGenerator = node.isGenerator;
-      _returnsWith = List<ReturnStatement>();
-      _returnsWithout = List<ReturnStatement>();
+      _returnsWith = <ReturnStatement>[];
+      _returnsWithout = <ReturnStatement>[];
       super.visitBlockFunctionBody(node);
     } finally {
       _inAsync = wasInAsync;
@@ -657,6 +661,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
       _checkForAmbiguousExport(node, exportElement, exportedLibrary);
       _checkForExportDuplicateLibraryName(node, exportElement, exportedLibrary);
       _checkForExportInternalLibrary(node, exportElement);
+      _checkForExportLegacySymbol(node);
     }
     super.visitExportDirective(node);
   }
@@ -2643,7 +2648,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
             if (element is PrefixElement) {
               List<ImportDirective> elements = prefixToDirectivesMap[element];
               if (elements == null) {
-                elements = List<ImportDirective>();
+                elements = <ImportDirective>[];
                 prefixToDirectivesMap[element] = elements;
               }
               elements.add(directive);
@@ -2802,6 +2807,33 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
         CompileTimeErrorCode.EXPORT_INTERNAL_LIBRARY,
         directive,
         [directive.uri]);
+  }
+
+  /**
+   * See [CompileTimeErrorCode.EXPORT_LEGACY_SYMBOL].
+   */
+  void _checkForExportLegacySymbol(ExportDirective node) {
+    if (!_isNonNullableByDefault) {
+      return;
+    }
+
+    var element = node.element as ExportElement;
+    // TODO(scheglov) Expose from ExportElement.
+    var namespace =
+        NamespaceBuilder().createExportNamespaceForDirective(element);
+
+    for (var element in namespace.definedNames.values) {
+      if (!element.library.isNonNullableByDefault) {
+        _errorReporter.reportErrorForNode(
+          CompileTimeErrorCode.EXPORT_LEGACY_SYMBOL,
+          node.uri,
+          [element.displayName],
+        );
+        // Stop after the first symbol.
+        // We don't want to list them all.
+        break;
+      }
+    }
   }
 
   /**
@@ -3948,10 +3980,11 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
           return true;
         }
         names[name] = typeName.name.name;
-        ExecutableElement inheritedMember =
-            superclass.lookUpMethod2(name, library) ??
-                superclass.lookUpGetter2(name, library) ??
-                superclass.lookUpSetter2(name, library);
+        ExecutableElement inheritedMember = _inheritanceManager.getMember(
+          superclass,
+          Name(library.source.uri, name),
+          concrete: true,
+        );
         if (inheritedMember != null) {
           _errorReporter.reportErrorForNode(
               CompileTimeErrorCode.PRIVATE_COLLISION_IN_MIXIN_APPLICATION,
@@ -5698,7 +5731,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
         Queue.of(classElement.mixins.map((i) => i.element))
           ..addAll(classElement.superclassConstraints.map((i) => i.element))
           ..add(classElement.supertype?.element);
-    Set<ClassElement> visitedClasses = Set<ClassElement>();
+    Set<ClassElement> visitedClasses = <ClassElement>{};
     while (superclasses.isNotEmpty) {
       ClassElement ancestor = superclasses.removeFirst();
       if (ancestor == null || !visitedClasses.add(ancestor)) {
@@ -5791,7 +5824,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
         return library.definingCompilationUnit.source.uri.toString();
       }
     }
-    List<String> indirectSources = List<String>();
+    List<String> indirectSources = <String>[];
     for (int i = 0; i < count; i++) {
       LibraryElement importedLibrary = imports[i].importedLibrary;
       if (importedLibrary != null) {
@@ -5973,7 +6006,7 @@ class ErrorVerifier extends RecursiveAstVisitor<void> {
    */
   static List<FieldElement> computeNotInitializedFields(
       ConstructorDeclaration constructor) {
-    Set<FieldElement> fields = Set<FieldElement>();
+    Set<FieldElement> fields = <FieldElement>{};
     var classDeclaration = constructor.parent as ClassDeclaration;
     for (ClassMember fieldDeclaration in classDeclaration.members) {
       if (fieldDeclaration is FieldDeclaration) {
