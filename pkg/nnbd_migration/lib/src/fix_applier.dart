@@ -214,6 +214,13 @@ extension on SimpleEditPlan {
     bool parensNeeded =
         innerPlan.parensNeeded(threshold, associative, allowCascade);
     assert(_checkParenLogic(planner, innerPlan, parensNeeded));
+    if (!parensNeeded && innerPlan is ProvisionalParenEditPlan) {
+      var innerInnerPlan = innerPlan.innerPlan;
+      if (innerInnerPlan is SimpleEditPlan && innerInnerPlan.isPassThrough) {
+        // Input source code had redundant parens, so keep them.
+        parensNeeded = true;
+      }
+    }
     var innerChanges = innerPlan.getChanges(parensNeeded);
     addInnerChanges(innerChanges);
   }
@@ -235,8 +242,10 @@ extension on SimpleEditPlan {
           !planner.allowRedundantParens) {
         // TODO(paulberry): carve out an exception for cascades, e.g. changing
         // `a..b = (throw c)` to `a..b = (throw c..d)`
-        assert(parensNeeded,
-            "Code prior to fixes needed parens here, should need parens now.");
+        assert(
+            parensNeeded,
+            "Code prior to fixes had parens here, but we think they aren't "
+            "needed now.");
       }
     }
     return true;

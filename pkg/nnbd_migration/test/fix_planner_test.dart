@@ -3,25 +3,12 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'package:analyzer/dart/ast/ast.dart';
-import 'package:analyzer/dart/ast/token.dart';
-import 'package:analyzer/dart/element/element.dart';
-import 'package:analyzer/dart/element/type.dart';
-import 'package:analyzer/error/error.dart';
-import 'package:analyzer/src/dart/element/type.dart';
-import 'package:analyzer/src/dart/element/type_provider.dart';
-import 'package:analyzer/src/generated/resolver.dart';
-import 'package:analyzer/src/generated/source.dart';
-import 'package:analyzer/src/generated/type_system.dart';
-import 'package:analyzer/src/task/strong/checker.dart';
-import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
 import 'package:nnbd_migration/src/edit_plan.dart';
 import 'package:nnbd_migration/src/fix_applier.dart';
-import 'package:nnbd_migration/src/variables.dart';
 import 'package:test/test.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
 
 import 'abstract_single_unit.dart';
-import 'migration_visitor_test_base.dart';
 
 main() {
   defineReflectiveSuite(() {
@@ -72,6 +59,14 @@ f(a, b) => a < b;
     });
   }
 
+  void test_keep_redundant_parens() async {
+    await resolveTestUnit('''
+f(a, b, c) => a + (b * c);
+''');
+    var previewInfo = _run({}, allowRedundantParens: true);
+    expect(previewInfo, isNull);
+  }
+
   void test_nullCheck_no_parens() async {
     await resolveTestUnit('''
 f(a) => a++;
@@ -100,7 +95,8 @@ f(a) => -a;
 f(a) => (a as num) as int;
 g(a, b) => a | b as int;
 ''');
-    _run({});
+    var previewInfo = _run({});
+    expect(previewInfo, isNull);
   }
 
   void test_precedence_binary_equality() async {
@@ -108,7 +104,8 @@ g(a, b) => a | b as int;
 f(a, b, c) => (a == b) == c;
 g(a, b, c) => a == (b == c);
 ''');
-    _run({});
+    var previewInfo = _run({});
+    expect(previewInfo, isNull);
   }
 
   void test_precedence_binary_left_associative() async {
@@ -118,7 +115,8 @@ g(a, b, c) => a == (b == c);
 f(a, b, c) => a + b + c;
 g(a, b, c) => a + (b + c);
 ''');
-    _run({});
+    var previewInfo = _run({});
+    expect(previewInfo, isNull);
   }
 
   void test_precedence_binary_relational() async {
@@ -126,7 +124,8 @@ g(a, b, c) => a + (b + c);
 f(a, b, c) => (a < b) < c;
 g(a, b, c) => a < (b < c);
 ''');
-    _run({});
+    var previewInfo = _run({});
+    expect(previewInfo, isNull);
   }
 
   void test_precedence_postfix_and_index() async {
@@ -135,7 +134,8 @@ f(a, b, c) => a[b][c];
 g(a, b) => a[b]++;
 h(a, b) => (-a)[b];
 ''');
-    _run({});
+    var previewInfo = _run({});
+    expect(previewInfo, isNull);
   }
 
   void test_precedence_prefix() async {
@@ -143,7 +143,8 @@ h(a, b) => (-a)[b];
 f(a) => ~-a;
 g(a, b) => -(a*b);
 ''');
-    _run({});
+    var previewInfo = _run({});
+    expect(previewInfo, isNull);
   }
 
   void test_removeAs_lower_precedence_do_not_remove_inner_parens() async {
@@ -205,9 +206,11 @@ f(a, b, c) => a < (b | c as int);
     });
   }
 
-  Object _run(Map<AstNode, Change> changes) {
+  Object _run(Map<AstNode, Change> changes,
+      {bool allowRedundantParens = false}) {
     // TODO(paulberry): test that redundant parens are allowed in certain
     //  circumstances.
-    return FixPlanner.run(testUnit, changes, allowRedundantParens: false);
+    return FixPlanner.run(testUnit, changes,
+        allowRedundantParens: allowRedundantParens);
   }
 }
