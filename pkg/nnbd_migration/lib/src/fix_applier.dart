@@ -39,7 +39,6 @@ class FixPlanner extends GeneralizingAstVisitor<EditPlan> {
   FixPlanner._(this._changes, this.allowRedundantParens);
 
   EditPlan visitAsExpression(AsExpression node) {
-    // TODO(paulberry): test precedence/associativity
     return SimpleEditPlan.forExpression(node)
       ..addInnerPlans(this, node.expression, threshold: node.precedence)
       ..addInnerPlans(this, node.type);

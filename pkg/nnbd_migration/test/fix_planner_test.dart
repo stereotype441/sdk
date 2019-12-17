@@ -143,6 +143,14 @@ f(a) => -a;
     });
   }
 
+  void test_precedence_as() async {
+    await resolveTestUnit('''
+f(a) => (a as num) as int;
+g(a, b) => a | b as int;
+''');
+    _run({});
+  }
+
   Object _run(Map<AstNode, Change> changes) {
     // TODO(paulberry): test that redundant parens are allowed in certain
     //  circumstances.
