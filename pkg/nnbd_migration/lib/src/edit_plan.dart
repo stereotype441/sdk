@@ -68,7 +68,7 @@ class ProvisionalParenEditPlan extends EditPlan {
 
   @override
   Map<int, List<PreviewInfo>> getChanges(bool parens) {
-    var changes = _innerPlan.getChanges(parens);
+    var changes = _innerPlan.getChanges(false);
     if (!parens) {
       changes ??= {};
       // TODO(paulberry): preserve empty parens if no other significant changes
@@ -144,7 +144,8 @@ class SimpleEditPlan extends EditPlan {
   @override
   bool parensNeeded(Precedence threshold, bool associative, bool allowCascade) {
     // TODO(paulberry): add logic for allowCascade.
-    return _precedence < threshold || (associative && _precedence == threshold);
+    return _precedence < threshold ||
+        (!associative && _precedence == threshold);
   }
 }
 

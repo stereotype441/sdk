@@ -82,7 +82,7 @@ class FixPlanner extends GeneralizingAstVisitor<EditPlan> {
   }
 
   EditPlan visitParenthesizedExpression(ParenthesizedExpression node) {
-    return ProvisionalParenEditPlan(node, node.expression.accept(this));
+    return ProvisionalParenEditPlan(node, _exploratory2(node.expression));
   }
 
   EditPlan visitPostfixExpression(PostfixExpression node) {
@@ -93,7 +93,8 @@ class FixPlanner extends GeneralizingAstVisitor<EditPlan> {
 
   EditPlan visitPrefixExpression(PrefixExpression node) {
     // TODO(paulberry): test
-    return SimpleEditPlan.forExpression(node)..addInnerPlans(this, node.operand);
+    return SimpleEditPlan.forExpression(node)
+      ..addInnerPlans(this, node.operand);
   }
 
   EditPlan visitSimpleIdentifier(Expression node) {
@@ -125,9 +126,13 @@ class IntroduceAs extends _NestableChange {
   @override
   EditPlan apply(AstNode node, FixPlanner planner) {
     var innerPlan = _inner.apply(node, planner);
-    var innerChanges = innerPlan.getChanges(innerPlan.parensNeeded(Precedence.relational, false, false));
-    return SimpleEditPlan.withPrecedence(node, Precedence.relational)..addInnerChanges(innerChanges)
-    ..addInnerChanges({node.end: [AddAs(type)]});
+    var innerChanges = innerPlan.getChanges(
+        innerPlan.parensNeeded(Precedence.relational, false, false));
+    return SimpleEditPlan.withPrecedence(node, Precedence.relational)
+      ..addInnerChanges(innerChanges)
+      ..addInnerChanges({
+        node.end: [AddAs(type)]
+      });
   }
 }
 
@@ -146,9 +151,13 @@ class NullCheck extends _NestableChange {
   @override
   EditPlan apply(AstNode node, FixPlanner planner) {
     var innerPlan = _inner.apply(node, planner);
-    var innerChanges = innerPlan.getChanges(innerPlan.parensNeeded(Precedence.postfix, true, false));
-    return SimpleEditPlan.withPrecedence(node, Precedence.postfix)..addInnerChanges(innerChanges)
-    ..addInnerChanges({node.end: [const AddBang()]});
+    var innerChanges = innerPlan
+        .getChanges(innerPlan.parensNeeded(Precedence.postfix, true, false));
+    return SimpleEditPlan.withPrecedence(node, Precedence.postfix)
+      ..addInnerChanges(innerChanges)
+      ..addInnerChanges({
+        node.end: [const AddBang()]
+      });
   }
 }
 
@@ -169,8 +178,18 @@ class _MakeNullable extends _NestableChange {
   EditPlan apply(AstNode node, FixPlanner planner) {
     var innerPlan = _inner.apply(node, planner);
     var innerChanges = innerPlan.getChanges(false);
-    return SimpleEditPlan.forNonExpression(node)..addInnerChanges(innerChanges)..addInnerChanges({node.end: [const AddQuestion()]});
+    return SimpleEditPlan.forNonExpression(node)
+      ..addInnerChanges(innerChanges)
+      ..addInnerChanges({
+        node.end: [const AddQuestion()]
+      });
   }
+}
+
+abstract class _NestableChange extends Change {
+  final Change _inner;
+
+  const _NestableChange(this._inner);
 }
 
 extension on SimpleEditPlan {
@@ -182,14 +201,9 @@ extension on SimpleEditPlan {
     var innerPlan = planner._exploratory2(node);
     // TODO(paulberry): do the right thing for allowCascade
     bool allowCascade = false;
-    bool parensNeeded = innerPlan.parensNeeded(threshold, associative, allowCascade);
+    bool parensNeeded =
+        innerPlan.parensNeeded(threshold, associative, allowCascade);
     var innerChanges = innerPlan.getChanges(parensNeeded);
     addInnerChanges(innerChanges);
   }
-}
-
-abstract class _NestableChange extends Change {
-  final Change _inner;
-
-  const _NestableChange(this._inner);
 }
