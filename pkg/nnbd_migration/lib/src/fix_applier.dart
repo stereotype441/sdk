@@ -79,7 +79,9 @@ class FixPlanner extends GeneralizingAstVisitor<_Plan> {
   }
 
   _Plan visitParenthesizedExpression(ParenthesizedExpression node) {
-    return _Plan.empty(node)..subsume(this, node.expression);
+    // TODO(paulberry): I think we need to do something smarter than pass atEnd
+    // as true.  It will be wrong if there are doubly nested parens.
+    return _Plan.empty(node)..subsume(this, node.expression, atEnd: true);
   }
 
   _Plan visitPostfixExpression(PostfixExpression node) {
@@ -206,47 +208,52 @@ class _Plan {
   final Precedence _precedence;
 
   /// TODO(paulberry): should I replace offset and end with a node?
-  final int _offset;
-
-  final int _end;
+  final AstNode _node;
 
   _Plan.empty(AstNode node)
       : _precedence = _computePrecedenceFor(node),
-        _offset = node.offset,
-        _end = node.end;
+        _node = node;
 
   _Plan.extract(AstNode node, _Plan innerPlan)
       : _previewInfo = innerPlan._previewInfo,
         _precedence = _computePrecedenceFor(node),
         endsInCascade = innerPlan.endsInCascade,
-        _offset = node.offset,
-        _end = node.end {
-    if (innerPlan._offset > _offset) {
-      ((_previewInfo ??= {})[_offset] ??= [])
-          .insert(0, RemoveText(innerPlan._offset - _offset));
+        _node = node {
+    // TODO(paulberry): don't remove comments
+    if (innerPlan._node.offset > _node.offset) {
+      ((_previewInfo ??= {})[_node.offset] ??= [])
+          .insert(0, RemoveText(innerPlan._node.offset - _node.offset));
     }
-    if (innerPlan._end < _end) {
-      ((_previewInfo ??= {})[innerPlan._end] ??= [])
-          .add(RemoveText(_end - innerPlan._end));
+    if (innerPlan._node.end < _node.end) {
+      ((_previewInfo ??= {})[innerPlan._node.end] ??= [])
+          .add(RemoveText(_node.end - innerPlan._node.end));
     }
   }
 
   _Plan.suffix(
       _Plan innerPlan, PreviewInfo affix, this._precedence, this.endsInCascade)
       : _previewInfo = innerPlan._previewInfo,
-        _offset = innerPlan._offset,
-        _end = innerPlan._end {
-    ((_previewInfo ??= {})[innerPlan._end] ??= []).add(affix);
+        _node = innerPlan._node {
+    ((_previewInfo ??= {})[innerPlan._node.end] ??= []).add(affix);
   }
 
   _Plan addParensIfEndsInCascade() {
+    // TODO(paulberry): I think I have to combine with
+    // addParensIfLowerPrecedenceThan so that I can compute the necessity for
+    // parens once.
     throw UnimplementedError('TODO(paulberry)');
   }
 
   _Plan addParensIfLowerPrecedenceThan(Precedence other) {
-    if (_precedence < other) {
-      ((_previewInfo ??= {})[_offset] ??= []).insert(0, const AddOpenParen());
-      ((_previewInfo ??= {})[_end] ??= []).add(const AddCloseParen());
+    bool parensNeeded = _precedence < other;
+    if (parensNeeded && _node is! ParenthesizedExpression) {
+      ((_previewInfo ??= {})[_node.offset] ??= [])
+          .insert(0, const AddOpenParen());
+      ((_previewInfo ??= {})[_node.end] ??= []).add(const AddCloseParen());
+    } else if (!parensNeeded && _node is ParenthesizedExpression) {
+      // TODO(paulberry): preserve empty parens if no other significant changes
+      ((_previewInfo ??= {})[_node.offset] ??= []).add(const RemoveText(1));
+      ((_previewInfo ??= {})[_node.end - 1] ??= []).add(const RemoveText(1));
     }
     return this;
   }
@@ -274,10 +281,14 @@ class _Plan {
   }
 
   static Precedence _computePrecedenceFor(AstNode node) {
-    // TODO(paulberry): special handling of cascades
-    if (node is Expression) return node.precedence;
-    // For non-expressions we can just use Precedence.primary since no adding of
-    // parens is necessary.
-    return Precedence.primary;
+    if (node is ParenthesizedExpression) {
+      return node.expression.precedence;
+    } else if (node is Expression) {
+      return node.precedence;
+    } else {
+      // For non-expressions we can just use Precedence.primary since no adding
+      // of parens is necessary.
+      return Precedence.primary;
+    }
   }
 }
