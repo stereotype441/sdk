@@ -40,6 +40,13 @@ class FixPlanner extends GeneralizingAstVisitor<_Plan> {
 
   FixPlanner._(this._changes);
 
+  _Plan visitAsExpression(AsExpression node) {
+    // TODO(paulberry): test precedence/associativity
+    return _Plan.empty(node)
+      ..subsume(this, node.expression, context: node.precedence)
+      ..subsume(this, node.type, atEnd: true);
+  }
+
   _Plan visitAssignmentExpression(AssignmentExpression node) {
     // TODO(paulberry): test
     // TODO(paulberry): RHS context
@@ -207,7 +214,6 @@ class _Plan {
 
   final Precedence _precedence;
 
-  /// TODO(paulberry): should I replace offset and end with a node?
   final AstNode _node;
 
   _Plan.empty(AstNode node)
@@ -263,6 +269,7 @@ class _Plan {
   }
 
   /// TODO(paulberry): subsume is no longer a good name.
+  /// TODO(paulberry): can we infer atEnd?
   void subsume(FixPlanner planner, AstNode node,
       {Precedence context = Precedence.none, bool atEnd: false}) {
     if (node == null) return;

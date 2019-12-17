@@ -47,6 +47,19 @@ f(a, b) => a + b;
     });
   }
 
+  void solo_test_extractNode_lower_precedence_remove_inner_parens() async {
+    await resolveTestUnit('''
+f(a, b) => (a == b) as Null;
+''');
+    var expr = findNode.binary('a == b');
+    var previewInfo =
+        FixPlanner.run(testUnit, {expr.parent.parent: const RemoveAs()});
+    expect(previewInfo, {
+      expr.parent.offset: [RemoveText(1)],
+      expr.end: [RemoveText(expr.parent.parent.end - expr.end)]
+    });
+  }
+
   void test_extractNode_raise_precedence_do_not_remove_parens() async {
     await resolveTestUnit('''
 f(a, b, c) => a | (b | c as int);
