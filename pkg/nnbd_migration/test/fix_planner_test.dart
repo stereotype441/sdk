@@ -47,6 +47,17 @@ f(a, b) => a + b;
     });
   }
 
+  void test_extractNode_raise_precedence_no_parens_to_remove() async {
+    await resolveTestUnit('''
+f(a, b, c) => a = b | c as int;
+''');
+    var expr = findNode.binary('b | c');
+    var previewInfo = FixPlanner.run(testUnit, {expr.parent: const RemoveAs()});
+    expect(previewInfo, {
+      expr.end: [RemoveText(expr.parent.end - expr.end)]
+    });
+  }
+
   void test_introduceAs_no_parens() async {
     await resolveTestUnit('''
 f(a, b) => a | b;

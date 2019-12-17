@@ -12,7 +12,8 @@ class AddAs extends PreviewInfo {
 
   const AddAs(this.type);
 
-  operator ==(Object other) => other is AddAs && type == other.type;
+  @override
+  bool operator ==(Object other) => other is AddAs && type == other.type;
 }
 
 class AddBang extends PreviewInfo {
@@ -38,6 +39,15 @@ class FixPlanner extends GeneralizingAstVisitor<_Plan> {
   final Map<AstNode, Change> _changes;
 
   FixPlanner._(this._changes);
+
+  _Plan visitAssignmentExpression(AssignmentExpression node) {
+    // TODO(paulberry): test
+    // TODO(paulberry): RHS context
+    // TODO(paulberry): ensure that cascades are properly handled
+    return _Plan.empty(node)
+      ..subsume(this, node.leftHandSide)
+      ..subsume(this, node.rightHandSide, atEnd: true);
+  }
 
   _Plan visitBinaryExpression(BinaryExpression node) {
     // TODO(paulberry): test
@@ -145,15 +155,27 @@ abstract class PreviewInfo {
   const PreviewInfo();
 }
 
-class _ExtractSubexpression extends Change {
-  AstNode _inner;
-
-  _ExtractSubexpression(this._inner);
+class RemoveAs extends _NestableChange {
+  const RemoveAs([Change inner = const NoChange()]) : super(inner);
 
   @override
   _Plan apply(AstNode node, FixPlanner planner) {
-    return _inner.accept(planner);
+    return _Plan.extract(
+        node, _inner.apply((node as AsExpression).expression, planner));
   }
+}
+
+class RemoveText extends PreviewInfo {
+  final int length;
+
+  const RemoveText(this.length);
+
+  @override
+  bool operator ==(Object other) =>
+      other is RemoveText && length == other.length;
+
+  @override
+  String toString() => 'RemoveText($length)';
 }
 
 class _MakeNullable extends _NestableChange {
@@ -188,6 +210,22 @@ class _Plan {
       : _precedence = _computePrecedenceFor(node),
         _offset = node.offset,
         _end = node.end;
+
+  _Plan.extract(AstNode node, _Plan innerPlan)
+      : _previewInfo = innerPlan._previewInfo,
+        _precedence = _computePrecedenceFor(node),
+        endsInCascade = innerPlan.endsInCascade,
+        _offset = node.offset,
+        _end = node.end {
+    if (innerPlan._offset > _offset) {
+      ((_previewInfo ??= {})[_offset] ??= [])
+          .insert(0, RemoveText(innerPlan._offset - _offset));
+    }
+    if (innerPlan._end < _end) {
+      ((_previewInfo ??= {})[innerPlan._end] ??= [])
+          .add(RemoveText(_end - innerPlan._end));
+    }
+  }
 
   _Plan.suffix(
       _Plan innerPlan, PreviewInfo affix, this._precedence, this.endsInCascade)
