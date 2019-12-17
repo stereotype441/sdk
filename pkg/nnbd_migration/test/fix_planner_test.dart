@@ -49,54 +49,6 @@ f(a, b) => a + b;
     });
   }
 
-  void test_extractNode_lower_precedence_remove_inner_parens() async {
-    await resolveTestUnit('''
-f(a, b) => (a == b) as Null;
-''');
-    var expr = findNode.binary('a == b');
-    var previewInfo = _run({expr.parent.parent: const RemoveAs()});
-    expect(previewInfo, {
-      expr.parent.offset: [RemoveText(1)],
-      expr.end: [RemoveText(1)],
-      expr.parent.end: [RemoveText(expr.parent.parent.end - expr.parent.end)]
-    });
-  }
-
-  void test_extractNode_raise_precedence_do_not_remove_parens() async {
-    await resolveTestUnit('''
-f(a, b, c) => a | (b | c as int);
-''');
-    var expr = findNode.binary('b | c');
-    var previewInfo = _run({expr.parent: const RemoveAs()});
-    expect(previewInfo, {
-      expr.end: [RemoveText(expr.parent.end - expr.end)]
-    });
-  }
-
-  void test_extractNode_raise_precedence_no_parens_to_remove() async {
-    await resolveTestUnit('''
-f(a, b, c) => a = b | c as int;
-''');
-    var expr = findNode.binary('b | c');
-    var previewInfo = _run({expr.parent: const RemoveAs()});
-    expect(previewInfo, {
-      expr.end: [RemoveText(expr.parent.end - expr.end)]
-    });
-  }
-
-  void test_extractNode_raise_precedence_remove_parens() async {
-    await resolveTestUnit('''
-f(a, b, c) => a < (b | c as int);
-''');
-    var expr = findNode.binary('b | c');
-    var previewInfo = _run({expr.parent: const RemoveAs()});
-    expect(previewInfo, {
-      expr.parent.parent.offset: [RemoveText(1)],
-      expr.end: [RemoveText(expr.parent.end - expr.end)],
-      expr.parent.end: [RemoveText(1)]
-    });
-  }
-
   void test_introduceAs_no_parens() async {
     await resolveTestUnit('''
 f(a, b) => a | b;
@@ -192,6 +144,65 @@ f(a) => ~-a;
 g(a, b) => -(a*b);
 ''');
     _run({});
+  }
+
+  void test_removeAs_lower_precedence_do_not_remove_inner_parens() async {
+    await resolveTestUnit('''
+f(a, b, c) => (a == b) as Null == c;
+''');
+    var expr = findNode.binary('a == b');
+    var previewInfo = _run({expr.parent.parent: const RemoveAs()});
+    expect(previewInfo, {
+      expr.parent.end: [RemoveText(expr.parent.parent.end - expr.parent.end)]
+    });
+  }
+
+  void test_removeAs_lower_precedence_remove_inner_parens() async {
+    await resolveTestUnit('''
+f(a, b) => (a == b) as Null;
+''');
+    var expr = findNode.binary('a == b');
+    var previewInfo = _run({expr.parent.parent: const RemoveAs()});
+    expect(previewInfo, {
+      expr.parent.offset: [RemoveText(1)],
+      expr.end: [RemoveText(1)],
+      expr.parent.end: [RemoveText(expr.parent.parent.end - expr.parent.end)]
+    });
+  }
+
+  void test_removeAs_raise_precedence_do_not_remove_parens() async {
+    await resolveTestUnit('''
+f(a, b, c) => a | (b | c as int);
+''');
+    var expr = findNode.binary('b | c');
+    var previewInfo = _run({expr.parent: const RemoveAs()});
+    expect(previewInfo, {
+      expr.end: [RemoveText(expr.parent.end - expr.end)]
+    });
+  }
+
+  void test_removeAs_raise_precedence_no_parens_to_remove() async {
+    await resolveTestUnit('''
+f(a, b, c) => a = b | c as int;
+''');
+    var expr = findNode.binary('b | c');
+    var previewInfo = _run({expr.parent: const RemoveAs()});
+    expect(previewInfo, {
+      expr.end: [RemoveText(expr.parent.end - expr.end)]
+    });
+  }
+
+  void test_removeAs_raise_precedence_remove_parens() async {
+    await resolveTestUnit('''
+f(a, b, c) => a < (b | c as int);
+''');
+    var expr = findNode.binary('b | c');
+    var previewInfo = _run({expr.parent: const RemoveAs()});
+    expect(previewInfo, {
+      expr.parent.parent.offset: [RemoveText(1)],
+      expr.end: [RemoveText(expr.parent.end - expr.end)],
+      expr.parent.end: [RemoveText(1)]
+    });
   }
 
   Object _run(Map<AstNode, Change> changes) {
