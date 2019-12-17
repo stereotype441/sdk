@@ -151,6 +151,32 @@ g(a, b) => a | b as int;
     _run({});
   }
 
+  void test_precedence_binary_equality() async {
+    await resolveTestUnit('''
+f(a, b, c) => (a == b) == c;
+g(a, b, c) => a == (b == c);
+''');
+    _run({});
+  }
+
+  void test_precedence_binary_left_associative() async {
+    // Associativity logic is the same for all operators except relational and
+    // equality, so we just test `+` as a stand-in for all the others.
+    await resolveTestUnit('''
+f(a, b, c) => a + b + c;
+g(a, b, c) => a + (b + c);
+''');
+    _run({});
+  }
+
+  void test_precedence_binary_relational() async {
+    await resolveTestUnit('''
+f(a, b, c) => (a < b) < c;
+g(a, b, c) => a < (b < c);
+''');
+    _run({});
+  }
+
   Object _run(Map<AstNode, Change> changes) {
     // TODO(paulberry): test that redundant parens are allowed in certain
     //  circumstances.
