@@ -102,9 +102,9 @@ class FixPlanner extends GeneralizingAstVisitor<EditPlan> {
   }
 
   EditPlan visitPrefixExpression(PrefixExpression node) {
-    // TODO(paulberry): test
     return SimpleEditPlan.forExpression(node)
-      ..addInnerPlans(this, node.operand);
+      ..addInnerPlans(this, node.operand,
+          threshold: Precedence.prefix, associative: true);
   }
 
   EditPlan visitSimpleIdentifier(Expression node) {

@@ -186,6 +186,14 @@ h(a, b) => (-a)[b];
     _run({});
   }
 
+  void test_precedence_prefix() async {
+    await resolveTestUnit('''
+f(a) => ~-a;
+g(a, b) => -(a*b);
+''');
+    _run({});
+  }
+
   Object _run(Map<AstNode, Change> changes) {
     // TODO(paulberry): test that redundant parens are allowed in certain
     //  circumstances.
