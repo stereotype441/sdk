@@ -114,12 +114,21 @@ class SimpleEditPlan extends EditPlan {
 
   SimpleEditPlan.withPrecedence(AstNode node, this._precedence) : super(node);
 
+  /// TODO(paulberry): document that this takes over ownership of newChanges.
+  /// TODO(paulberry): need to document ownership semantics elsewhere too.
   void addInnerChanges(Map<int, List<PreviewInfo>> newChanges) {
     if (newChanges == null) return;
     if (_innerChanges == null) {
       _innerChanges = newChanges;
     } else {
-      throw UnimplementedError('TODO(paulberry)');
+      for (var entry in newChanges.entries) {
+        var currentValue = _innerChanges[entry.key];
+        if (currentValue == null) {
+          _innerChanges[entry.key] = entry.value;
+        } else {
+          currentValue.addAll(entry.value);
+        }
+      }
     }
   }
 
