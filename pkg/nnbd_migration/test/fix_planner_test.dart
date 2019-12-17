@@ -177,6 +177,15 @@ g(a, b, c) => a < (b < c);
     _run({});
   }
 
+  void test_precedence_postfix() async {
+    await resolveTestUnit('''
+f(a, b, c) => a[b][c];
+g(a, b) => a[b]++;
+h(a, b) => (-a)[b];
+''');
+    _run({});
+  }
+
   Object _run(Map<AstNode, Change> changes) {
     // TODO(paulberry): test that redundant parens are allowed in certain
     //  circumstances.

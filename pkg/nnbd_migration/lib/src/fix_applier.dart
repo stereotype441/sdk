@@ -54,8 +54,6 @@ class FixPlanner extends GeneralizingAstVisitor<EditPlan> {
   }
 
   EditPlan visitBinaryExpression(BinaryExpression node) {
-    // TODO(paulberry): test
-    // TODO(paulberry): fix context
     var precedence = node.precedence;
     return SimpleEditPlan.forExpression(node)
       ..addInnerPlans(this, node.leftOperand,
@@ -76,6 +74,14 @@ class FixPlanner extends GeneralizingAstVisitor<EditPlan> {
       ..addInnerPlans(this, node.body);
   }
 
+  EditPlan visitIndexExpression(IndexExpression node) {
+    // TODO(paulberry): test precedence
+    return SimpleEditPlan.forExpression(node)
+      ..addInnerPlans(this, node.target,
+          threshold: Precedence.postfix, associative: true)
+      ..addInnerPlans(this, node.index);
+  }
+
   EditPlan visitNode(AstNode node) {
     var plan = SimpleEditPlan.forNonExpression(node);
     for (var entity in node.childEntities) {
@@ -91,9 +97,9 @@ class FixPlanner extends GeneralizingAstVisitor<EditPlan> {
   }
 
   EditPlan visitPostfixExpression(PostfixExpression node) {
-    // TODO(paulberry): test
     return SimpleEditPlan.forExpression(node)
-      ..addInnerPlans(this, node.operand, threshold: Precedence.postfix);
+      ..addInnerPlans(this, node.operand,
+          threshold: Precedence.postfix, associative: true);
   }
 
   EditPlan visitPrefixExpression(PrefixExpression node) {
