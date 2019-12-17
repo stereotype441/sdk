@@ -208,7 +208,6 @@ extension on SimpleEditPlan {
   void addInnerPlans(FixPlanner planner, AstNode node,
       {Precedence threshold = Precedence.none, bool associative = false}) {
     if (node == null) return;
-    // TODO(paulberry): test adding of parens
     var innerPlan = planner._exploratory2(node);
     // TODO(paulberry): do the right thing for allowCascade
     bool allowCascade = false;
