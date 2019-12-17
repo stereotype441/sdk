@@ -50,7 +50,8 @@ class FixPlanner extends GeneralizingAstVisitor<EditPlan> {
     // TODO(paulberry): ensure that cascades are properly handled
     return SimpleEditPlan.forExpression(node)
       ..addInnerPlans(this, node.leftHandSide)
-      ..addInnerPlans(this, node.rightHandSide);
+      ..addInnerPlans(this, node.rightHandSide,
+          allowCascade: node.parent is! CascadeExpression);
   }
 
   EditPlan visitBinaryExpression(BinaryExpression node) {
@@ -61,6 +62,17 @@ class FixPlanner extends GeneralizingAstVisitor<EditPlan> {
           associative: precedence != Precedence.relational &&
               precedence != Precedence.equality)
       ..addInnerPlans(this, node.rightOperand, threshold: precedence);
+  }
+
+  EditPlan visitCascadeExpression(CascadeExpression node) {
+    // TODO(paulberry): test precedence
+    var plan = SimpleEditPlan.forExpression(node)
+      ..addInnerPlans(this, node.target)
+      ..endsInCascade = true;
+    for (var cascadeSection in node.cascadeSections) {
+      plan.addInnerPlans(this, cascadeSection);
+    }
+    return plan;
   }
 
   EditPlan visitExpression(Expression node) {
@@ -107,8 +119,19 @@ class FixPlanner extends GeneralizingAstVisitor<EditPlan> {
           threshold: Precedence.prefix, associative: true);
   }
 
+  EditPlan visitPropertyAccess(PropertyAccess node) {
+    // TODO(paulberry): test precedence
+    return SimpleEditPlan.forExpression(node)..addInnerPlans(this, node.target);
+  }
+
   EditPlan visitSimpleIdentifier(Expression node) {
     return SimpleEditPlan.forExpression(node);
+  }
+
+  EditPlan visitThrowExpression(ThrowExpression node) {
+    // TODO(paulberry): test precedence
+    return SimpleEditPlan.forExpression(node)
+      ..addInnerPlans(this, node.expression);
   }
 
   /// This version passes around a plan
@@ -206,11 +229,11 @@ abstract class _NestableChange extends Change {
 extension on SimpleEditPlan {
   /// TODO(paulberry): can we infer atEnd?
   void addInnerPlans(FixPlanner planner, AstNode node,
-      {Precedence threshold = Precedence.none, bool associative = false}) {
+      {Precedence threshold = Precedence.none,
+      bool associative = false,
+      bool allowCascade = true}) {
     if (node == null) return;
     var innerPlan = planner._exploratory2(node);
-    // TODO(paulberry): do the right thing for allowCascade
-    bool allowCascade = false;
     bool parensNeeded =
         innerPlan.parensNeeded(threshold, associative, allowCascade);
     assert(_checkParenLogic(planner, innerPlan, parensNeeded));
@@ -223,13 +246,18 @@ extension on SimpleEditPlan {
     }
     var innerChanges = innerPlan.getChanges(parensNeeded);
     addInnerChanges(innerChanges);
+    if (!parensNeeded &&
+        node.end == sourceNode.end &&
+        innerPlan.endsInCascade) {
+      endsInCascade = true;
+    }
   }
 
   bool _checkParenLogic(
       FixPlanner planner, EditPlan innerPlan, bool parensNeeded) {
-    if (innerPlan is SimpleEditPlan && innerPlan.isPassThrough) {
-      // TODO(paulberry): carve out an exception for cascades, e.g. changing
-      // `a..b = throw c` to `a..b = (throw c..d)`
+    if (innerPlan is SimpleEditPlan &&
+        innerPlan.isPassThrough &&
+        !innerPlan.endsInCascade) {
       assert(
           !parensNeeded,
           "Code prior to fixes didn't need parens here, "

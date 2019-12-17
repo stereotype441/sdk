@@ -14,9 +14,9 @@ class AddOpenParen extends PreviewInfo {
 }
 
 abstract class EditPlan {
-  final AstNode _sourceNode;
+  final AstNode sourceNode;
 
-  EditPlan(this._sourceNode);
+  EditPlan(this.sourceNode);
 
   factory EditPlan.extract(AstNode sourceNode, EditPlan innerPlan) {
     if (innerPlan is ProvisionalParenEditPlan) {
@@ -26,6 +26,8 @@ abstract class EditPlan {
     }
   }
 
+  bool get endsInCascade;
+
   // TODO(paulberry): make some of these parameters optional?
   Map<int, List<PreviewInfo>> getChanges(bool parens);
 
@@ -34,21 +36,21 @@ abstract class EditPlan {
   Map<int, List<PreviewInfo>> _createAddParenChanges(
       Map<int, List<PreviewInfo>> changes) {
     changes ??= {};
-    (changes[_sourceNode.offset] ??= []).insert(0, const AddOpenParen());
-    (changes[_sourceNode.end] ??= []).add(const AddCloseParen());
+    (changes[sourceNode.offset] ??= []).insert(0, const AddOpenParen());
+    (changes[sourceNode.end] ??= []).add(const AddCloseParen());
     return changes;
   }
 
   static Map<int, List<PreviewInfo>> _createExtractChanges(EditPlan innerPlan,
       AstNode sourceNode, Map<int, List<PreviewInfo>> changes) {
     // TODO(paulberry): don't remove comments
-    if (innerPlan._sourceNode.offset > sourceNode.offset) {
+    if (innerPlan.sourceNode.offset > sourceNode.offset) {
       ((changes ??= {})[sourceNode.offset] ??= []).insert(
-          0, RemoveText(innerPlan._sourceNode.offset - sourceNode.offset));
+          0, RemoveText(innerPlan.sourceNode.offset - sourceNode.offset));
     }
-    if (innerPlan._sourceNode.end < sourceNode.end) {
-      ((changes ??= {})[innerPlan._sourceNode.end] ??= [])
-          .add(RemoveText(sourceNode.end - innerPlan._sourceNode.end));
+    if (innerPlan.sourceNode.end < sourceNode.end) {
+      ((changes ??= {})[innerPlan.sourceNode.end] ??= [])
+          .add(RemoveText(sourceNode.end - innerPlan.sourceNode.end));
     }
     return changes;
   }
@@ -66,14 +68,16 @@ class ProvisionalParenEditPlan extends EditPlan {
   ProvisionalParenEditPlan(ParenthesizedExpression node, this.innerPlan)
       : super(node);
 
+  bool get endsInCascade => innerPlan.endsInCascade;
+
   @override
   Map<int, List<PreviewInfo>> getChanges(bool parens) {
     var changes = innerPlan.getChanges(false);
     if (!parens) {
       changes ??= {};
       // TODO(paulberry): preserve empty parens if no other significant changes
-      (changes[_sourceNode.offset] ??= []).add(const RemoveText(1));
-      (changes[_sourceNode.end - 1] ??= []).add(const RemoveText(1));
+      (changes[sourceNode.offset] ??= []).add(const RemoveText(1));
+      (changes[sourceNode.end - 1] ??= []).add(const RemoveText(1));
     }
     return changes;
   }
@@ -100,7 +104,8 @@ class RemoveText extends PreviewInfo {
 class SimpleEditPlan extends EditPlan {
   Precedence _precedence;
 
-  bool _endsInCascade = false;
+  @override
+  bool endsInCascade = false;
 
   Map<int, List<PreviewInfo>> _innerChanges;
 
@@ -149,9 +154,10 @@ class SimpleEditPlan extends EditPlan {
 
   @override
   bool parensNeeded(Precedence threshold, bool associative, bool allowCascade) {
-    // TODO(paulberry): add logic for allowCascade.
-    return _precedence < threshold ||
-        (!associative && _precedence == threshold);
+    if (endsInCascade && !allowCascade) return true;
+    if (_precedence < threshold) return true;
+    if (_precedence == threshold && !associative) return true;
+    return false;
   }
 }
 
@@ -164,6 +170,8 @@ class _ExtractEditPlan extends EditPlan {
       : _innerChanges = EditPlan._createExtractChanges(
             _innerPlan, sourceNode, _innerPlan.getChanges(false)),
         super(sourceNode);
+
+  bool get endsInCascade => _innerPlan.endsInCascade;
 
   @override
   Map<int, List<PreviewInfo>> getChanges(bool parens) {
@@ -186,12 +194,12 @@ class _ProvisionalParenExtractEditPlan extends EditPlan {
   _ProvisionalParenExtractEditPlan(AstNode sourceNode, this._innerPlan)
       : super(sourceNode);
 
+  bool get endsInCascade => _innerPlan.endsInCascade;
+
   @override
   Map<int, List<PreviewInfo>> getChanges(bool parens) {
-    var innerPlan = _innerPlan;
-    var sourceNode = _sourceNode;
-    var changes = innerPlan.getChanges(parens);
-    return EditPlan._createExtractChanges(innerPlan, sourceNode, changes);
+    var changes = _innerPlan.getChanges(parens);
+    return EditPlan._createExtractChanges(_innerPlan, sourceNode, changes);
   }
 
   @override

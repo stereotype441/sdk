@@ -147,6 +147,23 @@ g(a, b) => -(a*b);
     expect(previewInfo, isNull);
   }
 
+  void test_removeAs_parens_needed_due_to_cascade() async {
+    await resolveTestUnit('''
+f(a, c) => a..b = throw (c..d) as int;
+''');
+    var cd = findNode.cascade('c..d');
+    var cast = cd.parent.parent;
+    var throw_ = cast.parent;
+    var previewInfo = _run({cast: const RemoveAs()});
+    expect(previewInfo, {
+      throw_.offset: [const AddOpenParen()],
+      cd.parent.offset: [const RemoveText(1)],
+      cd.end: [const RemoveText(1)],
+      cd.parent.end: [RemoveText(cast.end - cd.parent.end)],
+      throw_.end: [const AddCloseParen()]
+    });
+  }
+
   void test_removeAs_lower_precedence_do_not_remove_inner_parens() async {
     await resolveTestUnit('''
 f(a, b, c) => (a == b) as Null == c;
