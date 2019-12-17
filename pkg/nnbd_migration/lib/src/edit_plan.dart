@@ -104,14 +104,6 @@ class SimpleEditPlan extends EditPlan {
 
   Map<int, List<PreviewInfo>> _innerChanges;
 
-  void addInnerChanges(Map<int, List<PreviewInfo>> innerChanges) {
-    if (_innerChanges == null) {
-      _innerChanges = innerChanges;
-    } else {
-      throw UnimplementedError('TODO(paulberry)');
-    }
-  }
-
   SimpleEditPlan.forExpression(Expression node)
       : _precedence = node.precedence,
         super(node);
@@ -121,6 +113,15 @@ class SimpleEditPlan extends EditPlan {
         super(node);
 
   SimpleEditPlan.withPrecedence(AstNode node, this._precedence) : super(node);
+
+  void addInnerChanges(Map<int, List<PreviewInfo>> newChanges) {
+    if (newChanges == null) return;
+    if (_innerChanges == null) {
+      _innerChanges = newChanges;
+    } else {
+      throw UnimplementedError('TODO(paulberry)');
+    }
+  }
 
   @override
   Map<int, List<PreviewInfo>> getChanges(bool parens) {
