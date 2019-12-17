@@ -78,6 +78,10 @@ class FixPlanner extends GeneralizingAstVisitor<_Plan> {
     return plan;
   }
 
+  _Plan visitParenthesizedExpression(ParenthesizedExpression node) {
+    return _Plan.empty(node)..subsume(this, node.expression);
+  }
+
   _Plan visitPostfixExpression(PostfixExpression node) {
     // TODO(paulberry): test
     return _Plan.empty(node)
