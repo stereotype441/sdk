@@ -75,7 +75,6 @@ class FixPlanner extends GeneralizingAstVisitor<EditPlan> {
   }
 
   EditPlan visitIndexExpression(IndexExpression node) {
-    // TODO(paulberry): test precedence
     return SimpleEditPlan.forExpression(node)
       ..addInnerPlans(this, node.target,
           threshold: Precedence.postfix, associative: true)

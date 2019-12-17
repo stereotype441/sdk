@@ -177,7 +177,7 @@ g(a, b, c) => a < (b < c);
     _run({});
   }
 
-  void test_precedence_postfix() async {
+  void test_precedence_postfix_and_index() async {
     await resolveTestUnit('''
 f(a, b, c) => a[b][c];
 g(a, b) => a[b]++;
