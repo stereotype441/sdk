@@ -147,20 +147,21 @@ g(a, b) => -(a*b);
     expect(previewInfo, isNull);
   }
 
-  void test_removeAs_parens_needed_due_to_cascade() async {
+  void test_removeAs_in_cascade_target_no_parens_needed_conditional() async {
+    // TODO(paulberry): would it be better to keep the parens in this case for
+    // clarity, even though they're not needed?
     await resolveTestUnit('''
-f(a, c) => a..b = throw (c..d) as int;
+f(a, b, c) => ((a ? b : c) as dynamic)..d;
 ''');
-    var cd = findNode.cascade('c..d');
-    var cast = cd.parent.parent;
-    var throw_ = cast.parent;
+    var conditional = findNode.conditionalExpression('a ? b : c');
+    var cast = conditional.parent.parent;
     var previewInfo = _run({cast: const RemoveAs()});
     expect(previewInfo, {
-      throw_.offset: [const AddOpenParen()],
-      cd.parent.offset: [const RemoveText(1)],
-      cd.end: [const RemoveText(1)],
-      cd.parent.end: [RemoveText(cast.end - cd.parent.end)],
-      throw_.end: [const AddCloseParen()]
+      cast.parent.offset: [const RemoveText(1)],
+      conditional.parent.offset: [const RemoveText(1)],
+      conditional.end: [const RemoveText(1)],
+      conditional.parent.end: [RemoveText(cast.end - conditional.parent.end)],
+      cast.end: [const RemoveText(1)]
     });
   }
 
@@ -185,6 +186,23 @@ f(a, b) => (a == b) as Null;
       expr.parent.offset: [RemoveText(1)],
       expr.end: [RemoveText(1)],
       expr.parent.end: [RemoveText(expr.parent.parent.end - expr.parent.end)]
+    });
+  }
+
+  void test_removeAs_parens_needed_due_to_cascade() async {
+    await resolveTestUnit('''
+f(a, c) => a..b = throw (c..d) as int;
+''');
+    var cd = findNode.cascade('c..d');
+    var cast = cd.parent.parent;
+    var throw_ = cast.parent;
+    var previewInfo = _run({cast: const RemoveAs()});
+    expect(previewInfo, {
+      throw_.offset: [const AddOpenParen()],
+      cd.parent.offset: [const RemoveText(1)],
+      cd.end: [const RemoveText(1)],
+      cd.parent.end: [RemoveText(cast.end - cd.parent.end)],
+      throw_.end: [const AddCloseParen()]
     });
   }
 
