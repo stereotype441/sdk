@@ -13,6 +13,7 @@ import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/generated/type_system.dart';
 import 'package:analyzer/src/task/strong/checker.dart';
 import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
+import 'package:nnbd_migration/src/edit_plan.dart';
 import 'package:nnbd_migration/src/fix_applier.dart';
 import 'package:nnbd_migration/src/variables.dart';
 import 'package:test/test.dart';
@@ -47,7 +48,7 @@ f(a, b) => a + b;
     });
   }
 
-  void solo_test_extractNode_lower_precedence_remove_inner_parens() async {
+  void test_extractNode_lower_precedence_remove_inner_parens() async {
     await resolveTestUnit('''
 f(a, b) => (a == b) as Null;
 ''');
@@ -56,7 +57,8 @@ f(a, b) => (a == b) as Null;
         FixPlanner.run(testUnit, {expr.parent.parent: const RemoveAs()});
     expect(previewInfo, {
       expr.parent.offset: [RemoveText(1)],
-      expr.end: [RemoveText(expr.parent.parent.end - expr.end)]
+      expr.end: [RemoveText(1)],
+      expr.parent.end: [RemoveText(expr.parent.parent.end - expr.parent.end)]
     });
   }
 
