@@ -6,6 +6,7 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
+import 'package:analyzer/error/error.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type_provider.dart';
 import 'package:analyzer/src/generated/resolver.dart';
@@ -36,7 +37,7 @@ f(a, b) => a + b;
 ''');
     var aRef = findNode.simple('a +');
     var bRef = findNode.simple('b;');
-    var previewInfo = FixPlanner.run(testUnit, {
+    var previewInfo = _run({
       aRef: const NullCheck(),
       bRef: const NullCheck(),
       findNode.binary('a + b'): const NullCheck()
@@ -53,8 +54,7 @@ f(a, b) => a + b;
 f(a, b) => (a == b) as Null;
 ''');
     var expr = findNode.binary('a == b');
-    var previewInfo =
-        FixPlanner.run(testUnit, {expr.parent.parent: const RemoveAs()});
+    var previewInfo = _run({expr.parent.parent: const RemoveAs()});
     expect(previewInfo, {
       expr.parent.offset: [RemoveText(1)],
       expr.end: [RemoveText(1)],
@@ -67,7 +67,7 @@ f(a, b) => (a == b) as Null;
 f(a, b, c) => a | (b | c as int);
 ''');
     var expr = findNode.binary('b | c');
-    var previewInfo = FixPlanner.run(testUnit, {expr.parent: const RemoveAs()});
+    var previewInfo = _run({expr.parent: const RemoveAs()});
     expect(previewInfo, {
       expr.end: [RemoveText(expr.parent.end - expr.end)]
     });
@@ -78,7 +78,7 @@ f(a, b, c) => a | (b | c as int);
 f(a, b, c) => a = b | c as int;
 ''');
     var expr = findNode.binary('b | c');
-    var previewInfo = FixPlanner.run(testUnit, {expr.parent: const RemoveAs()});
+    var previewInfo = _run({expr.parent: const RemoveAs()});
     expect(previewInfo, {
       expr.end: [RemoveText(expr.parent.end - expr.end)]
     });
@@ -89,7 +89,7 @@ f(a, b, c) => a = b | c as int;
 f(a, b, c) => a < (b | c as int);
 ''');
     var expr = findNode.binary('b | c');
-    var previewInfo = FixPlanner.run(testUnit, {expr.parent: const RemoveAs()});
+    var previewInfo = _run({expr.parent: const RemoveAs()});
     expect(previewInfo, {
       expr.parent.parent.offset: [RemoveText(1)],
       expr.end: [RemoveText(expr.parent.end - expr.end)],
@@ -102,8 +102,7 @@ f(a, b, c) => a < (b | c as int);
 f(a, b) => a | b;
 ''');
     var expr = findNode.binary('a | b');
-    var previewInfo =
-        FixPlanner.run(testUnit, {expr: const IntroduceAs('int')});
+    var previewInfo = _run({expr: const IntroduceAs('int')});
     expect(previewInfo, {
       expr.end: [const AddAs('int')]
     });
@@ -114,8 +113,7 @@ f(a, b) => a | b;
 f(a, b) => a < b;
 ''');
     var expr = findNode.binary('a < b');
-    var previewInfo =
-        FixPlanner.run(testUnit, {expr: const IntroduceAs('bool')});
+    var previewInfo = _run({expr: const IntroduceAs('bool')});
     expect(previewInfo, {
       expr.offset: [const AddOpenParen()],
       expr.end: [const AddCloseParen(), const AddAs('bool')]
@@ -127,7 +125,7 @@ f(a, b) => a < b;
 f(a) => a++;
 ''');
     var expr = findNode.postfix('a++');
-    var previewInfo = FixPlanner.run(testUnit, {expr: const NullCheck()});
+    var previewInfo = _run({expr: const NullCheck()});
     expect(previewInfo, {
       expr.end: [const AddBang()]
     });
@@ -138,10 +136,16 @@ f(a) => a++;
 f(a) => -a;
 ''');
     var expr = findNode.prefix('-a');
-    var previewInfo = FixPlanner.run(testUnit, {expr: const NullCheck()});
+    var previewInfo = _run({expr: const NullCheck()});
     expect(previewInfo, {
       expr.offset: [const AddOpenParen()],
       expr.end: [const AddCloseParen(), const AddBang()]
     });
+  }
+
+  Object _run(Map<AstNode, Change> changes) {
+    // TODO(paulberry): test that redundant parens are allowed in certain
+    //  circumstances.
+    return FixPlanner.run(testUnit, changes, allowRedundantParens: false);
   }
 }

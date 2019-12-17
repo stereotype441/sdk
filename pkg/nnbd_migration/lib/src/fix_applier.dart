@@ -34,7 +34,9 @@ abstract class Change {
 class FixPlanner extends GeneralizingAstVisitor<EditPlan> {
   final Map<AstNode, Change> _changes;
 
-  FixPlanner._(this._changes);
+  final bool allowRedundantParens;
+
+  FixPlanner._(this._changes, this.allowRedundantParens);
 
   EditPlan visitAsExpression(AsExpression node) {
     // TODO(paulberry): test precedence/associativity
@@ -55,9 +57,13 @@ class FixPlanner extends GeneralizingAstVisitor<EditPlan> {
   EditPlan visitBinaryExpression(BinaryExpression node) {
     // TODO(paulberry): test
     // TODO(paulberry): fix context
+    var precedence = node.precedence;
     return SimpleEditPlan.forExpression(node)
-      ..addInnerPlans(this, node.leftOperand, threshold: node.precedence)
-      ..addInnerPlans(this, node.rightOperand, threshold: node.precedence);
+      ..addInnerPlans(this, node.leftOperand,
+          threshold: precedence,
+          associative: precedence != Precedence.relational &&
+              precedence != Precedence.equality)
+      ..addInnerPlans(this, node.rightOperand, threshold: precedence);
   }
 
   EditPlan visitExpression(Expression node) {
@@ -109,8 +115,9 @@ class FixPlanner extends GeneralizingAstVisitor<EditPlan> {
   }
 
   static Map<int, List<PreviewInfo>> run(
-      CompilationUnit unit, Map<AstNode, Change> changes) {
-    var fixPlanner = FixPlanner._(changes);
+      CompilationUnit unit, Map<AstNode, Change> changes,
+      {bool allowRedundantParens = true}) {
+    var fixPlanner = FixPlanner._(changes, allowRedundantParens);
     var plan = fixPlanner._exploratory2(unit);
     return plan.getChanges(false);
   }
@@ -203,7 +210,32 @@ extension on SimpleEditPlan {
     bool allowCascade = false;
     bool parensNeeded =
         innerPlan.parensNeeded(threshold, associative, allowCascade);
+    assert(_checkParenLogic(planner, innerPlan, parensNeeded));
     var innerChanges = innerPlan.getChanges(parensNeeded);
     addInnerChanges(innerChanges);
+  }
+
+  bool _checkParenLogic(
+      FixPlanner planner, EditPlan innerPlan, bool parensNeeded) {
+    if (innerPlan is SimpleEditPlan && innerPlan.isPassThrough) {
+      // TODO(paulberry): carve out an exception for cascades, e.g. changing
+      // `a..b = throw c` to `a..b = (throw c..d)`
+      assert(
+          !parensNeeded,
+          "Code prior to fixes didn't need parens here, "
+          "shouldn't need parens now.");
+    }
+    if (innerPlan is ProvisionalParenEditPlan) {
+      var innerInnerPlan = innerPlan.innerPlan;
+      if (innerInnerPlan is SimpleEditPlan &&
+          innerInnerPlan.isPassThrough &&
+          !planner.allowRedundantParens) {
+        // TODO(paulberry): carve out an exception for cascades, e.g. changing
+        // `a..b = (throw c)` to `a..b = (throw c..d)`
+        assert(parensNeeded,
+            "Code prior to fixes needed parens here, should need parens now.");
+      }
+    }
+    return true;
   }
 }

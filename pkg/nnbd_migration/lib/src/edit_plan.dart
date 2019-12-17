@@ -59,16 +59,16 @@ abstract class PreviewInfo {
 }
 
 class ProvisionalParenEditPlan extends EditPlan {
-  final EditPlan _innerPlan;
+  final EditPlan innerPlan;
 
   /// TODO(paulberry): if there are multiple levels of redundant parens, what
   /// should we do?
-  ProvisionalParenEditPlan(ParenthesizedExpression node, this._innerPlan)
+  ProvisionalParenEditPlan(ParenthesizedExpression node, this.innerPlan)
       : super(node);
 
   @override
   Map<int, List<PreviewInfo>> getChanges(bool parens) {
-    var changes = _innerPlan.getChanges(false);
+    var changes = innerPlan.getChanges(false);
     if (!parens) {
       changes ??= {};
       // TODO(paulberry): preserve empty parens if no other significant changes
@@ -81,7 +81,7 @@ class ProvisionalParenEditPlan extends EditPlan {
   @override
   bool parensNeeded(
           Precedence threshold, bool associative, bool allowCascade) =>
-      _innerPlan.parensNeeded(threshold, associative, allowCascade);
+      innerPlan.parensNeeded(threshold, associative, allowCascade);
 }
 
 class RemoveText extends PreviewInfo {
@@ -104,15 +104,21 @@ class SimpleEditPlan extends EditPlan {
 
   Map<int, List<PreviewInfo>> _innerChanges;
 
+  final bool isPassThrough;
+
   SimpleEditPlan.forExpression(Expression node)
       : _precedence = node.precedence,
+        isPassThrough = true,
         super(node);
 
   SimpleEditPlan.forNonExpression(AstNode node)
       : _precedence = Precedence.primary,
+        isPassThrough = true,
         super(node);
 
-  SimpleEditPlan.withPrecedence(AstNode node, this._precedence) : super(node);
+  SimpleEditPlan.withPrecedence(AstNode node, this._precedence)
+      : isPassThrough = false,
+        super(node);
 
   /// TODO(paulberry): document that this takes over ownership of newChanges.
   /// TODO(paulberry): need to document ownership semantics elsewhere too.
