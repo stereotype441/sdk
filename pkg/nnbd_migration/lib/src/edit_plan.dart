@@ -125,6 +125,8 @@ class SimpleEditPlan extends EditPlan {
       : isPassThrough = false,
         super(node);
 
+  bool get isEmpty => _innerChanges == null;
+
   /// TODO(paulberry): document that this takes over ownership of newChanges.
   /// TODO(paulberry): need to document ownership semantics elsewhere too.
   void addInnerChanges(Map<int, List<PreviewInfo>> newChanges) {

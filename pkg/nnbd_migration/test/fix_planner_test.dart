@@ -36,6 +36,21 @@ f(a, b) => a + b;
     });
   }
 
+  void test_introduceAs_distant_parens_no_longer_needed() async {
+    // Note: in principle it would be nice to delete the outer parens, but it's
+    // difficult to see that they used to be necessary and aren't anymore, so we
+    // leave them.
+    await resolveTestUnit('''
+f(a, c) => a..b = (throw c..d);
+''');
+    var cd = findNode.cascade('c..d');
+    var previewInfo = _run({cd: const IntroduceAs('int')});
+    expect(previewInfo, {
+      cd.offset: [const AddOpenParen()],
+      cd.end: [const AddCloseParen(), const AddAs('int')]
+    });
+  }
+
   void test_introduceAs_no_parens() async {
     await resolveTestUnit('''
 f(a, b) => a | b;

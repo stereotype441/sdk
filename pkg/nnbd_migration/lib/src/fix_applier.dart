@@ -233,7 +233,6 @@ abstract class _NestableChange extends Change {
 }
 
 extension on SimpleEditPlan {
-  /// TODO(paulberry): can we infer atEnd?
   void addInnerPlans(FixPlanner planner, AstNode node,
       {Precedence threshold = Precedence.none,
       bool associative = false,
@@ -262,8 +261,7 @@ extension on SimpleEditPlan {
   bool _checkParenLogic(
       FixPlanner planner, EditPlan innerPlan, bool parensNeeded) {
     if (innerPlan is SimpleEditPlan &&
-        innerPlan.isPassThrough &&
-        !innerPlan.endsInCascade) {
+        innerPlan.isEmpty) {
       assert(
           !parensNeeded,
           "Code prior to fixes didn't need parens here, "
@@ -272,10 +270,8 @@ extension on SimpleEditPlan {
     if (innerPlan is ProvisionalParenEditPlan) {
       var innerInnerPlan = innerPlan.innerPlan;
       if (innerInnerPlan is SimpleEditPlan &&
-          innerInnerPlan.isPassThrough &&
+          innerInnerPlan.isEmpty &&
           !planner.allowRedundantParens) {
-        // TODO(paulberry): carve out an exception for cascades, e.g. changing
-        // `a..b = (throw c)` to `a..b = (throw c..d)`
         assert(
             parensNeeded,
             "Code prior to fixes had parens here, but we think they aren't "
