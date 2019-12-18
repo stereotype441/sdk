@@ -14,6 +14,7 @@ import 'abstract_single_unit.dart';
 main() {
   defineReflectiveSuite(() {
     defineReflectiveTests(ExtractEditPlanWithoutParensTest);
+    defineReflectiveTests(ExtractEditPlanWithParensTest);
     defineReflectiveTests(ProvisionalParenEditPlanTest);
     defineReflectiveTests(SimpleEditPlanTest);
   });
@@ -86,7 +87,7 @@ void f(a, b, c, d) => a = b + c << d;
     return SimpleEditPlan.withPrecedence(expr, precedence);
   }
 
-  EditPlan makeOuterPlan(SimpleEditPlan innerPlan) {
+  EditPlan makeOuterPlan(EditPlan innerPlan) {
     return EditPlan.extract(outerExpr, innerPlan);
   }
 
@@ -171,6 +172,122 @@ void f(a, b, c) => a << b + c;
       ],
       expr.end: [RemoveText(outerExpr.end - expr.end)],
       outerExpr.end: [const AddCloseParen()]
+    });
+  }
+
+  test_parensNeeded() async {
+    checkParensNeeded_additive(makeOuterPlan(await makeInnerPlan()));
+  }
+
+  test_parensNeeded_allowCascade() async {
+    checkParensNeeded_cascaded(
+        makeOuterPlan(await makeInnerPlan(Precedence.cascade)
+          ..endsInCascade = true));
+  }
+}
+
+@reflectiveTest
+class ExtractEditPlanWithParensTest extends EditPlanTestBase {
+  Expression expr;
+  ParenthesizedExpression parens;
+  Expression outerExpr;
+
+  Future<SimpleEditPlan> makeInnerPlan(
+      [Precedence precedence = Precedence.additive]) async {
+    await resolveTestUnit('''
+void f(a, b, c, d) => a = (b + c) * d;
+''');
+    expr = findNode.binary('b + c');
+    parens = findNode.parenthesized('(b + c)');
+    outerExpr = findNode.assignment('a = (b + c) * d');
+    return SimpleEditPlan.withPrecedence(expr, precedence);
+  }
+
+  EditPlan makeOuterPlan(EditPlan innerPlan) {
+    return EditPlan.extract(
+        outerExpr, ProvisionalParenEditPlan(parens, innerPlan));
+  }
+
+  test_endsInCascade_false() async {
+    expect(makeOuterPlan(await makeInnerPlan()).endsInCascade, false);
+  }
+
+  test_endsInCascade_true() async {
+    expect(
+        makeOuterPlan(await makeInnerPlan()
+              ..endsInCascade = true)
+            .endsInCascade,
+        true);
+  }
+
+  test_getChanges_extractLeft() async {
+    await resolveTestUnit('''
+void f(a, b, c) => (a + b) * c;
+''');
+    expr = findNode.binary('+');
+    parens = findNode.parenthesized('+');
+    outerExpr = findNode.binary('*');
+    var innerPlan = SimpleEditPlan.forExpression(expr);
+    expect(makeOuterPlan(innerPlan).getChanges(true), {
+      parens.end: [RemoveText(outerExpr.end - parens.end)]
+    });
+  }
+
+  test_getChanges_extractRight() async {
+    await resolveTestUnit('''
+void f(a, b, c) => a * (b + c);
+''');
+    expr = findNode.binary('+');
+    parens = findNode.parenthesized('+');
+    outerExpr = findNode.binary('*');
+    var innerPlan = SimpleEditPlan.forExpression(expr);
+    expect(makeOuterPlan(innerPlan).getChanges(true), {
+      outerExpr.offset: [RemoveText(parens.offset - outerExpr.offset)]
+    });
+  }
+
+  test_getChanges_innerChanges() async {
+    expect(
+        makeOuterPlan(await makeInnerPlan()
+              ..addInnerChanges({
+                expr.end: [const AddBang()]
+              }))
+            .getChanges(true),
+        {
+          outerExpr.offset: [RemoveText(parens.offset - outerExpr.offset)],
+          expr.end: [const AddBang()],
+          parens.end: [RemoveText(outerExpr.end - parens.end)]
+        });
+  }
+
+  test_getChanges_innerChanges_strip_parens() async {
+    expect(
+        makeOuterPlan(await makeInnerPlan()
+              ..addInnerChanges({
+                expr.end: [const AddBang()]
+              }))
+            .getChanges(false),
+        {
+          outerExpr.offset: [RemoveText(parens.offset - outerExpr.offset)],
+          parens.offset: [RemoveText(1)],
+          expr.end: [const AddBang(), RemoveText(1)],
+          parens.end: [RemoveText(outerExpr.end - parens.end)]
+        });
+  }
+
+  test_getChanges_no_innerChanges() async {
+    expect(makeOuterPlan(await makeInnerPlan()).getChanges(true), {
+      outerExpr.offset: [RemoveText(parens.offset - outerExpr.offset)],
+      parens.end: [RemoveText(outerExpr.end - parens.end)]
+    });
+  }
+
+  test_getChanges_no_innerChanges_strip_parens() async {
+    expect(makeOuterPlan(await makeInnerPlan()).getChanges(false), {
+      outerExpr.offset: [RemoveText(parens.offset - outerExpr.offset)],
+      parens.offset: [RemoveText(1)],
+      expr.end: [RemoveText(1)],
+      parens.end: [RemoveText(outerExpr.end - parens.end)]
     });
   }
 
