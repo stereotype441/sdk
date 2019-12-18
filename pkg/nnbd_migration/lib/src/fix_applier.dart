@@ -174,6 +174,21 @@ class IntroduceAs extends _NestableChange {
   }
 }
 
+class MakeNullable extends _NestableChange {
+  const MakeNullable([Change inner = const NoChange()]) : super(inner);
+
+  @override
+  EditPlan apply(AstNode node, FixPlanner planner) {
+    var innerPlan = _inner.apply(node, planner);
+    var innerChanges = innerPlan.getChanges(false);
+    return SimpleEditPlan.forNonExpression(node)
+      ..addInnerChanges(innerChanges)
+      ..addInnerChanges({
+        node.end: [const AddQuestion()]
+      });
+  }
+}
+
 class NoChange extends Change {
   const NoChange();
 
@@ -206,21 +221,6 @@ class RemoveAs extends _NestableChange {
   EditPlan apply(AstNode node, FixPlanner planner) {
     return EditPlan.extract(
         node, _inner.apply((node as AsExpression).expression, planner));
-  }
-}
-
-class _MakeNullable extends _NestableChange {
-  _MakeNullable(Change inner) : super(inner);
-
-  @override
-  EditPlan apply(AstNode node, FixPlanner planner) {
-    var innerPlan = _inner.apply(node, planner);
-    var innerChanges = innerPlan.getChanges(false);
-    return SimpleEditPlan.forNonExpression(node)
-      ..addInnerChanges(innerChanges)
-      ..addInnerChanges({
-        node.end: [const AddQuestion()]
-      });
   }
 }
 

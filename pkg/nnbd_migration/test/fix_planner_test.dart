@@ -167,6 +167,17 @@ f(a, b, c) => a + (b * c);
     expect(previewInfo, isNull);
   }
 
+  void test_makeNullable() async {
+    await resolveTestUnit('''
+f(int x) {}
+''');
+    var typeName = findNode.typeName('int');
+    var previewInfo = _run({typeName: const MakeNullable()});
+    expect(previewInfo, {
+      typeName.end: [const AddQuestion()]
+    });
+  }
+
   void test_nullCheck_no_parens() async {
     await resolveTestUnit('''
 f(a) => a++;
