@@ -158,8 +158,8 @@ class IntroduceAs extends _NestableChange {
   @override
   EditPlan apply(AstNode node, FixPlanner planner) {
     var innerPlan = _inner.apply(node, planner);
-    var innerChanges = innerPlan.getChanges(
-        innerPlan.parensNeeded(Precedence.relational, false, false));
+    var innerChanges = innerPlan
+        .getChanges(innerPlan.parensNeeded(threshold: Precedence.relational));
     return SimpleEditPlan.withPrecedence(node, Precedence.relational)
       ..addInnerChanges(innerChanges)
       ..addInnerChanges({
@@ -198,8 +198,8 @@ class NullCheck extends _NestableChange {
   @override
   EditPlan apply(AstNode node, FixPlanner planner) {
     var innerPlan = _inner.apply(node, planner);
-    var innerChanges = innerPlan
-        .getChanges(innerPlan.parensNeeded(Precedence.postfix, true, false));
+    var innerChanges = innerPlan.getChanges(innerPlan.parensNeeded(
+        threshold: Precedence.postfix, associative: true));
     return SimpleEditPlan.withPrecedence(node, Precedence.postfix)
       ..addInnerChanges(innerChanges)
       ..addInnerChanges({
@@ -232,8 +232,10 @@ extension on SimpleEditPlan {
     if (node == null) return;
     var change = planner._changes[node] ?? NoChange();
     var innerPlan = change.apply(node, planner);
-    bool parensNeeded =
-        innerPlan.parensNeeded(threshold, associative, allowCascade);
+    bool parensNeeded = innerPlan.parensNeeded(
+        threshold: threshold,
+        associative: associative,
+        allowCascade: allowCascade);
     assert(_checkParenLogic(planner, innerPlan, parensNeeded));
     if (!parensNeeded && innerPlan is ProvisionalParenEditPlan) {
       var innerInnerPlan = innerPlan.innerPlan;

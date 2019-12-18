@@ -4,6 +4,7 @@
 
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/precedence.dart';
+import 'package:meta/meta.dart';
 
 class AddCloseParen extends PreviewInfo {
   const AddCloseParen();
@@ -38,7 +39,10 @@ abstract class EditPlan {
 
   Map<int, List<PreviewInfo>> getChanges(bool parens);
 
-  bool parensNeeded(Precedence threshold, bool associative, bool allowCascade);
+  bool parensNeeded(
+      {@required Precedence threshold,
+      bool associative = false,
+      bool allowCascade = false});
 
   Map<int, List<PreviewInfo>> _createAddParenChanges(
       Map<int, List<PreviewInfo>> changes) {
@@ -94,8 +98,13 @@ class ProvisionalParenEditPlan extends EditPlan {
 
   @override
   bool parensNeeded(
-          Precedence threshold, bool associative, bool allowCascade) =>
-      innerPlan.parensNeeded(threshold, associative, allowCascade);
+          {@required Precedence threshold,
+          bool associative = false,
+          bool allowCascade = false}) =>
+      innerPlan.parensNeeded(
+          threshold: threshold,
+          associative: associative,
+          allowCascade: allowCascade);
 }
 
 class RemoveText extends PreviewInfo {
@@ -168,7 +177,10 @@ class SimpleEditPlan extends EditPlan {
   }
 
   @override
-  bool parensNeeded(Precedence threshold, bool associative, bool allowCascade) {
+  bool parensNeeded(
+      {@required Precedence threshold,
+      bool associative = false,
+      bool allowCascade = false}) {
     if (endsInCascade && !allowCascade) return true;
     if (_precedence < threshold) return true;
     if (_precedence == threshold && !associative) return true;
@@ -199,8 +211,13 @@ class _ExtractEditPlan extends EditPlan {
 
   @override
   bool parensNeeded(
-          Precedence threshold, bool associative, bool allowCascade) =>
-      _innerPlan.parensNeeded(threshold, associative, allowCascade);
+          {@required Precedence threshold,
+          bool associative = false,
+          bool allowCascade = false}) =>
+      _innerPlan.parensNeeded(
+          threshold: threshold,
+          associative: associative,
+          allowCascade: allowCascade);
 }
 
 class _ProvisionalParenExtractEditPlan extends EditPlan {
@@ -219,6 +236,11 @@ class _ProvisionalParenExtractEditPlan extends EditPlan {
 
   @override
   bool parensNeeded(
-          Precedence threshold, bool associative, bool allowCascade) =>
-      _innerPlan.parensNeeded(threshold, associative, allowCascade);
+          {@required Precedence threshold,
+          bool associative = false,
+          bool allowCascade = false}) =>
+      _innerPlan.parensNeeded(
+          threshold: threshold,
+          associative: associative,
+          allowCascade: allowCascade);
 }
