@@ -107,7 +107,9 @@ class FixPlanner extends GeneralizingAstVisitor<EditPlan> {
   }
 
   EditPlan visitParenthesizedExpression(ParenthesizedExpression node) {
-    return ProvisionalParenEditPlan(node, _exploratory2(node.expression));
+    var change = _changes[node.expression] ?? NoChange();
+    var innerPlan = change.apply(node.expression, this);
+    return ProvisionalParenEditPlan(node, innerPlan);
   }
 
   EditPlan visitPostfixExpression(PostfixExpression node) {
@@ -137,19 +139,12 @@ class FixPlanner extends GeneralizingAstVisitor<EditPlan> {
       ..addInnerPlans(this, node.expression);
   }
 
-  /// This version passes around a plan
-  /// TODO(paulberry): rename
-  EditPlan _exploratory2(AstNode node) {
-    var change = _changes[node] ?? NoChange();
-    return change.apply(node, this);
-  }
-
   static Map<int, List<PreviewInfo>> run(
       CompilationUnit unit, Map<AstNode, Change> changes,
       {bool allowRedundantParens = true}) {
-    var fixPlanner = FixPlanner._(changes, allowRedundantParens);
-    var plan = fixPlanner._exploratory2(unit);
-    return plan.getChanges(false);
+    var planner = FixPlanner._(changes, allowRedundantParens);
+    var change = changes[unit] ?? NoChange();
+    return change.apply(unit, planner).getChanges(false);
   }
 }
 
@@ -235,7 +230,8 @@ extension on SimpleEditPlan {
       bool associative = false,
       bool allowCascade = true}) {
     if (node == null) return;
-    var innerPlan = planner._exploratory2(node);
+    var change = planner._changes[node] ?? NoChange();
+    var innerPlan = change.apply(node, planner);
     bool parensNeeded =
         innerPlan.parensNeeded(threshold, associative, allowCascade);
     assert(_checkParenLogic(planner, innerPlan, parensNeeded));
