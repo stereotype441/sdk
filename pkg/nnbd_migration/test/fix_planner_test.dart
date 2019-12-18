@@ -165,6 +165,14 @@ g(a) => (-a)?.b;
     expect(previewInfo, isNull);
   }
 
+  void test_precedence_throw() async {
+    await resolveTestUnit('''
+f(a, b) => throw a = b;
+''');
+    var previewInfo = _run({});
+    expect(previewInfo, isNull);
+  }
+
   void test_removeAs_in_cascade_target_no_parens_needed_cascade() async {
     await resolveTestUnit('''
 f(a) => ((a..b) as dynamic)..c;
