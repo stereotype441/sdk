@@ -128,6 +128,15 @@ g(a, b, c) => a < (b < c);
     expect(previewInfo, isNull);
   }
 
+  void test_precedence_conditional() async {
+    await resolveTestUnit('''
+g(a, b, c, d, e, f) => a ?? b ? c = d : e = f;
+h(a, b, c, d, e) => (a ? b : c) ? d : e;
+''');
+    var previewInfo = _run({});
+    expect(previewInfo, isNull);
+  }
+
   void test_precedence_postfix_and_index() async {
     await resolveTestUnit('''
 f(a, b, c) => a[b][c];

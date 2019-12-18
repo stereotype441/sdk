@@ -47,7 +47,6 @@ class FixPlanner extends GeneralizingAstVisitor<EditPlan> {
   EditPlan visitAssignmentExpression(AssignmentExpression node) {
     // TODO(paulberry): test
     // TODO(paulberry): RHS context
-    // TODO(paulberry): ensure that cascades are properly handled
     return SimpleEditPlan.forExpression(node)
       ..addInnerPlans(this, node.leftHandSide)
       ..addInnerPlans(this, node.rightHandSide,
@@ -76,9 +75,8 @@ class FixPlanner extends GeneralizingAstVisitor<EditPlan> {
   }
 
   EditPlan visitConditionalExpression(ConditionalExpression node) {
-    // TODO(paulberry): test precedence
     return SimpleEditPlan.forExpression(node)
-      ..addInnerPlans(this, node.condition)
+      ..addInnerPlans(this, node.condition, threshold: Precedence.conditional)
       ..addInnerPlans(this, node.thenExpression, allowCascade: false)
       ..addInnerPlans(this, node.elseExpression, allowCascade: false);
   }
