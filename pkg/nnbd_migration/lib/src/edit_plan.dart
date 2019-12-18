@@ -18,6 +18,14 @@ abstract class EditPlan {
 
   EditPlan(this.sourceNode);
 
+  /// Creates a new edit plan that consists of executing [innerPlan], and then
+  /// removing from the source code any code that is in [sourceNode] but not in
+  /// [innerPlan.sourceNode].  This is intended to be used to drop unnecessary
+  /// syntax (for example, to drop an unnecessary cast).
+  ///
+  /// Caller should not re-use [innerPlan] after this call--it (and the data
+  /// structures it points to) may be incorporated into this edit plan and later
+  /// modified.
   factory EditPlan.extract(AstNode sourceNode, EditPlan innerPlan) {
     if (innerPlan is ProvisionalParenEditPlan) {
       return _ProvisionalParenExtractEditPlan(sourceNode, innerPlan);
@@ -28,7 +36,6 @@ abstract class EditPlan {
 
   bool get endsInCascade;
 
-  // TODO(paulberry): make some of these parameters optional?
   Map<int, List<PreviewInfo>> getChanges(bool parens);
 
   bool parensNeeded(Precedence threshold, bool associative, bool allowCascade);
@@ -63,8 +70,12 @@ abstract class PreviewInfo {
 class ProvisionalParenEditPlan extends EditPlan {
   final EditPlan innerPlan;
 
-  /// TODO(paulberry): if there are multiple levels of redundant parens, what
-  /// should we do?
+  /// Creates a new edit plan that consists of executing [innerPlan], and then
+  /// possibly removing surrounding parentheses from the source code.
+  ///
+  /// Caller should not re-use [innerPlan] after this call--it (and the data
+  /// structures it points to) may be incorporated into this edit plan and later
+  /// modified.
   ProvisionalParenEditPlan(ParenthesizedExpression node, this.innerPlan)
       : super(node);
 
@@ -75,7 +86,6 @@ class ProvisionalParenEditPlan extends EditPlan {
     var changes = innerPlan.getChanges(false);
     if (!parens) {
       changes ??= {};
-      // TODO(paulberry): preserve empty parens if no other significant changes
       (changes[sourceNode.offset] ??= []).add(const RemoveText(1));
       (changes[sourceNode.end - 1] ??= []).add(const RemoveText(1));
     }
@@ -127,8 +137,11 @@ class SimpleEditPlan extends EditPlan {
 
   bool get isEmpty => _innerChanges == null;
 
-  /// TODO(paulberry): document that this takes over ownership of newChanges.
-  /// TODO(paulberry): need to document ownership semantics elsewhere too.
+  /// Adds the set of changes in [newChanges] to this edit plan.
+  ///
+  /// Caller should not re-use [newChanges] after this call--it (and the data
+  /// structures it points to) may be incorporated into this edit plan and later
+  /// modified.
   void addInnerChanges(Map<int, List<PreviewInfo>> newChanges) {
     if (newChanges == null) return;
     if (_innerChanges == null) {
