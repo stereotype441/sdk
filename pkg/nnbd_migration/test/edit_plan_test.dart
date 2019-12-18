@@ -21,6 +21,29 @@ class EditPlanTestBase extends AbstractSingleUnitTest {}
 
 @reflectiveTest
 class SimpleEditPlanTest extends EditPlanTestBase {
+  test_addInnerChanges() async {
+    await resolveTestUnit('''
+void f(a) => a;
+''');
+    var expr = findNode.simple('a;');
+    var plan = SimpleEditPlan.withPrecedence(expr, Precedence.additive);
+    expect(plan.getChanges(false), null);
+    plan.addInnerChanges({
+      expr.end: [const AddBang()]
+    });
+    expect(plan.getChanges(false), {
+      expr.end: [const AddBang()]
+    });
+    plan.addInnerChanges({
+      expr.offset: [const AddOpenParen()],
+      expr.end: [const AddCloseParen()]
+    });
+    expect(plan.getChanges(false), {
+      expr.offset: [const AddOpenParen()],
+      expr.end: [const AddBang(), const AddCloseParen()]
+    });
+  }
+
   test_forExpression() async {
     await resolveTestUnit('''
 void f(a, b) => a + b;
@@ -74,6 +97,19 @@ class C {}
             associative: false,
             allowCascade: false),
         false);
+  }
+
+  test_isEmpty() async {
+    await resolveTestUnit('''
+void f(a) => a;
+''');
+    var expr = findNode.simple('a;');
+    var plan = SimpleEditPlan.withPrecedence(expr, Precedence.additive);
+    expect(plan.isEmpty, true);
+    plan.addInnerChanges({
+      expr.end: [const AddBang()]
+    });
+    expect(plan.isEmpty, false);
   }
 
   test_parensNeeded_allowCascade() async {
