@@ -30,7 +30,6 @@ abstract class Change {
   EditPlan apply(AstNode node, FixPlanner planner);
 }
 
-/// TODO(paulberry): rename file to fix_planner.dart?
 class FixPlanner extends GeneralizingAstVisitor<EditPlan> {
   final Map<AstNode, Change> _changes;
 

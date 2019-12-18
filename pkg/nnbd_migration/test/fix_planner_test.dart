@@ -4,7 +4,7 @@
 
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:nnbd_migration/src/edit_plan.dart';
-import 'package:nnbd_migration/src/fix_applier.dart';
+import 'package:nnbd_migration/src/fix_planner.dart';
 import 'package:test/test.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
 
