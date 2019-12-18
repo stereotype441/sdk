@@ -13,13 +13,14 @@ import 'abstract_single_unit.dart';
 
 main() {
   defineReflectiveSuite(() {
+    defineReflectiveTests(ExtractEditPlanWithoutParensTest);
     defineReflectiveTests(ProvisionalParenEditPlanTest);
     defineReflectiveTests(SimpleEditPlanTest);
   });
 }
 
 class EditPlanTestBase extends AbstractSingleUnitTest {
-  void _checkParensNeeded_additive(EditPlan plan) {
+  void checkParensNeeded_additive(EditPlan plan) {
     expect(
         plan.parensNeeded(
             threshold: Precedence.additive,
@@ -54,7 +55,7 @@ class EditPlanTestBase extends AbstractSingleUnitTest {
         false);
   }
 
-  void _checkParensNeeded_cascaded(EditPlan plan) {
+  void checkParensNeeded_cascaded(EditPlan plan) {
     expect(
         plan.parensNeeded(
             threshold: Precedence.assignment,
@@ -67,6 +68,96 @@ class EditPlanTestBase extends AbstractSingleUnitTest {
             associative: true,
             allowCascade: false),
         true);
+  }
+}
+
+@reflectiveTest
+class ExtractEditPlanWithoutParensTest extends EditPlanTestBase {
+  Expression expr;
+  Expression outerExpr;
+
+  Future<SimpleEditPlan> makeInnerPlan(
+      [Precedence precedence = Precedence.additive]) async {
+    await resolveTestUnit('''
+void f(a, b, c, d) => a = b + c << d;
+''');
+    expr = findNode.binary('b + c');
+    outerExpr = findNode.assignment('a = b + c << d');
+    return SimpleEditPlan.withPrecedence(expr, precedence);
+  }
+
+  EditPlan makeOuterPlan(SimpleEditPlan innerPlan) {
+    return EditPlan.extract(outerExpr, innerPlan);
+  }
+
+  test_endsInCascade_false() async {
+    expect(makeOuterPlan(await makeInnerPlan()).endsInCascade, false);
+  }
+
+  test_endsInCascade_true() async {
+    expect(
+        makeOuterPlan(await makeInnerPlan()
+              ..endsInCascade = true)
+            .endsInCascade,
+        true);
+  }
+
+  test_getChanges_innerChanges() async {
+    expect(
+        makeOuterPlan(await makeInnerPlan()
+              ..addInnerChanges({
+                expr.end: [const AddBang()]
+              }))
+            .getChanges(false),
+        {
+          outerExpr.offset: [RemoveText(expr.offset - outerExpr.offset)],
+          expr.end: [const AddBang(), RemoveText(outerExpr.end - expr.end)]
+        });
+  }
+
+  test_getChanges_innerChanges_add_parens() async {
+    expect(
+        makeOuterPlan(await makeInnerPlan()
+              ..addInnerChanges({
+                expr.end: [const AddBang()]
+              }))
+            .getChanges(true),
+        {
+          outerExpr.offset: [
+            const AddOpenParen(),
+            RemoveText(expr.offset - outerExpr.offset)
+          ],
+          expr.end: [const AddBang(), RemoveText(outerExpr.end - expr.end)],
+          outerExpr.end: [const AddCloseParen()]
+        });
+  }
+
+  test_getChanges_no_innerChanges() async {
+    expect(makeOuterPlan(await makeInnerPlan()).getChanges(false), {
+      outerExpr.offset: [RemoveText(expr.offset - outerExpr.offset)],
+      expr.end: [RemoveText(outerExpr.end - expr.end)]
+    });
+  }
+
+  test_getChanges_no_innerChanges_add_parens() async {
+    expect(makeOuterPlan(await makeInnerPlan()).getChanges(true), {
+      outerExpr.offset: [
+        const AddOpenParen(),
+        RemoveText(expr.offset - outerExpr.offset)
+      ],
+      expr.end: [RemoveText(outerExpr.end - expr.end)],
+      outerExpr.end: [const AddCloseParen()]
+    });
+  }
+
+  test_parensNeeded() async {
+    checkParensNeeded_additive(makeOuterPlan(await makeInnerPlan()));
+  }
+
+  test_parensNeeded_allowCascade() async {
+    checkParensNeeded_cascaded(
+        makeOuterPlan(await makeInnerPlan(Precedence.cascade)
+          ..endsInCascade = true));
   }
 }
 
@@ -138,11 +229,11 @@ void f(a) => (a);
   }
 
   test_parensNeeded() async {
-    _checkParensNeeded_additive(makeOuterPlan(await makeInnerPlan()));
+    checkParensNeeded_additive(makeOuterPlan(await makeInnerPlan()));
   }
 
   test_parensNeeded_allowCascade() async {
-    _checkParensNeeded_cascaded(
+    checkParensNeeded_cascaded(
         makeOuterPlan(await makeInnerPlan(Precedence.cascade)
           ..endsInCascade = true));
   }
@@ -179,7 +270,7 @@ void f(a, b) => a + b;
 ''');
     var plan = SimpleEditPlan.forExpression(findNode.binary('a + b'));
     expect(plan.isPassThrough, true);
-    _checkParensNeeded_additive(plan);
+    checkParensNeeded_additive(plan);
   }
 
   test_forNonExpression() async {
@@ -244,7 +335,7 @@ void f(a) => a..b;
 ''');
     var plan = SimpleEditPlan.forExpression(findNode.cascade('a..b'))
       ..endsInCascade = true;
-    _checkParensNeeded_cascaded(plan);
+    checkParensNeeded_cascaded(plan);
   }
 
   test_withPrecedence() async {
