@@ -18,8 +18,60 @@ main() {
   });
 }
 
+class EditPlanTestBase extends AbstractSingleUnitTest {
+  void _checkParensNeeded_additive(EditPlan plan) {
+    expect(
+        plan.parensNeeded(
+            threshold: Precedence.additive,
+            associative: true,
+            allowCascade: true),
+        false);
+    expect(
+        plan.parensNeeded(
+            threshold: Precedence.multiplicative,
+            associative: true,
+            allowCascade: true),
+        true);
+    expect(
+        plan.parensNeeded(
+            threshold: Precedence.shift, associative: true, allowCascade: true),
+        false);
+    expect(
+        plan.parensNeeded(
+            threshold: Precedence.additive,
+            associative: false,
+            allowCascade: true),
+        true);
+    expect(
+        plan.parensNeeded(
+            threshold: Precedence.multiplicative,
+            associative: false,
+            allowCascade: true),
+        true);
+    expect(
+        plan.parensNeeded(
+            threshold: Precedence.shift, associative: true, allowCascade: true),
+        false);
+  }
+
+  void _checkParensNeeded_cascaded(EditPlan plan) {
+    expect(
+        plan.parensNeeded(
+            threshold: Precedence.assignment,
+            associative: true,
+            allowCascade: true),
+        false);
+    expect(
+        plan.parensNeeded(
+            threshold: Precedence.assignment,
+            associative: true,
+            allowCascade: false),
+        true);
+  }
+}
+
 @reflectiveTest
-class ProvisionalParenEditPlanTest extends AbstractSingleUnitTest {
+class ProvisionalParenEditPlanTest extends EditPlanTestBase {
   Expression expr;
   ParenthesizedExpression parens;
 
@@ -86,61 +138,18 @@ void f(a) => (a);
   }
 
   test_parensNeeded() async {
-    var plan = makeOuterPlan(await makeInnerPlan());
-    expect(
-        plan.parensNeeded(
-            threshold: Precedence.additive,
-            associative: true,
-            allowCascade: true),
-        false);
-    expect(
-        plan.parensNeeded(
-            threshold: Precedence.multiplicative,
-            associative: true,
-            allowCascade: true),
-        true);
-    expect(
-        plan.parensNeeded(
-            threshold: Precedence.shift, associative: true, allowCascade: true),
-        false);
-    expect(
-        plan.parensNeeded(
-            threshold: Precedence.additive,
-            associative: false,
-            allowCascade: true),
-        true);
-    expect(
-        plan.parensNeeded(
-            threshold: Precedence.multiplicative,
-            associative: false,
-            allowCascade: true),
-        true);
-    expect(
-        plan.parensNeeded(
-            threshold: Precedence.shift, associative: true, allowCascade: true),
-        false);
+    _checkParensNeeded_additive(makeOuterPlan(await makeInnerPlan()));
   }
 
   test_parensNeeded_allowCascade() async {
-    var plan = makeOuterPlan(await makeInnerPlan(Precedence.cascade)
-      ..endsInCascade = true);
-    expect(
-        plan.parensNeeded(
-            threshold: Precedence.assignment,
-            associative: true,
-            allowCascade: true),
-        false);
-    expect(
-        plan.parensNeeded(
-            threshold: Precedence.assignment,
-            associative: true,
-            allowCascade: false),
-        true);
+    _checkParensNeeded_cascaded(
+        makeOuterPlan(await makeInnerPlan(Precedence.cascade)
+          ..endsInCascade = true));
   }
 }
 
 @reflectiveTest
-class SimpleEditPlanTest extends AbstractSingleUnitTest {
+class SimpleEditPlanTest extends EditPlanTestBase {
   test_addInnerChanges() async {
     await resolveTestUnit('''
 void f(a) => a;
@@ -170,38 +179,7 @@ void f(a, b) => a + b;
 ''');
     var plan = SimpleEditPlan.forExpression(findNode.binary('a + b'));
     expect(plan.isPassThrough, true);
-    expect(
-        plan.parensNeeded(
-            threshold: Precedence.additive,
-            associative: true,
-            allowCascade: true),
-        false);
-    expect(
-        plan.parensNeeded(
-            threshold: Precedence.multiplicative,
-            associative: true,
-            allowCascade: true),
-        true);
-    expect(
-        plan.parensNeeded(
-            threshold: Precedence.shift, associative: true, allowCascade: true),
-        false);
-    expect(
-        plan.parensNeeded(
-            threshold: Precedence.additive,
-            associative: false,
-            allowCascade: true),
-        true);
-    expect(
-        plan.parensNeeded(
-            threshold: Precedence.multiplicative,
-            associative: false,
-            allowCascade: true),
-        true);
-    expect(
-        plan.parensNeeded(
-            threshold: Precedence.shift, associative: true, allowCascade: true),
-        false);
+    _checkParensNeeded_additive(plan);
   }
 
   test_forNonExpression() async {
@@ -266,18 +244,7 @@ void f(a) => a..b;
 ''');
     var plan = SimpleEditPlan.forExpression(findNode.cascade('a..b'))
       ..endsInCascade = true;
-    expect(
-        plan.parensNeeded(
-            threshold: Precedence.assignment,
-            associative: true,
-            allowCascade: true),
-        false);
-    expect(
-        plan.parensNeeded(
-            threshold: Precedence.assignment,
-            associative: true,
-            allowCascade: false),
-        true);
+    _checkParensNeeded_cascaded(plan);
   }
 
   test_withPrecedence() async {
