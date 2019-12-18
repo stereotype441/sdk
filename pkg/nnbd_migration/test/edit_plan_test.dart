@@ -23,13 +23,14 @@ class ProvisionalParenEditPlanTest extends AbstractSingleUnitTest {
   Expression expr;
   ParenthesizedExpression parens;
 
-  Future<SimpleEditPlan> makeInnerPlan() async {
+  Future<SimpleEditPlan> makeInnerPlan(
+      [Precedence precedence = Precedence.additive]) async {
     await resolveTestUnit('''
 void f(a) => (a);
 ''');
     expr = findNode.simple('a);');
     parens = findNode.parenthesized('(a);');
-    return SimpleEditPlan.withPrecedence(expr, Precedence.additive);
+    return SimpleEditPlan.withPrecedence(expr, precedence);
   }
 
   ProvisionalParenEditPlan makeOuterPlan(SimpleEditPlan innerPlan) {
@@ -82,6 +83,59 @@ void f(a) => (a);
       parens.offset: [const RemoveText(1)],
       expr.end: [const RemoveText(1)]
     });
+  }
+
+  test_parensNeeded() async {
+    var plan = makeOuterPlan(await makeInnerPlan());
+    expect(
+        plan.parensNeeded(
+            threshold: Precedence.additive,
+            associative: true,
+            allowCascade: true),
+        false);
+    expect(
+        plan.parensNeeded(
+            threshold: Precedence.multiplicative,
+            associative: true,
+            allowCascade: true),
+        true);
+    expect(
+        plan.parensNeeded(
+            threshold: Precedence.shift, associative: true, allowCascade: true),
+        false);
+    expect(
+        plan.parensNeeded(
+            threshold: Precedence.additive,
+            associative: false,
+            allowCascade: true),
+        true);
+    expect(
+        plan.parensNeeded(
+            threshold: Precedence.multiplicative,
+            associative: false,
+            allowCascade: true),
+        true);
+    expect(
+        plan.parensNeeded(
+            threshold: Precedence.shift, associative: true, allowCascade: true),
+        false);
+  }
+
+  test_parensNeeded_allowCascade() async {
+    var plan = makeOuterPlan(await makeInnerPlan(Precedence.cascade)
+      ..endsInCascade = true);
+    expect(
+        plan.parensNeeded(
+            threshold: Precedence.assignment,
+            associative: true,
+            allowCascade: true),
+        false);
+    expect(
+        plan.parensNeeded(
+            threshold: Precedence.assignment,
+            associative: true,
+            allowCascade: false),
+        true);
   }
 }
 
