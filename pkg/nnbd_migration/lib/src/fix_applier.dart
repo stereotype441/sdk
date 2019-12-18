@@ -79,8 +79,8 @@ class FixPlanner extends GeneralizingAstVisitor<EditPlan> {
     // TODO(paulberry): test precedence
     return SimpleEditPlan.forExpression(node)
       ..addInnerPlans(this, node.condition)
-      ..addInnerPlans(this, node.thenExpression)
-      ..addInnerPlans(this, node.elseExpression);
+      ..addInnerPlans(this, node.thenExpression, allowCascade: false)
+      ..addInnerPlans(this, node.elseExpression, allowCascade: false);
   }
 
   EditPlan visitExpression(Expression node) {

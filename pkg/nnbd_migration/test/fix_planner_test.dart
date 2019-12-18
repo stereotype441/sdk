@@ -250,6 +250,30 @@ f(a, c) => a..b = throw (c..d) as int;
     });
   }
 
+  void test_removeAs_parens_needed_due_to_cascade_in_conditional_else() async {
+    await resolveTestUnit('''
+f(a, b, c) => a ? b : (c..d) as int;
+''');
+    var cd = findNode.cascade('c..d');
+    var cast = cd.parent.parent;
+    var previewInfo = _run({cast: const RemoveAs()});
+    expect(previewInfo, {
+      cd.parent.end: [RemoveText(cast.end - cd.parent.end)],
+    });
+  }
+
+  void test_removeAs_parens_needed_due_to_cascade_in_conditional_then() async {
+    await resolveTestUnit('''
+f(a, b, d) => a ? (b..c) as int : d;
+''');
+    var bc = findNode.cascade('b..c');
+    var cast = bc.parent.parent;
+    var previewInfo = _run({cast: const RemoveAs()});
+    expect(previewInfo, {
+      bc.parent.end: [RemoveText(cast.end - bc.parent.end)],
+    });
+  }
+
   void test_removeAs_raise_precedence_do_not_remove_parens() async {
     await resolveTestUnit('''
 f(a, b, c) => a | (b | c as int);
