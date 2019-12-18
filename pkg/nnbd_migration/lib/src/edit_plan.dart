@@ -71,19 +71,15 @@ abstract class PreviewInfo {
   const PreviewInfo();
 }
 
-class ProvisionalParenEditPlan extends EditPlan {
-  final EditPlan innerPlan;
-
+class ProvisionalParenEditPlan extends _NestedEditPlan {
   /// Creates a new edit plan that consists of executing [innerPlan], and then
   /// possibly removing surrounding parentheses from the source code.
   ///
   /// Caller should not re-use [innerPlan] after this call--it (and the data
   /// structures it points to) may be incorporated into this edit plan and later
   /// modified.
-  ProvisionalParenEditPlan(ParenthesizedExpression node, this.innerPlan)
-      : super(node);
-
-  bool get endsInCascade => innerPlan.endsInCascade;
+  ProvisionalParenEditPlan(ParenthesizedExpression node, EditPlan innerPlan)
+      : super(node, innerPlan);
 
   @override
   Map<int, List<PreviewInfo>> getChanges(bool parens) {
@@ -95,16 +91,6 @@ class ProvisionalParenEditPlan extends EditPlan {
     }
     return changes;
   }
-
-  @override
-  bool parensNeeded(
-          {@required Precedence threshold,
-          bool associative = false,
-          bool allowCascade = false}) =>
-      innerPlan.parensNeeded(
-          threshold: threshold,
-          associative: associative,
-          allowCascade: allowCascade);
 }
 
 class RemoveText extends PreviewInfo {
@@ -188,17 +174,13 @@ class SimpleEditPlan extends EditPlan {
   }
 }
 
-class _ExtractEditPlan extends EditPlan {
-  final EditPlan _innerPlan;
-
+class _ExtractEditPlan extends _NestedEditPlan {
   final Map<int, List<PreviewInfo>> _innerChanges;
 
-  _ExtractEditPlan(AstNode sourceNode, this._innerPlan)
+  _ExtractEditPlan(AstNode sourceNode, EditPlan innerPlan)
       : _innerChanges = EditPlan._createExtractChanges(
-            _innerPlan, sourceNode, _innerPlan.getChanges(false)),
-        super(sourceNode);
-
-  bool get endsInCascade => _innerPlan.endsInCascade;
+            innerPlan, sourceNode, innerPlan.getChanges(false)),
+        super(sourceNode, innerPlan);
 
   @override
   Map<int, List<PreviewInfo>> getChanges(bool parens) {
@@ -208,39 +190,34 @@ class _ExtractEditPlan extends EditPlan {
       return _innerChanges;
     }
   }
+}
+
+abstract class _NestedEditPlan extends EditPlan {
+  final EditPlan innerPlan;
+
+  _NestedEditPlan(AstNode sourceNode, this.innerPlan) : super(sourceNode);
+
+  @override
+  bool get endsInCascade => innerPlan.endsInCascade;
 
   @override
   bool parensNeeded(
           {@required Precedence threshold,
           bool associative = false,
           bool allowCascade = false}) =>
-      _innerPlan.parensNeeded(
+      innerPlan.parensNeeded(
           threshold: threshold,
           associative: associative,
           allowCascade: allowCascade);
 }
 
-class _ProvisionalParenExtractEditPlan extends EditPlan {
-  final ProvisionalParenEditPlan _innerPlan;
-
-  _ProvisionalParenExtractEditPlan(AstNode sourceNode, this._innerPlan)
-      : super(sourceNode);
-
-  bool get endsInCascade => _innerPlan.endsInCascade;
+class _ProvisionalParenExtractEditPlan extends _NestedEditPlan {
+  _ProvisionalParenExtractEditPlan(AstNode sourceNode, EditPlan innerPlan)
+      : super(sourceNode, innerPlan);
 
   @override
   Map<int, List<PreviewInfo>> getChanges(bool parens) {
-    var changes = _innerPlan.getChanges(parens);
-    return EditPlan._createExtractChanges(_innerPlan, sourceNode, changes);
+    var changes = innerPlan.getChanges(parens);
+    return EditPlan._createExtractChanges(innerPlan, sourceNode, changes);
   }
-
-  @override
-  bool parensNeeded(
-          {@required Precedence threshold,
-          bool associative = false,
-          bool allowCascade = false}) =>
-      _innerPlan.parensNeeded(
-          threshold: threshold,
-          associative: associative,
-          allowCascade: allowCascade);
 }
