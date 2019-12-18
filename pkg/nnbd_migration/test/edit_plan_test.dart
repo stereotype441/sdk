@@ -102,6 +102,30 @@ void f(a, b, c, d) => a = b + c << d;
         true);
   }
 
+  test_getChanges_extractLeft() async {
+    await resolveTestUnit('''
+void f(a, b, c) => a + b << c;
+''');
+    expr = findNode.binary('+');
+    outerExpr = findNode.binary('<<');
+    var innerPlan = SimpleEditPlan.forExpression(expr);
+    expect(makeOuterPlan(innerPlan).getChanges(false), {
+      expr.end: [RemoveText(outerExpr.end - expr.end)]
+    });
+  }
+
+  test_getChanges_extractRight() async {
+    await resolveTestUnit('''
+void f(a, b, c) => a << b + c;
+''');
+    expr = findNode.binary('+');
+    outerExpr = findNode.binary('<<');
+    var innerPlan = SimpleEditPlan.forExpression(expr);
+    expect(makeOuterPlan(innerPlan).getChanges(false), {
+      outerExpr.offset: [RemoveText(expr.offset - outerExpr.offset)]
+    });
+  }
+
   test_getChanges_innerChanges() async {
     expect(
         makeOuterPlan(await makeInnerPlan()
