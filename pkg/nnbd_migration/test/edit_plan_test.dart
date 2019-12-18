@@ -99,6 +99,34 @@ class C {}
         false);
   }
 
+  test_getChanges_addParens_no_other_changes() async {
+    await resolveTestUnit('''
+void f(a) => a;
+''');
+    var aRef = findNode.simple('a;');
+    var plan = SimpleEditPlan.forExpression(aRef);
+    expect(plan.getChanges(true), {
+      aRef.offset: [const AddOpenParen()],
+      aRef.end: [const AddCloseParen()]
+    });
+  }
+
+  test_getChanges_addParens_other_changes() async {
+    await resolveTestUnit('''
+void f(a) => a;
+''');
+    var aRef = findNode.simple('a;');
+    var plan = SimpleEditPlan.forExpression(aRef);
+    plan.addInnerChanges({
+      aRef.offset: [const AddBang()],
+      aRef.end: [const AddBang()]
+    });
+    expect(plan.getChanges(true), {
+      aRef.offset: [const AddOpenParen(), const AddBang()],
+      aRef.end: [const AddBang(), const AddCloseParen()]
+    });
+  }
+
   test_isEmpty() async {
     await resolveTestUnit('''
 void f(a) => a;
