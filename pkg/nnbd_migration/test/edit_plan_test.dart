@@ -13,14 +13,80 @@ import 'abstract_single_unit.dart';
 
 main() {
   defineReflectiveSuite(() {
+    defineReflectiveTests(ProvisionalParenEditPlanTest);
     defineReflectiveTests(SimpleEditPlanTest);
   });
 }
 
-class EditPlanTestBase extends AbstractSingleUnitTest {}
+@reflectiveTest
+class ProvisionalParenEditPlanTest extends AbstractSingleUnitTest {
+  Expression expr;
+  ParenthesizedExpression parens;
+
+  Future<SimpleEditPlan> makeInnerPlan() async {
+    await resolveTestUnit('''
+void f(a) => (a);
+''');
+    expr = findNode.simple('a);');
+    parens = findNode.parenthesized('(a);');
+    return SimpleEditPlan.withPrecedence(expr, Precedence.additive);
+  }
+
+  ProvisionalParenEditPlan makeOuterPlan(SimpleEditPlan innerPlan) {
+    return ProvisionalParenEditPlan(parens, innerPlan);
+  }
+
+  test_endsInCascade_false() async {
+    expect(makeOuterPlan(await makeInnerPlan()).endsInCascade, false);
+  }
+
+  test_endsInCascade_true() async {
+    expect(
+        makeOuterPlan(await makeInnerPlan()
+              ..endsInCascade = true)
+            .endsInCascade,
+        true);
+  }
+
+  test_getChanges_innerChanges() async {
+    expect(
+        makeOuterPlan(await makeInnerPlan()
+              ..addInnerChanges({
+                expr.end: [const AddBang()]
+              }))
+            .getChanges(true),
+        {
+          expr.end: [const AddBang()]
+        });
+  }
+
+  test_getChanges_innerChanges_strip_parens() async {
+    expect(
+        makeOuterPlan(await makeInnerPlan()
+              ..addInnerChanges({
+                expr.end: [const AddBang()]
+              }))
+            .getChanges(false),
+        {
+          parens.offset: [const RemoveText(1)],
+          expr.end: [const AddBang(), const RemoveText(1)]
+        });
+  }
+
+  test_getChanges_none() async {
+    expect(makeOuterPlan(await makeInnerPlan()).getChanges(true), null);
+  }
+
+  test_getChanges_none_strip_parens() async {
+    expect(makeOuterPlan(await makeInnerPlan()).getChanges(false), {
+      parens.offset: [const RemoveText(1)],
+      expr.end: [const RemoveText(1)]
+    });
+  }
+}
 
 @reflectiveTest
-class SimpleEditPlanTest extends EditPlanTestBase {
+class SimpleEditPlanTest extends AbstractSingleUnitTest {
   test_addInnerChanges() async {
     await resolveTestUnit('''
 void f(a) => a;
