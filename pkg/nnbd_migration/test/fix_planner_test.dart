@@ -147,6 +147,22 @@ g(a, b) => -(a*b);
     expect(previewInfo, isNull);
   }
 
+  void test_removeAs_in_cascade_target_no_parens_needed_cascade() async {
+    await resolveTestUnit('''
+f(a) => ((a..b) as dynamic)..c;
+''');
+    var cascade = findNode.cascade('a..b');
+    var cast = cascade.parent.parent;
+    var previewInfo = _run({cast: const RemoveAs()});
+    expect(previewInfo, {
+      cast.parent.offset: [const RemoveText(1)],
+      cascade.parent.offset: [const RemoveText(1)],
+      cascade.end: [const RemoveText(1)],
+      cascade.parent.end: [RemoveText(cast.end - cascade.parent.end)],
+      cast.end: [const RemoveText(1)]
+    });
+  }
+
   void test_removeAs_in_cascade_target_no_parens_needed_conditional() async {
     // TODO(paulberry): would it be better to keep the parens in this case for
     // clarity, even though they're not needed?
@@ -162,6 +178,34 @@ f(a, b, c) => ((a ? b : c) as dynamic)..d;
       conditional.end: [const RemoveText(1)],
       conditional.parent.end: [RemoveText(cast.end - conditional.parent.end)],
       cast.end: [const RemoveText(1)]
+    });
+  }
+
+  void test_removeAs_in_cascade_target_parens_needed_assignment() async {
+    await resolveTestUnit('''
+f(a, b) => ((a = b) as dynamic)..c;
+''');
+    var assignment = findNode.assignment('a = b');
+    var cast = assignment.parent.parent;
+    var previewInfo = _run({cast: const RemoveAs()});
+    expect(previewInfo, {
+      assignment.parent.offset: [const RemoveText(1)],
+      assignment.end: [const RemoveText(1)],
+      assignment.parent.end: [RemoveText(cast.end - assignment.parent.end)]
+    });
+  }
+
+  void test_removeAs_in_cascade_target_parens_needed_throw() async {
+    await resolveTestUnit('''
+f(a) => ((throw a) as dynamic)..b;
+''');
+    var throw_ = findNode.throw_('throw a');
+    var cast = throw_.parent.parent;
+    var previewInfo = _run({cast: const RemoveAs()});
+    expect(previewInfo, {
+      throw_.parent.offset: [const RemoveText(1)],
+      throw_.end: [const RemoveText(1)],
+      throw_.parent.end: [RemoveText(cast.end - throw_.parent.end)]
     });
   }
 

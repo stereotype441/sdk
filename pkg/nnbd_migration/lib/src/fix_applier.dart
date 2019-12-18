@@ -67,7 +67,8 @@ class FixPlanner extends GeneralizingAstVisitor<EditPlan> {
   EditPlan visitCascadeExpression(CascadeExpression node) {
     // TODO(paulberry): test precedence
     var plan = SimpleEditPlan.forExpression(node)
-      ..addInnerPlans(this, node.target)
+      ..addInnerPlans(this, node.target,
+          threshold: Precedence.cascade, associative: true)
       ..endsInCascade = true;
     for (var cascadeSection in node.cascadeSections) {
       plan.addInnerPlans(this, cascadeSection);
