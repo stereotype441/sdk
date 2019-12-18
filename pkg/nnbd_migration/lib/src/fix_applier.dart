@@ -45,8 +45,6 @@ class FixPlanner extends GeneralizingAstVisitor<EditPlan> {
   }
 
   EditPlan visitAssignmentExpression(AssignmentExpression node) {
-    // TODO(paulberry): test
-    // TODO(paulberry): RHS context
     return SimpleEditPlan.forExpression(node)
       ..addInnerPlans(this, node.leftHandSide)
       ..addInnerPlans(this, node.rightHandSide,
@@ -260,8 +258,7 @@ extension on SimpleEditPlan {
 
   bool _checkParenLogic(
       FixPlanner planner, EditPlan innerPlan, bool parensNeeded) {
-    if (innerPlan is SimpleEditPlan &&
-        innerPlan.isEmpty) {
+    if (innerPlan is SimpleEditPlan && innerPlan.isEmpty) {
       assert(
           !parensNeeded,
           "Code prior to fixes didn't need parens here, "
