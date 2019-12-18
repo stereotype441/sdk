@@ -74,4 +74,18 @@ void g(a) => a..b;
             allowCascade: false),
         true);
   }
+
+  test_parensNeeded_forNonExpression() async {
+    await resolveTestUnit('''
+class C {}
+''');
+    var plan =
+        SimpleEditPlan.forNonExpression(findNode.classDeclaration('class C'));
+    expect(
+        plan.parensNeeded(
+            threshold: Precedence.postfix,
+            associative: false,
+            allowCascade: false),
+        false);
+  }
 }
