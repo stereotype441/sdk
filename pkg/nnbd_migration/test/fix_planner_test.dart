@@ -156,6 +156,15 @@ g(a, b) => -(a*b);
     expect(previewInfo, isNull);
   }
 
+  void test_precedence_property_access() async {
+    await resolveTestUnit('''
+f(a) => a?.b?.c;
+g(a) => (-a)?.b;
+''');
+    var previewInfo = _run({});
+    expect(previewInfo, isNull);
+  }
+
   void test_removeAs_in_cascade_target_no_parens_needed_cascade() async {
     await resolveTestUnit('''
 f(a) => ((a..b) as dynamic)..c;

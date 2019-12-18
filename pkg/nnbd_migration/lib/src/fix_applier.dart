@@ -126,8 +126,9 @@ class FixPlanner extends GeneralizingAstVisitor<EditPlan> {
   }
 
   EditPlan visitPropertyAccess(PropertyAccess node) {
-    // TODO(paulberry): test precedence
-    return SimpleEditPlan.forExpression(node)..addInnerPlans(this, node.target);
+    return SimpleEditPlan.forExpression(node)
+      ..addInnerPlans(this, node.target,
+          threshold: Precedence.postfix, associative: true);
   }
 
   EditPlan visitSimpleIdentifier(Expression node) {
