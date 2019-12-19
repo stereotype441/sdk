@@ -43,7 +43,25 @@ class FixPlanner extends UnifyingAstVisitor<EditPlan> {
         : SimpleEditPlan.forNonExpression(node);
     for (var entity in node.childEntities) {
       if (entity is AstNode) {
-        plan.addInnerPlans(this, entity);
+        var change = _changes[entity] ?? NoChange();
+        var innerPlan = change.apply(entity, this);
+        bool parensNeeded = innerPlan.parensNeededFromContext(entity);
+        assert(_checkParenLogic(innerPlan, parensNeeded));
+        if (!parensNeeded && innerPlan is ProvisionalParenEditPlan) {
+          var innerInnerPlan = innerPlan.innerPlan;
+          if (innerInnerPlan is SimpleEditPlan &&
+              innerInnerPlan.isPassThrough) {
+            // Input source code had redundant parens, so keep them.
+            parensNeeded = true;
+          }
+        }
+        var innerChanges = innerPlan.getChanges(parensNeeded);
+        plan.addInnerChanges(innerChanges);
+        if (!parensNeeded &&
+            entity.end == plan.sourceNode.end &&
+            innerPlan.endsInCascade) {
+          plan.endsInCascade = true;
+        }
       }
     }
     return plan;
@@ -53,6 +71,27 @@ class FixPlanner extends UnifyingAstVisitor<EditPlan> {
     var change = _changes[node.expression] ?? NoChange();
     var innerPlan = change.apply(node.expression, this);
     return ProvisionalParenEditPlan(node, innerPlan);
+  }
+
+  bool _checkParenLogic(EditPlan innerPlan, bool parensNeeded) {
+    if (innerPlan is SimpleEditPlan && innerPlan.isEmpty) {
+      assert(
+          !parensNeeded,
+          "Code prior to fixes didn't need parens here, "
+          "shouldn't need parens now.");
+    }
+    if (innerPlan is ProvisionalParenEditPlan) {
+      var innerInnerPlan = innerPlan.innerPlan;
+      if (innerInnerPlan is SimpleEditPlan &&
+          innerInnerPlan.isEmpty &&
+          !allowRedundantParens) {
+        assert(
+            parensNeeded,
+            "Code prior to fixes had parens here, but we think they aren't "
+            "needed now.");
+      }
+    }
+    return true;
   }
 
   static Map<int, List<PreviewInfo>> run(
@@ -138,54 +177,4 @@ abstract class _NestableChange extends Change {
   final Change _inner;
 
   const _NestableChange(this._inner);
-}
-
-extension on SimpleEditPlan {
-  void addInnerPlans(FixPlanner planner, AstNode node,
-      {Precedence threshold = Precedence.none,
-      bool associative = false,
-      bool allowCascade = true}) {
-    // TODO(paulberry): inline this method
-    if (node == null) return;
-    var change = planner._changes[node] ?? NoChange();
-    var innerPlan = change.apply(node, planner);
-    bool parensNeeded = innerPlan.parensNeededFromContext(node);
-    assert(_checkParenLogic(planner, innerPlan, parensNeeded));
-    if (!parensNeeded && innerPlan is ProvisionalParenEditPlan) {
-      var innerInnerPlan = innerPlan.innerPlan;
-      if (innerInnerPlan is SimpleEditPlan && innerInnerPlan.isPassThrough) {
-        // Input source code had redundant parens, so keep them.
-        parensNeeded = true;
-      }
-    }
-    var innerChanges = innerPlan.getChanges(parensNeeded);
-    addInnerChanges(innerChanges);
-    if (!parensNeeded &&
-        node.end == sourceNode.end &&
-        innerPlan.endsInCascade) {
-      endsInCascade = true;
-    }
-  }
-
-  bool _checkParenLogic(
-      FixPlanner planner, EditPlan innerPlan, bool parensNeeded) {
-    if (innerPlan is SimpleEditPlan && innerPlan.isEmpty) {
-      assert(
-          !parensNeeded,
-          "Code prior to fixes didn't need parens here, "
-          "shouldn't need parens now.");
-    }
-    if (innerPlan is ProvisionalParenEditPlan) {
-      var innerInnerPlan = innerPlan.innerPlan;
-      if (innerInnerPlan is SimpleEditPlan &&
-          innerInnerPlan.isEmpty &&
-          !planner.allowRedundantParens) {
-        assert(
-            parensNeeded,
-            "Code prior to fixes had parens here, but we think they aren't "
-            "needed now.");
-      }
-    }
-    return true;
-  }
 }
