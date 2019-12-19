@@ -109,7 +109,7 @@ void f(a, b, c) => a + b << c;
 ''');
     expr = findNode.binary('+');
     outerExpr = findNode.binary('<<');
-    var innerPlan = SimpleEditPlan.passThrough(expr);
+    var innerPlan = PassThroughEditPlan(expr);
     expect(makeOuterPlan(innerPlan).getChanges(false), {
       expr.end: [RemoveText(outerExpr.end - expr.end)]
     });
@@ -121,7 +121,7 @@ void f(a, b, c) => a << b + c;
 ''');
     expr = findNode.binary('+');
     outerExpr = findNode.binary('<<');
-    var innerPlan = SimpleEditPlan.passThrough(expr);
+    var innerPlan = PassThroughEditPlan(expr);
     expect(makeOuterPlan(innerPlan).getChanges(false), {
       outerExpr.offset: [RemoveText(expr.offset - outerExpr.offset)]
     });
@@ -227,7 +227,7 @@ void f(a, b, c) => (a + b) * c;
     expr = findNode.binary('+');
     parens = findNode.parenthesized('+');
     outerExpr = findNode.binary('*');
-    var innerPlan = SimpleEditPlan.passThrough(expr);
+    var innerPlan = PassThroughEditPlan(expr);
     expect(makeOuterPlan(innerPlan).getChanges(true), {
       parens.end: [RemoveText(outerExpr.end - parens.end)]
     });
@@ -240,7 +240,7 @@ void f(a, b, c) => a * (b + c);
     expr = findNode.binary('+');
     parens = findNode.parenthesized('+');
     outerExpr = findNode.binary('*');
-    var innerPlan = SimpleEditPlan.passThrough(expr);
+    var innerPlan = PassThroughEditPlan(expr);
     expect(makeOuterPlan(innerPlan).getChanges(true), {
       outerExpr.offset: [RemoveText(parens.offset - outerExpr.offset)]
     });
@@ -406,11 +406,11 @@ void f(a) => a;
   }
 
   test_forExpression() async {
+    // TODO(paulberry): is this test bogus now?
     await resolveTestUnit('''
 void f(a, b) => a + b;
 ''');
-    var plan = SimpleEditPlan.passThrough(findNode.binary('a + b'));
-    expect(plan.isPassThrough, true);
+    var plan = PassThroughEditPlan(findNode.binary('a + b'));
     checkParensNeeded_additive(plan);
   }
 
@@ -420,7 +420,6 @@ class C {}
 ''');
     var plan =
         SimpleEditPlan.forNonExpression(findNode.classDeclaration('class C'));
-    expect(plan.isPassThrough, true);
     expect(
         plan.parensNeeded(
             threshold: Precedence.postfix,
@@ -434,7 +433,7 @@ class C {}
 void f(a) => a;
 ''');
     var aRef = findNode.simple('a;');
-    var plan = SimpleEditPlan.passThrough(aRef);
+    var plan = PassThroughEditPlan(aRef);
     expect(plan.getChanges(true), {
       aRef.offset: [const AddOpenParen()],
       aRef.end: [const AddCloseParen()]
@@ -446,7 +445,7 @@ void f(a) => a;
 void f(a) => a;
 ''');
     var aRef = findNode.simple('a;');
-    var plan = SimpleEditPlan.passThrough(aRef);
+    var plan = PassThroughEditPlan(aRef);
     plan.addInnerChanges({
       aRef.offset: [const AddBang()],
       aRef.end: [const AddBang()]
@@ -474,7 +473,7 @@ void f(a) => a;
     await resolveTestUnit('''
 void f(a) => a..b;
 ''');
-    var plan = SimpleEditPlan.passThrough(findNode.cascade('a..b'))
+    var plan = PassThroughEditPlan(findNode.cascade('a..b'))
       ..endsInCascade = true;
     checkParensNeeded_cascaded(plan);
   }
@@ -485,7 +484,6 @@ void f(a) => a;
 ''');
     var plan = SimpleEditPlan.withPrecedence(
         findNode.simple('a;'), Precedence.additive);
-    expect(plan.isPassThrough, false);
     expect(
         plan.parensNeeded(
             threshold: Precedence.additive,
