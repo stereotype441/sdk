@@ -67,15 +67,21 @@ abstract class EditPlan {
       bool endsInCascade = false}) {
     var innerChanges =
         prefix == null ? null : {innerPlan.sourceNode.offset: prefix};
-    innerChanges += innerPlan.getChanges(innerPlan.parensNeeded(
+    var parensNeeded = innerPlan.parensNeeded(
         threshold: threshold,
         associative: associative,
-        allowCascade: allowCascade));
+        allowCascade: allowCascade);
+    innerChanges += innerPlan.getChanges(parensNeeded);
     if (suffix != null) {
       innerChanges += {innerPlan.sourceNode.end: suffix};
     }
-    return _SimpleEditPlan(innerPlan.sourceNode, precedence,
-        suffix == null ? innerPlan.endsInCascade : endsInCascade, innerChanges);
+    return _SimpleEditPlan(
+        innerPlan.sourceNode,
+        precedence,
+        suffix == null
+            ? innerPlan.endsInCascade && !parensNeeded
+            : endsInCascade,
+        innerChanges);
   }
 
   /// TODO(paulberry): get rid of this

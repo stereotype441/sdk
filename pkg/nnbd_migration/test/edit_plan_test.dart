@@ -29,11 +29,149 @@ class EditPlanTest extends AbstractSingleUnitTest {
     expect(plan.finalize().applyTo(code), expected);
   }
 
-  void test_extract_left() async {
+  EditPlan parenExtract(ParenthesizedExpression inner, AstNode outer) =>
+      EditPlan.extract(
+          outer,
+          EditPlan.provisionalParens(
+              inner, EditPlan.passThrough(inner.expression)));
+
+  EditPlan simpleExtract(AstNode inner, AstNode outer) =>
+      EditPlan.extract(outer, EditPlan.passThrough(inner));
+
+  test_extract_add_parens() async {
+    await analyze('f(g) => 1 * g(2, 3 + 4, 5);');
+    checkPlan(
+        simpleExtract(
+            findNode.binary('+'), findNode.functionExpressionInvocation('+')),
+        'f(g) => 1 * (3 + 4);');
+  }
+
+  test_extract_left() async {
     await analyze('var x = 1 + 2;');
-    var target = findNode.integerLiteral('1');
-    checkPlan(EditPlan.extract(target.parent, EditPlan.passThrough(target)),
+    checkPlan(simpleExtract(findNode.integerLiteral('1'), findNode.binary('+')),
         'var x = 1;');
+  }
+
+  test_extract_preserve_parens() async {
+    await analyze('var x = (1 << 2) * 3 + 4;');
+    checkPlan(parenExtract(findNode.parenthesized('<<'), findNode.binary('*')),
+        'var x = (1 << 2) + 4;');
+  }
+
+  test_surround_allowCascade() async {
+    await analyze('f(x) => 1..isEven;');
+    checkPlan(
+        EditPlan.surround(EditPlan.passThrough(findNode.cascade('..')),
+            prefix: [AddText('x..y = ')]),
+        'f(x) => x..y = (1..isEven);');
+    checkPlan(
+        EditPlan.surround(EditPlan.passThrough(findNode.cascade('..')),
+            prefix: [AddText('x = ')], allowCascade: true),
+        'f(x) => x = 1..isEven;');
+  }
+
+  test_surround_associative() async {
+    await analyze('var x = 1 - 2;');
+    checkPlan(
+        EditPlan.surround(EditPlan.passThrough(findNode.binary('-')),
+            suffix: [AddText(' - 3')],
+            threshold: Precedence.additive,
+            associative: true),
+        'var x = 1 - 2 - 3;');
+    checkPlan(
+        EditPlan.surround(EditPlan.passThrough(findNode.binary('-')),
+            prefix: [AddText('0 - ')], threshold: Precedence.additive),
+        'var x = 0 - (1 - 2);');
+  }
+
+  test_surround_endsInCascade() async {
+    await analyze('f(x) => x..y = 1;');
+    checkPlan(
+        EditPlan.surround(EditPlan.passThrough(findNode.integerLiteral('1')),
+            suffix: [AddText(' + 2')]),
+        'f(x) => x..y = 1 + 2;');
+    checkPlan(
+        EditPlan.surround(EditPlan.passThrough(findNode.integerLiteral('1')),
+            suffix: [AddText('..isEven')], endsInCascade: true),
+        'f(x) => x..y = (1..isEven);');
+  }
+
+  test_surround_endsInCascade_does_not_propagate_through_added_parens() async {
+    await analyze('f(a) => a..b = 0;');
+    checkPlan(
+        EditPlan.surround(
+            EditPlan.surround(EditPlan.passThrough(findNode.cascade('..')),
+                prefix: [AddText('1 + ')], threshold: Precedence.additive),
+            prefix: [AddText('true ? ')],
+            suffix: [AddText(' : 2')]),
+        'f(a) => true ? 1 + (a..b = 0) : 2;');
+    checkPlan(
+        EditPlan.surround(
+            EditPlan.surround(EditPlan.passThrough(findNode.cascade('..')),
+                prefix: [AddText('throw ')], allowCascade: true),
+            prefix: [AddText('true ? ')],
+            suffix: [AddText(' : 2')]),
+        'f(a) => true ? (throw a..b = 0) : 2;');
+  }
+
+  test_surround_endsInCascade_propagates() async {
+    await analyze('f(a) => a..b = 0;');
+    checkPlan(
+        EditPlan.surround(
+            EditPlan.surround(EditPlan.passThrough(findNode.cascade('..')),
+                prefix: [AddText('throw ')], allowCascade: true),
+            prefix: [AddText('true ? ')],
+            suffix: [AddText(' : 2')]),
+        'f(a) => true ? (throw a..b = 0) : 2;');
+    checkPlan(
+        EditPlan.surround(
+            EditPlan.surround(
+                EditPlan.passThrough(findNode.integerLiteral('0')),
+                prefix: [AddText('throw ')],
+                allowCascade: true),
+            prefix: [AddText('true ? ')],
+            suffix: [AddText(' : 2')]),
+        'f(a) => a..b = true ? throw 0 : 2;');
+  }
+
+  test_surround_precedence() async {
+    await analyze('var x = 1 == true;');
+    checkPlan(
+        EditPlan.surround(EditPlan.passThrough(findNode.integerLiteral('1')),
+            suffix: [AddText(' < 2')], precedence: Precedence.relational),
+        'var x = 1 < 2 == true;');
+    checkPlan(
+        EditPlan.surround(EditPlan.passThrough(findNode.integerLiteral('1')),
+            suffix: [AddText(' == 2')], precedence: Precedence.equality),
+        'var x = (1 == 2) == true;');
+  }
+
+  test_surround_prefix() async {
+    await analyze('var x = 1;');
+    checkPlan(
+        EditPlan.surround(EditPlan.passThrough(findNode.integerLiteral('1')),
+            prefix: [AddText('throw ')]),
+        'var x = throw 1;');
+  }
+
+  test_surround_suffix() async {
+    await analyze('var x = 1;');
+    checkPlan(
+        EditPlan.surround(EditPlan.passThrough(findNode.integerLiteral('1')),
+            suffix: [AddText('..isEven')]),
+        'var x = 1..isEven;');
+  }
+
+  test_surround_threshold() async {
+    await analyze('var x = 1 < 2;');
+    checkPlan(
+        EditPlan.surround(EditPlan.passThrough(findNode.binary('<')),
+            suffix: [AddText(' == true')], threshold: Precedence.equality),
+        'var x = 1 < 2 == true;');
+    checkPlan(
+        EditPlan.surround(EditPlan.passThrough(findNode.binary('<')),
+            suffix: [AddText(' as bool')], threshold: Precedence.relational),
+        'var x = (1 < 2) as bool;');
   }
 }
 
