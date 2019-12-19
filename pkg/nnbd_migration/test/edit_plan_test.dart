@@ -384,7 +384,10 @@ g(a) => (-a)?.b;
   }
 
   void test_precedence_throw() async {
-    await checkPrecedence('f(a, b) => throw a = b;');
+    await checkPrecedence('''
+f(a, b) => throw a = b;
+g(a, c) => a..b = throw (c..d);
+''');
   }
 }
 
