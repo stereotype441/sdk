@@ -38,7 +38,7 @@ class FixPlanner extends UnifyingAstVisitor<EditPlan> {
   FixPlanner._(this._changes, this.allowRedundantParens);
 
   EditPlan visitNode(AstNode node) {
-    return PassThroughEditPlan(node,
+    return EditPlan.passThrough(node,
         innerPlans: <EditPlan>[
           for (var entity in node.childEntities)
             if (entity is AstNode)

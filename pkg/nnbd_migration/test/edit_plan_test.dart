@@ -77,22 +77,22 @@ class ExtractEditPlanWithoutParensTest extends EditPlanTestBase {
   Expression expr;
   Expression outerExpr;
 
-  Future<PassThroughEditPlan> makeInnerPlan() async {
+  Future<EditPlan> makeInnerPlan() async {
     await resolveTestUnit('''
 void f(a, b, c, d) => a = b + c << d;
 ''');
     expr = findNode.binary('b + c');
     outerExpr = findNode.assignment('a = b + c << d');
-    return PassThroughEditPlan(expr);
+    return EditPlan.passThrough(expr);
   }
 
-  Future<PassThroughEditPlan> makeInnerPlan_cascaded() async {
+  Future<EditPlan> makeInnerPlan_cascaded() async {
     await resolveTestUnit('''
 void f(a, b) => a = b..c;
 ''');
     expr = findNode.cascade('b..c');
     outerExpr = findNode.assignment('a = b..c');
-    return PassThroughEditPlan(expr);
+    return EditPlan.passThrough(expr);
   }
 
   EditPlan makeOuterPlan(EditPlan innerPlan) {
@@ -113,7 +113,7 @@ void f(a, b, c) => a + b << c;
 ''');
     expr = findNode.binary('+');
     outerExpr = findNode.binary('<<');
-    var innerPlan = PassThroughEditPlan(expr);
+    var innerPlan = EditPlan.passThrough(expr);
     expect(makeOuterPlan(innerPlan).getChanges(false), {
       expr.end: [RemoveText(outerExpr.end - expr.end)]
     });
@@ -125,7 +125,7 @@ void f(a, b, c) => a << b + c;
 ''');
     expr = findNode.binary('+');
     outerExpr = findNode.binary('<<');
-    var innerPlan = PassThroughEditPlan(expr);
+    var innerPlan = EditPlan.passThrough(expr);
     expect(makeOuterPlan(innerPlan).getChanges(false), {
       outerExpr.offset: [RemoveText(expr.offset - outerExpr.offset)]
     });
@@ -188,24 +188,24 @@ class ExtractEditPlanWithParensTest extends EditPlanTestBase {
   ParenthesizedExpression parens;
   Expression outerExpr;
 
-  Future<PassThroughEditPlan> makeInnerPlan() async {
+  Future<EditPlan> makeInnerPlan() async {
     await resolveTestUnit('''
 void f(a, b, c, d) => a = (b + c) * d;
 ''');
     expr = findNode.binary('b + c');
     parens = findNode.parenthesized('(b + c)');
     outerExpr = findNode.assignment('a = (b + c) * d');
-    return PassThroughEditPlan(expr);
+    return EditPlan.passThrough(expr);
   }
 
-  Future<PassThroughEditPlan> makeInnerPlan_cascaded() async {
+  Future<EditPlan> makeInnerPlan_cascaded() async {
     await resolveTestUnit('''
 void f(a, b, d) => a = (b..c) * d;
 ''');
     expr = findNode.cascade('b..c');
     parens = findNode.parenthesized('(b..c)');
     outerExpr = findNode.assignment('a = (b..c) * d');
-    return PassThroughEditPlan(expr);
+    return EditPlan.passThrough(expr);
   }
 
   EditPlan makeOuterPlan(EditPlan innerPlan) {
@@ -228,7 +228,7 @@ void f(a, b, c) => (a + b) * c;
     expr = findNode.binary('+');
     parens = findNode.parenthesized('+');
     outerExpr = findNode.binary('*');
-    var innerPlan = PassThroughEditPlan(expr);
+    var innerPlan = EditPlan.passThrough(expr);
     expect(makeOuterPlan(innerPlan).getChanges(true), {
       parens.end: [RemoveText(outerExpr.end - parens.end)]
     });
@@ -241,7 +241,7 @@ void f(a, b, c) => a * (b + c);
     expr = findNode.binary('+');
     parens = findNode.parenthesized('+');
     outerExpr = findNode.binary('*');
-    var innerPlan = PassThroughEditPlan(expr);
+    var innerPlan = EditPlan.passThrough(expr);
     expect(makeOuterPlan(innerPlan).getChanges(true), {
       outerExpr.offset: [RemoveText(parens.offset - outerExpr.offset)]
     });
@@ -300,22 +300,22 @@ class ProvisionalParenEditPlanTest extends EditPlanTestBase {
   Expression expr;
   ParenthesizedExpression parens;
 
-  Future<PassThroughEditPlan> makeInnerPlan() async {
+  Future<EditPlan> makeInnerPlan() async {
     await resolveTestUnit('''
 void f(a, b) => (a + b);
 ''');
     expr = findNode.binary('a + b');
     parens = findNode.parenthesized('a + b');
-    return PassThroughEditPlan(expr);
+    return EditPlan.passThrough(expr);
   }
 
-  Future<PassThroughEditPlan> makeInnerPlan_cascaded() async {
+  Future<EditPlan> makeInnerPlan_cascaded() async {
     await resolveTestUnit('''
 void f(a) => (a..b);
 ''');
     expr = findNode.cascade('a..b');
     parens = findNode.parenthesized('a..b');
-    return PassThroughEditPlan(expr);
+    return EditPlan.passThrough(expr);
   }
 
   ProvisionalParenEditPlan makeOuterPlan(EditPlan innerPlan) {
@@ -377,7 +377,7 @@ class SimpleEditPlanTest extends EditPlanTestBase {
     await resolveTestUnit('''
 void f(a, b) => a + b;
 ''');
-    var plan = PassThroughEditPlan(findNode.binary('a + b'));
+    var plan = EditPlan.passThrough(findNode.binary('a + b'));
     checkParensNeeded_additive(plan);
   }
 
@@ -386,7 +386,7 @@ void f(a, b) => a + b;
 void f(a) => a;
 ''');
     var aRef = findNode.simple('a;');
-    var plan = PassThroughEditPlan(aRef);
+    var plan = EditPlan.passThrough(aRef);
     expect(plan.getChanges(true), {
       aRef.offset: [const AddOpenParen()],
       aRef.end: [const AddCloseParen()]
@@ -398,7 +398,7 @@ void f(a) => a;
 void f(a) => a;
 ''');
     var aRef = findNode.simple('a;');
-    var innerPlan = PassThroughEditPlan(aRef);
+    var innerPlan = EditPlan.passThrough(aRef);
     var plan = EditPlan.surround(innerPlan,
         prefix: [const AddBang()], suffix: [const AddBang()]);
     expect(plan.getChanges(true), {
@@ -411,7 +411,7 @@ void f(a) => a;
     await resolveTestUnit('''
 void f(a) => a..b;
 ''');
-    var plan = PassThroughEditPlan(findNode.cascade('a..b'));
+    var plan = EditPlan.passThrough(findNode.cascade('a..b'));
     checkParensNeeded_cascaded(plan);
   }
 }

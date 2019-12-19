@@ -36,6 +36,10 @@ abstract class EditPlan {
     }
   }
 
+  factory EditPlan.passThrough(AstNode node,
+      {Iterable<EditPlan> innerPlans,
+      bool allowRedundantParens}) = _PassThroughEditPlan;
+
   factory EditPlan.surround(EditPlan innerPlan,
       {List<PreviewInfo> prefix,
       List<PreviewInfo> suffix,
@@ -94,63 +98,6 @@ abstract class EditPlan {
           .add(RemoveText(sourceNode.end - innerPlan.sourceNode.end));
     }
     return changes;
-  }
-}
-
-/// TODO(paulberry): make private
-class PassThroughEditPlan extends _SimpleEditPlan {
-  factory PassThroughEditPlan(AstNode node,
-      {Iterable<EditPlan> innerPlans = const [],
-      bool allowRedundantParens = true}) {
-    bool /*?*/ endsInCascade = node is CascadeExpression ? true : null;
-    Map<int, List<PreviewInfo>> changes;
-    for (var innerPlan in innerPlans) {
-      var parensNeeded = innerPlan.parensNeededFromContext();
-      assert(_checkParenLogic(innerPlan, parensNeeded, allowRedundantParens));
-      if (!parensNeeded && innerPlan is ProvisionalParenEditPlan) {
-        var innerInnerPlan = innerPlan.innerPlan;
-        if (innerInnerPlan is PassThroughEditPlan) {
-          // Input source code had redundant parens, so keep them.
-          parensNeeded = true;
-        }
-      }
-      changes += innerPlan.getChanges(parensNeeded);
-      if (endsInCascade == null && innerPlan.sourceNode.end == node.end) {
-        endsInCascade = !parensNeeded && innerPlan.endsInCascade;
-      }
-    }
-    return PassThroughEditPlan._(
-        node,
-        node is Expression ? node.precedence : Precedence.primary,
-        endsInCascade ?? _EndsInCascadeVisitor.run(node),
-        changes);
-  }
-
-  PassThroughEditPlan._(AstNode node, Precedence precedence, bool endsInCascade,
-      Map<int, List<PreviewInfo>> innerChanges)
-      : super(node, precedence, endsInCascade, innerChanges);
-
-  static bool _checkParenLogic(
-      EditPlan innerPlan, bool parensNeeded, bool allowRedundantParens) {
-    // TODO(paulberry): make this check smarter.
-    if (innerPlan is _SimpleEditPlan && innerPlan._innerChanges == null) {
-      assert(
-          !parensNeeded,
-          "Code prior to fixes didn't need parens here, "
-          "shouldn't need parens now.");
-    }
-    if (innerPlan is ProvisionalParenEditPlan) {
-      var innerInnerPlan = innerPlan.innerPlan;
-      if (innerInnerPlan is _SimpleEditPlan &&
-          innerInnerPlan._innerChanges == null &&
-          !allowRedundantParens) {
-        assert(
-            parensNeeded,
-            "Code prior to fixes had parens here, but we think they aren't "
-            "needed now.");
-      }
-    }
-    return true;
   }
 }
 
@@ -419,6 +366,62 @@ class _ParensNeededFromContextVisitor extends GeneralizingAstVisitor<bool> {
   bool visitThrowExpression(ThrowExpression node) {
     assert(identical(target, node.expression));
     return false;
+  }
+}
+
+class _PassThroughEditPlan extends _SimpleEditPlan {
+  factory _PassThroughEditPlan(AstNode node,
+      {Iterable<EditPlan> innerPlans = const [],
+      bool allowRedundantParens = true}) {
+    bool /*?*/ endsInCascade = node is CascadeExpression ? true : null;
+    Map<int, List<PreviewInfo>> changes;
+    for (var innerPlan in innerPlans) {
+      var parensNeeded = innerPlan.parensNeededFromContext();
+      assert(_checkParenLogic(innerPlan, parensNeeded, allowRedundantParens));
+      if (!parensNeeded && innerPlan is ProvisionalParenEditPlan) {
+        var innerInnerPlan = innerPlan.innerPlan;
+        if (innerInnerPlan is _PassThroughEditPlan) {
+          // Input source code had redundant parens, so keep them.
+          parensNeeded = true;
+        }
+      }
+      changes += innerPlan.getChanges(parensNeeded);
+      if (endsInCascade == null && innerPlan.sourceNode.end == node.end) {
+        endsInCascade = !parensNeeded && innerPlan.endsInCascade;
+      }
+    }
+    return _PassThroughEditPlan._(
+        node,
+        node is Expression ? node.precedence : Precedence.primary,
+        endsInCascade ?? _EndsInCascadeVisitor.run(node),
+        changes);
+  }
+
+  _PassThroughEditPlan._(AstNode node, Precedence precedence,
+      bool endsInCascade, Map<int, List<PreviewInfo>> innerChanges)
+      : super(node, precedence, endsInCascade, innerChanges);
+
+  static bool _checkParenLogic(
+      EditPlan innerPlan, bool parensNeeded, bool allowRedundantParens) {
+    // TODO(paulberry): make this check smarter.
+    if (innerPlan is _SimpleEditPlan && innerPlan._innerChanges == null) {
+      assert(
+          !parensNeeded,
+          "Code prior to fixes didn't need parens here, "
+          "shouldn't need parens now.");
+    }
+    if (innerPlan is ProvisionalParenEditPlan) {
+      var innerInnerPlan = innerPlan.innerPlan;
+      if (innerInnerPlan is _SimpleEditPlan &&
+          innerInnerPlan._innerChanges == null &&
+          !allowRedundantParens) {
+        assert(
+            parensNeeded,
+            "Code prior to fixes had parens here, but we think they aren't "
+            "needed now.");
+      }
+    }
+    return true;
   }
 }
 
