@@ -7,21 +7,19 @@ import 'package:analyzer/dart/ast/precedence.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:nnbd_migration/src/edit_plan.dart';
 
-class AddAs extends PreviewInfo {
-  final String type;
-
-  const AddAs(this.type);
-
-  @override
-  bool operator ==(Object other) => other is AddAs && type == other.type;
+/// TODO(paulberry): eliminate
+class AddAs extends AddText {
+  AddAs(String type) : super(' as $type');
 }
 
-class AddBang extends PreviewInfo {
-  const AddBang();
+/// TODO(paulberry): eliminate
+class AddBang extends AddText {
+  const AddBang() : super('!');
 }
 
-class AddQuestion extends PreviewInfo {
-  const AddQuestion();
+/// TODO(paulberry): eliminate
+class AddQuestion extends AddText {
+  const AddQuestion() : super('?');
 }
 
 abstract class Change {

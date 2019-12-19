@@ -132,7 +132,7 @@ f(a, c) => a..b = (throw c..d);
     var previewInfo = _run({cd: const IntroduceAs('int')});
     expect(previewInfo, {
       cd.offset: [const AddOpenParen()],
-      cd.end: [const AddCloseParen(), const AddAs('int')]
+      cd.end: [const AddCloseParen(), AddAs('int')]
     });
   }
 
@@ -143,7 +143,7 @@ f(a, b) => a | b;
     var expr = findNode.binary('a | b');
     var previewInfo = _run({expr: const IntroduceAs('int')});
     expect(previewInfo, {
-      expr.end: [const AddAs('int')]
+      expr.end: [AddAs('int')]
     });
   }
 
@@ -155,7 +155,7 @@ f(a, b) => a < b;
     var previewInfo = _run({expr: const IntroduceAs('bool')});
     expect(previewInfo, {
       expr.offset: [const AddOpenParen()],
-      expr.end: [const AddCloseParen(), const AddAs('bool')]
+      expr.end: [const AddCloseParen(), AddAs('bool')]
     });
   }
 

@@ -2,19 +2,42 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+import 'dart:convert';
+
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/precedence.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
+import 'package:analyzer_plugin/protocol/protocol_common.dart';
 import 'package:meta/meta.dart';
 
-class AddCloseParen extends PreviewInfo {
-  const AddCloseParen();
+/// TODO(paulberry): eliminate
+class AddCloseParen extends AddText {
+  const AddCloseParen() : super(')');
 }
 
-class AddOpenParen extends PreviewInfo {
-  const AddOpenParen();
+/// TODO(paulberry): eliminate
+class AddOpenParen extends AddText {
+  const AddOpenParen() : super('(');
 }
 
+class AddText extends PreviewInfo {
+  @override
+  final String replacement;
+
+  const AddText(this.replacement);
+
+  @override
+  int get length => 0;
+
+  @override
+  bool operator ==(Object other) =>
+      other is AddText && replacement == other.replacement;
+
+  @override
+  String toString() => 'AddText(${json.encode(replacement)})';
+}
+
+/// TODO(paulberry): should this be called an EditBuilder?
 abstract class EditPlan {
   final AstNode sourceNode;
 
@@ -61,6 +84,7 @@ abstract class EditPlan {
         suffix == null ? innerPlan.endsInCascade : endsInCascade, innerChanges);
   }
 
+  @visibleForTesting
   bool get endsInCascade;
 
   Map<int, List<PreviewInfo>> getChanges(bool parens);
@@ -103,6 +127,10 @@ abstract class EditPlan {
 
 abstract class PreviewInfo {
   const PreviewInfo();
+
+  int get length;
+
+  String get replacement;
 }
 
 class ProvisionalParenEditPlan extends _NestedEditPlan {
@@ -128,9 +156,13 @@ class ProvisionalParenEditPlan extends _NestedEditPlan {
 }
 
 class RemoveText extends PreviewInfo {
+  @override
   final int length;
 
   const RemoveText(this.length);
+
+  @override
+  String get replacement => '';
 
   @override
   bool operator ==(Object other) =>
@@ -469,7 +501,26 @@ class _SimpleEditPlan extends EditPlan {
   }
 }
 
+extension on List<PreviewInfo> {
+  SourceEdit toSourceEdit(int offset) {
+    var totalLength = 0;
+    var replacement = '';
+    for (var previewInfo in this) {
+      totalLength += previewInfo.length;
+      replacement += previewInfo.replacement;
+    }
+    return SourceEdit(offset, totalLength, replacement);
+  }
+}
+
 extension on Map<int, List<PreviewInfo>> {
+  List<SourceEdit> toSourceEdits() {
+    return [
+      for (var offset in keys.toList()..sort())
+        this[offset].toSourceEdit(offset)
+    ];
+  }
+
   Map<int, List<PreviewInfo>> operator +(
       Map<int, List<PreviewInfo>> newChanges) {
     if (newChanges == null) return this;
