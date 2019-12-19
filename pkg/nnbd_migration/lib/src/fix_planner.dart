@@ -72,13 +72,10 @@ class IntroduceAs extends _NestableChange {
   @override
   EditPlan apply(AstNode node, FixPlanner planner) {
     var innerPlan = _inner.apply(node, planner);
-    var innerChanges = innerPlan
-        .getChanges(innerPlan.parensNeeded(threshold: Precedence.relational));
-    return SimpleEditPlan.withPrecedence(node, Precedence.relational)
-      ..addInnerChanges(innerChanges)
-      ..addInnerChanges({
-        node.end: [AddAs(type)]
-      });
+    return EditPlan.surround(innerPlan,
+        suffix: [AddAs(type)],
+        precedence: Precedence.relational,
+        threshold: Precedence.relational);
   }
 }
 
@@ -88,12 +85,7 @@ class MakeNullable extends _NestableChange {
   @override
   EditPlan apply(AstNode node, FixPlanner planner) {
     var innerPlan = _inner.apply(node, planner);
-    var innerChanges = innerPlan.getChanges(false);
-    return SimpleEditPlan.forNonExpression(node)
-      ..addInnerChanges(innerChanges)
-      ..addInnerChanges({
-        node.end: [const AddQuestion()]
-      });
+    return EditPlan.surround(innerPlan, suffix: [const AddQuestion()]);
   }
 }
 
@@ -112,13 +104,11 @@ class NullCheck extends _NestableChange {
   @override
   EditPlan apply(AstNode node, FixPlanner planner) {
     var innerPlan = _inner.apply(node, planner);
-    var innerChanges = innerPlan.getChanges(innerPlan.parensNeeded(
-        threshold: Precedence.postfix, associative: true));
-    return SimpleEditPlan.withPrecedence(node, Precedence.postfix)
-      ..addInnerChanges(innerChanges)
-      ..addInnerChanges({
-        node.end: [const AddBang()]
-      });
+    return EditPlan.surround(innerPlan,
+        suffix: [const AddBang()],
+        precedence: Precedence.postfix,
+        threshold: Precedence.postfix,
+        associative: true);
   }
 }
 

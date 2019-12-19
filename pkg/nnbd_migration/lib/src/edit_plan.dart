@@ -36,6 +36,27 @@ abstract class EditPlan {
     }
   }
 
+  factory EditPlan.surround(EditPlan innerPlan,
+      {List<PreviewInfo> prefix,
+      List<PreviewInfo> suffix,
+      Precedence precedence = Precedence.primary,
+      Precedence threshold = Precedence.none,
+      bool associative = false,
+      bool allowCascade = false,
+      bool endsInCascade = false}) {
+    var innerChanges =
+        prefix == null ? null : {innerPlan.sourceNode.offset: prefix};
+    innerChanges += innerPlan.getChanges(innerPlan.parensNeeded(
+        threshold: threshold,
+        associative: associative,
+        allowCascade: allowCascade));
+    if (suffix != null) {
+      innerChanges += {innerPlan.sourceNode.end: suffix};
+    }
+    return _SimpleEditPlan(innerPlan.sourceNode, precedence,
+        suffix == null ? innerPlan.endsInCascade : endsInCascade, innerChanges);
+  }
+
   bool get endsInCascade;
 
   Map<int, List<PreviewInfo>> getChanges(bool parens);
@@ -76,6 +97,7 @@ abstract class EditPlan {
   }
 }
 
+/// TODO(paulberry): make private
 class PassThroughEditPlan extends _SimpleEditPlan {
   factory PassThroughEditPlan(AstNode node,
       {Iterable<EditPlan> innerPlans = const [],
@@ -110,7 +132,8 @@ class PassThroughEditPlan extends _SimpleEditPlan {
 
   static bool _checkParenLogic(
       EditPlan innerPlan, bool parensNeeded, bool allowRedundantParens) {
-    if (innerPlan is SimpleEditPlan && innerPlan.isEmpty) {
+    // TODO(paulberry): make this check smarter.
+    if (innerPlan is _SimpleEditPlan && innerPlan._innerChanges == null) {
       assert(
           !parensNeeded,
           "Code prior to fixes didn't need parens here, "
@@ -118,8 +141,8 @@ class PassThroughEditPlan extends _SimpleEditPlan {
     }
     if (innerPlan is ProvisionalParenEditPlan) {
       var innerInnerPlan = innerPlan.innerPlan;
-      if (innerInnerPlan is SimpleEditPlan &&
-          innerInnerPlan.isEmpty &&
+      if (innerInnerPlan is _SimpleEditPlan &&
+          innerInnerPlan._innerChanges == null &&
           !allowRedundantParens) {
         assert(
             parensNeeded,
@@ -168,33 +191,6 @@ class RemoveText extends PreviewInfo {
 
   @override
   String toString() => 'RemoveText($length)';
-}
-
-class SimpleEditPlan extends _SimpleEditPlan {
-  SimpleEditPlan.forNonExpression(AstNode node)
-      : assert(node is! Expression),
-        super(node, Precedence.primary, false, null);
-
-  SimpleEditPlan.withPrecedence(AstNode node, Precedence precedence)
-      : super(node, precedence, false, null);
-
-  void set endsInCascade(bool value) {
-    _endsInCascade = value;
-  }
-
-  /// TODO(paulberry): is this still needed?
-  bool get isEmpty => _innerChanges == null;
-
-  /// Adds the set of changes in [newChanges] to this edit plan.
-  ///
-  /// Caller should not re-use [newChanges] after this call--it (and the data
-  /// structures it points to) may be incorporated into this edit plan and later
-  /// modified.
-  ///
-  /// TODO(paulberry): can this be made simpler?
-  void addInnerChanges(Map<int, List<PreviewInfo>> newChanges) {
-    _innerChanges += newChanges;
-  }
 }
 
 /// TODO(paulberry): unit test
@@ -437,6 +433,7 @@ class _ProvisionalParenExtractEditPlan extends _NestedEditPlan {
   }
 }
 
+/// TODO(paulberry): make stuff final if possible
 class _SimpleEditPlan extends EditPlan {
   Precedence _precedence;
 
