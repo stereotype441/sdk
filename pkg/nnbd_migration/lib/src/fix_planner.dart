@@ -41,7 +41,7 @@ class FixPlanner extends UnifyingAstVisitor<EditPlan> {
       {bool allowRedundantParens = true}) {
     var planner = FixPlanner._(changes, allowRedundantParens);
     var change = changes[unit] ?? NoChange();
-    return change.apply(unit, planner).getChanges(false);
+    return change.apply(unit, planner).finalize();
   }
 }
 

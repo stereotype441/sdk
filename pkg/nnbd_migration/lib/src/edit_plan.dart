@@ -90,8 +90,11 @@ abstract class EditPlan {
 
   /// TODO(paulberry): test
   Map<int, List<PreviewInfo>> finalize({AstNode cascadeSearchLimit}) {
-    bool parensNeeded = sourceNode.parent
-        .accept(_ParensNeededFromContextVisitor(this, cascadeSearchLimit));
+    var parent = sourceNode.parent;
+    bool parensNeeded = parent == null
+        ? false
+        : parent
+            .accept(_ParensNeededFromContextVisitor(this, cascadeSearchLimit));
     return getChanges(parensNeeded);
   }
 
