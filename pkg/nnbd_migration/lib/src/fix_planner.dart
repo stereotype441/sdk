@@ -7,21 +7,6 @@ import 'package:analyzer/dart/ast/precedence.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:nnbd_migration/src/edit_plan.dart';
 
-/// TODO(paulberry): eliminate
-class AddAs extends AddText {
-  AddAs(String type) : super(' as $type');
-}
-
-/// TODO(paulberry): eliminate
-class AddBang extends AddText {
-  const AddBang() : super('!');
-}
-
-/// TODO(paulberry): eliminate
-class AddQuestion extends AddText {
-  const AddQuestion() : super('?');
-}
-
 abstract class Change {
   const Change();
 
@@ -71,7 +56,7 @@ class IntroduceAs extends _NestableChange {
   EditPlan apply(AstNode node, FixPlanner planner) {
     var innerPlan = _inner.apply(node, planner);
     return EditPlan.surround(innerPlan,
-        suffix: [AddAs(type)],
+        suffix: [AddText(' as $type')],
         precedence: Precedence.relational,
         threshold: Precedence.relational);
   }
@@ -83,7 +68,7 @@ class MakeNullable extends _NestableChange {
   @override
   EditPlan apply(AstNode node, FixPlanner planner) {
     var innerPlan = _inner.apply(node, planner);
-    return EditPlan.surround(innerPlan, suffix: [const AddQuestion()]);
+    return EditPlan.surround(innerPlan, suffix: [const AddText('?')]);
   }
 }
 
@@ -103,7 +88,7 @@ class NullCheck extends _NestableChange {
   EditPlan apply(AstNode node, FixPlanner planner) {
     var innerPlan = _inner.apply(node, planner);
     return EditPlan.surround(innerPlan,
-        suffix: [const AddBang()],
+        suffix: [const AddText('!')],
         precedence: Precedence.postfix,
         threshold: Precedence.postfix,
         associative: true);

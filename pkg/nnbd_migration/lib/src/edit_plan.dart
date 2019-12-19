@@ -10,16 +10,6 @@ import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart';
 import 'package:meta/meta.dart';
 
-/// TODO(paulberry): eliminate
-class AddCloseParen extends AddText {
-  const AddCloseParen() : super(')');
-}
-
-/// TODO(paulberry): eliminate
-class AddOpenParen extends AddText {
-  const AddOpenParen() : super('(');
-}
-
 class AddText extends PreviewInfo {
   @override
   final String replacement;
@@ -106,8 +96,8 @@ abstract class EditPlan {
   Map<int, List<PreviewInfo>> _createAddParenChanges(
       Map<int, List<PreviewInfo>> changes) {
     changes ??= {};
-    (changes[sourceNode.offset] ??= []).insert(0, const AddOpenParen());
-    (changes[sourceNode.end] ??= []).add(const AddCloseParen());
+    (changes[sourceNode.offset] ??= []).insert(0, const AddText('('));
+    (changes[sourceNode.end] ??= []).add(const AddText(')'));
     return changes;
   }
 
