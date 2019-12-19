@@ -177,12 +177,6 @@ class _EndsInCascadeVisitor extends UnifyingAstVisitor<void> {
     if (node.end != end) return;
     node.visitChildren(this);
   }
-
-  static bool run(AstNode node) {
-    var visitor = _EndsInCascadeVisitor(node.end);
-    node.accept(visitor);
-    return visitor.endsInCascade;
-  }
 }
 
 class _ExtractEditPlan extends _NestedEditPlan {
@@ -447,7 +441,7 @@ class _PassThroughEditPlan extends _SimpleEditPlan {
     return _PassThroughEditPlan._(
         node,
         node is Expression ? node.precedence : Precedence.primary,
-        endsInCascade ?? _EndsInCascadeVisitor.run(node),
+        endsInCascade ?? node.endsInCascade,
         changes);
   }
 
@@ -585,5 +579,14 @@ extension ChangeMap on Map<int, List<PreviewInfo>> {
       }
       return this;
     }
+  }
+}
+
+extension EndsInCascadeExtension on AstNode {
+  @visibleForTesting
+  bool get endsInCascade {
+    var visitor = _EndsInCascadeVisitor(end);
+    accept(visitor);
+    return visitor.endsInCascade;
   }
 }
