@@ -84,7 +84,6 @@ abstract class EditPlan {
         innerChanges);
   }
 
-  /// TODO(paulberry): get rid of this
   @visibleForTesting
   bool get endsInCascade;
 

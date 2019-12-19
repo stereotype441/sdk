@@ -38,7 +38,6 @@ class EditPlanTest extends AbstractSingleUnitTest {
   EditPlan simpleExtract(AstNode inner, AstNode outer) =>
       EditPlan.extract(outer, EditPlan.passThrough(inner));
 
-  /// TODO(paulberry): rename this test
   test_cascadeSearchLimit() async {
     // Ok, we have to ask each parent if it represents a cascade section.
     // If we create a passThrough at node N, then when we create an enclosing
@@ -98,6 +97,17 @@ class EditPlanTest extends AbstractSingleUnitTest {
     await analyze('var x = (1 << 2) * 3 + 4;');
     checkPlan(parenExtract(findNode.parenthesized('<<'), findNode.binary('*')),
         'var x = (1 << 2) + 4;');
+  }
+
+  test_finalize_compilationUnit() async {
+    // Verify that an edit plan referring to the entire compilation unit can be
+    // finalized.  (This is an important corner case because the entire
+    // compilation unit is an AstNode with no parent).
+    await analyze('var x = 0;');
+    checkPlan(
+        EditPlan.surround(EditPlan.passThrough(testUnit),
+            suffix: [AddText(' var y = 0;')]),
+        'var x = 0; var y = 0;');
   }
 
   test_surround_allowCascade() async {
