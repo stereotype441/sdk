@@ -445,7 +445,7 @@ void f(a) => a;
 void f(a) => a;
 ''');
     var aRef = findNode.simple('a;');
-    var plan = PassThroughEditPlan(aRef);
+    var plan = SimpleEditPlan.withPrecedence(aRef, Precedence.primary);
     plan.addInnerChanges({
       aRef.offset: [const AddBang()],
       aRef.end: [const AddBang()]
@@ -473,7 +473,9 @@ void f(a) => a;
     await resolveTestUnit('''
 void f(a) => a..b;
 ''');
-    var plan = PassThroughEditPlan(findNode.cascade('a..b'))
+    // TODO(paulberry): I shouldn't have to set endsInCascade here.
+    var plan = SimpleEditPlan.withPrecedence(
+        findNode.cascade('a..b'), Precedence.cascade)
       ..endsInCascade = true;
     checkParensNeeded_cascaded(plan);
   }

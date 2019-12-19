@@ -76,7 +76,7 @@ abstract class EditPlan {
   }
 }
 
-class PassThroughEditPlan extends SimpleEditPlan {
+class PassThroughEditPlan extends _SimpleEditPlan {
   factory PassThroughEditPlan(AstNode node,
       {Iterable<EditPlan> innerPlans = const [],
       bool allowRedundantParens = true}) {
@@ -87,8 +87,7 @@ class PassThroughEditPlan extends SimpleEditPlan {
       assert(_checkParenLogic(innerPlan, parensNeeded, allowRedundantParens));
       if (!parensNeeded && innerPlan is ProvisionalParenEditPlan) {
         var innerInnerPlan = innerPlan.innerPlan;
-        if (innerInnerPlan is SimpleEditPlan &&
-            innerInnerPlan is PassThroughEditPlan) {
+        if (innerInnerPlan is PassThroughEditPlan) {
           // Input source code had redundant parens, so keep them.
           parensNeeded = true;
         }
@@ -107,7 +106,7 @@ class PassThroughEditPlan extends SimpleEditPlan {
 
   PassThroughEditPlan._(AstNode node, Precedence precedence, bool endsInCascade,
       Map<int, List<PreviewInfo>> innerChanges)
-      : super._(node, precedence, endsInCascade, innerChanges);
+      : super(node, precedence, endsInCascade, innerChanges);
 
   static bool _checkParenLogic(
       EditPlan innerPlan, bool parensNeeded, bool allowRedundantParens) {
@@ -171,25 +170,19 @@ class RemoveText extends PreviewInfo {
   String toString() => 'RemoveText($length)';
 }
 
-class SimpleEditPlan extends EditPlan {
-  Precedence _precedence;
-
-  @override
-  bool endsInCascade = false;
-
-  Map<int, List<PreviewInfo>> _innerChanges;
-
+class SimpleEditPlan extends _SimpleEditPlan {
   SimpleEditPlan.forNonExpression(AstNode node)
       : assert(node is! Expression),
-        _precedence = Precedence.primary,
-        super(node);
+        super(node, Precedence.primary, false, null);
 
-  SimpleEditPlan.withPrecedence(AstNode node, this._precedence) : super(node);
+  SimpleEditPlan.withPrecedence(AstNode node, Precedence precedence)
+      : super(node, precedence, false, null);
 
-  SimpleEditPlan._(
-      AstNode node, this._precedence, this.endsInCascade, this._innerChanges)
-      : super(node);
+  void set endsInCascade(bool value) {
+    _endsInCascade = value;
+  }
 
+  /// TODO(paulberry): is this still needed?
   bool get isEmpty => _innerChanges == null;
 
   /// Adds the set of changes in [newChanges] to this edit plan.
@@ -197,28 +190,10 @@ class SimpleEditPlan extends EditPlan {
   /// Caller should not re-use [newChanges] after this call--it (and the data
   /// structures it points to) may be incorporated into this edit plan and later
   /// modified.
+  ///
+  /// TODO(paulberry): can this be made simpler?
   void addInnerChanges(Map<int, List<PreviewInfo>> newChanges) {
     _innerChanges += newChanges;
-  }
-
-  @override
-  Map<int, List<PreviewInfo>> getChanges(bool parens) {
-    if (parens) {
-      return _createAddParenChanges(_innerChanges);
-    } else {
-      return _innerChanges;
-    }
-  }
-
-  @override
-  bool parensNeeded(
-      {@required Precedence threshold,
-      bool associative = false,
-      bool allowCascade = false}) {
-    if (endsInCascade && !allowCascade) return true;
-    if (_precedence < threshold) return true;
-    if (_precedence == threshold && !associative) return true;
-    return false;
   }
 }
 
@@ -459,6 +434,41 @@ class _ProvisionalParenExtractEditPlan extends _NestedEditPlan {
   Map<int, List<PreviewInfo>> getChanges(bool parens) {
     var changes = innerPlan.getChanges(parens);
     return EditPlan._createExtractChanges(innerPlan, sourceNode, changes);
+  }
+}
+
+class _SimpleEditPlan extends EditPlan {
+  Precedence _precedence;
+
+  bool _endsInCascade;
+
+  Map<int, List<PreviewInfo>> _innerChanges;
+
+  _SimpleEditPlan(
+      AstNode node, this._precedence, this._endsInCascade, this._innerChanges)
+      : super(node);
+
+  @override
+  bool get endsInCascade => _endsInCascade;
+
+  @override
+  Map<int, List<PreviewInfo>> getChanges(bool parens) {
+    if (parens) {
+      return _createAddParenChanges(_innerChanges);
+    } else {
+      return _innerChanges;
+    }
+  }
+
+  @override
+  bool parensNeeded(
+      {@required Precedence threshold,
+      bool associative = false,
+      bool allowCascade = false}) {
+    if (endsInCascade && !allowCascade) return true;
+    if (_precedence < threshold) return true;
+    if (_precedence == threshold && !associative) return true;
+    return false;
   }
 }
 
