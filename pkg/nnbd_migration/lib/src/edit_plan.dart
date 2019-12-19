@@ -436,20 +436,17 @@ class _ProvisionalParenExtractEditPlan extends _NestedEditPlan {
   }
 }
 
-/// TODO(paulberry): make stuff final if possible
 class _SimpleEditPlan extends EditPlan {
-  Precedence _precedence;
-
-  bool _endsInCascade;
-
-  Map<int, List<PreviewInfo>> _innerChanges;
-
-  _SimpleEditPlan(
-      AstNode node, this._precedence, this._endsInCascade, this._innerChanges)
-      : super(node);
+  final Precedence _precedence;
 
   @override
-  bool get endsInCascade => _endsInCascade;
+  final bool endsInCascade;
+
+  final Map<int, List<PreviewInfo>> _innerChanges;
+
+  _SimpleEditPlan(
+      AstNode node, this._precedence, this.endsInCascade, this._innerChanges)
+      : super(node);
 
   @override
   Map<int, List<PreviewInfo>> getChanges(bool parens) {
