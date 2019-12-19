@@ -329,6 +329,7 @@ class _ParensNeededFromContextVisitor extends GeneralizingAstVisitor<bool> {
     return false;
   }
 
+  /// TODO(paulberry): test
   @override
   bool visitParenthesizedExpression(ParenthesizedExpression node) {
     assert(identical(_target, node.expression));

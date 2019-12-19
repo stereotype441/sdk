@@ -372,7 +372,11 @@ g(a, b) => -(a*b);
 ''');
   }
 
-  void test_precedence_property_access() async {
+  void test_precedence_prefixedIdentifier() async {
+    await checkPrecedence('f(a) => a.b;');
+  }
+
+  void test_precedence_propertyAccess() async {
     await checkPrecedence('''
 f(a) => a?.b?.c;
 g(a) => (-a)?.b;
