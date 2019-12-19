@@ -45,12 +45,12 @@ abstract class EditPlan {
       bool associative = false,
       bool allowCascade = false});
 
-  bool parensNeededFromContext(AstNode target) {
+  bool parensNeededFromContext() {
     // TODO(paulberry): would it be more general to have a getChangesForContext?
     // That way I could customize provisional behavior to preserve inner parens
     // in `throw (a..b)` when it's placed in a context that doesn't allow
     // cascades.
-    return target.parent.accept(_ParensNeededFromContextVisitor(target, this));
+    return sourceNode.parent.accept(_ParensNeededFromContextVisitor(this));
   }
 
   Map<int, List<PreviewInfo>> _createAddParenChanges(
@@ -125,20 +125,46 @@ class SimpleEditPlan extends EditPlan {
 
   final bool isPassThrough;
 
-  /// TODO(paulberry): combine with forNonExpression
-  SimpleEditPlan.forExpression(Expression node)
-      : _precedence = node.precedence,
+  SimpleEditPlan.forNonExpression(AstNode node)
+      : assert(node is! Expression),
+        _precedence = Precedence.primary,
         isPassThrough = true,
-        endsInCascade = node is CascadeExpression,
         super(node);
 
-  SimpleEditPlan.forNonExpression(AstNode node)
-      : _precedence = Precedence.primary,
-        isPassThrough = true,
-        super(node);
+  factory SimpleEditPlan.passThrough(AstNode node,
+      {Iterable<EditPlan> innerPlans = const [],
+      bool allowRedundantParens = true}) {
+    bool /*?*/ endsInCascade = node is CascadeExpression ? true : null;
+    Map<int, List<PreviewInfo>> changes;
+    for (var innerPlan in innerPlans) {
+      var parensNeeded = innerPlan.parensNeededFromContext();
+      assert(_checkParenLogic(innerPlan, parensNeeded, allowRedundantParens));
+      if (!parensNeeded && innerPlan is ProvisionalParenEditPlan) {
+        var innerInnerPlan = innerPlan.innerPlan;
+        if (innerInnerPlan is SimpleEditPlan && innerInnerPlan.isPassThrough) {
+          // Input source code had redundant parens, so keep them.
+          parensNeeded = true;
+        }
+      }
+      changes += innerPlan.getChanges(parensNeeded);
+      if (endsInCascade == null && innerPlan.sourceNode.end == node.end) {
+        endsInCascade = !parensNeeded && innerPlan.endsInCascade;
+      }
+    }
+    return SimpleEditPlan._(
+        node,
+        node is Expression ? node.precedence : Precedence.primary,
+        endsInCascade ?? _EndsInCascadeVisitor.run(node),
+        changes);
+  }
 
   SimpleEditPlan.withPrecedence(AstNode node, this._precedence)
       : isPassThrough = false,
+        super(node);
+
+  SimpleEditPlan._(
+      AstNode node, this._precedence, this.endsInCascade, this._innerChanges)
+      : isPassThrough = true,
         super(node);
 
   bool get isEmpty => _innerChanges == null;
@@ -149,19 +175,7 @@ class SimpleEditPlan extends EditPlan {
   /// structures it points to) may be incorporated into this edit plan and later
   /// modified.
   void addInnerChanges(Map<int, List<PreviewInfo>> newChanges) {
-    if (newChanges == null) return;
-    if (_innerChanges == null) {
-      _innerChanges = newChanges;
-    } else {
-      for (var entry in newChanges.entries) {
-        var currentValue = _innerChanges[entry.key];
-        if (currentValue == null) {
-          _innerChanges[entry.key] = entry.value;
-        } else {
-          currentValue.addAll(entry.value);
-        }
-      }
-    }
+    _innerChanges += newChanges;
   }
 
   @override
@@ -182,6 +196,54 @@ class SimpleEditPlan extends EditPlan {
     if (_precedence < threshold) return true;
     if (_precedence == threshold && !associative) return true;
     return false;
+  }
+
+  static bool _checkParenLogic(
+      EditPlan innerPlan, bool parensNeeded, bool allowRedundantParens) {
+    if (innerPlan is SimpleEditPlan && innerPlan.isEmpty) {
+      assert(
+          !parensNeeded,
+          "Code prior to fixes didn't need parens here, "
+          "shouldn't need parens now.");
+    }
+    if (innerPlan is ProvisionalParenEditPlan) {
+      var innerInnerPlan = innerPlan.innerPlan;
+      if (innerInnerPlan is SimpleEditPlan &&
+          innerInnerPlan.isEmpty &&
+          !allowRedundantParens) {
+        assert(
+            parensNeeded,
+            "Code prior to fixes had parens here, but we think they aren't "
+            "needed now.");
+      }
+    }
+    return true;
+  }
+}
+
+/// TODO(paulberry): unit test
+class _EndsInCascadeVisitor extends UnifyingAstVisitor<void> {
+  bool endsInCascade = false;
+
+  final int end;
+
+  _EndsInCascadeVisitor(this.end);
+
+  @override
+  void visitCascadeExpression(CascadeExpression node) {
+    endsInCascade = true;
+  }
+
+  @override
+  void visitNode(AstNode node) {
+    if (node.end != end) return;
+    node.visitChildren(this);
+  }
+
+  static bool run(AstNode node) {
+    var visitor = _EndsInCascadeVisitor(node.end);
+    node.accept(visitor);
+    return visitor.endsInCascade;
   }
 }
 
@@ -223,10 +285,11 @@ abstract class _NestedEditPlan extends EditPlan {
 }
 
 class _ParensNeededFromContextVisitor extends GeneralizingAstVisitor<bool> {
-  final AstNode target;
   final EditPlan editPlan;
 
-  _ParensNeededFromContextVisitor(this.target, this.editPlan);
+  _ParensNeededFromContextVisitor(this.editPlan);
+
+  AstNode get target => editPlan.sourceNode;
 
   @override
   bool visitAsExpression(AsExpression node) {
@@ -395,5 +458,25 @@ class _ProvisionalParenExtractEditPlan extends _NestedEditPlan {
   Map<int, List<PreviewInfo>> getChanges(bool parens) {
     var changes = innerPlan.getChanges(parens);
     return EditPlan._createExtractChanges(innerPlan, sourceNode, changes);
+  }
+}
+
+extension on Map<int, List<PreviewInfo>> {
+  Map<int, List<PreviewInfo>> operator +(
+      Map<int, List<PreviewInfo>> newChanges) {
+    if (newChanges == null) return this;
+    if (this == null) {
+      return newChanges;
+    } else {
+      for (var entry in newChanges.entries) {
+        var currentValue = this[entry.key];
+        if (currentValue == null) {
+          this[entry.key] = entry.value;
+        } else {
+          currentValue.addAll(entry.value);
+        }
+      }
+      return this;
+    }
   }
 }

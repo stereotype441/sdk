@@ -38,60 +38,19 @@ class FixPlanner extends UnifyingAstVisitor<EditPlan> {
   FixPlanner._(this._changes, this.allowRedundantParens);
 
   EditPlan visitNode(AstNode node) {
-    var plan = node is Expression
-        ? SimpleEditPlan.forExpression(node)
-        : SimpleEditPlan.forNonExpression(node);
-    for (var entity in node.childEntities) {
-      if (entity is AstNode) {
-        var change = _changes[entity] ?? NoChange();
-        var innerPlan = change.apply(entity, this);
-        bool parensNeeded = innerPlan.parensNeededFromContext(entity);
-        assert(_checkParenLogic(innerPlan, parensNeeded));
-        if (!parensNeeded && innerPlan is ProvisionalParenEditPlan) {
-          var innerInnerPlan = innerPlan.innerPlan;
-          if (innerInnerPlan is SimpleEditPlan &&
-              innerInnerPlan.isPassThrough) {
-            // Input source code had redundant parens, so keep them.
-            parensNeeded = true;
-          }
-        }
-        var innerChanges = innerPlan.getChanges(parensNeeded);
-        plan.addInnerChanges(innerChanges);
-        if (!parensNeeded &&
-            entity.end == plan.sourceNode.end &&
-            innerPlan.endsInCascade) {
-          plan.endsInCascade = true;
-        }
-      }
-    }
-    return plan;
+    return SimpleEditPlan.passThrough(node,
+        innerPlans: <EditPlan>[
+          for (var entity in node.childEntities)
+            if (entity is AstNode)
+              (_changes[entity] ?? NoChange()).apply(entity, this)
+        ],
+        allowRedundantParens: allowRedundantParens);
   }
 
   EditPlan visitParenthesizedExpression(ParenthesizedExpression node) {
     var change = _changes[node.expression] ?? NoChange();
     var innerPlan = change.apply(node.expression, this);
     return ProvisionalParenEditPlan(node, innerPlan);
-  }
-
-  bool _checkParenLogic(EditPlan innerPlan, bool parensNeeded) {
-    if (innerPlan is SimpleEditPlan && innerPlan.isEmpty) {
-      assert(
-          !parensNeeded,
-          "Code prior to fixes didn't need parens here, "
-          "shouldn't need parens now.");
-    }
-    if (innerPlan is ProvisionalParenEditPlan) {
-      var innerInnerPlan = innerPlan.innerPlan;
-      if (innerInnerPlan is SimpleEditPlan &&
-          innerInnerPlan.isEmpty &&
-          !allowRedundantParens) {
-        assert(
-            parensNeeded,
-            "Code prior to fixes had parens here, but we think they aren't "
-            "needed now.");
-      }
-    }
-    return true;
   }
 
   static Map<int, List<PreviewInfo>> run(
