@@ -274,6 +274,7 @@ class EndsInCascadeTest extends AbstractSingleUnitTest {
   }
 }
 
+/// TODO(paulberry): document how these tests operate.
 @reflectiveTest
 class PrecedenceTest extends AbstractSingleUnitTest {
   void checkPrecedence(String content) async {
@@ -290,6 +291,17 @@ g(a, b) => a | b as int;
 
   void test_precedence_assignment() async {
     await checkPrecedence('f(a, b, c) => a = b = c;');
+  }
+
+  void test_precedence_assignment_in_cascade_with_parens() async {
+    await checkPrecedence('f(a, c, e) => a..b = (c..d = e);');
+  }
+
+  void test_precedence_await() async {
+    await checkPrecedence('''
+f(a) async => await -a;
+g(a, b) async => await (a*b);
+    ''');
   }
 
   void test_precedence_binary_equality() async {
@@ -319,6 +331,15 @@ g(a, b, c) => a < (b < c);
     await checkPrecedence('''
 g(a, b, c, d, e, f) => a ?? b ? c = d : e = f;
 h(a, b, c, d, e) => (a ? b : c) ? d : e;
+''');
+  }
+
+  void test_precedence_extension_override() async {
+    await checkPrecedence('''
+extension E on Object {
+  void f() {}
+}
+void g(x) => E(x).f();
 ''');
   }
 

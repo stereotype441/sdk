@@ -102,6 +102,7 @@ abstract class EditPlan {
 
   @visibleForTesting
   bool parensNeededFromContext(AstNode cascadeSearchLimit) {
+    if (sourceNode is! Expression) return false;
     var parent = sourceNode.parent;
     return parent == null
         ? false
@@ -326,7 +327,6 @@ class _ParensNeededFromContextVisitor extends GeneralizingAstVisitor<bool> {
 
   @override
   bool visitMethodInvocation(MethodInvocation node) {
-    assert(identical(_target, node.methodName));
     return _editPlan.parensNeeded(
         threshold: Precedence.postfix, associative: true);
   }
