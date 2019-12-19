@@ -38,6 +38,48 @@ class EditPlanTest extends AbstractSingleUnitTest {
   EditPlan simpleExtract(AstNode inner, AstNode outer) =>
       EditPlan.extract(outer, EditPlan.passThrough(inner));
 
+  /// TODO(paulberry): rename this test
+  test_cascadeSearchLimit() async {
+    // Ok, we have to ask each parent if it represents a cascade section.
+    // If we create a passThrough at node N, then when we create an enclosing
+    // passThrough, the first thing we'll check is N's parent.
+    await analyze('f(a, c) => a..b = c = 1;');
+    var cascade = findNode.cascade('..');
+    var outerAssignment = findNode.assignment('= c');
+    assert(identical(cascade, outerAssignment.parent));
+    var innerAssignment = findNode.assignment('= 1');
+    assert(identical(outerAssignment, innerAssignment.parent));
+    var one = findNode.integerLiteral('1');
+    assert(identical(innerAssignment, one.parent));
+    // The tests below will be based on an inner plan that adds `..isEven` after
+    // the `1`.
+    EditPlan makeInnerPlan() => EditPlan.surround(EditPlan.passThrough(one),
+        suffix: [AddText('..isEven')], endsInCascade: true);
+    {
+      // If we make a plan that passes through `c = 1`, containing a plan that
+      // adds `..isEven` to `1`, then we don't necessarily want to add parens yet,
+      // because we might not keep the cascade section above it.
+      var plan =
+          EditPlan.passThrough(innerAssignment, innerPlans: [makeInnerPlan()]);
+      // `endsInCascade` returns true because we haven't committed to adding
+      // parens, so we need to remember that the presence of `..isEven` may
+      // require parens later.
+      expect(plan.endsInCascade, true);
+      checkPlan(EditPlan.extract(cascade, plan), 'f(a, c) => c = 1..isEven;');
+    }
+    {
+      // If we make a plan that passes through `..b = c = 1`, containing a plan
+      // that adds `..isEven` to `1`, then we do necessarily want to add parens,
+      // because we're committed to keeping the cascade section.
+      var plan =
+          EditPlan.passThrough(outerAssignment, innerPlans: [makeInnerPlan()]);
+      // We can tell that the parens have been finalized because `endsInCascade`
+      // returns false now.
+      expect(plan.endsInCascade, false);
+      checkPlan(plan, 'f(a, c) => a..b = c = (1..isEven);');
+    }
+  }
+
   test_extract_add_parens() async {
     await analyze('f(g) => 1 * g(2, 3 + 4, 5);');
     checkPlan(

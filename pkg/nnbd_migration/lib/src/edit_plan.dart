@@ -89,12 +89,11 @@ abstract class EditPlan {
   bool get endsInCascade;
 
   /// TODO(paulberry): test
-  Map<int, List<PreviewInfo>> finalize({AstNode cascadeSearchLimit}) {
+  Map<int, List<PreviewInfo>> finalize() {
     var parent = sourceNode.parent;
     bool parensNeeded = parent == null
         ? false
-        : parent
-            .accept(_ParensNeededFromContextVisitor(this, cascadeSearchLimit));
+        : parent.accept(_ParensNeededFromContextVisitor(this, null));
     return getChanges(parensNeeded);
   }
 
@@ -107,14 +106,15 @@ abstract class EditPlan {
       bool associative = false,
       bool allowCascade = false});
 
-  /// TODO(paulberry): can we hide/inline?
-  bool parensNeededFromContext() {
+  /// TODO(paulberry): can we hide/inline/eliminate?
+  bool parensNeededFromContext(AstNode cascadeSearchLimit) {
     // TODO(paulberry): would it be more general to have a getChangesForContext?
     // That way I could customize provisional behavior to preserve inner parens
     // in `throw (a..b)` when it's placed in a context that doesn't allow
     // cascades.
     var parent = sourceNode.parent;
-    return parent.accept(_ParensNeededFromContextVisitor(this, parent?.parent));
+    return parent
+        .accept(_ParensNeededFromContextVisitor(this, cascadeSearchLimit));
   }
 
   Map<int, List<PreviewInfo>> _createAddParenChanges(
@@ -231,6 +231,11 @@ abstract class _NestedEditPlan extends EditPlan {
 class _ParensNeededFromContextVisitor extends GeneralizingAstVisitor<bool> {
   final EditPlan _editPlan;
 
+  /// In order to determine whether parens are needed around a cascade, we may
+  /// need to check some nodes in the chain of ancestors to see if any of them
+  /// are cascade sections.  [_cascadeSearchLimit] is the topmost node for which
+  /// we need to do this check, or `null` if we may need to check all ancestors
+  /// in the chain.
   final AstNode _cascadeSearchLimit;
 
   _ParensNeededFromContextVisitor(this._editPlan, this._cascadeSearchLimit);
@@ -414,7 +419,7 @@ class _ParensNeededFromContextVisitor extends GeneralizingAstVisitor<bool> {
         // Node is not the rightmost descendant of parent, so we can stop.
         return false;
       }
-      if (identical(parent, _cascadeSearchLimit)) {
+      if (identical(node, _cascadeSearchLimit)) {
         // We reached the cascade search limit so we don't have to look any
         // further.
         return false;
@@ -431,7 +436,7 @@ class _PassThroughEditPlan extends _SimpleEditPlan {
     bool /*?*/ endsInCascade = node is CascadeExpression ? true : null;
     Map<int, List<PreviewInfo>> changes;
     for (var innerPlan in innerPlans) {
-      var parensNeeded = innerPlan.parensNeededFromContext();
+      var parensNeeded = innerPlan.parensNeededFromContext(node);
       assert(_checkParenLogic(innerPlan, parensNeeded, allowRedundantParens));
       if (!parensNeeded && innerPlan is _ProvisionalParenEditPlan) {
         var innerInnerPlan = innerPlan.innerPlan;
