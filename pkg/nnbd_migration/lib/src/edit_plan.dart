@@ -105,23 +105,18 @@ abstract class EditPlan {
       bool associative = false,
       bool allowCascade = false});
 
-  /// TODO(paulberry): can we hide/inline/eliminate?
-  bool parensNeededFromContext(AstNode cascadeSearchLimit) {
-    // TODO(paulberry): would it be more general to have a getChangesForContext?
-    // That way I could customize provisional behavior to preserve inner parens
-    // in `throw (a..b)` when it's placed in a context that doesn't allow
-    // cascades.
-    var parent = sourceNode.parent;
-    return parent
-        .accept(_ParensNeededFromContextVisitor(this, cascadeSearchLimit));
-  }
-
   Map<int, List<PreviewInfo>> _createAddParenChanges(
       Map<int, List<PreviewInfo>> changes) {
     changes ??= {};
     (changes[sourceNode.offset] ??= []).insert(0, const AddText('('));
     (changes[sourceNode.end] ??= []).add(const AddText(')'));
     return changes;
+  }
+
+  bool _parensNeededFromContext(AstNode cascadeSearchLimit) {
+    var parent = sourceNode.parent;
+    return parent
+        .accept(_ParensNeededFromContextVisitor(this, cascadeSearchLimit));
   }
 
   static Map<int, List<PreviewInfo>> _createExtractChanges(EditPlan innerPlan,
@@ -435,7 +430,7 @@ class _PassThroughEditPlan extends _SimpleEditPlan {
     bool /*?*/ endsInCascade = node is CascadeExpression ? true : null;
     Map<int, List<PreviewInfo>> changes;
     for (var innerPlan in innerPlans) {
-      var parensNeeded = innerPlan.parensNeededFromContext(node);
+      var parensNeeded = innerPlan._parensNeededFromContext(node);
       assert(_checkParenLogic(innerPlan, parensNeeded, allowRedundantParens));
       if (!parensNeeded && innerPlan is _ProvisionalParenEditPlan) {
         var innerInnerPlan = innerPlan.innerPlan;
