@@ -12,14 +12,32 @@ import 'abstract_single_unit.dart';
 
 main() {
   defineReflectiveSuite(() {
-    defineReflectiveTests(ExtractEditPlanWithoutParensTest);
-    defineReflectiveTests(ExtractEditPlanWithParensTest);
-    defineReflectiveTests(ProvisionalParenEditPlanTest);
-    defineReflectiveTests(SimpleEditPlanTest);
+    defineReflectiveTests(EditPlanTest);
   });
 }
 
-class EditPlanTestBase extends AbstractSingleUnitTest {
+@reflectiveTest
+class EditPlanTest extends AbstractSingleUnitTest {
+  String code;
+
+  Future<void> analyze(String code) async {
+    this.code = code;
+    await resolveTestUnit(code);
+  }
+
+  void checkPlan(EditPlan plan, String expected) {
+    expect(plan.finalize().applyTo(code), expected);
+  }
+
+  void test_extract_left() async {
+    await analyze('var x = 1 + 2;');
+    var target = findNode.integerLiteral('1');
+    checkPlan(EditPlan.extract(target.parent, EditPlan.passThrough(target)),
+        'var x = 1;');
+  }
+}
+
+class _EditPlanTestBase extends AbstractSingleUnitTest {
   String code;
 
   Future<void> analyze(String code) async {
@@ -79,7 +97,7 @@ class EditPlanTestBase extends AbstractSingleUnitTest {
 }
 
 @reflectiveTest
-class ExtractEditPlanWithoutParensTest extends EditPlanTestBase {
+class _ExtractEditPlanWithoutParensTest extends _EditPlanTestBase {
   Expression expr;
   Expression outerExpr;
 
@@ -163,7 +181,7 @@ void f(a, b) => a = b..c;
 }
 
 @reflectiveTest
-class ExtractEditPlanWithParensTest extends EditPlanTestBase {
+class _ExtractEditPlanWithParensTest extends _EditPlanTestBase {
   Expression expr;
   ParenthesizedExpression parens;
   Expression outerExpr;
@@ -251,7 +269,7 @@ class ExtractEditPlanWithParensTest extends EditPlanTestBase {
 }
 
 @reflectiveTest
-class ProvisionalParenEditPlanTest extends EditPlanTestBase {
+class _ProvisionalParenEditPlanTest extends _EditPlanTestBase {
   Expression expr;
   ParenthesizedExpression parens;
 
@@ -315,7 +333,7 @@ class ProvisionalParenEditPlanTest extends EditPlanTestBase {
 
 /// TODO(paulberry): reorganize these tests
 @reflectiveTest
-class SimpleEditPlanTest extends EditPlanTestBase {
+class _SimpleEditPlanTest extends _EditPlanTestBase {
   test_forExpression() async {
     // TODO(paulberry): is this test bogus now?
     await analyze('''

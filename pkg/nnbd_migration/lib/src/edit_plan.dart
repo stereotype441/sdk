@@ -82,19 +82,30 @@ abstract class EditPlan {
   @visibleForTesting
   bool get endsInCascade;
 
+  /// TODO(paulberry): test
+  Map<int, List<PreviewInfo>> finalize({AstNode cascadeSearchLimit}) {
+    bool parensNeeded = sourceNode.parent
+        .accept(_ParensNeededFromContextVisitor(this, cascadeSearchLimit));
+    return getChanges(parensNeeded);
+  }
+
+  /// TODO(paulberry): can we hide/inline?
   Map<int, List<PreviewInfo>> getChanges(bool parens);
 
+  /// TODO(paulberry): can we hide/inline?
   bool parensNeeded(
       {@required Precedence threshold,
       bool associative = false,
       bool allowCascade = false});
 
+  /// TODO(paulberry): can we hide/inline?
   bool parensNeededFromContext() {
     // TODO(paulberry): would it be more general to have a getChangesForContext?
     // That way I could customize provisional behavior to preserve inner parens
     // in `throw (a..b)` when it's placed in a context that doesn't allow
     // cascades.
-    return sourceNode.parent.accept(_ParensNeededFromContextVisitor(this));
+    var parent = sourceNode.parent;
+    return parent.accept(_ParensNeededFromContextVisitor(this, parent?.parent));
   }
 
   Map<int, List<PreviewInfo>> _createAddParenChanges(
@@ -209,16 +220,18 @@ abstract class _NestedEditPlan extends EditPlan {
 }
 
 class _ParensNeededFromContextVisitor extends GeneralizingAstVisitor<bool> {
-  final EditPlan editPlan;
+  final EditPlan _editPlan;
 
-  _ParensNeededFromContextVisitor(this.editPlan);
+  final AstNode _cascadeSearchLimit;
 
-  AstNode get target => editPlan.sourceNode;
+  _ParensNeededFromContextVisitor(this._editPlan, this._cascadeSearchLimit);
+
+  AstNode get _target => _editPlan.sourceNode;
 
   @override
   bool visitAsExpression(AsExpression node) {
-    if (identical(target, node.expression)) {
-      return editPlan.parensNeeded(threshold: Precedence.relational);
+    if (identical(_target, node.expression)) {
+      return _editPlan.parensNeeded(threshold: Precedence.relational);
     } else {
       return false;
     }
@@ -226,10 +239,10 @@ class _ParensNeededFromContextVisitor extends GeneralizingAstVisitor<bool> {
 
   @override
   bool visitAssignmentExpression(AssignmentExpression node) {
-    if (identical(target, node.rightHandSide)) {
-      return editPlan.parensNeeded(
+    if (identical(_target, node.rightHandSide)) {
+      return _editPlan.parensNeeded(
           threshold: Precedence.none,
-          allowCascade: node.parent is! CascadeExpression);
+          allowCascade: !_isRightmostDescendantOfCascadeSection(node));
     } else {
       return false;
     }
@@ -237,25 +250,25 @@ class _ParensNeededFromContextVisitor extends GeneralizingAstVisitor<bool> {
 
   @override
   bool visitAwaitExpression(AwaitExpression node) {
-    assert(identical(target, node.expression));
-    return editPlan.parensNeeded(
+    assert(identical(_target, node.expression));
+    return _editPlan.parensNeeded(
         threshold: Precedence.prefix, associative: true);
   }
 
   @override
   bool visitBinaryExpression(BinaryExpression node) {
     var precedence = node.precedence;
-    return editPlan.parensNeeded(
+    return _editPlan.parensNeeded(
         threshold: precedence,
-        associative: identical(target, node.leftOperand) &&
+        associative: identical(_target, node.leftOperand) &&
             precedence != Precedence.relational &&
             precedence != Precedence.equality);
   }
 
   @override
   bool visitCascadeExpression(CascadeExpression node) {
-    if (identical(target, node.target)) {
-      return editPlan.parensNeeded(
+    if (identical(_target, node.target)) {
+      return _editPlan.parensNeeded(
           threshold: Precedence.cascade, associative: true, allowCascade: true);
     } else {
       return false;
@@ -264,31 +277,31 @@ class _ParensNeededFromContextVisitor extends GeneralizingAstVisitor<bool> {
 
   @override
   bool visitConditionalExpression(ConditionalExpression node) {
-    if (identical(target, node.condition)) {
-      return editPlan.parensNeeded(threshold: Precedence.conditional);
+    if (identical(_target, node.condition)) {
+      return _editPlan.parensNeeded(threshold: Precedence.conditional);
     } else {
-      return editPlan.parensNeeded(threshold: Precedence.none);
+      return _editPlan.parensNeeded(threshold: Precedence.none);
     }
   }
 
   @override
   bool visitExtensionOverride(ExtensionOverride node) {
-    assert(identical(target, node.extensionName));
-    return editPlan.parensNeeded(
+    assert(identical(_target, node.extensionName));
+    return _editPlan.parensNeeded(
         threshold: Precedence.postfix, associative: true);
   }
 
   @override
   bool visitFunctionExpressionInvocation(FunctionExpressionInvocation node) {
-    assert(identical(target, node.function));
-    return editPlan.parensNeeded(
+    assert(identical(_target, node.function));
+    return _editPlan.parensNeeded(
         threshold: Precedence.postfix, associative: true);
   }
 
   @override
   bool visitIndexExpression(IndexExpression node) {
-    if (identical(target, node.target)) {
-      return editPlan.parensNeeded(
+    if (identical(_target, node.target)) {
+      return _editPlan.parensNeeded(
           threshold: Precedence.postfix, associative: true);
     } else {
       return false;
@@ -297,15 +310,15 @@ class _ParensNeededFromContextVisitor extends GeneralizingAstVisitor<bool> {
 
   @override
   bool visitInstanceCreationExpression(InstanceCreationExpression node) {
-    assert(identical(target, node.constructorName));
-    return editPlan.parensNeeded(
+    assert(identical(_target, node.constructorName));
+    return _editPlan.parensNeeded(
         threshold: Precedence.postfix, associative: true);
   }
 
   @override
   bool visitIsExpression(IsExpression node) {
-    if (identical(target, node.expression)) {
-      return editPlan.parensNeeded(threshold: Precedence.relational);
+    if (identical(_target, node.expression)) {
+      return _editPlan.parensNeeded(threshold: Precedence.relational);
     } else {
       return false;
     }
@@ -313,8 +326,8 @@ class _ParensNeededFromContextVisitor extends GeneralizingAstVisitor<bool> {
 
   @override
   bool visitMethodInvocation(MethodInvocation node) {
-    assert(identical(target, node.methodName));
-    return editPlan.parensNeeded(
+    assert(identical(_target, node.methodName));
+    return _editPlan.parensNeeded(
         threshold: Precedence.postfix, associative: true);
   }
 
@@ -325,52 +338,80 @@ class _ParensNeededFromContextVisitor extends GeneralizingAstVisitor<bool> {
 
   @override
   bool visitParenthesizedExpression(ParenthesizedExpression node) {
-    assert(identical(target, node.expression));
+    assert(identical(_target, node.expression));
     return false;
   }
 
   @override
   bool visitPostfixExpression(PostfixExpression node) {
-    assert(identical(target, node.operand));
-    return editPlan.parensNeeded(
+    assert(identical(_target, node.operand));
+    return _editPlan.parensNeeded(
         threshold: Precedence.postfix, associative: true);
   }
 
   @override
   bool visitPrefixedIdentifier(PrefixedIdentifier node) {
-    if (identical(target, node.prefix)) {
-      return editPlan.parensNeeded(
+    if (identical(_target, node.prefix)) {
+      return _editPlan.parensNeeded(
           threshold: Precedence.postfix, associative: true);
     } else {
-      assert(identical(target, node.identifier));
-      return editPlan.parensNeeded(
+      assert(identical(_target, node.identifier));
+      return _editPlan.parensNeeded(
           threshold: Precedence.primary, associative: true);
     }
   }
 
   @override
   bool visitPrefixExpression(PrefixExpression node) {
-    assert(identical(target, node.operand));
-    return editPlan.parensNeeded(
+    assert(identical(_target, node.operand));
+    return _editPlan.parensNeeded(
         threshold: Precedence.prefix, associative: true);
   }
 
   @override
   bool visitPropertyAccess(PropertyAccess node) {
-    if (identical(target, node.target)) {
-      return editPlan.parensNeeded(
+    if (identical(_target, node.target)) {
+      return _editPlan.parensNeeded(
           threshold: Precedence.postfix, associative: true);
     } else {
-      assert(identical(target, node.propertyName));
-      return editPlan.parensNeeded(
+      assert(identical(_target, node.propertyName));
+      return _editPlan.parensNeeded(
           threshold: Precedence.primary, associative: true);
     }
   }
 
   @override
   bool visitThrowExpression(ThrowExpression node) {
-    assert(identical(target, node.expression));
-    return false;
+    assert(identical(_target, node.expression));
+    return _editPlan.parensNeeded(
+        threshold: Precedence.assignment,
+        associative: true,
+        allowCascade: !_isRightmostDescendantOfCascadeSection(node));
+  }
+
+  /// TODO(paulberry): document
+  bool _isRightmostDescendantOfCascadeSection(AstNode node) {
+    while (true) {
+      var parent = node.parent;
+      if (parent == null) {
+        // No more ancestors, so we can stop.
+        return false;
+      }
+      if (parent is CascadeExpression && !identical(parent.target, node)) {
+        // Node is a cascade section.
+        return true;
+      }
+      if (parent.end != node.end) {
+        // Node is not the rightmost descendant of parent, so we can stop.
+        return false;
+      }
+      if (identical(parent, _cascadeSearchLimit)) {
+        // We reached the cascade search limit so we don't have to look any
+        // further.
+        return false;
+      }
+      node = parent;
+    }
   }
 }
 
