@@ -84,6 +84,7 @@ abstract class EditPlan {
         suffix == null ? innerPlan.endsInCascade : endsInCascade, innerChanges);
   }
 
+  /// TODO(paulberry): get rid of this
   @visibleForTesting
   bool get endsInCascade;
 
@@ -133,6 +134,7 @@ abstract class PreviewInfo {
   String get replacement;
 }
 
+/// TODO(paulberry): hide
 class ProvisionalParenEditPlan extends _NestedEditPlan {
   /// Creates a new edit plan that consists of executing [innerPlan], and then
   /// possibly removing surrounding parentheses from the source code.
@@ -513,12 +515,16 @@ extension on List<PreviewInfo> {
   }
 }
 
-extension on Map<int, List<PreviewInfo>> {
+extension ChangeMap on Map<int, List<PreviewInfo>> {
   List<SourceEdit> toSourceEdits() {
     return [
-      for (var offset in keys.toList()..sort())
+      for (var offset in keys.toList()..sort((a, b) => b.compareTo(a)))
         this[offset].toSourceEdit(offset)
     ];
+  }
+
+  String applyTo(String code) {
+    return SourceEdit.applySequence(code, toSourceEdits());
   }
 
   Map<int, List<PreviewInfo>> operator +(

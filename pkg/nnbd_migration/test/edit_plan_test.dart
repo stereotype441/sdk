@@ -21,6 +21,13 @@ main() {
 }
 
 class EditPlanTestBase extends AbstractSingleUnitTest {
+  String code;
+
+  Future<void> analyze(String code) async {
+    this.code = code;
+    await resolveTestUnit(code);
+  }
+
   void checkParensNeeded_additive(EditPlan plan) {
     expect(
         plan.parensNeeded(
@@ -78,16 +85,14 @@ class ExtractEditPlanWithoutParensTest extends EditPlanTestBase {
   Expression outerExpr;
 
   Future<EditPlan> makeInnerPlan() async {
-    await resolveTestUnit('''
-void f(a, b, c, d) => a = b + c << d;
-''');
+    await analyze('void f(a, b, c, d) => a = b + c << d;');
     expr = findNode.binary('b + c');
     outerExpr = findNode.assignment('a = b + c << d');
     return EditPlan.passThrough(expr);
   }
 
   Future<EditPlan> makeInnerPlan_cascaded() async {
-    await resolveTestUnit('''
+    await analyze('''
 void f(a, b) => a = b..c;
 ''');
     expr = findNode.cascade('b..c');
@@ -108,69 +113,45 @@ void f(a, b) => a = b..c;
   }
 
   test_getChanges_extractLeft() async {
-    await resolveTestUnit('''
-void f(a, b, c) => a + b << c;
-''');
+    await analyze('void f(a, b, c) => a + b << c;');
     expr = findNode.binary('+');
     outerExpr = findNode.binary('<<');
     var innerPlan = EditPlan.passThrough(expr);
-    expect(makeOuterPlan(innerPlan).getChanges(false), {
-      expr.end: [RemoveText(outerExpr.end - expr.end)]
-    });
+    expect(makeOuterPlan(innerPlan).getChanges(false).applyTo(code),
+        'void f(a, b, c) => a + b;');
   }
 
   test_getChanges_extractRight() async {
-    await resolveTestUnit('''
-void f(a, b, c) => a << b + c;
-''');
+    await analyze('void f(a, b, c) => a << b + c;');
     expr = findNode.binary('+');
     outerExpr = findNode.binary('<<');
     var innerPlan = EditPlan.passThrough(expr);
-    expect(makeOuterPlan(innerPlan).getChanges(false), {
-      outerExpr.offset: [RemoveText(expr.offset - outerExpr.offset)]
-    });
+    expect(makeOuterPlan(innerPlan).getChanges(false).applyTo(code),
+        'void f(a, b, c) => b + c;');
   }
 
   test_getChanges_innerChanges() async {
     expect(
         makeOuterPlan(EditPlan.surround(await makeInnerPlan(),
-            suffix: [const AddBang()])).getChanges(false),
-        {
-          outerExpr.offset: [RemoveText(expr.offset - outerExpr.offset)],
-          expr.end: [const AddBang(), RemoveText(outerExpr.end - expr.end)]
-        });
+            suffix: [const AddText(' + d')])).getChanges(false).applyTo(code),
+        'void f(a, b, c, d) => b + c + d;');
   }
 
   test_getChanges_innerChanges_add_parens() async {
     expect(
         makeOuterPlan(EditPlan.surround(await makeInnerPlan(),
-            suffix: [const AddBang()])).getChanges(true),
-        {
-          outerExpr.offset: [
-            const AddOpenParen(),
-            RemoveText(expr.offset - outerExpr.offset)
-          ],
-          expr.end: [const AddBang(), RemoveText(outerExpr.end - expr.end)],
-          outerExpr.end: [const AddCloseParen()]
-        });
+            suffix: [const AddText(' + d')])).getChanges(true).applyTo(code),
+        'void f(a, b, c, d) => (b + c + d);');
   }
 
   test_getChanges_no_innerChanges() async {
-    expect(makeOuterPlan(await makeInnerPlan()).getChanges(false), {
-      outerExpr.offset: [RemoveText(expr.offset - outerExpr.offset)],
-      expr.end: [RemoveText(outerExpr.end - expr.end)]
-    });
+    expect(makeOuterPlan(await makeInnerPlan()).getChanges(false).applyTo(code),
+        'void f(a, b, c, d) => b + c;');
   }
 
   test_getChanges_no_innerChanges_add_parens() async {
-    expect(makeOuterPlan(await makeInnerPlan()).getChanges(true), {
-      outerExpr.offset: [
-        const AddOpenParen(),
-        RemoveText(expr.offset - outerExpr.offset)
-      ],
-      expr.end: [RemoveText(outerExpr.end - expr.end)],
-      outerExpr.end: [const AddCloseParen()]
-    });
+    expect(makeOuterPlan(await makeInnerPlan()).getChanges(true).applyTo(code),
+        'void f(a, b, c, d) => (b + c);');
   }
 
   test_parensNeeded() async {
@@ -189,9 +170,7 @@ class ExtractEditPlanWithParensTest extends EditPlanTestBase {
   Expression outerExpr;
 
   Future<EditPlan> makeInnerPlan() async {
-    await resolveTestUnit('''
-void f(a, b, c, d) => a = (b + c) * d;
-''');
+    await analyze('void f(a, b, c, d) => a = (b + c) * d;');
     expr = findNode.binary('b + c');
     parens = findNode.parenthesized('(b + c)');
     outerExpr = findNode.assignment('a = (b + c) * d');
@@ -199,9 +178,7 @@ void f(a, b, c, d) => a = (b + c) * d;
   }
 
   Future<EditPlan> makeInnerPlan_cascaded() async {
-    await resolveTestUnit('''
-void f(a, b, d) => a = (b..c) * d;
-''');
+    await analyze('void f(a, b, d) => a = (b..c) * d;');
     expr = findNode.cascade('b..c');
     parens = findNode.parenthesized('(b..c)');
     outerExpr = findNode.assignment('a = (b..c) * d');
@@ -222,68 +199,47 @@ void f(a, b, d) => a = (b..c) * d;
   }
 
   test_getChanges_extractLeft() async {
-    await resolveTestUnit('''
-void f(a, b, c) => (a + b) * c;
-''');
+    await analyze('void f(a, b, c) => (a + b) * c;');
     expr = findNode.binary('+');
     parens = findNode.parenthesized('+');
     outerExpr = findNode.binary('*');
     var innerPlan = EditPlan.passThrough(expr);
-    expect(makeOuterPlan(innerPlan).getChanges(true), {
-      parens.end: [RemoveText(outerExpr.end - parens.end)]
-    });
+    expect(makeOuterPlan(innerPlan).getChanges(true).applyTo(code),
+        'void f(a, b, c) => (a + b);');
   }
 
   test_getChanges_extractRight() async {
-    await resolveTestUnit('''
-void f(a, b, c) => a * (b + c);
-''');
+    await analyze('void f(a, b, c) => a * (b + c);');
     expr = findNode.binary('+');
     parens = findNode.parenthesized('+');
     outerExpr = findNode.binary('*');
     var innerPlan = EditPlan.passThrough(expr);
-    expect(makeOuterPlan(innerPlan).getChanges(true), {
-      outerExpr.offset: [RemoveText(parens.offset - outerExpr.offset)]
-    });
+    expect(makeOuterPlan(innerPlan).getChanges(true).applyTo(code),
+        'void f(a, b, c) => (b + c);');
   }
 
   test_getChanges_innerChanges() async {
     expect(
         makeOuterPlan(EditPlan.surround(await makeInnerPlan(),
-            suffix: [const AddBang()])).getChanges(true),
-        {
-          outerExpr.offset: [RemoveText(parens.offset - outerExpr.offset)],
-          expr.end: [const AddBang()],
-          parens.end: [RemoveText(outerExpr.end - parens.end)]
-        });
+            suffix: [const AddText(' + d')])).getChanges(true).applyTo(code),
+        'void f(a, b, c, d) => (b + c + d);');
   }
 
   test_getChanges_innerChanges_strip_parens() async {
     expect(
         makeOuterPlan(EditPlan.surround(await makeInnerPlan(),
-            suffix: [const AddBang()])).getChanges(false),
-        {
-          outerExpr.offset: [RemoveText(parens.offset - outerExpr.offset)],
-          parens.offset: [RemoveText(1)],
-          expr.end: [const AddBang(), RemoveText(1)],
-          parens.end: [RemoveText(outerExpr.end - parens.end)]
-        });
+            suffix: [const AddText(' + d')])).getChanges(false).applyTo(code),
+        'void f(a, b, c, d) => b + c + d;');
   }
 
   test_getChanges_no_innerChanges() async {
-    expect(makeOuterPlan(await makeInnerPlan()).getChanges(true), {
-      outerExpr.offset: [RemoveText(parens.offset - outerExpr.offset)],
-      parens.end: [RemoveText(outerExpr.end - parens.end)]
-    });
+    expect(makeOuterPlan(await makeInnerPlan()).getChanges(true).applyTo(code),
+        'void f(a, b, c, d) => (b + c);');
   }
 
   test_getChanges_no_innerChanges_strip_parens() async {
-    expect(makeOuterPlan(await makeInnerPlan()).getChanges(false), {
-      outerExpr.offset: [RemoveText(parens.offset - outerExpr.offset)],
-      parens.offset: [RemoveText(1)],
-      expr.end: [RemoveText(1)],
-      parens.end: [RemoveText(outerExpr.end - parens.end)]
-    });
+    expect(makeOuterPlan(await makeInnerPlan()).getChanges(false).applyTo(code),
+        'void f(a, b, c, d) => b + c;');
   }
 
   test_parensNeeded() async {
@@ -301,18 +257,14 @@ class ProvisionalParenEditPlanTest extends EditPlanTestBase {
   ParenthesizedExpression parens;
 
   Future<EditPlan> makeInnerPlan() async {
-    await resolveTestUnit('''
-void f(a, b) => (a + b);
-''');
+    await analyze('void f(a, b) => (a + b);');
     expr = findNode.binary('a + b');
     parens = findNode.parenthesized('a + b');
     return EditPlan.passThrough(expr);
   }
 
   Future<EditPlan> makeInnerPlan_cascaded() async {
-    await resolveTestUnit('''
-void f(a) => (a..b);
-''');
+    await analyze('void f(a) => (a..b);');
     expr = findNode.cascade('a..b');
     parens = findNode.parenthesized('a..b');
     return EditPlan.passThrough(expr);
@@ -333,20 +285,15 @@ void f(a) => (a..b);
   test_getChanges_innerChanges() async {
     expect(
         makeOuterPlan(EditPlan.surround(await makeInnerPlan(),
-            suffix: [const AddBang()])).getChanges(true),
-        {
-          expr.end: [const AddBang()]
-        });
+            suffix: [const AddText(' + c')])).getChanges(true).applyTo(code),
+        'void f(a, b) => (a + b + c);');
   }
 
   test_getChanges_innerChanges_strip_parens() async {
     expect(
         makeOuterPlan(EditPlan.surround(await makeInnerPlan(),
-            suffix: [const AddBang()])).getChanges(false),
-        {
-          parens.offset: [const RemoveText(1)],
-          expr.end: [const AddBang(), const RemoveText(1)]
-        });
+            suffix: [const AddText(' + c')])).getChanges(false).applyTo(code),
+        'void f(a, b) => a + b + c;');
   }
 
   test_getChanges_none() async {
@@ -354,10 +301,8 @@ void f(a) => (a..b);
   }
 
   test_getChanges_none_strip_parens() async {
-    expect(makeOuterPlan(await makeInnerPlan()).getChanges(false), {
-      parens.offset: [const RemoveText(1)],
-      expr.end: [const RemoveText(1)]
-    });
+    expect(makeOuterPlan(await makeInnerPlan()).getChanges(false).applyTo(code),
+        'void f(a, b) => a + b;');
   }
 
   test_parensNeeded() async {
@@ -374,7 +319,7 @@ void f(a) => (a..b);
 class SimpleEditPlanTest extends EditPlanTestBase {
   test_forExpression() async {
     // TODO(paulberry): is this test bogus now?
-    await resolveTestUnit('''
+    await analyze('''
 void f(a, b) => a + b;
 ''');
     var plan = EditPlan.passThrough(findNode.binary('a + b'));
@@ -382,33 +327,23 @@ void f(a, b) => a + b;
   }
 
   test_getChanges_addParens_no_other_changes() async {
-    await resolveTestUnit('''
-void f(a) => a;
-''');
+    await analyze('void f(a) => a;');
     var aRef = findNode.simple('a;');
     var plan = EditPlan.passThrough(aRef);
-    expect(plan.getChanges(true), {
-      aRef.offset: [const AddOpenParen()],
-      aRef.end: [const AddCloseParen()]
-    });
+    expect(plan.getChanges(true).applyTo(code), 'void f(a) => (a);');
   }
 
   test_getChanges_addParens_other_changes() async {
-    await resolveTestUnit('''
-void f(a) => a;
-''');
+    await analyze('void f(a) => a;');
     var aRef = findNode.simple('a;');
     var innerPlan = EditPlan.passThrough(aRef);
     var plan = EditPlan.surround(innerPlan,
-        prefix: [const AddBang()], suffix: [const AddBang()]);
-    expect(plan.getChanges(true), {
-      aRef.offset: [const AddOpenParen(), const AddBang()],
-      aRef.end: [const AddBang(), const AddCloseParen()]
-    });
+        prefix: [const AddText('0 + ')], suffix: [const AddText(' + 0')]);
+    expect(plan.getChanges(true).applyTo(code), 'void f(a) => (0 + a + 0);');
   }
 
   test_parensNeeded_allowCascade() async {
-    await resolveTestUnit('''
+    await analyze('''
 void f(a) => a..b;
 ''');
     var plan = EditPlan.passThrough(findNode.cascade('a..b'));
