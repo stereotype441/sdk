@@ -33,7 +33,7 @@ class FixPlanner extends UnifyingAstVisitor<EditPlan> {
   EditPlan visitParenthesizedExpression(ParenthesizedExpression node) {
     var change = _changes[node.expression] ?? NoChange();
     var innerPlan = change.apply(node.expression, this);
-    return ProvisionalParenEditPlan(node, innerPlan);
+    return EditPlan.provisionalParens(node, innerPlan);
   }
 
   static Map<int, List<PreviewInfo>> run(

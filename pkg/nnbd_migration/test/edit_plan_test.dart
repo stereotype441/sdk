@@ -186,7 +186,7 @@ class ExtractEditPlanWithParensTest extends EditPlanTestBase {
 
   EditPlan makeOuterPlan(EditPlan innerPlan) {
     return EditPlan.extract(
-        outerExpr, ProvisionalParenEditPlan(parens, innerPlan));
+        outerExpr, EditPlan.provisionalParens(parens, innerPlan));
   }
 
   test_endsInCascade_false() async {
@@ -269,8 +269,8 @@ class ProvisionalParenEditPlanTest extends EditPlanTestBase {
     return EditPlan.passThrough(expr);
   }
 
-  ProvisionalParenEditPlan makeOuterPlan(EditPlan innerPlan) {
-    return ProvisionalParenEditPlan(parens, innerPlan);
+  EditPlan makeOuterPlan(EditPlan innerPlan) {
+    return EditPlan.provisionalParens(parens, innerPlan);
   }
 
   test_endsInCascade_false() async {

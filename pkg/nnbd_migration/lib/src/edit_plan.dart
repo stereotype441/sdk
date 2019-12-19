@@ -42,7 +42,7 @@ abstract class EditPlan {
   /// structures it points to) may be incorporated into this edit plan and later
   /// modified.
   factory EditPlan.extract(AstNode sourceNode, EditPlan innerPlan) {
-    if (innerPlan is ProvisionalParenEditPlan) {
+    if (innerPlan is _ProvisionalParenEditPlan) {
       return _ProvisionalParenExtractEditPlan(sourceNode, innerPlan);
     } else {
       return _ExtractEditPlan(sourceNode, innerPlan);
@@ -52,6 +52,10 @@ abstract class EditPlan {
   factory EditPlan.passThrough(AstNode node,
       {Iterable<EditPlan> innerPlans,
       bool allowRedundantParens}) = _PassThroughEditPlan;
+
+  factory EditPlan.provisionalParens(
+          ParenthesizedExpression node, EditPlan innerPlan) =
+      _ProvisionalParenEditPlan;
 
   factory EditPlan.surround(EditPlan innerPlan,
       {List<PreviewInfo> prefix,
@@ -122,29 +126,6 @@ abstract class PreviewInfo {
   int get length;
 
   String get replacement;
-}
-
-/// TODO(paulberry): hide
-class ProvisionalParenEditPlan extends _NestedEditPlan {
-  /// Creates a new edit plan that consists of executing [innerPlan], and then
-  /// possibly removing surrounding parentheses from the source code.
-  ///
-  /// Caller should not re-use [innerPlan] after this call--it (and the data
-  /// structures it points to) may be incorporated into this edit plan and later
-  /// modified.
-  ProvisionalParenEditPlan(ParenthesizedExpression node, EditPlan innerPlan)
-      : super(node, innerPlan);
-
-  @override
-  Map<int, List<PreviewInfo>> getChanges(bool parens) {
-    var changes = innerPlan.getChanges(false);
-    if (!parens) {
-      changes ??= {};
-      (changes[sourceNode.offset] ??= []).add(const RemoveText(1));
-      (changes[sourceNode.end - 1] ??= []).add(const RemoveText(1));
-    }
-    return changes;
-  }
 }
 
 class RemoveText extends PreviewInfo {
@@ -402,7 +383,7 @@ class _PassThroughEditPlan extends _SimpleEditPlan {
     for (var innerPlan in innerPlans) {
       var parensNeeded = innerPlan.parensNeededFromContext();
       assert(_checkParenLogic(innerPlan, parensNeeded, allowRedundantParens));
-      if (!parensNeeded && innerPlan is ProvisionalParenEditPlan) {
+      if (!parensNeeded && innerPlan is _ProvisionalParenEditPlan) {
         var innerInnerPlan = innerPlan.innerPlan;
         if (innerInnerPlan is _PassThroughEditPlan) {
           // Input source code had redundant parens, so keep them.
@@ -434,7 +415,7 @@ class _PassThroughEditPlan extends _SimpleEditPlan {
           "Code prior to fixes didn't need parens here, "
           "shouldn't need parens now.");
     }
-    if (innerPlan is ProvisionalParenEditPlan) {
+    if (innerPlan is _ProvisionalParenEditPlan) {
       var innerInnerPlan = innerPlan.innerPlan;
       if (innerInnerPlan is _SimpleEditPlan &&
           innerInnerPlan._innerChanges == null &&
@@ -446,6 +427,28 @@ class _PassThroughEditPlan extends _SimpleEditPlan {
       }
     }
     return true;
+  }
+}
+
+class _ProvisionalParenEditPlan extends _NestedEditPlan {
+  /// Creates a new edit plan that consists of executing [innerPlan], and then
+  /// possibly removing surrounding parentheses from the source code.
+  ///
+  /// Caller should not re-use [innerPlan] after this call--it (and the data
+  /// structures it points to) may be incorporated into this edit plan and later
+  /// modified.
+  _ProvisionalParenEditPlan(ParenthesizedExpression node, EditPlan innerPlan)
+      : super(node, innerPlan);
+
+  @override
+  Map<int, List<PreviewInfo>> getChanges(bool parens) {
+    var changes = innerPlan.getChanges(false);
+    if (!parens) {
+      changes ??= {};
+      (changes[sourceNode.offset] ??= []).add(const RemoveText(1));
+      (changes[sourceNode.end - 1] ??= []).add(const RemoveText(1));
+    }
+    return changes;
   }
 }
 
