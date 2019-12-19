@@ -4,6 +4,7 @@
 
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/precedence.dart';
+import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:meta/meta.dart';
 
 class AddCloseParen extends PreviewInfo {
@@ -43,6 +44,14 @@ abstract class EditPlan {
       {@required Precedence threshold,
       bool associative = false,
       bool allowCascade = false});
+
+  bool parensNeededFromContext(AstNode target) {
+    // TODO(paulberry): would it be more general to have a getChangesForContext?
+    // That way I could customize provisional behavior to preserve inner parens
+    // in `throw (a..b)` when it's placed in a context that doesn't allow
+    // cascades.
+    return target.parent.accept(_ParensNeededFromContextVisitor(target, this));
+  }
 
   Map<int, List<PreviewInfo>> _createAddParenChanges(
       Map<int, List<PreviewInfo>> changes) {
@@ -116,9 +125,11 @@ class SimpleEditPlan extends EditPlan {
 
   final bool isPassThrough;
 
+  /// TODO(paulberry): combine with forNonExpression
   SimpleEditPlan.forExpression(Expression node)
       : _precedence = node.precedence,
         isPassThrough = true,
+        endsInCascade = node is CascadeExpression,
         super(node);
 
   SimpleEditPlan.forNonExpression(AstNode node)
@@ -209,6 +220,171 @@ abstract class _NestedEditPlan extends EditPlan {
           threshold: threshold,
           associative: associative,
           allowCascade: allowCascade);
+}
+
+class _ParensNeededFromContextVisitor extends GeneralizingAstVisitor<bool> {
+  final AstNode target;
+  final EditPlan editPlan;
+
+  _ParensNeededFromContextVisitor(this.target, this.editPlan);
+
+  @override
+  bool visitAsExpression(AsExpression node) {
+    if (identical(target, node.expression)) {
+      return editPlan.parensNeeded(threshold: Precedence.relational);
+    } else {
+      return false;
+    }
+  }
+
+  @override
+  bool visitAssignmentExpression(AssignmentExpression node) {
+    if (identical(target, node.rightHandSide)) {
+      return editPlan.parensNeeded(
+          threshold: Precedence.none,
+          allowCascade: node.parent is! CascadeExpression);
+    } else {
+      return false;
+    }
+  }
+
+  @override
+  bool visitAwaitExpression(AwaitExpression node) {
+    assert(identical(target, node.expression));
+    return editPlan.parensNeeded(
+        threshold: Precedence.prefix, associative: true);
+  }
+
+  @override
+  bool visitBinaryExpression(BinaryExpression node) {
+    var precedence = node.precedence;
+    return editPlan.parensNeeded(
+        threshold: precedence,
+        associative: identical(target, node.leftOperand) &&
+            precedence != Precedence.relational &&
+            precedence != Precedence.equality);
+  }
+
+  @override
+  bool visitCascadeExpression(CascadeExpression node) {
+    if (identical(target, node.target)) {
+      return editPlan.parensNeeded(
+          threshold: Precedence.cascade, associative: true, allowCascade: true);
+    } else {
+      return false;
+    }
+  }
+
+  @override
+  bool visitConditionalExpression(ConditionalExpression node) {
+    if (identical(target, node.condition)) {
+      return editPlan.parensNeeded(threshold: Precedence.conditional);
+    } else {
+      return editPlan.parensNeeded(threshold: Precedence.none);
+    }
+  }
+
+  @override
+  bool visitExtensionOverride(ExtensionOverride node) {
+    assert(identical(target, node.extensionName));
+    return editPlan.parensNeeded(
+        threshold: Precedence.postfix, associative: true);
+  }
+
+  @override
+  bool visitFunctionExpressionInvocation(FunctionExpressionInvocation node) {
+    assert(identical(target, node.function));
+    return editPlan.parensNeeded(
+        threshold: Precedence.postfix, associative: true);
+  }
+
+  @override
+  bool visitIndexExpression(IndexExpression node) {
+    if (identical(target, node.target)) {
+      return editPlan.parensNeeded(
+          threshold: Precedence.postfix, associative: true);
+    } else {
+      return false;
+    }
+  }
+
+  @override
+  bool visitInstanceCreationExpression(InstanceCreationExpression node) {
+    assert(identical(target, node.constructorName));
+    return editPlan.parensNeeded(
+        threshold: Precedence.postfix, associative: true);
+  }
+
+  @override
+  bool visitIsExpression(IsExpression node) {
+    if (identical(target, node.expression)) {
+      return editPlan.parensNeeded(threshold: Precedence.relational);
+    } else {
+      return false;
+    }
+  }
+
+  @override
+  bool visitMethodInvocation(MethodInvocation node) {
+    assert(identical(target, node.methodName));
+    return editPlan.parensNeeded(
+        threshold: Precedence.postfix, associative: true);
+  }
+
+  @override
+  bool visitNode(AstNode node) {
+    return false;
+  }
+
+  @override
+  bool visitParenthesizedExpression(ParenthesizedExpression node) {
+    assert(identical(target, node.expression));
+    return false;
+  }
+
+  @override
+  bool visitPostfixExpression(PostfixExpression node) {
+    assert(identical(target, node.operand));
+    return editPlan.parensNeeded(
+        threshold: Precedence.postfix, associative: true);
+  }
+
+  @override
+  bool visitPrefixedIdentifier(PrefixedIdentifier node) {
+    if (identical(target, node.prefix)) {
+      return editPlan.parensNeeded(
+          threshold: Precedence.postfix, associative: true);
+    } else {
+      assert(identical(target, node.identifier));
+      return editPlan.parensNeeded(
+          threshold: Precedence.primary, associative: true);
+    }
+  }
+
+  @override
+  bool visitPrefixExpression(PrefixExpression node) {
+    assert(identical(target, node.operand));
+    return editPlan.parensNeeded(
+        threshold: Precedence.prefix, associative: true);
+  }
+
+  @override
+  bool visitPropertyAccess(PropertyAccess node) {
+    if (identical(target, node.target)) {
+      return editPlan.parensNeeded(
+          threshold: Precedence.postfix, associative: true);
+    } else {
+      assert(identical(target, node.propertyName));
+      return editPlan.parensNeeded(
+          threshold: Precedence.primary, associative: true);
+    }
+  }
+
+  @override
+  bool visitThrowExpression(ThrowExpression node) {
+    assert(identical(target, node.expression));
+    return false;
+  }
 }
 
 class _ProvisionalParenExtractEditPlan extends _NestedEditPlan {

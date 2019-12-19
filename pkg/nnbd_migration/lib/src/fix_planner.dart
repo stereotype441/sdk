@@ -30,74 +30,17 @@ abstract class Change {
   EditPlan apply(AstNode node, FixPlanner planner);
 }
 
-class FixPlanner extends GeneralizingAstVisitor<EditPlan> {
+class FixPlanner extends UnifyingAstVisitor<EditPlan> {
   final Map<AstNode, Change> _changes;
 
   final bool allowRedundantParens;
 
   FixPlanner._(this._changes, this.allowRedundantParens);
 
-  EditPlan visitAsExpression(AsExpression node) {
-    return SimpleEditPlan.forExpression(node)
-      ..addInnerPlans(this, node.expression, threshold: node.precedence)
-      ..addInnerPlans(this, node.type);
-  }
-
-  EditPlan visitAssignmentExpression(AssignmentExpression node) {
-    return SimpleEditPlan.forExpression(node)
-      ..addInnerPlans(this, node.leftHandSide)
-      ..addInnerPlans(this, node.rightHandSide,
-          allowCascade: node.parent is! CascadeExpression);
-  }
-
-  EditPlan visitBinaryExpression(BinaryExpression node) {
-    var precedence = node.precedence;
-    return SimpleEditPlan.forExpression(node)
-      ..addInnerPlans(this, node.leftOperand,
-          threshold: precedence,
-          associative: precedence != Precedence.relational &&
-              precedence != Precedence.equality)
-      ..addInnerPlans(this, node.rightOperand, threshold: precedence);
-  }
-
-  EditPlan visitCascadeExpression(CascadeExpression node) {
-    var plan = SimpleEditPlan.forExpression(node)
-      ..addInnerPlans(this, node.target,
-          threshold: Precedence.cascade, associative: true)
-      ..endsInCascade = true;
-    for (var cascadeSection in node.cascadeSections) {
-      plan.addInnerPlans(this, cascadeSection);
-    }
-    return plan;
-  }
-
-  EditPlan visitConditionalExpression(ConditionalExpression node) {
-    return SimpleEditPlan.forExpression(node)
-      ..addInnerPlans(this, node.condition, threshold: Precedence.conditional)
-      ..addInnerPlans(this, node.thenExpression, allowCascade: false)
-      ..addInnerPlans(this, node.elseExpression, allowCascade: false);
-  }
-
-  EditPlan visitExpression(Expression node) {
-    throw UnimplementedError('TODO(paulberry): ${node.runtimeType}');
-  }
-
-  EditPlan visitFunctionExpression(FunctionExpression node) {
-    return SimpleEditPlan.forExpression(node)
-      ..addInnerPlans(this, node.typeParameters)
-      ..addInnerPlans(this, node.parameters)
-      ..addInnerPlans(this, node.body);
-  }
-
-  EditPlan visitIndexExpression(IndexExpression node) {
-    return SimpleEditPlan.forExpression(node)
-      ..addInnerPlans(this, node.target,
-          threshold: Precedence.postfix, associative: true)
-      ..addInnerPlans(this, node.index);
-  }
-
   EditPlan visitNode(AstNode node) {
-    var plan = SimpleEditPlan.forNonExpression(node);
+    var plan = node is Expression
+        ? SimpleEditPlan.forExpression(node)
+        : SimpleEditPlan.forNonExpression(node);
     for (var entity in node.childEntities) {
       if (entity is AstNode) {
         plan.addInnerPlans(this, entity);
@@ -110,33 +53,6 @@ class FixPlanner extends GeneralizingAstVisitor<EditPlan> {
     var change = _changes[node.expression] ?? NoChange();
     var innerPlan = change.apply(node.expression, this);
     return ProvisionalParenEditPlan(node, innerPlan);
-  }
-
-  EditPlan visitPostfixExpression(PostfixExpression node) {
-    return SimpleEditPlan.forExpression(node)
-      ..addInnerPlans(this, node.operand,
-          threshold: Precedence.postfix, associative: true);
-  }
-
-  EditPlan visitPrefixExpression(PrefixExpression node) {
-    return SimpleEditPlan.forExpression(node)
-      ..addInnerPlans(this, node.operand,
-          threshold: Precedence.prefix, associative: true);
-  }
-
-  EditPlan visitPropertyAccess(PropertyAccess node) {
-    return SimpleEditPlan.forExpression(node)
-      ..addInnerPlans(this, node.target,
-          threshold: Precedence.postfix, associative: true);
-  }
-
-  EditPlan visitSimpleIdentifier(Expression node) {
-    return SimpleEditPlan.forExpression(node);
-  }
-
-  EditPlan visitThrowExpression(ThrowExpression node) {
-    return SimpleEditPlan.forExpression(node)
-      ..addInnerPlans(this, node.expression);
   }
 
   static Map<int, List<PreviewInfo>> run(
@@ -229,13 +145,11 @@ extension on SimpleEditPlan {
       {Precedence threshold = Precedence.none,
       bool associative = false,
       bool allowCascade = true}) {
+    // TODO(paulberry): inline this method
     if (node == null) return;
     var change = planner._changes[node] ?? NoChange();
     var innerPlan = change.apply(node, planner);
-    bool parensNeeded = innerPlan.parensNeeded(
-        threshold: threshold,
-        associative: associative,
-        allowCascade: allowCascade);
+    bool parensNeeded = innerPlan.parensNeededFromContext(node);
     assert(_checkParenLogic(planner, innerPlan, parensNeeded));
     if (!parensNeeded && innerPlan is ProvisionalParenEditPlan) {
       var innerInnerPlan = innerPlan.innerPlan;
