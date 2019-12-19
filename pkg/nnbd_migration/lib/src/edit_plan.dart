@@ -174,6 +174,8 @@ class _EndsInCascadeVisitor extends UnifyingAstVisitor<void> {
 class _ExtractEditPlan extends _NestedEditPlan {
   final Map<int, List<PreviewInfo>> _innerChanges;
 
+  bool _finalized = false;
+
   _ExtractEditPlan(AstNode sourceNode, EditPlan innerPlan)
       : _innerChanges = EditPlan._createExtractChanges(
             innerPlan, sourceNode, innerPlan.getChanges(false)),
@@ -181,11 +183,9 @@ class _ExtractEditPlan extends _NestedEditPlan {
 
   @override
   Map<int, List<PreviewInfo>> getChanges(bool parens) {
-    if (parens) {
-      return _createAddParenChanges(_innerChanges);
-    } else {
-      return _innerChanges;
-    }
+    assert(!_finalized);
+    _finalized = true;
+    return parens ? _createAddParenChanges(_innerChanges) : _innerChanges;
   }
 }
 
@@ -471,17 +471,17 @@ class _SimpleEditPlan extends EditPlan {
 
   final Map<int, List<PreviewInfo>> _innerChanges;
 
+  bool _finalized = false;
+
   _SimpleEditPlan(
       AstNode node, this._precedence, this.endsInCascade, this._innerChanges)
       : super(node);
 
   @override
   Map<int, List<PreviewInfo>> getChanges(bool parens) {
-    if (parens) {
-      return _createAddParenChanges(_innerChanges);
-    } else {
-      return _innerChanges;
-    }
+    assert(!_finalized);
+    _finalized = true;
+    return parens ? _createAddParenChanges(_innerChanges) : _innerChanges;
   }
 
   @override
