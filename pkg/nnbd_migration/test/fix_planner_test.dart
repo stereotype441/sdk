@@ -12,89 +12,8 @@ import 'abstract_single_unit.dart';
 
 main() {
   defineReflectiveSuite(() {
-    defineReflectiveTests(FixPlannerPrecedenceTest);
     defineReflectiveTests(FixPlannerTest);
   });
-}
-
-@reflectiveTest
-class FixPlannerPrecedenceTest extends FixPlannerTestBase {
-  void test_precedence_as() async {
-    await _checkPrecedence('''
-f(a) => (a as num) as int;
-g(a, b) => a | b as int;
-''');
-  }
-
-  void test_precedence_assignment() async {
-    await _checkPrecedence('f(a, b, c) => a = b = c;');
-  }
-
-  void test_precedence_binary_equality() async {
-    await _checkPrecedence('''
-f(a, b, c) => (a == b) == c;
-g(a, b, c) => a == (b == c);
-''');
-  }
-
-  void test_precedence_binary_left_associative() async {
-    // Associativity logic is the same for all operators except relational and
-    // equality, so we just test `+` as a stand-in for all the others.
-    await _checkPrecedence('''
-f(a, b, c) => a + b + c;
-g(a, b, c) => a + (b + c);
-''');
-  }
-
-  void test_precedence_binary_relational() async {
-    await _checkPrecedence('''
-f(a, b, c) => (a < b) < c;
-g(a, b, c) => a < (b < c);
-''');
-  }
-
-  void test_precedence_conditional() async {
-    await _checkPrecedence('''
-g(a, b, c, d, e, f) => a ?? b ? c = d : e = f;
-h(a, b, c, d, e) => (a ? b : c) ? d : e;
-''');
-  }
-
-  void test_precedence_postfix_and_index() async {
-    await _checkPrecedence('''
-f(a, b, c) => a[b][c];
-g(a, b) => a[b]++;
-h(a, b) => (-a)[b];
-''');
-  }
-
-  void test_precedence_prefix() async {
-    await _checkPrecedence('''
-f(a) => ~-a;
-g(a, b) => -(a*b);
-''');
-  }
-
-  void test_precedence_property_access() async {
-    await _checkPrecedence('''
-f(a) => a?.b?.c;
-g(a) => (-a)?.b;
-''');
-  }
-
-  void test_precedence_throw() async {
-    await _checkPrecedence('f(a, b) => throw a = b;');
-  }
-
-  void _checkPrecedence(String content) async {
-    // Note: assertions will fire if the fix planner thinks it needs to add or
-    // remove parens to code that is not being otherwise modified, so we can
-    // verify correct precedence by simply running the fix planner over the
-    // code with no changes requested.
-    await analyze(content);
-    var previewInfo = run({});
-    expect(previewInfo, isNull);
-  }
 }
 
 @reflectiveTest

@@ -87,13 +87,8 @@ abstract class EditPlan {
   @visibleForTesting
   bool get endsInCascade;
 
-  /// TODO(paulberry): test
   Map<int, List<PreviewInfo>> finalize() {
-    var parent = sourceNode.parent;
-    bool parensNeeded = parent == null
-        ? false
-        : parent.accept(_ParensNeededFromContextVisitor(this, null));
-    return getChanges(parensNeeded);
+    return getChanges(parensNeededFromContext(null));
   }
 
   /// TODO(paulberry): can we hide/inline?
@@ -105,18 +100,21 @@ abstract class EditPlan {
       bool associative = false,
       bool allowCascade = false});
 
+  @visibleForTesting
+  bool parensNeededFromContext(AstNode cascadeSearchLimit) {
+    var parent = sourceNode.parent;
+    return parent == null
+        ? false
+        : parent
+            .accept(_ParensNeededFromContextVisitor(this, cascadeSearchLimit));
+  }
+
   Map<int, List<PreviewInfo>> _createAddParenChanges(
       Map<int, List<PreviewInfo>> changes) {
     changes ??= {};
     (changes[sourceNode.offset] ??= []).insert(0, const AddText('('));
     (changes[sourceNode.end] ??= []).add(const AddText(')'));
     return changes;
-  }
-
-  bool _parensNeededFromContext(AstNode cascadeSearchLimit) {
-    var parent = sourceNode.parent;
-    return parent
-        .accept(_ParensNeededFromContextVisitor(this, cascadeSearchLimit));
   }
 
   static Map<int, List<PreviewInfo>> _createExtractChanges(EditPlan innerPlan,
@@ -424,7 +422,7 @@ class _PassThroughEditPlan extends _SimpleEditPlan {
     bool /*?*/ endsInCascade = node is CascadeExpression ? true : null;
     Map<int, List<PreviewInfo>> changes;
     for (var innerPlan in innerPlans) {
-      var parensNeeded = innerPlan._parensNeededFromContext(node);
+      var parensNeeded = innerPlan.parensNeededFromContext(node);
       assert(_checkParenLogic(innerPlan, parensNeeded, allowRedundantParens));
       if (!parensNeeded && innerPlan is _ProvisionalParenEditPlan) {
         var innerInnerPlan = innerPlan.innerPlan;

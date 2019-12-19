@@ -4,6 +4,7 @@
 
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/precedence.dart';
+import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:nnbd_migration/src/edit_plan.dart';
 import 'package:test/test.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
@@ -14,6 +15,7 @@ main() {
   defineReflectiveSuite(() {
     defineReflectiveTests(EditPlanTest);
     defineReflectiveTests(EndsInCascadeTest);
+    defineReflectiveTests(PrecedenceTest);
   });
 }
 
@@ -272,6 +274,81 @@ class EndsInCascadeTest extends AbstractSingleUnitTest {
   }
 }
 
+@reflectiveTest
+class PrecedenceTest extends AbstractSingleUnitTest {
+  void checkPrecedence(String content) async {
+    await resolveTestUnit(content);
+    testUnit.accept(_PrecedenceChecker());
+  }
+
+  void test_precedence_as() async {
+    await checkPrecedence('''
+f(a) => (a as num) as int;
+g(a, b) => a | b as int;
+''');
+  }
+
+  void test_precedence_assignment() async {
+    await checkPrecedence('f(a, b, c) => a = b = c;');
+  }
+
+  void test_precedence_binary_equality() async {
+    await checkPrecedence('''
+f(a, b, c) => (a == b) == c;
+g(a, b, c) => a == (b == c);
+''');
+  }
+
+  void test_precedence_binary_left_associative() async {
+    // Associativity logic is the same for all operators except relational and
+    // equality, so we just test `+` as a stand-in for all the others.
+    await checkPrecedence('''
+f(a, b, c) => a + b + c;
+g(a, b, c) => a + (b + c);
+''');
+  }
+
+  void test_precedence_binary_relational() async {
+    await checkPrecedence('''
+f(a, b, c) => (a < b) < c;
+g(a, b, c) => a < (b < c);
+''');
+  }
+
+  void test_precedence_conditional() async {
+    await checkPrecedence('''
+g(a, b, c, d, e, f) => a ?? b ? c = d : e = f;
+h(a, b, c, d, e) => (a ? b : c) ? d : e;
+''');
+  }
+
+  void test_precedence_postfix_and_index() async {
+    await checkPrecedence('''
+f(a, b, c) => a[b][c];
+g(a, b) => a[b]++;
+h(a, b) => (-a)[b];
+''');
+  }
+
+  void test_precedence_prefix() async {
+    await checkPrecedence('''
+f(a) => ~-a;
+g(a, b) => -(a*b);
+''');
+  }
+
+  void test_precedence_property_access() async {
+    await checkPrecedence('''
+f(a) => a?.b?.c;
+g(a) => (-a)?.b;
+''');
+  }
+
+  void test_precedence_throw() async {
+    await checkPrecedence('f(a, b) => throw a = b;');
+  }
+}
+
 class _EditPlanTestBase extends AbstractSingleUnitTest {
   String code;
 
@@ -500,6 +577,22 @@ class _ExtractEditPlanWithParensTest extends _EditPlanTestBase {
 
   test_parensNeeded_allowCascade() async {
     checkParensNeeded_cascaded(makeOuterPlan(await makeInnerPlan_cascaded()));
+  }
+}
+
+class _PrecedenceChecker extends UnifyingAstVisitor<void> {
+  @override
+  void visitNode(AstNode node) {
+    var parent = node.parent;
+    if (parent is ParenthesizedExpression) {
+      expect(
+          EditPlan.provisionalParens(parent, EditPlan.passThrough(node))
+              .parensNeededFromContext(null),
+          true);
+    } else {
+      expect(EditPlan.passThrough(node).parensNeededFromContext(null), false);
+    }
+    node.visitChildren(this);
   }
 }
 
