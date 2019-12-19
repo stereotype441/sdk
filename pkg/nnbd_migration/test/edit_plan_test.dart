@@ -13,6 +13,7 @@ import 'abstract_single_unit.dart';
 main() {
   defineReflectiveSuite(() {
     defineReflectiveTests(EditPlanTest);
+    defineReflectiveTests(EndsInCascadeTest);
   });
 }
 
@@ -224,6 +225,28 @@ class EditPlanTest extends AbstractSingleUnitTest {
         EditPlan.surround(EditPlan.passThrough(findNode.binary('<')),
             suffix: [AddText(' as bool')], threshold: Precedence.relational),
         'var x = (1 < 2) as bool;');
+  }
+}
+
+@reflectiveTest
+class EndsInCascadeTest extends AbstractSingleUnitTest {
+  test_ignore_subexpression_not_at_end() async {
+    await resolveTestUnit('f(g) => g(0..isEven, 1);');
+    expect(findNode.functionExpressionInvocation('g(').endsInCascade, false);
+    expect(findNode.cascade('..').endsInCascade, true);
+  }
+
+  test_no_cascade() async {
+    await resolveTestUnit('var x = 0;');
+    expect(findNode.integerLiteral('0').endsInCascade, false);
+  }
+
+  test_stop_searching_when_parens_encountered() async {
+    await resolveTestUnit('f(x) => x = (x = 0..isEven);');
+    expect(findNode.assignment('= (x').endsInCascade, false);
+    expect(findNode.parenthesized('(x =').endsInCascade, false);
+    expect(findNode.assignment('= 0').endsInCascade, true);
+    expect(findNode.cascade('..').endsInCascade, true);
   }
 }
 

@@ -159,7 +159,6 @@ class RemoveText extends PreviewInfo {
   String toString() => 'RemoveText($length)';
 }
 
-/// TODO(paulberry): unit test
 class _EndsInCascadeVisitor extends UnifyingAstVisitor<void> {
   bool endsInCascade = false;
 
@@ -169,6 +168,7 @@ class _EndsInCascadeVisitor extends UnifyingAstVisitor<void> {
 
   @override
   void visitCascadeExpression(CascadeExpression node) {
+    if (node.end != end) return;
     endsInCascade = true;
   }
 
