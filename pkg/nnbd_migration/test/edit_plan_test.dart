@@ -88,6 +88,16 @@ class EditPlanTest extends AbstractSingleUnitTest {
         'f(g) => 1 * (3 + 4);');
   }
 
+  test_extract_inner_endsInCascade() async {
+    await analyze('f(a, g) => a..b = g(0, 1..isEven, 2);');
+    expect(
+        simpleExtract(findNode.cascade('1..isEven'),
+            findNode.functionExpressionInvocation('g(')).endsInCascade, true);
+    expect(
+        simpleExtract(findNode.integerLiteral('1'),
+            findNode.functionExpressionInvocation('g(')).endsInCascade, false);
+  }
+
   test_extract_left() async {
     await analyze('var x = 1 + 2;');
     checkPlan(simpleExtract(findNode.integerLiteral('1'), findNode.binary('+')),
