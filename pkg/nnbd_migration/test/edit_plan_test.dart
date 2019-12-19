@@ -343,6 +343,20 @@ void g(x) => E(x).f();
 ''');
   }
 
+  void test_precedence_functionExpressionInvocation() async {
+    await checkPrecedence('''
+f(g) => g[0](1);
+h(x) => (x + 2)(3);
+''');
+  }
+
+  void test_precedence_is() async {
+    await checkPrecedence('''
+f(a) => (a as num) is int;
+g(a, b) => a | b is int;
+''');
+  }
+
   void test_precedence_postfix_and_index() async {
     await checkPrecedence('''
 f(a, b, c) => a[b][c];

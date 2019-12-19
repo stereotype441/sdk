@@ -310,13 +310,6 @@ class _ParensNeededFromContextVisitor extends GeneralizingAstVisitor<bool> {
   }
 
   @override
-  bool visitInstanceCreationExpression(InstanceCreationExpression node) {
-    assert(identical(_target, node.constructorName));
-    return _editPlan.parensNeeded(
-        threshold: Precedence.postfix, associative: true);
-  }
-
-  @override
   bool visitIsExpression(IsExpression node) {
     if (identical(_target, node.expression)) {
       return _editPlan.parensNeeded(threshold: Precedence.relational);
