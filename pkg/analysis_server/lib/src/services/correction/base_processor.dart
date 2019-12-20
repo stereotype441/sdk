@@ -234,6 +234,45 @@ abstract class BaseProcessor {
     return null;
   }
 
+  Future<ChangeBuilder> createBuilder_addReturnType() async {
+    var node = this.node;
+    if (node is SimpleIdentifier) {
+      FunctionBody body;
+      var parent = node.parent;
+      if (parent is MethodDeclaration) {
+        if (parent.returnType != null) {
+          _coverageMarker();
+          return null;
+        }
+        body = parent.body;
+      } else if (parent is FunctionDeclaration) {
+        if (parent.returnType != null) {
+          _coverageMarker();
+          return null;
+        }
+        body = parent.functionExpression.body;
+      } else {
+        _coverageMarker();
+        return null;
+      }
+      var returnType = inferReturnType(body);
+      if (returnType == null) {
+        _coverageMarker();
+        return null;
+      }
+      var changeBuilder = _newDartChangeBuilder();
+      bool validChange = true;
+      await changeBuilder.addFileEdit(file, (DartFileEditBuilder builder) {
+        builder.addInsertion(node.offset, (DartEditBuilder builder) {
+          validChange = builder.writeType(returnType);
+          builder.write(' ');
+        });
+      });
+      return validChange ? changeBuilder : null;
+    }
+    return null;
+  }
+
   Future<ChangeBuilder>
       createBuilder_addTypeAnnotation_DeclaredIdentifier() async {
     DeclaredIdentifier declaredIdentifier =
@@ -657,11 +696,11 @@ abstract class BaseProcessor {
       loopVariableName = keyParameterName;
     } else {
       _ParameterReferenceFinder keyFinder =
-          new _ParameterReferenceFinder(keyParameter.declaredElement);
+          _ParameterReferenceFinder(keyParameter.declaredElement);
       keyBody.accept(keyFinder);
 
       _ParameterReferenceFinder valueFinder =
-          new _ParameterReferenceFinder(valueParameter.declaredElement);
+          _ParameterReferenceFinder(valueParameter.declaredElement);
       valueBody.accept(valueFinder);
 
       String computeUnusedVariableName() {
@@ -740,12 +779,11 @@ abstract class BaseProcessor {
           var changeBuilder = _newDartChangeBuilder();
           await changeBuilder.addFileEdit(file, (DartFileEditBuilder builder) {
             builder.addSimpleReplacement(
-                new SourceRange(
+                SourceRange(
                     literal.offset + (literal.isRaw ? 1 : 0), quoteLength),
                 newQuote);
             builder.addSimpleReplacement(
-                new SourceRange(literal.end - quoteLength, quoteLength),
-                newQuote);
+                SourceRange(literal.end - quoteLength, quoteLength), newQuote);
           });
           return changeBuilder;
         }
@@ -770,11 +808,10 @@ abstract class BaseProcessor {
         var changeBuilder = _newDartChangeBuilder();
         await changeBuilder.addFileEdit(file, (DartFileEditBuilder builder) {
           builder.addSimpleReplacement(
-              new SourceRange(
-                  parent.offset + (parent.isRaw ? 1 : 0), quoteLength),
+              SourceRange(parent.offset + (parent.isRaw ? 1 : 0), quoteLength),
               newQuote);
           builder.addSimpleReplacement(
-              new SourceRange(parent.end - quoteLength, quoteLength), newQuote);
+              SourceRange(parent.end - quoteLength, quoteLength), newQuote);
         });
         return changeBuilder;
       }
@@ -851,7 +888,7 @@ abstract class BaseProcessor {
 
     var changeBuilder = _newDartChangeBuilder();
     await changeBuilder.addFileEdit(file, (DartFileEditBuilder builder) {
-      builder.addReplacement(new SourceRange(literal.offset, literal.length),
+      builder.addReplacement(SourceRange(literal.offset, literal.length),
           (DartEditBuilder builder) {
         builder.write('$intValue');
       });
@@ -1188,7 +1225,7 @@ abstract class BaseProcessor {
       builder.addSimpleReplacement(childRange, '');
       builder.addSimpleInsertion(last.end + 1, childText);
 
-      changeBuilder.setSelection(new Position(file, last.end + 1));
+      changeBuilder.setSelection(Position(file, last.end + 1));
     });
 
     return changeBuilder;
@@ -1354,6 +1391,47 @@ abstract class BaseProcessor {
     return null;
   }
 
+  /// Return the type of value returned by the function [body], or `null` if a
+  /// type can't be inferred.
+  DartType inferReturnType(FunctionBody body) {
+    bool isAsynchronous;
+    bool isGenerator;
+    DartType baseType;
+    if (body is ExpressionFunctionBody) {
+      isAsynchronous = body.isAsynchronous;
+      isGenerator = body.isGenerator;
+      baseType = body.expression.staticType;
+    } else if (body is BlockFunctionBody) {
+      isAsynchronous = body.isAsynchronous;
+      isGenerator = body.isGenerator;
+      var computer = _ReturnTypeComputer(resolvedResult.typeSystem);
+      body.block.accept(computer);
+      baseType = computer.returnType;
+      if (baseType == null && computer.hasReturn) {
+        baseType = typeProvider.voidType;
+      }
+    }
+    if (baseType == null) {
+      return null;
+    }
+    if (isAsynchronous) {
+      if (isGenerator) {
+        return typeProvider.streamElement.instantiate(
+            typeArguments: [baseType],
+            nullabilitySuffix: baseType.nullabilitySuffix);
+      } else {
+        return typeProvider.futureElement.instantiate(
+            typeArguments: [baseType],
+            nullabilitySuffix: baseType.nullabilitySuffix);
+      }
+    } else if (isGenerator) {
+      return typeProvider.iterableElement.instantiate(
+          typeArguments: [baseType],
+          nullabilitySuffix: baseType.nullabilitySuffix);
+    }
+    return baseType;
+  }
+
   bool isEnum(DartType type) {
     final element = type.element;
     return element is ClassElement && element.isEnum;
@@ -1433,7 +1511,7 @@ class _ParameterReferenceFinder extends RecursiveAstVisitor<void> {
   /// A collection of the names of other simple identifiers that were found. We
   /// need to know these in order to ensure that the selected loop variable does
   /// not hide a name from an enclosing scope that is already being referenced.
-  final Set<String> otherNames = new Set<String>();
+  final Set<String> otherNames = Set<String>();
 
   /// Initialize a newly created finder to find references to the [parameter].
   _ParameterReferenceFinder(this.parameter) : assert(parameter != null);
@@ -1465,6 +1543,48 @@ class _ParameterReferenceFinder extends RecursiveAstVisitor<void> {
     } else if (!node.isQualified) {
       // Only non-prefixed identifiers can be hidden.
       otherNames.add(node.name);
+    }
+  }
+}
+
+/// Copied from lib/src/services/correction/base_processor.dart, but [hasReturn]
+/// was added.
+// TODO(brianwilkerson) Decide whether to unify the two classes.
+class _ReturnTypeComputer extends RecursiveAstVisitor {
+  final TypeSystem typeSystem;
+
+  DartType returnType;
+
+  /// A flag indicating whether at least one return statement was found.
+  bool hasReturn = false;
+
+  _ReturnTypeComputer(this.typeSystem);
+
+  @override
+  visitBlockFunctionBody(BlockFunctionBody node) {}
+
+  @override
+  visitReturnStatement(ReturnStatement node) {
+    hasReturn = true;
+    // prepare expression
+    Expression expression = node.expression;
+    if (expression == null) {
+      return;
+    }
+    // prepare type
+    DartType type = expression.staticType;
+    if (type.isBottom) {
+      return;
+    }
+    // combine types
+    if (returnType == null) {
+      returnType = type;
+    } else {
+      if (returnType is InterfaceType && type is InterfaceType) {
+        returnType = InterfaceType.getSmartLeastUpperBound(returnType, type);
+      } else {
+        returnType = typeSystem.leastUpperBound(returnType, type);
+      }
     }
   }
 }

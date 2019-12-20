@@ -41,9 +41,12 @@ class NonNullableFix extends FixCodeTask {
   /// which all included paths share.
   final String includedRoot;
 
+  /// The HTTP server that serves the preview tool.
+  HttpPreviewServer server;
+
   /// The port on which preview pages should be served, or `null` if no preview
   /// server should be started.
-  final int port;
+  int port;
 
   InstrumentationListener instrumentationListener;
 
@@ -54,12 +57,11 @@ class NonNullableFix extends FixCodeTask {
   /// If this occurs, then don't update any code.
   bool _packageIsNNBD = true;
 
-  NonNullableFix(this.listener, this.port, {List<String> included = const []})
+  NonNullableFix(this.listener, {List<String> included = const []})
       : this.includedRoot =
             _getIncludedRoot(included, listener.server.resourceProvider) {
-    instrumentationListener = port == null ? null : InstrumentationListener();
-    migration = new NullabilityMigration(
-        new NullabilityMigrationAdapter(listener),
+    instrumentationListener = InstrumentationListener();
+    migration = NullabilityMigration(NullabilityMigrationAdapter(listener),
         permissive: _usePermissiveMode,
         instrumentation: instrumentationListener);
   }
@@ -76,23 +78,19 @@ class NonNullableFix extends FixCodeTask {
   @override
   Future<void> finish() async {
     migration.finish();
-    if (port != null) {
-      OverlayResourceProvider provider = listener.server.resourceProvider;
-      InfoBuilder infoBuilder = InfoBuilder(
-          provider, includedRoot, instrumentationListener.data, listener);
-      Set<UnitInfo> unitInfos = await infoBuilder.explainMigration();
-      var pathContext = provider.pathContext;
-      MigrationInfo migrationInfo = MigrationInfo(
-          unitInfos, infoBuilder.unitMap, pathContext, includedRoot);
-      PathMapper pathMapper = PathMapper(provider);
 
-      print(Uri(
-          scheme: 'http', host: 'localhost', port: port, path: includedRoot));
+    OverlayResourceProvider provider = listener.server.resourceProvider;
+    InfoBuilder infoBuilder = InfoBuilder(
+        provider, includedRoot, instrumentationListener.data, listener);
+    Set<UnitInfo> unitInfos = await infoBuilder.explainMigration();
+    var pathContext = provider.pathContext;
+    MigrationInfo migrationInfo = MigrationInfo(
+        unitInfos, infoBuilder.unitMap, pathContext, includedRoot);
+    PathMapper pathMapper = PathMapper(provider);
 
-      // TODO(brianwilkerson) Capture the server so that it can be closed
-      //  cleanly.
-      HttpPreviewServer(migrationInfo, pathMapper).serveHttp(port);
-    }
+    server = HttpPreviewServer(migrationInfo, pathMapper);
+    server.serveHttp();
+    port = await server.boundPort;
   }
 
   /// If the package contains an analysis_options.yaml file, then update the
@@ -131,8 +129,8 @@ class NonNullableFix extends FixCodeTask {
       analyzerOptions = optionsMap.nodes[AnalyzerOptions.analyzer];
     }
     if (analyzerOptions == null) {
-      var start = new SourceLocation(0, line: 0, column: 0);
-      parentSpan = new SourceSpan(start, start, '');
+      var start = SourceLocation(0, line: 0, column: 0);
+      parentSpan = SourceSpan(start, start, '');
       content = '''
 analyzer:
   enable-experiment:
@@ -182,15 +180,15 @@ analyzer:
       }
       listener.addSourceFileEdit(
           'enable non-nullable analysis',
-          new Location(
+          Location(
             optionsFile.path,
             offset,
             content.length,
             line,
             0,
           ),
-          new SourceFileEdit(optionsFile.path, 0,
-              edits: [new SourceEdit(offset, 0, content)]));
+          SourceFileEdit(optionsFile.path, 0,
+              edits: [SourceEdit(offset, 0, content)]));
     }
   }
 
@@ -207,7 +205,7 @@ analyzer:
         migration.processInput(result);
         break;
       default:
-        throw new ArgumentError('Unsupported phase $phase');
+        throw ArgumentError('Unsupported phase $phase');
     }
   }
 
@@ -227,8 +225,8 @@ analyzer:
 
   static void task(DartFixRegistrar registrar, DartFixListener listener,
       EditDartfixParams params) {
-    registrar.registerCodeTask(
-        new NonNullableFix(listener, params.port, included: params.included));
+    registrar
+        .registerCodeTask(NonNullableFix(listener, included: params.included));
   }
 
   /// Get the "root" of all [included] paths. See [includedRoot] for its

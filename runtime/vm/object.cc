@@ -1044,11 +1044,7 @@ void Object::Init(Isolate* isolate) {
   void_type_->SetCanonical();
 
   cls = never_class_;
-  *never_type_ = Type::New(cls, Object::null_type_arguments(),
-                           TokenPosition::kNoSource, Nullability::kNonNullable);
-  never_type_->SetIsFinalized();
-  never_type_->ComputeHash();
-  never_type_->SetCanonical();
+  *never_type_ = Type::NewNonParameterizedType(cls);
 
   // Since TypeArguments objects are passed as function arguments, make them
   // behave as Dart instances, although they are just VM objects.
@@ -1476,7 +1472,7 @@ void Object::MakeUnusedSpaceTraversable(const Object& obj,
         old_tags = tags;
         // We can't use obj.CompareAndSwapTags here because we don't have a
         // handle for the new object.
-      } while (!raw->ptr()->tags_.compare_exchange_weak(old_tags, new_tags));
+      } while (!raw->ptr()->tags_.WeakCAS(old_tags, new_tags));
 
       intptr_t leftover_len = (leftover_size - TypedData::InstanceSize(0));
       ASSERT(TypedData::InstanceSize(leftover_len) == leftover_size);
@@ -1505,7 +1501,7 @@ void Object::MakeUnusedSpaceTraversable(const Object& obj,
         old_tags = tags;
         // We can't use obj.CompareAndSwapTags here because we don't have a
         // handle for the new object.
-      } while (!raw->ptr()->tags_.compare_exchange_weak(old_tags, new_tags));
+      } while (!raw->ptr()->tags_.WeakCAS(old_tags, new_tags));
     }
   }
 }
@@ -4433,7 +4429,7 @@ void Class::set_constants(const Array& value) const {
 }
 
 void Class::set_declaration_type(const Type& value) const {
-  ASSERT(!(id() >= kDynamicCid && id() <= kNeverCid));
+  ASSERT(id() != kDynamicCid && id() != kVoidCid);
   ASSERT(!value.IsNull() && value.IsCanonical() && value.IsOld());
   ASSERT((declaration_type() == Object::null()) ||
          (declaration_type() == value.raw()));  // Set during own finalization.
@@ -4457,9 +4453,6 @@ RawType* Class::DeclarationType() const {
   }
   if (IsVoidClass()) {
     return Type::VoidType();
-  }
-  if (IsNeverClass()) {
-    return Type::NeverType();
   }
   if (declaration_type() != Type::null()) {
     return declaration_type();
@@ -17244,8 +17237,7 @@ RawAbstractType* AbstractType::CheckInstantiatedNullability(
     }
   } else {
     const classid_t cid = type_class_id();
-    if (cid == kDynamicCid || cid == kVoidCid || cid == kNeverCid ||
-        cid == kNullCid) {
+    if (cid == kDynamicCid || cid == kVoidCid || cid == kNullCid) {
       // Do not force result to kLegacy.
       return raw();
     }
@@ -17886,9 +17878,6 @@ RawType* Type::NewNonParameterizedType(const Class& type_class) {
   if (type_class.IsVoidClass()) {
     return Type::VoidType();
   }
-  if (type_class.IsNeverClass()) {
-    return Type::NeverType();
-  }
   // It is too early to use the class finalizer, as type_class may not be named
   // yet, so do not call DeclarationType().
   Type& type = Type::Handle(type_class.declaration_type());
@@ -17934,13 +17923,6 @@ RawType* Type::ToNullability(Nullability value, Heap::Space space) const {
   // instantiating a non-nullable type parameter (TypeError thrown).
   const classid_t cid = type_class_id();
   if (cid == kDynamicCid || cid == kVoidCid || cid == kNullCid) {
-    return raw();
-  }
-  if (cid == kNeverCid) {
-    if (value == Nullability::kNullable) {
-      // Map nullable Never type to Null type.
-      return Type::NullType();
-    }
     return raw();
   }
   // Clone type and set new nullability.
@@ -18296,11 +18278,6 @@ RawAbstractType* Type::Canonicalize(TrailPtr trail) const {
     return Object::void_type().raw();
   }
 
-  if (cid == kNeverCid) {
-    ASSERT(Object::never_type().IsCanonical());
-    return Object::never_type().raw();
-  }
-
   const Class& cls = Class::Handle(zone, type_class());
 
   // Fast canonical lookup/registry for simple types.
@@ -18427,9 +18404,6 @@ bool Type::CheckIsCanonical(Thread* thread) const {
   }
   if (cid == kVoidCid) {
     return (raw() == Object::void_type().raw());
-  }
-  if (cid == kNeverCid) {
-    return (raw() == Object::never_type().raw());
   }
   Zone* zone = thread->zone();
   Isolate* isolate = thread->isolate();
@@ -21300,6 +21274,10 @@ void Array::Truncate(intptr_t new_len) const {
   // that it can be traversed over successfully during garbage collection.
   Object::MakeUnusedSpaceTraversable(array, old_size, new_size);
 
+  // For the heap to remain walkable by the sweeper, it must observe the
+  // creation of the filler object no later than the new length of the array.
+  std::atomic_thread_fence(std::memory_order_release);
+
   // Update the size in the header field and length of the array object.
   uint32_t tags = array.raw_ptr()->tags_;
   ASSERT(kArrayCid == RawObject::ClassIdTag::decode(tags));
@@ -21309,16 +21287,12 @@ void Array::Truncate(intptr_t new_len) const {
     uint32_t new_tags = RawObject::SizeTag::update(new_size, old_tags);
     tags = CompareAndSwapTags(old_tags, new_tags);
   } while (tags != old_tags);
-  // TODO(22501): For the heap to remain walkable by the sweeper, it must
-  // observe the creation of the filler object no later than the new length
-  // of the array. This assumption holds on ia32/x64 or if the CAS above is a
-  // full memory barrier.
-  //
-  // Also, between the CAS of the header above and the SetLength below,
-  // the array is temporarily in an inconsistent state. The header is considered
-  // the overriding source of object size by RawObject::Size, but the ASSERTs
-  // in RawObject::SizeFromClass must handle this special case.
-  array.SetLength(new_len);
+
+  // Between the CAS of the header above and the SetLength below, the array is
+  // temporarily in an inconsistent state. The header is considered the
+  // overriding source of object size by RawObject::Size, but the ASSERTs in
+  // RawObject::SizeFromClass must handle this special case.
+  array.SetLengthIgnoreRace(new_len);
 }
 
 RawArray* Array::MakeFixedLength(const GrowableObjectArray& growable_array,
@@ -22456,17 +22430,14 @@ const char* StackTrace::ToDwarfCString(const StackTrace& stack_trace_in) {
   OSThread* thread = OSThread::Current();
   buffer.Printf("pid: %" Pd ", tid: %" Pd ", name %s\n", OS::ProcessId(),
                 OSThread::ThreadIdToIntPtr(thread->id()), thread->name());
-  if (auto const isolate_group = T->isolate_group()) {
-    buffer.Printf("isolate_instructions: %" Px "",
-                  reinterpret_cast<uintptr_t>(
-                      isolate_group->source()->snapshot_instructions));
-    if (auto const vm_group = Dart::vm_isolate()->group()) {
-      buffer.Printf(" vm_instructions: %" Px "",
-                    reinterpret_cast<uintptr_t>(
-                        vm_group->source()->snapshot_instructions));
-    }
-    buffer.Printf("\n");
-  }
+  auto const isolate_instructions =
+      T->isolate_group()->source()->snapshot_instructions;
+  auto const vm_instructions =
+      Dart::vm_isolate()->group()->source()->snapshot_instructions;
+  buffer.Printf("isolate_instructions: %" Px "",
+                reinterpret_cast<uintptr_t>(isolate_instructions));
+  buffer.Printf(" vm_instructions: %" Px "\n",
+                reinterpret_cast<uintptr_t>(vm_instructions));
   intptr_t frame_index = 0;
   uint32_t frame_skip = 0;
   do {

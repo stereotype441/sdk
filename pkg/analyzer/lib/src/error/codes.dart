@@ -7253,6 +7253,16 @@ class StaticWarningCode extends AnalyzerErrorCode {
       INSTANTIATE_ABSTRACT_CLASS;
 
   /**
+   * It is a warning to use null aware operators '??' or '??=' on an
+   * expression of type `T` if `T` is strictly non-nullable.
+   */
+  static const StaticWarningCode DEAD_NULL_COALESCE = StaticWarningCode(
+      'DEAD_NULL_COALESCE',
+      "The left operand can't be null, so the right operand is never executed.",
+      correction: "Try removing the right operand.",
+      errorSeverity: ErrorSeverity.WARNING);
+
+  /**
    * 14.2 Exports: It is a static warning to export two different libraries with
    * the same name.
    *
@@ -7598,6 +7608,42 @@ class StaticWarningCode extends AnalyzerErrorCode {
               "value.",
           correction: "Try using the same default value in both methods.",
           errorSeverity: ErrorSeverity.WARNING);
+
+  /**
+   * It is an error to call a method or getter on an expression of type `Never`,
+   * or to invoke it as if it were a function.
+   *
+   * Go out of our way to provide a *little* more information here because many
+   * dart users probably have never heard of the type Never. Be careful however
+   * of providing too much information or it only becomes more confusing. Hard
+   * balance to strike.
+   *
+   * Parameters: none
+   */
+  static const StaticWarningCode INVALID_USE_OF_NEVER_VALUE = StaticWarningCode(
+      'INVALID_USE_OF_NEVER_VALUE',
+      'This expression is invalid because its target is of type Never and'
+          ' will never complete with a value',
+      correction: 'Try checking for throw expressions or type errors in the'
+          ' target expression');
+
+  /**
+   * For the purposes of experimenting with potential non-null type semantics.
+   *
+   * Whereas [UNCHECKED_USE_OF_NULLABLE] refers to using a value of type T? as
+   * if it were a T, this refers to using a value of type [Null] itself. These
+   * occur at many of the same times ([Null] is a potentially nullable type) but
+   * it indicates a different type of programmer error and has different
+   * corrections.
+   *
+   * Parameters: none
+   */
+  static const StaticWarningCode INVALID_USE_OF_NULL_VALUE = StaticWarningCode(
+      'INVALID_USE_OF_NULL_VALUE',
+      "This expression is invalid as it will always be null.",
+      correction:
+          "Try changing the type, or casting, to a more useful type like "
+          "dynamic.");
 
   /**
    * Parameters:
@@ -8462,6 +8508,16 @@ class StaticWarningCode extends AnalyzerErrorCode {
           errorSeverity: ErrorSeverity.WARNING);
 
   /**
+   * When the '?.' operator is used on a target that we know to be non-null,
+   * it is unnecessary.
+   */
+  static const StaticWarningCode UNNECESSARY_NULL_AWARE_CALL =
+      StaticWarningCode('UNNECESSARY_NULL_AWARE_CALL',
+          "The target expression can't be null, and so '?.' isn't necessary.",
+          correction: "Try replacing the '?.' with a '.' in the invocation.",
+          errorSeverity: ErrorSeverity.WARNING);
+
+  /**
    * When the '...?' operator is used on a value that we know to be non-null,
    * it is unnecessary.
    */
@@ -8471,52 +8527,6 @@ class StaticWarningCode extends AnalyzerErrorCode {
           "The target expression can't be null, so it isn't necessary to use "
               "the null-aware spread operator '...?'.",
           correction: "Try replacing the '...?' with a '...' in the spread.",
-          errorSeverity: ErrorSeverity.WARNING);
-
-  /**
-   * For the purposes of experimenting with potential non-null type semantics.
-   *
-   * Whereas [UNCHECKED_USE_OF_NULLABLE] refers to using a value of type T? as
-   * if it were a T, this refers to using a value of type [Null] itself. These
-   * occur at many of the same times ([Null] is a potentially nullable type) but
-   * it indicates a different type of programmer error and has different
-   * corrections.
-   *
-   * Parameters: none
-   */
-  static const StaticWarningCode INVALID_USE_OF_NULL_VALUE = StaticWarningCode(
-      'INVALID_USE_OF_NULL_VALUE',
-      "This expression is invalid as it will always be null.",
-      correction:
-          "Try changing the type, or casting, to a more useful type like "
-          "dynamic.");
-
-  /**
-   * It is an error to call a method or getter on an expression of type `Never`,
-   * or to invoke it as if it were a function.
-   *
-   * Go out of our way to provide a *little* more information here because many
-   * dart users probably have never heard of the type Never. Be careful however
-   * of providing too much information or it only becomes more confusing. Hard
-   * balance to strike.
-   *
-   * Parameters: none
-   */
-  static const StaticWarningCode INVALID_USE_OF_NEVER_VALUE = StaticWarningCode(
-      'INVALID_USE_OF_NEVER_VALUE',
-      'This expression is invalid because its target is of type Never and'
-          ' will never complete with a value',
-      correction: 'Try checking for throw expressions or type errors in the'
-          ' target expression');
-
-  /**
-   * When the '?.' operator is used on a target that we know to be non-null,
-   * it is unnecessary.
-   */
-  static const StaticWarningCode UNNECESSARY_NULL_AWARE_CALL =
-      StaticWarningCode('UNNECESSARY_NULL_AWARE_CALL',
-          "The target expression can't be null, and so '?.' isn't necessary.",
-          correction: "Try replacing the '?.' with a '.' in the invocation.",
           errorSeverity: ErrorSeverity.WARNING);
 
   /**
@@ -8599,19 +8609,6 @@ class StaticWarningCodeWithUniqueName extends StaticWarningCode {
  * levels, so they are grouped for clarity.
  */
 class StrongModeCode extends ErrorCode {
-  /**
-   * This is appended to the end of an error message about implicit dynamic.
-   *
-   * The idea is to make sure the user is aware that this error message is the
-   * result of turning on a particular option, and they are free to turn it
-   * back off.
-   */
-  static const String _implicitDynamicCorrection =
-      "Try adding an explicit type like 'dynamic', or "
-      "enable implicit-dynamic in your analysis options file.";
-
-  static const String _inferredTypeMessage = "'{0}' has inferred type '{1}'.";
-
   static const StrongModeCode INVALID_PARAMETER_DECLARATION = StrongModeCode(
       ErrorType.COMPILE_TIME_ERROR,
       'INVALID_PARAMETER_DECLARATION',
@@ -8621,18 +8618,6 @@ class StrongModeCode extends ErrorCode {
       ErrorType.COMPILE_TIME_ERROR,
       'COULD_NOT_INFER',
       "Couldn't infer type parameter '{0}'.{1}");
-
-  static const StrongModeCode INFERRED_TYPE =
-      StrongModeCode(ErrorType.HINT, 'INFERRED_TYPE', _inferredTypeMessage);
-
-  static const StrongModeCode INFERRED_TYPE_LITERAL = StrongModeCode(
-      ErrorType.HINT, 'INFERRED_TYPE_LITERAL', _inferredTypeMessage);
-
-  static const StrongModeCode INFERRED_TYPE_ALLOCATION = StrongModeCode(
-      ErrorType.HINT, 'INFERRED_TYPE_ALLOCATION', _inferredTypeMessage);
-
-  static const StrongModeCode INFERRED_TYPE_CLOSURE = StrongModeCode(
-      ErrorType.HINT, 'INFERRED_TYPE_CLOSURE', _inferredTypeMessage);
 
   static const StrongModeCode INVALID_CAST_LITERAL = StrongModeCode(
       ErrorType.COMPILE_TIME_ERROR,
@@ -8692,74 +8677,6 @@ class StrongModeCode extends ErrorCode {
       'INVALID_SUPER_INVOCATION',
       "The super call must be last in an initializer "
           "list (see https://goo.gl/EY6hDP): '{0}'.");
-
-  static const StrongModeCode NON_GROUND_TYPE_CHECK_INFO = StrongModeCode(
-      ErrorType.HINT,
-      'NON_GROUND_TYPE_CHECK_INFO',
-      "Runtime check on non-ground type '{0}' may throw StrongModeError.");
-
-  static const StrongModeCode DYNAMIC_INVOKE = StrongModeCode(
-      ErrorType.HINT, 'DYNAMIC_INVOKE', "'{0}' requires a dynamic invoke.");
-
-  static const StrongModeCode IMPLICIT_DYNAMIC_PARAMETER = StrongModeCode(
-      ErrorType.COMPILE_TIME_ERROR,
-      'IMPLICIT_DYNAMIC_PARAMETER',
-      "Missing parameter type for '{0}'.",
-      correction: _implicitDynamicCorrection);
-
-  static const StrongModeCode IMPLICIT_DYNAMIC_RETURN = StrongModeCode(
-      ErrorType.COMPILE_TIME_ERROR,
-      'IMPLICIT_DYNAMIC_RETURN',
-      "Missing return type for '{0}'.",
-      correction: _implicitDynamicCorrection);
-
-  static const StrongModeCode IMPLICIT_DYNAMIC_VARIABLE = StrongModeCode(
-      ErrorType.COMPILE_TIME_ERROR,
-      'IMPLICIT_DYNAMIC_VARIABLE',
-      "Missing variable type for '{0}'.",
-      correction: _implicitDynamicCorrection);
-
-  static const StrongModeCode IMPLICIT_DYNAMIC_FIELD = StrongModeCode(
-      ErrorType.COMPILE_TIME_ERROR,
-      'IMPLICIT_DYNAMIC_FIELD',
-      "Missing field type for '{0}'.",
-      correction: _implicitDynamicCorrection);
-
-  static const StrongModeCode IMPLICIT_DYNAMIC_TYPE = StrongModeCode(
-      ErrorType.COMPILE_TIME_ERROR,
-      'IMPLICIT_DYNAMIC_TYPE',
-      "Missing type arguments for generic type '{0}'.",
-      correction: _implicitDynamicCorrection);
-
-  static const StrongModeCode IMPLICIT_DYNAMIC_LIST_LITERAL = StrongModeCode(
-      ErrorType.COMPILE_TIME_ERROR,
-      'IMPLICIT_DYNAMIC_LIST_LITERAL',
-      "Missing type argument for list literal.",
-      correction: _implicitDynamicCorrection);
-
-  static const StrongModeCode IMPLICIT_DYNAMIC_MAP_LITERAL = StrongModeCode(
-      ErrorType.COMPILE_TIME_ERROR,
-      'IMPLICIT_DYNAMIC_MAP_LITERAL',
-      "Missing type arguments for map literal.",
-      correction: _implicitDynamicCorrection);
-
-  static const StrongModeCode IMPLICIT_DYNAMIC_FUNCTION = StrongModeCode(
-      ErrorType.COMPILE_TIME_ERROR,
-      'IMPLICIT_DYNAMIC_FUNCTION',
-      "Missing type arguments for generic function '{0}<{1}>'.",
-      correction: _implicitDynamicCorrection);
-
-  static const StrongModeCode IMPLICIT_DYNAMIC_METHOD = StrongModeCode(
-      ErrorType.COMPILE_TIME_ERROR,
-      'IMPLICIT_DYNAMIC_METHOD',
-      "Missing type arguments for generic method '{0}<{1}>'.",
-      correction: _implicitDynamicCorrection);
-
-  static const StrongModeCode IMPLICIT_DYNAMIC_INVOKE = StrongModeCode(
-      ErrorType.COMPILE_TIME_ERROR,
-      'IMPLICIT_DYNAMIC_INVOKE',
-      "Missing type arguments for calling generic function type '{0}'.",
-      correction: _implicitDynamicCorrection);
 
   static const StrongModeCode NOT_INSTANTIATED_BOUND = StrongModeCode(
       ErrorType.COMPILE_TIME_ERROR,

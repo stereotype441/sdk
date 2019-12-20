@@ -133,7 +133,7 @@ class Dart2TypeSystem extends TypeSystem {
     return t is FunctionType || t.isDartCoreFunction;
   }
 
-  bool anyParameterType(FunctionType ft, bool predicate(DartType t)) {
+  bool anyParameterType(FunctionType ft, bool Function(DartType t) predicate) {
     return ft.parameters.any((p) => predicate(p.type));
   }
 
@@ -927,41 +927,6 @@ class Dart2TypeSystem extends TypeSystem {
     }
 
     // BOTTOM(T) is false otherwise
-    return false;
-  }
-
-  bool isGroundType(DartType t) {
-    // TODO(leafp): Revisit this.
-    if (t is TypeParameterType) {
-      return false;
-    }
-    // TODO(mfairhurst): switch legacy Top checks to true Top checks
-    if (_isLegacyTop(t, orTrueTop: true)) {
-      return true;
-    }
-
-    if (t is FunctionType) {
-      // TODO(mfairhurst): switch legacy Top checks to true Top checks
-      // TODO(mfairhurst): switch legacy Bottom checks to true Bottom checks
-      if (!_isLegacyTop(t.returnType, orTrueTop: true) ||
-          anyParameterType(
-              t, (pt) => !_isLegacyBottom(pt, orTrueBottom: true))) {
-        return false;
-      } else {
-        return true;
-      }
-    }
-
-    if (t is InterfaceType) {
-      List<DartType> typeArguments = t.typeArguments;
-      for (DartType typeArgument in typeArguments) {
-        // TODO(mfairhurst): switch legacy Top checks to true Top checks
-        if (!_isLegacyTop(typeArgument, orTrueTop: true)) return false;
-      }
-      return true;
-    }
-
-    // We should not see any other type aside from malformed code.
     return false;
   }
 
@@ -2408,7 +2373,7 @@ class Dart2TypeSystem extends TypeSystem {
         .substituteType(type);
   }
 
-  static List<T> _transformList<T>(List<T> list, T f(T t)) {
+  static List<T> _transformList<T>(List<T> list, T Function(T t) f) {
     List<T> newList;
     for (var i = 0; i < list.length; i++) {
       var item = list[i];
@@ -3754,6 +3719,20 @@ abstract class TypeSystem implements public.TypeSystem {
 
   @override
   bool isPotentiallyNullable(DartType type) => !isNonNullable(type);
+
+  @override
+  bool isStrictlyNonNullable(DartType type) {
+    if (type.isDynamic || type.isVoid || type.isDartCoreNull) {
+      return false;
+    } else if (type.nullabilitySuffix != NullabilitySuffix.none) {
+      return false;
+    } else if (type is InterfaceType && type.isDartAsyncFutureOr) {
+      return isStrictlyNonNullable(type.typeArguments[0]);
+    } else if (type is TypeParameterType) {
+      return isStrictlyNonNullable(type.bound);
+    }
+    return true;
+  }
 
   /**
    * Return `true` if the [leftType] is a subtype of the [rightType] (that is,

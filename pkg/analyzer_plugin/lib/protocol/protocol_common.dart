@@ -58,7 +58,7 @@ class AddContentOverlay implements HasToJson {
       } else {
         throw jsonDecoder.mismatch(jsonPath, "content");
       }
-      return new AddContentOverlay(content);
+      return AddContentOverlay(content);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "AddContentOverlay", json);
     }
@@ -288,21 +288,21 @@ class AnalysisError implements HasToJson {
     if (json is Map) {
       AnalysisErrorSeverity severity;
       if (json.containsKey("severity")) {
-        severity = new AnalysisErrorSeverity.fromJson(
+        severity = AnalysisErrorSeverity.fromJson(
             jsonDecoder, jsonPath + ".severity", json["severity"]);
       } else {
         throw jsonDecoder.mismatch(jsonPath, "severity");
       }
       AnalysisErrorType type;
       if (json.containsKey("type")) {
-        type = new AnalysisErrorType.fromJson(
+        type = AnalysisErrorType.fromJson(
             jsonDecoder, jsonPath + ".type", json["type"]);
       } else {
         throw jsonDecoder.mismatch(jsonPath, "type");
       }
       Location location;
       if (json.containsKey("location")) {
-        location = new Location.fromJson(
+        location = Location.fromJson(
             jsonDecoder, jsonPath + ".location", json["location"]);
       } else {
         throw jsonDecoder.mismatch(jsonPath, "location");
@@ -335,13 +335,13 @@ class AnalysisError implements HasToJson {
             jsonPath + ".contextMessages",
             json["contextMessages"],
             (String jsonPath, Object json) =>
-                new DiagnosticMessage.fromJson(jsonDecoder, jsonPath, json));
+                DiagnosticMessage.fromJson(jsonDecoder, jsonPath, json));
       }
       bool hasFix;
       if (json.containsKey("hasFix")) {
         hasFix = jsonDecoder.decodeBool(jsonPath + ".hasFix", json["hasFix"]);
       }
-      return new AnalysisError(severity, type, location, message, code,
+      return AnalysisError(severity, type, location, message, code,
           correction: correction,
           url: url,
           contextMessages: contextMessages,
@@ -424,20 +424,21 @@ class AnalysisError implements HasToJson {
  * Clients may not extend, implement or mix-in this class.
  */
 class AnalysisErrorSeverity implements Enum {
-  static const AnalysisErrorSeverity INFO =
-      const AnalysisErrorSeverity._("INFO");
+  static const AnalysisErrorSeverity INFO = AnalysisErrorSeverity._("INFO");
 
   static const AnalysisErrorSeverity WARNING =
-      const AnalysisErrorSeverity._("WARNING");
+      AnalysisErrorSeverity._("WARNING");
 
-  static const AnalysisErrorSeverity ERROR =
-      const AnalysisErrorSeverity._("ERROR");
+  static const AnalysisErrorSeverity ERROR = AnalysisErrorSeverity._("ERROR");
 
   /**
    * A list containing all of the enum values that are defined.
    */
-  static const List<AnalysisErrorSeverity> VALUES =
-      const <AnalysisErrorSeverity>[INFO, WARNING, ERROR];
+  static const List<AnalysisErrorSeverity> VALUES = <AnalysisErrorSeverity>[
+    INFO,
+    WARNING,
+    ERROR
+  ];
 
   @override
   final String name;
@@ -453,14 +454,14 @@ class AnalysisErrorSeverity implements Enum {
       case "ERROR":
         return ERROR;
     }
-    throw new Exception('Illegal enum value: $name');
+    throw Exception('Illegal enum value: $name');
   }
 
   factory AnalysisErrorSeverity.fromJson(
       JsonDecoder jsonDecoder, String jsonPath, Object json) {
     if (json is String) {
       try {
-        return new AnalysisErrorSeverity(json);
+        return AnalysisErrorSeverity(json);
       } catch (_) {
         // Fall through
       }
@@ -492,30 +493,30 @@ class AnalysisErrorSeverity implements Enum {
  */
 class AnalysisErrorType implements Enum {
   static const AnalysisErrorType CHECKED_MODE_COMPILE_TIME_ERROR =
-      const AnalysisErrorType._("CHECKED_MODE_COMPILE_TIME_ERROR");
+      AnalysisErrorType._("CHECKED_MODE_COMPILE_TIME_ERROR");
 
   static const AnalysisErrorType COMPILE_TIME_ERROR =
-      const AnalysisErrorType._("COMPILE_TIME_ERROR");
+      AnalysisErrorType._("COMPILE_TIME_ERROR");
 
-  static const AnalysisErrorType HINT = const AnalysisErrorType._("HINT");
+  static const AnalysisErrorType HINT = AnalysisErrorType._("HINT");
 
-  static const AnalysisErrorType LINT = const AnalysisErrorType._("LINT");
+  static const AnalysisErrorType LINT = AnalysisErrorType._("LINT");
 
   static const AnalysisErrorType STATIC_TYPE_WARNING =
-      const AnalysisErrorType._("STATIC_TYPE_WARNING");
+      AnalysisErrorType._("STATIC_TYPE_WARNING");
 
   static const AnalysisErrorType STATIC_WARNING =
-      const AnalysisErrorType._("STATIC_WARNING");
+      AnalysisErrorType._("STATIC_WARNING");
 
   static const AnalysisErrorType SYNTACTIC_ERROR =
-      const AnalysisErrorType._("SYNTACTIC_ERROR");
+      AnalysisErrorType._("SYNTACTIC_ERROR");
 
-  static const AnalysisErrorType TODO = const AnalysisErrorType._("TODO");
+  static const AnalysisErrorType TODO = AnalysisErrorType._("TODO");
 
   /**
    * A list containing all of the enum values that are defined.
    */
-  static const List<AnalysisErrorType> VALUES = const <AnalysisErrorType>[
+  static const List<AnalysisErrorType> VALUES = <AnalysisErrorType>[
     CHECKED_MODE_COMPILE_TIME_ERROR,
     COMPILE_TIME_ERROR,
     HINT,
@@ -550,14 +551,14 @@ class AnalysisErrorType implements Enum {
       case "TODO":
         return TODO;
     }
-    throw new Exception('Illegal enum value: $name');
+    throw Exception('Illegal enum value: $name');
   }
 
   factory AnalysisErrorType.fromJson(
       JsonDecoder jsonDecoder, String jsonPath, Object json) {
     if (json is String) {
       try {
-        return new AnalysisErrorType(json);
+        return AnalysisErrorType(json);
       } catch (_) {
         // Fall through
       }
@@ -616,11 +617,11 @@ class ChangeContentOverlay implements HasToJson {
             jsonPath + ".edits",
             json["edits"],
             (String jsonPath, Object json) =>
-                new SourceEdit.fromJson(jsonDecoder, jsonPath, json));
+                SourceEdit.fromJson(jsonDecoder, jsonPath, json));
       } else {
         throw jsonDecoder.mismatch(jsonPath, "edits");
       }
-      return new ChangeContentOverlay(edits);
+      return ChangeContentOverlay(edits);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "ChangeContentOverlay", json);
     }
@@ -1095,7 +1096,7 @@ class CompletionSuggestion implements HasToJson {
     if (json is Map) {
       CompletionSuggestionKind kind;
       if (json.containsKey("kind")) {
-        kind = new CompletionSuggestionKind.fromJson(
+        kind = CompletionSuggestionKind.fromJson(
             jsonDecoder, jsonPath + ".kind", json["kind"]);
       } else {
         throw jsonDecoder.mismatch(jsonPath, "kind");
@@ -1177,7 +1178,7 @@ class CompletionSuggestion implements HasToJson {
       }
       Element element;
       if (json.containsKey("element")) {
-        element = new Element.fromJson(
+        element = Element.fromJson(
             jsonDecoder, jsonPath + ".element", json["element"]);
       }
       String returnType;
@@ -1216,8 +1217,8 @@ class CompletionSuggestion implements HasToJson {
         parameterType = jsonDecoder.decodeString(
             jsonPath + ".parameterType", json["parameterType"]);
       }
-      return new CompletionSuggestion(kind, relevance, completion,
-          selectionOffset, selectionLength, isDeprecated, isPotential,
+      return CompletionSuggestion(kind, relevance, completion, selectionOffset,
+          selectionLength, isDeprecated, isPotential,
           displayText: displayText,
           docSummary: docSummary,
           docComplete: docComplete,
@@ -1379,10 +1380,10 @@ class CompletionSuggestionKind implements Enum {
    * requiredParameterCount attributes are defined.
    */
   static const CompletionSuggestionKind ARGUMENT_LIST =
-      const CompletionSuggestionKind._("ARGUMENT_LIST");
+      CompletionSuggestionKind._("ARGUMENT_LIST");
 
   static const CompletionSuggestionKind IMPORT =
-      const CompletionSuggestionKind._("IMPORT");
+      CompletionSuggestionKind._("IMPORT");
 
   /**
    * The element identifier should be inserted at the completion location. For
@@ -1391,7 +1392,7 @@ class CompletionSuggestionKind implements Enum {
    * completion field is the element's identifier.
    */
   static const CompletionSuggestionKind IDENTIFIER =
-      const CompletionSuggestionKind._("IDENTIFIER");
+      CompletionSuggestionKind._("IDENTIFIER");
 
   /**
    * The element is being invoked at the completion location. For example,
@@ -1399,14 +1400,14 @@ class CompletionSuggestionKind implements Enum {
    * attribute is defined and the completion field is the element's identifier.
    */
   static const CompletionSuggestionKind INVOCATION =
-      const CompletionSuggestionKind._("INVOCATION");
+      CompletionSuggestionKind._("INVOCATION");
 
   /**
    * A keyword is being suggested. For suggestions of this kind, the completion
    * is the keyword.
    */
   static const CompletionSuggestionKind KEYWORD =
-      const CompletionSuggestionKind._("KEYWORD");
+      CompletionSuggestionKind._("KEYWORD");
 
   /**
    * A named argument for the current call site is being suggested. For
@@ -1414,25 +1415,25 @@ class CompletionSuggestionKind implements Enum {
    * including a trailing ':' and a space.
    */
   static const CompletionSuggestionKind NAMED_ARGUMENT =
-      const CompletionSuggestionKind._("NAMED_ARGUMENT");
+      CompletionSuggestionKind._("NAMED_ARGUMENT");
 
   static const CompletionSuggestionKind OPTIONAL_ARGUMENT =
-      const CompletionSuggestionKind._("OPTIONAL_ARGUMENT");
+      CompletionSuggestionKind._("OPTIONAL_ARGUMENT");
 
   /**
    * An overriding implementation of a class member is being suggested.
    */
   static const CompletionSuggestionKind OVERRIDE =
-      const CompletionSuggestionKind._("OVERRIDE");
+      CompletionSuggestionKind._("OVERRIDE");
 
   static const CompletionSuggestionKind PARAMETER =
-      const CompletionSuggestionKind._("PARAMETER");
+      CompletionSuggestionKind._("PARAMETER");
 
   /**
    * A list containing all of the enum values that are defined.
    */
   static const List<CompletionSuggestionKind> VALUES =
-      const <CompletionSuggestionKind>[
+      <CompletionSuggestionKind>[
     ARGUMENT_LIST,
     IMPORT,
     IDENTIFIER,
@@ -1470,14 +1471,14 @@ class CompletionSuggestionKind implements Enum {
       case "PARAMETER":
         return PARAMETER;
     }
-    throw new Exception('Illegal enum value: $name');
+    throw Exception('Illegal enum value: $name');
   }
 
   factory CompletionSuggestionKind.fromJson(
       JsonDecoder jsonDecoder, String jsonPath, Object json) {
     if (json is String) {
       try {
-        return new CompletionSuggestionKind(json);
+        return CompletionSuggestionKind(json);
       } catch (_) {
         // Fall through
       }
@@ -1554,12 +1555,12 @@ class DiagnosticMessage implements HasToJson {
       }
       Location location;
       if (json.containsKey("location")) {
-        location = new Location.fromJson(
+        location = Location.fromJson(
             jsonDecoder, jsonPath + ".location", json["location"]);
       } else {
         throw jsonDecoder.mismatch(jsonPath, "location");
       }
-      return new DiagnosticMessage(message, location);
+      return DiagnosticMessage(message, location);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "DiagnosticMessage", json);
     }
@@ -1786,8 +1787,8 @@ class Element implements HasToJson {
     if (json is Map) {
       ElementKind kind;
       if (json.containsKey("kind")) {
-        kind = new ElementKind.fromJson(
-            jsonDecoder, jsonPath + ".kind", json["kind"]);
+        kind =
+            ElementKind.fromJson(jsonDecoder, jsonPath + ".kind", json["kind"]);
       } else {
         throw jsonDecoder.mismatch(jsonPath, "kind");
       }
@@ -1799,7 +1800,7 @@ class Element implements HasToJson {
       }
       Location location;
       if (json.containsKey("location")) {
-        location = new Location.fromJson(
+        location = Location.fromJson(
             jsonDecoder, jsonPath + ".location", json["location"]);
       }
       int flags;
@@ -1823,7 +1824,7 @@ class Element implements HasToJson {
         typeParameters = jsonDecoder.decodeString(
             jsonPath + ".typeParameters", json["typeParameters"]);
       }
-      return new Element(kind, name, flags,
+      return Element(kind, name, flags,
           location: location,
           parameters: parameters,
           returnType: returnType,
@@ -1928,74 +1929,68 @@ class Element implements HasToJson {
  * Clients may not extend, implement or mix-in this class.
  */
 class ElementKind implements Enum {
-  static const ElementKind CLASS = const ElementKind._("CLASS");
+  static const ElementKind CLASS = ElementKind._("CLASS");
 
-  static const ElementKind CLASS_TYPE_ALIAS =
-      const ElementKind._("CLASS_TYPE_ALIAS");
+  static const ElementKind CLASS_TYPE_ALIAS = ElementKind._("CLASS_TYPE_ALIAS");
 
-  static const ElementKind COMPILATION_UNIT =
-      const ElementKind._("COMPILATION_UNIT");
+  static const ElementKind COMPILATION_UNIT = ElementKind._("COMPILATION_UNIT");
 
-  static const ElementKind CONSTRUCTOR = const ElementKind._("CONSTRUCTOR");
+  static const ElementKind CONSTRUCTOR = ElementKind._("CONSTRUCTOR");
 
   static const ElementKind CONSTRUCTOR_INVOCATION =
-      const ElementKind._("CONSTRUCTOR_INVOCATION");
+      ElementKind._("CONSTRUCTOR_INVOCATION");
 
-  static const ElementKind ENUM = const ElementKind._("ENUM");
+  static const ElementKind ENUM = ElementKind._("ENUM");
 
-  static const ElementKind ENUM_CONSTANT = const ElementKind._("ENUM_CONSTANT");
+  static const ElementKind ENUM_CONSTANT = ElementKind._("ENUM_CONSTANT");
 
-  static const ElementKind EXTENSION = const ElementKind._("EXTENSION");
+  static const ElementKind EXTENSION = ElementKind._("EXTENSION");
 
-  static const ElementKind FIELD = const ElementKind._("FIELD");
+  static const ElementKind FIELD = ElementKind._("FIELD");
 
-  static const ElementKind FILE = const ElementKind._("FILE");
+  static const ElementKind FILE = ElementKind._("FILE");
 
-  static const ElementKind FUNCTION = const ElementKind._("FUNCTION");
+  static const ElementKind FUNCTION = ElementKind._("FUNCTION");
 
   static const ElementKind FUNCTION_INVOCATION =
-      const ElementKind._("FUNCTION_INVOCATION");
+      ElementKind._("FUNCTION_INVOCATION");
 
   static const ElementKind FUNCTION_TYPE_ALIAS =
-      const ElementKind._("FUNCTION_TYPE_ALIAS");
+      ElementKind._("FUNCTION_TYPE_ALIAS");
 
-  static const ElementKind GETTER = const ElementKind._("GETTER");
+  static const ElementKind GETTER = ElementKind._("GETTER");
 
-  static const ElementKind LABEL = const ElementKind._("LABEL");
+  static const ElementKind LABEL = ElementKind._("LABEL");
 
-  static const ElementKind LIBRARY = const ElementKind._("LIBRARY");
+  static const ElementKind LIBRARY = ElementKind._("LIBRARY");
 
-  static const ElementKind LOCAL_VARIABLE =
-      const ElementKind._("LOCAL_VARIABLE");
+  static const ElementKind LOCAL_VARIABLE = ElementKind._("LOCAL_VARIABLE");
 
-  static const ElementKind METHOD = const ElementKind._("METHOD");
+  static const ElementKind METHOD = ElementKind._("METHOD");
 
-  static const ElementKind MIXIN = const ElementKind._("MIXIN");
+  static const ElementKind MIXIN = ElementKind._("MIXIN");
 
-  static const ElementKind PARAMETER = const ElementKind._("PARAMETER");
+  static const ElementKind PARAMETER = ElementKind._("PARAMETER");
 
-  static const ElementKind PREFIX = const ElementKind._("PREFIX");
+  static const ElementKind PREFIX = ElementKind._("PREFIX");
 
-  static const ElementKind SETTER = const ElementKind._("SETTER");
+  static const ElementKind SETTER = ElementKind._("SETTER");
 
   static const ElementKind TOP_LEVEL_VARIABLE =
-      const ElementKind._("TOP_LEVEL_VARIABLE");
+      ElementKind._("TOP_LEVEL_VARIABLE");
 
-  static const ElementKind TYPE_PARAMETER =
-      const ElementKind._("TYPE_PARAMETER");
+  static const ElementKind TYPE_PARAMETER = ElementKind._("TYPE_PARAMETER");
 
-  static const ElementKind UNIT_TEST_GROUP =
-      const ElementKind._("UNIT_TEST_GROUP");
+  static const ElementKind UNIT_TEST_GROUP = ElementKind._("UNIT_TEST_GROUP");
 
-  static const ElementKind UNIT_TEST_TEST =
-      const ElementKind._("UNIT_TEST_TEST");
+  static const ElementKind UNIT_TEST_TEST = ElementKind._("UNIT_TEST_TEST");
 
-  static const ElementKind UNKNOWN = const ElementKind._("UNKNOWN");
+  static const ElementKind UNKNOWN = ElementKind._("UNKNOWN");
 
   /**
    * A list containing all of the enum values that are defined.
    */
-  static const List<ElementKind> VALUES = const <ElementKind>[
+  static const List<ElementKind> VALUES = <ElementKind>[
     CLASS,
     CLASS_TYPE_ALIAS,
     COMPILATION_UNIT,
@@ -2087,14 +2082,14 @@ class ElementKind implements Enum {
       case "UNKNOWN":
         return UNKNOWN;
     }
-    throw new Exception('Illegal enum value: $name');
+    throw Exception('Illegal enum value: $name');
   }
 
   factory ElementKind.fromJson(
       JsonDecoder jsonDecoder, String jsonPath, Object json) {
     if (json is String) {
       try {
-        return new ElementKind(json);
+        return ElementKind(json);
       } catch (_) {
         // Fall through
       }
@@ -2125,27 +2120,27 @@ class ElementKind implements Enum {
  * Clients may not extend, implement or mix-in this class.
  */
 class FoldingKind implements Enum {
-  static const FoldingKind ANNOTATIONS = const FoldingKind._("ANNOTATIONS");
+  static const FoldingKind ANNOTATIONS = FoldingKind._("ANNOTATIONS");
 
-  static const FoldingKind CLASS_BODY = const FoldingKind._("CLASS_BODY");
+  static const FoldingKind CLASS_BODY = FoldingKind._("CLASS_BODY");
 
-  static const FoldingKind DIRECTIVES = const FoldingKind._("DIRECTIVES");
+  static const FoldingKind DIRECTIVES = FoldingKind._("DIRECTIVES");
 
   static const FoldingKind DOCUMENTATION_COMMENT =
-      const FoldingKind._("DOCUMENTATION_COMMENT");
+      FoldingKind._("DOCUMENTATION_COMMENT");
 
-  static const FoldingKind FILE_HEADER = const FoldingKind._("FILE_HEADER");
+  static const FoldingKind FILE_HEADER = FoldingKind._("FILE_HEADER");
 
-  static const FoldingKind FUNCTION_BODY = const FoldingKind._("FUNCTION_BODY");
+  static const FoldingKind FUNCTION_BODY = FoldingKind._("FUNCTION_BODY");
 
-  static const FoldingKind INVOCATION = const FoldingKind._("INVOCATION");
+  static const FoldingKind INVOCATION = FoldingKind._("INVOCATION");
 
-  static const FoldingKind LITERAL = const FoldingKind._("LITERAL");
+  static const FoldingKind LITERAL = FoldingKind._("LITERAL");
 
   /**
    * A list containing all of the enum values that are defined.
    */
-  static const List<FoldingKind> VALUES = const <FoldingKind>[
+  static const List<FoldingKind> VALUES = <FoldingKind>[
     ANNOTATIONS,
     CLASS_BODY,
     DIRECTIVES,
@@ -2180,14 +2175,14 @@ class FoldingKind implements Enum {
       case "LITERAL":
         return LITERAL;
     }
-    throw new Exception('Illegal enum value: $name');
+    throw Exception('Illegal enum value: $name');
   }
 
   factory FoldingKind.fromJson(
       JsonDecoder jsonDecoder, String jsonPath, Object json) {
     if (json is String) {
       try {
-        return new FoldingKind(json);
+        return FoldingKind(json);
       } catch (_) {
         // Fall through
       }
@@ -2272,8 +2267,8 @@ class FoldingRegion implements HasToJson {
     if (json is Map) {
       FoldingKind kind;
       if (json.containsKey("kind")) {
-        kind = new FoldingKind.fromJson(
-            jsonDecoder, jsonPath + ".kind", json["kind"]);
+        kind =
+            FoldingKind.fromJson(jsonDecoder, jsonPath + ".kind", json["kind"]);
       } else {
         throw jsonDecoder.mismatch(jsonPath, "kind");
       }
@@ -2289,7 +2284,7 @@ class FoldingRegion implements HasToJson {
       } else {
         throw jsonDecoder.mismatch(jsonPath, "length");
       }
-      return new FoldingRegion(kind, offset, length);
+      return FoldingRegion(kind, offset, length);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "FoldingRegion", json);
     }
@@ -2398,7 +2393,7 @@ class HighlightRegion implements HasToJson {
     if (json is Map) {
       HighlightRegionType type;
       if (json.containsKey("type")) {
-        type = new HighlightRegionType.fromJson(
+        type = HighlightRegionType.fromJson(
             jsonDecoder, jsonPath + ".type", json["type"]);
       } else {
         throw jsonDecoder.mismatch(jsonPath, "type");
@@ -2415,7 +2410,7 @@ class HighlightRegion implements HasToJson {
       } else {
         throw jsonDecoder.mismatch(jsonPath, "length");
       }
-      return new HighlightRegion(type, offset, length);
+      return HighlightRegion(type, offset, length);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "HighlightRegion", json);
     }
@@ -2536,371 +2531,367 @@ class HighlightRegion implements HasToJson {
  */
 class HighlightRegionType implements Enum {
   static const HighlightRegionType ANNOTATION =
-      const HighlightRegionType._("ANNOTATION");
+      HighlightRegionType._("ANNOTATION");
 
-  static const HighlightRegionType BUILT_IN =
-      const HighlightRegionType._("BUILT_IN");
+  static const HighlightRegionType BUILT_IN = HighlightRegionType._("BUILT_IN");
 
-  static const HighlightRegionType CLASS = const HighlightRegionType._("CLASS");
+  static const HighlightRegionType CLASS = HighlightRegionType._("CLASS");
 
   static const HighlightRegionType COMMENT_BLOCK =
-      const HighlightRegionType._("COMMENT_BLOCK");
+      HighlightRegionType._("COMMENT_BLOCK");
 
   static const HighlightRegionType COMMENT_DOCUMENTATION =
-      const HighlightRegionType._("COMMENT_DOCUMENTATION");
+      HighlightRegionType._("COMMENT_DOCUMENTATION");
 
   static const HighlightRegionType COMMENT_END_OF_LINE =
-      const HighlightRegionType._("COMMENT_END_OF_LINE");
+      HighlightRegionType._("COMMENT_END_OF_LINE");
 
   static const HighlightRegionType CONSTRUCTOR =
-      const HighlightRegionType._("CONSTRUCTOR");
+      HighlightRegionType._("CONSTRUCTOR");
 
   static const HighlightRegionType DIRECTIVE =
-      const HighlightRegionType._("DIRECTIVE");
+      HighlightRegionType._("DIRECTIVE");
 
   /**
    * Only for version 1 of highlight.
    */
   static const HighlightRegionType DYNAMIC_TYPE =
-      const HighlightRegionType._("DYNAMIC_TYPE");
+      HighlightRegionType._("DYNAMIC_TYPE");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType DYNAMIC_LOCAL_VARIABLE_DECLARATION =
-      const HighlightRegionType._("DYNAMIC_LOCAL_VARIABLE_DECLARATION");
+      HighlightRegionType._("DYNAMIC_LOCAL_VARIABLE_DECLARATION");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType DYNAMIC_LOCAL_VARIABLE_REFERENCE =
-      const HighlightRegionType._("DYNAMIC_LOCAL_VARIABLE_REFERENCE");
+      HighlightRegionType._("DYNAMIC_LOCAL_VARIABLE_REFERENCE");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType DYNAMIC_PARAMETER_DECLARATION =
-      const HighlightRegionType._("DYNAMIC_PARAMETER_DECLARATION");
+      HighlightRegionType._("DYNAMIC_PARAMETER_DECLARATION");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType DYNAMIC_PARAMETER_REFERENCE =
-      const HighlightRegionType._("DYNAMIC_PARAMETER_REFERENCE");
+      HighlightRegionType._("DYNAMIC_PARAMETER_REFERENCE");
 
-  static const HighlightRegionType ENUM = const HighlightRegionType._("ENUM");
+  static const HighlightRegionType ENUM = HighlightRegionType._("ENUM");
 
   static const HighlightRegionType ENUM_CONSTANT =
-      const HighlightRegionType._("ENUM_CONSTANT");
+      HighlightRegionType._("ENUM_CONSTANT");
 
   /**
    * Only for version 1 of highlight.
    */
-  static const HighlightRegionType FIELD = const HighlightRegionType._("FIELD");
+  static const HighlightRegionType FIELD = HighlightRegionType._("FIELD");
 
   /**
    * Only for version 1 of highlight.
    */
   static const HighlightRegionType FIELD_STATIC =
-      const HighlightRegionType._("FIELD_STATIC");
+      HighlightRegionType._("FIELD_STATIC");
 
   /**
    * Only for version 1 of highlight.
    */
-  static const HighlightRegionType FUNCTION =
-      const HighlightRegionType._("FUNCTION");
+  static const HighlightRegionType FUNCTION = HighlightRegionType._("FUNCTION");
 
   /**
    * Only for version 1 of highlight.
    */
   static const HighlightRegionType FUNCTION_DECLARATION =
-      const HighlightRegionType._("FUNCTION_DECLARATION");
+      HighlightRegionType._("FUNCTION_DECLARATION");
 
   static const HighlightRegionType FUNCTION_TYPE_ALIAS =
-      const HighlightRegionType._("FUNCTION_TYPE_ALIAS");
+      HighlightRegionType._("FUNCTION_TYPE_ALIAS");
 
   /**
    * Only for version 1 of highlight.
    */
   static const HighlightRegionType GETTER_DECLARATION =
-      const HighlightRegionType._("GETTER_DECLARATION");
+      HighlightRegionType._("GETTER_DECLARATION");
 
   static const HighlightRegionType IDENTIFIER_DEFAULT =
-      const HighlightRegionType._("IDENTIFIER_DEFAULT");
+      HighlightRegionType._("IDENTIFIER_DEFAULT");
 
   static const HighlightRegionType IMPORT_PREFIX =
-      const HighlightRegionType._("IMPORT_PREFIX");
+      HighlightRegionType._("IMPORT_PREFIX");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType INSTANCE_FIELD_DECLARATION =
-      const HighlightRegionType._("INSTANCE_FIELD_DECLARATION");
+      HighlightRegionType._("INSTANCE_FIELD_DECLARATION");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType INSTANCE_FIELD_REFERENCE =
-      const HighlightRegionType._("INSTANCE_FIELD_REFERENCE");
+      HighlightRegionType._("INSTANCE_FIELD_REFERENCE");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType INSTANCE_GETTER_DECLARATION =
-      const HighlightRegionType._("INSTANCE_GETTER_DECLARATION");
+      HighlightRegionType._("INSTANCE_GETTER_DECLARATION");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType INSTANCE_GETTER_REFERENCE =
-      const HighlightRegionType._("INSTANCE_GETTER_REFERENCE");
+      HighlightRegionType._("INSTANCE_GETTER_REFERENCE");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType INSTANCE_METHOD_DECLARATION =
-      const HighlightRegionType._("INSTANCE_METHOD_DECLARATION");
+      HighlightRegionType._("INSTANCE_METHOD_DECLARATION");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType INSTANCE_METHOD_REFERENCE =
-      const HighlightRegionType._("INSTANCE_METHOD_REFERENCE");
+      HighlightRegionType._("INSTANCE_METHOD_REFERENCE");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType INSTANCE_SETTER_DECLARATION =
-      const HighlightRegionType._("INSTANCE_SETTER_DECLARATION");
+      HighlightRegionType._("INSTANCE_SETTER_DECLARATION");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType INSTANCE_SETTER_REFERENCE =
-      const HighlightRegionType._("INSTANCE_SETTER_REFERENCE");
+      HighlightRegionType._("INSTANCE_SETTER_REFERENCE");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType INVALID_STRING_ESCAPE =
-      const HighlightRegionType._("INVALID_STRING_ESCAPE");
+      HighlightRegionType._("INVALID_STRING_ESCAPE");
 
-  static const HighlightRegionType KEYWORD =
-      const HighlightRegionType._("KEYWORD");
+  static const HighlightRegionType KEYWORD = HighlightRegionType._("KEYWORD");
 
-  static const HighlightRegionType LABEL = const HighlightRegionType._("LABEL");
+  static const HighlightRegionType LABEL = HighlightRegionType._("LABEL");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType LIBRARY_NAME =
-      const HighlightRegionType._("LIBRARY_NAME");
+      HighlightRegionType._("LIBRARY_NAME");
 
   static const HighlightRegionType LITERAL_BOOLEAN =
-      const HighlightRegionType._("LITERAL_BOOLEAN");
+      HighlightRegionType._("LITERAL_BOOLEAN");
 
   static const HighlightRegionType LITERAL_DOUBLE =
-      const HighlightRegionType._("LITERAL_DOUBLE");
+      HighlightRegionType._("LITERAL_DOUBLE");
 
   static const HighlightRegionType LITERAL_INTEGER =
-      const HighlightRegionType._("LITERAL_INTEGER");
+      HighlightRegionType._("LITERAL_INTEGER");
 
   static const HighlightRegionType LITERAL_LIST =
-      const HighlightRegionType._("LITERAL_LIST");
+      HighlightRegionType._("LITERAL_LIST");
 
   static const HighlightRegionType LITERAL_MAP =
-      const HighlightRegionType._("LITERAL_MAP");
+      HighlightRegionType._("LITERAL_MAP");
 
   static const HighlightRegionType LITERAL_STRING =
-      const HighlightRegionType._("LITERAL_STRING");
+      HighlightRegionType._("LITERAL_STRING");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType LOCAL_FUNCTION_DECLARATION =
-      const HighlightRegionType._("LOCAL_FUNCTION_DECLARATION");
+      HighlightRegionType._("LOCAL_FUNCTION_DECLARATION");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType LOCAL_FUNCTION_REFERENCE =
-      const HighlightRegionType._("LOCAL_FUNCTION_REFERENCE");
+      HighlightRegionType._("LOCAL_FUNCTION_REFERENCE");
 
   /**
    * Only for version 1 of highlight.
    */
   static const HighlightRegionType LOCAL_VARIABLE =
-      const HighlightRegionType._("LOCAL_VARIABLE");
+      HighlightRegionType._("LOCAL_VARIABLE");
 
   static const HighlightRegionType LOCAL_VARIABLE_DECLARATION =
-      const HighlightRegionType._("LOCAL_VARIABLE_DECLARATION");
+      HighlightRegionType._("LOCAL_VARIABLE_DECLARATION");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType LOCAL_VARIABLE_REFERENCE =
-      const HighlightRegionType._("LOCAL_VARIABLE_REFERENCE");
+      HighlightRegionType._("LOCAL_VARIABLE_REFERENCE");
 
   /**
    * Only for version 1 of highlight.
    */
-  static const HighlightRegionType METHOD =
-      const HighlightRegionType._("METHOD");
+  static const HighlightRegionType METHOD = HighlightRegionType._("METHOD");
 
   /**
    * Only for version 1 of highlight.
    */
   static const HighlightRegionType METHOD_DECLARATION =
-      const HighlightRegionType._("METHOD_DECLARATION");
+      HighlightRegionType._("METHOD_DECLARATION");
 
   /**
    * Only for version 1 of highlight.
    */
   static const HighlightRegionType METHOD_DECLARATION_STATIC =
-      const HighlightRegionType._("METHOD_DECLARATION_STATIC");
+      HighlightRegionType._("METHOD_DECLARATION_STATIC");
 
   /**
    * Only for version 1 of highlight.
    */
   static const HighlightRegionType METHOD_STATIC =
-      const HighlightRegionType._("METHOD_STATIC");
+      HighlightRegionType._("METHOD_STATIC");
 
   /**
    * Only for version 1 of highlight.
    */
   static const HighlightRegionType PARAMETER =
-      const HighlightRegionType._("PARAMETER");
+      HighlightRegionType._("PARAMETER");
 
   /**
    * Only for version 1 of highlight.
    */
   static const HighlightRegionType SETTER_DECLARATION =
-      const HighlightRegionType._("SETTER_DECLARATION");
+      HighlightRegionType._("SETTER_DECLARATION");
 
   /**
    * Only for version 1 of highlight.
    */
   static const HighlightRegionType TOP_LEVEL_VARIABLE =
-      const HighlightRegionType._("TOP_LEVEL_VARIABLE");
+      HighlightRegionType._("TOP_LEVEL_VARIABLE");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType PARAMETER_DECLARATION =
-      const HighlightRegionType._("PARAMETER_DECLARATION");
+      HighlightRegionType._("PARAMETER_DECLARATION");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType PARAMETER_REFERENCE =
-      const HighlightRegionType._("PARAMETER_REFERENCE");
+      HighlightRegionType._("PARAMETER_REFERENCE");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType STATIC_FIELD_DECLARATION =
-      const HighlightRegionType._("STATIC_FIELD_DECLARATION");
+      HighlightRegionType._("STATIC_FIELD_DECLARATION");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType STATIC_GETTER_DECLARATION =
-      const HighlightRegionType._("STATIC_GETTER_DECLARATION");
+      HighlightRegionType._("STATIC_GETTER_DECLARATION");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType STATIC_GETTER_REFERENCE =
-      const HighlightRegionType._("STATIC_GETTER_REFERENCE");
+      HighlightRegionType._("STATIC_GETTER_REFERENCE");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType STATIC_METHOD_DECLARATION =
-      const HighlightRegionType._("STATIC_METHOD_DECLARATION");
+      HighlightRegionType._("STATIC_METHOD_DECLARATION");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType STATIC_METHOD_REFERENCE =
-      const HighlightRegionType._("STATIC_METHOD_REFERENCE");
+      HighlightRegionType._("STATIC_METHOD_REFERENCE");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType STATIC_SETTER_DECLARATION =
-      const HighlightRegionType._("STATIC_SETTER_DECLARATION");
+      HighlightRegionType._("STATIC_SETTER_DECLARATION");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType STATIC_SETTER_REFERENCE =
-      const HighlightRegionType._("STATIC_SETTER_REFERENCE");
+      HighlightRegionType._("STATIC_SETTER_REFERENCE");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType TOP_LEVEL_FUNCTION_DECLARATION =
-      const HighlightRegionType._("TOP_LEVEL_FUNCTION_DECLARATION");
+      HighlightRegionType._("TOP_LEVEL_FUNCTION_DECLARATION");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType TOP_LEVEL_FUNCTION_REFERENCE =
-      const HighlightRegionType._("TOP_LEVEL_FUNCTION_REFERENCE");
+      HighlightRegionType._("TOP_LEVEL_FUNCTION_REFERENCE");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType TOP_LEVEL_GETTER_DECLARATION =
-      const HighlightRegionType._("TOP_LEVEL_GETTER_DECLARATION");
+      HighlightRegionType._("TOP_LEVEL_GETTER_DECLARATION");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType TOP_LEVEL_GETTER_REFERENCE =
-      const HighlightRegionType._("TOP_LEVEL_GETTER_REFERENCE");
+      HighlightRegionType._("TOP_LEVEL_GETTER_REFERENCE");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType TOP_LEVEL_SETTER_DECLARATION =
-      const HighlightRegionType._("TOP_LEVEL_SETTER_DECLARATION");
+      HighlightRegionType._("TOP_LEVEL_SETTER_DECLARATION");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType TOP_LEVEL_SETTER_REFERENCE =
-      const HighlightRegionType._("TOP_LEVEL_SETTER_REFERENCE");
+      HighlightRegionType._("TOP_LEVEL_SETTER_REFERENCE");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType TOP_LEVEL_VARIABLE_DECLARATION =
-      const HighlightRegionType._("TOP_LEVEL_VARIABLE_DECLARATION");
+      HighlightRegionType._("TOP_LEVEL_VARIABLE_DECLARATION");
 
   static const HighlightRegionType TYPE_NAME_DYNAMIC =
-      const HighlightRegionType._("TYPE_NAME_DYNAMIC");
+      HighlightRegionType._("TYPE_NAME_DYNAMIC");
 
   static const HighlightRegionType TYPE_PARAMETER =
-      const HighlightRegionType._("TYPE_PARAMETER");
+      HighlightRegionType._("TYPE_PARAMETER");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType UNRESOLVED_INSTANCE_MEMBER_REFERENCE =
-      const HighlightRegionType._("UNRESOLVED_INSTANCE_MEMBER_REFERENCE");
+      HighlightRegionType._("UNRESOLVED_INSTANCE_MEMBER_REFERENCE");
 
   /**
    * Only for version 2 of highlight.
    */
   static const HighlightRegionType VALID_STRING_ESCAPE =
-      const HighlightRegionType._("VALID_STRING_ESCAPE");
+      HighlightRegionType._("VALID_STRING_ESCAPE");
 
   /**
    * A list containing all of the enum values that are defined.
    */
-  static const List<HighlightRegionType> VALUES = const <HighlightRegionType>[
+  static const List<HighlightRegionType> VALUES = <HighlightRegionType>[
     ANNOTATION,
     BUILT_IN,
     CLASS,
@@ -3130,14 +3121,14 @@ class HighlightRegionType implements Enum {
       case "VALID_STRING_ESCAPE":
         return VALID_STRING_ESCAPE;
     }
-    throw new Exception('Illegal enum value: $name');
+    throw Exception('Illegal enum value: $name');
   }
 
   factory HighlightRegionType.fromJson(
       JsonDecoder jsonDecoder, String jsonPath, Object json) {
     if (json is String) {
       try {
-        return new HighlightRegionType(json);
+        return HighlightRegionType(json);
       } catch (_) {
         // Fall through
       }
@@ -3254,7 +3245,7 @@ class KytheEntry implements HasToJson {
     if (json is Map) {
       KytheVName source;
       if (json.containsKey("source")) {
-        source = new KytheVName.fromJson(
+        source = KytheVName.fromJson(
             jsonDecoder, jsonPath + ".source", json["source"]);
       } else {
         throw jsonDecoder.mismatch(jsonPath, "source");
@@ -3265,7 +3256,7 @@ class KytheEntry implements HasToJson {
       }
       KytheVName target;
       if (json.containsKey("target")) {
-        target = new KytheVName.fromJson(
+        target = KytheVName.fromJson(
             jsonDecoder, jsonPath + ".target", json["target"]);
       }
       String fact;
@@ -3279,8 +3270,7 @@ class KytheEntry implements HasToJson {
         value = jsonDecoder.decodeList(
             jsonPath + ".value", json["value"], jsonDecoder.decodeInt);
       }
-      return new KytheEntry(source, fact,
-          kind: kind, target: target, value: value);
+      return KytheEntry(source, fact, kind: kind, target: target, value: value);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "KytheEntry", json);
     }
@@ -3476,7 +3466,7 @@ class KytheVName implements HasToJson {
       } else {
         throw jsonDecoder.mismatch(jsonPath, "language");
       }
-      return new KytheVName(signature, corpus, root, path, language);
+      return KytheVName(signature, corpus, root, path, language);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "KytheVName", json);
     }
@@ -3598,7 +3588,7 @@ class LinkedEditGroup implements HasToJson {
             jsonPath + ".positions",
             json["positions"],
             (String jsonPath, Object json) =>
-                new Position.fromJson(jsonDecoder, jsonPath, json));
+                Position.fromJson(jsonDecoder, jsonPath, json));
       } else {
         throw jsonDecoder.mismatch(jsonPath, "positions");
       }
@@ -3614,11 +3604,11 @@ class LinkedEditGroup implements HasToJson {
             jsonPath + ".suggestions",
             json["suggestions"],
             (String jsonPath, Object json) =>
-                new LinkedEditSuggestion.fromJson(jsonDecoder, jsonPath, json));
+                LinkedEditSuggestion.fromJson(jsonDecoder, jsonPath, json));
       } else {
         throw jsonDecoder.mismatch(jsonPath, "suggestions");
       }
-      return new LinkedEditGroup(positions, length, suggestions);
+      return LinkedEditGroup(positions, length, suggestions);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "LinkedEditGroup", json);
     }
@@ -3741,12 +3731,12 @@ class LinkedEditSuggestion implements HasToJson {
       }
       LinkedEditSuggestionKind kind;
       if (json.containsKey("kind")) {
-        kind = new LinkedEditSuggestionKind.fromJson(
+        kind = LinkedEditSuggestionKind.fromJson(
             jsonDecoder, jsonPath + ".kind", json["kind"]);
       } else {
         throw jsonDecoder.mismatch(jsonPath, "kind");
       }
-      return new LinkedEditSuggestion(value, kind);
+      return LinkedEditSuggestion(value, kind);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "LinkedEditSuggestion", json);
     }
@@ -3794,22 +3784,22 @@ class LinkedEditSuggestion implements HasToJson {
  */
 class LinkedEditSuggestionKind implements Enum {
   static const LinkedEditSuggestionKind METHOD =
-      const LinkedEditSuggestionKind._("METHOD");
+      LinkedEditSuggestionKind._("METHOD");
 
   static const LinkedEditSuggestionKind PARAMETER =
-      const LinkedEditSuggestionKind._("PARAMETER");
+      LinkedEditSuggestionKind._("PARAMETER");
 
   static const LinkedEditSuggestionKind TYPE =
-      const LinkedEditSuggestionKind._("TYPE");
+      LinkedEditSuggestionKind._("TYPE");
 
   static const LinkedEditSuggestionKind VARIABLE =
-      const LinkedEditSuggestionKind._("VARIABLE");
+      LinkedEditSuggestionKind._("VARIABLE");
 
   /**
    * A list containing all of the enum values that are defined.
    */
   static const List<LinkedEditSuggestionKind> VALUES =
-      const <LinkedEditSuggestionKind>[METHOD, PARAMETER, TYPE, VARIABLE];
+      <LinkedEditSuggestionKind>[METHOD, PARAMETER, TYPE, VARIABLE];
 
   @override
   final String name;
@@ -3827,14 +3817,14 @@ class LinkedEditSuggestionKind implements Enum {
       case "VARIABLE":
         return VARIABLE;
     }
-    throw new Exception('Illegal enum value: $name');
+    throw Exception('Illegal enum value: $name');
   }
 
   factory LinkedEditSuggestionKind.fromJson(
       JsonDecoder jsonDecoder, String jsonPath, Object json) {
     if (json is String) {
       try {
-        return new LinkedEditSuggestionKind(json);
+        return LinkedEditSuggestionKind(json);
       } catch (_) {
         // Fall through
       }
@@ -3988,7 +3978,7 @@ class Location implements HasToJson {
       } else {
         throw jsonDecoder.mismatch(jsonPath, "startColumn");
       }
-      return new Location(file, offset, length, startLine, startColumn);
+      return Location(file, offset, length, startLine, startColumn);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "Location", json);
     }
@@ -4124,7 +4114,7 @@ class NavigationRegion implements HasToJson {
       } else {
         throw jsonDecoder.mismatch(jsonPath, "targets");
       }
-      return new NavigationRegion(offset, length, targets);
+      return NavigationRegion(offset, length, targets);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "NavigationRegion", json);
     }
@@ -4291,8 +4281,8 @@ class NavigationTarget implements HasToJson {
     if (json is Map) {
       ElementKind kind;
       if (json.containsKey("kind")) {
-        kind = new ElementKind.fromJson(
-            jsonDecoder, jsonPath + ".kind", json["kind"]);
+        kind =
+            ElementKind.fromJson(jsonDecoder, jsonPath + ".kind", json["kind"]);
       } else {
         throw jsonDecoder.mismatch(jsonPath, "kind");
       }
@@ -4329,7 +4319,7 @@ class NavigationTarget implements HasToJson {
       } else {
         throw jsonDecoder.mismatch(jsonPath, "startColumn");
       }
-      return new NavigationTarget(
+      return NavigationTarget(
           kind, fileIndex, offset, length, startLine, startColumn);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "NavigationTarget", json);
@@ -4448,7 +4438,7 @@ class Occurrences implements HasToJson {
     if (json is Map) {
       Element element;
       if (json.containsKey("element")) {
-        element = new Element.fromJson(
+        element = Element.fromJson(
             jsonDecoder, jsonPath + ".element", json["element"]);
       } else {
         throw jsonDecoder.mismatch(jsonPath, "element");
@@ -4466,7 +4456,7 @@ class Occurrences implements HasToJson {
       } else {
         throw jsonDecoder.mismatch(jsonPath, "length");
       }
-      return new Occurrences(element, offsets, length);
+      return Occurrences(element, offsets, length);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "Occurrences", json);
     }
@@ -4637,7 +4627,7 @@ class Outline implements HasToJson {
     if (json is Map) {
       Element element;
       if (json.containsKey("element")) {
-        element = new Element.fromJson(
+        element = Element.fromJson(
             jsonDecoder, jsonPath + ".element", json["element"]);
       } else {
         throw jsonDecoder.mismatch(jsonPath, "element");
@@ -4674,9 +4664,9 @@ class Outline implements HasToJson {
             jsonPath + ".children",
             json["children"],
             (String jsonPath, Object json) =>
-                new Outline.fromJson(jsonDecoder, jsonPath, json));
+                Outline.fromJson(jsonDecoder, jsonPath, json));
       }
-      return new Outline(element, offset, length, codeOffset, codeLength,
+      return Outline(element, offset, length, codeOffset, codeLength,
           children: children);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "Outline", json);
@@ -4817,7 +4807,7 @@ class ParameterInfo implements HasToJson {
     if (json is Map) {
       ParameterKind kind;
       if (json.containsKey("kind")) {
-        kind = new ParameterKind.fromJson(
+        kind = ParameterKind.fromJson(
             jsonDecoder, jsonPath + ".kind", json["kind"]);
       } else {
         throw jsonDecoder.mismatch(jsonPath, "kind");
@@ -4839,7 +4829,7 @@ class ParameterInfo implements HasToJson {
         defaultValue = jsonDecoder.decodeString(
             jsonPath + ".defaultValue", json["defaultValue"]);
       }
-      return new ParameterInfo(kind, name, type, defaultValue: defaultValue);
+      return ParameterInfo(kind, name, type, defaultValue: defaultValue);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "ParameterInfo", json);
     }
@@ -4897,22 +4887,22 @@ class ParameterKind implements Enum {
   /**
    * A named parameter.
    */
-  static const ParameterKind NAMED = const ParameterKind._("NAMED");
+  static const ParameterKind NAMED = ParameterKind._("NAMED");
 
   /**
    * An optional parameter.
    */
-  static const ParameterKind OPTIONAL = const ParameterKind._("OPTIONAL");
+  static const ParameterKind OPTIONAL = ParameterKind._("OPTIONAL");
 
   /**
    * A required parameter.
    */
-  static const ParameterKind REQUIRED = const ParameterKind._("REQUIRED");
+  static const ParameterKind REQUIRED = ParameterKind._("REQUIRED");
 
   /**
    * A list containing all of the enum values that are defined.
    */
-  static const List<ParameterKind> VALUES = const <ParameterKind>[
+  static const List<ParameterKind> VALUES = <ParameterKind>[
     NAMED,
     OPTIONAL,
     REQUIRED
@@ -4932,14 +4922,14 @@ class ParameterKind implements Enum {
       case "REQUIRED":
         return REQUIRED;
     }
-    throw new Exception('Illegal enum value: $name');
+    throw Exception('Illegal enum value: $name');
   }
 
   factory ParameterKind.fromJson(
       JsonDecoder jsonDecoder, String jsonPath, Object json) {
     if (json is String) {
       try {
-        return new ParameterKind(json);
+        return ParameterKind(json);
       } catch (_) {
         // Fall through
       }
@@ -5017,7 +5007,7 @@ class Position implements HasToJson {
       } else {
         throw jsonDecoder.mismatch(jsonPath, "offset");
       }
-      return new Position(file, offset);
+      return Position(file, offset);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "Position", json);
     }
@@ -5070,34 +5060,34 @@ class Position implements HasToJson {
  */
 class RefactoringKind implements Enum {
   static const RefactoringKind CONVERT_GETTER_TO_METHOD =
-      const RefactoringKind._("CONVERT_GETTER_TO_METHOD");
+      RefactoringKind._("CONVERT_GETTER_TO_METHOD");
 
   static const RefactoringKind CONVERT_METHOD_TO_GETTER =
-      const RefactoringKind._("CONVERT_METHOD_TO_GETTER");
+      RefactoringKind._("CONVERT_METHOD_TO_GETTER");
 
   static const RefactoringKind EXTRACT_LOCAL_VARIABLE =
-      const RefactoringKind._("EXTRACT_LOCAL_VARIABLE");
+      RefactoringKind._("EXTRACT_LOCAL_VARIABLE");
 
   static const RefactoringKind EXTRACT_METHOD =
-      const RefactoringKind._("EXTRACT_METHOD");
+      RefactoringKind._("EXTRACT_METHOD");
 
   static const RefactoringKind EXTRACT_WIDGET =
-      const RefactoringKind._("EXTRACT_WIDGET");
+      RefactoringKind._("EXTRACT_WIDGET");
 
   static const RefactoringKind INLINE_LOCAL_VARIABLE =
-      const RefactoringKind._("INLINE_LOCAL_VARIABLE");
+      RefactoringKind._("INLINE_LOCAL_VARIABLE");
 
   static const RefactoringKind INLINE_METHOD =
-      const RefactoringKind._("INLINE_METHOD");
+      RefactoringKind._("INLINE_METHOD");
 
-  static const RefactoringKind MOVE_FILE = const RefactoringKind._("MOVE_FILE");
+  static const RefactoringKind MOVE_FILE = RefactoringKind._("MOVE_FILE");
 
-  static const RefactoringKind RENAME = const RefactoringKind._("RENAME");
+  static const RefactoringKind RENAME = RefactoringKind._("RENAME");
 
   /**
    * A list containing all of the enum values that are defined.
    */
-  static const List<RefactoringKind> VALUES = const <RefactoringKind>[
+  static const List<RefactoringKind> VALUES = <RefactoringKind>[
     CONVERT_GETTER_TO_METHOD,
     CONVERT_METHOD_TO_GETTER,
     EXTRACT_LOCAL_VARIABLE,
@@ -5135,14 +5125,14 @@ class RefactoringKind implements Enum {
       case "RENAME":
         return RENAME;
     }
-    throw new Exception('Illegal enum value: $name');
+    throw Exception('Illegal enum value: $name');
   }
 
   factory RefactoringKind.fromJson(
       JsonDecoder jsonDecoder, String jsonPath, Object json) {
     if (json is String) {
       try {
-        return new RefactoringKind(json);
+        return RefactoringKind(json);
       } catch (_) {
         // Fall through
       }
@@ -5273,7 +5263,7 @@ class RefactoringMethodParameter implements HasToJson {
       }
       RefactoringMethodParameterKind kind;
       if (json.containsKey("kind")) {
-        kind = new RefactoringMethodParameterKind.fromJson(
+        kind = RefactoringMethodParameterKind.fromJson(
             jsonDecoder, jsonPath + ".kind", json["kind"]);
       } else {
         throw jsonDecoder.mismatch(jsonPath, "kind");
@@ -5295,7 +5285,7 @@ class RefactoringMethodParameter implements HasToJson {
         parameters = jsonDecoder.decodeString(
             jsonPath + ".parameters", json["parameters"]);
       }
-      return new RefactoringMethodParameter(kind, type, name,
+      return RefactoringMethodParameter(kind, type, name,
           id: id, parameters: parameters);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "RefactoringMethodParameter", json);
@@ -5357,19 +5347,19 @@ class RefactoringMethodParameter implements HasToJson {
  */
 class RefactoringMethodParameterKind implements Enum {
   static const RefactoringMethodParameterKind REQUIRED =
-      const RefactoringMethodParameterKind._("REQUIRED");
+      RefactoringMethodParameterKind._("REQUIRED");
 
   static const RefactoringMethodParameterKind POSITIONAL =
-      const RefactoringMethodParameterKind._("POSITIONAL");
+      RefactoringMethodParameterKind._("POSITIONAL");
 
   static const RefactoringMethodParameterKind NAMED =
-      const RefactoringMethodParameterKind._("NAMED");
+      RefactoringMethodParameterKind._("NAMED");
 
   /**
    * A list containing all of the enum values that are defined.
    */
   static const List<RefactoringMethodParameterKind> VALUES =
-      const <RefactoringMethodParameterKind>[REQUIRED, POSITIONAL, NAMED];
+      <RefactoringMethodParameterKind>[REQUIRED, POSITIONAL, NAMED];
 
   @override
   final String name;
@@ -5385,14 +5375,14 @@ class RefactoringMethodParameterKind implements Enum {
       case "NAMED":
         return NAMED;
     }
-    throw new Exception('Illegal enum value: $name');
+    throw Exception('Illegal enum value: $name');
   }
 
   factory RefactoringMethodParameterKind.fromJson(
       JsonDecoder jsonDecoder, String jsonPath, Object json) {
     if (json is String) {
       try {
-        return new RefactoringMethodParameterKind(json);
+        return RefactoringMethodParameterKind(json);
       } catch (_) {
         // Fall through
       }
@@ -5482,7 +5472,7 @@ class RefactoringProblem implements HasToJson {
     if (json is Map) {
       RefactoringProblemSeverity severity;
       if (json.containsKey("severity")) {
-        severity = new RefactoringProblemSeverity.fromJson(
+        severity = RefactoringProblemSeverity.fromJson(
             jsonDecoder, jsonPath + ".severity", json["severity"]);
       } else {
         throw jsonDecoder.mismatch(jsonPath, "severity");
@@ -5496,10 +5486,10 @@ class RefactoringProblem implements HasToJson {
       }
       Location location;
       if (json.containsKey("location")) {
-        location = new Location.fromJson(
+        location = Location.fromJson(
             jsonDecoder, jsonPath + ".location", json["location"]);
       }
-      return new RefactoringProblem(severity, message, location: location);
+      return RefactoringProblem(severity, message, location: location);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "RefactoringProblem", json);
     }
@@ -5556,7 +5546,7 @@ class RefactoringProblemSeverity implements Enum {
    * A minor code problem. No example, because it is not used yet.
    */
   static const RefactoringProblemSeverity INFO =
-      const RefactoringProblemSeverity._("INFO");
+      RefactoringProblemSeverity._("INFO");
 
   /**
    * A minor code problem. For example names of local variables should be camel
@@ -5565,7 +5555,7 @@ class RefactoringProblemSeverity implements Enum {
    * to warn the user.
    */
   static const RefactoringProblemSeverity WARNING =
-      const RefactoringProblemSeverity._("WARNING");
+      RefactoringProblemSeverity._("WARNING");
 
   /**
    * The refactoring technically can be performed, but there is a logical
@@ -5579,7 +5569,7 @@ class RefactoringProblemSeverity implements Enum {
    * afterwards.
    */
   static const RefactoringProblemSeverity ERROR =
-      const RefactoringProblemSeverity._("ERROR");
+      RefactoringProblemSeverity._("ERROR");
 
   /**
    * A fatal error, which prevents performing the refactoring. For example the
@@ -5587,13 +5577,13 @@ class RefactoringProblemSeverity implements Enum {
    * selection is not a valid expression.
    */
   static const RefactoringProblemSeverity FATAL =
-      const RefactoringProblemSeverity._("FATAL");
+      RefactoringProblemSeverity._("FATAL");
 
   /**
    * A list containing all of the enum values that are defined.
    */
   static const List<RefactoringProblemSeverity> VALUES =
-      const <RefactoringProblemSeverity>[INFO, WARNING, ERROR, FATAL];
+      <RefactoringProblemSeverity>[INFO, WARNING, ERROR, FATAL];
 
   @override
   final String name;
@@ -5611,14 +5601,14 @@ class RefactoringProblemSeverity implements Enum {
       case "FATAL":
         return FATAL;
     }
-    throw new Exception('Illegal enum value: $name');
+    throw Exception('Illegal enum value: $name');
   }
 
   factory RefactoringProblemSeverity.fromJson(
       JsonDecoder jsonDecoder, String jsonPath, Object json) {
     if (json is String) {
       try {
-        return new RefactoringProblemSeverity(json);
+        return RefactoringProblemSeverity(json);
       } catch (_) {
         // Fall through
       }
@@ -5660,7 +5650,7 @@ class RemoveContentOverlay implements HasToJson {
       if (json["type"] != "remove") {
         throw jsonDecoder.mismatch(jsonPath, "equal " + "remove", json);
       }
-      return new RemoveContentOverlay();
+      return RemoveContentOverlay();
     } else {
       throw jsonDecoder.mismatch(jsonPath, "RemoveContentOverlay", json);
     }
@@ -5822,7 +5812,7 @@ class SourceChange implements HasToJson {
             jsonPath + ".edits",
             json["edits"],
             (String jsonPath, Object json) =>
-                new SourceFileEdit.fromJson(jsonDecoder, jsonPath, json));
+                SourceFileEdit.fromJson(jsonDecoder, jsonPath, json));
       } else {
         throw jsonDecoder.mismatch(jsonPath, "edits");
       }
@@ -5832,20 +5822,20 @@ class SourceChange implements HasToJson {
             jsonPath + ".linkedEditGroups",
             json["linkedEditGroups"],
             (String jsonPath, Object json) =>
-                new LinkedEditGroup.fromJson(jsonDecoder, jsonPath, json));
+                LinkedEditGroup.fromJson(jsonDecoder, jsonPath, json));
       } else {
         throw jsonDecoder.mismatch(jsonPath, "linkedEditGroups");
       }
       Position selection;
       if (json.containsKey("selection")) {
-        selection = new Position.fromJson(
+        selection = Position.fromJson(
             jsonDecoder, jsonPath + ".selection", json["selection"]);
       }
       String id;
       if (json.containsKey("id")) {
         id = jsonDecoder.decodeString(jsonPath + ".id", json["id"]);
       }
-      return new SourceChange(message,
+      return SourceChange(message,
           edits: edits,
           linkedEditGroups: linkedEditGroups,
           selection: selection,
@@ -6056,7 +6046,7 @@ class SourceEdit implements HasToJson {
       if (json.containsKey("id")) {
         id = jsonDecoder.decodeString(jsonPath + ".id", json["id"]);
       }
-      return new SourceEdit(offset, length, replacement, id: id);
+      return SourceEdit(offset, length, replacement, id: id);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "SourceEdit", json);
     }
@@ -6209,11 +6199,11 @@ class SourceFileEdit implements HasToJson {
             jsonPath + ".edits",
             json["edits"],
             (String jsonPath, Object json) =>
-                new SourceEdit.fromJson(jsonDecoder, jsonPath, json));
+                SourceEdit.fromJson(jsonDecoder, jsonPath, json));
       } else {
         throw jsonDecoder.mismatch(jsonPath, "edits");
       }
-      return new SourceFileEdit(file, fileStamp, edits: edits);
+      return SourceFileEdit(file, fileStamp, edits: edits);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "SourceFileEdit", json);
     }

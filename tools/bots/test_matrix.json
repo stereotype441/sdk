@@ -228,13 +228,11 @@
       "xcodebuild/DebugIA32/",
       "xcodebuild/DebugSIMARM/",
       "xcodebuild/DebugSIMARM64/",
-      "xcodebuild/DebugSIMARM_X64/",
       "xcodebuild/DebugX64/",
       "xcodebuild/ProductX64/",
       "xcodebuild/ReleaseIA32/",
       "xcodebuild/ReleaseSIMARM/",
       "xcodebuild/ReleaseSIMARM64/",
-      "xcodebuild/ReleaseSIMARM_X64/",
       "xcodebuild/ReleaseX64/",
       "samples/",
       "samples-dev/",
@@ -450,6 +448,11 @@
         "use-elf": true
     }},
     "dartk-(linux|mac|win)-(debug|product|release)-(ia32|x64)": { },
+    "dartk-weak-asserts-(linux|mac|win)-(debug|product|release)-x64": {
+      "options": {
+        "enable-experiment": ["non-nullable"],
+        "enable-asserts": true
+    }},
     "dartk-(linux|mac|win)-(debug|product|release)-(ia32|simarm|simarm64|x64)-ast": {
       "options": {
         "builder-tag": "ast",
@@ -1123,6 +1126,32 @@
     },
     {
       "builders": [
+        "vm-kernel-nnbd-linux-release-x64",
+        "vm-kernel-nnbd-linux-debug-x64"
+      ],
+      "meta": {
+        "description": "This configuration is for the VM nnbd builder group."
+      },
+      "steps": [
+        {
+          "name": "build dart",
+          "script": "tools/build.py",
+          "arguments": [
+            "--nnbd",
+            "create_sdk"
+          ]
+        },
+        {
+          "name": "vm weak tests with asserts",
+          "arguments": [
+            "-ndartk-weak-asserts-${system}-${mode}-${arch}",
+            "language"
+          ]
+        }
+      ]
+    },
+    {
+      "builders": [
         "vm-kernel-linux-product-x64",
         "vm-kernel-linux-release-x64",
         "vm-kernel-linux-debug-ia32",
@@ -1267,17 +1296,6 @@
           "arguments": [
             "pkg/dev_compiler/test/modular_suite.dart",
             "-ndartdevk-${system}-release",
-            "--verbose",
-            "--use-sdk"
-          ]
-        },
-        {
-          "name": "ddc kernel modular NNBD tests",
-          "script": "out/ReleaseX64/dart-sdk/bin/dart",
-          "testRunner": true,
-          "arguments": [
-            "pkg/dev_compiler/test/modular_suite_nnbd.dart",
-            "-ndartdevk-nnbd-${system}-release",
             "--verbose",
             "--use-sdk"
           ]
@@ -1912,7 +1930,7 @@
         {
           "name": "build dart",
           "script": "tools/build.py",
-          "arguments": ["--arch=ia32,x64",
+          "arguments": ["--arch=x64",
                         "--mode=release", "create_sdk"]
         },
         {
@@ -2579,7 +2597,7 @@
     {
       "builders": [
         "vm-kernel-precomp-linux-debug-simarm_x64",
-        "vm-kernel-precomp-mac-release-simarm_x64"
+        "vm-kernel-precomp-linux-release-simarm_x64"
       ],
       "meta": {
         "description": "This configuration runs tests for the simarm_x64 architecture."

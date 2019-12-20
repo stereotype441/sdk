@@ -55,7 +55,7 @@ Future<void> checkStackTrace(String rawStack, Dwarf dwarf,
   print("Raw stack trace:");
   print(rawStack);
 
-  var rawLines =
+  final rawLines =
       await Stream.value(rawStack).transform(const LineSplitter()).toList();
 
   final pcAddresses =

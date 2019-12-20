@@ -50,10 +50,11 @@ import 'const_spread_expected_list_or_set_test.dart'
     as const_spread_expected_list_or_set;
 import 'const_spread_expected_map_test.dart' as const_spread_expected_map;
 import 'dead_code_test.dart' as dead_code;
+import 'dead_null_coalesce_test.dart' as dead_null_coalesce;
 import 'default_list_constructor_mismatch_test.dart'
     as default_list_constructor_mismatch;
 import 'default_value_on_required_parameter_test.dart'
-    as default_value_on_required_paramter;
+    as default_value_on_required_parameter;
 import 'deferred_import_of_extension_test.dart' as deferred_import_of_extension;
 import 'deprecated_extends_function_test.dart' as deprecated_extends_function;
 import 'deprecated_function_class_declaration_test.dart'
@@ -67,9 +68,9 @@ import 'duplicate_import_test.dart' as duplicate_import;
 import 'duplicate_shown_name_test.dart' as duplicate_shown_name;
 import 'equal_elements_in_const_set_test.dart' as equal_elements_in_const_set;
 import 'equal_keys_in_const_map_test.dart' as equal_keys_in_const_map;
+import 'export_duplicated_library_named_test.dart'
+    as export_duplicated_library_named;
 import 'export_legacy_symbol_test.dart' as export_legacy_symbol;
-import 'export_suplicated_library_named_test.dart'
-    as export_suplicated_library_named;
 import 'expression_in_map_test.dart' as expression_in_map;
 import 'extends_disallowed_class_test.dart' as extends_disallowed_class;
 import 'extends_non_class_test.dart' as extends_non_class;
@@ -104,7 +105,7 @@ import 'field_initializer_not_assignable_test.dart'
 import 'field_initializing_formal_not_assignable_test.dart'
     as field_initializing_formal_not_assignable;
 import 'final_initialized_in_delcaration_and_constructor_test.dart'
-    as final_initialized_in_delcaration_and_constructor;
+    as final_initialized_in_declaration_and_constructor;
 import 'final_not_initialized_constructor_test.dart'
     as final_not_initialized_constructor;
 import 'final_not_initialized_test.dart' as final_not_initialized;
@@ -433,8 +434,9 @@ main() {
     const_spread_expected_list_or_set.main();
     const_spread_expected_map.main();
     dead_code.main();
+    dead_null_coalesce.main();
     default_list_constructor_mismatch.main();
-    default_value_on_required_paramter.main();
+    default_value_on_required_parameter.main();
     deferred_import_of_extension.main();
     deprecated_extends_function.main();
     deprecated_function_class_declaration.main();
@@ -447,8 +449,8 @@ main() {
     duplicate_shown_name.main();
     equal_elements_in_const_set.main();
     equal_keys_in_const_map.main();
+    export_duplicated_library_named.main();
     export_legacy_symbol.main();
-    export_suplicated_library_named.main();
     expression_in_map.main();
     extends_disallowed_class.main();
     extends_non_class.main();
@@ -469,7 +471,7 @@ main() {
     field_initializer_in_struct.main();
     field_initializer_not_assignable.main();
     field_initializing_formal_not_assignable.main();
-    final_initialized_in_delcaration_and_constructor.main();
+    final_initialized_in_declaration_and_constructor.main();
     final_not_initialized_constructor.main();
     final_not_initialized.main();
     generic_struct_subclass.main();

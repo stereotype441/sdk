@@ -9,8 +9,6 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/generated/engine.dart';
-import 'package:analyzer/src/generated/java_engine.dart';
-import 'package:analyzer/src/generated/source.dart';
 
 /**
  * The scope defined by a block.
@@ -428,15 +426,6 @@ class LibraryImportScope extends Scope {
   }
 
   @override
-  Source getSource(AstNode node) {
-    Source source = super.getSource(node);
-    if (source == null) {
-      source = _definingLibrary.definingCompilationUnit.source;
-    }
-    return source;
-  }
-
-  @override
   Element internalLookup(
       Identifier identifier, String name, LibraryElement referencingLibrary) {
     Element element = localLookup(name, referencingLibrary);
@@ -555,7 +544,7 @@ class LibraryImportScope extends Scope {
   }
 
   Element _lookupInImportedNamespaces(
-      Identifier identifier, Element lookup(Namespace namespace)) {
+      Identifier identifier, Element Function(Namespace namespace) lookup) {
     Element result;
 
     bool hasPotentialConflict = false;
@@ -609,7 +598,7 @@ class LibraryImportScope extends Scope {
  * A scope containing all of the names defined in a given library.
  */
 class LibraryScope extends EnclosedScope {
-  List<ExtensionElement> _extensions = <ExtensionElement>[];
+  final List<ExtensionElement> _extensions = <ExtensionElement>[];
 
   /**
    * Initialize a newly created scope representing the names defined in the
@@ -1079,22 +1068,6 @@ abstract class Scope {
   }
 
   /**
-   * Return the source that contains the given [identifier], or the source
-   * associated with this scope if the source containing the identifier could
-   * not be determined.
-   */
-  Source getSource(AstNode identifier) {
-    CompilationUnit unit = identifier.thisOrAncestorOfType<CompilationUnit>();
-    if (unit != null) {
-      CompilationUnitElement unitElement = unit.declaredElement;
-      if (unitElement != null) {
-        return unitElement.source;
-      }
-    }
-    return null;
-  }
-
-  /**
    * Return the element with which the given [name] is associated, or `null` if
    * the name is not defined within this scope. The [identifier] is the
    * identifier node to lookup element for, used to report correct kind of a
@@ -1175,7 +1148,7 @@ abstract class Scope {
    * Return `true` if the given [name] is a library-private name.
    */
   static bool isPrivateName(String name) =>
-      name != null && StringUtilities.startsWithChar(name, PRIVATE_NAME_PREFIX);
+      name != null && name.startsWith('_');
 }
 
 /**
