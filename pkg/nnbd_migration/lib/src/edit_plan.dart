@@ -466,7 +466,7 @@ class _ProvisionalParenEditPlan extends _NestedEditPlan {
     var changes = innerPlan.getChanges(false);
     if (!parens) {
       changes ??= {};
-      (changes[sourceNode.offset] ??= []).add(const RemoveText(1));
+      (changes[sourceNode.offset] ??= []).insert(0, const RemoveText(1));
       (changes[sourceNode.end - 1] ??= []).add(const RemoveText(1));
     }
     return changes;
