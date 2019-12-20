@@ -41,11 +41,7 @@ class DeleteText extends AtomicEdit {
   String get replacement => '';
 
   @override
-  bool operator ==(Object other) =>
-      other is DeleteText && length == other.length;
-
-  @override
-  String toString() => 'RemoveText($length)';
+  String toString() => 'DeleteText($length)';
 }
 
 /// A builder mechanism for recursively assembling edits to Dart source files.
@@ -214,11 +210,7 @@ class InsertText extends AtomicEdit {
   int get length => 0;
 
   @override
-  bool operator ==(Object other) =>
-      other is InsertText && replacement == other.replacement;
-
-  @override
-  String toString() => 'AddText(${json.encode(replacement)})';
+  String toString() => 'InsertText(${json.encode(replacement)})';
 }
 
 class _EndsInCascadeVisitor extends UnifyingAstVisitor<void> {
