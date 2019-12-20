@@ -42,6 +42,7 @@ abstract class EditPlan {
   /// structures it points to) may be incorporated into this edit plan and later
   /// modified.
   factory EditPlan.extract(AstNode sourceNode, EditPlan innerPlan) {
+    innerPlan = innerPlan._incorporateParenParentIfPresent(sourceNode);
     if (innerPlan is _ProvisionalParenEditPlan) {
       return _ProvisionalParenExtractEditPlan(sourceNode, innerPlan);
     } else {
@@ -52,16 +53,12 @@ abstract class EditPlan {
   factory EditPlan.passThrough(AstNode node,
       {Iterable<EditPlan> innerPlans = const []}) {
     if (node is ParenthesizedExpression) {
-      return EditPlan.provisionalParens(
+      return _ProvisionalParenEditPlan(
           node, _PassThroughEditPlan(node.expression, innerPlans: innerPlans));
     } else {
       return _PassThroughEditPlan(node, innerPlans: innerPlans);
     }
   }
-
-  factory EditPlan.provisionalParens(
-          ParenthesizedExpression node, EditPlan innerPlan) =
-      _ProvisionalParenEditPlan;
 
   factory EditPlan.surround(EditPlan innerPlan,
       {List<PreviewInfo> prefix,
@@ -128,7 +125,7 @@ abstract class EditPlan {
   EditPlan _incorporateParenParentIfPresent(AstNode limit) {
     var parent = sourceNode.parent;
     if (!identical(parent, this) && parent is ParenthesizedExpression) {
-      return EditPlan.provisionalParens(parent, this);
+      return _ProvisionalParenEditPlan(parent, this);
     } else {
       return this;
     }
