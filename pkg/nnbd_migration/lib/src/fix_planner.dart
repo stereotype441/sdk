@@ -16,18 +16,14 @@ abstract class Change {
 class FixPlanner extends UnifyingAstVisitor<EditPlan> {
   final Map<AstNode, Change> _changes;
 
-  final bool allowRedundantParens;
-
-  FixPlanner._(this._changes, this.allowRedundantParens);
+  FixPlanner._(this._changes);
 
   EditPlan visitNode(AstNode node) {
-    return EditPlan.passThrough(node,
-        innerPlans: <EditPlan>[
-          for (var entity in node.childEntities)
-            if (entity is AstNode)
-              (_changes[entity] ?? NoChange()).apply(entity, this)
-        ],
-        allowRedundantParens: allowRedundantParens);
+    return EditPlan.passThrough(node, innerPlans: <EditPlan>[
+      for (var entity in node.childEntities)
+        if (entity is AstNode)
+          (_changes[entity] ?? NoChange()).apply(entity, this)
+    ]);
   }
 
   EditPlan visitParenthesizedExpression(ParenthesizedExpression node) {
@@ -37,9 +33,8 @@ class FixPlanner extends UnifyingAstVisitor<EditPlan> {
   }
 
   static Map<int, List<PreviewInfo>> run(
-      CompilationUnit unit, Map<AstNode, Change> changes,
-      {bool allowRedundantParens = true}) {
-    var planner = FixPlanner._(changes, allowRedundantParens);
+      CompilationUnit unit, Map<AstNode, Change> changes) {
+    var planner = FixPlanner._(changes);
     var change = changes[unit] ?? NoChange();
     return change.apply(unit, planner).finalize();
   }

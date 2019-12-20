@@ -49,9 +49,8 @@ abstract class EditPlan {
     }
   }
 
-  factory EditPlan.passThrough(AstNode node,
-      {Iterable<EditPlan> innerPlans,
-      bool allowRedundantParens}) = _PassThroughEditPlan;
+  factory EditPlan.passThrough(AstNode node, {Iterable<EditPlan> innerPlans}) =
+      _PassThroughEditPlan;
 
   factory EditPlan.provisionalParens(
           ParenthesizedExpression node, EditPlan innerPlan) =
@@ -411,13 +410,12 @@ class _ParensNeededFromContextVisitor extends GeneralizingAstVisitor<bool> {
 
 class _PassThroughEditPlan extends _SimpleEditPlan {
   factory _PassThroughEditPlan(AstNode node,
-      {Iterable<EditPlan> innerPlans = const [],
-      bool allowRedundantParens = true}) {
+      {Iterable<EditPlan> innerPlans = const []}) {
     bool /*?*/ endsInCascade = node is CascadeExpression ? true : null;
     Map<int, List<PreviewInfo>> changes;
     for (var innerPlan in innerPlans) {
       var parensNeeded = innerPlan.parensNeededFromContext(node);
-      assert(_checkParenLogic(innerPlan, parensNeeded, allowRedundantParens));
+      assert(_checkParenLogic(innerPlan, parensNeeded));
       if (!parensNeeded && innerPlan is _ProvisionalParenEditPlan) {
         var innerInnerPlan = innerPlan.innerPlan;
         if (innerInnerPlan is _PassThroughEditPlan) {
@@ -441,25 +439,13 @@ class _PassThroughEditPlan extends _SimpleEditPlan {
       bool endsInCascade, Map<int, List<PreviewInfo>> innerChanges)
       : super(node, precedence, endsInCascade, innerChanges);
 
-  static bool _checkParenLogic(
-      EditPlan innerPlan, bool parensNeeded, bool allowRedundantParens) {
+  static bool _checkParenLogic(EditPlan innerPlan, bool parensNeeded) {
     // TODO(paulberry): make this check smarter.
     if (innerPlan is _SimpleEditPlan && innerPlan._innerChanges == null) {
       assert(
           !parensNeeded,
           "Code prior to fixes didn't need parens here, "
           "shouldn't need parens now.");
-    }
-    if (innerPlan is _ProvisionalParenEditPlan) {
-      var innerInnerPlan = innerPlan.innerPlan;
-      if (innerInnerPlan is _SimpleEditPlan &&
-          innerInnerPlan._innerChanges == null &&
-          !allowRedundantParens) {
-        assert(
-            parensNeeded,
-            "Code prior to fixes had parens here, but we think they aren't "
-            "needed now.");
-      }
     }
     return true;
   }

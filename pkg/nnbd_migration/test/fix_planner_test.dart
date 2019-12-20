@@ -57,7 +57,7 @@ class FixPlannerTest extends FixPlannerTestBase {
 
   void test_keep_redundant_parens() async {
     await analyze('f(a, b, c) => a + (b * c);');
-    var previewInfo = run({}, allowRedundantParens: true);
+    var previewInfo = run({});
     expect(previewInfo, isNull);
   }
 
@@ -184,9 +184,7 @@ class FixPlannerTestBase extends AbstractSingleUnitTest {
     await resolveTestUnit(code);
   }
 
-  Map<int, List<PreviewInfo>> run(Map<AstNode, Change> changes,
-      {bool allowRedundantParens = false}) {
-    return FixPlanner.run(testUnit, changes,
-        allowRedundantParens: allowRedundantParens);
+  Map<int, List<PreviewInfo>> run(Map<AstNode, Change> changes) {
+    return FixPlanner.run(testUnit, changes);
   }
 }
