@@ -191,6 +191,14 @@ class EditPlanTest extends AbstractSingleUnitTest {
         'f(a) => true ? (throw a..b = 0) : 2;');
   }
 
+  test_surround_endsInCascade_internal_throw() async {
+    await analyze('f(x, g) => g(0, throw x, 1);');
+    checkPlan(
+        EditPlan.surround(EditPlan.passThrough(findNode.simple('x, 1')),
+            suffix: [AddText('..y')], endsInCascade: true),
+        'f(x, g) => g(0, throw x..y, 1);');
+  }
+
   test_surround_endsInCascade_propagates() async {
     await analyze('f(a) => a..b = 0;');
     checkPlan(
