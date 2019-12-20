@@ -10,6 +10,7 @@ import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart';
 import 'package:meta/meta.dart';
 
+/// Implementation of [PreviewInfo] that inserts a string of new text.
 class AddText extends PreviewInfo {
   @override
   final String replacement;
@@ -27,8 +28,10 @@ class AddText extends PreviewInfo {
   String toString() => 'AddText(${json.encode(replacement)})';
 }
 
-/// TODO(paulberry): should this be called an EditBuilder?
+/// A builder mechanism for recursively assembling edits to Dart source files.
+/// Automatically handles addition and removal of parentheses when necessary.
 abstract class EditPlan {
+  /// The AST node to which the edit plan applies.
   final AstNode sourceNode;
 
   EditPlan(this.sourceNode);
@@ -38,9 +41,12 @@ abstract class EditPlan {
   /// [innerPlan.sourceNode].  This is intended to be used to drop unnecessary
   /// syntax (for example, to drop an unnecessary cast).
   ///
-  /// Caller should not re-use [innerPlan] after this call--it (and the data
-  /// structures it points to) may be incorporated into this edit plan and later
-  /// modified.
+  /// If no changes are required to the AST node that is being extracted, the
+  /// caller may create innerPlan using [EditPlan.passThrough].
+  ///
+  /// [innerPlan] will be finalized as a side effect (either immediately or when
+  /// the newly created plan is finalized), so it should not be re-used by the
+  /// caller.
   factory EditPlan.extract(AstNode sourceNode, EditPlan innerPlan) {
     innerPlan = innerPlan._incorporateParenParentIfPresent(sourceNode);
     if (innerPlan is _ProvisionalParenEditPlan) {
@@ -50,6 +56,12 @@ abstract class EditPlan {
     }
   }
 
+  /// Creates a new edit plan that makes no changes to [node], but may make
+  /// changes to some of its descendants (specified via [innerPlans]).
+  ///
+  /// All plans in [innerPlans] will be finalized as a side effect (either
+  /// immediately or when the newly created plan is finalized), so they should
+  /// not be re-used by the caller.
   factory EditPlan.passThrough(AstNode node,
       {Iterable<EditPlan> innerPlans = const []}) {
     if (node is ParenthesizedExpression) {
@@ -60,23 +72,47 @@ abstract class EditPlan {
     }
   }
 
+  /// Creates a new edit plan that consists of executing [innerPlan], and then
+  /// surrounding it with [prefix] and [suffix] text.  This could be used, for
+  /// example, to add a cast.
+  ///
+  /// If the edit plan is going to be used in a context where an expression is
+  /// expected, additional arguments should be provided to control the behavior
+  /// of parentheses insertion and deletion: [precedence] indicates the
+  /// precedence of the resulting expression.  [threshold] indicates the
+  /// precedence that is required for [innerPlan].  [associative] indicates
+  /// whether it is allowed for [innerPlan]'s precedence to match [threshold].
+  /// [allowCascade] indicates whether [innerPlan] can end in a cascade section
+  /// without requiring parentheses.  [endsInCascade] indicates whether the
+  /// resulting plan will end in a cascade.
+  ///
+  /// So, for example, if it is desired to append the suffix ` + foo` to an
+  /// expression, specify `Precedence.additive` for [precedence] and
+  /// [threshold], and `true` for [associative] (since addition associates to
+  /// the left).
+  ///
+  /// Note that [endsInCascade] is ignored if there is no [suffix] (since in
+  /// this situation, whether the final plan ends in a cascade section will be
+  /// determined by [innerPlan]).
   factory EditPlan.surround(EditPlan innerPlan,
-      {List<PreviewInfo> prefix,
-      List<PreviewInfo> suffix,
+      {List<AddText> prefix,
+      List<AddText> suffix,
       Precedence precedence = Precedence.primary,
       Precedence threshold = Precedence.none,
       bool associative = false,
       bool allowCascade = false,
       bool endsInCascade = false}) {
-    var innerChanges =
-        prefix == null ? null : {innerPlan.sourceNode.offset: prefix};
     var parensNeeded = innerPlan._parensNeeded(
         threshold: threshold,
         associative: associative,
         allowCascade: allowCascade);
-    innerChanges += innerPlan._getChanges(parensNeeded);
+    var innerChanges =
+        innerPlan._getChanges(parensNeeded) ?? <int, List<PreviewInfo>>{};
+    if (prefix != null) {
+      (innerChanges[innerPlan.sourceNode.offset] ??= []).insertAll(0, prefix);
+    }
     if (suffix != null) {
-      innerChanges += {innerPlan.sourceNode.end: suffix};
+      (innerChanges[innerPlan.sourceNode.end] ??= []).addAll(suffix);
     }
     return _SimpleEditPlan(
         innerPlan.sourceNode,
