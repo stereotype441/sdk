@@ -124,6 +124,12 @@ class EditPlanTest extends AbstractSingleUnitTest {
         'var x = ( 1 << 2 ) + 4;');
   }
 
+  test_extract_remove_parens() async {
+    await analyze('var x = (1 + 2) * 3 << 4;');
+    checkPlan(parenExtract(findNode.parenthesized('+'), findNode.binary('*')),
+        'var x = 1 + 2 << 4;');
+  }
+
   test_finalize_compilationUnit() async {
     // Verify that an edit plan referring to the entire compilation unit can be
     // finalized.  (This is an important corner case because the entire
