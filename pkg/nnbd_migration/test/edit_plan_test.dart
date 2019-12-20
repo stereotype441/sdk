@@ -32,10 +32,7 @@ class EditPlanTest extends AbstractSingleUnitTest {
     expect(plan.finalize().applyTo(code), expected);
   }
 
-  EditPlan parenExtract(ParenthesizedExpression inner, AstNode outer) =>
-      EditPlan.extract(outer, EditPlan.passThrough(inner.expression));
-
-  EditPlan simpleExtract(AstNode inner, AstNode outer) =>
+  EditPlan extract(AstNode inner, AstNode outer) =>
       EditPlan.extract(outer, EditPlan.passThrough(inner));
 
   test_cascadeSearchLimit() async {
@@ -82,7 +79,7 @@ class EditPlanTest extends AbstractSingleUnitTest {
   test_extract_add_parens() async {
     await analyze('f(g) => 1 * g(2, 3 + 4, 5);');
     checkPlan(
-        simpleExtract(
+        extract(
             findNode.binary('+'), findNode.functionExpressionInvocation('+')),
         'f(g) => 1 * (3 + 4);');
   }
@@ -90,12 +87,12 @@ class EditPlanTest extends AbstractSingleUnitTest {
   test_extract_inner_endsInCascade() async {
     await analyze('f(a, g) => a..b = g(0, 1..isEven, 2);');
     expect(
-        simpleExtract(findNode.cascade('1..isEven'),
+        extract(findNode.cascade('1..isEven'),
                 findNode.functionExpressionInvocation('g('))
             .endsInCascade,
         true);
     expect(
-        simpleExtract(findNode.integerLiteral('1'),
+        extract(findNode.integerLiteral('1'),
                 findNode.functionExpressionInvocation('g('))
             .endsInCascade,
         false);
@@ -103,13 +100,13 @@ class EditPlanTest extends AbstractSingleUnitTest {
 
   test_extract_left() async {
     await analyze('var x = 1 + 2;');
-    checkPlan(simpleExtract(findNode.integerLiteral('1'), findNode.binary('+')),
+    checkPlan(extract(findNode.integerLiteral('1'), findNode.binary('+')),
         'var x = 1;');
   }
 
   test_extract_no_parens_needed() async {
     await analyze('var x = 1 + 2 * 3;');
-    checkPlan(simpleExtract(findNode.integerLiteral('2'), findNode.binary('*')),
+    checkPlan(extract(findNode.integerLiteral('2'), findNode.binary('*')),
         'var x = 1 + 2;');
   }
 
@@ -117,13 +114,13 @@ class EditPlanTest extends AbstractSingleUnitTest {
     // Note: extra spaces to verify that we are really preserving the parens
     // rather than removing them and adding new ones.
     await analyze('var x = ( 1 << 2 ) * 3 + 4;');
-    checkPlan(parenExtract(findNode.parenthesized('<<'), findNode.binary('*')),
+    checkPlan(extract(findNode.binary('<<'), findNode.binary('*')),
         'var x = ( 1 << 2 ) + 4;');
   }
 
   test_extract_remove_parens() async {
     await analyze('var x = (1 + 2) * 3 << 4;');
-    checkPlan(parenExtract(findNode.parenthesized('+'), findNode.binary('*')),
+    checkPlan(extract(findNode.binary('+'), findNode.binary('*')),
         'var x = 1 + 2 << 4;');
   }
 
