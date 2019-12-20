@@ -530,7 +530,16 @@ class _SimpleEditPlan extends EditPlan {
   }
 }
 
-extension on List<PreviewInfo> {
+extension EndsInCascadeExtension on AstNode {
+  @visibleForTesting
+  bool get endsInCascade {
+    var visitor = _EndsInCascadeVisitor(end);
+    accept(visitor);
+    return visitor.endsInCascade;
+  }
+}
+
+extension PreviewList on List<PreviewInfo> {
   SourceEdit toSourceEdit(int offset) {
     var totalLength = 0;
     var replacement = '';
@@ -542,7 +551,7 @@ extension on List<PreviewInfo> {
   }
 }
 
-extension ChangeMap on Map<int, List<PreviewInfo>> {
+extension PreviewMap on Map<int, List<PreviewInfo>> {
   List<SourceEdit> toSourceEdits() {
     return [
       for (var offset in keys.toList()..sort((a, b) => b.compareTo(a)))
@@ -570,14 +579,5 @@ extension ChangeMap on Map<int, List<PreviewInfo>> {
       }
       return this;
     }
-  }
-}
-
-extension EndsInCascadeExtension on AstNode {
-  @visibleForTesting
-  bool get endsInCascade {
-    var visitor = _EndsInCascadeVisitor(end);
-    accept(visitor);
-    return visitor.endsInCascade;
   }
 }
