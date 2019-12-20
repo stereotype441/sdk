@@ -10,33 +10,51 @@ import 'package:nnbd_migration/src/edit_plan.dart';
 abstract class Change {
   const Change();
 
-  EditPlan apply(AstNode node, FixPlanner planner);
+  EditPlan apply(AstNode node, EditPlan Function(AstNode) gather);
 }
 
-class FixPlanner extends UnifyingAstVisitor<EditPlan> {
+class FixPlanner extends UnifyingAstVisitor<void> {
   final Map<AstNode, Change> _changes;
+
+  List<EditPlan> _plans = [];
 
   FixPlanner._(this._changes);
 
-  EditPlan visitNode(AstNode node) {
-    return EditPlan.passThrough(node, innerPlans: <EditPlan>[
-      for (var entity in node.childEntities)
-        if (entity is AstNode)
-          (_changes[entity] ?? NoChange()).apply(entity, this)
-    ]);
+  EditPlan gather(AstNode node) {
+    var previousPlans = _plans;
+    try {
+      _plans = [];
+      node.visitChildren(this);
+      return EditPlan.passThrough(node, innerPlans: _plans);
+    } finally {
+      _plans = previousPlans;
+    }
   }
 
-  EditPlan visitParenthesizedExpression(ParenthesizedExpression node) {
-    var change = _changes[node.expression] ?? NoChange();
-    var innerPlan = change.apply(node.expression, this);
-    return EditPlan.provisionalParens(node, innerPlan);
+  void visitNode(AstNode node) {
+    var change = _changes[node];
+    if (change != null) {
+      var innerPlan = change.apply(node, gather);
+      if (innerPlan != null) {
+        _plans.add(innerPlan);
+      }
+    } else {
+      node.visitChildren(this);
+    }
   }
 
   static Map<int, List<PreviewInfo>> run(
       CompilationUnit unit, Map<AstNode, Change> changes) {
     var planner = FixPlanner._(changes);
-    var change = changes[unit] ?? NoChange();
-    return change.apply(unit, planner).finalize();
+    unit.accept(planner);
+    if (planner._plans.isEmpty) return {};
+    EditPlan plan;
+    if (planner._plans.length == 1) {
+      plan = planner._plans[0];
+    } else {
+      plan = EditPlan.passThrough(unit, innerPlans: planner._plans);
+    }
+    return plan.finalize();
   }
 }
 
@@ -48,8 +66,8 @@ class IntroduceAs extends _NestableChange {
       : super(inner);
 
   @override
-  EditPlan apply(AstNode node, FixPlanner planner) {
-    var innerPlan = _inner.apply(node, planner);
+  EditPlan apply(AstNode node, EditPlan Function(AstNode) gather) {
+    var innerPlan = _inner.apply(node, gather);
     return EditPlan.surround(innerPlan,
         suffix: [AddText(' as $type')],
         precedence: Precedence.relational,
@@ -61,8 +79,8 @@ class MakeNullable extends _NestableChange {
   const MakeNullable([Change inner = const NoChange()]) : super(inner);
 
   @override
-  EditPlan apply(AstNode node, FixPlanner planner) {
-    var innerPlan = _inner.apply(node, planner);
+  EditPlan apply(AstNode node, EditPlan Function(AstNode) gather) {
+    var innerPlan = _inner.apply(node, gather);
     return EditPlan.surround(innerPlan, suffix: [const AddText('?')]);
   }
 }
@@ -71,8 +89,8 @@ class NoChange extends Change {
   const NoChange();
 
   @override
-  EditPlan apply(AstNode node, FixPlanner planner) {
-    return node.accept(planner);
+  EditPlan apply(AstNode node, EditPlan Function(AstNode) gather) {
+    return gather(node);
   }
 }
 
@@ -80,8 +98,8 @@ class NullCheck extends _NestableChange {
   const NullCheck([Change inner = const NoChange()]) : super(inner);
 
   @override
-  EditPlan apply(AstNode node, FixPlanner planner) {
-    var innerPlan = _inner.apply(node, planner);
+  EditPlan apply(AstNode node, EditPlan Function(AstNode) gather) {
+    var innerPlan = _inner.apply(node, gather);
     return EditPlan.surround(innerPlan,
         suffix: [const AddText('!')],
         precedence: Precedence.postfix,
@@ -94,9 +112,9 @@ class RemoveAs extends _NestableChange {
   const RemoveAs([Change inner = const NoChange()]) : super(inner);
 
   @override
-  EditPlan apply(AstNode node, FixPlanner planner) {
+  EditPlan apply(AstNode node, EditPlan Function(AstNode) gather) {
     return EditPlan.extract(
-        node, _inner.apply((node as AsExpression).expression, planner));
+        node, _inner.apply((node as AsExpression).expression, gather));
   }
 }
 

@@ -58,7 +58,7 @@ class FixPlannerTest extends FixPlannerTestBase {
   void test_keep_redundant_parens() async {
     await analyze('f(a, b, c) => a + (b * c);');
     var previewInfo = run({});
-    expect(previewInfo, isNull);
+    expect(previewInfo, isEmpty);
   }
 
   void test_makeNullable() async {
@@ -131,11 +131,13 @@ class FixPlannerTest extends FixPlannerTestBase {
   }
 
   void test_removeAs_parens_needed_due_to_cascade() async {
-    await analyze('f(a, c) => a..b = throw (c..d) as int;');
+    // Note: spaces around parens to verify that we don't remove the old parens
+    // and create new ones.
+    await analyze('f(a, c) => a..b = throw ( c..d ) as int;');
     var cd = findNode.cascade('c..d');
     var cast = cd.parent.parent;
     var previewInfo = run({cast: const RemoveAs()});
-    expect(previewInfo.applyTo(code), 'f(a, c) => a..b = (throw c..d);');
+    expect(previewInfo.applyTo(code), 'f(a, c) => a..b = throw ( c..d );');
   }
 
   void test_removeAs_parens_needed_due_to_cascade_in_conditional_else() async {

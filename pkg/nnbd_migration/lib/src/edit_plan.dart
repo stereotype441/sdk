@@ -49,8 +49,15 @@ abstract class EditPlan {
     }
   }
 
-  factory EditPlan.passThrough(AstNode node, {Iterable<EditPlan> innerPlans}) =
-      _PassThroughEditPlan;
+  factory EditPlan.passThrough(AstNode node,
+      {Iterable<EditPlan> innerPlans = const []}) {
+    if (node is ParenthesizedExpression) {
+      return EditPlan.provisionalParens(
+          node, _PassThroughEditPlan(node.expression, innerPlans: innerPlans));
+    } else {
+      return _PassThroughEditPlan(node, innerPlans: innerPlans);
+    }
+  }
 
   factory EditPlan.provisionalParens(
           ParenthesizedExpression node, EditPlan innerPlan) =
@@ -87,7 +94,8 @@ abstract class EditPlan {
   bool get endsInCascade;
 
   Map<int, List<PreviewInfo>> finalize() {
-    return getChanges(parensNeededFromContext(null));
+    var plan = _incorporateParenParentIfPresent(null);
+    return plan.getChanges(plan.parensNeededFromContext(null));
   }
 
   /// TODO(paulberry): can we hide/inline?
@@ -115,6 +123,15 @@ abstract class EditPlan {
     (changes[sourceNode.offset] ??= []).insert(0, const AddText('('));
     (changes[sourceNode.end] ??= []).add(const AddText(')'));
     return changes;
+  }
+
+  EditPlan _incorporateParenParentIfPresent(AstNode limit) {
+    var parent = sourceNode.parent;
+    if (!identical(parent, this) && parent is ParenthesizedExpression) {
+      return EditPlan.provisionalParens(parent, this);
+    } else {
+      return this;
+    }
   }
 
   static Map<int, List<PreviewInfo>> _createExtractChanges(EditPlan innerPlan,
@@ -414,6 +431,7 @@ class _PassThroughEditPlan extends _SimpleEditPlan {
     bool /*?*/ endsInCascade = node is CascadeExpression ? true : null;
     Map<int, List<PreviewInfo>> changes;
     for (var innerPlan in innerPlans) {
+      innerPlan = innerPlan._incorporateParenParentIfPresent(node);
       var parensNeeded = innerPlan.parensNeededFromContext(node);
       assert(_checkParenLogic(innerPlan, parensNeeded));
       if (!parensNeeded && innerPlan is _ProvisionalParenEditPlan) {

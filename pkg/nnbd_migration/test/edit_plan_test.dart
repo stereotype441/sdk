@@ -403,6 +403,12 @@ f(a, b) => throw a = b;
 g(a, c) => a..b = throw (c..d);
 ''');
   }
+
+  void test_precedenceChecker_detects_unnecessary_paren() async {
+    await resolveTestUnit('var x = (1);');
+    expect(() => testUnit.accept(_PrecedenceChecker()),
+        throwsA(TypeMatcher<TestFailure>()));
+  }
 }
 
 class _EditPlanTestBase extends AbstractSingleUnitTest {
@@ -639,16 +645,14 @@ class _ExtractEditPlanWithParensTest extends _EditPlanTestBase {
 class _PrecedenceChecker extends UnifyingAstVisitor<void> {
   @override
   void visitNode(AstNode node) {
-    var parent = node.parent;
-    if (parent is ParenthesizedExpression) {
-      expect(
-          EditPlan.provisionalParens(parent, EditPlan.passThrough(node))
-              .parensNeededFromContext(null),
-          true);
-    } else {
-      expect(EditPlan.passThrough(node).parensNeededFromContext(null), false);
-    }
+    expect(EditPlan.passThrough(node).parensNeededFromContext(null), false);
     node.visitChildren(this);
+  }
+
+  @override
+  void visitParenthesizedExpression(ParenthesizedExpression node) {
+    expect(EditPlan.passThrough(node).parensNeededFromContext(null), true);
+    node.expression.visitChildren(this);
   }
 }
 
