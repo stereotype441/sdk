@@ -10,22 +10,42 @@ import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart';
 import 'package:meta/meta.dart';
 
-/// Implementation of [PreviewInfo] that inserts a string of new text.
-class AddText extends PreviewInfo {
-  @override
-  final String replacement;
+/// Abstract base class representing a single atomic change to a source file,
+/// decoupled from the location at which the change is made.
+///
+/// May be subclassed to allow additional information to be recorded about the
+/// deletion.
+abstract class AtomicEdit {
+  const AtomicEdit();
 
-  const AddText(this.replacement);
+  /// Queries the number of source characters that should be deleted by this
+  /// edit, or 0 if no characters should be deleted.
+  int get length;
+
+  /// Queries the source characters that should be inserted by this edit, or
+  /// the empty string if no characters should be inserted.
+  String get replacement;
+}
+
+/// Implementation of [AtomicEdit] that deletes characters of text.
+///
+/// May be subclassed to allow additional information to be recorded about the
+/// deletion.
+class DeleteText extends AtomicEdit {
+  @override
+  final int length;
+
+  const DeleteText(this.length);
 
   @override
-  int get length => 0;
+  String get replacement => '';
 
   @override
   bool operator ==(Object other) =>
-      other is AddText && replacement == other.replacement;
+      other is DeleteText && length == other.length;
 
   @override
-  String toString() => 'AddText(${json.encode(replacement)})';
+  String toString() => 'RemoveText($length)';
 }
 
 /// A builder mechanism for recursively assembling edits to Dart source files.
@@ -95,8 +115,8 @@ abstract class EditPlan {
   /// this situation, whether the final plan ends in a cascade section will be
   /// determined by [innerPlan]).
   factory EditPlan.surround(EditPlan innerPlan,
-      {List<AddText> prefix,
-      List<AddText> suffix,
+      {List<InsertText> prefix,
+      List<InsertText> suffix,
       Precedence precedence = Precedence.primary,
       Precedence threshold = Precedence.none,
       bool associative = false,
@@ -107,7 +127,7 @@ abstract class EditPlan {
         associative: associative,
         allowCascade: allowCascade);
     var innerChanges =
-        innerPlan._getChanges(parensNeeded) ?? <int, List<PreviewInfo>>{};
+        innerPlan._getChanges(parensNeeded) ?? <int, List<AtomicEdit>>{};
     if (prefix != null) {
       (innerChanges[innerPlan.sourceNode.offset] ??= []).insertAll(0, prefix);
     }
@@ -126,7 +146,7 @@ abstract class EditPlan {
   @visibleForTesting
   bool get endsInCascade;
 
-  Map<int, List<PreviewInfo>> finalize() {
+  Map<int, List<AtomicEdit>> finalize() {
     var plan = _incorporateParenParentIfPresent(null);
     return plan._getChanges(plan.parensNeededFromContext(null));
   }
@@ -141,15 +161,15 @@ abstract class EditPlan {
             .accept(_ParensNeededFromContextVisitor(this, cascadeSearchLimit));
   }
 
-  Map<int, List<PreviewInfo>> _createAddParenChanges(
-      Map<int, List<PreviewInfo>> changes) {
+  Map<int, List<AtomicEdit>> _createAddParenChanges(
+      Map<int, List<AtomicEdit>> changes) {
     changes ??= {};
-    (changes[sourceNode.offset] ??= []).insert(0, const AddText('('));
-    (changes[sourceNode.end] ??= []).add(const AddText(')'));
+    (changes[sourceNode.offset] ??= []).insert(0, const InsertText('('));
+    (changes[sourceNode.end] ??= []).add(const InsertText(')'));
     return changes;
   }
 
-  Map<int, List<PreviewInfo>> _getChanges(bool parens);
+  Map<int, List<AtomicEdit>> _getChanges(bool parens);
 
   EditPlan _incorporateParenParentIfPresent(AstNode limit) {
     var parent = sourceNode.parent;
@@ -165,44 +185,40 @@ abstract class EditPlan {
       bool associative = false,
       bool allowCascade = false});
 
-  static Map<int, List<PreviewInfo>> _createExtractChanges(EditPlan innerPlan,
-      AstNode sourceNode, Map<int, List<PreviewInfo>> changes) {
+  static Map<int, List<AtomicEdit>> _createExtractChanges(EditPlan innerPlan,
+      AstNode sourceNode, Map<int, List<AtomicEdit>> changes) {
     // TODO(paulberry): don't remove comments
     if (innerPlan.sourceNode.offset > sourceNode.offset) {
       ((changes ??= {})[sourceNode.offset] ??= []).insert(
-          0, RemoveText(innerPlan.sourceNode.offset - sourceNode.offset));
+          0, DeleteText(innerPlan.sourceNode.offset - sourceNode.offset));
     }
     if (innerPlan.sourceNode.end < sourceNode.end) {
       ((changes ??= {})[innerPlan.sourceNode.end] ??= [])
-          .add(RemoveText(sourceNode.end - innerPlan.sourceNode.end));
+          .add(DeleteText(sourceNode.end - innerPlan.sourceNode.end));
     }
     return changes;
   }
 }
 
-abstract class PreviewInfo {
-  const PreviewInfo();
-
-  int get length;
-
-  String get replacement;
-}
-
-class RemoveText extends PreviewInfo {
+/// Implementation of [AtomicEdit] that inserts a string of new text.
+///
+/// May be subclassed to allow additional information to be recorded about the
+/// insertion.
+class InsertText extends AtomicEdit {
   @override
-  final int length;
+  final String replacement;
 
-  const RemoveText(this.length);
+  const InsertText(this.replacement);
 
   @override
-  String get replacement => '';
+  int get length => 0;
 
   @override
   bool operator ==(Object other) =>
-      other is RemoveText && length == other.length;
+      other is InsertText && replacement == other.replacement;
 
   @override
-  String toString() => 'RemoveText($length)';
+  String toString() => 'AddText(${json.encode(replacement)})';
 }
 
 class _EndsInCascadeVisitor extends UnifyingAstVisitor<void> {
@@ -226,7 +242,7 @@ class _EndsInCascadeVisitor extends UnifyingAstVisitor<void> {
 }
 
 class _ExtractEditPlan extends _NestedEditPlan {
-  final Map<int, List<PreviewInfo>> _innerChanges;
+  final Map<int, List<AtomicEdit>> _innerChanges;
 
   bool _finalized = false;
 
@@ -236,7 +252,7 @@ class _ExtractEditPlan extends _NestedEditPlan {
         super(sourceNode, innerPlan);
 
   @override
-  Map<int, List<PreviewInfo>> _getChanges(bool parens) {
+  Map<int, List<AtomicEdit>> _getChanges(bool parens) {
     assert(!_finalized);
     _finalized = true;
     return parens ? _createAddParenChanges(_innerChanges) : _innerChanges;
@@ -460,7 +476,7 @@ class _PassThroughEditPlan extends _SimpleEditPlan {
   factory _PassThroughEditPlan(AstNode node,
       {Iterable<EditPlan> innerPlans = const []}) {
     bool /*?*/ endsInCascade = node is CascadeExpression ? true : null;
-    Map<int, List<PreviewInfo>> changes;
+    Map<int, List<AtomicEdit>> changes;
     for (var innerPlan in innerPlans) {
       innerPlan = innerPlan._incorporateParenParentIfPresent(node);
       var parensNeeded = innerPlan.parensNeededFromContext(node);
@@ -485,7 +501,7 @@ class _PassThroughEditPlan extends _SimpleEditPlan {
   }
 
   _PassThroughEditPlan._(AstNode node, Precedence precedence,
-      bool endsInCascade, Map<int, List<PreviewInfo>> innerChanges)
+      bool endsInCascade, Map<int, List<AtomicEdit>> innerChanges)
       : super(node, precedence, endsInCascade, innerChanges);
 
   static bool _checkParenLogic(EditPlan innerPlan, bool parensNeeded) {
@@ -511,12 +527,12 @@ class _ProvisionalParenEditPlan extends _NestedEditPlan {
       : super(node, innerPlan);
 
   @override
-  Map<int, List<PreviewInfo>> _getChanges(bool parens) {
+  Map<int, List<AtomicEdit>> _getChanges(bool parens) {
     var changes = innerPlan._getChanges(false);
     if (!parens) {
       changes ??= {};
-      (changes[sourceNode.offset] ??= []).insert(0, const RemoveText(1));
-      (changes[sourceNode.end - 1] ??= []).add(const RemoveText(1));
+      (changes[sourceNode.offset] ??= []).insert(0, const DeleteText(1));
+      (changes[sourceNode.end - 1] ??= []).add(const DeleteText(1));
     }
     return changes;
   }
@@ -527,7 +543,7 @@ class _ProvisionalParenExtractEditPlan extends _NestedEditPlan {
       : super(sourceNode, innerPlan);
 
   @override
-  Map<int, List<PreviewInfo>> _getChanges(bool parens) {
+  Map<int, List<AtomicEdit>> _getChanges(bool parens) {
     var changes = innerPlan._getChanges(parens);
     return EditPlan._createExtractChanges(innerPlan, sourceNode, changes);
   }
@@ -539,7 +555,7 @@ class _SimpleEditPlan extends EditPlan {
   @override
   final bool endsInCascade;
 
-  final Map<int, List<PreviewInfo>> _innerChanges;
+  final Map<int, List<AtomicEdit>> _innerChanges;
 
   bool _finalized = false;
 
@@ -548,7 +564,7 @@ class _SimpleEditPlan extends EditPlan {
       : super(node);
 
   @override
-  Map<int, List<PreviewInfo>> _getChanges(bool parens) {
+  Map<int, List<AtomicEdit>> _getChanges(bool parens) {
     assert(!_finalized);
     _finalized = true;
     return parens ? _createAddParenChanges(_innerChanges) : _innerChanges;
@@ -575,7 +591,7 @@ extension EndsInCascadeExtension on AstNode {
   }
 }
 
-extension PreviewList on List<PreviewInfo> {
+extension PreviewList on List<AtomicEdit> {
   SourceEdit toSourceEdit(int offset) {
     var totalLength = 0;
     var replacement = '';
@@ -587,7 +603,7 @@ extension PreviewList on List<PreviewInfo> {
   }
 }
 
-extension PreviewMap on Map<int, List<PreviewInfo>> {
+extension PreviewMap on Map<int, List<AtomicEdit>> {
   List<SourceEdit> toSourceEdits() {
     return [
       for (var offset in keys.toList()..sort((a, b) => b.compareTo(a)))
@@ -599,8 +615,7 @@ extension PreviewMap on Map<int, List<PreviewInfo>> {
     return SourceEdit.applySequence(code, toSourceEdits());
   }
 
-  Map<int, List<PreviewInfo>> operator +(
-      Map<int, List<PreviewInfo>> newChanges) {
+  Map<int, List<AtomicEdit>> operator +(Map<int, List<AtomicEdit>> newChanges) {
     if (newChanges == null) return this;
     if (this == null) {
       return newChanges;

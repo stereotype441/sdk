@@ -186,7 +186,7 @@ class FixPlannerTestBase extends AbstractSingleUnitTest {
     await resolveTestUnit(code);
   }
 
-  Map<int, List<PreviewInfo>> run(Map<AstNode, NodeChange> changes) {
+  Map<int, List<AtomicEdit>> run(Map<AstNode, NodeChange> changes) {
     return FixPlanner.run(testUnit, changes);
   }
 }

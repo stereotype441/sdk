@@ -37,7 +37,7 @@ class FixPlanner extends UnifyingAstVisitor<void> {
     }
   }
 
-  static Map<int, List<PreviewInfo>> run(
+  static Map<int, List<AtomicEdit>> run(
       CompilationUnit unit, Map<AstNode, NodeChange> changes) {
     var planner = FixPlanner._(changes);
     unit.accept(planner);
@@ -70,7 +70,7 @@ class IntroduceAs extends _NestableChange {
   EditPlan apply(AstNode node, EditPlan Function(AstNode) gather) {
     var innerPlan = _inner.apply(node, gather);
     return EditPlan.surround(innerPlan,
-        suffix: [AddText(' as $type')],
+        suffix: [InsertText(' as $type')],
         precedence: Precedence.relational,
         threshold: Precedence.relational);
   }
@@ -87,7 +87,7 @@ class MakeNullable extends _NestableChange {
   @override
   EditPlan apply(AstNode node, EditPlan Function(AstNode) gather) {
     var innerPlan = _inner.apply(node, gather);
-    return EditPlan.surround(innerPlan, suffix: [const AddText('?')]);
+    return EditPlan.surround(innerPlan, suffix: [const InsertText('?')]);
   }
 }
 
@@ -123,7 +123,7 @@ class NullCheck extends _NestableChange {
   EditPlan apply(AstNode node, EditPlan Function(AstNode) gather) {
     var innerPlan = _inner.apply(node, gather);
     return EditPlan.surround(innerPlan,
-        suffix: [const AddText('!')],
+        suffix: [const InsertText('!')],
         precedence: Precedence.postfix,
         threshold: Precedence.postfix,
         associative: true);
