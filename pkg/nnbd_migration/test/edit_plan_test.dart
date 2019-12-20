@@ -50,7 +50,7 @@ class EditPlanTest extends AbstractSingleUnitTest {
     // The tests below will be based on an inner plan that adds `..isEven` after
     // the `1`.
     EditPlan makeInnerPlan() => EditPlan.surround(EditPlan.passThrough(one),
-        suffix: [AddText('..isEven')], endsInCascade: true);
+        suffix: [InsertText('..isEven')], endsInCascade: true);
     {
       // If we make a plan that passes through `c = 1`, containing a plan that
       // adds `..isEven` to `1`, then we don't necessarily want to add parens yet,
@@ -131,7 +131,7 @@ class EditPlanTest extends AbstractSingleUnitTest {
     await analyze('var x = 0;');
     checkPlan(
         EditPlan.surround(EditPlan.passThrough(testUnit),
-            suffix: [AddText(' var y = 0;')]),
+            suffix: [InsertText(' var y = 0;')]),
         'var x = 0; var y = 0;');
   }
 
@@ -139,11 +139,11 @@ class EditPlanTest extends AbstractSingleUnitTest {
     await analyze('f(x) => 1..isEven;');
     checkPlan(
         EditPlan.surround(EditPlan.passThrough(findNode.cascade('..')),
-            prefix: [AddText('x..y = ')]),
+            prefix: [InsertText('x..y = ')]),
         'f(x) => x..y = (1..isEven);');
     checkPlan(
         EditPlan.surround(EditPlan.passThrough(findNode.cascade('..')),
-            prefix: [AddText('x = ')], allowCascade: true),
+            prefix: [InsertText('x = ')], allowCascade: true),
         'f(x) => x = 1..isEven;');
   }
 
@@ -151,13 +151,13 @@ class EditPlanTest extends AbstractSingleUnitTest {
     await analyze('var x = 1 - 2;');
     checkPlan(
         EditPlan.surround(EditPlan.passThrough(findNode.binary('-')),
-            suffix: [AddText(' - 3')],
+            suffix: [InsertText(' - 3')],
             threshold: Precedence.additive,
             associative: true),
         'var x = 1 - 2 - 3;');
     checkPlan(
         EditPlan.surround(EditPlan.passThrough(findNode.binary('-')),
-            prefix: [AddText('0 - ')], threshold: Precedence.additive),
+            prefix: [InsertText('0 - ')], threshold: Precedence.additive),
         'var x = 0 - (1 - 2);');
   }
 
@@ -165,11 +165,11 @@ class EditPlanTest extends AbstractSingleUnitTest {
     await analyze('f(x) => x..y = 1;');
     checkPlan(
         EditPlan.surround(EditPlan.passThrough(findNode.integerLiteral('1')),
-            suffix: [AddText(' + 2')]),
+            suffix: [InsertText(' + 2')]),
         'f(x) => x..y = 1 + 2;');
     checkPlan(
         EditPlan.surround(EditPlan.passThrough(findNode.integerLiteral('1')),
-            suffix: [AddText('..isEven')], endsInCascade: true),
+            suffix: [InsertText('..isEven')], endsInCascade: true),
         'f(x) => x..y = (1..isEven);');
   }
 
@@ -178,16 +178,16 @@ class EditPlanTest extends AbstractSingleUnitTest {
     checkPlan(
         EditPlan.surround(
             EditPlan.surround(EditPlan.passThrough(findNode.cascade('..')),
-                prefix: [AddText('1 + ')], threshold: Precedence.additive),
-            prefix: [AddText('true ? ')],
-            suffix: [AddText(' : 2')]),
+                prefix: [InsertText('1 + ')], threshold: Precedence.additive),
+            prefix: [InsertText('true ? ')],
+            suffix: [InsertText(' : 2')]),
         'f(a) => true ? 1 + (a..b = 0) : 2;');
     checkPlan(
         EditPlan.surround(
             EditPlan.surround(EditPlan.passThrough(findNode.cascade('..')),
-                prefix: [AddText('throw ')], allowCascade: true),
-            prefix: [AddText('true ? ')],
-            suffix: [AddText(' : 2')]),
+                prefix: [InsertText('throw ')], allowCascade: true),
+            prefix: [InsertText('true ? ')],
+            suffix: [InsertText(' : 2')]),
         'f(a) => true ? (throw a..b = 0) : 2;');
   }
 
@@ -195,7 +195,7 @@ class EditPlanTest extends AbstractSingleUnitTest {
     await analyze('f(x, g) => g(0, throw x, 1);');
     checkPlan(
         EditPlan.surround(EditPlan.passThrough(findNode.simple('x, 1')),
-            suffix: [AddText('..y')], endsInCascade: true),
+            suffix: [InsertText('..y')], endsInCascade: true),
         'f(x, g) => g(0, throw x..y, 1);');
   }
 
@@ -204,18 +204,18 @@ class EditPlanTest extends AbstractSingleUnitTest {
     checkPlan(
         EditPlan.surround(
             EditPlan.surround(EditPlan.passThrough(findNode.cascade('..')),
-                prefix: [AddText('throw ')], allowCascade: true),
-            prefix: [AddText('true ? ')],
-            suffix: [AddText(' : 2')]),
+                prefix: [InsertText('throw ')], allowCascade: true),
+            prefix: [InsertText('true ? ')],
+            suffix: [InsertText(' : 2')]),
         'f(a) => true ? (throw a..b = 0) : 2;');
     checkPlan(
         EditPlan.surround(
             EditPlan.surround(
                 EditPlan.passThrough(findNode.integerLiteral('0')),
-                prefix: [AddText('throw ')],
+                prefix: [InsertText('throw ')],
                 allowCascade: true),
-            prefix: [AddText('true ? ')],
-            suffix: [AddText(' : 2')]),
+            prefix: [InsertText('true ? ')],
+            suffix: [InsertText(' : 2')]),
         'f(a) => a..b = true ? throw 0 : 2;');
   }
 
@@ -223,11 +223,11 @@ class EditPlanTest extends AbstractSingleUnitTest {
     await analyze('var x = 1 == true;');
     checkPlan(
         EditPlan.surround(EditPlan.passThrough(findNode.integerLiteral('1')),
-            suffix: [AddText(' < 2')], precedence: Precedence.relational),
+            suffix: [InsertText(' < 2')], precedence: Precedence.relational),
         'var x = 1 < 2 == true;');
     checkPlan(
         EditPlan.surround(EditPlan.passThrough(findNode.integerLiteral('1')),
-            suffix: [AddText(' == 2')], precedence: Precedence.equality),
+            suffix: [InsertText(' == 2')], precedence: Precedence.equality),
         'var x = (1 == 2) == true;');
   }
 
@@ -235,7 +235,7 @@ class EditPlanTest extends AbstractSingleUnitTest {
     await analyze('var x = 1;');
     checkPlan(
         EditPlan.surround(EditPlan.passThrough(findNode.integerLiteral('1')),
-            prefix: [AddText('throw ')]),
+            prefix: [InsertText('throw ')]),
         'var x = throw 1;');
   }
 
@@ -243,7 +243,7 @@ class EditPlanTest extends AbstractSingleUnitTest {
     await analyze('var x = 1;');
     checkPlan(
         EditPlan.surround(EditPlan.passThrough(findNode.integerLiteral('1')),
-            suffix: [AddText('..isEven')]),
+            suffix: [InsertText('..isEven')]),
         'var x = 1..isEven;');
   }
 
@@ -251,11 +251,11 @@ class EditPlanTest extends AbstractSingleUnitTest {
     await analyze('var x = 1 < 2;');
     checkPlan(
         EditPlan.surround(EditPlan.passThrough(findNode.binary('<')),
-            suffix: [AddText(' == true')], threshold: Precedence.equality),
+            suffix: [InsertText(' == true')], threshold: Precedence.equality),
         'var x = 1 < 2 == true;');
     checkPlan(
         EditPlan.surround(EditPlan.passThrough(findNode.binary('<')),
-            suffix: [AddText(' as bool')], threshold: Precedence.relational),
+            suffix: [InsertText(' as bool')], threshold: Precedence.relational),
         'var x = (1 < 2) as bool;');
   }
 }
