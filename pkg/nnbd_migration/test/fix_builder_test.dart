@@ -57,6 +57,20 @@ class FixBuilderTest extends EdgeBuilderTestBase {
     return unit;
   }
 
+  Map<AstNode, NodeChange> scopedChanges(
+          _FixBuilder fixBuilder, AstNode scope) =>
+      {
+        for (var entry in fixBuilder._changes.entries)
+          if (_isInScope(entry.key, scope)) entry.key: entry.value
+      };
+
+  Map<AstNode, Set<Problem>> scopedProblems(
+          _FixBuilder fixBuilder, AstNode scope) =>
+      {
+        for (var entry in fixBuilder._problems.entries)
+          if (_isInScope(entry.key, scope)) entry.key: entry.value
+      };
+
   test_assignmentExpression_compound_combined_nullable_noProblem() async {
     await analyze('''
 abstract class _C {
@@ -2125,8 +2139,8 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
     }
     expect((targetInfo.writeType as TypeImpl).toString(withNullability: true),
         expectedWriteType);
-    expect(fixBuilder.changes, changes);
-    expect(fixBuilder.problems, problems);
+    expect(scopedChanges(fixBuilder, node), changes);
+    expect(scopedProblems(fixBuilder, node), problems);
   }
 
   void visitStatement(Statement node,
@@ -2134,8 +2148,8 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
       Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
     _FixBuilder fixBuilder = _createFixBuilder(node);
     fixBuilder.visitAll(node.thisOrAncestorOfType<CompilationUnit>());
-    expect(fixBuilder.changes, changes);
-    expect(fixBuilder.problems, problems);
+    expect(scopedChanges(fixBuilder, node), changes);
+    expect(scopedProblems(fixBuilder, node), problems);
   }
 
   void visitSubexpression(Expression node, String expectedType,
@@ -2145,8 +2159,8 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
     fixBuilder.visitAll(node.thisOrAncestorOfType<CompilationUnit>());
     var type = node.staticType;
     expect((type as TypeImpl).toString(withNullability: true), expectedType);
-    expect(fixBuilder.changes, changes);
-    expect(fixBuilder.problems, problems);
+    expect(scopedChanges(fixBuilder, node), changes);
+    expect(scopedProblems(fixBuilder, node), problems);
   }
 
   void visitTypeAnnotation(TypeAnnotation node, String expectedType,
@@ -2156,8 +2170,8 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
     fixBuilder.visitAll(node.thisOrAncestorOfType<CompilationUnit>());
     var type = node.type;
     expect((type as TypeImpl).toString(withNullability: true), expectedType);
-    expect(fixBuilder.changes, changes);
-    expect(fixBuilder.problems, problems);
+    expect(scopedChanges(fixBuilder, node), changes);
+    expect(scopedProblems(fixBuilder, node), problems);
   }
 
   AssignmentTargetInfo _computeAssignmentTargetInfo(
@@ -2177,20 +2191,23 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
   _FixBuilder _createFixBuilder(AstNode scope) {
     var unit = scope.thisOrAncestorOfType<CompilationUnit>();
     var definingLibrary = unit.declaredElement.library;
-    return _FixBuilder(scope, testSource, decoratedClassHierarchy, typeProvider,
+    return _FixBuilder(testSource, decoratedClassHierarchy, typeProvider,
         typeSystem, variables, definingLibrary);
+  }
+
+  bool _isInScope(AstNode node, AstNode scope) {
+    return node
+            .thisOrAncestorMatching((ancestor) => identical(ancestor, scope)) !=
+        null;
   }
 }
 
 class _FixBuilder extends FixBuilder {
-  final AstNode scope;
+  final Map<AstNode, NodeChange> _changes = {};
 
-  final Map<AstNode, NodeChange> changes = {};
-
-  final Map<AstNode, Set<Problem>> problems = {};
+  final Map<AstNode, Set<Problem>> _problems = {};
 
   _FixBuilder(
-      this.scope,
       Source source,
       DecoratedClassHierarchy decoratedClassHierarchy,
       TypeProvider typeProvider,
@@ -2202,21 +2219,13 @@ class _FixBuilder extends FixBuilder {
 
   @override
   void addChange(AstNode node, NodeChange change) {
-    if (!_isInScope(node)) return;
-    expect(changes, isNot(contains(node)));
-    changes[node] = change;
+    expect(_changes, isNot(contains(node)));
+    _changes[node] = change;
   }
 
   @override
   void addProblem(AstNode node, Problem problem) {
-    if (!_isInScope(node)) return;
-    var newlyAdded = (problems[node] ??= {}).add(problem);
+    var newlyAdded = (_problems[node] ??= {}).add(problem);
     expect(newlyAdded, true);
-  }
-
-  bool _isInScope(AstNode node) {
-    return node
-            .thisOrAncestorMatching((ancestor) => identical(ancestor, scope)) !=
-        null;
   }
 }
