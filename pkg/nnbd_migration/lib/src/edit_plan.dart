@@ -70,11 +70,11 @@ abstract class EditPlan {
       bool endsInCascade = false}) {
     var innerChanges =
         prefix == null ? null : {innerPlan.sourceNode.offset: prefix};
-    var parensNeeded = innerPlan.parensNeeded(
+    var parensNeeded = innerPlan._parensNeeded(
         threshold: threshold,
         associative: associative,
         allowCascade: allowCascade);
-    innerChanges += innerPlan.getChanges(parensNeeded);
+    innerChanges += innerPlan._getChanges(parensNeeded);
     if (suffix != null) {
       innerChanges += {innerPlan.sourceNode.end: suffix};
     }
@@ -92,17 +92,8 @@ abstract class EditPlan {
 
   Map<int, List<PreviewInfo>> finalize() {
     var plan = _incorporateParenParentIfPresent(null);
-    return plan.getChanges(plan.parensNeededFromContext(null));
+    return plan._getChanges(plan.parensNeededFromContext(null));
   }
-
-  /// TODO(paulberry): can we hide/inline?
-  Map<int, List<PreviewInfo>> getChanges(bool parens);
-
-  /// TODO(paulberry): can we hide/inline?
-  bool parensNeeded(
-      {@required Precedence threshold,
-      bool associative = false,
-      bool allowCascade = false});
 
   @visibleForTesting
   bool parensNeededFromContext(AstNode cascadeSearchLimit) {
@@ -122,6 +113,8 @@ abstract class EditPlan {
     return changes;
   }
 
+  Map<int, List<PreviewInfo>> _getChanges(bool parens);
+
   EditPlan _incorporateParenParentIfPresent(AstNode limit) {
     var parent = sourceNode.parent;
     if (!identical(parent, this) && parent is ParenthesizedExpression) {
@@ -130,6 +123,11 @@ abstract class EditPlan {
       return this;
     }
   }
+
+  bool _parensNeeded(
+      {@required Precedence threshold,
+      bool associative = false,
+      bool allowCascade = false});
 
   static Map<int, List<PreviewInfo>> _createExtractChanges(EditPlan innerPlan,
       AstNode sourceNode, Map<int, List<PreviewInfo>> changes) {
@@ -198,11 +196,11 @@ class _ExtractEditPlan extends _NestedEditPlan {
 
   _ExtractEditPlan(AstNode sourceNode, EditPlan innerPlan)
       : _innerChanges = EditPlan._createExtractChanges(
-            innerPlan, sourceNode, innerPlan.getChanges(false)),
+            innerPlan, sourceNode, innerPlan._getChanges(false)),
         super(sourceNode, innerPlan);
 
   @override
-  Map<int, List<PreviewInfo>> getChanges(bool parens) {
+  Map<int, List<PreviewInfo>> _getChanges(bool parens) {
     assert(!_finalized);
     _finalized = true;
     return parens ? _createAddParenChanges(_innerChanges) : _innerChanges;
@@ -218,11 +216,11 @@ abstract class _NestedEditPlan extends EditPlan {
   bool get endsInCascade => innerPlan.endsInCascade;
 
   @override
-  bool parensNeeded(
+  bool _parensNeeded(
           {@required Precedence threshold,
           bool associative = false,
           bool allowCascade = false}) =>
-      innerPlan.parensNeeded(
+      innerPlan._parensNeeded(
           threshold: threshold,
           associative: associative,
           allowCascade: allowCascade);
@@ -245,7 +243,7 @@ class _ParensNeededFromContextVisitor extends GeneralizingAstVisitor<bool> {
   @override
   bool visitAsExpression(AsExpression node) {
     if (identical(_target, node.expression)) {
-      return _editPlan.parensNeeded(threshold: Precedence.relational);
+      return _editPlan._parensNeeded(threshold: Precedence.relational);
     } else {
       return false;
     }
@@ -254,7 +252,7 @@ class _ParensNeededFromContextVisitor extends GeneralizingAstVisitor<bool> {
   @override
   bool visitAssignmentExpression(AssignmentExpression node) {
     if (identical(_target, node.rightHandSide)) {
-      return _editPlan.parensNeeded(
+      return _editPlan._parensNeeded(
           threshold: Precedence.none,
           allowCascade: !_isRightmostDescendantOfCascadeSection(node));
     } else {
@@ -265,14 +263,14 @@ class _ParensNeededFromContextVisitor extends GeneralizingAstVisitor<bool> {
   @override
   bool visitAwaitExpression(AwaitExpression node) {
     assert(identical(_target, node.expression));
-    return _editPlan.parensNeeded(
+    return _editPlan._parensNeeded(
         threshold: Precedence.prefix, associative: true);
   }
 
   @override
   bool visitBinaryExpression(BinaryExpression node) {
     var precedence = node.precedence;
-    return _editPlan.parensNeeded(
+    return _editPlan._parensNeeded(
         threshold: precedence,
         associative: identical(_target, node.leftOperand) &&
             precedence != Precedence.relational &&
@@ -282,7 +280,7 @@ class _ParensNeededFromContextVisitor extends GeneralizingAstVisitor<bool> {
   @override
   bool visitCascadeExpression(CascadeExpression node) {
     if (identical(_target, node.target)) {
-      return _editPlan.parensNeeded(
+      return _editPlan._parensNeeded(
           threshold: Precedence.cascade, associative: true, allowCascade: true);
     } else {
       return false;
@@ -292,30 +290,30 @@ class _ParensNeededFromContextVisitor extends GeneralizingAstVisitor<bool> {
   @override
   bool visitConditionalExpression(ConditionalExpression node) {
     if (identical(_target, node.condition)) {
-      return _editPlan.parensNeeded(threshold: Precedence.conditional);
+      return _editPlan._parensNeeded(threshold: Precedence.conditional);
     } else {
-      return _editPlan.parensNeeded(threshold: Precedence.none);
+      return _editPlan._parensNeeded(threshold: Precedence.none);
     }
   }
 
   @override
   bool visitExtensionOverride(ExtensionOverride node) {
     assert(identical(_target, node.extensionName));
-    return _editPlan.parensNeeded(
+    return _editPlan._parensNeeded(
         threshold: Precedence.postfix, associative: true);
   }
 
   @override
   bool visitFunctionExpressionInvocation(FunctionExpressionInvocation node) {
     assert(identical(_target, node.function));
-    return _editPlan.parensNeeded(
+    return _editPlan._parensNeeded(
         threshold: Precedence.postfix, associative: true);
   }
 
   @override
   bool visitIndexExpression(IndexExpression node) {
     if (identical(_target, node.target)) {
-      return _editPlan.parensNeeded(
+      return _editPlan._parensNeeded(
           threshold: Precedence.postfix, associative: true);
     } else {
       return false;
@@ -325,7 +323,7 @@ class _ParensNeededFromContextVisitor extends GeneralizingAstVisitor<bool> {
   @override
   bool visitIsExpression(IsExpression node) {
     if (identical(_target, node.expression)) {
-      return _editPlan.parensNeeded(threshold: Precedence.relational);
+      return _editPlan._parensNeeded(threshold: Precedence.relational);
     } else {
       return false;
     }
@@ -333,7 +331,7 @@ class _ParensNeededFromContextVisitor extends GeneralizingAstVisitor<bool> {
 
   @override
   bool visitMethodInvocation(MethodInvocation node) {
-    return _editPlan.parensNeeded(
+    return _editPlan._parensNeeded(
         threshold: Precedence.postfix, associative: true);
   }
 
@@ -352,18 +350,18 @@ class _ParensNeededFromContextVisitor extends GeneralizingAstVisitor<bool> {
   @override
   bool visitPostfixExpression(PostfixExpression node) {
     assert(identical(_target, node.operand));
-    return _editPlan.parensNeeded(
+    return _editPlan._parensNeeded(
         threshold: Precedence.postfix, associative: true);
   }
 
   @override
   bool visitPrefixedIdentifier(PrefixedIdentifier node) {
     if (identical(_target, node.prefix)) {
-      return _editPlan.parensNeeded(
+      return _editPlan._parensNeeded(
           threshold: Precedence.postfix, associative: true);
     } else {
       assert(identical(_target, node.identifier));
-      return _editPlan.parensNeeded(
+      return _editPlan._parensNeeded(
           threshold: Precedence.primary, associative: true);
     }
   }
@@ -371,18 +369,18 @@ class _ParensNeededFromContextVisitor extends GeneralizingAstVisitor<bool> {
   @override
   bool visitPrefixExpression(PrefixExpression node) {
     assert(identical(_target, node.operand));
-    return _editPlan.parensNeeded(
+    return _editPlan._parensNeeded(
         threshold: Precedence.prefix, associative: true);
   }
 
   @override
   bool visitPropertyAccess(PropertyAccess node) {
     if (identical(_target, node.target)) {
-      return _editPlan.parensNeeded(
+      return _editPlan._parensNeeded(
           threshold: Precedence.postfix, associative: true);
     } else {
       assert(identical(_target, node.propertyName));
-      return _editPlan.parensNeeded(
+      return _editPlan._parensNeeded(
           threshold: Precedence.primary, associative: true);
     }
   }
@@ -390,7 +388,7 @@ class _ParensNeededFromContextVisitor extends GeneralizingAstVisitor<bool> {
   @override
   bool visitThrowExpression(ThrowExpression node) {
     assert(identical(_target, node.expression));
-    return _editPlan.parensNeeded(
+    return _editPlan._parensNeeded(
         threshold: Precedence.assignment,
         associative: true,
         allowCascade: !_isRightmostDescendantOfCascadeSection(node));
@@ -438,7 +436,7 @@ class _PassThroughEditPlan extends _SimpleEditPlan {
           parensNeeded = true;
         }
       }
-      changes += innerPlan.getChanges(parensNeeded);
+      changes += innerPlan._getChanges(parensNeeded);
       if (endsInCascade == null && innerPlan.sourceNode.end == node.end) {
         endsInCascade = !parensNeeded && innerPlan.endsInCascade;
       }
@@ -477,8 +475,8 @@ class _ProvisionalParenEditPlan extends _NestedEditPlan {
       : super(node, innerPlan);
 
   @override
-  Map<int, List<PreviewInfo>> getChanges(bool parens) {
-    var changes = innerPlan.getChanges(false);
+  Map<int, List<PreviewInfo>> _getChanges(bool parens) {
+    var changes = innerPlan._getChanges(false);
     if (!parens) {
       changes ??= {};
       (changes[sourceNode.offset] ??= []).insert(0, const RemoveText(1));
@@ -493,8 +491,8 @@ class _ProvisionalParenExtractEditPlan extends _NestedEditPlan {
       : super(sourceNode, innerPlan);
 
   @override
-  Map<int, List<PreviewInfo>> getChanges(bool parens) {
-    var changes = innerPlan.getChanges(parens);
+  Map<int, List<PreviewInfo>> _getChanges(bool parens) {
+    var changes = innerPlan._getChanges(parens);
     return EditPlan._createExtractChanges(innerPlan, sourceNode, changes);
   }
 }
@@ -514,14 +512,14 @@ class _SimpleEditPlan extends EditPlan {
       : super(node);
 
   @override
-  Map<int, List<PreviewInfo>> getChanges(bool parens) {
+  Map<int, List<PreviewInfo>> _getChanges(bool parens) {
     assert(!_finalized);
     _finalized = true;
     return parens ? _createAddParenChanges(_innerChanges) : _innerChanges;
   }
 
   @override
-  bool parensNeeded(
+  bool _parensNeeded(
       {@required Precedence threshold,
       bool associative = false,
       bool allowCascade = false}) {

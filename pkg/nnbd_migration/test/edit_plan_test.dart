@@ -408,65 +408,6 @@ g(a, c) => a..b = throw (c..d);
   }
 }
 
-class _EditPlanTestBase extends AbstractSingleUnitTest {
-  String code;
-
-  Future<void> analyze(String code) async {
-    this.code = code;
-    await resolveTestUnit(code);
-  }
-
-  void checkParensNeeded_additive(EditPlan plan) {
-    expect(
-        plan.parensNeeded(
-            threshold: Precedence.additive,
-            associative: true,
-            allowCascade: true),
-        false);
-    expect(
-        plan.parensNeeded(
-            threshold: Precedence.multiplicative,
-            associative: true,
-            allowCascade: true),
-        true);
-    expect(
-        plan.parensNeeded(
-            threshold: Precedence.shift, associative: true, allowCascade: true),
-        false);
-    expect(
-        plan.parensNeeded(
-            threshold: Precedence.additive,
-            associative: false,
-            allowCascade: true),
-        true);
-    expect(
-        plan.parensNeeded(
-            threshold: Precedence.multiplicative,
-            associative: false,
-            allowCascade: true),
-        true);
-    expect(
-        plan.parensNeeded(
-            threshold: Precedence.shift, associative: true, allowCascade: true),
-        false);
-  }
-
-  void checkParensNeeded_cascaded(EditPlan plan) {
-    expect(
-        plan.parensNeeded(
-            threshold: Precedence.assignment,
-            associative: true,
-            allowCascade: true),
-        false);
-    expect(
-        plan.parensNeeded(
-            threshold: Precedence.assignment,
-            associative: true,
-            allowCascade: false),
-        true);
-  }
-}
-
 class _PrecedenceChecker extends UnifyingAstVisitor<void> {
   @override
   void visitNode(AstNode node) {
