@@ -14,6 +14,7 @@ import 'package:analyzer/src/generated/type_system.dart';
 import 'package:analyzer/src/task/strong/checker.dart';
 import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
 import 'package:nnbd_migration/src/fix_builder.dart';
+import 'package:nnbd_migration/src/fix_planner.dart';
 import 'package:nnbd_migration/src/variables.dart';
 import 'package:test/test.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';

@@ -21,6 +21,7 @@ import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/generated/utilities_dart.dart';
 import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
 import 'package:nnbd_migration/src/decorated_type.dart';
+import 'package:nnbd_migration/src/fix_planner.dart';
 import 'package:nnbd_migration/src/variables.dart';
 
 /// Problem reported by [FixBuilder] when encountering a compound assignment
@@ -171,14 +172,6 @@ abstract class FixBuilder {
         strictInference: typeSystem.strictInference,
         typeProvider: nnbdTypeProvider);
   }
-}
-
-/// [NodeChange] reprensenting a type annotation that needs to have a question
-/// mark added to it, to make it nullable.
-class MakeNullable implements NodeChange {
-  factory MakeNullable() => const MakeNullable._();
-
-  const MakeNullable._();
 }
 
 /// Implementation of [MigrationResolutionHooks] that interfaces with
@@ -334,18 +327,6 @@ class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
     }
     return false;
   }
-}
-
-/// Base class representing a change the FixBuilder wishes to make to an AST
-/// node.
-abstract class NodeChange {}
-
-/// [NodeChange] representing an expression that needs to have a null check
-/// added to it.
-class NullCheck implements NodeChange {
-  factory NullCheck() => const NullCheck._();
-
-  const NullCheck._();
 }
 
 /// Common supertype for problems reported by [FixBuilder.addProblem].

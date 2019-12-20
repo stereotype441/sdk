@@ -7,14 +7,8 @@ import 'package:analyzer/dart/ast/precedence.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:nnbd_migration/src/edit_plan.dart';
 
-abstract class Change {
-  const Change();
-
-  EditPlan apply(AstNode node, EditPlan Function(AstNode) gather);
-}
-
 class FixPlanner extends UnifyingAstVisitor<void> {
-  final Map<AstNode, Change> _changes;
+  final Map<AstNode, NodeChange> _changes;
 
   List<EditPlan> _plans = [];
 
@@ -44,7 +38,7 @@ class FixPlanner extends UnifyingAstVisitor<void> {
   }
 
   static Map<int, List<PreviewInfo>> run(
-      CompilationUnit unit, Map<AstNode, Change> changes) {
+      CompilationUnit unit, Map<AstNode, NodeChange> changes) {
     var planner = FixPlanner._(changes);
     unit.accept(planner);
     if (planner._plans.isEmpty) return {};
@@ -62,8 +56,15 @@ class IntroduceAs extends _NestableChange {
   /// TODO(paulberry): shouldn't be a String
   final String type;
 
-  const IntroduceAs(this.type, [Change inner = const NoChange()])
+  const IntroduceAs(this.type, [NodeChange inner = const NoChange()])
       : super(inner);
+
+  @override
+  bool operator ==(Object other) {
+    return other is IntroduceAs &&
+        other._inner == this._inner &&
+        other.type == this.type;
+  }
 
   @override
   EditPlan apply(AstNode node, EditPlan Function(AstNode) gather) {
@@ -76,7 +77,12 @@ class IntroduceAs extends _NestableChange {
 }
 
 class MakeNullable extends _NestableChange {
-  const MakeNullable([Change inner = const NoChange()]) : super(inner);
+  const MakeNullable([NodeChange inner = const NoChange()]) : super(inner);
+
+  @override
+  bool operator ==(Object other) {
+    return other is MakeNullable && other._inner == this._inner;
+  }
 
   @override
   EditPlan apply(AstNode node, EditPlan Function(AstNode) gather) {
@@ -85,8 +91,13 @@ class MakeNullable extends _NestableChange {
   }
 }
 
-class NoChange extends Change {
+class NoChange extends NodeChange {
   const NoChange();
+
+  @override
+  bool operator ==(Object other) {
+    return other is NoChange;
+  }
 
   @override
   EditPlan apply(AstNode node, EditPlan Function(AstNode) gather) {
@@ -94,8 +105,19 @@ class NoChange extends Change {
   }
 }
 
+abstract class NodeChange {
+  const NodeChange();
+
+  EditPlan apply(AstNode node, EditPlan Function(AstNode) gather);
+}
+
 class NullCheck extends _NestableChange {
-  const NullCheck([Change inner = const NoChange()]) : super(inner);
+  const NullCheck([NodeChange inner = const NoChange()]) : super(inner);
+
+  @override
+  bool operator ==(Object other) {
+    return other is NullCheck && other._inner == this._inner;
+  }
 
   @override
   EditPlan apply(AstNode node, EditPlan Function(AstNode) gather) {
@@ -109,7 +131,12 @@ class NullCheck extends _NestableChange {
 }
 
 class RemoveAs extends _NestableChange {
-  const RemoveAs([Change inner = const NoChange()]) : super(inner);
+  const RemoveAs([NodeChange inner = const NoChange()]) : super(inner);
+
+  @override
+  bool operator ==(Object other) {
+    return other is RemoveAs && other._inner == this._inner;
+  }
 
   @override
   EditPlan apply(AstNode node, EditPlan Function(AstNode) gather) {
@@ -118,8 +145,8 @@ class RemoveAs extends _NestableChange {
   }
 }
 
-abstract class _NestableChange extends Change {
-  final Change _inner;
+abstract class _NestableChange extends NodeChange {
+  final NodeChange _inner;
 
   const _NestableChange(this._inner);
 }
