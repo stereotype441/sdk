@@ -4,18 +4,13 @@
 
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/token.dart';
-import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type.dart';
 import 'package:analyzer/src/dart/element/type_provider.dart';
 import 'package:analyzer/src/generated/resolver.dart';
-import 'package:analyzer/src/generated/source.dart';
-import 'package:analyzer/src/generated/type_system.dart';
 import 'package:analyzer/src/task/strong/checker.dart';
-import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
 import 'package:nnbd_migration/src/fix_builder.dart';
 import 'package:nnbd_migration/src/fix_planner.dart';
-import 'package:nnbd_migration/src/variables.dart';
 import 'package:test/test.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
 
@@ -56,6 +51,20 @@ class FixBuilderTest extends EdgeBuilderTestBase {
     graph.propagate();
     return unit;
   }
+
+  Map<AstNode, NodeChange> scopedChanges(
+          FixBuilder fixBuilder, AstNode scope) =>
+      {
+        for (var entry in fixBuilder.changes.entries)
+          if (_isInScope(entry.key, scope)) entry.key: entry.value
+      };
+
+  Map<AstNode, Set<Problem>> scopedProblems(
+          FixBuilder fixBuilder, AstNode scope) =>
+      {
+        for (var entry in fixBuilder.problems.entries)
+          if (_isInScope(entry.key, scope)) entry.key: entry.value
+      };
 
   test_assignmentExpression_compound_combined_nullable_noProblem() async {
     await analyze('''
@@ -2125,43 +2134,43 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
     }
     expect((targetInfo.writeType as TypeImpl).toString(withNullability: true),
         expectedWriteType);
-    expect(fixBuilder.changes, changes);
-    expect(fixBuilder.problems, problems);
+    expect(scopedChanges(fixBuilder, node), changes);
+    expect(scopedProblems(fixBuilder, node), problems);
   }
 
   void visitStatement(Statement node,
       {Map<AstNode, NodeChange> changes = const <Expression, NodeChange>{},
       Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
-    _FixBuilder fixBuilder = _createFixBuilder(node);
+    var fixBuilder = _createFixBuilder(node);
     fixBuilder.visitAll(node.thisOrAncestorOfType<CompilationUnit>());
-    expect(fixBuilder.changes, changes);
-    expect(fixBuilder.problems, problems);
+    expect(scopedChanges(fixBuilder, node), changes);
+    expect(scopedProblems(fixBuilder, node), problems);
   }
 
   void visitSubexpression(Expression node, String expectedType,
       {Map<AstNode, NodeChange> changes = const <Expression, NodeChange>{},
       Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
-    _FixBuilder fixBuilder = _createFixBuilder(node);
+    var fixBuilder = _createFixBuilder(node);
     fixBuilder.visitAll(node.thisOrAncestorOfType<CompilationUnit>());
     var type = node.staticType;
     expect((type as TypeImpl).toString(withNullability: true), expectedType);
-    expect(fixBuilder.changes, changes);
-    expect(fixBuilder.problems, problems);
+    expect(scopedChanges(fixBuilder, node), changes);
+    expect(scopedProblems(fixBuilder, node), problems);
   }
 
   void visitTypeAnnotation(TypeAnnotation node, String expectedType,
       {Map<AstNode, NodeChange> changes = const <AstNode, NodeChange>{},
       Map<AstNode, Set<Problem>> problems = const <AstNode, Set<Problem>>{}}) {
-    _FixBuilder fixBuilder = _createFixBuilder(node);
+    var fixBuilder = _createFixBuilder(node);
     fixBuilder.visitAll(node.thisOrAncestorOfType<CompilationUnit>());
     var type = node.type;
     expect((type as TypeImpl).toString(withNullability: true), expectedType);
-    expect(fixBuilder.changes, changes);
-    expect(fixBuilder.problems, problems);
+    expect(scopedChanges(fixBuilder, node), changes);
+    expect(scopedProblems(fixBuilder, node), problems);
   }
 
   AssignmentTargetInfo _computeAssignmentTargetInfo(
-      Expression node, _FixBuilder fixBuilder) {
+      Expression node, FixBuilder fixBuilder) {
     var assignment = node.thisOrAncestorOfType<AssignmentExpression>();
     var isReadWrite = assignment.operator.type != TokenType.EQ;
     var readType = isReadWrite
@@ -2174,50 +2183,14 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
     return AssignmentTargetInfo(readType, writeType);
   }
 
-  _FixBuilder _createFixBuilder(AstNode scope) {
+  FixBuilder _createFixBuilder(AstNode scope) {
     var unit = scope.thisOrAncestorOfType<CompilationUnit>();
     var definingLibrary = unit.declaredElement.library;
-    return _FixBuilder(scope, unit, testSource, decoratedClassHierarchy,
-        typeProvider, typeSystem, variables, definingLibrary);
-  }
-}
-
-class _FixBuilder extends FixBuilder {
-  final AstNode scope;
-
-  final CompilationUnit unit;
-
-  final Map<AstNode, NodeChange> changes = {};
-
-  final Map<AstNode, Set<Problem>> problems = {};
-
-  _FixBuilder(
-      this.scope,
-      this.unit,
-      Source source,
-      DecoratedClassHierarchy decoratedClassHierarchy,
-      TypeProvider typeProvider,
-      TypeSystemImpl typeSystem,
-      Variables variables,
-      LibraryElement definingLibrary)
-      : super(source, decoratedClassHierarchy, typeProvider, typeSystem,
-            variables, definingLibrary);
-
-  @override
-  void addChange(AstNode node, NodeChange change) {
-    if (!_isInScope(node)) return;
-    expect(changes, isNot(contains(node)));
-    changes[node] = change;
+    return FixBuilder(testSource, decoratedClassHierarchy, typeProvider,
+        typeSystem, variables, definingLibrary);
   }
 
-  @override
-  void addProblem(AstNode node, Problem problem) {
-    if (!_isInScope(node)) return;
-    var newlyAdded = (problems[node] ??= {}).add(problem);
-    expect(newlyAdded, true);
-  }
-
-  bool _isInScope(AstNode node) {
+  bool _isInScope(AstNode node, AstNode scope) {
     return node
             .thisOrAncestorMatching((ancestor) => identical(ancestor, scope)) !=
         null;
