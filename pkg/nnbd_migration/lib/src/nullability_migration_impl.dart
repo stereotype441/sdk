@@ -4,13 +4,16 @@
 
 import 'package:analysis_server/src/protocol_server.dart';
 import 'package:analyzer/dart/analysis/results.dart';
+import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:meta/meta.dart';
 import 'package:nnbd_migration/instrumentation.dart';
 import 'package:nnbd_migration/nnbd_migration.dart';
 import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
 import 'package:nnbd_migration/src/edge_builder.dart';
+import 'package:nnbd_migration/src/edit_plan.dart';
 import 'package:nnbd_migration/src/fix_builder.dart';
+import 'package:nnbd_migration/src/fix_planner.dart';
 import 'package:nnbd_migration/src/node_builder.dart';
 import 'package:nnbd_migration/src/nullability_node.dart';
 import 'package:nnbd_migration/src/potential_modification.dart';
@@ -55,8 +58,27 @@ class NullabilityMigrationImpl implements NullabilityMigration {
       _graph.propagate();
     }
     var unit = result.unit;
-    unit.accept(
-        throw UnimplementedError('TODO(paulberry): construct $FixBuilder'));
+    var compilationUnit = unit.declaredElement;
+    var library = compilationUnit.library;
+    var source = compilationUnit.source;
+    var fixBuilder = FixBuilder(
+        source,
+        _decoratedClassHierarchy,
+        result.typeProvider,
+        library.typeSystem as Dart2TypeSystem,
+        _variables,
+        library);
+    fixBuilder.visitAll(unit);
+    var changes = FixPlanner.run(unit, fixBuilder.changes);
+    for (var entry in changes.entries) {
+      final lineInfo = LineInfo.fromContent(source.contents.data);
+      // TODO(paulberry): don't pass null to _SingleNullabilityFix.
+      var fix = _SingleNullabilityFix(source, null, lineInfo);
+      listener.addFix(fix);
+      // TODO(paulberry): don't pass null to instrumentation.
+      _instrumentation?.fix(fix, null);
+      listener.addEdit(fix, entry.value.toSourceEdit(entry.key));
+    }
   }
 
   /// TODO(paulberry): eliminate?
@@ -128,18 +150,22 @@ class _SingleNullabilityFix extends SingleNullabilityFix {
       PotentialModification potentialModification, LineInfo lineInfo) {
     List<Location> locations = [];
 
-    for (var modification in potentialModification.modifications) {
-      final locationInfo = lineInfo.getLocation(modification.offset);
-      locations.add(new Location(
-        source.fullName,
-        modification.offset,
-        modification.length,
-        locationInfo.lineNumber,
-        locationInfo.columnNumber,
-      ));
+    // TODO(paulberry): null check is a hack.
+    if (potentialModification != null) {
+      for (var modification in potentialModification.modifications) {
+        final locationInfo = lineInfo.getLocation(modification.offset);
+        locations.add(new Location(
+          source.fullName,
+          modification.offset,
+          modification.length,
+          locationInfo.lineNumber,
+          locationInfo.columnNumber,
+        ));
+      }
     }
 
-    return _SingleNullabilityFix._(source, potentialModification.description,
+    // TODO(paulberry): null check is a hack.
+    return _SingleNullabilityFix._(source, potentialModification?.description,
         locations: locations);
   }
 
