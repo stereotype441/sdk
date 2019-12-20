@@ -56,9 +56,13 @@ class CompoundAssignmentReadNullable implements Problem {
 /// graph propagation, to figure out what changes need to be made.  It doesn't
 /// actually make the changes; it simply reports what changes are necessary
 /// through abstract methods.
-abstract class FixBuilder {
+class FixBuilder {
   /// The type provider providing non-nullable types.
   final TypeProvider typeProvider;
+
+  final Map<AstNode, NodeChange> changes = {};
+
+  final Map<AstNode, Set<Problem>> problems = {};
 
   /// The NNBD type system.
   final TypeSystemImpl _typeSystem;
@@ -116,16 +120,24 @@ abstract class FixBuilder {
         MigrationResolutionHooksImpl(this));
   }
 
-  /// Called whenever an AST node is found that needs to be changed.
-  void addChange(AstNode node, NodeChange change);
-
-  /// Called whenever code is found that can't be automatically fixed.
-  void addProblem(AstNode node, Problem problem);
-
   /// Visits the entire compilation [unit] using the analyzer's resolver and
   /// makes note of changes that need to be made.
   void visitAll(CompilationUnit unit) {
     unit.accept(_resolver);
+  }
+
+  /// Called whenever an AST node is found that needs to be changed.
+  void _addChange(AstNode node, NodeChange change) {
+    assert(!changes.containsKey(node));
+    changes[node] = change;
+  }
+
+  /// Called whenever code is found that can't be automatically fixed.
+  /// TODO(paulberry): make use of this.
+  void _addProblem(AstNode node, Problem problem) {
+    // ignore: unused_element
+    var newlyAdded = (problems[node] ??= {}).add(problem);
+    assert(newlyAdded);
   }
 
   /// Computes the type that [element] will have after migration.
@@ -249,7 +261,7 @@ class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
   }
 
   DartType _addNullCheck(Expression node, DartType type) {
-    _fixBuilder.addChange(node, NullCheck());
+    _fixBuilder._addChange(node, NullCheck());
     _flowAnalysis.nonNullAssert_end(node);
     return _fixBuilder._typeSystem.promoteToNonNull(type as TypeImpl);
   }
@@ -271,7 +283,7 @@ class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
     var decoratedType =
         _fixBuilder._variables.decoratedTypeAnnotation(source, node);
     if (!decoratedType.type.isDynamic && decoratedType.node.isNullable) {
-      _fixBuilder.addChange(node, MakeNullable());
+      _fixBuilder._addChange(node, MakeNullable());
     }
     if (node is TypeName) {
       var typeArguments = node.typeArguments;
@@ -329,5 +341,5 @@ class MigrationResolutionHooksImpl implements MigrationResolutionHooks {
   }
 }
 
-/// Common supertype for problems reported by [FixBuilder.addProblem].
+/// Common supertype for problems reported by [FixBuilder._addProblem].
 abstract class Problem {}
