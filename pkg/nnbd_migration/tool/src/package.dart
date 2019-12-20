@@ -9,7 +9,12 @@ import 'dart:io';
 
 import 'package:path/path.dart' as path;
 
+import 'multi_future_tracker.dart';
 import 'subprocess_launcher.dart';
+
+/// Route all executions of pub through this [MultiFutureTracker] to avoid
+/// parallel executions of the pub command.
+final MultiFutureTracker _pubTracker = MultiFutureTracker(1);
 
 /// Return a resolved path including the home directory in place of tilde
 /// references.
@@ -109,7 +114,7 @@ class GitPackage extends Package {
     int indexOfName = pathParts.lastIndexOf('git') - 1;
     if (indexOfName < 0) {
       throw ArgumentError(
-          'GitPackage can not figure out the name, pass it in manually');
+          'GitPackage can not figure out the name for $clonePath, pass it in manually?');
     }
     return pathParts[indexOfName];
   }
@@ -135,7 +140,9 @@ class GitPackage extends Package {
             workingDirectory: packagePath);
         // TODO(jcollins-g): allow for migrating dependencies?
       }
-      await launcher.runStreamed('pub', ['get'], workingDirectory: packagePath);
+      await _pubTracker.addFutureFromClosure(() =>
+          launcher.runStreamed('pub', ['get'], workingDirectory: packagePath));
+      await _pubTracker.wait();
     }
   }
 

@@ -15,11 +15,11 @@ namespace dart {
 
 #if defined(TARGET_ARCH_IS_32_BIT)
 #define FORM_ADDR ".4byte"
-#define ADDR_SIZE kInt32Size
 #elif defined(TARGET_ARCH_IS_64_BIT)
 #define FORM_ADDR ".8byte"
-#define ADDR_SIZE kInt64Size
 #endif
+
+static const intptr_t kTargetWordSize = sizeof(compiler::target::kWordSize);
 
 class InliningNode : public ZoneAllocated {
  public:
@@ -331,9 +331,9 @@ void Dwarf::WriteCompilationUnit() {
     cu_start = position();
   }
 
-  u2(2);              // DWARF version 2
-  u4(0);              // debug_abbrev_offset
-  u1(ADDR_SIZE);      // address_size
+  u2(2);                // DWARF version 2
+  u4(0);                // debug_abbrev_offset
+  u1(kTargetWordSize);  // address_size
 
   // Compilation Unit DIE. We describe the entire Dart program as a single
   // compilation unit. Note we write attributes in the same order we declared
@@ -782,8 +782,8 @@ void Dwarf::WriteLines() {
           // 4. Update LNP pc.
           if (previous_code_offset == -1) {
             // This variant is relocatable.
-            u1(0);              // This is an extended opcode
-            u1(1 + ADDR_SIZE);  // that is 5 or 9 bytes long
+            u1(0);                    // This is an extended opcode
+            u1(1 + kTargetWordSize);  // that is 5 or 9 bytes long
             u1(DW_LNE_set_address);
             if (asm_stream_) {
               Print(FORM_ADDR " %s + %" Pd32 "\n", asm_name, current_pc_offset);

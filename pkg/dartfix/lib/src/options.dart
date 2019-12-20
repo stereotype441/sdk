@@ -25,6 +25,7 @@ const _colorOption = 'color';
 const _helpOption = 'help';
 
 // options only supported by server 1.22.2 and greater
+const _previewOption = 'preview';
 const _serverSnapshot = 'server';
 const _verboseOption = 'verbose';
 
@@ -37,6 +38,8 @@ class Options {
   final String sdkPath;
   final String serverSnapshot;
 
+  bool isUpgrade = false;
+
   final bool pedanticFixes;
   final bool requiredFixes;
   final List<String> includeFixes;
@@ -44,9 +47,8 @@ class Options {
 
   final bool force;
   final bool showHelp;
-  final bool overwrite;
-  final String previewDir;
-  final String previewPort;
+  bool overwrite;
+  final bool preview;
   final bool useColor;
   final bool verbose;
 
@@ -56,8 +58,7 @@ class Options {
         excludeFixes = (results[excludeFixOption] as List ?? []).cast<String>(),
         overwrite = results[overwriteOption] as bool,
         pedanticFixes = results[pedanticOption] as bool,
-        previewDir = results[previewDirOption] as String,
-        previewPort = results[previewPortOption] as String,
+        preview = results[_previewOption] as bool,
         requiredFixes = results[requiredOption] as bool,
         sdkPath = results[sdkOption] as String ?? _getSdkPath(),
         serverSnapshot = results[_serverSnapshot] as String,
@@ -103,6 +104,11 @@ class Options {
           help: 'Display this help message.',
           defaultsTo: false,
           negatable: false)
+      ..addFlag(_previewOption,
+          help: 'Open the preview tool to view changes.',
+          defaultsTo: true,
+          negatable: true,
+          hide: true)
       ..addOption(sdkOption,
           help: 'Path to the SDK to analyze against.',
           valueHelp: 'path',
@@ -120,12 +126,9 @@ class Options {
           help: 'Use ansi colors when printing messages.',
           defaultsTo: Ansi.terminalSupportsAnsi)
       //
-      // Hidden options.
+      // Commands.
       //
-      ..addOption(previewDirOption,
-          help: 'Path to the preview directory', hide: true)
-      ..addOption(previewPortOption,
-          help: 'The port used by the preview tool', hide: true);
+      ..addCommand('upgrade');
 
     context ??= Context();
 
@@ -169,6 +172,45 @@ class Options {
     if (!context.exists(sdkPath)) {
       logger.stderr('Invalid Dart SDK path: $sdkPath');
       context.exit(19);
+    }
+
+    var command = results.command;
+    if (command != null) {
+      if (command.name == 'upgrade') {
+        options.isUpgrade = true;
+        var rest = command.rest;
+        if (rest.isNotEmpty) {
+          if (rest[0] == 'sdk') {
+            if (options.includeFixes.isNotEmpty) {
+              logger.stderr('Cannot define includeFixes when using upgrade.');
+              context.exit(22);
+            }
+            if (options.excludeFixes.isNotEmpty) {
+              logger.stderr('Cannot define excludeFixes when using upgrade.');
+              context.exit(22);
+            }
+            if (options.pedanticFixes) {
+              logger.stderr('Cannot use pedanticFixes when using upgrade.');
+              context.exit(22);
+            }
+            if (options.requiredFixes) {
+              logger.stderr('Cannot use requiredFixes when using upgrade.');
+              context.exit(22);
+            }
+            options.includeFixes.add('non-nullable');
+            if (rest.length > 1) {
+              options.targets = command.rest.sublist(1);
+            } else {
+              options.targets = [Directory.current.path];
+            }
+          } else {
+            logger
+                .stderr('Missing or invalid specification of what to upgrade.');
+            logger.stderr("(Currently 'sdk' is the only supported option.)");
+            context.exit(22);
+          }
+        }
+      }
     }
 
     // Check for files and/or directories to analyze.

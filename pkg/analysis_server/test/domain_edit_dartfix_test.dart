@@ -60,13 +60,15 @@ class EditDartfixDomainHandlerTest extends AbstractAnalysisTest {
       List<String> excludedFixes,
       bool pedantic}) async {
     final id = nextRequestId;
-    final params = new EditDartfixParams([projectPath]);
+    final params = EditDartfixParams([projectPath]);
     params.includedFixes = includedFixes;
     params.excludedFixes = excludedFixes;
     params.includePedanticFixes = pedantic;
-    final request = new Request(id, 'edit.dartfix', params.toJson());
+    final request = Request(id, 'edit.dartfix', params.toJson());
 
-    final response = await new EditDartFix(server, request).compute();
+    var fix = EditDartFix(server, request);
+    final response = await fix.compute();
+    fix.nonNullableFixTask?.server?.close();
     expect(response.id, id);
     return response;
   }
@@ -136,17 +138,17 @@ const double myDouble = 42.0;
     addTestFile('''
 class A<T> { A.from(Object obj) { } }
 main() {
-  print(new A.from<String>([]));
+  print(A.from<String>([]));
 }
     ''');
     createProject();
     EditDartfixResult result = await performFix();
     expect(result.suggestions, hasLength(1));
-    expectSuggestion(result.suggestions[0], 'type arguments', 65, 8);
+    expectSuggestion(result.suggestions[0], 'type arguments', 61, 8);
     expectEdits(result.edits, '''
 class A<T> { A.from(Object obj) { } }
 main() {
-  print(new A<String>.from([]));
+  print(A<String>.from([]));
 }
     ''');
   }
