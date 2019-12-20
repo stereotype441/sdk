@@ -10,6 +10,7 @@ import 'package:nnbd_migration/instrumentation.dart';
 import 'package:nnbd_migration/nnbd_migration.dart';
 import 'package:nnbd_migration/src/decorated_class_hierarchy.dart';
 import 'package:nnbd_migration/src/edge_builder.dart';
+import 'package:nnbd_migration/src/fix_builder.dart';
 import 'package:nnbd_migration/src/node_builder.dart';
 import 'package:nnbd_migration/src/nullability_node.dart';
 import 'package:nnbd_migration/src/potential_modification.dart';
@@ -29,6 +30,8 @@ class NullabilityMigrationImpl implements NullabilityMigration {
 
   DecoratedClassHierarchy _decoratedClassHierarchy;
 
+  bool _propagated = false;
+
   /// Prepares to perform nullability migration.
   ///
   /// If [permissive] is `true`, exception handling logic will try to proceed
@@ -46,21 +49,18 @@ class NullabilityMigrationImpl implements NullabilityMigration {
     _instrumentation?.immutableNodes(_graph.never, _graph.always);
   }
 
-  void finish() {
-    _graph.propagate();
-    if (_graph.unsatisfiedSubstitutions.isNotEmpty) {
-      // TODO(paulberry): for now we just ignore unsatisfied substitutions, to
-      // work around https://github.com/dart-lang/sdk/issues/38257
-      // throw new UnimplementedError('Need to report unsatisfied substitutions');
+  void finalizeInput(ResolvedUnitResult result) {
+    if (!_propagated) {
+      _propagated = true;
+      _graph.propagate();
     }
-    // TODO(paulberry): it would be nice to report on unsatisfied edges as well,
-    // however, since every `!` we add has an unsatisfied edge associated with
-    // it, we can't report on every unsatisfied edge.  We need to figure out a
-    // way to report unsatisfied edges that isn't too overwhelming.
-    if (_variables != null) {
-      broadcast(_variables, listener, _instrumentation);
-    }
+    var unit = result.unit;
+    unit.accept(
+        throw UnimplementedError('TODO(paulberry): construct $FixBuilder'));
   }
+
+  /// TODO(paulberry): eliminate?
+  void finish() {}
 
   void prepareInput(ResolvedUnitResult result) {
     if (_variables == null) {
@@ -87,6 +87,7 @@ class NullabilityMigrationImpl implements NullabilityMigration {
         instrumentation: _instrumentation));
   }
 
+  /// TODO(paulberry): eliminate?
   @visibleForTesting
   static void broadcast(
       Variables variables,

@@ -30,8 +30,9 @@ class _ProvisionalApiTest extends _ProvisionalApiTestBase
 abstract class _ProvisionalApiTestBase extends AbstractContextTest {
   bool get _usePermissiveMode;
 
-  /// Hook invoked after calling `prepareInput` on each input.
-  void _afterPrepare() {}
+  /// Hook invoked after calling `prepareInput` on each input, and again after
+  /// calling `_processInput` on each input.
+  void _betweenStages() {}
 
   /// Verifies that migration of the files in [input] produces the output in
   /// [expectedOutput].
@@ -46,9 +47,13 @@ abstract class _ProvisionalApiTestBase extends AbstractContextTest {
     for (var path in input.keys) {
       migration.prepareInput(await session.getResolvedUnit(path));
     }
-    _afterPrepare();
+    _betweenStages();
     for (var path in input.keys) {
       migration.processInput(await session.getResolvedUnit(path));
+    }
+    _betweenStages();
+    for (var path in input.keys) {
+      migration.finalizeInput(await session.getResolvedUnit(path));
     }
     migration.finish();
     var sourceEdits = <String, List<SourceEdit>>{};
@@ -3566,7 +3571,7 @@ class _ProvisionalApiTestWithReset extends _ProvisionalApiTestBase
   bool get _usePermissiveMode => false;
 
   @override
-  void _afterPrepare() {
+  void _betweenStages() {
     driver.resetUriResolution();
   }
 }
