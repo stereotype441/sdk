@@ -2177,15 +2177,13 @@ void _f(bool/*?*/ x, bool/*?*/ y) {
   _FixBuilder _createFixBuilder(AstNode scope) {
     var unit = scope.thisOrAncestorOfType<CompilationUnit>();
     var definingLibrary = unit.declaredElement.library;
-    return _FixBuilder(scope, unit, testSource, decoratedClassHierarchy,
-        typeProvider, typeSystem, variables, definingLibrary);
+    return _FixBuilder(scope, testSource, decoratedClassHierarchy, typeProvider,
+        typeSystem, variables, definingLibrary);
   }
 }
 
 class _FixBuilder extends FixBuilder {
   final AstNode scope;
-
-  final CompilationUnit unit;
 
   final Map<AstNode, NodeChange> changes = {};
 
@@ -2193,7 +2191,6 @@ class _FixBuilder extends FixBuilder {
 
   _FixBuilder(
       this.scope,
-      this.unit,
       Source source,
       DecoratedClassHierarchy decoratedClassHierarchy,
       TypeProvider typeProvider,
