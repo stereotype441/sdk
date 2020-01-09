@@ -688,6 +688,19 @@ enum _RemovalStyle {
   spaceComment,
 }
 
+class _RemoveEditPlan extends EditPlan {
+  _RemoveEditPlan(AstNode sourceNode) : super._(sourceNode);
+
+  @override
+  EditPlan _incorporateAncestors(AstNode limit) {
+    var parent = sourceNode.parent;
+    if (!identical(parent, limit) && parent is Block) {
+      return _ProvisionalParenEditPlan(parent, this);
+    }
+    return this;
+  }
+}
+
 /// Implementation of [EditPlan] underlying simple cases where no computation
 /// needs to be deferred.
 class _SimpleEditPlan extends NodeProducingEditPlan {
