@@ -19,8 +19,8 @@ class AddRequiredKeyword extends _NestableChange {
   @override
   EditPlan apply(AstNode node, FixAggregator aggregator) {
     var innerPlan = _inner.apply(node, aggregator);
-    return aggregator.planner
-        .surround(innerPlan as NodeProducingEditPlan, prefix: [const InsertText('required ')]);
+    return aggregator.planner.surround(innerPlan as NodeProducingEditPlan,
+        prefix: [const InsertText('required ')]);
   }
 }
 
@@ -115,8 +115,8 @@ class MakeNullable extends _NestableChange {
   @override
   EditPlan apply(AstNode node, FixAggregator aggregator) {
     var innerPlan = _inner.apply(node, aggregator);
-    return aggregator.planner
-        .surround(innerPlan as NodeProducingEditPlan, suffix: [const InsertText('?')]);
+    return aggregator.planner.surround(innerPlan as NodeProducingEditPlan,
+        suffix: [const InsertText('?')]);
   }
 }
 

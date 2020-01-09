@@ -109,62 +109,9 @@ abstract class EditPlan {
   ///
   /// This method is used when composing and finalizing plans, to ensure that
   /// parentheses are removed when they are no longer needed.
-  /// 
+  ///
   /// TODO(paulberry): consider changing to "incorporate parent"
   NodeProducingEditPlan _incorporateParentIfPresent(AstNode limit);
-}
-
-/// Specialization of [EditPlan] for the situation where the text being produced
-/// represents a single expression (i.e. an expression, statement, class
-/// declaration, etc.)
-abstract class NodeProducingEditPlan extends EditPlan {
-  NodeProducingEditPlan._(AstNode sourceNode) : super._(sourceNode);
-
-  /// Determines whether the text produced by this [EditPlan] would need
-  /// parentheses if it were to be used as a replacement for its [sourceNode].
-  ///
-  /// If this [EditPlan] would produce an expression that ends in a cascade, it
-  /// will be necessary to search the [sourceNode]'s ancestors to see if any of
-  /// them represents a cascade section (and hence, parentheses are required).
-  /// If a non-null value is provided for [cascadeSearchLimit], it is the most
-  /// distant ancestor that will be searched.
-  @visibleForTesting
-  bool parensNeededFromContext(AstNode cascadeSearchLimit) {
-    if (sourceNode is! Expression) return false;
-    var parent = sourceNode.parent;
-    return parent == null
-        ? false
-        : parent
-        .accept(_ParensNeededFromContextVisitor(this, cascadeSearchLimit));
-  }
-
-  /// If the result of executing this [EditPlan] will be an expression,
-  /// indicates whether the expression will end in an unparenthesized cascade.
-  @visibleForTesting
-  bool get endsInCascade;
-
-  /// Computes the necessary set of [changes] for this [EditPlan], either
-  /// including or not including parentheses depending on the value of [parens].
-  ///
-  /// An [EditPlan] for which [_getChanges] has been called is considered to be
-  /// finalized.
-  Map<int, List<AtomicEdit>> _getChanges(bool parens);
-
-  /// Determines if the text that would be produced by [EditPlan] needs to be
-  /// surrounded by parens, based on the context in which it will be used.
-  bool _parensNeeded({@required Precedence threshold,
-    bool associative = false,
-    bool allowCascade = false});
-
-  @override
-  NodeProducingEditPlan _incorporateParentIfPresent(AstNode limit) {
-    var parent = sourceNode.parent;
-    if (!identical(parent, limit) && parent is ParenthesizedExpression) {
-      return _ProvisionalParenEditPlan(parent, this);
-    } else {
-      return this;
-    }
-  }
 }
 
 /// Factory class for creating [EditPlan]s.
@@ -188,7 +135,8 @@ class EditPlanner {
   /// the newly created plan is finalized), so it should not be re-used by the
   /// caller.
   NodeProducingEditPlan extract(AstNode sourceNode, EditPlan innerPlan) {
-    return _ExtractEditPlan(sourceNode, innerPlan._incorporateParentIfPresent(sourceNode), this);
+    return _ExtractEditPlan(
+        sourceNode, innerPlan._incorporateParentIfPresent(sourceNode), this);
   }
 
   /// Creates a new edit plan that makes no changes to [node], but may make
@@ -231,12 +179,12 @@ class EditPlanner {
   /// determined by [innerPlan]).
   NodeProducingEditPlan surround(NodeProducingEditPlan innerPlan,
       {List<InsertText> prefix,
-        List<InsertText> suffix,
-        Precedence outerPrecedence = Precedence.primary,
-        Precedence innerPrecedence = Precedence.none,
-        bool associative = false,
-        bool allowCascade = false,
-        bool endsInCascade = false}) {
+      List<InsertText> suffix,
+      Precedence outerPrecedence = Precedence.primary,
+      Precedence innerPrecedence = Precedence.none,
+      bool associative = false,
+      bool allowCascade = false,
+      bool endsInCascade = false}) {
     var parensNeeded = innerPlan._parensNeeded(
         threshold: innerPrecedence,
         associative: associative,
@@ -276,6 +224,60 @@ class InsertText extends AtomicEdit {
   String toString() => 'InsertText(${json.encode(replacement)})';
 }
 
+/// Specialization of [EditPlan] for the situation where the text being produced
+/// represents a single expression (i.e. an expression, statement, class
+/// declaration, etc.)
+abstract class NodeProducingEditPlan extends EditPlan {
+  NodeProducingEditPlan._(AstNode sourceNode) : super._(sourceNode);
+
+  /// If the result of executing this [EditPlan] will be an expression,
+  /// indicates whether the expression will end in an unparenthesized cascade.
+  @visibleForTesting
+  bool get endsInCascade;
+
+  /// Determines whether the text produced by this [EditPlan] would need
+  /// parentheses if it were to be used as a replacement for its [sourceNode].
+  ///
+  /// If this [EditPlan] would produce an expression that ends in a cascade, it
+  /// will be necessary to search the [sourceNode]'s ancestors to see if any of
+  /// them represents a cascade section (and hence, parentheses are required).
+  /// If a non-null value is provided for [cascadeSearchLimit], it is the most
+  /// distant ancestor that will be searched.
+  @visibleForTesting
+  bool parensNeededFromContext(AstNode cascadeSearchLimit) {
+    if (sourceNode is! Expression) return false;
+    var parent = sourceNode.parent;
+    return parent == null
+        ? false
+        : parent
+            .accept(_ParensNeededFromContextVisitor(this, cascadeSearchLimit));
+  }
+
+  /// Computes the necessary set of [changes] for this [EditPlan], either
+  /// including or not including parentheses depending on the value of [parens].
+  ///
+  /// An [EditPlan] for which [_getChanges] has been called is considered to be
+  /// finalized.
+  Map<int, List<AtomicEdit>> _getChanges(bool parens);
+
+  @override
+  NodeProducingEditPlan _incorporateParentIfPresent(AstNode limit) {
+    var parent = sourceNode.parent;
+    if (!identical(parent, limit) && parent is ParenthesizedExpression) {
+      return _ProvisionalParenEditPlan(parent, this);
+    } else {
+      return this;
+    }
+  }
+
+  /// Determines if the text that would be produced by [EditPlan] needs to be
+  /// surrounded by parens, based on the context in which it will be used.
+  bool _parensNeeded(
+      {@required Precedence threshold,
+      bool associative = false,
+      bool allowCascade = false});
+}
+
 /// Visitor that determines whether a given [AstNode] ends in a cascade.
 class _EndsInCascadeVisitor extends UnifyingAstVisitor<void> {
   bool endsInCascade = false;
@@ -304,7 +306,8 @@ class _EndsInCascadeVisitor extends UnifyingAstVisitor<void> {
 class _ExtractEditPlan extends _NestedEditPlan {
   final EditPlanner _planner;
 
-  _ExtractEditPlan(AstNode sourceNode, NodeProducingEditPlan innerPlan, this._planner)
+  _ExtractEditPlan(
+      AstNode sourceNode, NodeProducingEditPlan innerPlan, this._planner)
       : super(sourceNode, innerPlan);
 
   @override
@@ -617,7 +620,8 @@ class _PassThroughEditPlan extends _SimpleEditPlan {
         }
       }
       changes += incorporatedInnerPlan._getChanges(parensNeeded);
-      if (endsInCascade == null && incorporatedInnerPlan.sourceNode.end == node.end) {
+      if (endsInCascade == null &&
+          incorporatedInnerPlan.sourceNode.end == node.end) {
         endsInCascade = !parensNeeded && incorporatedInnerPlan.endsInCascade;
       }
     }
@@ -656,7 +660,8 @@ class _ProvisionalParenEditPlan extends _NestedEditPlan {
   /// Caller should not re-use [innerPlan] after this call--it (and the data
   /// structures it points to) may be incorporated into this edit plan and later
   /// modified.
-  _ProvisionalParenEditPlan(ParenthesizedExpression node, NodeProducingEditPlan innerPlan)
+  _ProvisionalParenEditPlan(
+      ParenthesizedExpression node, NodeProducingEditPlan innerPlan)
       : super(node, innerPlan);
 
   @override
