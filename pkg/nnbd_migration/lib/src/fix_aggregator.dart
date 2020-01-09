@@ -17,10 +17,10 @@ class AddRequiredKeyword extends _NestableChange {
       : super(inner);
 
   @override
-  NodeProducingEditPlan apply(AstNode node, FixAggregator aggregator) {
+  EditPlan apply(AstNode node, FixAggregator aggregator) {
     var innerPlan = _inner.apply(node, aggregator);
     return aggregator.planner
-        .surround(innerPlan as NodeProducingEditPlan, prefix: [const InsertText('required ')]);
+        .surround(innerPlan, prefix: [const InsertText('required ')]);
   }
 }
 
@@ -32,7 +32,7 @@ class FixAggregator extends UnifyingAstVisitor<void> {
   final Map<AstNode, NodeChange> _changes;
 
   /// The set of [EditPlan]s being accumulated.
-  List<NodeProducingEditPlan> _plans = [];
+  List<EditPlan> _plans = [];
 
   final EditPlanner planner;
 
@@ -40,7 +40,7 @@ class FixAggregator extends UnifyingAstVisitor<void> {
 
   /// Gathers all the changes to nodes descended from [node] into a single
   /// [EditPlan].
-  NodeProducingEditPlan innerPlanForNode(AstNode node) {
+  EditPlan innerPlanForNode(AstNode node) {
     var previousPlans = _plans;
     try {
       _plans = [];
@@ -94,7 +94,7 @@ class IntroduceAs extends _NestableChange {
       : super(inner);
 
   @override
-  NodeProducingEditPlan apply(AstNode node, FixAggregator aggregator) {
+  EditPlan apply(AstNode node, FixAggregator aggregator) {
     var innerPlan = _inner.apply(node, aggregator);
     return aggregator.planner.surround(innerPlan,
         suffix: [InsertText(' as $type')],
@@ -112,7 +112,7 @@ class MakeNullable extends _NestableChange {
   const MakeNullable([NodeChange inner = const NoChange()]) : super(inner);
 
   @override
-  NodeProducingEditPlan apply(AstNode node, FixAggregator aggregator) {
+  EditPlan apply(AstNode node, FixAggregator aggregator) {
     var innerPlan = _inner.apply(node, aggregator);
     return aggregator.planner
         .surround(innerPlan, suffix: [const InsertText('?')]);
@@ -126,7 +126,7 @@ class NoChange extends NodeChange {
   const NoChange();
 
   @override
-  NodeProducingEditPlan apply(AstNode node, FixAggregator aggregator) {
+  EditPlan apply(AstNode node, FixAggregator aggregator) {
     return aggregator.innerPlanForNode(node);
   }
 }
@@ -145,7 +145,7 @@ abstract class NodeChange {
   /// below them (e.g. dropping an unnecessary cast), so those changes need to
   /// be able to call the appropriate [aggregator] methods just on the nodes
   /// they need.
-  NodeProducingEditPlan apply(AstNode node, FixAggregator aggregator);
+  EditPlan apply(AstNode node, FixAggregator aggregator);
 }
 
 /// Implementation of [NodeChange] representing the addition of a null check to
