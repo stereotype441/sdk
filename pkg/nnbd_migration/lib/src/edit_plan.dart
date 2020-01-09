@@ -93,9 +93,15 @@ abstract class EditPlan {
     return changes;
   }
 
-  /// If the [sourceNode]'s parent is a [ParenthesizedExpression] returns a
-  /// [_ProvisionalParenEditPlan] which will keep or discard the enclosing
-  /// parentheses as necessary based on precedence.  Otherwise, returns this.
+  /// Returns a new [EditPlan] that replicates this [EditPlan], but incorporates
+  /// information obtained from any ancestors of [sourceNode].  For example, if
+  /// this [EditPlan] would produce an expression that might or might not need
+  /// parentheses, and the parent of [sourceNode] is a
+  /// [ParenthesizedExpression], then an [EditPlan] is produced that will either
+  /// preserve the existing parentheses, or remove them, as appropriate.
+  ///
+  /// May return `this`, if no information need to be incorporated from the
+  /// parent.
   ///
   /// If [limit] is provided, and it is the same as [sourceNode]'s parent, then
   /// the parent is ignored.  This is used to avoid trying to remove parentheses
@@ -103,11 +109,14 @@ abstract class EditPlan {
   ///
   /// This method is used when composing and finalizing plans, to ensure that
   /// parentheses are removed when they are no longer needed.
-  ///
-  /// TODO(paulberry): docs out of date
+  /// 
+  /// TODO(paulberry): consider changing to "incorporate parent"
   NodeProducingEditPlan _incorporateParentIfPresent(AstNode limit);
 }
 
+/// Specialization of [EditPlan] for the situation where the text being produced
+/// represents a single expression (i.e. an expression, statement, class
+/// declaration, etc.)
 abstract class NodeProducingEditPlan extends EditPlan {
   NodeProducingEditPlan._(AstNode sourceNode) : super._(sourceNode);
 
