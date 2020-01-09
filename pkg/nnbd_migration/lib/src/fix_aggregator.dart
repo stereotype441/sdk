@@ -20,7 +20,7 @@ class AddRequiredKeyword extends _NestableChange {
   EditPlan apply(AstNode node, FixAggregator aggregator) {
     var innerPlan = _inner.apply(node, aggregator);
     return aggregator.planner
-        .surround(innerPlan, prefix: [const InsertText('required ')]);
+        .surround(innerPlan as NodeProducingEditPlan, prefix: [const InsertText('required ')]);
   }
 }
 
@@ -96,7 +96,8 @@ class IntroduceAs extends _NestableChange {
   @override
   EditPlan apply(AstNode node, FixAggregator aggregator) {
     var innerPlan = _inner.apply(node, aggregator);
-    return aggregator.planner.surround(innerPlan,
+    // TODO(paulberry): I don't like these casts.
+    return aggregator.planner.surround(innerPlan as NodeProducingEditPlan,
         suffix: [InsertText(' as $type')],
         outerPrecedence: Precedence.relational,
         innerPrecedence: Precedence.relational);
@@ -115,7 +116,7 @@ class MakeNullable extends _NestableChange {
   EditPlan apply(AstNode node, FixAggregator aggregator) {
     var innerPlan = _inner.apply(node, aggregator);
     return aggregator.planner
-        .surround(innerPlan, suffix: [const InsertText('?')]);
+        .surround(innerPlan as NodeProducingEditPlan, suffix: [const InsertText('?')]);
   }
 }
 
@@ -159,7 +160,7 @@ class NullCheck extends _NestableChange {
   @override
   EditPlan apply(AstNode node, FixAggregator aggregator) {
     var innerPlan = _inner.apply(node, aggregator);
-    return aggregator.planner.surround(innerPlan,
+    return aggregator.planner.surround(innerPlan as NodeProducingEditPlan,
         suffix: [const InsertText('!')],
         outerPrecedence: Precedence.postfix,
         innerPrecedence: Precedence.postfix,

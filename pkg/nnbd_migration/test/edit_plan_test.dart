@@ -34,7 +34,7 @@ class EditPlanTest extends AbstractSingleUnitTest {
     expect(plan.finalize().applyTo(code), expected);
   }
 
-  EditPlan extract(AstNode inner, AstNode outer) =>
+  NodeProducingEditPlan extract(AstNode inner, AstNode outer) =>
       planner.extract(outer, planner.passThrough(inner));
 
   Future<void> test_cascadeSearchLimit() async {
