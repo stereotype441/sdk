@@ -77,7 +77,7 @@ abstract class EditPlan {
   /// Finalizing an [EditPlan] is a destructive operation; it should not be used
   /// again after it is finalized.
   Map<int, List<AtomicEdit>> finalize() {
-    var plan = _incorporateParentIfPresent(null);
+    var plan = _incorporateAncestors(null);
     return plan._getChanges(plan.parensNeededFromContext(null));
   }
 
@@ -93,25 +93,22 @@ abstract class EditPlan {
     return changes;
   }
 
-  /// Returns a new [EditPlan] that replicates this [EditPlan], but incorporates
-  /// information obtained from any ancestors of [sourceNode].  For example, if
-  /// this [EditPlan] would produce an expression that might or might not need
-  /// parentheses, and the parent of [sourceNode] is a
-  /// [ParenthesizedExpression], then an [EditPlan] is produced that will either
-  /// preserve the existing parentheses, or remove them, as appropriate.
+  /// Returns a new [EditPlan] that replicates this [EditPlan], but may
+  /// incorporate relevant information obtained from any ancestors of
+  /// [sourceNode].  For example, if this [EditPlan] would produce an expression
+  /// that might or might not need parentheses, and the parent of [sourceNode]
+  /// is a [ParenthesizedExpression], then an [EditPlan] is produced that will
+  /// either preserve the existing parentheses, or remove them, as appropriate.
   ///
-  /// May return `this`, if no information need to be incorporated from the
+  /// May return `this`, if no information needs to be incorporated from the
   /// parent.
   ///
-  /// If [limit] is provided, and it is the same as [sourceNode]'s parent, then
-  /// the parent is ignored.  This is used to avoid trying to remove parentheses
-  /// twice.
+  /// If [limit] is provided, then only ancestors below the level of [limit] are
+  /// considered.  This is used to avoid trying to remove parentheses twice.
   ///
   /// This method is used when composing and finalizing plans, to ensure that
   /// parentheses are removed when they are no longer needed.
-  ///
-  /// TODO(paulberry): consider changing to "incorporate parent"
-  NodeProducingEditPlan _incorporateParentIfPresent(AstNode limit);
+  NodeProducingEditPlan _incorporateAncestors(AstNode limit);
 }
 
 /// Factory class for creating [EditPlan]s.
@@ -136,7 +133,7 @@ class EditPlanner {
   /// caller.
   NodeProducingEditPlan extract(AstNode sourceNode, EditPlan innerPlan) {
     return _ExtractEditPlan(
-        sourceNode, innerPlan._incorporateParentIfPresent(sourceNode), this);
+        sourceNode, innerPlan._incorporateAncestors(sourceNode), this);
   }
 
   /// Creates a new edit plan that makes no changes to [node], but may make
@@ -261,7 +258,7 @@ abstract class NodeProducingEditPlan extends EditPlan {
   Map<int, List<AtomicEdit>> _getChanges(bool parens);
 
   @override
-  NodeProducingEditPlan _incorporateParentIfPresent(AstNode limit) {
+  NodeProducingEditPlan _incorporateAncestors(AstNode limit) {
     var parent = sourceNode.parent;
     if (!identical(parent, limit) && parent is ParenthesizedExpression) {
       return _ProvisionalParenEditPlan(parent, this);
@@ -609,7 +606,7 @@ class _PassThroughEditPlan extends _SimpleEditPlan {
     bool /*?*/ endsInCascade = node is CascadeExpression ? true : null;
     Map<int, List<AtomicEdit>> changes;
     for (var innerPlan in innerPlans) {
-      var incorporatedInnerPlan = innerPlan._incorporateParentIfPresent(node);
+      var incorporatedInnerPlan = innerPlan._incorporateAncestors(node);
       var parensNeeded = incorporatedInnerPlan.parensNeededFromContext(node);
       assert(_checkParenLogic(incorporatedInnerPlan, parensNeeded));
       if (!parensNeeded && incorporatedInnerPlan is _ProvisionalParenEditPlan) {
