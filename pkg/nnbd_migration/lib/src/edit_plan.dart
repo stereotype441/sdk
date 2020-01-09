@@ -77,7 +77,7 @@ abstract class EditPlan {
   /// Finalizing an [EditPlan] is a destructive operation; it should not be used
   /// again after it is finalized.
   Map<int, List<AtomicEdit>> finalize() {
-    var plan = _incorporateAncestors(null);
+    var plan = _incorporateParent();
     return plan._getChanges(plan.parensNeededFromContext(null));
   }
 
@@ -94,21 +94,18 @@ abstract class EditPlan {
   }
 
   /// Returns a new [EditPlan] that replicates this [EditPlan], but may
-  /// incorporate relevant information obtained from any ancestors of
-  /// [sourceNode].  For example, if this [EditPlan] would produce an expression
-  /// that might or might not need parentheses, and the parent of [sourceNode]
-  /// is a [ParenthesizedExpression], then an [EditPlan] is produced that will
-  /// either preserve the existing parentheses, or remove them, as appropriate.
+  /// incorporate relevant information obtained from the parent of [sourceNode].
+  /// For example, if this [EditPlan] would produce an expression that might or
+  /// might not need parentheses, and the parent of [sourceNode] is a
+  /// [ParenthesizedExpression], then an [EditPlan] is produced that will either
+  /// preserve the existing parentheses, or remove them, as appropriate.
   ///
   /// May return `this`, if no information needs to be incorporated from the
   /// parent.
   ///
-  /// If [limit] is provided, then only ancestors below the level of [limit] are
-  /// considered.  This is used to avoid trying to remove parentheses twice.
-  ///
   /// This method is used when composing and finalizing plans, to ensure that
   /// parentheses are removed when they are no longer needed.
-  NodeProducingEditPlan _incorporateAncestors(AstNode limit);
+  NodeProducingEditPlan _incorporateParent();
 }
 
 /// Factory class for creating [EditPlan]s.
@@ -131,9 +128,12 @@ class EditPlanner {
   /// [innerPlan] will be finalized as a side effect (either immediately or when
   /// the newly created plan is finalized), so it should not be re-used by the
   /// caller.
-  NodeProducingEditPlan extract(AstNode sourceNode, EditPlan innerPlan) {
-    return _ExtractEditPlan(
-        sourceNode, innerPlan._incorporateAncestors(sourceNode), this);
+  NodeProducingEditPlan extract(
+      AstNode sourceNode, NodeProducingEditPlan innerPlan) {
+    if (!identical(innerPlan.sourceNode.parent, sourceNode)) {
+      innerPlan = innerPlan._incorporateParent();
+    }
+    return _ExtractEditPlan(sourceNode, innerPlan, this);
   }
 
   /// Creates a new edit plan that makes no changes to [node], but may make
@@ -258,9 +258,9 @@ abstract class NodeProducingEditPlan extends EditPlan {
   Map<int, List<AtomicEdit>> _getChanges(bool parens);
 
   @override
-  NodeProducingEditPlan _incorporateAncestors(AstNode limit) {
+  NodeProducingEditPlan _incorporateParent() {
     var parent = sourceNode.parent;
-    if (!identical(parent, limit) && parent is ParenthesizedExpression) {
+    if (parent is ParenthesizedExpression) {
       return _ProvisionalParenEditPlan(parent, this);
     } else {
       return this;
@@ -606,20 +606,26 @@ class _PassThroughEditPlan extends _SimpleEditPlan {
     bool /*?*/ endsInCascade = node is CascadeExpression ? true : null;
     Map<int, List<AtomicEdit>> changes;
     for (var innerPlan in innerPlans) {
-      var incorporatedInnerPlan = innerPlan._incorporateAncestors(node);
-      var parensNeeded = incorporatedInnerPlan.parensNeededFromContext(node);
-      assert(_checkParenLogic(incorporatedInnerPlan, parensNeeded));
-      if (!parensNeeded && incorporatedInnerPlan is _ProvisionalParenEditPlan) {
-        var innerInnerPlan = incorporatedInnerPlan.innerPlan;
-        if (innerInnerPlan is _PassThroughEditPlan) {
-          // Input source code had redundant parens, so keep them.
-          parensNeeded = true;
-        }
+      if (!identical(innerPlan.sourceNode.parent, node)) {
+        innerPlan = innerPlan._incorporateParent();
       }
-      changes += incorporatedInnerPlan._getChanges(parensNeeded);
-      if (endsInCascade == null &&
-          incorporatedInnerPlan.sourceNode.end == node.end) {
-        endsInCascade = !parensNeeded && incorporatedInnerPlan.endsInCascade;
+      if (innerPlan is NodeProducingEditPlan) {
+        var parensNeeded = innerPlan.parensNeededFromContext(node);
+        assert(_checkParenLogic(innerPlan, parensNeeded));
+        if (!parensNeeded && innerPlan is _ProvisionalParenEditPlan) {
+          var innerInnerPlan = innerPlan.innerPlan;
+          if (innerInnerPlan is _PassThroughEditPlan) {
+            // Input source code had redundant parens, so keep them.
+            parensNeeded = true;
+          }
+        }
+        changes += innerPlan._getChanges(parensNeeded);
+        if (endsInCascade == null && innerPlan.sourceNode.end == node.end) {
+          endsInCascade = !parensNeeded && innerPlan.endsInCascade;
+        }
+      } else {
+        // TODO(paulberry): handle this case.
+        throw UnimplementedError('Inner plan is not node-producing');
       }
     }
     return _PassThroughEditPlan._(
