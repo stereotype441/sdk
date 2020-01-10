@@ -7,6 +7,7 @@ import 'dart:convert';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/precedence.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
+import 'package:analyzer/source/line_info.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart';
 import 'package:meta/meta.dart';
 
@@ -135,7 +136,11 @@ class EditPlanner {
   /// that is removed.
   final bool removeViaComments;
 
-  EditPlanner({this.removeViaComments = false});
+  final LineInfo lineInfo;
+
+  final String sourceText;
+
+  EditPlanner(this.lineInfo, this.sourceText, {this.removeViaComments = false});
 
   /// Creates a new edit plan that consists of executing [innerPlan], and then
   /// removing from the source code any code that is in [sourceNode] but not in
@@ -237,6 +242,25 @@ class EditPlanner {
             ? innerPlan.endsInCascade && !parensNeeded
             : endsInCascade,
         innerChanges);
+  }
+
+  int _backToLineStart(int offset) {
+    var lineNumber = lineInfo.getLocation(offset).lineNumber;
+    // lineNumber is one-based but lineInfo.lineStarts expects a zero-based
+    // index, so we need `lineInfo.lineStarts[lineNumber - 1]`.
+    int limit = lineInfo.lineStarts[lineNumber - 1];
+    return limit + sourceText.substring(limit, offset).trimRight().length;
+  }
+
+  int _forwardToNextLine(int offset) {
+    int lineNumber = lineInfo.getLocation(offset).lineNumber;
+    // lineNumber is one-based but lineInfo.lineStarts expects a zero-based
+    // index, so `lineInfo.lineStarts[lineNumber]` gives us the beginning of the
+    // next line.
+    int limit = lineNumber < lineInfo.lineStarts.length
+        ? lineInfo.lineStarts[lineNumber]
+        : sourceText.length;
+    return limit - sourceText.substring(offset, limit).trimLeft().length;
   }
 }
 
@@ -638,12 +662,16 @@ class _PassThroughEditPlan extends _SimpleEditPlan {
         assert(identical(toRemove.parent, node));
         // TODO(paulberry): if removing two adjacent statements via deletion,
         // do so cleanly.
-        changes += _removeCode(
-            toRemove.offset,
-            toRemove.end,
-            planner.removeViaComments
-                ? _RemovalStyle.spaceInsideComment
-                : _RemovalStyle.delete);
+
+        int offset = toRemove.offset;
+        int end = toRemove.end;
+        if (planner.removeViaComments) {
+          changes += _removeCode(offset, end, _RemovalStyle.spaceInsideComment);
+        } else {
+          offset = planner._backToLineStart(offset);
+          end = planner._forwardToNextLine(end);
+          changes += _removeCode(offset, end, _RemovalStyle.delete);
+        }
       } else {
         throw UnimplementedError('Unrecognized inner plan type');
       }

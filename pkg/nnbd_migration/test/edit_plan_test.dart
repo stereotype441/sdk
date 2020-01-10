@@ -5,6 +5,7 @@
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/precedence.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
+import 'package:analyzer/source/line_info.dart';
 import 'package:nnbd_migration/src/edit_plan.dart';
 import 'package:test/test.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
@@ -23,7 +24,12 @@ main() {
 class EditPlanTest extends AbstractSingleUnitTest {
   String code;
 
-  var planner = EditPlanner();
+  EditPlanner _planner;
+
+  EditPlanner get planner {
+    if (_planner == null) createPlanner();
+    return _planner;
+  }
 
   Future<void> analyze(String code) async {
     this.code = code;
@@ -32,6 +38,11 @@ class EditPlanTest extends AbstractSingleUnitTest {
 
   void checkPlan(EditPlan plan, String expected) {
     expect(planner.finalize(plan).applyTo(code), expected);
+  }
+
+  void createPlanner({bool removeViaComments: false}) {
+    _planner = EditPlanner(testUnit.lineInfo, code,
+        removeViaComments: removeViaComments);
   }
 
   NodeProducingEditPlan extract(AstNode inner, AstNode outer) =>
@@ -127,22 +138,22 @@ class EditPlanTest extends AbstractSingleUnitTest {
   }
 
   Future<void> test_extract_using_comments_inner() async {
-    planner = EditPlanner(removeViaComments: true);
     await analyze('var x = 1 + 2 * 3;');
+    createPlanner(removeViaComments: true);
     checkPlan(extract(findNode.integerLiteral('2'), findNode.binary('+')),
         'var x = /* 1 + */ 2 /* * 3 */;');
   }
 
   Future<void> test_extract_using_comments_left() async {
-    planner = EditPlanner(removeViaComments: true);
     await analyze('var x = 1 + 2;');
+    createPlanner(removeViaComments: true);
     checkPlan(extract(findNode.integerLiteral('1'), findNode.binary('+')),
         'var x = 1 /* + 2 */;');
   }
 
   Future<void> test_extract_using_comments_right() async {
-    planner = EditPlanner(removeViaComments: true);
     await analyze('var x = 1 + 2;');
+    createPlanner(removeViaComments: true);
     checkPlan(extract(findNode.integerLiteral('2'), findNode.binary('+')),
         'var x = /* 1 + */ 2;');
   }
@@ -158,8 +169,7 @@ class EditPlanTest extends AbstractSingleUnitTest {
         'var x = 0; var y = 0;');
   }
 
-  Future<void> test_remove_statement_comments() async {
-    planner = EditPlanner(removeViaComments: true);
+  Future<void> test_remove_statement() async {
     await analyze('''
 void f() {
   1;
@@ -167,6 +177,23 @@ void f() {
   3;
 }
 ''');
+    checkPlan(planner.remove(findNode.statement('2')), '''
+void f() {
+  1;
+  3;
+}
+''');
+  }
+
+  Future<void> test_remove_statement_comments() async {
+    await analyze('''
+void f() {
+  1;
+  2;
+  3;
+}
+''');
+    createPlanner(removeViaComments: true);
     checkPlan(planner.remove(findNode.statement('2')), '''
 void f() {
   1;
@@ -340,7 +367,7 @@ class EndsInCascadeTest extends AbstractSingleUnitTest {
 class PrecedenceTest extends AbstractSingleUnitTest {
   Future<void> checkPrecedence(String content) async {
     await resolveTestUnit(content);
-    testUnit.accept(_PrecedenceChecker());
+    testUnit.accept(_PrecedenceChecker(testUnit.lineInfo, testCode));
   }
 
   Future<void> test_precedence_as() async {
@@ -453,13 +480,17 @@ g(a, c) => a..b = throw (c..d);
 
   Future<void> test_precedenceChecker_detects_unnecessary_paren() async {
     await resolveTestUnit('var x = (1);');
-    expect(() => testUnit.accept(_PrecedenceChecker()),
+    expect(
+        () => testUnit.accept(_PrecedenceChecker(testUnit.lineInfo, testCode)),
         throwsA(TypeMatcher<TestFailure>()));
   }
 }
 
 class _PrecedenceChecker extends UnifyingAstVisitor<void> {
-  final planner = EditPlanner();
+  final EditPlanner planner;
+
+  _PrecedenceChecker(LineInfo lineInfo, String sourceText)
+      : planner = EditPlanner(lineInfo, sourceText);
 
   @override
   void visitNode(AstNode node) {
