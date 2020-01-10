@@ -158,6 +158,24 @@ class EditPlanTest extends AbstractSingleUnitTest {
         'var x = 0; var y = 0;');
   }
 
+  Future<void> test_remove_statement_comments() async {
+    planner = EditPlanner(removeViaComments: true);
+    await analyze('''
+void f() {
+  1;
+  2;
+  3;
+}
+''');
+    checkPlan(planner.remove(findNode.statement('2')), '''
+void f() {
+  1;
+  /* 2; */
+  3;
+}
+''');
+  }
+
   Future<void> test_surround_allowCascade() async {
     await analyze('f(x) => 1..isEven;');
     checkPlan(
