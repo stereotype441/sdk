@@ -78,7 +78,7 @@ class FixAggregator extends UnifyingAstVisitor<void> {
     } else {
       plan = planner.passThrough(unit, innerPlans: aggregator._plans);
     }
-    return plan.finalize();
+    return planner.finalize(plan);
   }
 }
 

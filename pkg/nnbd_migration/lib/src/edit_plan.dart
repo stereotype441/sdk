@@ -10,6 +10,37 @@ import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart';
 import 'package:meta/meta.dart';
 
+Map<int, List<AtomicEdit>> _removeCode(
+    int offset, int end, _RemovalStyle removalStyle) {
+  if (offset < end) {
+    // TODO(paulberry): handle preexisting comments?
+    switch (removalStyle) {
+      case _RemovalStyle.commentSpace:
+        return {
+          offset: [InsertText('/* ')],
+          end: [InsertText('*/ ')]
+        };
+      case _RemovalStyle.delete:
+        return {
+          offset: [DeleteText(end - offset)]
+        };
+      case _RemovalStyle.spaceComment:
+        return {
+          offset: [InsertText(' /*')],
+          end: [InsertText(' */')]
+        };
+      case _RemovalStyle.spaceInsideComment:
+        return {
+          offset: [InsertText('/* ')],
+          end: [InsertText(' */')]
+        };
+    }
+    throw StateError('Null value for removalStyle');
+  } else {
+    return null;
+  }
+}
+
 /// Abstract base class representing a single atomic change to a source file,
 /// decoupled from the location at which the change is made.  The [EditPlan]
 /// class performs its duties by creating and manipulating [AtomicEdit] objects.
@@ -70,17 +101,6 @@ abstract class EditPlan {
 
   EditPlan._(this.sourceNode);
 
-  /// Converts this [EditPlan] a representation of the concrete edits that need
-  /// to be made to the source file.  These edits may be converted into
-  /// [SourceEdit]s using the extensions [AtomicEditList] and [AtomicEditMap].
-  ///
-  /// Finalizing an [EditPlan] is a destructive operation; it should not be used
-  /// again after it is finalized.
-  Map<int, List<AtomicEdit>> finalize() {
-    var plan = _incorporateParent();
-    return plan._getChanges(plan.parensNeededFromContext(null));
-  }
-
   /// Modifies [changes] to insert parentheses enclosing the [sourceNode].  This
   /// works even if [changes] already includes modifications at the beginning or
   /// end of [sourceNode]--the parentheses are inserted outside of any
@@ -105,7 +125,7 @@ abstract class EditPlan {
   ///
   /// This method is used when composing and finalizing plans, to ensure that
   /// parentheses are removed when they are no longer needed.
-  NodeProducingEditPlan _incorporateParent();
+  NodeProducingEditPlan _incorporateParent(EditPlanner planner);
 }
 
 /// Factory class for creating [EditPlan]s.
@@ -131,9 +151,21 @@ class EditPlanner {
   NodeProducingEditPlan extract(
       AstNode sourceNode, NodeProducingEditPlan innerPlan) {
     if (!identical(innerPlan.sourceNode.parent, sourceNode)) {
-      innerPlan = innerPlan._incorporateParent();
+      innerPlan = innerPlan._incorporateParent(this);
     }
     return _ExtractEditPlan(sourceNode, innerPlan, this);
+  }
+
+  /// Converts [plan] to a representation of the concrete edits that need
+  /// to be made to the source file.  These edits may be converted into
+  /// [SourceEdit]s using the extensions [AtomicEditList] and [AtomicEditMap].
+  ///
+  /// Finalizing an [EditPlan] is a destructive operation; it should not be used
+  /// again after it is finalized.
+  Map<int, List<AtomicEdit>> finalize(EditPlan plan) {
+    var incorporatedPlan = plan._incorporateParent(this);
+    return incorporatedPlan
+        ._getChanges(incorporatedPlan.parensNeededFromContext(null));
   }
 
   /// Creates a new edit plan that makes no changes to [node], but may make
@@ -146,10 +178,14 @@ class EditPlanner {
       {Iterable<EditPlan> innerPlans = const []}) {
     if (node is ParenthesizedExpression) {
       return _ProvisionalParenEditPlan(
-          node, _PassThroughEditPlan(node.expression, innerPlans: innerPlans));
+          node, _PassThroughEditPlan(this, node.expression, innerPlans));
     } else {
-      return _PassThroughEditPlan(node, innerPlans: innerPlans);
+      return _PassThroughEditPlan(this, node, innerPlans);
     }
+  }
+
+  EditPlan remove(AstNode sourceNode) {
+    return _RemoveEditPlan(sourceNode);
   }
 
   /// Creates a new edit plan that consists of executing [innerPlan], and then
@@ -258,7 +294,7 @@ abstract class NodeProducingEditPlan extends EditPlan {
   Map<int, List<AtomicEdit>> _getChanges(bool parens);
 
   @override
-  NodeProducingEditPlan _incorporateParent() {
+  NodeProducingEditPlan _incorporateParent(EditPlanner planner) {
     var parent = sourceNode.parent;
     if (parent is ParenthesizedExpression) {
       return _ProvisionalParenEditPlan(parent, this);
@@ -333,32 +369,6 @@ class _ExtractEditPlan extends _NestedEditPlan {
       changes = _createAddParenChanges(changes);
     }
     return changes;
-  }
-
-  static Map<int, List<AtomicEdit>> _removeCode(
-      int offset, int end, _RemovalStyle removalStyle) {
-    if (offset < end) {
-      // TODO(paulberry): handle preexisting comments?
-      switch (removalStyle) {
-        case _RemovalStyle.commentSpace:
-          return {
-            offset: [InsertText('/* ')],
-            end: [InsertText('*/ ')]
-          };
-        case _RemovalStyle.delete:
-          return {
-            offset: [DeleteText(end - offset)]
-          };
-        case _RemovalStyle.spaceComment:
-          return {
-            offset: [InsertText(' /*')],
-            end: [InsertText(' */')]
-          };
-      }
-      throw StateError('Null value for removalStyle');
-    } else {
-      return null;
-    }
   }
 }
 
@@ -601,13 +611,13 @@ class _ParensNeededFromContextVisitor extends GeneralizingAstVisitor<bool> {
 /// [EditPlan] representing an AstNode that is not to be changed, but may have
 /// some changes applied to some of its descendants.
 class _PassThroughEditPlan extends _SimpleEditPlan {
-  factory _PassThroughEditPlan(AstNode node,
-      {Iterable<EditPlan> innerPlans = const []}) {
+  factory _PassThroughEditPlan(
+      EditPlanner planner, AstNode node, Iterable<EditPlan> innerPlans) {
     bool /*?*/ endsInCascade = node is CascadeExpression ? true : null;
     Map<int, List<AtomicEdit>> changes;
     for (var innerPlan in innerPlans) {
       if (!identical(innerPlan.sourceNode.parent, node)) {
-        innerPlan = innerPlan._incorporateParent();
+        innerPlan = innerPlan._incorporateParent(planner);
       }
       if (innerPlan is NodeProducingEditPlan) {
         var parensNeeded = innerPlan.parensNeededFromContext(node);
@@ -623,9 +633,19 @@ class _PassThroughEditPlan extends _SimpleEditPlan {
         if (endsInCascade == null && innerPlan.sourceNode.end == node.end) {
           endsInCascade = !parensNeeded && innerPlan.endsInCascade;
         }
+      } else if (innerPlan is _RemoveEditPlan) {
+        var toRemove = innerPlan.sourceNode;
+        assert(identical(toRemove.parent, node));
+        // TODO(paulberry): if removing two adjacent statements via deletion,
+        // do so cleanly.
+        changes += _removeCode(
+            toRemove.offset,
+            toRemove.end,
+            planner.removeViaComments
+                ? _RemovalStyle.spaceInsideComment
+                : _RemovalStyle.delete);
       } else {
-        // TODO(paulberry): handle this case.
-        throw UnimplementedError('Inner plan is not node-producing');
+        throw UnimplementedError('Unrecognized inner plan type');
       }
     }
     return _PassThroughEditPlan._(
@@ -692,18 +712,22 @@ enum _RemovalStyle {
   /// Code should be removed by commenting it out.  Inserted comment delimiters
   /// should be a space followed by a comment delimiter (i.e. ` /*` and ` */`).
   spaceComment,
+
+  /// Code should be removed by commenting it out.  Inserted comment delimiters
+  /// should have a space inside the comment.
+  spaceInsideComment,
 }
 
 class _RemoveEditPlan extends EditPlan {
-  _RemoveEditPlan(AstNode sourceNode) : super._(sourceNode);
+  _RemoveEditPlan(AstNode sourceNode) : super._(sourceNode) {
+    // The parent node must be some kind of container from which elements can be
+    // removed.  Currently we only support Block.
+    assert(sourceNode.parent is Block);
+  }
 
   @override
-  EditPlan _incorporateAncestors(AstNode limit) {
-    var parent = sourceNode.parent;
-    if (!identical(parent, limit) && parent is Block) {
-      return _ProvisionalParenEditPlan(parent, this);
-    }
-    return this;
+  NodeProducingEditPlan _incorporateParent(EditPlanner planner) {
+    return _PassThroughEditPlan(planner, sourceNode.parent, [this]);
   }
 }
 
