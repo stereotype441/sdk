@@ -226,6 +226,7 @@ Future<ComputeKernelResult> computeKernel(List<String> args,
     case 'ddc':
       // TODO(jakemac):If `generateKernel` changes to return a summary
       // component, process the component instead.
+      (parsedArgs['enable-experiment'] as List<String>).add('non-nullable');
       target =
           new DevCompilerSummaryTarget(sources, excludeNonSources, targetFlags);
       if (!summaryOnly) {

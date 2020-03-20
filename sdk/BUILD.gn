@@ -303,7 +303,7 @@ foreach(library, _full_sdk_libraries) {
         ":copy_platform_sdk_libraries",
         ":copy_full_sdk_libraries",
       ]
-      source = "lib/$library"
+      source = "../sdk_nnbd/lib/$library"
       dest = "$root_out_dir/dart-sdk/lib/$library"
       ignore_patterns = "*.svn,doc,*.py,*.gypi,*.sh,.gitignore"
     },

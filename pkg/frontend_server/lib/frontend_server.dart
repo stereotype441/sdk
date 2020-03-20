@@ -366,6 +366,13 @@ class FrontendCompiler implements CompilerInterface {
     final String platformKernelDill =
         options['platform'] ?? 'platform_strong.dill';
     final String packagesOption = _options['packages'];
+    final Map<ExperimentalFlag, bool> experimentalFlags =
+        parseExperimentalFlags(
+            parseExperimentalArguments(options['enable-experiment']),
+            onError: (msg) => errors.add(msg));
+    if (options['target'] == 'dartdevc') {
+      experimentalFlags[ExperimentalFlag.nonNullable] = true;
+    }
     final CompilerOptions compilerOptions = CompilerOptions()
       ..sdkRoot = sdkRoot
       ..fileSystem = _fileSystem
@@ -374,9 +381,7 @@ class FrontendCompiler implements CompilerInterface {
       ..sdkSummary = sdkRoot.resolve(platformKernelDill)
       ..verbose = options['verbose']
       ..embedSourceText = options['embed-source-text']
-      ..experimentalFlags = parseExperimentalFlags(
-          parseExperimentalArguments(options['enable-experiment']),
-          onError: (msg) => errors.add(msg))
+      ..experimentalFlags = experimentalFlags
       ..nnbdMode = options['null-safety'] ? NnbdMode.Strong : NnbdMode.Weak
       ..onDiagnostic = (DiagnosticMessage message) {
         bool printMessage;

@@ -249,6 +249,9 @@ Future<CompilerResult> _compile(List<String> args,
 
   var experiments = fe.parseExperimentalFlags(options.experiments,
       onError: stderr.writeln, onWarning: print);
+  if (experiments[fe.ExperimentalFlag.nonNullable] != true) {
+    throw 'Null safety not configured in $experiments';
+  }
 
   var trackWidgetCreation =
       argResults['track-widget-creation'] as bool ?? false;

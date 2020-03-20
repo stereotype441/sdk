@@ -99,7 +99,7 @@ class SharedCompilerOptions {
       this.replCompile = false,
       this.summaryModules = const {},
       this.moduleFormats = const [],
-      this.experiments = const {},
+      this.experiments = const {'non-nullable': true},
       this.moduleName});
 
   SharedCompilerOptions.fromArguments(ArgResults args,
@@ -110,7 +110,8 @@ class SharedCompilerOptions {
             summarizeApi: args['summarize'] as bool,
             enableAsserts: args['enable-asserts'] as bool,
             experiments: parseExperimentalArguments(
-                args['enable-experiment'] as List<String>),
+                args['enable-experiment'] as List<String>)
+              ..addAll({'non-nullable': true}),
             summaryModules: _parseCustomSummaryModules(
                 args['summary'] as List<String>, moduleRoot, summaryExtension),
             moduleFormats: parseModuleFormatOption(args),
@@ -176,7 +177,10 @@ class SharedCompilerOptions {
   }
 
   // TODO(nshahan) Cleanup when NNBD graduates experimental status.
-  bool get enableNullSafety => experiments['non-nullable'] ?? false;
+  bool get enableNullSafety {
+    if (experiments['non-nullable'] != true) throw 'Null Safety not configured';
+    return true;
+  }
 }
 
 /// Finds explicit module names of the form `path=name` in [summaryPaths],
