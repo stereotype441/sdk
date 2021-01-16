@@ -16,6 +16,8 @@
 *   **Breaking Change** [#44660][]: Fixed an implementation bug where `this`
     would sometimes undergo type promotion in extensions.
 
+[#44660]: https://github.com/dart-lang/sdk/issues/44660
+
 ### Core libraries
 
 #### `dart:collection`
