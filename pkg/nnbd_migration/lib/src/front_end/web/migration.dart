@@ -83,7 +83,7 @@ void main() {
     migrateUnitStatusIcon.onClick.listen((MouseEvent event) {
       var unitPath = unitName.innerText;
       var unitNavItem = document
-          .querySelector('.nav-panel [data-name*=${json.encode(unitPath)}]')
+          .querySelector('.nav-panel [data-name*="${Css.escape(unitPath)}"]')
           .parentNode as Element;
       var statusIcon = unitNavItem.querySelector('.status-icon');
       var entity = navigationTree.find(unitPath);
@@ -826,7 +826,7 @@ void updateParentIcons(Element element, NavigationTreeNode entity) {
 void updateSubtreeIcons(Element element, NavigationTreeDirectoryNode entity) {
   for (var child in entity.subtree) {
     var childNode =
-        element.querySelector('[data-name*=${json.encode(child.path)}]');
+        element.querySelector('[data-name*="${Css.escape(child.path)}"]');
     if (child is NavigationTreeDirectoryNode) {
       updateSubtreeIcons(childNode, child);
       var childIcon = childNode.querySelector(':scope > .status-icon');
