@@ -48,7 +48,7 @@ vars = {
   "co19_2_rev": "cf6eed0535e45413672bb5bb6e65df9f59846372",
 
   # The internal benchmarks to use. See go/dart-benchmarks-internal
-  "benchmarks_internal_rev": "354c978979c57e4a76f62e22cf644ed0804f4421",
+  "benchmarks_internal_rev": "076df10d9b77af337f2d8029725787155eb1cd52",
   "checkout_benchmarks_internal": False,
 
   # Checkout Android dependencies only on Mac and Linux.
@@ -98,7 +98,7 @@ vars = {
   #     and land the review.
   #
   # For more details, see https://github.com/dart-lang/sdk/issues/30164
-  "dart_style_tag": "1.3.11",  # Please see the note above before updating.
+  "dart_style_tag": "a1d65dd9c4b83c9702ba409465879b94caeb04ea",
 
   "chromedriver_tag": "83.0.4103.39",
   "dartdoc_rev" : "174021f3d76c2a8500b54977c80f32c5bbc099f1",
@@ -113,7 +113,7 @@ vars = {
   "http_retry_rev": "845771af7bb5ab38ab740ce4a31f3b0c7680302b",
   "http_rev": "d5c678cd63c3e9c1d779a09acfa95b7e3af84665",
   "http_throttle_tag" : "1.0.2",
-  "icu_rev" : "79326efe26e5440f530963704c3c0ff965b3a4ac",
+  "icu_rev" : "81d656878ec611cb0b42d52c82e9dae93920d9ba",
   "idl_parser_rev": "5fb1ebf49d235b5a70c9f49047e83b0654031eb7",
   "intl_tag": "0.17.0-nullsafety",
   "jinja2_rev": "2222b31554f03e62600cd7e383376a7c187967a1",
@@ -155,8 +155,8 @@ vars = {
   "stream_channel_tag": "d7251e61253ec389ee6e045ee1042311bced8f1d",
   "string_scanner_rev": "1b63e6e5db5933d7be0a45da6e1129fe00262734",
   "sync_http_rev": "b59c134f2e34d12acac110d4f17f83e5a7db4330",
-  "test_descriptor_tag": "1.1.1",
-  "test_process_tag": "1.0.3",
+  "test_descriptor_tag": "2.0.0",
+  "test_process_tag": "2.0.0",
   "term_glyph_rev": "6a0f9b6fb645ba75e7a00a4e20072678327a0347",
   "test_reflective_loader_rev": "54e930a11c372683792e22bddad79197728c91ce",
   "test_rev": "e673623f45d75ccec750d35271b0b4d1423e9fac",
