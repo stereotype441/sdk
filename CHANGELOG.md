@@ -2,6 +2,19 @@
 
 ### Language
 
+- **Breaking Change** [#49687][]: Don't delegate foreign private names to
+  `noSuchMethod`.  If a concrete class implements an interface containing a name
+  that's private to a different library, any attempt to invoke that name will
+  result in an exception getting thrown.  Previously, such attempts would result
+  in the call being diverted to noSuchMethod.
+
+  This change closes a loophole in Dart's privacy system, and paves the way for
+  a future implementation of promotion for private final fields (see
+  [#2020][]).
+
+[#49687]: https://github.com/dart-lang/sdk/issues/49687
+[#2020]: https://github.com/dart-lang/language/issues/2020
+
 ### Libraries
 
 #### `dart:convert`
