@@ -1,0 +1,48 @@
+name: linter
+
+on:
+  schedule:
+    # “At 00:00 (UTC) on Sunday.”
+    - cron: '0 0 * * 0'
+  pull_request:
+  push:
+    branches:
+      - main
+
+env:
+  PUB_ENVIRONMENT: bot.github
+
+permissions: read-all
+
+jobs:
+  build:
+    permissions:
+      checks: write  # for coverallsapp/github-action to create new checks
+    name: ${{ matrix.linter-bot }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        linter-bot:
+          - main
+          - coverage
+          - benchmark
+
+    steps:
+      - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab
+      - uses: dart-lang/setup-dart@d6a63dab3335f427404425de0fbfed4686d93c4f
+        with:
+          sdk: dev
+
+      - run: dart pub get
+
+      - name: tool/bot.sh
+        env:
+          LINTER_BOT: ${{ matrix.linter-bot }}
+        run: ./tool/bot.sh
+      - name: upload coverage
+        if: matrix.linter-bot == 'coverage'
+        uses: coverallsapp/github-action@f350da2c033043742f89e8c0b7b5145a1616da6d
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: var/lcov.info

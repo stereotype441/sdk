@@ -1,0 +1,17 @@
+name: "labeler"
+
+on:
+  - pull_request_target
+
+permissions: read-all
+
+jobs:
+  triage:
+    permissions:
+      contents: read
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/labeler@0776a679364a9a16110aac8d0f40f5e11009e327
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
